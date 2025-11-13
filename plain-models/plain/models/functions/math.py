@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from plain.models.expressions import Func, Value
@@ -45,7 +46,7 @@ class ATan2(NumericOutputFieldMixin, Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         if not getattr(
             connection.ops, "spatialite", False
         ) or connection.ops.spatial_version >= (5, 0, 0):  # type: ignore[attr-defined]
@@ -111,7 +112,7 @@ class Log(FixDecimalInputMixin, NumericOutputFieldMixin, Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         if not getattr(connection.ops, "spatialite", False):
             return self.as_sql(compiler, connection)
         # This function is usually Log(b, x) returning the logarithm of x to
@@ -150,7 +151,7 @@ class Random(NumericOutputFieldMixin, Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return super().as_sql(compiler, connection, function="RAND", **extra_context)
 
     def as_sqlite(
@@ -158,7 +159,7 @@ class Random(NumericOutputFieldMixin, Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return super().as_sql(compiler, connection, function="RAND", **extra_context)
 
     def get_group_by_cols(self) -> list[Any]:
@@ -178,7 +179,7 @@ class Round(FixDecimalInputMixin, Transform):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, Sequence[Any]]:
         precision = self.get_source_expressions()[1]
         if isinstance(precision, Value) and precision.value < 0:
             raise ValueError("SQLite does not support negative precision.")

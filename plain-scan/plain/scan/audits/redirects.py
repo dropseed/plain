@@ -23,11 +23,14 @@ class RedirectsAudit(Audit):
         """Check redirect configuration and hygiene."""
         response = scanner.fetch()
 
+        # response.url should always be set after a successful fetch
+        final_url = str(response.url) if response.url else scanner.url
+
         # Check if any redirects occurred
         if not response.history:
             # No redirects - but we still run checks on the final URL
             checks = [
-                self._check_final_url_https(scanner.url, response.url),
+                self._check_final_url_https(scanner.url, final_url),
                 self._check_trailing_slash_redirect(scanner.url, response),
             ]
 
@@ -43,7 +46,7 @@ class RedirectsAudit(Audit):
         checks = [
             self._check_http_to_https(scanner.url, response),
             self._check_redirect_chain_length(response),
-            self._check_final_url_https(scanner.url, response.url),
+            self._check_final_url_https(scanner.url, final_url),
             self._check_cross_origin_redirects(scanner.url, response),
             self._check_status_codes(response),
             self._check_trailing_slash_redirect(scanner.url, response),

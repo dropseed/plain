@@ -9,6 +9,7 @@ that have complete type annotations (parameters and return types).
 import argparse
 import ast
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
@@ -39,6 +40,9 @@ class FileStats:
     """Statistics for a single Python file."""
     path: str
     functions: List[FunctionInfo] = field(default_factory=list)
+    ignore_comments: int = 0
+    cast_calls: int = 0
+    assert_statements: int = 0
 
     @property
     def total_functions(self) -> int:
@@ -141,6 +145,52 @@ class TypeCoverageAnalyzer(ast.NodeVisitor):
         self.functions.append(func_info)
 
 
+def count_ignore_comments(content: str) -> int:
+    """Count type: ignore comments in the file."""
+    count = 0
+    pattern = r'#\s*type:\s*ignore'
+
+    for line in content.split('\n'):
+        if re.search(pattern, line, re.IGNORECASE):
+            count += 1
+
+    return count
+
+
+def count_cast_calls(content: str) -> int:
+    """Count cast() function calls in the file."""
+    # Match both 'cast(' and 'typing.cast('
+    patterns = [
+        r'\bcast\s*\(',
+        r'\btyping\.cast\s*\(',
+    ]
+
+    count = 0
+    for line in content.split('\n'):
+        for pattern in patterns:
+            count += len(re.findall(pattern, line))
+
+    return count
+
+
+class AssertCounter(ast.NodeVisitor):
+    """AST visitor to count assert statements."""
+
+    def __init__(self):
+        self.count = 0
+
+    def visit_Assert(self, node: ast.Assert) -> None:
+        self.count += 1
+        self.generic_visit(node)
+
+
+def count_assert_statements(tree: ast.AST) -> int:
+    """Count assert statements in the AST."""
+    counter = AssertCounter()
+    counter.visit(tree)
+    return counter.count
+
+
 def analyze_file(file_path: Path) -> Optional[FileStats]:
     """Analyze a single Python file for type coverage."""
     try:
@@ -151,7 +201,17 @@ def analyze_file(file_path: Path) -> Optional[FileStats]:
         analyzer = TypeCoverageAnalyzer(str(file_path))
         analyzer.visit(tree)
 
-        stats = FileStats(path=str(file_path), functions=analyzer.functions)
+        ignore_count = count_ignore_comments(content)
+        cast_count = count_cast_calls(content)
+        assert_count = count_assert_statements(tree)
+
+        stats = FileStats(
+            path=str(file_path),
+            functions=analyzer.functions,
+            ignore_comments=ignore_count,
+            cast_calls=cast_count,
+            assert_statements=assert_count,
+        )
         return stats
 
     except (SyntaxError, UnicodeDecodeError) as e:
@@ -228,6 +288,9 @@ def format_report(
     # Calculate overall statistics
     total_functions = sum(s.total_functions for s in all_stats)
     fully_typed_functions = sum(s.fully_typed_functions for s in all_stats)
+    total_ignores = sum(s.ignore_comments for s in all_stats)
+    total_casts = sum(s.cast_calls for s in all_stats)
+    total_asserts = sum(s.assert_statements for s in all_stats)
 
     if total_functions > 0:
         overall_coverage = (fully_typed_functions / total_functions) * 100
@@ -239,6 +302,9 @@ def format_report(
     lines.append(f"Functions analyzed: {total_functions}")
     lines.append(f"Fully typed functions: {fully_typed_functions}")
     lines.append(f"Missing annotations: {total_functions - fully_typed_functions}")
+    lines.append(f"Type ignore comments: {total_ignores}")
+    lines.append(f"cast() calls: {total_casts}")
+    lines.append(f"assert statements: {total_asserts}")
     lines.append("")
 
     if show_details:
@@ -259,6 +325,12 @@ def format_report(
 
             lines.append(f"\n{stats.path}")
             lines.append(f"  Coverage: {stats.coverage_percentage:.1f}% ({stats.fully_typed_functions}/{stats.total_functions})")
+            if stats.ignore_comments > 0:
+                lines.append(f"  Type ignores: {stats.ignore_comments}")
+            if stats.cast_calls > 0:
+                lines.append(f"  cast() calls: {stats.cast_calls}")
+            if stats.assert_statements > 0:
+                lines.append(f"  assert statements: {stats.assert_statements}")
 
             if show_missing:
                 missing_functions = [f for f in stats.functions if not f.is_fully_typed]
@@ -395,12 +467,18 @@ def main():
             "overall_coverage": overall_coverage,
             "total_functions": total_functions,
             "fully_typed_functions": fully_typed_functions,
+            "total_ignores": sum(s.ignore_comments for s in all_stats),
+            "total_casts": sum(s.cast_calls for s in all_stats),
+            "total_asserts": sum(s.assert_statements for s in all_stats),
             "files": [
                 {
                     "path": s.path,
                     "coverage": s.coverage_percentage,
                     "total_functions": s.total_functions,
                     "fully_typed_functions": s.fully_typed_functions,
+                    "ignore_comments": s.ignore_comments,
+                    "cast_calls": s.cast_calls,
+                    "assert_statements": s.assert_statements,
                     "functions": [
                         {
                             "name": f.name,

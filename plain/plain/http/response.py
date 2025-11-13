@@ -284,7 +284,7 @@ class ResponseBase:
         # the secure flag and:
         # - the cookie name starts with "__Host-" or "__Secure-", or
         # - the samesite is "none".
-        secure = key.startswith(("__Secure-", "__Host-")) or (
+        secure = key.startswith(("__Secure-", "__Host-")) or bool(
             samesite and samesite.lower() == "none"
         )
         self.set_cookie(
@@ -542,21 +542,21 @@ class FileResponse(StreamingResponse):
             if seekable:
                 initial_position = filelike.tell()
                 filelike.seek(0, io.SEEK_END)
-                self.headers["Content-Length"] = filelike.tell() - initial_position
+                self.headers["Content-Length"] = str(filelike.tell() - initial_position)
                 filelike.seek(initial_position)
             elif hasattr(filelike, "getbuffer") and callable(
                 getattr(filelike, "getbuffer")
             ):
-                self.headers["Content-Length"] = (
+                self.headers["Content-Length"] = str(
                     filelike.getbuffer().nbytes - filelike.tell()  # type: ignore
                 )
             elif os.path.exists(filename):
-                self.headers["Content-Length"] = (
+                self.headers["Content-Length"] = str(
                     os.path.getsize(filename) - filelike.tell()
                 )
         elif seekable:
-            self.headers["Content-Length"] = sum(
-                iter(lambda: len(filelike.read(self.block_size)), 0)
+            self.headers["Content-Length"] = str(
+                sum(iter(lambda: len(filelike.read(self.block_size)), 0))
             )
             filelike.seek(-int(self.headers["Content-Length"]), io.SEEK_END)
 

@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-support@0.22.0) (2025-11-12)
+
+### What's changed
+
+- Improved type checking compatibility with added type ignore comments for ORM patterns ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcef))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.2](https://github.com/dropseed/plain/releases/plain-support@0.21.2) (2025-11-03)
 
 ### What's changed

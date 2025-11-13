@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.54.0](https://github.com/dropseed/plain/releases/plain-admin@0.54.0) (2025-11-12)
+
+### What's changed
+
+- `ChartCard` is now an abstract base class with `get_chart_data()` as an abstract method ([81489a6](https://github.com/dropseed/plain/commit/81489a6e50))
+- Type annotations have been improved throughout the package, including better type checking for `DatetimeRange`, card presets, and model list view querysets ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcefa92))
+- Admin model list views no longer fall back to Python-based sorting when an invalid field is used in `order_by` - instead, `FieldError` will propagate to surface the issue ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcefa92))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.53.2](https://github.com/dropseed/plain/releases/plain-admin@0.53.2) (2025-11-11)
 
 ### What's changed

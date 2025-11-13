@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from plain.models.query_utils import Q
     from plain.models.sql.compiler import SQLCompiler
 
+
 __all__ = [
     "Aggregate",
     "Avg",
@@ -65,9 +66,9 @@ class Aggregate(Func):
             return source_expressions + [self.filter]
         return source_expressions
 
-    def set_source_expressions(self, exprs: list[Expression]) -> list[Expression]:
+    def set_source_expressions(self, exprs: list[Expression]) -> None:
         self.filter = self.filter and exprs.pop()
-        return super().set_source_expressions(exprs)
+        super().set_source_expressions(exprs)
 
     def resolve_expression(
         self,
@@ -79,9 +80,8 @@ class Aggregate(Func):
     ) -> Expression:
         # Aggregates are not allowed in UPDATE queries, so ignore for_save
         c = super().resolve_expression(query, allow_joins, reuse, summarize)
-        c.filter = c.filter and c.filter.resolve_expression(
-            query, allow_joins, reuse, summarize
-        )
+        if c.filter is not None:
+            c.filter = c.filter.resolve_expression(query, allow_joins, reuse, summarize)
         if not summarize:
             # Call Aggregate.get_source_expressions() to avoid
             # returning self.filter and including that in this loop.
@@ -114,6 +114,8 @@ class Aggregate(Func):
     def default_alias(self) -> str:
         expressions = self.get_source_expressions()
         if len(expressions) == 1 and hasattr(expressions[0], "name"):
+            if self.name is None:
+                raise TypeError("Aggregate subclasses must define a name")
             return f"{expressions[0].name}__{self.name.lower()}"
         raise TypeError("Complex expressions require an alias")
 
@@ -125,12 +127,12 @@ class Aggregate(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         extra_context["distinct"] = "DISTINCT " if self.distinct else ""
-        if self.filter:
+        if self.filter is not None:
             if connection.features.supports_aggregate_filter_clause:
                 try:
-                    filter_sql, filter_params = self.filter.as_sql(compiler, connection)
+                    filter_sql, filter_params = self.filter.as_sql(compiler, connection)  # type: ignore[union-attr]
                 except FullResultSet:
                     pass
                 else:
@@ -144,7 +146,7 @@ class Aggregate(Func):
                         filter=filter_sql,
                         **extra_context,
                     )
-                    return sql, (*params, *filter_params)
+                    return sql, [*params, *filter_params]
             else:
                 copy = self.copy()
                 copy.filter = None

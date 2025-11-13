@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.fields.core import BaseField
+    from plain.models.fields import Field
 
 
 class BaseDatabaseValidation:
@@ -16,7 +16,14 @@ class BaseDatabaseValidation:
     def preflight(self) -> list[Any]:
         return []
 
-    def check_field(self, field: BaseField, **kwargs: Any) -> list[Any]:
+    def check_field_type(self, field: Field, field_type: str) -> list[Any]:
+        """
+        Backend-specific field type validation.
+        Subclasses may override this method to perform validation specific to their database.
+        """
+        return []
+
+    def check_field(self, field: Field, **kwargs: Any) -> list[Any]:
         errors = []
         # Backends may implement a check_field_type() method.
         if (

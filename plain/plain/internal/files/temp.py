@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from plain.internal.files.utils import FileProxyMixin
@@ -61,7 +62,7 @@ if os.name == "nt":
         # Because close can be called during shutdown
         # we need to cache os.unlink and access it
         # as self.unlink only
-        unlink = os.unlink
+        unlink: Callable[[str], None] = os.unlink
 
         def close(self) -> None:
             if not self.close_called:

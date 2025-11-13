@@ -53,8 +53,10 @@ class AssetView(View):
                 if redirect_response := self.get_redirect_response(url_path):
                     return redirect_response
 
+        # check_asset_path validates and raises if path is invalid
+        # After this point, absolute_path is guaranteed to be a valid str
         self.check_asset_path(absolute_path)
-        # After check_asset_path, absolute_path is guaranteed to be a valid str
+        # Type guard: absolute_path is now str (check_asset_path raises if None/invalid)
         assert absolute_path is not None
 
         if encoded_path := self.get_encoded_path(absolute_path):
@@ -130,9 +132,7 @@ class AssetView(View):
     def get_size(self, path: str) -> int:
         return os.path.getsize(path)
 
-    def update_headers(
-        self, headers: dict | ResponseHeaders, path: str
-    ) -> dict | ResponseHeaders:
+    def update_headers(self, headers: ResponseHeaders, path: str) -> ResponseHeaders:
         headers.setdefault("Access-Control-Allow-Origin", "*")
 
         # Always vary on Accept-Encoding

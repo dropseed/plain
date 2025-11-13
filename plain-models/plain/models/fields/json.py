@@ -97,6 +97,7 @@ class HasKeyLookup(PostgresOperatorLookup):
         else:
             lhs, lhs_params = self.process_lhs(compiler, connection)
             lhs_json_path = "$"
+        assert template is not None, "template must be provided"
         sql = template % lhs
         # Process JSON path from the right-hand side.
         rhs = self.rhs
@@ -375,7 +376,7 @@ class KeyTransformIn(lookups.In):
             mysql_connection = cast(MySQLDatabaseWrapper, connection)
             if mysql_connection.mysql_is_mariadb:
                 sql = f"JSON_UNQUOTE({sql})"
-        return sql, params
+        return sql, tuple(params)
 
 
 class KeyTransformExact(JSONExact):

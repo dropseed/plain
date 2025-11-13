@@ -39,7 +39,7 @@ tracer = trace.get_tracer("plain")
 
 
 class BaseHandler:
-    _middleware_chain: Callable[[Request], Response] | None = None
+    _middleware_chain: Callable[[Request], ResponseBase] | None = None
 
     def load_middleware(self) -> None:
         """
@@ -70,6 +70,9 @@ class BaseHandler:
 
     def get_response(self, request: Request) -> ResponseBase:
         """Return a Response object for the given Request."""
+        assert self._middleware_chain is not None, (
+            "load_middleware() must be called before get_response()"
+        )
 
         span_attributes = {
             "plain.request.id": request.unique_id,

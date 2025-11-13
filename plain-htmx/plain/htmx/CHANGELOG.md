@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-htmx@0.12.0) (2025-11-12)
+
+### What's changed
+
+- Improved type checking compatibility by adding type ignore comments for mixin methods and ensuring proper None handling ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcef))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.1](https://github.com/dropseed/plain/releases/plain-htmx@0.11.1) (2025-10-31)
 
 ### What's changed

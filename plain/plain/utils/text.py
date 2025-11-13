@@ -18,6 +18,8 @@ class Truncator(SimpleLazyObject):
     An object used to truncate text, either by characters or words.
     """
 
+    _wrapped: str  # Override parent type since we always store str
+
     def __init__(self, text: Any):
         super().__init__(lambda: str(text))
 

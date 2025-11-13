@@ -88,10 +88,6 @@ class ThreadWorker(base.Worker):
         super().__init__(*args, **kwargs)
         self.worker_connections: int = WORKER_CONNECTIONS
         self.max_keepalived: int = WORKER_CONNECTIONS - self.cfg.threads
-        # initialise the pool
-        self.tpool: futures.ThreadPoolExecutor | None = None
-        self.poller: selectors.DefaultSelector | None = None
-        self._lock: RLock | None = None
         self.futures: deque[futures.Future[tuple[bool, TConn]]] = deque()
         self._keep: deque[TConn] = deque()
         self.nr_conns: int = 0
@@ -107,9 +103,10 @@ class ThreadWorker(base.Worker):
             )
 
     def init_process(self) -> None:
-        self.tpool = self.get_thread_pool()
-        self.poller = selectors.DefaultSelector()
-        self._lock = RLock()
+        # These are always initialized before any worker methods are called
+        self.tpool: futures.ThreadPoolExecutor = self.get_thread_pool()
+        self.poller: selectors.DefaultSelector = selectors.DefaultSelector()
+        self._lock: RLock = RLock()
         super().init_process()
 
     def get_thread_pool(self) -> futures.ThreadPoolExecutor:
@@ -177,6 +174,10 @@ class ThreadWorker(base.Worker):
                 except IndexError:
                     break
 
+            # Connections in _keep always have timeout set via set_timeout()
+            assert conn.timeout is not None, (
+                "timeout should be set for keepalive connections"
+            )
             delta = conn.timeout - now
             if delta > 0:
                 # add the connection back to the queue

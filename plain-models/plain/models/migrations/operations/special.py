@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from .base import Operation
 
@@ -127,9 +127,7 @@ class RunSQL(Operation):
                 schema_editor.execute(sql, params=params)
         else:
             # sqls is a str in this branch
-            statements = schema_editor.connection.ops.prepare_sql_script(
-                cast(str, sqls)
-            )
+            statements = schema_editor.connection.ops.prepare_sql_script(sqls)
             for statement in statements:
                 schema_editor.execute(statement, params=None)
 

@@ -60,6 +60,12 @@ Database.register_adapter(datetime.datetime, adapt_datetime)
 
 
 class SQLiteDatabaseWrapper(BaseDatabaseWrapper):
+    # Type checker hints: narrow base class attribute types to backend-specific classes
+    ops: DatabaseOperations
+    features: DatabaseFeatures
+    introspection: DatabaseIntrospection
+    creation: DatabaseCreation
+
     vendor = "sqlite"
     display_name = "SQLite"
     # SQLite doesn't actually support most of these types, but it "does the right
@@ -263,6 +269,9 @@ class SQLiteDatabaseWrapper(BaseDatabaseWrapper):
                 column_name, referenced_column_name = foreign_key[3:5]
                 primary_key_column_name = self.introspection.get_primary_key_column(
                     cursor, table_name
+                )
+                assert primary_key_column_name is not None, (
+                    f"Table {table_name} must have a primary key"
                 )
                 primary_key_value, bad_value = cursor.execute(
                     f"SELECT {self.ops.quote_name(primary_key_column_name)}, {self.ops.quote_name(column_name)} FROM {self.ops.quote_name(table_name)} WHERE rowid = %s",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from types import NoneType
 from typing import TYPE_CHECKING, Any
 
@@ -79,7 +80,7 @@ class Index:
             for field_name in self.fields
         ]
         self.name = name or ""
-        self.opclasses = opclasses
+        self.opclasses: tuple[str, ...] = tuple(opclasses)
         self.condition = condition
         self.include = tuple(include) if include else ()
         self.expressions = tuple(
@@ -312,6 +313,6 @@ class IndexExpression(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, Sequence[Any]]:
         # Casting to numeric is unnecessary.
         return self.as_sql(compiler, connection, **extra_context)

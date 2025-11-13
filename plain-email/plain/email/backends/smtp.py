@@ -158,6 +158,7 @@ class EmailBackend(BaseEmailBackend):
             sanitize_address(addr, encoding) for addr in email_message.recipients()
         ]
         message = email_message.message()
+        assert self.connection is not None, "connection should be open before sending"
         try:
             assert self.connection is not None
             self.connection.sendmail(

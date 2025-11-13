@@ -11,13 +11,13 @@ import json
 import math
 import re
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, Sequence
 from decimal import Decimal, DecimalException
 from io import BytesIO
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import urlsplit, urlunsplit
 
-from plain import validators
+from plain import validators as validators_
 from plain.exceptions import ValidationError
 from plain.utils import timezone
 from plain.utils.dateparse import parse_datetime, parse_duration
@@ -66,7 +66,7 @@ class Field:
     default_error_messages = {
         "required": "This field is required.",
     }
-    empty_values = list(validators.EMPTY_VALUES)
+    empty_values = list(validators_.EMPTY_VALUES)
 
     def __init__(
         self,
@@ -74,7 +74,7 @@ class Field:
         required: bool = True,
         initial: Any = None,
         error_messages: dict[str, str] | None = None,
-        validators: tuple[Callable[[Any], None], ...] = (),
+        validators: Sequence[Callable[[Any], None]] = (),
     ):
         # required -- Boolean that specifies whether the field is required.
         #             True by default.
@@ -144,7 +144,7 @@ class Field:
         try:
             data = self.to_python(data)
             if hasattr(self, "_coerce"):
-                return self._coerce(data) != self._coerce(initial)
+                return self._coerce(data) != self._coerce(initial)  # type: ignore[attr-defined]
         except ValidationError:
             return True
         # For purposes of seeing whether something has changed, None is
@@ -161,7 +161,7 @@ class Field:
         """
         return BoundField(form, self, field_name)
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> Field:
+    def __deepcopy__(self: Self, memo: dict[int, Any]) -> Self:
         result = copy.copy(self)
         memo[id(self)] = result
         result.error_messages = self.error_messages.copy()
@@ -190,18 +190,26 @@ class CharField(Field):
         min_length: int | None = None,
         strip: bool = True,
         empty_value: str = "",
-        **kwargs: Any,
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
     ):
         self.max_length = max_length
         self.min_length = min_length
         self.strip = strip
         self.empty_value = empty_value
-        super().__init__(**kwargs)
+        super().__init__(
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
         if min_length is not None:
-            self.validators.append(validators.MinLengthValidator(int(min_length)))
+            self.validators.append(validators_.MinLengthValidator(int(min_length)))
         if max_length is not None:
-            self.validators.append(validators.MaxLengthValidator(int(max_length)))
-        self.validators.append(validators.ProhibitNullCharactersValidator())
+            self.validators.append(validators_.MaxLengthValidator(int(max_length)))
+        self.validators.append(validators_.ProhibitNullCharactersValidator())
 
     def to_python(self, value: Any) -> str:
         """Return a string."""
@@ -226,17 +234,25 @@ class IntegerField(Field):
         max_value: int | None = None,
         min_value: int | None = None,
         step_size: int | None = None,
-        **kwargs: Any,
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
     ):
         self.max_value, self.min_value, self.step_size = max_value, min_value, step_size
-        super().__init__(**kwargs)
+        super().__init__(
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
 
         if max_value is not None:
-            self.validators.append(validators.MaxValueValidator(max_value))
+            self.validators.append(validators_.MaxValueValidator(max_value))
         if min_value is not None:
-            self.validators.append(validators.MinValueValidator(min_value))
+            self.validators.append(validators_.MinValueValidator(min_value))
         if step_size is not None:
-            self.validators.append(validators.StepValueValidator(step_size))
+            self.validators.append(validators_.StepValueValidator(step_size))
 
     def to_python(self, value: Any) -> int | None:
         """
@@ -293,11 +309,21 @@ class DecimalField(IntegerField):
         min_value: int | None = None,
         max_digits: int | None = None,
         decimal_places: int | None = None,
-        **kwargs: Any,
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
     ):
         self.max_digits, self.decimal_places = max_digits, decimal_places
-        super().__init__(max_value=max_value, min_value=min_value, **kwargs)
-        self.validators.append(validators.DecimalValidator(max_digits, decimal_places))
+        super().__init__(
+            max_value=max_value,
+            min_value=min_value,
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
+        self.validators.append(validators_.DecimalValidator(max_digits, decimal_places))
 
     def to_python(self, value: Any) -> Decimal | None:
         """
@@ -372,8 +398,21 @@ class BaseTemporalField(Field):
         "%m/%d/%y %H:%M",  # '10/25/06 14:30'
     ]
 
-    def __init__(self, *, input_formats: list[str] | None = None, **kwargs: Any):
-        super().__init__(**kwargs)
+    def __init__(
+        self,
+        *,
+        input_formats: list[str] | None = None,
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
+    ):
+        super().__init__(
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
         if input_formats is not None:
             self.input_formats = input_formats
 
@@ -506,12 +545,32 @@ class DurationField(Field):
 
 
 class RegexField(CharField):
-    def __init__(self, regex: str | re.Pattern[str], **kwargs: Any) -> None:
+    def __init__(
+        self,
+        regex: str | re.Pattern[str],
+        *,
+        max_length: int | None = None,
+        min_length: int | None = None,
+        strip: bool = False,
+        empty_value: str = "",
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
+    ) -> None:
         """
         regex can be either a string or a compiled regular expression object.
         """
-        kwargs.setdefault("strip", False)
-        super().__init__(**kwargs)
+        super().__init__(
+            max_length=max_length,
+            min_length=min_length,
+            strip=strip,
+            empty_value=empty_value,
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
         self._set_regex(regex)
 
     def _get_regex(self) -> re.Pattern[str]:
@@ -526,17 +585,37 @@ class RegexField(CharField):
             and self._regex_validator in self.validators
         ):
             self.validators.remove(self._regex_validator)
-        self._regex_validator = validators.RegexValidator(regex=regex)
+        self._regex_validator = validators_.RegexValidator(regex=regex)
         self.validators.append(self._regex_validator)
 
     regex = property(_get_regex, _set_regex)
 
 
 class EmailField(CharField):
-    default_validators = [validators.validate_email]
+    default_validators = [validators_.validate_email]
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(strip=True, **kwargs)
+    def __init__(
+        self,
+        *,
+        max_length: int | None = None,
+        min_length: int | None = None,
+        strip: bool = True,
+        empty_value: str = "",
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
+    ) -> None:
+        super().__init__(
+            max_length=max_length,
+            min_length=min_length,
+            strip=strip,
+            empty_value=empty_value,
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
 
 
 class FileField(Field):
@@ -557,11 +636,19 @@ class FileField(Field):
         *,
         max_length: int | None = None,
         allow_empty_file: bool = False,
-        **kwargs: Any,
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
     ) -> None:
         self.max_length = max_length
         self.allow_empty_file = allow_empty_file
-        super().__init__(**kwargs)
+        super().__init__(
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
 
     def to_python(self, data: Any) -> Any:
         if data in self.empty_values:
@@ -621,7 +708,7 @@ class FileField(Field):
 
 
 class ImageField(FileField):
-    default_validators = [validators.validate_image_file_extension]
+    default_validators = [validators_.validate_image_file_extension]
     default_error_messages = {
         "invalid_image": "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
     }
@@ -674,10 +761,30 @@ class URLField(CharField):
     default_error_messages = {
         "invalid": "Enter a valid URL.",
     }
-    default_validators = [validators.URLValidator()]
+    default_validators = [validators_.URLValidator()]
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(strip=True, **kwargs)
+    def __init__(
+        self,
+        *,
+        max_length: int | None = None,
+        min_length: int | None = None,
+        strip: bool = True,
+        empty_value: str = "",
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
+    ) -> None:
+        super().__init__(
+            max_length=max_length,
+            min_length=min_length,
+            strip=strip,
+            empty_value=empty_value,
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
 
     def to_python(self, value: Any) -> str:
         def split_url(url: str | bytes) -> list[str]:
@@ -792,7 +899,7 @@ class CallableChoiceIterator:
     def __init__(self, choices_func: Callable[[], Any]) -> None:
         self.choices_func = choices_func
 
-    def __iter__(self) -> Any:
+    def __iter__(self) -> Iterator[Any]:
         yield from self.choices_func()
 
 
@@ -801,8 +908,23 @@ class ChoiceField(Field):
         "invalid_choice": "Select a valid choice. %(value)s is not one of the available choices.",
     }
 
-    def __init__(self, *, choices: Any = (), **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    _choices: CallableChoiceIterator | list[Any]  # Set by choices property setter
+
+    def __init__(
+        self,
+        *,
+        choices: Any = (),
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
+    ) -> None:
+        super().__init__(
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
         if hasattr(choices, "choices"):
             choices = choices.choices
         elif isinstance(choices, enum.EnumMeta):
@@ -814,7 +936,7 @@ class ChoiceField(Field):
         result._choices = copy.deepcopy(self._choices, memo)
         return result
 
-    def _get_choices(self) -> Any:
+    def _get_choices(self) -> CallableChoiceIterator | list[Any]:
         return self._choices
 
     def _set_choices(self, value: Any) -> None:
@@ -867,11 +989,21 @@ class TypedChoiceField(ChoiceField):
         *,
         coerce: Callable[[Any], Any] = lambda val: val,
         empty_value: Any = "",
-        **kwargs: Any,
+        choices: Any = (),
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
     ) -> None:
         self.coerce = coerce
         self.empty_value = empty_value
-        super().__init__(**kwargs)
+        super().__init__(
+            choices=choices,
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
 
     def _coerce(self, value: Any) -> Any:
         """
@@ -978,13 +1110,30 @@ class JSONField(CharField):
         decoder: Any = None,
         indent: int | None = None,
         sort_keys: bool = False,
-        **kwargs: Any,
+        *,
+        max_length: int | None = None,
+        min_length: int | None = None,
+        strip: bool = True,
+        empty_value: str = "",
+        required: bool = True,
+        initial: Any = None,
+        error_messages: dict[str, str] | None = None,
+        validators: Sequence[Callable[[Any], None]] = (),
     ) -> None:
         self.encoder = encoder
         self.decoder = decoder
         self.indent = indent
         self.sort_keys = sort_keys
-        super().__init__(**kwargs)
+        super().__init__(
+            max_length=max_length,
+            min_length=min_length,
+            strip=strip,
+            empty_value=empty_value,
+            required=required,
+            initial=initial,
+            error_messages=error_messages,
+            validators=validators,
+        )
 
     def to_python(self, value: Any) -> Any:
         if value in self.empty_values:

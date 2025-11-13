@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any
 
@@ -16,7 +16,8 @@ from plain.models.constants import OnConflict
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
-    from plain.models.fields.core import BaseField
+    from plain.models.backends.postgresql.base import PostgreSQLDatabaseWrapper
+    from plain.models.fields import Field
 
 
 @lru_cache
@@ -29,6 +30,9 @@ def get_json_dumps(
 
 
 class DatabaseOperations(BaseDatabaseOperations):
+    # Type checker hint: connection is always PostgreSQLDatabaseWrapper in this class
+    connection: PostgreSQLDatabaseWrapper
+
     cast_char_field_without_max_length = "varchar"
     explain_prefix = "EXPLAIN"
     explain_options = frozenset(
@@ -56,7 +60,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         "PositiveBigIntegerField": numeric.Int8,
     }
 
-    def unification_cast_sql(self, output_field: BaseField) -> str:
+    def unification_cast_sql(self, output_field: Field) -> str:
         internal_type = output_field.get_internal_type()
         if internal_type in (
             "GenericIPAddressField",
@@ -229,7 +233,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return name  # Quoting once is enough.
         return f'"{name}"'
 
-    def compose_sql(self, sql: str, params: Any) -> bytes:
+    def compose_sql(self, sql: str, params: Any) -> str:
         return ClientCursor(self.connection.connection).mogrify(sql, params)
 
     def set_time_zone_sql(self) -> str:
@@ -260,15 +264,13 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             return ["DISTINCT"], []
 
-    def last_executed_query(self, cursor: Any, sql: str, params: Any) -> bytes | None:
+    def last_executed_query(self, cursor: Any, sql: str, params: Any) -> str | None:
         try:
             return self.compose_sql(sql, params)
         except errors.DataError:
             return None
 
-    def return_insert_columns(
-        self, fields: list[BaseField]
-    ) -> tuple[str, tuple[Any, ...]]:
+    def return_insert_columns(self, fields: list[Field]) -> tuple[str, tuple[Any, ...]]:
         if not fields:
             return "", ()
         columns = [
@@ -278,7 +280,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return "RETURNING {}".format(", ".join(columns)), ()
 
     def bulk_insert_sql(
-        self, fields: list[BaseField], placeholder_rows: list[list[str]]
+        self, fields: list[Field], placeholder_rows: list[list[str]]
     ) -> str:
         placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
         values_sql = ", ".join(f"({sql})" for sql in placeholder_rows_sql)
@@ -315,7 +317,9 @@ class DatabaseOperations(BaseDatabaseOperations):
             return ipaddress.ip_address(value)
         return None
 
-    def adapt_json_value(self, value: Any, encoder: type[json.JSONEncoder]) -> Jsonb:
+    def adapt_json_value(
+        self, value: Any, encoder: type[json.JSONEncoder] | None
+    ) -> Jsonb:
         return Jsonb(value, dumps=get_json_dumps(encoder))
 
     def subtract_temporals(
@@ -354,10 +358,10 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def on_conflict_suffix_sql(
         self,
-        fields: list[BaseField],
+        fields: list[Field],
         on_conflict: OnConflict | None,
-        update_fields: list[BaseField],
-        unique_fields: list[BaseField],
+        update_fields: Iterable[str],
+        unique_fields: Iterable[str],
     ) -> str:
         if on_conflict == OnConflict.IGNORE:
             return "ON CONFLICT DO NOTHING"

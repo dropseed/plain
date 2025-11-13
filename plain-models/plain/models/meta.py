@@ -3,17 +3,11 @@ from __future__ import annotations
 import bisect
 import copy
 import inspect
-import types
 from collections import defaultdict
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
-    Annotated,
     Any,
-    Union,
-    get_args,
-    get_origin,
-    get_type_hints,
 )
 
 from plain.models.exceptions import FieldDoesNotExist
@@ -502,7 +496,7 @@ class Meta:
         return frozenset(names)
 
     @cached_property
-    def db_returning_fields(self) -> list[Field]:
+    def db_returning_fields(self) -> list[BaseField]:
         """
         Private API intended only to be used by Plain itself.
         Fields to be returned after a database insert.

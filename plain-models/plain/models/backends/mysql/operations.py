@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import uuid
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from plain.models.backends.base.operations import BaseDatabaseOperations
@@ -15,9 +16,14 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.mysql.base import MySQLDatabaseWrapper
+    from plain.models.fields import Field
 
 
 class DatabaseOperations(BaseDatabaseOperations):
+    # Type checker hint: connection is always MySQLDatabaseWrapper in this class
+    connection: MySQLDatabaseWrapper
+
     compiler_module = "plain.models.backends.mysql.compiler"
 
     # MySQL stores positive fields as UNSIGNED ints.
@@ -435,10 +441,10 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def on_conflict_suffix_sql(
         self,
-        fields: list[Any],
+        fields: list[Field],
         on_conflict: Any,
-        update_fields: list[Any],
-        unique_fields: list[Any],
+        update_fields: Iterable[str],
+        unique_fields: Iterable[str],
     ) -> str:
         if on_conflict == OnConflict.UPDATE:
             conflict_suffix_sql = "ON DUPLICATE KEY UPDATE %(fields)s"

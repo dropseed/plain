@@ -163,6 +163,7 @@ class MigrationLoader:
         Return the migration(s) which match the given app label and name_prefix.
         """
         # Do the search
+        assert self.disk_migrations is not None, "load_disk() must be called first"
         results = []
         for migration_package_label, migration_name in self.disk_migrations:
             if migration_package_label == package_label and migration_name.startswith(
@@ -221,7 +222,8 @@ class MigrationLoader:
         for parent in migration.dependencies:
             # Ignore __first__ references to the same app.
             if parent[0] == key[0] and parent[1] != "__first__":
-                self.graph.add_dependency(migration, key, parent, skip_validation=True)
+                # Migration object is used only for error messages in add_dependency
+                self.graph.add_dependency(migration, key, parent, skip_validation=True)  # type: ignore[arg-type]
 
     def add_external_dependencies(
         self, key: tuple[str, str], migration: Migration
@@ -232,7 +234,8 @@ class MigrationLoader:
                 continue
             parent = self.check_key(parent, key[0])
             if parent is not None:
-                self.graph.add_dependency(migration, key, parent, skip_validation=True)
+                # Migration object is used only for error messages in add_dependency
+                self.graph.add_dependency(migration, key, parent, skip_validation=True)  # type: ignore[arg-type]
 
     def build_graph(self) -> None:
         """
@@ -242,6 +245,7 @@ class MigrationLoader:
         """
         # Load disk data
         self.load_disk()
+        assert self.disk_migrations is not None  # load_disk() ensures this
         # Load database data
         if self.connection is None:
             self.applied_migrations = {}
@@ -334,9 +338,10 @@ class MigrationLoader:
                 if parent not in applied:
                     # Skip unapplied squashed migrations that have all of their
                     # `replaces` applied.
-                    if parent in self.replacements:
+                    # Use parent.key for dict lookup (Node.__eq__ allows `in` check)
+                    if parent.key in self.replacements:
                         if all(
-                            m in applied for m in self.replacements[parent].replaces
+                            m in applied for m in self.replacements[parent.key].replaces
                         ):
                             continue
                     raise InconsistentMigrationHistory(

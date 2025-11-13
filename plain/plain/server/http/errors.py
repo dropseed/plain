@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .message import Message
+
 #
 #
 # This file is part of gunicorn released under the MIT license.
@@ -53,7 +58,7 @@ class InvalidRequestMethod(ParseException):
 
 
 class InvalidHTTPVersion(ParseException):
-    def __init__(self, version: str):
+    def __init__(self, version: str | tuple[int, int]):
         self.version = version
 
     def __str__(self) -> str:
@@ -61,7 +66,7 @@ class InvalidHTTPVersion(ParseException):
 
 
 class InvalidHeader(ParseException):
-    def __init__(self, hdr: str, req: str | None = None):
+    def __init__(self, hdr: str, req: Message | None = None):
         self.hdr = hdr
         self.req = req
 

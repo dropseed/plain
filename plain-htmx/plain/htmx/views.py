@@ -10,7 +10,10 @@ from .templates import render_template_fragment
 
 
 class HTMXViewMixin:
+    """Mixin for View classes to add HTMX-specific functionality."""
+
     def render_template(self) -> str:
+        # These methods are provided by the View base class
         template = self.get_template()  # type: ignore[attr-defined]
         context = self.get_template_context()  # type: ignore[attr-defined]
 

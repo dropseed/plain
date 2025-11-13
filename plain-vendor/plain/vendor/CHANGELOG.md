@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.10.0](https://github.com/dropseed/plain/releases/plain-vendor@0.10.0) (2025-11-12)
+
+### What's changed
+
+- Improved type safety with stricter type annotations and runtime type checks in dependency management ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcef))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.9.3](https://github.com/dropseed/plain/releases/plain-vendor@0.9.3) (2025-11-03)
 
 ### What's changed

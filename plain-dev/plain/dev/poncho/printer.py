@@ -52,10 +52,11 @@ class Printer:
         # When encountering data that cannot be interpreted as UTF-8 encoded
         # Unicode, Printer will replace the unrecognisable bytes with the
         # Unicode replacement character (U+FFFD).
+        # message.data is always bytes for type="line" messages (the only type this handles)
         if isinstance(message.data, bytes):
             string = message.data.decode("utf-8", "replace")
         else:
-            string = message.data
+            string = str(message.data)
 
         for line in string.splitlines():
             prefix = ""

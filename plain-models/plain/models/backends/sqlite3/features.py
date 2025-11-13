@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import operator
 from functools import cached_property
+from typing import TYPE_CHECKING
 
 from plain.models import transaction
 from plain.models.backends.base.features import BaseDatabaseFeatures
@@ -9,8 +10,14 @@ from plain.models.db import OperationalError
 
 from .base import Database
 
+if TYPE_CHECKING:
+    from plain.models.backends.sqlite3.base import SQLiteDatabaseWrapper
+
 
 class DatabaseFeatures(BaseDatabaseFeatures):
+    # Type checker hint: connection is always SQLiteDatabaseWrapper in this class
+    connection: SQLiteDatabaseWrapper
+
     minimum_database_version = (3, 21)
     max_query_params = 999
     supports_transactions = True

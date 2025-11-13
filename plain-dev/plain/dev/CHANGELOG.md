@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.47.0](https://github.com/dropseed/plain/releases/plain-dev@0.47.0) (2025-11-12)
+
+### What's changed
+
+- Fixed type errors and warnings for improved type checker compatibility ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcef))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.46.0](https://github.com/dropseed/plain/releases/plain-dev@0.46.0) (2025-11-10)
 
 ### What's changed

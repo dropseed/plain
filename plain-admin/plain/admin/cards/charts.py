@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any
 
@@ -11,7 +12,7 @@ from plain.models.functions import (
 from .base import Card
 
 
-class ChartCard(Card):
+class ChartCard(Card, ABC):
     template_name = "admin/cards/chart.html"
 
     def get_template_context(self) -> dict[str, Any]:
@@ -19,8 +20,8 @@ class ChartCard(Card):
         context["chart_data"] = self.get_chart_data()
         return context
 
-    def get_chart_data(self) -> dict:
-        raise NotImplementedError
+    @abstractmethod
+    def get_chart_data(self) -> dict: ...
 
 
 class TrendCard(ChartCard):

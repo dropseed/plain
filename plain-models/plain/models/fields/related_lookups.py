@@ -10,9 +10,12 @@ from plain.models.lookups import (
     IsNull,
     LessThan,
     LessThanOrEqual,
+    Lookup,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
@@ -38,7 +41,7 @@ class MultiColSource:
             relabels.get(self.alias, self.alias), self.targets, self.sources, self.field
         )
 
-    def get_lookup(self, lookup: str) -> Any:
+    def get_lookup(self, lookup: str) -> type[Lookup] | None:
         return self.output_field.get_lookup(lookup)
 
     def resolve_expression(self, *args: Any, **kwargs: Any) -> MultiColSource:
@@ -107,7 +110,7 @@ class RelatedIn(In):
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, list[Any]]:  # type: ignore[misc]
+    ) -> tuple[str, Sequence[Any]]:
         if isinstance(self.lhs, MultiColSource):
             # For multicolumn lookups we need to build a multicolumn where clause.
             # This clause is either a SubqueryConstraint (for values that need
@@ -148,8 +151,14 @@ class RelatedIn(In):
         return super().as_sql(compiler, connection)
 
 
-class RelatedLookupMixin:
-    def get_prep_lookup(self) -> Any:  # type: ignore[misc]
+class RelatedLookupMixin(Lookup):
+    # Type hints for attributes/methods expected from Lookup base class
+    lhs: Any
+    rhs: Any
+    prepare_rhs: bool
+    lookup_name: str | None
+
+    def get_prep_lookup(self) -> Any:
         if not isinstance(self.lhs, MultiColSource) and not hasattr(
             self.rhs, "resolve_expression"
         ):
@@ -165,11 +174,11 @@ class RelatedLookupMixin:
                 target_field = self.lhs.output_field.path_infos[-1].target_fields[-1]
                 self.rhs = target_field.get_prep_value(self.rhs)
 
-        return super().get_prep_lookup()  # type: ignore[misc]
+        return super().get_prep_lookup()
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, list[Any]]:  # type: ignore[misc]
+    ) -> tuple[str, Sequence[Any]]:
         if isinstance(self.lhs, MultiColSource):
             assert self.rhs_is_direct_value()
             self.rhs = get_normalized_value(self.rhs, self.lhs)

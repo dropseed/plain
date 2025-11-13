@@ -25,7 +25,7 @@ class StopWaiting(Exception):
 
 
 class SyncWorker(base.Worker):
-    def accept(self, listener: socket.socket) -> None:
+    def accept(self, listener: sock.BaseSocket) -> None:
         client, addr = listener.accept()
         client.setblocking(True)
         util.close_on_exec(client.fileno())
@@ -128,7 +128,9 @@ class SyncWorker(base.Worker):
         else:
             self.run_for_one(timeout)
 
-    def handle(self, listener: socket.socket, client: socket.socket, addr: Any) -> None:
+    def handle(
+        self, listener: sock.BaseSocket, client: socket.socket, addr: Any
+    ) -> None:
         req = None
         try:
             if self.cfg.is_ssl:
@@ -163,7 +165,7 @@ class SyncWorker(base.Worker):
             util.close(client)
 
     def handle_request(
-        self, listener: socket.socket, req: Any, client: socket.socket, addr: Any
+        self, listener: sock.BaseSocket, req: Any, client: socket.socket, addr: Any
     ) -> None:
         environ = {}
         resp = None

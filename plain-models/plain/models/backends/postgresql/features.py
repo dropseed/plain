@@ -1,7 +1,17 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from plain.models.backends.base.features import BaseDatabaseFeatures
+
+if TYPE_CHECKING:
+    from plain.models.backends.postgresql.base import PostgreSQLDatabaseWrapper
 
 
 class DatabaseFeatures(BaseDatabaseFeatures):
+    # Type checker hint: connection is always PostgreSQLDatabaseWrapper in this class
+    connection: PostgreSQLDatabaseWrapper
+
     minimum_database_version = (12,)
     allows_group_by_selected_pks = True
     can_return_columns_from_insert = True

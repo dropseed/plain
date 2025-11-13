@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain.auth import login, logout
 from plain.auth.views import AuthViewMixin
+from plain.forms import BaseForm
 from plain.http import Response, ResponseRedirect
 from plain.runtime import settings
 from plain.urls import reverse, reverse_lazy

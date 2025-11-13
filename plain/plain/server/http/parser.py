@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 class Parser:
-    mesg_class = None
+    mesg_class: type[Request] | None = None
 
     def __init__(
         self,
@@ -48,13 +48,14 @@ class Parser:
             raise StopIteration()
 
         # Discard any unread body of the previous message
-        if self.mesg:
+        if self.mesg and self.mesg.body:
             data = self.mesg.body.read(8192)
             while data:
                 data = self.mesg.body.read(8192)
 
         # Parse the next request
         self.req_count += 1
+        assert self.mesg_class is not None, "mesg_class must be set by subclass"
         self.mesg = self.mesg_class(
             self.cfg, self.unreader, self.source_addr, self.req_count
         )

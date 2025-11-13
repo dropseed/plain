@@ -12,6 +12,7 @@ import signal
 import sys
 import time
 import traceback
+from abc import ABC, abstractmethod
 from datetime import datetime
 from random import randint
 from ssl import SSLError
@@ -19,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain.internal.reloader import Reloader
 
-from .. import util
+from .. import sock, util
 from ..http.errors import (
     ConfigurationProblem,
     InvalidHeader,
@@ -48,7 +49,7 @@ if TYPE_CHECKING:
 MAX_REQUESTS_JITTER = 50
 
 
-class Worker:
+class Worker(ABC):
     SIGNALS = [
         getattr(signal, f"SIG{x}")
         for x in ("ABRT HUP QUIT INT TERM USR1 USR2 WINCH CHLD".split())
@@ -60,9 +61,9 @@ class Worker:
         self,
         age: int,
         ppid: int,
-        sockets: list[socket.socket],
+        sockets: list[sock.BaseSocket],
         app: ServerApplication,
-        timeout: int,
+        timeout: int | float,
         cfg: Config,
         log: Logger,
     ):
@@ -105,13 +106,14 @@ class Worker:
         """
         self.tmp.notify()
 
+    @abstractmethod
     def run(self) -> None:
         """\
         This is the mainloop of a worker process. You should override
         this method in a subclass to provide the intended behaviour
         for your particular evil schemes.
         """
-        raise NotImplementedError()
+        ...
 
     def init_process(self) -> None:
         """\
@@ -131,7 +133,7 @@ class Worker:
 
         # Prevent fd inheritance
         for s in self.sockets:
-            util.close_on_exec(s)
+            util.close_on_exec(s.fileno())
         util.close_on_exec(self.tmp.fileno())
 
         self.wait_fds = self.sockets + [self.PIPE[0]]
@@ -163,11 +165,11 @@ class Worker:
     def load_wsgi(self) -> None:
         try:
             self.wsgi = self.app.wsgi()
-        except SyntaxError as e:
+        except SyntaxError:
             if not self.cfg.reload:
                 raise
 
-            self.log.exception(e)
+            self.log.exception("Error loading WSGI application")
 
             # fix from PR #1228
             # storing the traceback into exc_tb will create a circular reference.
@@ -218,7 +220,7 @@ class Worker:
         sys.exit(1)
 
     def handle_error(
-        self, req: Request | None, client: socket.socket, addr: Any, exc: Exception
+        self, req: Request | None, client: socket.socket, addr: Any, exc: BaseException
     ) -> None:
         request_start = datetime.now()
         addr = addr or ("", -1)  # unix socket case

@@ -1,5 +1,17 @@
 # plain-jobs changelog
 
+## [0.39.0](https://github.com/dropseed/plain/releases/plain-jobs@0.39.0) (2025-11-12)
+
+### What's changed
+
+- Improved type annotations across the codebase for better IDE support and type checking ([f4dbcefa92](https://github.com/dropseed/plain/commit/f4dbcefa92))
+- Added type hints for `_init_args` and `_init_kwargs` attributes on the `Job` class that are set by the `JobType` metaclass ([f4dbcefa92](https://github.com/dropseed/plain/commit/f4dbcefa92))
+- Fixed type annotation for `get_initial_queryset()` in admin views to properly indicate it returns `JobResultQuerySet` ([f4dbcefa92](https://github.com/dropseed/plain/commit/f4dbcefa92))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.38.1](https://github.com/dropseed/plain/releases/plain-jobs@0.38.1) (2025-11-11)
 
 ### What's changed

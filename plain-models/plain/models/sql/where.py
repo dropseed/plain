@@ -15,6 +15,7 @@ from plain.utils import tree
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.lookups import Lookup
     from plain.models.sql.compiler import SQLCompiler
 
 # Connection types
@@ -313,7 +314,7 @@ class WhereNode(tree.Node):
     def get_db_converters(self, connection: BaseDatabaseWrapper) -> list[Any]:
         return self.output_field.get_db_converters(connection)
 
-    def get_lookup(self, lookup: str) -> Any:
+    def get_lookup(self, lookup: str) -> type[Lookup] | None:
         return self.output_field.get_lookup(lookup)
 
     def leaves(self) -> Any:

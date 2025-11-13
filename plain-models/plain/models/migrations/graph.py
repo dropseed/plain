@@ -27,7 +27,7 @@ class Node:
         return self.key == other
 
     def __lt__(self, other: object) -> bool:
-        return self.key < other
+        return self.key < other  # type: ignore[operator]
 
     def __hash__(self) -> int:
         return hash(self.key)
@@ -341,6 +341,7 @@ class MigrationGraph:
             return ProjectState()
         if not isinstance(nodes[0], tuple):
             nodes = [nodes]  # type: ignore[list-item]
+        assert isinstance(nodes, list)  # Type narrowing after checks above
         plan = self._generate_plan(nodes, at_end)
         project_state = ProjectState(real_packages=real_packages)
         for node in plan:

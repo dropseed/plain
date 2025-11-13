@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import math
 import warnings
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
@@ -158,7 +159,7 @@ def must_update_salt(salt: str, expected_entropy: int) -> bool:
     return len(salt) * math.log2(len(RANDOM_STRING_CHARS)) < expected_entropy
 
 
-class BasePasswordHasher:
+class BasePasswordHasher(ABC):
     """
     Abstract base class for password hashers
 
@@ -181,11 +182,10 @@ class BasePasswordHasher:
         char_count = math.ceil(self.salt_entropy / math.log2(len(RANDOM_STRING_CHARS)))
         return get_random_string(char_count, allowed_chars=RANDOM_STRING_CHARS)
 
+    @abstractmethod
     def verify(self, password: str, encoded: str) -> bool:
         """Check if the given password is correct."""
-        raise NotImplementedError(
-            "subclasses of BasePasswordHasher must provide a verify() method"
-        )
+        ...
 
     def _check_encode_args(self, password: str, salt: str) -> None:
         if password is None:
@@ -193,6 +193,7 @@ class BasePasswordHasher:
         if not salt or "$" in salt:
             raise ValueError("salt must be provided and cannot contain $.")
 
+    @abstractmethod
     def encode(self, password: str, salt: str) -> str:
         """
         Create an encoded database value.
@@ -200,10 +201,9 @@ class BasePasswordHasher:
         The result is normally formatted as "algorithm$salt$hash" and
         must be fewer than 128 characters.
         """
-        raise NotImplementedError(
-            "subclasses of BasePasswordHasher must provide an encode() method"
-        )
+        ...
 
+    @abstractmethod
     def decode(self, encoded: str) -> dict[str, Any]:
         """
         Return a decoded database value.
@@ -212,10 +212,9 @@ class BasePasswordHasher:
         `salt`. Extra keys can be algorithm specific like `iterations` or
         `work_factor`.
         """
-        raise NotImplementedError(
-            "subclasses of BasePasswordHasher must provide a decode() method."
-        )
+        ...
 
+    @abstractmethod
     def safe_summary(self, encoded: str) -> dict[str, Any]:
         """
         Return a summary of safe values.
@@ -223,9 +222,7 @@ class BasePasswordHasher:
         The result is a dictionary and will be used where the password field
         must be displayed to construct a safe representation of the password.
         """
-        raise NotImplementedError(
-            "subclasses of BasePasswordHasher must provide a safe_summary() method"
-        )
+        ...
 
     def must_update(self, encoded: str) -> bool:
         return False

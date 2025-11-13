@@ -5,6 +5,7 @@ Base file upload handler classes, and the built-in concrete subclasses
 from __future__ import annotations
 
 import os
+from abc import ABC, abstractmethod
 from io import BytesIO
 from typing import TYPE_CHECKING
 
@@ -78,7 +79,7 @@ class StopFutureHandlers(UploadFileException):
     pass
 
 
-class FileUploadHandler:
+class FileUploadHandler(ABC):
     """
     Base class for streaming upload handlers.
     """
@@ -123,7 +124,7 @@ class FileUploadHandler:
         field_name: str,
         file_name: str,
         content_type: str,
-        content_length: int,
+        content_length: int | None,
         charset: str | None = None,
         content_type_extra: dict[str, str] | None = None,
     ) -> None:
@@ -140,15 +141,15 @@ class FileUploadHandler:
         self.charset = charset
         self.content_type_extra = content_type_extra
 
+    @abstractmethod
     def receive_data_chunk(self, raw_data: bytes, start: int) -> bytes | None:
         """
         Receive data from the streamed upload parser. ``start`` is the position
         in the file of the chunk.
         """
-        raise NotImplementedError(
-            "subclasses of FileUploadHandler must provide a receive_data_chunk() method"
-        )
+        ...
 
+    @abstractmethod
     def file_complete(self, file_size: int) -> UploadedFile | None:
         """
         Signal that a file has completed. File size corresponds to the actual
@@ -156,9 +157,7 @@ class FileUploadHandler:
 
         Subclasses should return a valid ``UploadedFile`` object.
         """
-        raise NotImplementedError(
-            "subclasses of FileUploadHandler must provide a file_complete() method"
-        )
+        ...
 
     def upload_complete(self) -> None:
         """
@@ -185,6 +184,10 @@ class TemporaryFileUploadHandler(FileUploadHandler):
         Create the file object to append to as data is coming in.
         """
         super().new_file(*args, **kwargs)
+        assert self.file_name is not None, "file_name should be set by parent new_file"
+        assert self.content_type is not None, (
+            "content_type should be set by parent new_file"
+        )
         self.file = TemporaryUploadedFile(
             self.file_name, self.content_type, 0, self.charset, self.content_type_extra
         )
@@ -249,6 +252,8 @@ class MemoryFileUploadHandler(FileUploadHandler):
             return None
 
         self.file.seek(0)
+        assert self.file_name is not None, "file_name should be set by new_file"
+        assert self.content_type is not None, "content_type should be set by new_file"
         return InMemoryUploadedFile(
             file=self.file,
             field_name=self.field_name,

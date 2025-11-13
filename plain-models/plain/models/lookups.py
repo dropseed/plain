@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import math
+from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
@@ -28,6 +29,8 @@ class Lookup(Expression):
     lookup_name: str | None = None
     prepare_rhs: bool = True
     can_use_none_as_rhs: bool = False
+    lhs: Any
+    rhs: Any
 
     def __init__(self, lhs: Any, rhs: Any):
         self.lhs, self.rhs = lhs, rhs
@@ -89,9 +92,9 @@ class Lookup(Expression):
     def get_prep_lookup(self) -> Any:
         if not self.prepare_rhs or hasattr(self.rhs, "resolve_expression"):
             return self.rhs
-        if hasattr(self.lhs, "output_field"):
-            if hasattr(self.lhs.output_field, "get_prep_value"):  # type: ignore[attr-defined]
-                return self.lhs.output_field.get_prep_value(self.rhs)  # type: ignore[attr-defined]
+        if output_field := getattr(self.lhs, "output_field", None):
+            if get_prep_value := getattr(output_field, "get_prep_value", None):
+                return get_prep_value(self.rhs)
         elif self.rhs_is_direct_value():
             return Value(self.rhs)
         return self.rhs
@@ -244,7 +247,7 @@ class BuiltinLookup(Lookup):
         return connection.operators[self.lookup_name] % rhs  # type: ignore[index]
 
 
-class FieldGetDbPrepValueMixin:
+class FieldGetDbPrepValueMixin(Lookup):
     """
     Some lookups require Field.get_db_prep_value() to be called on their
     inputs.
@@ -290,8 +293,10 @@ class FieldGetDbPrepValueIterableMixin(FieldGetDbPrepValueMixin):
                 # An expression will be handled by the database but can coexist
                 # alongside real values.
                 pass
-            elif self.prepare_rhs and hasattr(self.lhs.output_field, "get_prep_value"):  # type: ignore[attr-defined]
-                rhs_value = self.lhs.output_field.get_prep_value(rhs_value)  # type: ignore[attr-defined]
+            elif self.prepare_rhs:
+                if output_field := getattr(self.lhs, "output_field", None):
+                    if get_prep_value := getattr(output_field, "get_prep_value", None):
+                        rhs_value = get_prep_value(rhs_value)
             prepared_values.append(rhs_value)
         return prepared_values
 
@@ -677,7 +682,7 @@ class IRegex(Regex):
     lookup_name: str = "iregex"
 
 
-class YearLookup(Lookup):
+class YearLookup(Lookup, ABC):
     def year_lookup_bounds(
         self, connection: BaseDatabaseWrapper, year: int
     ) -> list[str | Any | None]:
@@ -716,10 +721,8 @@ class YearLookup(Lookup):
     def get_direct_rhs_sql(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
         return connection.operators[self.lookup_name] % rhs  # type: ignore[index]
 
-    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any, ...]:
-        raise NotImplementedError(
-            "subclasses of YearLookup must provide a get_bound_params() method"
-        )
+    @abstractmethod
+    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any, ...]: ...
 
 
 class YearExact(YearLookup, Exact):
@@ -750,7 +753,7 @@ class YearLte(YearLookup, LessThanOrEqual):
         return (finish,)
 
 
-class UUIDTextMixin:
+class UUIDTextMixin(Lookup):
     """
     Strip hyphens from a value when filtering a UUIDField on backends without
     a native datatype for UUID.
@@ -769,7 +772,7 @@ class UUIDTextMixin:
             self.rhs = Replace(
                 self.rhs, Value("-"), Value(""), output_field=CharField()
             )
-        rhs, params = super().process_rhs(qn, connection)  # type: ignore[misc]
+        rhs, params = super().process_rhs(qn, connection)
         return rhs, params
 
 

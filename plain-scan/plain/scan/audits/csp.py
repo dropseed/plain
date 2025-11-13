@@ -41,6 +41,8 @@ class CSPAudit(Audit):
         # Determine which header to analyze
         # Prefer the enforcing header if both are present
         header_to_analyze = csp_header if csp_header else csp_report_only_header
+        # At this point, at least one header exists (we returned early if both were None)
+        assert header_to_analyze is not None
         is_report_only = csp_header is None and csp_report_only_header is not None
 
         # Parse CSP once

@@ -68,6 +68,9 @@ class ChoicesMeta(enum.EnumMeta):
 class Choices(enum.Enum, metaclass=ChoicesMeta):
     """Class for creating enumerated choices."""
 
+    # Dynamically set by metaclass
+    _label_: str
+
     @DynamicClassAttribute
     def label(self) -> str:
         return self._label_

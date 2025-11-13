@@ -65,6 +65,9 @@ class BaseForm:
     class.
     """
 
+    # Set by DeclarativeFieldsMetaclass
+    base_fields: dict[str, Field]
+
     prefix: str | None = None
 
     def __init__(
@@ -139,10 +142,11 @@ class BaseForm:
         return self._bound_fields_cache[name]
 
     @property
-    def errors(self) -> dict[str, list[str]] | None:
+    def errors(self) -> dict[str, list[str]]:
         """Return an error dict for the data provided for the form."""
         if self._errors is None:
             self.full_clean()
+        assert self._errors is not None, "full_clean should initialize _errors"
         return self._errors
 
     def is_valid(self) -> bool:
@@ -213,13 +217,16 @@ class BaseForm:
                     yield next(iter(err))
 
         for field_key, error_list in error_dict.items():
+            # Accessing self.errors ensures _errors is initialized
             if field_key not in self.errors:
                 if field_key != NON_FIELD_ERRORS and field_key not in self.fields:
                     raise ValueError(
                         f"'{self.__class__.__name__}' has no field named '{field_key}'."
                     )
+                assert self._errors is not None, "errors property initializes _errors"
                 self._errors[field_key] = ValidationErrors()
 
+            assert self._errors is not None, "errors property initializes _errors"
             self._errors[field_key].extend(error_list)
 
             # The field had an error, so removed it from the final data

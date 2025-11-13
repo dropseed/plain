@@ -50,7 +50,11 @@ class DatetimeRangeAliases(Enum):
         raise ValueError(f"{value} is not a valid value for {cls.__name__}")
 
     @classmethod
-    def to_range(cls, value: str) -> DatetimeRange:
+    def to_range(cls, value: str | DatetimeRangeAliases) -> DatetimeRange:
+        # Convert enum to string value if needed
+        if isinstance(value, DatetimeRangeAliases):
+            value = value.value
+
         now = timezone.localtime()
         start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         start_of_week = start_of_today - datetime.timedelta(
@@ -157,33 +161,34 @@ class DatetimeRangeAliases(Enum):
 
 
 class DatetimeRange:
+    start: datetime.datetime
+    end: datetime.datetime
+
     def __init__(
         self,
         start: datetime.datetime | datetime.date | str,
         end: datetime.datetime | datetime.date | str,
     ):
-        self.start = start
-        self.end = end
-
-        if isinstance(self.start, str) and self.start:
-            self.start = datetime.datetime.fromisoformat(self.start)
-
-        if isinstance(self.end, str) and self.end:
-            self.end = datetime.datetime.fromisoformat(self.end)
-
-        if isinstance(self.start, datetime.date) and not isinstance(
-            self.start, datetime.datetime
+        # Convert all inputs to datetime.datetime
+        if isinstance(start, str) and start:
+            self.start = datetime.datetime.fromisoformat(start)
+        elif isinstance(start, datetime.date) and not isinstance(
+            start, datetime.datetime
         ):
             self.start = timezone.localtime().replace(
-                year=self.start.year, month=self.start.month, day=self.start.day
+                year=start.year, month=start.month, day=start.day
             )
+        else:
+            self.start = start  # type: ignore[assignment]
 
-        if isinstance(self.end, datetime.date) and not isinstance(
-            self.start, datetime.datetime
-        ):
+        if isinstance(end, str) and end:
+            self.end = datetime.datetime.fromisoformat(end)
+        elif isinstance(end, datetime.date) and not isinstance(end, datetime.datetime):
             self.end = timezone.localtime().replace(
-                year=self.end.year, month=self.end.month, day=self.end.day
+                year=end.year, month=end.month, day=end.day
             )
+        else:
+            self.end = end  # type: ignore[assignment]
 
     def as_tuple(self) -> tuple[datetime.datetime, datetime.datetime]:
         return (self.start, self.end)

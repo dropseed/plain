@@ -44,18 +44,19 @@ class SQLDeleteCompiler(compiler.SQLDeleteCompiler, SQLCompiler):
             # window functions as it doesn't allow for GROUP BY/HAVING clauses
             # and the subquery wrapping (necessary to emulate QUALIFY).
             return super().as_sql()
-        result = [
-            f"DELETE {self.quote_name_unless_alias(self.query.get_initial_alias())} FROM"
-        ]
+        initial_alias = self.query.get_initial_alias()
+        assert initial_alias is not None, "DELETE query must have an initial alias"
+        result = [f"DELETE {self.quote_name_unless_alias(initial_alias)} FROM"]
         from_sql, params = self.get_from_clause()
         result.extend(from_sql)
-        try:
-            where_sql, where_params = self.compile(where)
-        except FullResultSet:
-            pass
-        else:
-            result.append(f"WHERE {where_sql}")
-            params.extend(where_params)
+        if where is not None:
+            try:
+                where_sql, where_params = self.compile(where)
+            except FullResultSet:
+                pass
+            else:
+                result.append(f"WHERE {where_sql}")
+                params.extend(where_params)
         return " ".join(result), tuple(params)
 
 
@@ -66,7 +67,7 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler, SQLCompiler):
         if self.query.order_by:
             order_by_sql = []
             order_by_params = []
-            db_table = self.query.get_model_meta().db_table
+            db_table = self.query.model.model_options.db_table
             try:
                 for resolved, (sql, params, _) in self.get_order_by():
                     if (

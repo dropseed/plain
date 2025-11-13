@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from plain import signals
-from plain.http import QueryDict, Request, parse_cookie
+from plain.http import FileResponse, QueryDict, Request, parse_cookie
 from plain.internal.handlers import base
 from plain.utils.datastructures import MultiValueDict
 from plain.utils.regex_helper import _lazy_re_compile
@@ -156,8 +156,10 @@ class WSGIHandler(base.BaseHandler):
             *(("Set-Cookie", c.output(header="")) for c in response.cookies.values()),
         ]
         start_response(status, response_headers)
-        if getattr(response, "file_to_stream", None) is not None and environ.get(
-            "wsgi.file_wrapper"
+        if (
+            isinstance(response, FileResponse)
+            and response.file_to_stream is not None
+            and environ.get("wsgi.file_wrapper")
         ):
             # If `wsgi.file_wrapper` is used the WSGI server does not call
             # .close on the response, but on the file wrapper. Patch it to use

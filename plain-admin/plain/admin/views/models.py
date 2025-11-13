@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models import Q
-from plain.models.exceptions import FieldError
 from plain.models.fields.related_managers import BaseRelatedManager
 
 from .objects import (
@@ -88,7 +87,7 @@ class AdminModelListView(AdminListView):
 
         return context
 
-    def get_objects(self) -> models.QuerySet | list:
+    def get_objects(self) -> models.QuerySet:
         queryset = self.get_initial_queryset()
         queryset = self.search_queryset(queryset)
         queryset = self.order_queryset(queryset)
@@ -99,26 +98,12 @@ class AdminModelListView(AdminListView):
         # so that annotations can be added BEFORE order_by, etc.
         return self.model.query.all()
 
-    def order_queryset(self, queryset: models.QuerySet) -> models.QuerySet | list:
+    def order_queryset(self, queryset: models.QuerySet) -> models.QuerySet:
         result = queryset
         if order_by := self.request.query_params.get("order_by"):
-            try:
-                result = queryset.order_by(order_by)
-            except FieldError:
-                # Fallback to sorting in Python if the field is not valid
-                # Note this can be an expensive operation!
-                if order_by.startswith("-"):
-                    result = sorted(
-                        queryset,
-                        key=lambda obj: self.get_field_value(obj, order_by[1:]),
-                        reverse=True,
-                    )
-                else:
-                    result = sorted(
-                        queryset,
-                        key=lambda obj: self.get_field_value(obj, order_by),
-                        reverse=False,
-                    )
+            # Let FieldError propagate - invalid fields should error
+            # TODO: disable sorting on non-fields in the UI to prevent this
+            result = queryset.order_by(order_by)
         elif self.queryset_order:
             result = queryset.order_by(*self.queryset_order)
 

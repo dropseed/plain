@@ -65,7 +65,8 @@ class DoesNotExistDescriptor:
 
         # Create a unique exception class for this model if we haven't already
         if owner not in self._exceptions_by_class:
-            exc_class = type(
+            # type() returns a subclass of ObjectDoesNotExist
+            exc_class: type[ObjectDoesNotExist] = type(  # type: ignore[assignment]
                 "DoesNotExist",
                 (ObjectDoesNotExist,),
                 {
@@ -95,7 +96,8 @@ class MultipleObjectsReturnedDescriptor:
 
         # Create a unique exception class for this model if we haven't already
         if owner not in self._exceptions_by_class:
-            exc_class = type(
+            # type() returns a subclass of MultipleObjectsReturned
+            exc_class: type[MultipleObjectsReturned] = type(  # type: ignore[assignment]
                 "MultipleObjectsReturned",
                 (MultipleObjectsReturned,),
                 {

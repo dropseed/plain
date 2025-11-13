@@ -41,7 +41,7 @@ class ErrorView(TemplateView):
         response.status_code = self.status_code
         return response
 
-    def get(self) -> ResponseBase:
+    def get(self) -> ResponseBase | int:
         try:
             return super().get()
         except TemplateFileMissing:

@@ -20,6 +20,8 @@ class classproperty:
         self.fget = method
 
     def __get__(self, instance: Any, cls: type | None = None) -> Any:
+        assert cls is not None, "cls must be provided for classproperty"
+        assert self.fget is not None, "fget must be set before accessing classproperty"
         return self.fget(cls)
 
     def getter(self, method: Callable[[type], Any]) -> classproperty:

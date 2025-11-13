@@ -3,10 +3,10 @@ from __future__ import annotations
 import collections
 import json
 import re
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, Sequence
 from functools import cached_property, partial
 from itertools import chain
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, NotSupportedError
@@ -32,6 +32,18 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.expressions import BaseExpression
+    from plain.models.sql.subqueries import InsertQuery
+
+
+class SQLCompilable(Protocol):
+    """Protocol for objects that can be compiled to SQL."""
+
+    def as_sql(
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+    ) -> tuple[str, Sequence[Any]]:
+        """Return SQL string and parameters for this object."""
+        ...
 
 
 class PositionRef(Ref):
@@ -94,6 +106,7 @@ class SQLCompiler:
         might not have all the pieces in place at that time.
         """
         self.setup_query(with_col_aliases=with_col_aliases)
+        assert self.select is not None  # Set by setup_query()
         order_by = self.get_order_by()
         self.where, self.having, self.qualify = self.query.where.split_having_qualify(  # type: ignore[attr-defined]
             must_group_by=self.query.group_by is not None
@@ -180,7 +193,7 @@ class SQLCompiler:
                 # the SELECT clause are already part of the GROUP BY.
                 if not is_ref:
                     expressions.extend(expr.get_group_by_cols())
-        having_group_by = self.having.get_group_by_cols() if self.having else ()
+        having_group_by = self.having.get_group_by_cols() if self.having else []
         for expr in having_group_by:
             expressions.append(expr)
         result = []
@@ -334,7 +347,7 @@ class SQLCompiler:
             and options.ordering
         ):
             ordering = options.ordering
-            self._meta_ordering = ordering
+            self._meta_ordering = list(ordering)
         else:
             ordering = []
         if self.query.standard_ordering:
@@ -352,14 +365,17 @@ class SQLCompiler:
 
         for field in ordering:
             if hasattr(field, "resolve_expression"):
-                if isinstance(field, Value):
+                # field is a BaseExpression (has asc/desc/copy methods)
+                field_expr: BaseExpression = field  # type: ignore[assignment]
+                if isinstance(field_expr, Value):
                     # output_field must be resolved for constants.
-                    field = Cast(field, field.output_field)
-                if not isinstance(field, OrderBy):
-                    field = field.asc()
+                    field_expr = Cast(field_expr, field_expr.output_field)
+                if not isinstance(field_expr, OrderBy):
+                    field_expr = field_expr.asc()
                 if not self.query.standard_ordering:
-                    field = field.copy()
-                    field.reverse_ordering()
+                    field_expr = field_expr.copy()
+                    field_expr.reverse_ordering()
+                field = field_expr
                 select_ref = selected_exprs.get(field.expression)  # type: ignore[attr-defined]
                 if select_ref or (
                     isinstance(field.expression, F)  # type: ignore[attr-defined]
@@ -467,7 +483,7 @@ class SQLCompiler:
         for expr, is_ref in self._order_by_pairs():
             resolved = expr.resolve_expression(self.query, allow_joins=True, reuse=None)
             if not is_ref and self.query.combinator and self.select:
-                src = resolved.expression
+                src = resolved.expression  # type: ignore[attr-defined]
                 expr_src = expr.expression
                 for sel_expr, _, col_alias in self.select:
                     if src == sel_expr:
@@ -499,7 +515,7 @@ class SQLCompiler:
                                 "the result set."
                             )
                         q.add_annotation(expr_src, col_alias)
-                    self.query.add_select_col(resolved, col_alias)
+                    self.query.add_select_col(resolved, col_alias)  # type: ignore[arg-type]
                     resolved.set_source_expressions([Ref(col_alias, src)])
             sql, params = self.compile(resolved)
             # Don't add the same column twice, but the order direction is
@@ -548,13 +564,13 @@ class SQLCompiler:
         self.quote_cache[name] = r
         return r
 
-    def compile(self, node: Any) -> tuple[str, tuple]:
+    def compile(self, node: SQLCompilable) -> tuple[str, tuple]:
         vendor_impl = getattr(node, "as_" + self.connection.vendor, None)
         if vendor_impl:
             sql, params = vendor_impl(self, self.connection)
         else:
             sql, params = node.as_sql(self, self.connection)
-        return sql, params
+        return sql, tuple(params)
 
     def get_combinator_sql(self, combinator: str, all: bool) -> tuple[list[str], list]:
         features = self.connection.features
@@ -675,10 +691,14 @@ class SQLCompiler:
                     inner_query.add_annotation(expr, select_alias)
                     replacements[expr] = select_alias
 
-        collect_replacements(list(self.qualify.leaves()))
-        self.qualify = self.qualify.replace_expressions(
+        qualify = self.qualify
+        if qualify is None:
+            raise ValueError("QUALIFY clause expected but not provided")
+        collect_replacements(list(qualify.leaves()))
+        qualify = qualify.replace_expressions(
             {expr: Ref(alias, expr) for expr, alias in replacements.items()}
         )
+        self.qualify = qualify
         order_by = []
         for order_by_expr, *_ in self.get_order_by():
             collect_replacements(order_by_expr.get_source_expressions())
@@ -696,7 +716,7 @@ class SQLCompiler:
             # and make rhs predicates referencing easier.
             with_col_aliases=True,
         )
-        qualify_sql, qualify_params = self.compile(self.qualify)
+        qualify_sql, qualify_params = self.compile(qualify)
         result = [
             "SELECT * FROM (",
             inner_sql,
@@ -708,7 +728,11 @@ class SQLCompiler:
         if qual_aliases:
             # If some select aliases were unmasked for filtering purposes they
             # must be masked back.
-            cols = [self.connection.ops.quote_name(alias) for alias in select.values()]
+            cols = [
+                self.connection.ops.quote_name(alias)
+                for alias in select.values()
+                if alias is not None
+            ]
             result = [
                 "SELECT",
                 ", ".join(cols),
@@ -717,7 +741,7 @@ class SQLCompiler:
                 ")",
                 self.connection.ops.quote_name("qualify_mask"),
             ]
-        params = list(inner_params) + qualify_params
+        params = list(inner_params) + list(qualify_params)
         # As the SQL spec is unclear on whether or not derived tables
         # ordering must propagate it has to be explicitly repeated on the
         # outer-most query to ensure it's preserved.
@@ -746,6 +770,7 @@ class SQLCompiler:
             extra_select, order_by, group_by = self.pre_sql_setup(
                 with_col_aliases=with_col_aliases or bool(combinator),
             )
+            assert self.select is not None  # Set by pre_sql_setup()
             for_update_part = None
             # Is a LIMIT/OFFSET clause needed?
             with_limit_offset = with_limits and self.query.is_sliced
@@ -857,7 +882,7 @@ class SQLCompiler:
                     for_update_part = self.connection.ops.for_update_sql(
                         nowait=nowait,
                         skip_locked=skip_locked,
-                        of=self.get_select_for_update_of_arguments(),
+                        of=tuple(self.get_select_for_update_of_arguments()),
                         no_key=no_key,
                     )
 
@@ -1062,7 +1087,8 @@ class SQLCompiler:
                 if hasattr(item, "resolve_expression") and not isinstance(
                     item, OrderBy
                 ):
-                    item = item.desc() if descending else item.asc()
+                    item_expr: BaseExpression = item  # type: ignore[assignment]
+                    item = item_expr.desc() if descending else item_expr.asc()
                 if isinstance(item, OrderBy):
                     results.append(
                         (item.prefix_references(f"{name}{LOOKUP_SEP}"), False)
@@ -1092,6 +1118,7 @@ class SQLCompiler:
         match. Executing SQL where this is not true is an error.
         """
         alias = alias or self.query.get_initial_alias()
+        assert alias is not None
         field, targets, meta, joins, path, transform_function = self.query.setup_joins(
             pieces, meta, alias
         )
@@ -1175,13 +1202,15 @@ class SQLCompiler:
             opts = self.query.get_model_meta()
             root_alias = self.query.get_initial_alias()
 
+        assert root_alias is not None  # Must be provided or set above
+
         # Setup for the case when only particular related fields should be
         # included in the related selection.
         fields_found = set()
         if requested is None:
             restricted = isinstance(self.query.select_related, dict)
             if restricted:
-                requested = self.query.select_related
+                requested = self.query.select_related  # type: ignore[assignment]
 
         def get_related_klass_infos(
             klass_info: dict, related_klass_infos: list
@@ -1205,7 +1234,7 @@ class SQLCompiler:
                             )
                         )
             else:
-                next = False
+                next = None
 
             if not select_related_descend(f, restricted, requested, select_mask):  # type: ignore[arg-type]
                 continue
@@ -1395,15 +1424,19 @@ class SQLCompiler:
                     path = []
                     yield "self"
                 else:
+                    assert klass_info is not None  # Only first iteration has None
                     field = klass_info["field"]
                     if klass_info["reverse"]:
                         field = field.remote_field
                     path = parent_path + [field.name]
                     yield LOOKUP_SEP.join(path)
-                queue.extend(
-                    (path, klass_info)
-                    for klass_info in klass_info.get("related_klass_infos", [])
-                )
+                if klass_info is not None:
+                    queue.extend(
+                        (path, related_klass_info)
+                        for related_klass_info in klass_info.get(
+                            "related_klass_infos", []
+                        )
+                    )
 
         if not self.klass_info:
             return []
@@ -1415,6 +1448,8 @@ class SQLCompiler:
                 col = _get_first_selected_col_from_model(klass_info)
             else:
                 for part in name.split(LOOKUP_SEP):
+                    if klass_info is None:
+                        break
                     klass_infos = (*klass_info.get("related_klass_infos", []),)
                     for related_klass_info in klass_infos:
                         field = related_klass_info["field"]
@@ -1481,6 +1516,7 @@ class SQLCompiler:
             results = self.execute_sql(
                 MULTI, chunked_fetch=chunked_fetch, chunk_size=chunk_size
             )
+        assert self.select is not None  # Set during query execution
         fields = [s[0] for s in self.select[0 : self.col_count]]
         converters = self.get_converters(fields)
         rows = chain.from_iterable(results)
@@ -1582,9 +1618,10 @@ class SQLCompiler:
 
     def explain_query(self) -> Generator[str, None, None]:
         result = list(self.execute_sql())
+        explain_info = self.query.explain_info
         # Some backends return 1 item tuples with strings, and others return
         # tuples with integers and strings. Flatten them out into strings.
-        format_ = self.query.explain_info.format
+        format_ = explain_info.format if explain_info is not None else None
         output_formatter = json.dumps if format_ and format_.lower() == "json" else str
         for row in result[0]:
             if not isinstance(row, str):
@@ -1594,6 +1631,7 @@ class SQLCompiler:
 
 
 class SQLInsertCompiler(SQLCompiler):
+    query: InsertQuery  # type: ignore[assignment]
     returning_fields: list | None = None
     returning_params: tuple = ()
 
@@ -1611,7 +1649,8 @@ class SQLInsertCompiler(SQLCompiler):
             sql, params = val, []
         elif hasattr(val, "as_sql"):
             # This is an expression, let's compile it.
-            sql, params = self.compile(val)
+            sql, params_tuple = self.compile(val)
+            params = list(params_tuple)
         elif hasattr(field, "get_placeholder"):
             # Some fields (e.g. geo fields) need special munging before
             # they can be inserted.
@@ -1627,7 +1666,7 @@ class SQLInsertCompiler(SQLCompiler):
         # the corresponding None parameter. See ticket #10888.
         params = self.connection.ops.modify_insert_params(sql, params)
 
-        return sql, params
+        return sql, list(params)  # Ensure params is a list
 
     def prepare_value(self, field: Any, value: Any) -> Any:
         """
@@ -1742,7 +1781,7 @@ class SQLInsertCompiler(SQLCompiler):
         placeholder_rows, param_rows = self.assemble_as_sql(fields, value_rows)
 
         on_conflict_suffix_sql = self.connection.ops.on_conflict_suffix_sql(
-            fields,
+            fields,  # type: ignore[arg-type]
             self.query.on_conflict,
             (f.column for f in self.query.update_fields),
             (f.column for f in self.query.unique_fields),
@@ -1753,7 +1792,7 @@ class SQLInsertCompiler(SQLCompiler):
         ):
             if self.connection.features.can_return_rows_from_bulk_insert:
                 result.append(
-                    self.connection.ops.bulk_insert_sql(fields, placeholder_rows)
+                    self.connection.ops.bulk_insert_sql(fields, placeholder_rows)  # type: ignore[arg-type]
                 )
                 params = param_rows
             else:
@@ -1763,16 +1802,18 @@ class SQLInsertCompiler(SQLCompiler):
                 result.append(on_conflict_suffix_sql)
             # Skip empty r_sql to allow subclasses to customize behavior for
             # 3rd party backends. Refs #19096.
-            r_sql, self.returning_params = self.connection.ops.return_insert_columns(
+            returning_cols = self.connection.ops.return_insert_columns(
                 self.returning_fields
             )
-            if r_sql:
-                result.append(r_sql)
-                params += [self.returning_params]
+            if returning_cols:
+                r_sql, self.returning_params = returning_cols
+                if r_sql:
+                    result.append(r_sql)
+                    params += [list(self.returning_params)]
             return [(" ".join(result), tuple(chain.from_iterable(params)))]
 
         if can_bulk:
-            result.append(self.connection.ops.bulk_insert_sql(fields, placeholder_rows))
+            result.append(self.connection.ops.bulk_insert_sql(fields, placeholder_rows))  # type: ignore[arg-type]
             if on_conflict_suffix_sql:
                 result.append(on_conflict_suffix_sql)
             return [(" ".join(result), tuple(p for ps in param_rows for p in ps))]
@@ -1892,11 +1933,12 @@ class SQLUpdateCompiler(SQLCompiler):
         parameters.
         """
         self.pre_sql_setup()
-        if not self.query.values:
+        query_values = getattr(self.query, "values", None)
+        if not query_values:
             return "", ()
         qn = self.quote_name_unless_alias
         values, update_params = [], []
-        for field, model, val in self.query.values:
+        for field, model, val in query_values:
             if hasattr(val, "resolve_expression"):
                 val = val.resolve_expression(
                     self.query, allow_joins=False, for_save=True
@@ -1947,7 +1989,7 @@ class SQLUpdateCompiler(SQLCompiler):
             params = []
         else:
             result.append(f"WHERE {where}")
-        return " ".join(result), tuple(update_params + params)
+        return " ".join(result), tuple(update_params + list(params))
 
     def execute_sql(self, result_type: str) -> int:
         """
@@ -1963,7 +2005,10 @@ class SQLUpdateCompiler(SQLCompiler):
         finally:
             if cursor:
                 cursor.close()
-        for query in self.query.get_related_updates():
+        related_update_queries = getattr(self.query, "get_related_updates", None)
+        if related_update_queries is None:
+            return rows
+        for query in related_update_queries():
             aux_rows = query.get_compiler().execute_sql(result_type)
             if is_empty and aux_rows:
                 rows = aux_rows
@@ -1983,7 +2028,8 @@ class SQLUpdateCompiler(SQLCompiler):
         # Ensure base table is in the query
         self.query.get_initial_alias()
         count = self.query.count_active_tables()
-        if not self.query.related_updates and count == 1:
+        related_updates = getattr(self.query, "related_updates", [])
+        if not related_updates and count == 1:
             return
         query = self.query.chain(klass=Query)
         query.select_related = False
@@ -1992,7 +2038,7 @@ class SQLUpdateCompiler(SQLCompiler):
         query.select = []
         fields = ["id"]
         related_ids_index = []
-        for related in self.query.related_updates:
+        for related in related_updates:
             # If a primary key chain exists to the targeted related update,
             # then the primary key value can be used for it.
             related_ids_index.append((related, 0))
@@ -2007,7 +2053,7 @@ class SQLUpdateCompiler(SQLCompiler):
         # Now we adjust the current query: reset the where clause and get rid
         # of all the tables we don't need (since they're in the sub-select).
         self.query.clear_where()
-        if self.query.related_updates or must_pre_select:
+        if related_updates or must_pre_select:
             # Either we're using the idents in multiple update queries (so
             # don't want them to change), or the db backend doesn't support
             # selecting from the updating table (e.g. MySQL).
@@ -2018,7 +2064,7 @@ class SQLUpdateCompiler(SQLCompiler):
                 for parent, index in related_ids_index:
                     related_ids[parent].extend(r[index] for r in rows)
             self.query.add_filter("id__in", idents)
-            self.query.related_ids = related_ids
+            self.query.related_ids = related_ids  # type: ignore[invalid-assignment]
         else:
             # The fast path. Filters and updates in one query.
             self.query.add_filter("id__in", query)
@@ -2041,7 +2087,10 @@ class SQLAggregateCompiler(SQLCompiler):
         sql = ", ".join(sql)
         params = tuple(params)
 
-        inner_query_sql, inner_query_params = self.query.inner_query.get_compiler(
+        inner_query = getattr(self.query, "inner_query", None)
+        if inner_query is None:
+            raise ValueError("Inner query expected for update with related ids")
+        inner_query_sql, inner_query_params = inner_query.get_compiler(
             elide_empty=self.elide_empty,
         ).as_sql(with_col_aliases=True)
         sql = f"SELECT {sql} FROM ({inner_query_sql}) subquery"

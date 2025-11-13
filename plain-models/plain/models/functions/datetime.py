@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from plain.models.sql.compiler import SQLCompiler
 
 
-class TimezoneMixin:
+class TimezoneMixin(Transform):
     tzinfo = None
 
     def get_tzname(self) -> str | None:
@@ -42,7 +42,7 @@ class TimezoneMixin:
 
 
 class Extract(TimezoneMixin, Transform):
-    lookup_name = None
+    lookup_name: str | None = None
     output_field = IntegerField()
 
     def __init__(
@@ -61,7 +61,9 @@ class Extract(TimezoneMixin, Transform):
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
+        # lookup_name is guaranteed to be str after __init__ validation
+        assert self.lookup_name is not None
         sql, params = compiler.compile(self.lhs)
         lhs_output_field = self.lhs.output_field
         if isinstance(lhs_output_field, DateTimeField):
@@ -91,7 +93,7 @@ class Extract(TimezoneMixin, Transform):
             # resolve_expression has already validated the output_field so this
             # assert should never be hit.
             raise ValueError("Tried to Extract from an invalid type.")
-        return sql, tuple(params) if isinstance(params, list) else params
+        return sql, list(params)
 
     def resolve_expression(
         self,
@@ -234,7 +236,7 @@ class Now(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         # PostgreSQL's CURRENT_TIMESTAMP means "the time at the start of the
         # transaction". Use STATEMENT_TIMESTAMP to be cross-compatible with
         # other databases.
@@ -247,7 +249,7 @@ class Now(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return self.as_sql(
             compiler, connection, template="CURRENT_TIMESTAMP(6)", **extra_context
         )
@@ -257,7 +259,7 @@ class Now(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return self.as_sql(
             compiler,
             connection,
@@ -267,7 +269,7 @@ class Now(Func):
 
 
 class TruncBase(TimezoneMixin, Transform):
-    kind = None
+    kind: str | None = None
     tzinfo = None
 
     def __init__(
@@ -282,7 +284,9 @@ class TruncBase(TimezoneMixin, Transform):
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
+        # kind is guaranteed to be str in subclasses
+        assert self.kind is not None
         sql, params = compiler.compile(self.lhs)
         tzname = None
         if isinstance(self.lhs.output_field, DateTimeField):
@@ -305,7 +309,7 @@ class TruncBase(TimezoneMixin, Transform):
             raise ValueError(
                 "Trunc only valid on DateField, TimeField, or DateTimeField."
             )
-        return sql, tuple(params) if isinstance(params, list) else params
+        return sql, list(params)
 
     def resolve_expression(
         self,
@@ -431,12 +435,12 @@ class TruncDate(TruncBase):
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         # Cast to date rather than truncate to date.
         sql, params = compiler.compile(self.lhs)
         tzname = self.get_tzname()
         sql, params = connection.ops.datetime_cast_date_sql(sql, tuple(params), tzname)
-        return sql, tuple(params) if isinstance(params, list) else params
+        return sql, list(params)
 
 
 class TruncTime(TruncBase):
@@ -446,12 +450,12 @@ class TruncTime(TruncBase):
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         # Cast to time rather than truncate to time.
         sql, params = compiler.compile(self.lhs)
         tzname = self.get_tzname()
         sql, params = connection.ops.datetime_cast_time_sql(sql, tuple(params), tzname)
-        return sql, tuple(params) if isinstance(params, list) else params
+        return sql, list(params)
 
 
 class TruncHour(TruncBase):

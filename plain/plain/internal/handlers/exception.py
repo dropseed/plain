@@ -20,15 +20,15 @@ from plain.views.errors import ErrorView
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from plain.http import Request, Response
+    from plain.http import Request, Response, ResponseBase
 
 
 request_logger = logging.getLogger("plain.request")
 
 
 def convert_exception_to_response(
-    get_response: Callable[[Request], Response],
-) -> Callable[[Request], Response]:
+    get_response: Callable[[Request], ResponseBase],
+) -> Callable[[Request], ResponseBase]:
     """
     Wrap the given get_response callable in exception-to-response conversion.
 
@@ -43,7 +43,7 @@ def convert_exception_to_response(
     """
 
     @wraps(get_response)
-    def inner(request: Request) -> Response:
+    def inner(request: Request) -> ResponseBase:
         try:
             response = get_response(request)
         except Exception as exc:

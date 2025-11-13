@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.87.0](https://github.com/dropseed/plain/releases/plain@0.87.0) (2025-11-12)
+
+### What's changed
+
+- Internal classes now use abstract base classes with `@abstractmethod` decorators instead of raising `NotImplementedError`, improving type checking and IDE support ([91b329a](https://github.com/dropseed/plain/commit/91b329a8adb477031c4358e638b12f35f19bb85d), [81b5f88](https://github.com/dropseed/plain/commit/81b5f88a4bd39785f6b19c3c00c0ed23a36fb72f), [d2e2423](https://github.com/dropseed/plain/commit/d2e24235f497a92f45d5a21fc83d802897c2dec0), [61e7b5a](https://github.com/dropseed/plain/commit/61e7b5a0c8675aaaf65f0a626ff7959a786dca7f))
+- Updated to latest version of `ty` type checker and fixed type errors and warnings throughout the codebase ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcefa929058be517cb1d4ab35bd73a89f26b8))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.86.2](https://github.com/dropseed/plain/releases/plain@0.86.2) (2025-11-11)
 
 ### What's changed

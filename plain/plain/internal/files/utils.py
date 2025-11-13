@@ -8,7 +8,7 @@ from plain.exceptions import SuspiciousFileOperation
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Any
+    from typing import IO, Any
 
 
 def validate_file_name(name: str, allow_relative_path: bool = False) -> str:
@@ -40,6 +40,9 @@ class FileProxyMixin:
             def __init__(self, file):
                 self.file = file
     """
+
+    # Expected to be set by subclasses
+    file: IO[Any]
 
     encoding = property(lambda self: self.file.encoding)
     fileno = property(lambda self: self.file.fileno)

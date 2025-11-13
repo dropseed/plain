@@ -5,6 +5,7 @@ discarded within when executing a migration.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
     from plain.models.sql.compiler import SQLCompiler
 
 
-class Reference:
+class Reference(ABC):
     """Base class that defines the reference interface."""
 
     def references_table(self, table: str) -> bool:
@@ -45,10 +46,8 @@ class Reference:
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {str(self)!r}>"
 
-    def __str__(self) -> str:
-        raise NotImplementedError(
-            "Subclasses must define how they should be converted to string."
-        )
+    @abstractmethod
+    def __str__(self) -> str: ...
 
 
 class Table(Reference):
@@ -268,7 +267,7 @@ class Expressions(TableColumns):
         self.quote_value = quote_value
         columns = [
             col.target.column
-            for col in self.compiler.query._gen_cols([self.expressions])
+            for col in self.compiler.query._gen_cols(iter([self.expressions]))
         ]
         super().__init__(table, columns)
 
@@ -285,7 +284,7 @@ class Expressions(TableColumns):
             return
         expressions = deepcopy(self.expressions)
         self.columns = []
-        for col in self.compiler.query._gen_cols([expressions]):
+        for col in self.compiler.query._gen_cols(iter([expressions])):
             if col.target.column == old_column:
                 col.target.column = new_column
             self.columns.append(col.target.column)

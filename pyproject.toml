@@ -34,7 +34,10 @@ dev = [
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
+    # Type checking and better dev experience
     "ty>=0.0.1a21",
+    "psycopg[binary]>=3.2.12",
+    "mysqlclient>=2.2.7",
 ]
 
 [tool.uv.sources]

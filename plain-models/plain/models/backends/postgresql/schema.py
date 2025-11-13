@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from psycopg import sql  # type: ignore[import-untyped]
@@ -11,12 +12,16 @@ from plain.models.backends.utils import strip_quotes
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    from plain.models.backends.postgresql.base import PostgreSQLDatabaseWrapper
     from plain.models.base import Model
-    from plain.models.fields.core import BaseField
+    from plain.models.fields import Field
     from plain.models.indexes import Index
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
+    # Type checker hint: connection is always PostgreSQLDatabaseWrapper in this class
+    connection: PostgreSQLDatabaseWrapper
+
     # Setting all constraints to IMMEDIATE to allow changing data in the same
     # transaction.
     sql_update_with_default = (
@@ -73,16 +78,16 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             value = value.replace("%", "%%")
         return sql.quote(value, self.connection.connection)
 
-    def _field_indexes_sql(
-        self, model: type[Model], field: BaseField
-    ) -> list[Statement]:
+    def _field_indexes_sql(self, model: type[Model], field: Field) -> list[Statement]:
         output = super()._field_indexes_sql(model, field)
         like_index_statement = self._create_like_index_sql(model, field)
         if like_index_statement is not None:
             output.append(like_index_statement)
         return output
 
-    def _field_data_type(self, field: BaseField) -> str | None:
+    def _field_data_type(
+        self, field: Field
+    ) -> str | None | Callable[[dict[str, Any]], str]:
         if field.is_relation:
             return field.rel_db_type(self.connection)
         return self.connection.data_types.get(
@@ -90,9 +95,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             field.db_type(self.connection),
         )
 
-    def _field_base_data_types(
-        self, field: BaseField
-    ) -> Generator[str | None, None, None]:
+    def _field_base_data_types(self, field: Field) -> Generator[str | None, None, None]:
         # Yield base data types for array fields.
         if field.base_field.get_internal_type() == "ArrayField":  # type: ignore[attr-defined]
             yield from self._field_base_data_types(field.base_field)  # type: ignore[attr-defined]
@@ -100,7 +103,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             yield self._field_data_type(field.base_field)  # type: ignore[attr-defined]
 
     def _create_like_index_sql(
-        self, model: type[Model], field: BaseField
+        self, model: type[Model], field: Field
     ) -> Statement | None:
         """
         Return the statement to create an index with varchar operator pattern
@@ -137,7 +140,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 )
         return None
 
-    def _using_sql(self, new_field: BaseField, old_field: BaseField) -> str:
+    def _using_sql(self, new_field: Field, old_field: Field) -> str:
         using_sql = " USING %(column)s::%(type)s"
         new_internal_type = new_field.get_internal_type()
         old_internal_type = old_field.get_internal_type()
@@ -161,8 +164,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     def _alter_column_type_sql(
         self,
         model: type[Model],
-        old_field: BaseField,
-        new_field: BaseField,
+        old_field: Field,
+        new_field: Field,
         new_type: str,
         old_collation: str | None,
         new_collation: str | None,
@@ -274,8 +277,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     def _alter_field(
         self,
         model: type[Model],
-        old_field: BaseField,
-        new_field: BaseField,
+        old_field: Field,
+        new_field: Field,
         old_type: str,
         new_type: str,
         old_db_params: dict[str, Any],
@@ -361,7 +364,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         self,
         model: type[Model],
         *,
-        fields: list[BaseField] | None = None,
+        fields: list[Field] | None = None,
         name: str | None = None,
         suffix: str = "",
         using: str = "",

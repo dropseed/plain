@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-auth@0.21.0) (2025-11-12)
+
+### What's changed
+
+- Improved type checking compatibility by adding type ignore comment for mixin method resolution in `AuthViewMixin` ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcefa92))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.7](https://github.com/dropseed/plain/releases/plain-auth@0.20.7) (2025-10-31)
 
 ### What's changed

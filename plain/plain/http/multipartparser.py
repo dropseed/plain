@@ -424,7 +424,7 @@ class MultiPartParser:
         # (Maybe add handler.free_file to complement new_file)
         for handler in self._upload_handlers:
             if hasattr(handler, "file"):
-                handler.file.close()
+                handler.file.close()  # type: ignore[union-attr]
 
 
 class LazyStream:
@@ -503,7 +503,7 @@ class LazyStream:
         Replace the producer with an empty list. Any leftover bytes that have
         already been read will still be reported upon read() and/or next().
         """
-        self._producer = []
+        self._producer = iter([])
 
     def __iter__(self) -> LazyStream:
         return self

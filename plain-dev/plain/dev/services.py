@@ -33,6 +33,8 @@ class ServicesProcess(ProcessManager):
         self.prepare_log()
         self.init_poncho(print)
 
+        assert self.poncho is not None, "poncho should be initialized"
+
         try:
             assert self.poncho is not None, "poncho should be initialized"
             services = self.get_services(APP_PATH.parent)

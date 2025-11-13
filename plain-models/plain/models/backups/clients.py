@@ -79,10 +79,11 @@ class PostgresBackupClient:
         host = settings_dict.get("HOST")
         port = settings_dict.get("PORT")
         dbname = settings_dict.get("NAME")
+        assert dbname is not None, "Database NAME is required in settings"
         user = settings_dict.get("USER")
 
         # Build common connection args
-        conn_args = []
+        conn_args: list[str] = []
         if user:
             conn_args += ["-U", user]
         if host:

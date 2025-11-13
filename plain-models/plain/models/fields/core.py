@@ -12,7 +12,7 @@ import warnings
 from base64 import b64decode, b64encode
 from collections.abc import Callable, Sequence
 from functools import cached_property, total_ordering
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
 
 from plain import exceptions, preflight, validators
 from plain.models.constants import LOOKUP_SEP
@@ -34,7 +34,6 @@ from plain.utils.ipv6 import clean_ipv6_address
 from plain.utils.itercompat import is_iterable
 
 from ..registry import models_registry
-from .mixins import CheckFieldDefaultMixin
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
@@ -130,8 +129,8 @@ class BaseField(RegisterLookupMixin, Generic[T]):
     # These track each time a Field instance is created. Used to retain order.
     # The auto_creation_counter is used for fields that Plain implicitly
     # creates, creation_counter is used for all user-specified fields.
-    creation_counter = 0
-    auto_creation_counter = -1
+    creation_counter: int = 0
+    auto_creation_counter: int = -1
     default_validators = []  # Default set of validators
     default_error_messages = {
         "invalid_choice": "Value %(value)r is not a valid choice.",
@@ -183,7 +182,7 @@ class BaseField(RegisterLookupMixin, Generic[T]):
         error_messages: dict[str, str] | None = None,
         db_comment: str | None = None,
     ):
-        self.name = None  # Set by set_attributes_from_name
+        self.name: str | None = None  # Set by set_attributes_from_name
         self.max_length = max_length
         self.required, self.allow_null = required, allow_null
         self.remote_field = rel
@@ -243,6 +242,7 @@ class BaseField(RegisterLookupMixin, Generic[T]):
         Check if field name is valid, i.e. 1) does not end with an
         underscore, 2) does not contain "__" and 3) is not "id".
         """
+        assert self.name is not None, "Field name must be set before preflight checks"
         if self.name.endswith("_"):
             return [
                 PreflightResult(
@@ -502,7 +502,7 @@ class BaseField(RegisterLookupMixin, Generic[T]):
         elif path.startswith("plain.models.fields"):
             path = path.replace("plain.models.fields", "plain.models")
         # Return basic info - other fields should override this.
-        return (self.name, path, [], keywords)
+        return (self.name, path, [], keywords)  # type: ignore[return-value]
 
     def clone(self) -> BaseField:
         """
@@ -599,7 +599,7 @@ class BaseField(RegisterLookupMixin, Generic[T]):
             # usage.
             state.pop("_get_default", None)
             return _empty, (self.__class__,), state
-        return _load_field, (
+        return _load_field, (  # type: ignore[return-value]
             self.model.model_options.package_label,
             self.model.model_options.object_name,
             self.name,
@@ -781,7 +781,7 @@ class BaseField(RegisterLookupMixin, Generic[T]):
         self, connection: BaseDatabaseWrapper
     ) -> list[Callable[..., Any]]:
         if hasattr(self, "from_db_value"):
-            return [self.from_db_value]
+            return [cast(Callable[..., Any], self.from_db_value)]
         return []
 
     @property
@@ -884,6 +884,7 @@ class BaseField(RegisterLookupMixin, Generic[T]):
             )
 
     def get_attname(self) -> str:
+        assert self.name is not None, "Field name must be set"
         return self.name
 
     def get_attname_column(self) -> tuple[str, str]:
@@ -961,10 +962,10 @@ class BaseField(RegisterLookupMixin, Generic[T]):
                 if not blank_defined:
                     choices = blank_choice + choices
             return choices
-        rel_model = self.remote_field.model
-        limit_choices_to = limit_choices_to or self.get_limit_choices_to()
+        rel_model = self.remote_field.model  # type: ignore[union-attr]
+        limit_choices_to = limit_choices_to or self.get_limit_choices_to()  # type: ignore[attr-defined]
         choice_func = operator.attrgetter(
-            self.remote_field.get_related_field().attname
+            cast(Any, self.remote_field.get_related_field()).attname  # type: ignore[union-attr]
             if hasattr(self.remote_field, "get_related_field")
             else "id"
         )
@@ -997,6 +998,7 @@ class BaseField(RegisterLookupMixin, Generic[T]):
     flatchoices = property(_get_flatchoices)
 
     def save_form_data(self, instance: Any, data: Any) -> None:
+        assert self.name is not None, "Field name must be set"
         setattr(instance, self.name, data)
 
     def value_from_object(self, obj: Any) -> Any:
@@ -1916,9 +1918,9 @@ class PositiveIntegerRelDbTypeMixin:
         db_type.
         """
         if connection.features.related_fields_match_type:
-            return self.db_type(connection)
+            return self.db_type(connection)  # type: ignore[attr-defined]
         else:
-            return self.integer_field_class().db_type(connection=connection)
+            return self.integer_field_class().db_type(connection=connection)  # type: ignore[misc]
 
 
 class PositiveBigIntegerField(PositiveIntegerRelDbTypeMixin, BigIntegerField):
@@ -2245,7 +2247,7 @@ class PrimaryKeyField(BigIntegerField):
 
     def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         # PrimaryKeyField takes no parameters, so we return an empty kwargs dict
-        return (self.name, "plain.models.PrimaryKeyField", [], {})
+        return (self.name, "plain.models.PrimaryKeyField", [], {})  # type: ignore[return-value]
 
     def validate(self, value: Any, model_instance: Any) -> None:
         pass
@@ -2265,7 +2267,7 @@ class PrimaryKeyField(BigIntegerField):
         return BigIntegerField().db_type(connection=connection)
 
 
-class JSONField(CheckFieldDefaultMixin, BaseField):
+class JSONField(BaseField):
     empty_strings_allowed = False
     description = "A JSON object"
     default_error_messages = {
@@ -2288,8 +2290,31 @@ class JSONField(CheckFieldDefaultMixin, BaseField):
         self.decoder = decoder
         super().__init__(**kwargs)
 
+    def _check_default(self) -> list[PreflightResult]:
+        if (
+            self.has_default()
+            and self.default is not None
+            and not callable(self.default)
+        ):
+            return [
+                preflight.PreflightResult(
+                    fix=(
+                        f"{self.__class__.__name__} default should be a callable instead of an instance "
+                        "so that it's not shared between all field instances. "
+                        "Use a callable instead, e.g., use `{}` instead of "
+                        "`{}`.".format(*self._default_fix)
+                    ),
+                    obj=self,
+                    id="fields.invalid_choice_mixin_default",
+                    warning=True,
+                )
+            ]
+        else:
+            return []
+
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         errors = super().preflight(**kwargs)
+        errors.extend(self._check_default())
         errors.extend(self._check_supported())
         return errors
 

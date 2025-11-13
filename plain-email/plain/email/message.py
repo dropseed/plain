@@ -439,7 +439,7 @@ class EmailMessage:
         return attachment
 
     def _create_attachment(
-        self, filename: str | None, content: str | bytes, mimetype: str | None = None
+        self, filename: str | None, content: str | bytes, mimetype: str
     ) -> SafeMIMEText | SafeMIMEMessage | MIMEBase:
         """
         Convert the filename, content, mimetype triple into a MIME attachment

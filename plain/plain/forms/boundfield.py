@@ -58,7 +58,7 @@ class BoundField:
         associated Form has specified auto_id. Return an empty string otherwise.
         """
         auto_id = self._form._auto_id  # Boolean or string
-        if auto_id and "%s" in str(auto_id):
+        if auto_id and isinstance(auto_id, str) and "%s" in auto_id:
             return auto_id % self.html_name
         elif auto_id:
             return self.html_name

@@ -37,9 +37,10 @@ class ExpiringSigner(Signer):
     def sign_object(
         self,
         obj: Any,
+        *,
+        expires_in: int,
         serializer: type = JSONSerializer,
         compress: bool = False,
-        expires_in: int | None = None,
     ) -> str:
         """
         Return URL-safe, hmac signed base64 compressed JSON string.
@@ -81,11 +82,12 @@ class ExpiringSigner(Signer):
 
 def dumps(
     obj: Any,
+    *,
+    expires_in: int,
     key: str | None = None,
     salt: str = "plain.loginlink",
     serializer: type = JSONSerializer,
     compress: bool = False,
-    expires_in: int | None = None,
 ) -> str:
     """
     Return URL-safe, hmac signed base64 compressed JSON string. If key is
@@ -104,12 +106,13 @@ def dumps(
     The serializer is expected to return a bytestring.
     """
     return ExpiringSigner(key=key, salt=salt).sign_object(
-        obj, serializer=serializer, compress=compress, expires_in=expires_in
+        obj, expires_in=expires_in, serializer=serializer, compress=compress
     )
 
 
 def loads(
     s: str,
+    *,
     key: str | None = None,
     salt: str = "plain.loginlink",
     serializer: type = JSONSerializer,

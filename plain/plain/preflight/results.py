@@ -34,4 +34,4 @@ class PreflightResult:
         return f"{obj}: {id_part}{self.fix}"
 
     def is_silenced(self) -> bool:
-        return self.id and self.id in settings.PREFLIGHT_SILENCED_RESULTS
+        return bool(self.id and self.id in settings.PREFLIGHT_SILENCED_RESULTS)

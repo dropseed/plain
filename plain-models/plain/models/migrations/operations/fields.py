@@ -124,6 +124,7 @@ class AddField(FieldOperation):
                 package_label, self.model_name
             )
             field = to_model._model_meta.get_field(self.name)
+            assert self.field is not None
             if not self.preserve_default:
                 field.default = self.field.default
             schema_editor.add_field(
@@ -158,6 +159,7 @@ class AddField(FieldOperation):
             elif isinstance(operation, RemoveField):
                 return []
             elif isinstance(operation, RenameField):
+                assert self.field is not None  # AddField always has a field
                 return [
                     AddField(
                         model_name=self.model_name,
@@ -265,6 +267,7 @@ class AlterField(FieldOperation):
             )
             from_field = from_model._model_meta.get_field(self.name)
             to_field = to_model._model_meta.get_field(self.name)
+            assert self.field is not None
             if not self.preserve_default:
                 to_field.default = self.field.default
             schema_editor.alter_field(from_model, from_field, to_field)
@@ -288,6 +291,7 @@ class AlterField(FieldOperation):
         elif (
             isinstance(operation, RenameField)
             and self.is_same_field_operation(operation)
+            and self.field is not None
             and self.field.db_column is None
         ):
             return [
