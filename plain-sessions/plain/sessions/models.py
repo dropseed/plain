@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
-
 from plain.models import (
     CharField,
     DateTimeField,
-    Field,
     Index,
     JSONField,
     Model,
@@ -18,10 +14,10 @@ from plain.models import (
 
 @register_model
 class Session(Model):
-    session_key: Field[str] = CharField(max_length=40)
-    session_data: Field[dict[str, Any]] = JSONField(default=dict, required=False)
-    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
-    expires_at: Field[datetime | None] = DateTimeField(allow_null=True)
+    session_key = CharField(max_length=40)
+    session_data = JSONField(default=dict, required=False)
+    created_at = DateTimeField(auto_now_add=True)
+    expires_at = DateTimeField(allow_null=True)
 
     model_options = Options(
         indexes=[

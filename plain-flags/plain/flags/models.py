@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
-from typing import Any
 
 from plain.exceptions import ValidationError
 from plain.models import (
@@ -10,7 +8,6 @@ from plain.models import (
     BooleanField,
     CharField,
     DateTimeField,
-    Field,
     ForeignKey,
     JSONField,
     Model,
@@ -28,19 +25,19 @@ def validate_flag_name(value: str) -> None:
 
 @register_model
 class Flag(Model):
-    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
-    updated_at: Field[datetime] = DateTimeField(auto_now=True)
-    name: Field[str] = CharField(max_length=255, validators=[validate_flag_name])
+    created_at = DateTimeField(auto_now_add=True)
+    updated_at = DateTimeField(auto_now=True)
+    name = CharField(max_length=255, validators=[validate_flag_name])
 
     # Optional description that can be filled in after the flag is used/created
-    description: Field[str] = TextField(required=False)
+    description = TextField(required=False)
 
     # To manually disable a flag before completing deleting
     # (good to disable first to make sure the code doesn't use the flag anymore)
-    enabled: Field[bool] = BooleanField(default=True)
+    enabled = BooleanField(default=True)
 
     # To provide an easier way to see if a flag is still being used
-    used_at: Field[datetime | None] = DateTimeField(required=False, allow_null=True)
+    used_at = DateTimeField(required=False, allow_null=True)
 
     model_options = Options(
         constraints=[
@@ -54,11 +51,11 @@ class Flag(Model):
 
 @register_model
 class FlagResult(Model):
-    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
-    updated_at: Field[datetime] = DateTimeField(auto_now=True)
-    flag: Field[Flag] = ForeignKey(Flag, on_delete=CASCADE)
-    key: Field[str] = CharField(max_length=255)
-    value: Field[Any] = JSONField()
+    created_at = DateTimeField(auto_now_add=True)
+    updated_at = DateTimeField(auto_now=True)
+    flag = ForeignKey(Flag, on_delete=CASCADE)
+    key = CharField(max_length=255)
+    value = JSONField()
 
     model_options = Options(
         constraints=[

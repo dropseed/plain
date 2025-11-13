@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain.models import CharField, DateTimeField, Field, Model, Options
+from plain.models import Options
+from plain.models.base import Model
 from plain.models.connections import DatabaseConnection
 from plain.models.db import DatabaseError
+from plain.models.fields.core import CharField, DateTimeField
 from plain.models.meta import Meta
 from plain.models.registry import ModelsRegistry
 from plain.utils.functional import classproperty
@@ -43,11 +44,9 @@ class MigrationRecorder:
             _models_registry.ready = True
 
             class Migration(Model):
-                app: Field[str] = CharField(max_length=255)
-                name: Field[str] = CharField(max_length=255)
-                applied: Field[datetime | None] = DateTimeField(
-                    default=now, allow_null=True
-                )
+                app = CharField(max_length=255)
+                name = CharField(max_length=255)
+                applied = DateTimeField(default=now, allow_null=True)
 
                 # Use isolated models registry for migrations
                 _model_meta = Meta(models_registry=_models_registry)

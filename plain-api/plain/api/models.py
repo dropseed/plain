@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import binascii
 import os
-from datetime import datetime
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from plain.models import (
     CharField,
     DateTimeField,
-    Field,
     Model,
     Options,
     UniqueConstraint,
@@ -23,19 +21,17 @@ def generate_token() -> str:
 
 @register_model
 class APIKey(Model):
-    uuid: Field[UUID | None] = UUIDField(default=uuid4, allow_null=True)
-    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
-    updated_at: Field[datetime] = DateTimeField(auto_now=True)
-    expires_at: Field[datetime | None] = DateTimeField(required=False, allow_null=True)
-    last_used_at: Field[datetime | None] = DateTimeField(
-        required=False, allow_null=True
-    )
+    uuid = UUIDField(default=uuid4, allow_null=True)
+    created_at = DateTimeField(auto_now_add=True)
+    updated_at = DateTimeField(auto_now=True)
+    expires_at = DateTimeField(required=False, allow_null=True)
+    last_used_at = DateTimeField(required=False, allow_null=True)
 
-    name: Field[str] = CharField(max_length=255, required=False)
+    name = CharField(max_length=255, required=False)
 
-    token: Field[str] = CharField(max_length=40, default=generate_token)
+    token = CharField(max_length=40, default=generate_token)
 
-    api_version: Field[str] = CharField(max_length=255, required=False)
+    api_version = CharField(max_length=255, required=False)
 
     model_options = Options(
         constraints=[

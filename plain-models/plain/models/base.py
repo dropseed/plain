@@ -4,7 +4,7 @@ import copy
 import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import chain
-from typing import TYPE_CHECKING, Any, dataclass_transform
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from plain.models.meta import Meta
@@ -27,7 +27,7 @@ from plain.models.exceptions import (
     MultipleObjectsReturnedDescriptor,
 )
 from plain.models.expressions import RawSQL, Value
-from plain.models.fields.core import NOT_PROVIDED, BaseField, PrimaryKeyField
+from plain.models.fields.core import NOT_PROVIDED, PrimaryKeyField
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.meta import Meta
 from plain.models.options import Options
@@ -48,17 +48,8 @@ class Deferred:
 DEFERRED = Deferred()
 
 
-@dataclass_transform(
-    eq_default=True,
-    kw_only_default=True,
-    field_specifiers=(BaseField,),
-)
 class ModelBase(type):
-    """Metaclass for all models.
-
-    The dataclass_transform decorator tells type checkers to synthesize __init__
-    signatures from field type annotations, providing better IDE support and type checking.
-    """
+    """Metaclass for all models."""
 
     def __new__(
         cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any], **kwargs: Any

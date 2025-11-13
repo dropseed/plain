@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import datetime
-from typing import Any, Self
+from typing import Self
 
 from plain.models import (
     CharField,
     DateTimeField,
-    Field,
     Index,
     JSONField,
     Model,
@@ -31,13 +29,11 @@ class CachedItemQuerySet(QuerySet["CachedItem"]):
 
 @register_model
 class CachedItem(Model):
-    key: Field[str] = CharField(max_length=255)
-    value: Field[Any | None] = JSONField(required=False, allow_null=True)
-    expires_at: Field[datetime.datetime | None] = DateTimeField(
-        required=False, allow_null=True
-    )
-    created_at: Field[datetime.datetime] = DateTimeField(auto_now_add=True)
-    updated_at: Field[datetime.datetime] = DateTimeField(auto_now=True)
+    key = CharField(max_length=255)
+    value = JSONField(required=False, allow_null=True)
+    expires_at = DateTimeField(required=False, allow_null=True)
+    created_at = DateTimeField(auto_now_add=True)
+    updated_at = DateTimeField(auto_now=True)
 
     query = CachedItemQuerySet()
 
