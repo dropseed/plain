@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import Any
 
 NOT_PROVIDED = object()
 
 
-class FieldCacheMixin(ABC):
+class FieldCacheMixin:
     """Provide an API for working with the model's fields value cache."""
 
-    @abstractmethod
-    def get_cache_name(self) -> str: ...
+    def get_cache_name(self) -> str:
+        raise NotImplementedError
 
     def get_cached_value(self, instance: Any, default: Any = NOT_PROVIDED) -> Any:
         cache_name = self.get_cache_name()
