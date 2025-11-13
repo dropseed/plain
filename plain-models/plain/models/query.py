@@ -7,6 +7,7 @@ from __future__ import annotations
 import copy
 import operator
 import warnings
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from functools import cached_property
 from itertools import chain, islice
@@ -62,7 +63,7 @@ MAX_GET_RESULTS = 21
 REPR_OUTPUT_SIZE = 20
 
 
-class BaseIterable:
+class BaseIterable(ABC):
     def __init__(
         self,
         queryset: QuerySet[Any],
@@ -73,10 +74,8 @@ class BaseIterable:
         self.chunked_fetch = chunked_fetch
         self.chunk_size = chunk_size
 
-    def __iter__(self) -> Iterator[Any]:
-        raise NotImplementedError(
-            "subclasses of BaseIterable must provide an __iter__() method"
-        )
+    @abstractmethod
+    def __iter__(self) -> Iterator[Any]: ...
 
 
 class ModelIterable(BaseIterable):
