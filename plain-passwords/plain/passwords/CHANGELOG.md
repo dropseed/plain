@@ -1,5 +1,16 @@
 # plain-passwords changelog
 
+## [0.16.0](https://github.com/dropseed/plain/releases/plain-passwords@0.16.0) (2025-11-12)
+
+### What's changed
+
+- `BasePasswordHasher` now inherits from `ABC` and uses `@abstractmethod` decorators for better type checking and enforcement ([4f2d1d4](https://github.com/dropseed/plain/commit/4f2d1d47c0))
+- Improved type annotations and fixed type checker warnings throughout the package ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcefa92))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.1](https://github.com/dropseed/plain/releases/plain-passwords@0.15.1) (2025-10-31)
 
 ### What's changed
