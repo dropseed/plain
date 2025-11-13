@@ -84,8 +84,11 @@ class BaseDatabaseOperations(ABC):
         """
         return len(objs)
 
-    @abstractmethod
-    def format_for_duration_arithmetic(self, sql: str) -> str: ...
+    def format_for_duration_arithmetic(self, sql: str) -> str:
+        raise NotImplementedError(
+            "subclasses of BaseDatabaseOperations may require a "
+            "format_for_duration_arithmetic() method."
+        )
 
     def unification_cast_sql(self, output_field: Field) -> str:
         """
