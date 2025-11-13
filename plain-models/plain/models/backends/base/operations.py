@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import decimal
 import json
+from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     from plain.models.fields import Field
 
 
-class BaseDatabaseOperations:
+class BaseDatabaseOperations(ABC):
     """
     Encapsulate backend-specific differences, such as the way a backend
     performs ordering or calculates the ID of a recently-inserted row.
@@ -83,11 +84,8 @@ class BaseDatabaseOperations:
         """
         return len(objs)
 
-    def format_for_duration_arithmetic(self, sql: str) -> str:
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a "
-            "format_for_duration_arithmetic() method."
-        )
+    @abstractmethod
+    def format_for_duration_arithmetic(self, sql: str) -> str: ...
 
     def unification_cast_sql(self, output_field: Field) -> str:
         """
@@ -97,6 +95,7 @@ class BaseDatabaseOperations:
         """
         return "%s"
 
+    @abstractmethod
     def date_extract_sql(
         self, lookup_type: str, sql: str, params: list[Any] | tuple[Any, ...]
     ) -> tuple[str, list[Any] | tuple[Any, ...]]:
@@ -104,11 +103,9 @@ class BaseDatabaseOperations:
         Given a lookup_type of 'year', 'month', or 'day', return the SQL that
         extracts a value from the given date field field_name.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a date_extract_sql() "
-            "method"
-        )
+        ...
 
+    @abstractmethod
     def date_trunc_sql(
         self,
         lookup_type: str,
@@ -124,33 +121,27 @@ class BaseDatabaseOperations:
         If `tzname` is provided, the given value is truncated in a specific
         timezone.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a date_trunc_sql() "
-            "method."
-        )
+        ...
 
+    @abstractmethod
     def datetime_cast_date_sql(
         self, sql: str, params: list[Any] | tuple[Any, ...], tzname: str | None
     ) -> tuple[str, list[Any] | tuple[Any, ...]]:
         """
         Return the SQL to cast a datetime value to date value.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a "
-            "datetime_cast_date_sql() method."
-        )
+        ...
 
+    @abstractmethod
     def datetime_cast_time_sql(
         self, sql: str, params: list[Any] | tuple[Any, ...], tzname: str | None
     ) -> tuple[str, list[Any] | tuple[Any, ...]]:
         """
         Return the SQL to cast a datetime value to time value.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a "
-            "datetime_cast_time_sql() method"
-        )
+        ...
 
+    @abstractmethod
     def datetime_extract_sql(
         self,
         lookup_type: str,
@@ -163,11 +154,9 @@ class BaseDatabaseOperations:
         'second', return the SQL that extracts a value from the given
         datetime field field_name.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a datetime_extract_sql() "
-            "method"
-        )
+        ...
 
+    @abstractmethod
     def datetime_trunc_sql(
         self,
         lookup_type: str,
@@ -180,11 +169,9 @@ class BaseDatabaseOperations:
         'second', return the SQL that truncates the given datetime field
         field_name to a datetime object with only the given specificity.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a datetime_trunc_sql() "
-            "method"
-        )
+        ...
 
+    @abstractmethod
     def time_trunc_sql(
         self,
         lookup_type: str,
@@ -200,9 +187,7 @@ class BaseDatabaseOperations:
         If `tzname` is provided, the given value is truncated in a specific
         timezone.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a time_trunc_sql() method"
-        )
+        ...
 
     def time_extract_sql(
         self, lookup_type: str, sql: str, params: list[Any] | tuple[Any, ...]
@@ -358,14 +343,13 @@ class BaseDatabaseOperations:
         """
         return None
 
+    @abstractmethod
     def no_limit_value(self) -> int | None:
         """
         Return the value to use for the LIMIT when we are wanting "LIMIT
         infinity". Return None if the limit clause can be omitted in this case.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a no_limit_value() method"
-        )
+        ...
 
     def pk_default_value(self) -> str:
         """
@@ -399,24 +383,22 @@ class BaseDatabaseOperations:
         """
         return None
 
+    @abstractmethod
     def bulk_insert_sql(
         self, fields: list[Field], placeholder_rows: list[list[str]]
     ) -> str:
         """
         Return the SQL for bulk inserting rows.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a bulk_insert_sql() method"
-        )
+        ...
 
+    @abstractmethod
     def fetch_returned_insert_rows(self, cursor: Any) -> list[Any]:
         """
         Given a cursor object that has just performed an INSERT...RETURNING
         statement into a table, return the list of returned data.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a fetch_returned_insert_rows() method"
-        )
+        ...
 
     def compiler(self, compiler_name: str) -> type[Any]:
         """
@@ -428,14 +410,13 @@ class BaseDatabaseOperations:
             self._cache = import_module(self.compiler_module)
         return getattr(self._cache, compiler_name)
 
+    @abstractmethod
     def quote_name(self, name: str) -> str:
         """
         Return a quoted version of the given table, index, or column name. Do
         not quote the given name if it's already been quoted.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a quote_name() method"
-        )
+        ...
 
     def regex_lookup(self, lookup_type: str) -> str:
         """
