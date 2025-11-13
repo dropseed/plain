@@ -46,11 +46,6 @@ Convert to ABC pattern with `@abstractmethod`:
 - Methods: `state_forwards()`, `database_forwards()`
 - Core migration system
 
-**FileUploadHandler** (2 abstract methods)
-
-- Location: `plain/plain/internal/files/uploadhandler.py:81`
-- Methods: `receive_data_chunk()`, `file_complete()`
-
 ### Medium Priority (Plugin patterns)
 
 **BaseEmailBackend** (1 abstract method)
@@ -102,6 +97,13 @@ See separate proposal: `plain-models-database-abstract-base-classes.md`
 
 Good examples to follow!
 
+## Completed
+
+**FileUploadHandler** - `plain/plain/internal/files/uploadhandler.py:81` ✅
+
+- Converted 2 abstract methods: `receive_data_chunk()`, `file_complete()`
+- All tests passing, type checking passes
+
 ## Implementation
 
 For each class:
@@ -115,8 +117,8 @@ For each class:
 
 ## Statistics
 
-- **15 strong candidates**
-- **38+ abstract methods** total
+- **14 strong candidates**
+- **36+ abstract methods** total
 - **8 packages** affected: plain-models, plain-oauth, plain-email, plain-passwords, plain-admin, plain-flags, plain, plain-scan
 
 ## Benefits

@@ -5,6 +5,7 @@ Base file upload handler classes, and the built-in concrete subclasses
 from __future__ import annotations
 
 import os
+from abc import ABC, abstractmethod
 from io import BytesIO
 from typing import TYPE_CHECKING
 
@@ -78,7 +79,7 @@ class StopFutureHandlers(UploadFileException):
     pass
 
 
-class FileUploadHandler:
+class FileUploadHandler(ABC):
     """
     Base class for streaming upload handlers.
     """
@@ -140,15 +141,15 @@ class FileUploadHandler:
         self.charset = charset
         self.content_type_extra = content_type_extra
 
+    @abstractmethod
     def receive_data_chunk(self, raw_data: bytes, start: int) -> bytes | None:
         """
         Receive data from the streamed upload parser. ``start`` is the position
         in the file of the chunk.
         """
-        raise NotImplementedError(
-            "subclasses of FileUploadHandler must provide a receive_data_chunk() method"
-        )
+        ...
 
+    @abstractmethod
     def file_complete(self, file_size: int) -> UploadedFile | None:
         """
         Signal that a file has completed. File size corresponds to the actual
@@ -156,9 +157,7 @@ class FileUploadHandler:
 
         Subclasses should return a valid ``UploadedFile`` object.
         """
-        raise NotImplementedError(
-            "subclasses of FileUploadHandler must provide a file_complete() method"
-        )
+        ...
 
     def upload_complete(self) -> None:
         """
