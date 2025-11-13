@@ -1,5 +1,16 @@
 # plain-email changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-email@0.12.0) (2025-11-12)
+
+### What's changed
+
+- The filebased email backend now requires `EMAIL_FILE_PATH` to be set and raises `ImproperlyConfigured` if not provided ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcefa929058be517cb1d4ab35bd73a89f26b8))
+- `BaseEmailBackend` now uses Python's abstract base class with `@abstractmethod` for better type checking ([245b5f4](https://github.com/dropseed/plain/commit/245b5f472c89178b8b764869f1624f8fc885b0f7))
+
+### Upgrade instructions
+
+- If using the filebased email backend, ensure `EMAIL_FILE_PATH` is configured in your settings or passed when initializing the backend
+
 ## [0.11.1](https://github.com/dropseed/plain/releases/plain-email@0.11.1) (2025-10-06)
 
 ### What's changed
