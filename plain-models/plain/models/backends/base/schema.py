@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import operator
+from abc import ABC, abstractmethod
 from collections.abc import Generator
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -90,7 +91,7 @@ def _related_non_m2m_objects(
         )
 
 
-class BaseDatabaseSchemaEditor:
+class BaseDatabaseSchemaEditor(ABC):
     """
     This class and its subclasses are responsible for emitting schema-changing
     statements to the databases - model creation/removal/alteration, field
@@ -374,14 +375,12 @@ class BaseDatabaseSchemaEditor:
         """
         return False
 
+    @abstractmethod
     def prepare_default(self, value: Any) -> str:
         """
         Only used for backends which have requires_literal_defaults feature
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseSchemaEditor for backends which have "
-            "requires_literal_defaults must provide a prepare_default() method"
-        )
+        ...
 
     def _column_default_sql(self, field: Field) -> str:
         """
@@ -420,6 +419,7 @@ class BaseDatabaseSchemaEditor:
         """Return a field's effective database default value."""
         return field.get_db_prep_save(self._effective_default(field), self.connection)
 
+    @abstractmethod
     def quote_value(self, value: Any) -> str:
         """
         Return a quoted version of the value so it's safe to use in an SQL
@@ -428,7 +428,7 @@ class BaseDatabaseSchemaEditor:
         for particularly tricky backends (defaults are not user-defined, though,
         so this is safe).
         """
-        raise NotImplementedError()
+        ...
 
     # Actions
 
