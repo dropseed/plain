@@ -48,6 +48,7 @@ reverse many-to-one relation.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import Any
 
@@ -256,7 +257,7 @@ class ForwardManyToOneDescriptor:
         return getattr, (self.field.model, self.field.name)
 
 
-class RelationDescriptorBase:
+class RelationDescriptorBase(ABC):
     """
     Base class for relation descriptors that don't allow direct assignment.
 
@@ -281,17 +282,15 @@ class RelationDescriptorBase:
             return self
         return self.get_related_manager(instance)
 
+    @abstractmethod
     def get_related_manager(self, instance: Any) -> Any:
         """Return the appropriate manager for this relation."""
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement get_related_manager()"
-        )
+        ...
 
+    @abstractmethod
     def _get_set_deprecation_msg_params(self) -> tuple[str, str]:
         """Return parameters for the error message when direct assignment is attempted."""
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement _get_set_deprecation_msg_params()"
-        )
+        ...
 
     def __set__(self, instance: Any, value: Any) -> None:
         """Prevent direct assignment to the relation."""
