@@ -1,5 +1,6 @@
 import datetime
 import secrets
+from abc import ABC, abstractmethod
 from typing import Any
 from urllib.parse import urlencode
 
@@ -48,7 +49,7 @@ class OAuthUser:
         return str(self.provider_id)
 
 
-class OAuthProvider:
+class OAuthProvider(ABC):
     authorization_url = ""
 
     def __init__(
@@ -76,14 +77,14 @@ class OAuthProvider:
             "response_type": "code",
         }
 
-    def refresh_oauth_token(self, *, oauth_token: OAuthToken) -> OAuthToken:
-        raise NotImplementedError()
+    @abstractmethod
+    def refresh_oauth_token(self, *, oauth_token: OAuthToken) -> OAuthToken: ...
 
-    def get_oauth_token(self, *, code: str, request: Request) -> OAuthToken:
-        raise NotImplementedError()
+    @abstractmethod
+    def get_oauth_token(self, *, code: str, request: Request) -> OAuthToken: ...
 
-    def get_oauth_user(self, *, oauth_token: OAuthToken) -> OAuthUser:
-        raise NotImplementedError()
+    @abstractmethod
+    def get_oauth_user(self, *, oauth_token: OAuthToken) -> OAuthUser: ...
 
     def get_authorization_url(self, *, request: Request) -> str:
         return self.authorization_url

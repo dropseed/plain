@@ -8,6 +8,11 @@ class DummyProvider(OAuthProvider):
             access_token="dummy_token",
         )
 
+    def refresh_oauth_token(self, *, oauth_token):
+        return OAuthToken(
+            access_token="dummy_refreshed_token",
+        )
+
     def get_oauth_user(self, *, oauth_token):
         return OAuthUser(
             provider_id="dummy_user_id",
