@@ -1,5 +1,15 @@
 # plain-scan changelog
 
+## [0.4.0](https://github.com/dropseed/plain/releases/plain-scan@0.4.0) (2025-11-12)
+
+### What's changed
+
+- Improved type safety with additional type annotations and assertions ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcef))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.3.1](https://github.com/dropseed/plain/releases/plain-scan@0.3.1) (2025-11-03)
 
 ### What's changed
