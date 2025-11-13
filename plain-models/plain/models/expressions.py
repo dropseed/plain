@@ -4,6 +4,7 @@ import copy
 import datetime
 import functools
 import inspect
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from decimal import Decimal
 from functools import cached_property
@@ -1942,7 +1943,7 @@ class Window(SQLiteNumericMixin, Expression):
         return group_by_cols
 
 
-class WindowFrame(Expression):
+class WindowFrame(Expression, ABC):
     """
     Model the frame clause in window expressions. There are two types of frame
     clauses which are subclasses, however, all processing and validation (by no
@@ -2007,10 +2008,10 @@ class WindowFrame(Expression):
             "end": end,
         }
 
+    @abstractmethod
     def window_frame_start_end(
         self, connection: BaseDatabaseWrapper, start: int | None, end: int | None
-    ) -> tuple[str, str]:
-        raise NotImplementedError("Subclasses must implement window_frame_start_end().")
+    ) -> tuple[str, str]: ...
 
 
 class RowRange(WindowFrame):
