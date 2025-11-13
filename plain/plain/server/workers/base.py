@@ -12,6 +12,7 @@ import signal
 import sys
 import time
 import traceback
+from abc import ABC, abstractmethod
 from datetime import datetime
 from random import randint
 from ssl import SSLError
@@ -48,7 +49,7 @@ if TYPE_CHECKING:
 MAX_REQUESTS_JITTER = 50
 
 
-class Worker:
+class Worker(ABC):
     SIGNALS = [
         getattr(signal, f"SIG{x}")
         for x in ("ABRT HUP QUIT INT TERM USR1 USR2 WINCH CHLD".split())
@@ -105,13 +106,14 @@ class Worker:
         """
         self.tmp.notify()
 
+    @abstractmethod
     def run(self) -> None:
         """\
         This is the mainloop of a worker process. You should override
         this method in a subclass to provide the intended behaviour
         for your particular evil schemes.
         """
-        raise NotImplementedError()
+        ...
 
     def init_process(self) -> None:
         """\
