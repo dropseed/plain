@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import math
+from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
@@ -681,7 +682,7 @@ class IRegex(Regex):
     lookup_name: str = "iregex"
 
 
-class YearLookup(Lookup):
+class YearLookup(Lookup, ABC):
     def year_lookup_bounds(
         self, connection: BaseDatabaseWrapper, year: int
     ) -> list[str | Any | None]:
@@ -720,10 +721,8 @@ class YearLookup(Lookup):
     def get_direct_rhs_sql(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
         return connection.operators[self.lookup_name] % rhs  # type: ignore[index]
 
-    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any, ...]:
-        raise NotImplementedError(
-            "subclasses of YearLookup must provide a get_bound_params() method"
-        )
+    @abstractmethod
+    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any, ...]: ...
 
 
 class YearExact(YearLookup, Exact):
