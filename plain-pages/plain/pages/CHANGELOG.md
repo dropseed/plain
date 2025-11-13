@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.16.0](https://github.com/dropseed/plain/releases/plain-pages@0.16.0) (2025-11-12)
+
+### What's changed
+
+- Improved type checking compatibility with updated type checker ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcef))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.1](https://github.com/dropseed/plain/releases/plain-pages@0.15.1) (2025-10-31)
 
 ### What's changed
