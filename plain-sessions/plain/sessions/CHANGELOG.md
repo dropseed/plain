@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.37.0](https://github.com/dropseed/plain/releases/plain-sessions@0.37.0) (2025-11-12)
+
+### What's changed
+
+- Type checking has been improved in `SessionMiddleware` with an assertion to ensure `session_key` exists after `save()` and explicit `bool()` conversions for cookie security flags ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcef))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.36.2](https://github.com/dropseed/plain/releases/plain-sessions@0.36.2) (2025-10-31)
 
 ### What's changed
