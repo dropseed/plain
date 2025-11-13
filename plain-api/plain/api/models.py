@@ -23,17 +23,19 @@ def generate_token() -> str:
 
 @register_model
 class APIKey(Model):
-    uuid: Field[UUID | None, UUIDField(default=uuid4)] = None
-    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
-    updated_at: Field[datetime | None, DateTimeField(auto_now=True)] = None
-    expires_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
-    last_used_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
+    uuid: Field[UUID | None] = UUIDField(default=uuid4, allow_null=True)
+    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
+    updated_at: Field[datetime] = DateTimeField(auto_now=True)
+    expires_at: Field[datetime | None] = DateTimeField(required=False, allow_null=True)
+    last_used_at: Field[datetime | None] = DateTimeField(
+        required=False, allow_null=True
+    )
 
-    name: Field[str, CharField(max_length=255)] = ""
+    name: Field[str] = CharField(max_length=255, required=False)
 
-    token: Field[str, CharField(max_length=40, default=generate_token)]
+    token: Field[str] = CharField(max_length=40, default=generate_token)
 
-    api_version: Field[str, CharField(max_length=255)] = ""
+    api_version: Field[str] = CharField(max_length=255, required=False)
 
     model_options = Options(
         constraints=[

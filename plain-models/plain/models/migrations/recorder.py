@@ -43,9 +43,11 @@ class MigrationRecorder:
             _models_registry.ready = True
 
             class Migration(Model):
-                app: Field[str, CharField(max_length=255)]
-                name: Field[str, CharField(max_length=255)]
-                applied: Field[datetime | None, DateTimeField(default=now)]
+                app: Field[str] = CharField(max_length=255)
+                name: Field[str] = CharField(max_length=255)
+                applied: Field[datetime | None] = DateTimeField(
+                    default=now, allow_null=True
+                )
 
                 # Use isolated models registry for migrations
                 _model_meta = Meta(models_registry=_models_registry)

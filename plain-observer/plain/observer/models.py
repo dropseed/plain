@@ -54,23 +54,25 @@ from plain.utils import timezone
 
 @register_model
 class Trace(Model):
-    trace_id: Field[str, CharField(max_length=255)]
-    start_time: Field[datetime, DateTimeField()]
-    end_time: Field[datetime, DateTimeField()]
+    trace_id: Field[str] = CharField(max_length=255)
+    start_time: Field[datetime] = DateTimeField()
+    end_time: Field[datetime] = DateTimeField()
 
-    root_span_name: Field[str, TextField()] = ""
-    summary: Field[str, CharField(max_length=255)] = ""
+    root_span_name: Field[str] = TextField(default="")
+    summary: Field[str] = CharField(max_length=255, default="")
 
     # Plain fields
-    request_id: Field[str, CharField(max_length=255)] = ""
-    session_id: Field[str, CharField(max_length=255)] = ""
-    user_id: Field[str, CharField(max_length=255)] = ""
-    app_name: Field[str, CharField(max_length=255)] = ""
-    app_version: Field[str, CharField(max_length=255)] = ""
+    request_id: Field[str] = CharField(max_length=255, default="")
+    session_id: Field[str] = CharField(max_length=255, default="")
+    user_id: Field[str] = CharField(max_length=255, default="")
+    app_name: Field[str] = CharField(max_length=255, default="")
+    app_version: Field[str] = CharField(max_length=255, default="")
 
     # Shareable URL fields
-    share_id: Field[str, CharField(max_length=32)] = ""
-    share_created_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
+    share_id: Field[str] = CharField(max_length=32, default="")
+    share_created_at: Field[datetime | None] = DateTimeField(
+        required=False, allow_null=True
+    )
 
     if TYPE_CHECKING:
         from plain.models.fields.related_managers import BaseRelatedManager
@@ -333,17 +335,17 @@ class SpanQuerySet(QuerySet["Span"]):
 
 @register_model
 class Span(Model):
-    trace: Field[Trace, ForeignKey(Trace, on_delete=CASCADE, related_name="spans")]
+    trace: Field[Trace] = ForeignKey(Trace, on_delete=CASCADE, related_name="spans")
 
-    span_id: Field[str, CharField(max_length=255)]
+    span_id: Field[str] = CharField(max_length=255)
 
-    name: Field[str, CharField(max_length=255)]
-    kind: Field[str, CharField(max_length=50)]
-    parent_id: Field[str, CharField(max_length=255)] = ""
-    start_time: Field[datetime, DateTimeField()]
-    end_time: Field[datetime, DateTimeField()]
-    status: Field[str, CharField(max_length=50)] = ""
-    span_data: Field[dict[str, Any], JSONField(default=dict)]
+    name: Field[str] = CharField(max_length=255)
+    kind: Field[str] = CharField(max_length=50)
+    parent_id: Field[str] = CharField(max_length=255, default="")
+    start_time: Field[datetime] = DateTimeField()
+    end_time: Field[datetime] = DateTimeField()
+    status: Field[str] = CharField(max_length=50, default="")
+    span_data: Field[dict[str, Any]] = JSONField(default=dict)
 
     query: SpanQuerySet = SpanQuerySet()
 
@@ -518,19 +520,17 @@ class Span(Model):
 
 @register_model
 class Log(Model):
-    trace: Field[Trace, ForeignKey(Trace, on_delete=CASCADE, related_name="logs")]
-    span: Field[
-        Span | None,
-        ForeignKey(
-            Span,
-            on_delete=SET_NULL,
-            related_name="logs",
-        ),
-    ] = None
+    trace: Field[Trace] = ForeignKey(Trace, on_delete=CASCADE, related_name="logs")
+    span: Field[Span | None] = ForeignKey(
+        Span,
+        on_delete=SET_NULL,
+        related_name="logs",
+        allow_null=True,
+    )
 
-    timestamp: Field[datetime, DateTimeField()]
-    level: Field[str, CharField(max_length=20)]
-    message: Field[str, TextField()]
+    timestamp: Field[datetime] = DateTimeField()
+    level: Field[str] = CharField(max_length=20)
+    message: Field[str] = TextField()
 
     model_options = Options(
         ordering=["timestamp"],

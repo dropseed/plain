@@ -8,9 +8,6 @@ from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
-    get_args,
-    get_origin,
-    get_type_hints,
 )
 
 from plain.models.exceptions import FieldDoesNotExist
@@ -121,65 +118,18 @@ class Meta:
             for attr_name in list(klass.__dict__.keys()):
                 if attr_name.startswith("_") or attr_name in seen_attrs:
                     continue
+                seen_attrs.add(attr_name)
 
                 attr_value = klass.__dict__[attr_name]
 
-                # Only process actual field instances, not literal default values
-                # (literal values are just for type checker - actual field comes from annotation)
                 if not inspect.isclass(attr_value) and hasattr(
                     attr_value, "contribute_to_class"
                 ):
-                    seen_attrs.add(attr_name)
                     if attr_name not in model.__dict__:
                         field = copy.deepcopy(attr_value)
                     else:
                         field = attr_value
                     field.contribute_to_class(model, attr_name)
-
-        # Process fields from annotations (Field[Type, instance] syntax)
-        # This handles the Annotated[Type, field_instance] pattern
-        from typing import Annotated
-
-        for klass in model.__mro__:
-            # Use get_type_hints to evaluate string annotations
-            # include_extras=True preserves Annotated metadata
-            try:
-                type_hints = get_type_hints(klass, include_extras=True)
-            except Exception:
-                # If get_type_hints fails (e.g., forward references), fall back to __annotations__
-                type_hints = getattr(klass, "__annotations__", {})
-
-            for attr_name, annotation in type_hints.items():
-                if attr_name.startswith("_") or attr_name in seen_attrs:
-                    continue
-
-                # Check if this is an Annotated type
-                if get_origin(annotation) is Annotated:
-                    args = get_args(annotation)
-                    # args[0] is the actual type, args[1:] are metadata
-                    # Look for field instances in the metadata
-                    for metadata in args[1:]:
-                        if not inspect.isclass(metadata) and hasattr(
-                            metadata, "contribute_to_class"
-                        ):
-                            seen_attrs.add(attr_name)
-                            # Use the field instance from the annotation
-                            field = metadata
-
-                            # If there's a literal value in __dict__, use it as the default
-                            # (unless the field already has a default configured)
-                            if attr_name in klass.__dict__:
-                                literal_value = klass.__dict__[attr_name]
-                                # Check if it's a literal value (not a field instance)
-                                if not hasattr(literal_value, "contribute_to_class"):
-                                    # Apply the literal as the field's default if not already set
-                                    from plain.models.fields.core import NOT_PROVIDED
-
-                                    if field.default is NOT_PROVIDED:
-                                        field.default = literal_value
-
-                            field.contribute_to_class(model, attr_name)
-                            break
 
         # Set index names now that fields are contributed
         # Trigger model_options descriptor to ensure it's initialized

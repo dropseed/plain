@@ -18,10 +18,10 @@ from plain.models import (
 
 @register_model
 class Session(Model):
-    session_key: Field[str, CharField(max_length=40)]
-    session_data: Field[dict[str, Any], JSONField(default=dict)]
-    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
-    expires_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
+    session_key: Field[str] = CharField(max_length=40)
+    session_data: Field[dict[str, Any]] = JSONField(default=dict, required=False)
+    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
+    expires_at: Field[datetime | None] = DateTimeField(allow_null=True)
 
     model_options = Options(
         indexes=[

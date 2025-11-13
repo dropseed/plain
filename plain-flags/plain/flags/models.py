@@ -28,19 +28,19 @@ def validate_flag_name(value: str) -> None:
 
 @register_model
 class Flag(Model):
-    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
-    updated_at: Field[datetime | None, DateTimeField(auto_now=True)] = None
-    name: Field[str, CharField(max_length=255, validators=[validate_flag_name])]
+    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
+    updated_at: Field[datetime] = DateTimeField(auto_now=True)
+    name: Field[str] = CharField(max_length=255, validators=[validate_flag_name])
 
     # Optional description that can be filled in after the flag is used/created
-    description: Field[str, TextField()] = ""
+    description: Field[str] = TextField(required=False)
 
     # To manually disable a flag before completing deleting
     # (good to disable first to make sure the code doesn't use the flag anymore)
-    enabled: Field[bool, BooleanField()] = True
+    enabled: Field[bool] = BooleanField(default=True)
 
     # To provide an easier way to see if a flag is still being used
-    used_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
+    used_at: Field[datetime | None] = DateTimeField(required=False, allow_null=True)
 
     model_options = Options(
         constraints=[
@@ -54,11 +54,11 @@ class Flag(Model):
 
 @register_model
 class FlagResult(Model):
-    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
-    updated_at: Field[datetime | None, DateTimeField(auto_now=True)] = None
-    flag: Field[Flag, ForeignKey(Flag, on_delete=CASCADE)]
-    key: Field[str, CharField(max_length=255)]
-    value: Field[Any, JSONField()]
+    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
+    updated_at: Field[datetime] = DateTimeField(auto_now=True)
+    flag: Field[Flag] = ForeignKey(Flag, on_delete=CASCADE)
+    key: Field[str] = CharField(max_length=255)
+    value: Field[Any] = JSONField()
 
     model_options = Options(
         constraints=[

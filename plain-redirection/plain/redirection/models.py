@@ -34,16 +34,16 @@ def _get_client_ip(request: Request) -> str | None:
 
 @register_model
 class Redirect(Model):
-    from_pattern: Field[str, CharField(max_length=255)]
-    to_pattern: Field[str, CharField(max_length=255)]
-    http_status: Field[int, PositiveSmallIntegerField()] = (
-        301  # Default to permanent - could be choices?
+    from_pattern: Field[str] = CharField(max_length=255)
+    to_pattern: Field[str] = CharField(max_length=255)
+    http_status: Field[int] = PositiveSmallIntegerField(
+        default=301  # Default to permanent - could be choices?
     )
-    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
-    updated_at: Field[datetime | None, DateTimeField(auto_now=True)] = None
-    order: Field[int, PositiveSmallIntegerField()] = 0
-    enabled: Field[bool, BooleanField()] = True
-    is_regex: Field[bool, BooleanField()] = False
+    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
+    updated_at: Field[datetime] = DateTimeField(auto_now=True)
+    order: Field[int] = PositiveSmallIntegerField(default=0)
+    enabled: Field[bool] = BooleanField(default=True)
+    is_regex: Field[bool] = BooleanField(default=False)
 
     # query params?
     # logged in or not? auth not required necessarily...
@@ -99,19 +99,19 @@ class Redirect(Model):
 
 @register_model
 class RedirectLog(Model):
-    redirect: Field[Redirect, ForeignKey(Redirect, on_delete=CASCADE)]
+    redirect: Field[Redirect] = ForeignKey(Redirect, on_delete=CASCADE)
 
     # The actuals that were used to redirect
-    from_url: Field[str, URLField(max_length=512)]
-    to_url: Field[str, URLField(max_length=512)]
-    http_status: Field[int, PositiveSmallIntegerField()] = 301
+    from_url: Field[str] = URLField(max_length=512)
+    to_url: Field[str] = URLField(max_length=512)
+    http_status: Field[int] = PositiveSmallIntegerField(default=301)
 
     # Request metadata
-    ip_address: Field[str, GenericIPAddressField()]
-    user_agent: Field[str, CharField(max_length=512)] = ""
-    referrer: Field[str, CharField(max_length=512)] = ""
+    ip_address: Field[str] = GenericIPAddressField()
+    user_agent: Field[str] = CharField(max_length=512, default="")
+    referrer: Field[str] = CharField(max_length=512, default="")
 
-    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
 
     model_options = Options(
         ordering=["-created_at"],
@@ -144,14 +144,14 @@ class RedirectLog(Model):
 
 @register_model
 class NotFoundLog(Model):
-    url: Field[str, URLField(max_length=512)]
+    url: Field[str] = URLField(max_length=512)
 
     # Request metadata
-    ip_address: Field[str, GenericIPAddressField()]
-    user_agent: Field[str | None, CharField(max_length=512)] = None
-    referrer: Field[str | None, CharField(max_length=512)] = None
+    ip_address: Field[str] = GenericIPAddressField()
+    user_agent: Field[str | None] = CharField(max_length=512, allow_null=True)
+    referrer: Field[str | None] = CharField(max_length=512, allow_null=True)
 
-    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
 
     model_options = Options(
         ordering=["-created_at"],

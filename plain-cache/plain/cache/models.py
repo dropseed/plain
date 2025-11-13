@@ -31,11 +31,13 @@ class CachedItemQuerySet(QuerySet["CachedItem"]):
 
 @register_model
 class CachedItem(Model):
-    key: Field[str, CharField(max_length=255)]
-    value: Field[Any | None, JSONField(allow_null=True)] = None
-    expires_at: Field[datetime.datetime | None, DateTimeField(allow_null=True)] = None
-    created_at: Field[datetime.datetime | None, DateTimeField(auto_now_add=True)] = None
-    updated_at: Field[datetime.datetime | None, DateTimeField(auto_now=True)] = None
+    key: Field[str] = CharField(max_length=255)
+    value: Field[Any | None] = JSONField(required=False, allow_null=True)
+    expires_at: Field[datetime.datetime | None] = DateTimeField(
+        required=False, allow_null=True
+    )
+    created_at: Field[datetime.datetime] = DateTimeField(auto_now_add=True)
+    updated_at: Field[datetime.datetime] = DateTimeField(auto_now=True)
 
     query = CachedItemQuerySet()
 

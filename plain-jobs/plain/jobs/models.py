@@ -60,25 +60,25 @@ class JobRequest(Model):
     Keep all pending job requests in a single table.
     """
 
-    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
-    uuid: Field[UUID | None, UUIDField(default=uuid4)] = None
+    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
+    uuid: Field[UUID | None] = UUIDField(default=uuid4, allow_null=True)
 
-    job_class: Field[str, CharField(max_length=255)]
-    parameters: Field[dict[str, Any] | None, JSONField(allow_null=True)] = None
-    priority: Field[int, SmallIntegerField()] = 0
-    source: Field[str, TextField()] = ""
-    queue: Field[str, CharField(max_length=255)] = "default"
+    job_class: Field[str] = CharField(max_length=255)
+    parameters: Field[dict[str, Any] | None] = JSONField(allow_null=True)
+    priority: Field[int] = SmallIntegerField(default=0)
+    source: Field[str] = TextField(default="")
+    queue: Field[str] = CharField(max_length=255, default="default")
 
-    retries: Field[int, SmallIntegerField()] = 0
-    retry_attempt: Field[int, SmallIntegerField()] = 0
+    retries: Field[int] = SmallIntegerField(default=0)
+    retry_attempt: Field[int] = SmallIntegerField(default=0)
 
-    concurrency_key: Field[str, CharField(max_length=255)] = ""
+    concurrency_key: Field[str] = CharField(max_length=255, default="")
 
-    start_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
+    start_at: Field[datetime | None] = DateTimeField(required=False, allow_null=True)
 
     # OpenTelemetry trace context
-    trace_id: Field[str | None, CharField(max_length=34, allow_null=True)] = None
-    span_id: Field[str | None, CharField(max_length=18, allow_null=True)] = None
+    trace_id: Field[str | None] = CharField(max_length=34, allow_null=True)
+    span_id: Field[str | None] = CharField(max_length=18, allow_null=True)
 
     # expires_at = models.DateTimeField(required=False, allow_null=True)
 
@@ -163,24 +163,24 @@ class JobProcess(Model):
     All active jobs are stored in this table.
     """
 
-    uuid: Field[UUID | None, UUIDField(default=uuid4)] = None
-    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
-    started_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
+    uuid: Field[UUID | None] = UUIDField(default=uuid4, allow_null=True)
+    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
+    started_at: Field[datetime | None] = DateTimeField(required=False, allow_null=True)
 
     # From the JobRequest
-    job_request_uuid: Field[UUID, UUIDField()]
-    job_class: Field[str, CharField(max_length=255)]
-    parameters: Field[dict[str, Any] | None, JSONField(allow_null=True)] = None
-    priority: Field[int, SmallIntegerField()] = 0
-    source: Field[str, TextField()] = ""
-    queue: Field[str, CharField(max_length=255)] = "default"
-    retries: Field[int, SmallIntegerField()] = 0
-    retry_attempt: Field[int, SmallIntegerField()] = 0
-    concurrency_key: Field[str, CharField(max_length=255)] = ""
+    job_request_uuid: Field[UUID] = UUIDField()
+    job_class: Field[str] = CharField(max_length=255)
+    parameters: Field[dict[str, Any] | None] = JSONField(allow_null=True)
+    priority: Field[int] = SmallIntegerField(default=0)
+    source: Field[str] = TextField(default="")
+    queue: Field[str] = CharField(max_length=255, default="default")
+    retries: Field[int] = SmallIntegerField(default=0)
+    retry_attempt: Field[int] = SmallIntegerField(default=0)
+    concurrency_key: Field[str] = CharField(max_length=255, default="")
 
     # OpenTelemetry trace context
-    trace_id: Field[str | None, CharField(max_length=34, allow_null=True)] = None
-    span_id: Field[str | None, CharField(max_length=18, allow_null=True)] = None
+    trace_id: Field[str | None] = CharField(max_length=34, allow_null=True)
+    span_id: Field[str | None] = CharField(max_length=18, allow_null=True)
 
     query: JobQuerySet = JobQuerySet()
 
@@ -461,39 +461,38 @@ class JobResult(Model):
     All in-process and completed jobs are stored in this table.
     """
 
-    uuid: Field[UUID | None, UUIDField(default=uuid4)] = None
-    created_at: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    uuid: Field[UUID | None] = UUIDField(default=uuid4, allow_null=True)
+    created_at: Field[datetime] = DateTimeField(auto_now_add=True)
 
     # From the Job
-    job_process_uuid: Field[UUID, UUIDField()]
-    started_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
-    ended_at: Field[datetime | None, DateTimeField(allow_null=True)] = None
-    error: Field[str, TextField()] = ""
-    status: Field[
-        str,
-        CharField(
-            max_length=20,
-            choices=JobResultStatuses.choices,
-        ),
-    ]
+    job_process_uuid: Field[UUID] = UUIDField()
+    started_at: Field[datetime | None] = DateTimeField(required=False, allow_null=True)
+    ended_at: Field[datetime | None] = DateTimeField(required=False, allow_null=True)
+    error: Field[str] = TextField(default="")
+    status: Field[str] = CharField(
+        max_length=20,
+        choices=JobResultStatuses.choices,
+    )
 
     # From the JobRequest
-    job_request_uuid: Field[UUID, UUIDField()]
-    job_class: Field[str, CharField(max_length=255)]
-    parameters: Field[dict[str, Any] | None, JSONField(allow_null=True)] = None
-    priority: Field[int, SmallIntegerField()] = 0
-    source: Field[str, TextField()] = ""
-    queue: Field[str, CharField(max_length=255)] = "default"
-    retries: Field[int, SmallIntegerField()] = 0
-    retry_attempt: Field[int, SmallIntegerField()] = 0
-    concurrency_key: Field[str, CharField(max_length=255)] = ""
+    job_request_uuid: Field[UUID] = UUIDField()
+    job_class: Field[str] = CharField(max_length=255)
+    parameters: Field[dict[str, Any] | None] = JSONField(allow_null=True)
+    priority: Field[int] = SmallIntegerField(default=0)
+    source: Field[str] = TextField(default="")
+    queue: Field[str] = CharField(max_length=255, default="default")
+    retries: Field[int] = SmallIntegerField(default=0)
+    retry_attempt: Field[int] = SmallIntegerField(default=0)
+    concurrency_key: Field[str] = CharField(max_length=255, default="")
 
     # Retries
-    retry_job_request_uuid: Field[UUID | None, UUIDField(allow_null=True)] = None
+    retry_job_request_uuid: Field[UUID | None] = UUIDField(
+        required=False, allow_null=True
+    )
 
     # OpenTelemetry trace context
-    trace_id: Field[str | None, CharField(max_length=34, allow_null=True)] = None
-    span_id: Field[str | None, CharField(max_length=18, allow_null=True)] = None
+    trace_id: Field[str | None] = CharField(max_length=34, allow_null=True)
+    span_id: Field[str | None] = CharField(max_length=18, allow_null=True)
 
     query: JobResultQuerySet = JobResultQuerySet()
 

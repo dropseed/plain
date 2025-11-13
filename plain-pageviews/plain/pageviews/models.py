@@ -44,21 +44,21 @@ class Pageview(Model):
     # stores up to 4 bytes per character). The ``url`` field is indexed below,
     # so we keep the length at 768 characters (768 × 4 = 3072 bytes) to ensure
     # the index can be created on all supported database backends.
-    url: Field[str, URLField(max_length=768)]
-    timestamp: Field[datetime | None, DateTimeField(auto_now_add=True)] = None
+    url: Field[str] = URLField(max_length=768)
+    timestamp: Field[datetime] = DateTimeField(auto_now_add=True)
 
-    title: Field[str, CharField(max_length=512)] = ""
+    title: Field[str] = CharField(max_length=512, default="")
     # Referrers may not always be valid URLs (e.g. `android-app://...`).
     # Use a plain CharField so we don't validate the scheme or format.
-    referrer: Field[str, CharField(max_length=1024)] = ""
+    referrer: Field[str] = CharField(max_length=1024, default="")
 
-    user_id: Field[str, CharField(max_length=255)] = ""
-    session_id: Field[str, CharField(max_length=255)] = ""
+    user_id: Field[str] = CharField(max_length=255, default="")
+    session_id: Field[str] = CharField(max_length=255, default="")
 
     # Attribution tracking
-    source: Field[str, CharField(max_length=200)] = ""
-    medium: Field[str, CharField(max_length=200)] = ""
-    campaign: Field[str, CharField(max_length=200)] = ""
+    source: Field[str] = CharField(max_length=200, default="")
+    medium: Field[str] = CharField(max_length=200, default="")
+    campaign: Field[str] = CharField(max_length=200, default="")
 
     model_options = Options(
         ordering=["-timestamp"],
