@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-api@0.17.0) (2025-11-12)
+
+### What's changed
+
+- Fixed type checker warnings in OpenAPI decorator implementation ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcef))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.3](https://github.com/dropseed/plain/releases/plain-api@0.16.3) (2025-11-03)
 
 ### What's changed
