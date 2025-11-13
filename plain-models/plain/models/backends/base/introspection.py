@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Any
@@ -18,7 +19,7 @@ FieldInfo = namedtuple(
 )
 
 
-class BaseDatabaseIntrospection:
+class BaseDatabaseIntrospection(ABC):
     """Encapsulate backend-specific introspection utilities."""
 
     data_types_reverse: dict[Any, str] = {}
@@ -64,25 +65,21 @@ class BaseDatabaseIntrospection:
                 return get_names(cursor)
         return get_names(cursor)
 
+    @abstractmethod
     def get_table_list(self, cursor: Any) -> list[TableInfo]:
         """
         Return an unsorted list of TableInfo named tuples of all tables and
         views that exist in the database.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseIntrospection may require a get_table_list() "
-            "method"
-        )
+        ...
 
+    @abstractmethod
     def get_table_description(self, cursor: Any, table_name: str) -> list[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseIntrospection may require a "
-            "get_table_description() method."
-        )
+        ...
 
     def get_migratable_models(self) -> Generator[Any, None, None]:
         from plain.models import models_registry
@@ -137,6 +134,7 @@ class BaseDatabaseIntrospection:
                 )
         return sequence_list
 
+    @abstractmethod
     def get_sequences(
         self, cursor: Any, table_name: str, table_fields: tuple[Any, ...] = ()
     ) -> list[dict[str, Any]]:
@@ -145,20 +143,15 @@ class BaseDatabaseIntrospection:
         is a dict: {'table': <table_name>, 'column': <column_name>}. An optional
         'name' key can be added if the backend supports named sequences.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseIntrospection may require a get_sequences() "
-            "method"
-        )
+        ...
 
+    @abstractmethod
     def get_relations(self, cursor: Any, table_name: str) -> dict[str, tuple[str, str]]:
         """
         Return a dictionary of {field_name: (field_name_other_table, other_table)}
         representing all foreign keys in the given table.
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseIntrospection may require a "
-            "get_relations() method."
-        )
+        ...
 
     def get_primary_key_column(self, cursor: Any, table_name: str) -> str | None:
         """
@@ -174,6 +167,7 @@ class BaseDatabaseIntrospection:
                 return constraint["columns"]
         return None
 
+    @abstractmethod
     def get_constraints(
         self, cursor: Any, table_name: str
     ) -> dict[str, dict[str, Any]]:
@@ -195,7 +189,4 @@ class BaseDatabaseIntrospection:
         Some backends may return special constraint names that don't exist
         if they don't name constraints of a certain type (e.g. SQLite)
         """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseIntrospection may require a get_constraints() "
-            "method"
-        )
+        ...
