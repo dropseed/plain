@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.16.0](https://github.com/dropseed/plain/releases/plain-observer@0.16.0) (2025-11-12)
+
+### What's changed
+
+- Fixed type checking errors and warnings by adding type ignore comments for ORM operations that are inherently difficult to type ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcefa929058be517cb1d4ab35bd73a89f26b8))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.0](https://github.com/dropseed/plain/releases/plain-observer@0.15.0) (2025-11-03)
 
 ### What's changed
