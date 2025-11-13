@@ -144,7 +144,7 @@ class DeleteView(ObjectTemplateViewMixin, FormView):
         return super().form_valid(form)
 
 
-class ListView(TemplateView):
+class ListView(TemplateView, ABC):
     """
     Render some list of objects, set by `self.get_queryset()`, with a response
     rendered by a template.
@@ -156,10 +156,8 @@ class ListView(TemplateView):
     def objects(self) -> Any:
         return self.get_objects()
 
-    def get_objects(self) -> Any:
-        raise NotImplementedError(
-            f"get_objects() is not implemented on {self.__class__.__name__}"
-        )
+    @abstractmethod
+    def get_objects(self) -> Any: ...
 
     def get_template_context(self) -> dict:
         """Insert the single object into the context dict."""
