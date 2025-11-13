@@ -491,7 +491,7 @@ class Model(metaclass=ModelBase):
                 )
                 for f in non_pks
             ]
-            forced_update = update_fields or force_update
+            forced_update = bool(update_fields or force_update)
             updated = self._do_update(
                 base_qs, id_val, values, update_fields, forced_update
             )
@@ -657,7 +657,7 @@ class Model(metaclass=ModelBase):
 
     def _get_unique_checks(
         self, exclude: set[str] | None = None
-    ) -> list[tuple[type, tuple[str, ...]]]:
+    ) -> list[tuple[type[Model], tuple[str, ...]]]:
         """
         Return a list of checks to perform. Since validate_unique() could be
         called from a ModelForm, some fields may have been excluded; we can't
@@ -685,7 +685,7 @@ class Model(metaclass=ModelBase):
         return unique_checks
 
     def _perform_unique_checks(
-        self, unique_checks: list[tuple[type, tuple[str, ...]]]
+        self, unique_checks: list[tuple[type[Model], tuple[str, ...]]]
     ) -> dict[str, list[ValidationError]]:
         errors = {}
 
@@ -773,7 +773,7 @@ class Model(metaclass=ModelBase):
             )
 
     def get_constraints(self) -> list[tuple[type, list[Any]]]:
-        constraints = [(self.__class__, self.model_options.constraints)]
+        constraints = [(self.__class__, list(self.model_options.constraints))]
         return constraints
 
     def validate_constraints(self, exclude: set[str] | None = None) -> None:

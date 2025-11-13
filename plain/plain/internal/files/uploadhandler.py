@@ -123,7 +123,7 @@ class FileUploadHandler:
         field_name: str,
         file_name: str,
         content_type: str,
-        content_length: int,
+        content_length: int | None,
         charset: str | None = None,
         content_type_extra: dict[str, str] | None = None,
     ) -> None:
@@ -185,6 +185,10 @@ class TemporaryFileUploadHandler(FileUploadHandler):
         Create the file object to append to as data is coming in.
         """
         super().new_file(*args, **kwargs)
+        assert self.file_name is not None, "file_name should be set by parent new_file"
+        assert self.content_type is not None, (
+            "content_type should be set by parent new_file"
+        )
         self.file = TemporaryUploadedFile(
             self.file_name, self.content_type, 0, self.charset, self.content_type_extra
         )
@@ -249,6 +253,8 @@ class MemoryFileUploadHandler(FileUploadHandler):
             return None
 
         self.file.seek(0)
+        assert self.file_name is not None, "file_name should be set by new_file"
+        assert self.content_type is not None, "content_type should be set by new_file"
         return InMemoryUploadedFile(
             file=self.file,
             field_name=self.field_name,

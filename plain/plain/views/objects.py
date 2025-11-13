@@ -8,7 +8,7 @@ try:
 except ImportError:
     ObjectDoesNotExist = None  # type: ignore[assignment]
 
-from plain.forms import Form
+from plain.forms import BaseForm, Form
 from plain.http import Http404
 
 from .forms import FormView
@@ -21,10 +21,10 @@ class CreateView(FormView):
     """
 
     # TODO? would rather you have to specify this...
-    def get_success_url(self, form: Form) -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         """Return the URL to redirect to after processing a valid form."""
         if self.success_url:
-            url = self.success_url.format(**self.object.__dict__)
+            url = str(self.success_url).format(**self.object.__dict__)
         else:
             try:
                 url = self.object.get_absolute_url()
@@ -35,7 +35,7 @@ class CreateView(FormView):
                 )
         return url
 
-    def form_valid(self, form: Form) -> Any:
+    def form_valid(self, form: BaseForm) -> Any:
         """If the form is valid, save the associated model."""
         self.object = form.save()  # type: ignore[attr-defined]
         return super().form_valid(form)
@@ -91,10 +91,10 @@ class DetailView(ObjectTemplateViewMixin, TemplateView):
 class UpdateView(ObjectTemplateViewMixin, FormView):
     """View for updating an object, with a response rendered by a template."""
 
-    def get_success_url(self, form: Form) -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         """Return the URL to redirect to after processing a valid form."""
         if self.success_url:
-            url = self.success_url.format(**self.object.__dict__)
+            url = str(self.success_url).format(**self.object.__dict__)
         else:
             try:
                 url = self.object.get_absolute_url()
@@ -105,7 +105,7 @@ class UpdateView(ObjectTemplateViewMixin, FormView):
                 )
         return url
 
-    def form_valid(self, form: Form) -> Any:
+    def form_valid(self, form: BaseForm) -> Any:
         """If the form is valid, save the associated model."""
         form.save()  # type: ignore[attr-defined]
         return super().form_valid(form)
@@ -124,9 +124,9 @@ class DeleteView(ObjectTemplateViewMixin, FormView):
     """
 
     class EmptyDeleteForm(Form):
-        def __init__(self, instance: Any, *args: object, **kwargs: object) -> None:
+        def __init__(self, instance: Any, **kwargs: Any) -> None:
             self.instance = instance
-            super().__init__(*args, **kwargs)
+            super().__init__(**kwargs)
 
         def save(self) -> None:
             self.instance.delete()
@@ -139,7 +139,7 @@ class DeleteView(ObjectTemplateViewMixin, FormView):
         kwargs.update({"instance": self.object})
         return kwargs
 
-    def form_valid(self, form: Form) -> Any:
+    def form_valid(self, form: BaseForm) -> Any:
         """If the form is valid, save the associated model."""
         form.save()  # type: ignore[attr-defined]
         return super().form_valid(form)

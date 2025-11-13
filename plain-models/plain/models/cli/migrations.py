@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import time
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -34,9 +34,8 @@ if TYPE_CHECKING:
     from ..backends.base.base import BaseDatabaseWrapper
     from ..migrations.operations.base import Operation
 
-    db_connection = cast("BaseDatabaseWrapper", _db_connection)
-else:
-    db_connection = _db_connection
+# Type annotation for type checkers; runtime value is _db_connection
+db_connection: BaseDatabaseWrapper = _db_connection  # type: ignore[assignment]
 
 
 @register_cli("migrations")
@@ -904,19 +903,24 @@ def squash(
     migration = find_migration(loader, package_label, migration_name)
 
     # Work out the list of predecessor migrations
-    migrations_to_squash = [
-        loader.get_migration(al, mn)
-        for al, mn in loader.graph.forwards_plan(
-            (migration.package_label, migration.name)
-        )
-        if al == migration.package_label
-    ]
+    migrations_to_squash: list[Migration] = []
+    for al, mn in loader.graph.forwards_plan((migration.package_label, migration.name)):
+        if al != migration.package_label:
+            continue
+        candidate = loader.get_migration(al, mn)
+        if candidate is None:
+            raise click.ClickException(f"Migration {mn} in package {al} is missing")
+        migrations_to_squash.append(candidate)
 
     if start_migration_name:
         start_migration = find_migration(loader, package_label, start_migration_name)
         start = loader.get_migration(
             start_migration.package_label, start_migration.name
         )
+        if start is None:
+            raise click.ClickException(
+                f"Cannot find migration '{start_migration.name}' in package '{package_label}'."
+            )
         try:
             start_index = migrations_to_squash.index(start)
             migrations_to_squash = migrations_to_squash[start_index:]
@@ -981,7 +985,7 @@ def squash(
 
     # Work out the value of replaces (any squashed ones we're re-squashing)
     # need to feed their replaces into ours
-    replaces = []
+    replaces: list[tuple[str, str]] = []
     for migration in migrations_to_squash:
         if migration.replaces:
             replaces.extend(migration.replaces)

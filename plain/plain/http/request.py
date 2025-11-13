@@ -24,6 +24,7 @@ from plain.http.multipartparser import (
     TooManyFilesSent,
 )
 from plain.internal.files import uploadhandler
+from plain.internal.files.uploadhandler import FileUploadHandler
 from plain.runtime import settings
 from plain.utils.datastructures import (
     CaseInsensitiveMapping,
@@ -53,7 +54,7 @@ class Request:
 
     # The encoding used in GET/POST dicts. None means use default setting.
     _encoding = None
-    _upload_handlers = []
+    _upload_handlers: list[FileUploadHandler] = []
 
     non_picklable_attrs = frozenset(["resolver_match", "_stream"])
 
@@ -313,20 +314,22 @@ class Request:
         ]
 
     @property
-    def upload_handlers(self) -> list[Any]:
+    def upload_handlers(self) -> list[FileUploadHandler]:
         if not self._upload_handlers:
             # If there are no upload handlers defined, initialize them from settings.
             self._initialize_handlers()
         return self._upload_handlers
 
     @upload_handlers.setter
-    def upload_handlers(self, upload_handlers: list[Any]) -> None:
+    def upload_handlers(
+        self, upload_handlers: list[FileUploadHandler] | ImmutableList
+    ) -> None:
         if hasattr(self, "_files"):
             raise AttributeError(
                 "You cannot set the upload handlers after the upload has been "
                 "processed."
             )
-        self._upload_handlers = upload_handlers
+        self._upload_handlers = upload_handlers  # type: ignore[assignment]
 
     def parse_file_upload(
         self, meta: dict[str, Any], post_data: IO[bytes]
@@ -379,7 +382,7 @@ class Request:
             self._mark_post_parse_error()
             return
 
-        if self.content_type.startswith("application/json"):
+        if self.content_type and self.content_type.startswith("application/json"):
             try:
                 self._data = json.loads(self.body)
                 self._files = MultiValueDict()
@@ -535,7 +538,7 @@ class QueryDict(MultiValueDict):
         super().__init__()
         self.encoding = encoding or settings.DEFAULT_CHARSET
         query_string = query_string or ""
-        parse_qsl_kwargs = {
+        parse_qsl_kwargs: dict[str, Any] = {
             "keep_blank_values": True,
             "encoding": self.encoding,
             "max_num_fields": settings.DATA_UPLOAD_MAX_NUMBER_FIELDS,

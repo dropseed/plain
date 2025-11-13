@@ -21,10 +21,11 @@ class HTMXJSExtension(InclusionTagExtension):
     def get_context(
         self, context: dict[str, Any], *args: Any, **kwargs: Any
     ) -> dict[str, Any]:
+        request = context.get("request")
         return {
             "DEBUG": settings.DEBUG,
             "extensions": kwargs.get("extensions", []),
-            "csp_nonce": context.get("request").csp_nonce,
+            "csp_nonce": request.csp_nonce if request else None,  # type: ignore[attr-defined]
         }
 
 

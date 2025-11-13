@@ -80,6 +80,9 @@ class TLSAudit(Audit):
                 description=self.description,
             )
 
+        # Convert hostname to str (urlparse can return bytes in edge cases)
+        hostname = str(hostname) if isinstance(hostname, bytes) else hostname
+
         # Try to get certificate info
         try:
             cert_info = self._get_certificate_info(hostname, port)

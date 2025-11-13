@@ -6,7 +6,10 @@ ORM.
 from __future__ import annotations
 
 import copy
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from typing import Self
 
 from plain.utils.hashable import make_hashable
 
@@ -39,7 +42,7 @@ class Node:
         children: list[Any] | None = None,
         connector: str | None = None,
         negated: bool = False,
-    ) -> Node:
+    ) -> Self:
         """
         Create a new instance using Node() instead of __init__() as some
         subclasses, e.g. plain.models.query_utils.Q, may implement a custom
@@ -48,7 +51,7 @@ class Node:
         """
         obj = Node(children, connector or cls.default, negated)
         obj.__class__ = cls
-        return obj
+        return obj  # type: ignore[return-value]
 
     def __str__(self) -> str:
         template = "(NOT (%s: %s))" if self.negated else "(%s: %s)"
@@ -57,14 +60,14 @@ class Node:
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"
 
-    def __copy__(self) -> Node:
+    def __copy__(self) -> Self:
         obj = self.create(connector=self.connector, negated=self.negated)
         obj.children = self.children  # Don't [:] as .__init__() via .create() does.
         return obj
 
     copy = __copy__
 
-    def __deepcopy__(self, memodict: dict[int, Any]) -> Node:
+    def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         obj = self.create(connector=self.connector, negated=self.negated)
         obj.children = copy.deepcopy(self.children, memodict)
         return obj

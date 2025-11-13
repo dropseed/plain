@@ -12,13 +12,16 @@ they're the closest concept currently available.
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models.exceptions import FieldDoesNotExist, FieldError
 from plain.utils.hashable import make_hashable
 
 from . import BLANK_CHOICE_DASH
 from .mixins import FieldCacheMixin
+
+if TYPE_CHECKING:
+    from plain.models.lookups import Lookup
 
 
 class ForeignObjectRel(FieldCacheMixin):
@@ -106,7 +109,7 @@ class ForeignObjectRel(FieldCacheMixin):
     def one_to_many(self) -> bool:
         return self.field.many_to_one
 
-    def get_lookup(self, lookup_name: str) -> Any:
+    def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
         return self.field.get_lookup(lookup_name)
 
     def get_internal_type(self) -> str:

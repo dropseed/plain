@@ -255,8 +255,8 @@ class MigrationAutodetector:
 
     @staticmethod
     def _resolve_dependency(
-        dependency: tuple[str, ...],
-    ) -> tuple[tuple[str, ...], bool]:
+        dependency: tuple[str, str, str | None, bool | str],
+    ) -> tuple[tuple[str, str, str | None, bool | str], bool]:
         """
         Return the resolved dependency and a boolean denoting whether or not
         it was a settings dependency.
@@ -421,7 +421,7 @@ class MigrationAutodetector:
                 )
 
     def check_dependency(
-        self, operation: Operation, dependency: tuple[str, ...]
+        self, operation: Operation, dependency: tuple[str, str, str | None, bool | str]
     ) -> bool:
         """
         Return True if the given operation depends on the given dependency,
@@ -472,11 +472,11 @@ class MigrationAutodetector:
         self,
         package_label: str,
         operation: Operation,
-        dependencies: list[tuple[str, ...]] | None = None,
+        dependencies: list[tuple[str, str, str | None, bool | str]] | None = None,
         beginning: bool = False,
     ) -> None:
-        # Dependencies are
-        # (package_label, model_name, field_name, create/delete as True/False)
+        # Operation dependencies are 4-element tuples:
+        # (package_label, model_name, field_name, create/delete as True/False or "alter")
         operation._auto_deps = dependencies or []  # type: ignore[attr-defined]
         if beginning:
             self.generated_operations.setdefault(package_label, []).insert(0, operation)
@@ -1181,7 +1181,7 @@ class MigrationAutodetector:
     @staticmethod
     def _get_dependencies_for_foreign_key(
         package_label: str, model_name: str, field: Field, project_state: ProjectState
-    ) -> list[tuple[str, str, None, bool]]:
+    ) -> list[tuple[str, str, str | None, bool | str]]:
         remote_field_model = None
         if hasattr(field.remote_field, "model"):
             remote_field_model = field.remote_field.model
@@ -1213,7 +1213,7 @@ class MigrationAutodetector:
 
     def _get_dependencies_for_model(
         self, package_label: str, model_name: str
-    ) -> list[tuple[str, str, None, bool]]:
+    ) -> list[tuple[str, str, str | None, bool | str]]:
         """Return foreign key dependencies of the given model."""
         dependencies = []
         model_state = self.to_state.models[package_label, model_name]

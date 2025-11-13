@@ -162,7 +162,7 @@ class Collector:
         if reverse_dependency:
             model, dependency = dependency, model
         self.dependencies[model].add(dependency)
-        self.data.setdefault(dependency, self.data.default_factory())
+        self.data.setdefault(dependency, set())
 
     def add_field_update(self, field: Field, value: Any, objs: Iterable[Any]) -> None:
         """
@@ -392,7 +392,9 @@ class Collector:
                     found = True
             if not found:
                 return
-        self.data = {model: self.data[model] for model in sorted_models}
+        self.data = defaultdict(
+            set, {model: self.data[model] for model in sorted_models}
+        )
 
     def delete(self) -> tuple[int, dict[str, int]]:
         # sort instance collections
@@ -424,6 +426,7 @@ class Collector:
 
             # update fields
             for (field, value), instances_list in self.field_updates.items():
+                assert field.name is not None
                 updates = []
                 objs = []
                 for instances in instances_list:

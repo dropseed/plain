@@ -291,6 +291,13 @@ class BaseManyToManyManager(BaseRelatedManager):
     - symmetrical (for forward relations)
     """
 
+    # Type hints for attributes set by subclasses
+    model: Any
+    query_field_name: str
+    prefetch_cache_name: str
+    source_field_name: str
+    target_field_name: str
+
     def __init__(self, instance: Any, rel: Any):
         self.instance = instance
         self.through = rel.through

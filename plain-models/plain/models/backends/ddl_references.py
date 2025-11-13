@@ -268,7 +268,7 @@ class Expressions(TableColumns):
         self.quote_value = quote_value
         columns = [
             col.target.column
-            for col in self.compiler.query._gen_cols([self.expressions])
+            for col in self.compiler.query._gen_cols(iter([self.expressions]))
         ]
         super().__init__(table, columns)
 
@@ -285,7 +285,7 @@ class Expressions(TableColumns):
             return
         expressions = deepcopy(self.expressions)
         self.columns = []
-        for col in self.compiler.query._gen_cols([expressions]):
+        for col in self.compiler.query._gen_cols(iter([expressions])):
             if col.target.column == old_column:
                 col.target.column = new_column
             self.columns.append(col.target.column)

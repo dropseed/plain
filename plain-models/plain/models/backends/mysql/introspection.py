@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import sqlparse
-from MySQLdb.constants import FIELD_TYPE  # type: ignore[import-untyped]
+from MySQLdb.constants import FIELD_TYPE
 
 from plain.models.backends.base.introspection import BaseDatabaseIntrospection
 from plain.models.backends.base.introspection import FieldInfo as BaseFieldInfo
 from plain.models.backends.base.introspection import TableInfo as BaseTableInfo
 from plain.models.indexes import Index
 from plain.utils.datastructures import OrderedSet
+
+if TYPE_CHECKING:
+    from .base import MySQLDatabaseWrapper
 
 FieldInfo = namedtuple(
     "FieldInfo",
@@ -25,6 +28,9 @@ TableInfo = namedtuple("TableInfo", BaseTableInfo._fields + ("comment",))
 
 
 class DatabaseIntrospection(BaseDatabaseIntrospection):
+    # Type hint: narrow connection type to MySQL-specific wrapper
+    connection: MySQLDatabaseWrapper
+
     data_types_reverse = {
         FIELD_TYPE.BLOB: "TextField",
         FIELD_TYPE.CHAR: "CharField",

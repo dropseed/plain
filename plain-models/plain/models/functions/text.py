@@ -12,14 +12,17 @@ if TYPE_CHECKING:
     from plain.models.sql.compiler import SQLCompiler
 
 
-class MySQLSHA2Mixin:
+class MySQLSHA2Mixin(Transform):
+    """Mixin for Transform subclasses that implement SHA2 hashing on MySQL."""
+
     def as_mysql(
         self,
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
-        return super().as_sql(  # type: ignore[misc]
+    ) -> tuple[str, list[Any]]:
+        assert self.function is not None
+        return super().as_sql(
             compiler,
             connection,
             template=f"SHA2(%(expressions)s, {self.function[3:]})",
@@ -27,14 +30,17 @@ class MySQLSHA2Mixin:
         )
 
 
-class PostgreSQLSHAMixin:
+class PostgreSQLSHAMixin(Transform):
+    """Mixin for Transform subclasses that implement SHA hashing on PostgreSQL."""
+
     def as_postgresql(
         self,
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
-        return super().as_sql(  # type: ignore[misc]
+    ) -> tuple[str, list[Any]]:
+        assert self.function is not None
+        return super().as_sql(
             compiler,
             connection,
             template="ENCODE(DIGEST(%(expressions)s, '%(function)s'), 'hex')",
@@ -52,7 +58,7 @@ class Chr(Transform):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return super().as_sql(
             compiler,
             connection,
@@ -66,7 +72,7 @@ class Chr(Transform):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return super().as_sql(compiler, connection, function="CHAR", **extra_context)
 
 
@@ -83,7 +89,7 @@ class ConcatPair(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         coalesced = self.coalesce()
         return super(ConcatPair, coalesced).as_sql(
             compiler,
@@ -98,7 +104,7 @@ class ConcatPair(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         copy = self.copy()
         copy.set_source_expressions(
             [
@@ -117,7 +123,7 @@ class ConcatPair(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         # Use CONCAT_WS with an empty separator so that NULLs are ignored.
         return super().as_sql(
             compiler,
@@ -187,7 +193,7 @@ class Left(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return self.get_substr().as_sqlite(compiler, connection, **extra_context)
 
 
@@ -203,7 +209,7 @@ class Length(Transform):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return super().as_sql(
             compiler, connection, function="CHAR_LENGTH", **extra_context
         )
@@ -250,7 +256,7 @@ class Ord(Transform):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return super().as_sql(compiler, connection, function="ORD", **extra_context)
 
     def as_sqlite(
@@ -258,7 +264,7 @@ class Ord(Transform):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return super().as_sql(compiler, connection, function="UNICODE", **extra_context)
 
 
@@ -349,7 +355,7 @@ class StrIndex(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return super().as_sql(compiler, connection, function="STRPOS", **extra_context)
 
 
@@ -378,7 +384,7 @@ class Substr(Func):
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         return super().as_sql(compiler, connection, function="SUBSTR", **extra_context)
 
 

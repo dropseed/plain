@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
-from typing import Any, cast
+from typing import Any
 
 from plain.utils.functional import SimpleLazyObject
 
@@ -359,6 +359,6 @@ def _lazy_re_compile(
             return re.compile(regex, flags)
         else:
             assert not flags, "flags must be empty if regex is passed pre-compiled"
-            return cast(re.Pattern[str] | re.Pattern[bytes], regex)
+            return regex
 
     return SimpleLazyObject(_compile)

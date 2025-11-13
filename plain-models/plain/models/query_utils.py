@@ -24,8 +24,10 @@ if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
     from plain.models.fields import Field
+    from plain.models.lookups import Lookup, Transform
     from plain.models.meta import Meta
     from plain.models.sql.compiler import SQLCompiler
+    from plain.models.sql.where import WhereNode
 
 logger = logging.getLogger("plain.models")
 
@@ -104,7 +106,7 @@ class Q(tree.Node):
         reuse: Any = None,
         summarize: bool = False,
         for_save: bool = False,
-    ) -> Any:
+    ) -> WhereNode:
         # We must promote any new joins to left outer joins so that when Q is
         # used as an expression, rows aren't filtered due to joins.
         clause, joins = query._add_q(  # type: ignore[union-attr]
@@ -212,22 +214,26 @@ class RegisterLookupMixin:
     get_lookups = class_or_instance_method(get_class_lookups, get_instance_lookups)
     get_class_lookups = classmethod(get_class_lookups)  # type: ignore[assignment]
 
-    def get_lookup(self, lookup_name: str) -> type | None:
+    def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
         from plain.models.lookups import Lookup
 
         found = self._get_lookup(lookup_name)
-        if found is None and hasattr(self, "output_field"):
-            return self.output_field.get_lookup(lookup_name)
+        if found is None:
+            # output_field is a Field which inherits from RegisterLookupMixin
+            if output_field := getattr(self, "output_field", None):
+                return output_field.get_lookup(lookup_name)
         if found is not None and not issubclass(found, Lookup):
             return None
         return found
 
-    def get_transform(self, lookup_name: str) -> type | None:
+    def get_transform(self, lookup_name: str) -> type[Transform] | None:
         from plain.models.lookups import Transform
 
         found = self._get_lookup(lookup_name)
-        if found is None and hasattr(self, "output_field"):
-            return self.output_field.get_transform(lookup_name)
+        if found is None:
+            # output_field is a Field which inherits from RegisterLookupMixin
+            if output_field := getattr(self, "output_field", None):
+                return output_field.get_transform(lookup_name)
         if found is not None and not issubclass(found, Transform):
             return None
         return found

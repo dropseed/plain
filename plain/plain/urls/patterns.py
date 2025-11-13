@@ -15,6 +15,10 @@ from .converters import get_converter
 
 @internalcode
 class CheckURLMixin:
+    # Expected to be set by subclasses
+    regex: re.Pattern[str]
+    name: str | None
+
     def describe(self) -> str:
         """
         Format the URL pattern for display in warning messages.

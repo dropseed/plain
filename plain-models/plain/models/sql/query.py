@@ -14,12 +14,15 @@ import difflib
 import functools
 import sys
 from collections import Counter, namedtuple
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from collections.abc import Iterator as TypingIterator
 from functools import cached_property
 from itertools import chain, count, product
 from string import ascii_uppercase
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
+
+if TYPE_CHECKING:
+    from typing import Self
 
 from plain.models.aggregates import Count
 from plain.models.constants import LOOKUP_SEP
@@ -39,6 +42,7 @@ from plain.models.fields import Field
 from plain.models.fields.related_lookups import MultiColSource
 from plain.models.lookups import Lookup
 from plain.models.query_utils import (
+    PathInfo,
     Q,
     check_rel_lookup_compatibility,
     refs_expression,
@@ -97,7 +101,7 @@ class RawQuery:
     def __init__(self, sql: str, params: tuple[Any, ...] | dict[str, Any] = ()):
         self.params = params
         self.sql = sql
-        self.cursor = None
+        self.cursor: Any = None
 
         # Mirror some properties of a normal query so that
         # the compiler can be used to process results.
@@ -154,7 +158,7 @@ class RawQuery:
         if params_type is tuple:
             params = tuple(adapter(val) for val in self.params)
         elif params_type is dict:
-            params = {key: adapter(val) for key, val in self.params.items()}
+            params = {key: adapter(val) for key, val in self.params.items()}  # type: ignore[union-attr]
         elif params_type is None:
             params = None
         else:
@@ -165,6 +169,8 @@ class RawQuery:
 
 
 ExplainInfo = namedtuple("ExplainInfo", ("format", "options"))
+
+QueryType = TypeVar("QueryType", bound="Query")
 
 
 class Query(BaseExpression):
@@ -209,7 +215,7 @@ class Query(BaseExpression):
     select_for_update_skip_locked = False
     select_for_update_of = ()
     select_for_no_key_update = False
-    select_related = False
+    select_related: bool | dict[str, Any] = False
     has_select_fields = False
     # Arbitrary limit for select_related to prevents infinite recursion.
     max_depth = 5
@@ -299,7 +305,7 @@ class Query(BaseExpression):
         """
         return self.get_compiler().as_sql()
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> Query:
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
         """Limit the amount of work when a Query is deepcopied."""
         result = self.clone()
         memo[id(self)] = result
@@ -318,7 +324,7 @@ class Query(BaseExpression):
         """
         return self.model._model_meta
 
-    def clone(self) -> Query:
+    def clone(self) -> Self:
         """
         Return a copy of the current Query. A lightweight alternative to
         deepcopy().
@@ -363,6 +369,12 @@ class Query(BaseExpression):
         obj.__dict__.pop("base_table", None)
         return obj  # type: ignore[return-value]
 
+    @overload
+    def chain(self, klass: None = None) -> Self: ...
+
+    @overload
+    def chain(self, klass: type[QueryType]) -> QueryType: ...
+
     def chain(self, klass: type[Query] | None = None) -> Query:
         """
         Return a copy of the current Query that's ready for another operation.
@@ -378,7 +390,7 @@ class Query(BaseExpression):
             obj._setup_query()  # type: ignore[attr-defined]
         return obj  # type: ignore[return-value]
 
-    def relabeled_clone(self, change_map: dict[str, str]) -> Query:
+    def relabeled_clone(self, change_map: dict[str, str]) -> Self:
         clone = self.clone()
         clone.change_aliases(change_map)
         return clone
@@ -547,9 +559,9 @@ class Query(BaseExpression):
         return obj.get_aggregation({"__count": Count("*")})["__count"]
 
     def has_filters(self) -> bool:
-        return self.where
+        return bool(self.where)
 
-    def exists(self, limit: bool = True) -> Query:
+    def exists(self, limit: bool = True) -> Self:
         q = self.clone()
         if not (q.distinct and q.is_sliced):
             if q.group_by is True:
@@ -613,6 +625,7 @@ class Query(BaseExpression):
         # except if the alias is the base table since it must be present in the
         # query on both sides.
         initial_alias = self.get_initial_alias()
+        assert initial_alias is not None
         rhs.bump_prefix(self, exclude={initial_alias})
 
         # Work out how to relabel the rhs aliases, if necessary.
@@ -1091,7 +1104,7 @@ class Query(BaseExpression):
             self.set_annotation_mask(set(self.annotation_select).difference({alias}))
         self.annotations[alias] = annotation
 
-    def resolve_expression(self, query: Query, *args: Any, **kwargs: Any) -> Query:
+    def resolve_expression(self, query: Query, *args: Any, **kwargs: Any) -> Self:
         clone = self.clone()
         # Subqueries need to use a different set of aliases than the outer query.
         clone.bump_prefix(query)
@@ -1181,7 +1194,9 @@ class Query(BaseExpression):
 
     def solve_lookup_type(
         self, lookup: str, summarize: bool = False
-    ) -> tuple[list[str] | tuple[str, ...], tuple[str, ...], BaseExpression | bool]:
+    ) -> tuple[
+        list[str] | tuple[str, ...], tuple[str, ...], BaseExpression | Literal[False]
+    ]:
         """
         Solve the lookup type from the lookup (e.g.: 'foobar__id__icontains').
         """
@@ -1251,7 +1266,7 @@ class Query(BaseExpression):
                 self.check_filterable(expr)
 
     def build_lookup(
-        self, lookups: list[str], lhs: BaseExpression, rhs: Any
+        self, lookups: list[str], lhs: BaseExpression | MultiColSource, rhs: Any
     ) -> Lookup | None:
         """
         Try to extract transforms and lookup from given lhs.
@@ -1287,12 +1302,14 @@ class Query(BaseExpression):
 
         return lookup
 
-    def try_transform(self, lhs: BaseExpression, name: str) -> BaseExpression:
+    def try_transform(
+        self, lhs: BaseExpression | MultiColSource, name: str
+    ) -> BaseExpression | MultiColSource:
         """
         Helper method for build_lookup(). Try to fetch and initialize
         a transform for name parameter from lhs.
         """
-        transform_class = lhs.get_transform(name)
+        transform_class = lhs.get_transform(name)  # type: ignore[union-attr]
         if transform_class:
             return transform_class(lhs)
         else:
@@ -1394,16 +1411,17 @@ class Query(BaseExpression):
             self.check_filterable(value)
 
         if reffed_expression:
-            condition = self.build_lookup(lookups, reffed_expression, value)
+            condition = self.build_lookup(list(lookups), reffed_expression, value)
             return WhereNode([condition], connector=AND), []  # type: ignore[return-value]
 
         meta = self.get_model_meta()
         alias = self.get_initial_alias()
+        assert alias is not None
         allow_many = not branch_negated or not split_subq
 
         try:
             join_info = self.setup_joins(
-                parts,
+                list(parts),
                 meta,
                 alias,
                 can_reuse=can_reuse,
@@ -1420,7 +1438,11 @@ class Query(BaseExpression):
             # lookup parts
             self._lookup_joins = join_info.joins
         except MultiJoin as e:
-            return self.split_exclude(filter_expr, can_reuse, e.names_with_path)
+            return self.split_exclude(
+                filter_expr,
+                can_reuse or set(),
+                e.names_with_path,  # type: ignore[invalid-argument-type]
+            )
 
         # Update used_joins before trimming since they are reused to determine
         # which joins could be later promoted to INNER.
@@ -1441,7 +1463,8 @@ class Query(BaseExpression):
         else:
             col = self._get_col(targets[0], join_info.final_field, alias)
 
-        condition = self.build_lookup(lookups, col, value)
+        condition = self.build_lookup(list(lookups), col, value)
+        assert condition is not None
         lookup_type = condition.lookup_name
         clause = WhereNode([condition], connector=AND)
 
@@ -1469,12 +1492,14 @@ class Query(BaseExpression):
                     or self.alias_map[join_list[-1]].join_type == LOUTER
                 ):
                     lookup_class = targets[0].get_lookup("isnull")
+                    assert lookup_class is not None
                     col = self._get_col(targets[0], join_info.targets[0], alias)
                     clause.add(lookup_class(col, False), AND)
                 # If someval is a nullable column, someval IS NOT NULL is
                 # added.
                 if isinstance(value, Col) and self.is_nullable(value.target):
                     lookup_class = value.target.get_lookup("isnull")
+                    assert lookup_class is not None
                     clause.add(lookup_class(value, False), AND)
         return clause, used_joins if not require_outer else ()
 
@@ -1500,7 +1525,9 @@ class Query(BaseExpression):
             self.where.add(clause, AND)
         self.demote_joins(existing_inner)
 
-    def build_where(self, filter_expr: tuple[str, Any]) -> WhereNode:
+    def build_where(
+        self, filter_expr: tuple[str, Any] | Q | BaseExpression
+    ) -> WhereNode:
         return self.build_filter(filter_expr, allow_joins=False)[0]
 
     def clear_where(self) -> None:
@@ -1682,10 +1709,11 @@ class Query(BaseExpression):
                 break
 
             if hasattr(field, "path_infos"):
+                pathinfos: list[PathInfo]
                 if filtered_relation:
-                    pathinfos = field.get_path_info(filtered_relation)
+                    pathinfos = field.get_path_info(filtered_relation)  # type: ignore[attr-defined]
                 else:
-                    pathinfos = field.path_infos
+                    pathinfos = field.path_infos  # type: ignore[attr-defined]
                 if not allow_many:
                     for inner_pos, p in enumerate(pathinfos):
                         if p.m2m:
@@ -1788,7 +1816,7 @@ class Query(BaseExpression):
 
             def transform(
                 field: Field, alias: str | None, *, name: str, previous: Any
-            ) -> BaseExpression:
+            ) -> BaseExpression | MultiColSource:
                 try:
                     wrapped = previous(field, alias)
                     return self.try_transform(wrapped, name)
@@ -1875,7 +1903,7 @@ class Query(BaseExpression):
     @classmethod
     def _gen_cols(
         cls,
-        exprs: TypingIterator[Any],
+        exprs: Iterable[Any],
         include_external: bool = False,
         resolve_refs: bool = True,
     ) -> TypingIterator[Col]:
@@ -1896,7 +1924,7 @@ class Query(BaseExpression):
                 )
 
     @classmethod
-    def _gen_col_aliases(cls, exprs: TypingIterator[Any]) -> TypingIterator[str]:
+    def _gen_col_aliases(cls, exprs: Iterable[Any]) -> TypingIterator[str]:
         yield from (expr.alias for expr in cls._gen_cols(exprs))
 
     def resolve_ref(
@@ -1905,7 +1933,7 @@ class Query(BaseExpression):
         allow_joins: bool = True,
         reuse: set[str] | None = None,
         summarize: bool = False,
-    ) -> BaseExpression:
+    ) -> BaseExpression | MultiColSource:
         annotation = self.annotations.get(name)
         if annotation is not None:
             if not allow_joins:
@@ -1934,10 +1962,12 @@ class Query(BaseExpression):
                 for transform in field_list[1:]:
                     annotation = self.try_transform(annotation, transform)
                 return annotation
+            initial_alias = self.get_initial_alias()
+            assert initial_alias is not None
             join_info = self.setup_joins(
                 field_list,
                 self.get_model_meta(),
-                self.get_initial_alias(),
+                initial_alias,
                 can_reuse=reuse,
             )
             targets, final_alias, join_list = self.trim_joins(
@@ -2124,6 +2154,7 @@ class Query(BaseExpression):
         the order specified.
         """
         alias = self.get_initial_alias()
+        assert alias is not None
         meta = self.get_model_meta()
 
         try:
@@ -2261,7 +2292,7 @@ class Query(BaseExpression):
         self.select_related=True).
         """
         if isinstance(self.select_related, bool):
-            field_dict = {}
+            field_dict: dict[str, Any] = {}
         else:
             field_dict = self.select_related
         for field in fields:
@@ -2328,17 +2359,18 @@ class Query(BaseExpression):
         # splitting and handling when computing the SQL column names (as part of
         # get_columns()).
         existing, defer = self.deferred_loading
+        existing_set = set(existing)
         if defer:
             # Add to existing deferred names.
-            self.deferred_loading = existing.union(field_names), True
+            self.deferred_loading = frozenset(existing_set.union(field_names)), True
         else:
             # Remove names from the set of any existing "immediate load" names.
-            if new_existing := existing.difference(field_names):
-                self.deferred_loading = new_existing, False
+            if new_existing := existing_set.difference(field_names):
+                self.deferred_loading = frozenset(new_existing), False
             else:
                 self.clear_deferred_loading()
-                if new_only := set(field_names).difference(existing):
-                    self.deferred_loading = new_only, True
+                if new_only := set(field_names).difference(existing_set):
+                    self.deferred_loading = frozenset(new_only), True
 
     def add_immediate_loading(self, field_names: list[str] | set[str]) -> None:
         """
@@ -2351,18 +2383,27 @@ class Query(BaseExpression):
         existing immediate values, but respects existing deferrals.)
         """
         existing, defer = self.deferred_loading
-        field_names = set(field_names)
+        field_names_set = set(field_names)
 
         if defer:
             # Remove any existing deferred names from the current set before
             # setting the new names.
-            self.deferred_loading = field_names.difference(existing), False
+            self.deferred_loading = (
+                frozenset(field_names_set.difference(existing)),
+                False,
+            )
         else:
             # Replace any existing "immediate load" field names.
-            self.deferred_loading = frozenset(field_names), False
+            self.deferred_loading = frozenset(field_names_set), False
 
     def set_annotation_mask(
-        self, names: set[str] | frozenset[str] | list[str] | dict[str, Any] | None
+        self,
+        names: set[str]
+        | frozenset[str]
+        | list[str]
+        | tuple[str, ...]
+        | dict[str, Any]
+        | None,
     ) -> None:  # type: ignore[misc]
         """Set the mask of annotations that will be returned by the SELECT."""
         if names is None:
@@ -2375,7 +2416,9 @@ class Query(BaseExpression):
         if self.annotation_select_mask is not None:
             self.set_annotation_mask(self.annotation_select_mask.union(names))
 
-    def set_extra_mask(self, names: set[str] | tuple[str, ...] | None) -> None:
+    def set_extra_mask(
+        self, names: set[str] | list[str] | tuple[str, ...] | None
+    ) -> None:
         """
         Set the mask of extra select items that will be returned by SELECT.
         Don't remove them from the Query since they might be used later.

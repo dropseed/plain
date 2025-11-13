@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any
+import datetime
+from typing import TYPE_CHECKING, Any, cast
 
 from plain import models
 from plain.auth import get_user_model
@@ -57,8 +58,12 @@ class OAuthConnection(models.Model):
         oauth_token = OAuthToken(
             access_token=self.access_token,
             refresh_token=self.refresh_token,
-            access_token_expires_at=self.access_token_expires_at,
-            refresh_token_expires_at=self.refresh_token_expires_at,
+            access_token_expires_at=cast(
+                datetime.datetime | None, self.access_token_expires_at
+            ),
+            refresh_token_expires_at=cast(
+                datetime.datetime | None, self.refresh_token_expires_at
+            ),
         )
         refreshed_oauth_token = provider_instance.refresh_oauth_token(
             oauth_token=oauth_token

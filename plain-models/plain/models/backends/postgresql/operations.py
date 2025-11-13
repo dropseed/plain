@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +16,7 @@ from plain.models.constants import OnConflict
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
+    from plain.models.backends.postgresql.base import PostgreSQLDatabaseWrapper
     from plain.models.fields import Field
 
 
@@ -29,6 +30,9 @@ def get_json_dumps(
 
 
 class DatabaseOperations(BaseDatabaseOperations):
+    # Type checker hint: connection is always PostgreSQLDatabaseWrapper in this class
+    connection: PostgreSQLDatabaseWrapper
+
     cast_char_field_without_max_length = "varchar"
     explain_prefix = "EXPLAIN"
     explain_options = frozenset(
@@ -313,7 +317,9 @@ class DatabaseOperations(BaseDatabaseOperations):
             return ipaddress.ip_address(value)
         return None
 
-    def adapt_json_value(self, value: Any, encoder: type[json.JSONEncoder]) -> Jsonb:
+    def adapt_json_value(
+        self, value: Any, encoder: type[json.JSONEncoder] | None
+    ) -> Jsonb:
         return Jsonb(value, dumps=get_json_dumps(encoder))
 
     def subtract_temporals(
@@ -354,8 +360,8 @@ class DatabaseOperations(BaseDatabaseOperations):
         self,
         fields: list[Field],
         on_conflict: OnConflict | None,
-        update_fields: list[Field],
-        unique_fields: list[Field],
+        update_fields: Iterable[str],
+        unique_fields: Iterable[str],
     ) -> str:
         if on_conflict == OnConflict.IGNORE:
             return "ON CONFLICT DO NOTHING"

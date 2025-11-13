@@ -80,8 +80,8 @@ class Card:
         return self.request.query_params.get(f"{self.get_slug()}.preset", "")
 
     def get_presets(self) -> list[str] | Enum | None:
-        if hasattr(self.presets, "copy"):
+        if isinstance(self.presets, list):
             # Avoid mutating the class attribute
-            return self.presets.copy()
+            return self.presets.copy()  # type: ignore[return-value]
         else:
             return self.presets

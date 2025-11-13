@@ -12,7 +12,8 @@ from plain.models.sql.constants import INNER, LOUTER
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.fields import Field
+    from plain.models.fields.related import RelatedField
+    from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -58,7 +59,7 @@ class Join:
         parent_alias: str,
         table_alias: str,
         join_type: str,
-        join_field: Field,
+        join_field: RelatedField | ForeignObjectRel,
         nullable: bool,
         filtered_relation: Any = None,
     ) -> None:
@@ -99,7 +100,7 @@ class Join:
 
         # Add a single condition inside parentheses for whatever
         # get_extra_restriction() returns.
-        extra_cond = self.join_field.get_extra_restriction(
+        extra_cond = self.join_field.get_extra_restriction(  # type: ignore[attr-defined]
             self.table_alias, self.parent_alias
         )
         if extra_cond:

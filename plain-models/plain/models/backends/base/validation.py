@@ -16,6 +16,13 @@ class BaseDatabaseValidation:
     def preflight(self) -> list[Any]:
         return []
 
+    def check_field_type(self, field: Field, field_type: str) -> list[Any]:
+        """
+        Backend-specific field type validation.
+        Subclasses may override this method to perform validation specific to their database.
+        """
+        return []
+
     def check_field(self, field: Field, **kwargs: Any) -> list[Any]:
         errors = []
         # Backends may implement a check_field_type() method.

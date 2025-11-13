@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from plain import exceptions, preflight
 from plain.models import expressions, lookups
@@ -10,12 +10,12 @@ from plain.models.db import NotSupportedError, db_connection
 from plain.models.fields import TextField
 from plain.models.lookups import (
     FieldGetDbPrepValueMixin,
+    Lookup,
     PostgresOperatorLookup,
     Transform,
 )
 
 from . import Field
-from .mixins import CheckFieldDefaultMixin
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 __all__ = ["JSONField"]
 
 
-class JSONField(CheckFieldDefaultMixin, Field):
+class JSONField(Field):
     empty_strings_allowed = False
     description = "A JSON object"
     default_error_messages = {
@@ -50,8 +50,31 @@ class JSONField(CheckFieldDefaultMixin, Field):
         self.decoder = decoder
         super().__init__(**kwargs)
 
+    def _check_default(self) -> list[PreflightResult]:
+        if (
+            self.has_default()
+            and self.default is not None
+            and not callable(self.default)
+        ):
+            return [
+                preflight.PreflightResult(
+                    fix=(
+                        f"{self.__class__.__name__} default should be a callable instead of an instance "
+                        "so that it's not shared between all field instances. "
+                        "Use a callable instead, e.g., use `{}` instead of "
+                        "`{}`.".format(*self._default_fix)
+                    ),
+                    obj=self,
+                    id="fields.invalid_choice_mixin_default",
+                    warning=True,
+                )
+            ]
+        else:
+            return []
+
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         errors = super().preflight(**kwargs)
+        errors.extend(self._check_default())
         errors.extend(self._check_supported())
         return errors
 
@@ -208,7 +231,8 @@ class HasKeyLookup(PostgresOperatorLookup):
         else:
             lhs, lhs_params = self.process_lhs(compiler, connection)
             lhs_json_path = "$"
-        sql = template % lhs
+        effective_template = template or "%s"
+        sql = effective_template % lhs
         # Process JSON path from the right-hand side.
         rhs = self.rhs
         rhs_params = []
@@ -279,7 +303,7 @@ class HasKeyOrArrayIndex(HasKey):
         return compile_json_path([key_transform], include_root=False)
 
 
-class CaseInsensitiveMixin:
+class CaseInsensitiveMixin(Lookup):
     """
     Mixin to allow case-insensitive comparison of JSON values on MySQL.
     MySQL handles strings used in JSON context using the utf8mb4_bin collation.
@@ -290,7 +314,7 @@ class CaseInsensitiveMixin:
     def process_lhs(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        lhs, lhs_params = super().process_lhs(compiler, connection)  # type: ignore[misc]
+        lhs, lhs_params = super().process_lhs(compiler, connection)
         if connection.vendor == "mysql":
             return f"LOWER({lhs})", lhs_params
         return lhs, lhs_params
@@ -298,7 +322,7 @@ class CaseInsensitiveMixin:
     def process_rhs(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        rhs, rhs_params = super().process_rhs(compiler, connection)  # type: ignore[misc]
+        rhs, rhs_params = super().process_rhs(compiler, connection)
         if connection.vendor == "mysql":
             return f"LOWER({rhs})", rhs_params
         return rhs, rhs_params
@@ -375,7 +399,8 @@ class KeyTransform(Transform):
     def as_sqlite(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, tuple[Any, ...]]:
-        sqlite_connection = cast(SQLiteDatabaseWrapper, connection)
+        # as_sqlite is only called for SQLite connections
+        sqlite_connection: SQLiteDatabaseWrapper = connection  # type: ignore[assignment]
         lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
         json_path = compile_json_path(key_transforms)
         datatype_values = ",".join(
@@ -398,7 +423,8 @@ class KeyTextTransform(KeyTransform):
     def as_mysql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, tuple[Any, ...]]:
-        mysql_connection = cast(MySQLDatabaseWrapper, connection)
+        # as_mysql is only called for MySQL connections
+        mysql_connection: MySQLDatabaseWrapper = connection  # type: ignore[assignment]
         if mysql_connection.mysql_is_mariadb:
             # MariaDB doesn't support -> and ->> operators (see MDEV-13594).
             sql, params = super().as_mysql(compiler, connection)
@@ -421,7 +447,7 @@ class KeyTextTransform(KeyTransform):
 KT = KeyTextTransform.from_lookup
 
 
-class KeyTransformTextLookupMixin:
+class KeyTransformTextLookupMixin(Lookup):
     """
     Mixin for combining with a lookup expecting a text lhs from a JSONField
     key lookup. On PostgreSQL, make use of the ->> operator instead of casting
@@ -440,7 +466,7 @@ class KeyTransformTextLookupMixin:
             *key_transform.source_expressions,
             **key_transform.extra,
         )
-        super().__init__(key_text_transform, *args, **kwargs)  # type: ignore[misc]
+        super().__init__(key_text_transform, *args, **kwargs)
 
 
 class KeyTransformIsNull(lookups.IsNull):
@@ -479,14 +505,16 @@ class KeyTransformIn(lookups.In):
             if connection.vendor == "mysql":
                 sql = "JSON_EXTRACT(%s, '$')"
             elif connection.vendor == "sqlite":
-                sqlite_connection = cast(SQLiteDatabaseWrapper, connection)
+                # After checking vendor, we know connection is SQLiteDatabaseWrapper
+                sqlite_connection: SQLiteDatabaseWrapper = connection  # type: ignore[assignment]
                 if params[0] not in sqlite_connection.ops.jsonfield_datatype_values:  # type: ignore[attr-defined]
                     sql = "JSON_EXTRACT(%s, '$')"
         if connection.vendor == "mysql":
-            mysql_connection = cast(MySQLDatabaseWrapper, connection)
+            # After checking vendor, we know connection is MySQLDatabaseWrapper
+            mysql_connection: MySQLDatabaseWrapper = connection  # type: ignore[assignment]
             if mysql_connection.mysql_is_mariadb:
                 sql = f"JSON_UNQUOTE({sql})"
-        return sql, params
+        return sql, tuple(params)
 
 
 class KeyTransformExact(JSONExact):
@@ -497,7 +525,8 @@ class KeyTransformExact(JSONExact):
             return super(lookups.Exact, self).process_rhs(compiler, connection)
         rhs, rhs_params = super().process_rhs(compiler, connection)
         if connection.vendor == "sqlite":
-            sqlite_connection = cast(SQLiteDatabaseWrapper, connection)
+            # After checking vendor, we know connection is SQLiteDatabaseWrapper
+            sqlite_connection: SQLiteDatabaseWrapper = connection  # type: ignore[assignment]
             func = []
             for value in rhs_params:
                 if value in sqlite_connection.ops.jsonfield_datatype_values:  # type: ignore[attr-defined]
@@ -550,11 +579,11 @@ class KeyTransformIRegex(
     pass
 
 
-class KeyTransformNumericLookupMixin:
+class KeyTransformNumericLookupMixin(Lookup):
     def process_rhs(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        rhs, rhs_params = super().process_rhs(compiler, connection)  # type: ignore[misc]
+        rhs, rhs_params = super().process_rhs(compiler, connection)
         if not connection.features.has_native_json_field:
             rhs_params = [json.loads(value) for value in rhs_params]
         return rhs, rhs_params

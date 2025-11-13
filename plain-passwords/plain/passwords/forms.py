@@ -75,7 +75,7 @@ class PasswordResetForm(forms.Form):
                 template_name=email_template_name,
                 context=context,
                 from_email=from_email,
-                to_email=user.email,
+                to_email=user.email,  # type: ignore[attr-defined]
             )
 
 
@@ -101,13 +101,17 @@ class PasswordSetForm(forms.Form):
                 code="password_mismatch",
             )
 
+        # password2 must exist at this point (required field)
+        assert isinstance(password2, str), "new_password2 must be a string"
+
         # Clean it as if it were being put into the model directly
         self.user._model_meta.get_field("password").clean(password2, self.user)
 
         return password2
 
     def save(self, commit: bool = True) -> Model:
-        self.user.password = self.cleaned_data["new_password1"]
+        # User model has password attribute
+        self.user.password = self.cleaned_data["new_password1"]  # type: ignore[attr-defined]
         if commit:
             self.user.save()
         return self.user

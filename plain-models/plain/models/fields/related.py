@@ -35,6 +35,7 @@ from .reverse_related import ManyToManyRel, ManyToOneRel
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
+    from plain.models.fields.reverse_related import ForeignObjectRel
 
 RECURSIVE_RELATIONSHIP_CONSTANT = "self"
 
@@ -98,6 +99,9 @@ class RelatedField(FieldCacheMixin, Field):
     one_to_many = False
     many_to_many = False
     many_to_one = False
+
+    # RelatedField always has a remote_field (never None)
+    remote_field: ForeignObjectRel
 
     def __init__(
         self,
@@ -498,7 +502,7 @@ class ForeignKey(RelatedField):
         self.db_constraint = db_constraint
 
     def __copy__(self) -> ForeignKey:
-        obj = super().__copy__()  # type: ignore[misc]
+        obj: ForeignKey = super().__copy__()  # type: ignore[misc]
         # Remove any cached PathInfo values.
         obj.__dict__.pop("path_infos", None)
         obj.__dict__.pop("reverse_path_infos", None)
@@ -522,7 +526,7 @@ class ForeignKey(RelatedField):
         super().__set__(instance, value)
 
     @cached_property
-    def related_fields(self) -> list[tuple[Field, Field]]:
+    def related_fields(self) -> list[tuple[ForeignKey, Field]]:
         return self.resolve_related_fields()
 
     @cached_property
@@ -823,6 +827,9 @@ class ManyToManyField(RelatedField):
     one_to_many = False
 
     rel_class = ManyToManyRel
+
+    # ManyToManyField uses ManyToManyRel which has through/through_fields
+    remote_field: ManyToManyRel
 
     description = "Many-to-many relationship"
 

@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import operator
 from functools import cached_property
+from typing import TYPE_CHECKING
 
 from plain.models.backends.base.features import BaseDatabaseFeatures
 
+if TYPE_CHECKING:
+    from plain.models.backends.mysql.base import MySQLDatabaseWrapper
+
 
 class DatabaseFeatures(BaseDatabaseFeatures):
+    # Type checker hint: connection is always MySQLDatabaseWrapper in this class
+    connection: MySQLDatabaseWrapper
+
     empty_fetchmany_value = ()
     allows_group_by_selected_pks = True
     related_fields_match_type = True

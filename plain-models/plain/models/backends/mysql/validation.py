@@ -8,8 +8,13 @@ from plain.preflight import PreflightResult
 if TYPE_CHECKING:
     from plain.models.fields import Field
 
+    from .base import MySQLDatabaseWrapper
+
 
 class DatabaseValidation(BaseDatabaseValidation):
+    # Type hint: narrow connection type to MySQL-specific wrapper
+    connection: MySQLDatabaseWrapper
+
     def preflight(self) -> list[PreflightResult]:
         issues = super().preflight()
         issues.extend(self._check_sql_mode())

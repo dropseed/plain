@@ -50,12 +50,29 @@ class BaseSocket:
         self.sock: socket.socket | None = self.set_options(sock, bound=bound)
 
     def __str__(self) -> str:
+        assert self.sock is not None, "Socket is closed"
         return f"<socket {self.sock.fileno()}>"
 
     def __getattr__(self, name: str) -> object:
         return getattr(self.sock, name)
 
+    def accept(self) -> tuple[socket.socket, tuple[str, int] | str]:
+        """Accept a connection. Returns (socket object, address)."""
+        assert self.sock is not None, "Socket is closed"
+        return self.sock.accept()
+
+    def fileno(self) -> int:
+        """Return the socket's file descriptor."""
+        assert self.sock is not None, "Socket is closed"
+        return self.sock.fileno()
+
+    def setblocking(self, flag: bool) -> None:
+        """Set blocking or non-blocking mode of the socket."""
+        assert self.sock is not None, "Socket is closed"
+        return self.sock.setblocking(flag)
+
     def getsockname(self) -> tuple[str, int] | str:
+        assert self.sock is not None, "Socket is closed"
         return self.sock.getsockname()
 
     def set_options(self, sock: socket.socket, bound: bool = False) -> socket.socket:
@@ -96,6 +113,7 @@ class TCPSocket(BaseSocket):
         else:
             scheme = "http"
 
+        assert self.sock is not None, "Socket is closed"
         addr = self.sock.getsockname()
         return f"{scheme}://{addr[0]}:{addr[1]}"
 
@@ -108,6 +126,7 @@ class TCP6Socket(TCPSocket):
     FAMILY = socket.AF_INET6
 
     def __str__(self) -> str:
+        assert self.sock is not None, "Socket is closed"
         (host, port, _, _) = self.sock.getsockname()
         return f"http://[{host}]:{port}"
 

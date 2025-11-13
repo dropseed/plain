@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import os
 from io import BytesIO
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from plain.internal.files import temp as tempfile
 from plain.internal.files.base import File
@@ -36,7 +36,7 @@ class UploadedFile(File):
 
     def __init__(
         self,
-        file: IO[Any] | None = None,
+        file: IO[Any],
         name: str | None = None,
         content_type: str | None = None,
         size: int | None = None,
@@ -52,7 +52,7 @@ class UploadedFile(File):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.name} ({self.content_type})>"
 
-    def _get_name(self) -> str:
+    def _get_name(self) -> str | None:
         return self._name
 
     def _set_name(self, name: str | None) -> None:
@@ -84,12 +84,15 @@ class TemporaryUploadedFile(UploadedFile):
         name: str,
         content_type: str,
         size: int,
-        charset: str,
+        charset: str | None,
         content_type_extra: dict[str, str] | None = None,
     ) -> None:
         _, ext = os.path.splitext(name)
-        file = tempfile.NamedTemporaryFile(
-            suffix=".upload" + ext, dir=settings.FILE_UPLOAD_TEMP_DIR
+        file = cast(
+            IO[Any],
+            tempfile.NamedTemporaryFile(
+                suffix=".upload" + ext, dir=settings.FILE_UPLOAD_TEMP_DIR
+            ),
         )
         super().__init__(file, name, content_type, size, charset, content_type_extra)
 
@@ -119,7 +122,7 @@ class InMemoryUploadedFile(UploadedFile):
         name: str,
         content_type: str,
         size: int,
-        charset: str,
+        charset: str | None,
         content_type_extra: dict[str, str] | None = None,
     ) -> None:
         super().__init__(file, name, content_type, size, charset, content_type_extra)

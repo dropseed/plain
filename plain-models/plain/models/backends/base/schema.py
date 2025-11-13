@@ -6,6 +6,9 @@ from collections.abc import Generator
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from typing import Self
+
 from plain.models.backends.ddl_references import (
     Columns,
     Expressions,
@@ -166,7 +169,7 @@ class BaseDatabaseSchemaEditor:
 
     # State-managing methods
 
-    def __enter__(self) -> BaseDatabaseSchemaEditor:
+    def __enter__(self) -> Self:
         self.deferred_sql: list[Any] = []
         self.executed_sql: list[str] = []
         if self.atomic_migration:
@@ -233,12 +236,16 @@ class BaseDatabaseSchemaEditor:
             col_type_suffix = field.db_type_suffix(connection=self.connection)
             if col_type_suffix:
                 definition += f" {col_type_suffix}"
-            params.extend(extra_params)
+            if extra_params:
+                params.extend(extra_params)
             # FK.
             if field.remote_field and field.db_constraint:  # type: ignore[attr-defined]
-                to_table = field.remote_field.model.model_options.db_table
-                to_column = field.remote_field.model._model_meta.get_field(
-                    field.remote_field.field_name
+                # After checking these attributes, we know field is a ForeignKey
+                fk_field: ForeignKey = field  # type: ignore[assignment]
+                assert fk_field.remote_field is not None  # Checked in if condition
+                to_table = fk_field.remote_field.model.model_options.db_table
+                to_column = fk_field.remote_field.model._model_meta.get_field(
+                    fk_field.remote_field.field_name
                 ).column
                 if self.sql_create_inline_fk:
                     definition += " " + self.sql_create_inline_fk % {
@@ -248,7 +255,7 @@ class BaseDatabaseSchemaEditor:
                 elif self.connection.features.supports_foreign_keys:
                     self.deferred_sql.append(
                         self._create_fk_sql(
-                            model, field, "_fk_%(to_table)s_%(to_column)s"
+                            model, fk_field, "_fk_%(to_table)s_%(to_column)s"
                         )
                     )
             # Add the SQL to our big list.
@@ -576,18 +583,23 @@ class BaseDatabaseSchemaEditor:
             and self.connection.features.supports_foreign_keys
             and field.db_constraint  # type: ignore[attr-defined]
         ):
+            # After checking these attributes, we know field is a ForeignKey
+            fk_field: ForeignKey = field  # type: ignore[assignment]
+            assert fk_field.remote_field is not None  # Checked in if condition
             constraint_suffix = "_fk_%(to_table)s_%(to_column)s"
             # Add FK constraint inline, if supported.
             if self.sql_create_column_inline_fk:
-                to_table = field.remote_field.model.model_options.db_table
-                to_column = field.remote_field.model._model_meta.get_field(
-                    field.remote_field.field_name
+                to_table = fk_field.remote_field.model.model_options.db_table
+                to_column = fk_field.remote_field.model._model_meta.get_field(
+                    fk_field.remote_field.field_name
                 ).column
                 namespace, _ = split_identifier(model.model_options.db_table)
                 definition += " " + self.sql_create_column_inline_fk % {
-                    "name": self._fk_constraint_name(model, field, constraint_suffix),
+                    "name": self._fk_constraint_name(
+                        model, fk_field, constraint_suffix
+                    ),
                     "namespace": f"{self.quote_name(namespace)}." if namespace else "",
-                    "column": self.quote_name(field.column),
+                    "column": self.quote_name(fk_field.column),
                     "to_table": self.quote_name(to_table),
                     "to_column": self.quote_name(to_column),
                     "deferrable": self.connection.ops.deferrable_sql(),
@@ -595,7 +607,7 @@ class BaseDatabaseSchemaEditor:
             # Otherwise, add FK constraints later.
             else:
                 self.deferred_sql.append(
-                    self._create_fk_sql(model, field, constraint_suffix)
+                    self._create_fk_sql(model, fk_field, constraint_suffix)
                 )
         # Build the SQL and run it
         sql = self.sql_create_column % {
@@ -786,7 +798,9 @@ class BaseDatabaseSchemaEditor:
                     f"Found wrong number ({len(constraint_names)}) of unique constraints for {model.model_options.db_table}.{old_field.column}"
                 )
             for constraint_name in constraint_names:
-                self.execute(self._delete_unique_sql(model, constraint_name))
+                sql = self._delete_unique_sql(model, constraint_name)
+                if sql is not None:
+                    self.execute(sql)
         # Drop incoming FK constraints if the field is a primary key or unique,
         # which might be a to_field target, and things are going to change.
         old_collation = old_db_params.get("collation")
@@ -857,7 +871,9 @@ class BaseDatabaseSchemaEditor:
                     f"Found wrong number ({len(constraint_names)}) of check constraints for {model.model_options.db_table}.{old_field.column}"
                 )
             for constraint_name in constraint_names:
-                self.execute(self._delete_check_sql(model, constraint_name))
+                sql = self._delete_check_sql(model, constraint_name)
+                if sql is not None:
+                    self.execute(sql)
         # Have they renamed the column?
         if old_field.column != new_field.column:
             self.execute(
@@ -1035,8 +1051,11 @@ class BaseDatabaseSchemaEditor:
             )
             and new_field.db_constraint  # type: ignore[attr-defined]
         ):
+            # After checking these attributes, we know new_field is a ForeignKey
+            fk_field: ForeignKey = new_field  # type: ignore[assignment]
+            assert fk_field.remote_field is not None  # Checked in if condition
             self.execute(
-                self._create_fk_sql(model, new_field, "_fk_%(to_table)s_%(to_column)s")
+                self._create_fk_sql(model, fk_field, "_fk_%(to_table)s_%(to_column)s")
             )
         # Rebuild FKs that pointed to us if we previously had to drop them
         if drop_foreign_keys:
@@ -1050,9 +1069,9 @@ class BaseDatabaseSchemaEditor:
             constraint_name = self._create_index_name(
                 model.model_options.db_table, [new_field.column], suffix="_check"
             )
-            self.execute(
-                self._create_check_sql(model, constraint_name, new_db_params["check"])
-            )
+            sql = self._create_check_sql(model, constraint_name, new_db_params["check"])
+            if sql is not None:
+                self.execute(sql)
         # Drop the default if we need to
         # (Plain usually does not use in-database defaults)
         if needs_database_default:
@@ -1555,24 +1574,25 @@ class BaseDatabaseSchemaEditor:
         compiler = Query(model, alias_cols=False).get_compiler()
         table = model.model_options.db_table
         columns = [field.column for field in fields]
+        constraint_name: IndexName | str
         if name is None:
-            name = self._unique_constraint_name(table, columns, quote=True)
+            constraint_name = self._unique_constraint_name(table, columns, quote=True)
         else:
-            name = self.quote_name(name)
+            constraint_name = self.quote_name(name)
         if condition or include or opclasses or expressions:
             sql = self.sql_create_unique_index
         else:
             sql = self.sql_create_unique
         if columns:
             columns_obj: Columns | Expressions = self._index_columns(
-                table, columns, col_suffixes=(), opclasses=opclasses
+                table, columns, col_suffixes=(), opclasses=opclasses or ()
             )
         else:
             columns_obj = Expressions(table, expressions, compiler, self.quote_value)
         return Statement(
             sql,
             table=Table(table, self.quote_name),
-            name=name,
+            name=constraint_name,
             columns=columns_obj,
             condition=self._index_condition_sql(condition),
             deferrable=self._deferrable_constraint_sql(deferrable),

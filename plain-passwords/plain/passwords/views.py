@@ -10,6 +10,7 @@ from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthViewMixin
 from plain.exceptions import BadRequest
+from plain.forms import BaseForm
 from plain.http import (
     ResponseRedirect,
 )
@@ -96,7 +97,7 @@ class PasswordResetView(AuthViewMixin, FormView):
     def get(self) -> Response:
         if self.user:
             # Redirect if the user is already logged in
-            return ResponseRedirect(self.success_url)
+            return ResponseRedirect(str(self.success_url) if self.success_url else "/")
 
         # Tokens are initially passed as GET parameters and we
         # immediately store them in the session and remove it from the URL.
@@ -180,7 +181,7 @@ class PasswordSignupView(CreateView):
     form_class = PasswordSignupForm
     success_url = "/"
 
-    def form_valid(self, form: PasswordSignupForm) -> Response:
+    def form_valid(self, form: BaseForm) -> Response:
         # # Log the user in and redirect
         # auth_login(self.request, form.save())
 

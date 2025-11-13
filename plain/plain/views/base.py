@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from http import HTTPMethod
-from typing import Any
+from typing import Any, Self
 
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.code_attributes import (
@@ -47,7 +47,7 @@ class View:
 
     @classonlymethod
     def as_view(
-        cls, *init_args: object, **init_kwargs: object
+        cls: type[Self], *init_args: object, **init_kwargs: object
     ) -> Callable[[Request, Any, Any], ResponseBase]:
         def view(
             request: Request, *url_args: object, **url_kwargs: object

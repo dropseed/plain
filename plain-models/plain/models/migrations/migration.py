@@ -39,7 +39,9 @@ class Migration:
     # Migration names in this app that this migration replaces. If this is
     # non-empty, this migration will only be applied if all these migrations
     # are not applied.
-    replaces: list[str] = []
+    # Note: Despite the comment saying "migration names", this is actually a list of tuples
+    # (app_label, migration_name) as used throughout the codebase.
+    replaces: list[tuple[str, str]] = []
 
     # Is this an initial migration? Initial migrations are skipped on
     # --fake-initial if the table or fields already exist. If None, check if

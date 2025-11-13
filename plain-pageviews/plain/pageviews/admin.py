@@ -38,8 +38,9 @@ class UserPageviewsCard(Card):
     def get_template_context(self) -> dict:
         context = super().get_template_context()
 
+        # self.view has an object attribute when used in DetailView context
         context["pageviews"] = Pageview.query.filter(
-            user_id=self.view.object.id
+            user_id=self.view.object.id  # type: ignore[attr-defined]
         ).order_by("-timestamp")[:50]
 
         return context

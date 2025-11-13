@@ -34,10 +34,11 @@ def iter_next_version(version: str) -> Generator[str, None, None]:
 class Dependency:
     def __init__(self, name: str, **config: str | bool):
         self.name = name
-        self.url = config.get("url", "")
-        self.installed = config.get("installed", "")
-        self.filename = config.get("filename", "")
-        self.sourcemap = config.get("sourcemap", "")
+        # Config values for these keys are always strings
+        self.url: str = str(config.get("url", ""))
+        self.installed: str = str(config.get("installed", ""))
+        self.filename: str = str(config.get("filename", ""))
+        self.sourcemap: str = str(config.get("sourcemap", ""))
 
     @staticmethod
     def parse_version_from_url(url: str) -> str:
@@ -114,6 +115,9 @@ class Dependency:
         if not version:
             # Use the currently installed version if we found nothing else
             version, response = self.download(self.installed)
+
+        if not response:
+            raise requests.RequestException("Unable to download dependency")
 
         vendored_path = self.vendor(response)
         self.installed = version

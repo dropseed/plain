@@ -185,6 +185,7 @@ class CreateModel(ModelOperation):
             and self.name_lower == operation.model_name_lower
         ):
             if isinstance(operation, AddField):
+                assert operation.field is not None
                 return [
                     CreateModel(
                         self.name,
@@ -194,6 +195,7 @@ class CreateModel(ModelOperation):
                     ),
                 ]
             elif isinstance(operation, AlterField):
+                assert operation.field is not None
                 return [
                     CreateModel(
                         self.name,
@@ -373,9 +375,9 @@ class ModelOptionOperation(ModelOperation):
     def reduce(
         self, operation: Operation, package_label: str
     ) -> bool | list[Operation]:
-        if (
-            isinstance(operation, self.__class__ | DeleteModel)
-            and self.name_lower == operation.name_lower
+        # Use tuple syntax because self.__class__ is not compatible with union syntax in isinstance
+        if isinstance(operation, (self.__class__, DeleteModel)) and (  # noqa: UP038
+            self.name_lower == operation.name_lower
         ):
             return [operation]
         return super().reduce(operation, package_label)
@@ -672,6 +674,7 @@ class RenameIndex(IndexOperation):
                 models.Index(fields=self.old_fields, name=self.new_name),
             )
         else:
+            assert self.old_name is not None
             state.rename_index(
                 package_label,
                 self.model_name_lower,
@@ -715,6 +718,7 @@ class RenameIndex(IndexOperation):
             )
         else:
             from_model_state = from_state.models[package_label, self.model_name_lower]
+            assert self.old_name is not None
             old_index = from_model_state.get_index_by_name(self.old_name)  # type: ignore[arg-type]
         # Don't alter when the index name is not changed.
         if old_index.name == self.new_name:  # type: ignore[attr-defined]

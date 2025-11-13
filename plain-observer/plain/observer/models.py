@@ -233,7 +233,7 @@ class Trace(models.Model):
         """Get chronological list of spans and logs for unified timeline display."""
         events: list[dict[str, Any]] = []
 
-        for span in self.spans.query.all().annotate_spans():
+        for span in self.spans.query.all().annotate_spans():  # type: ignore[attr-defined]
             events.append(
                 {
                     "type": "span",

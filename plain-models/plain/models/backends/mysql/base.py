@@ -9,15 +9,21 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Any
 
-import MySQLdb as Database  # type: ignore[import-untyped]
-from MySQLdb.constants import CLIENT, FIELD_TYPE  # type: ignore[import-untyped]
-from MySQLdb.converters import conversions  # type: ignore[import-untyped]
+import MySQLdb as Database
+from MySQLdb.constants import CLIENT, FIELD_TYPE
+from MySQLdb.converters import conversions
 
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends import utils as backend_utils
 from plain.models.backends.base.base import BaseDatabaseWrapper
 from plain.models.db import IntegrityError
 from plain.utils.regex_helper import _lazy_re_compile
+
+# With mysqlclient stubs, we can now type the connection
+try:
+    from MySQLdb.connections import Connection as MySQLConnection
+except ImportError:
+    MySQLConnection = Any  # type: ignore[misc, assignment]
 
 from .client import DatabaseClient
 from .creation import DatabaseCreation
@@ -88,6 +94,12 @@ class CursorWrapper:
 
 
 class MySQLDatabaseWrapper(BaseDatabaseWrapper):
+    # Type checker hints: narrow base class attribute types to backend-specific classes
+    ops: DatabaseOperations
+    features: DatabaseFeatures
+    introspection: DatabaseIntrospection
+    creation: DatabaseCreation
+
     vendor = "mysql"
     # This dictionary maps Field objects to their associated MySQL column
     # types, as strings. Column-type strings can contain format strings; they'll
@@ -224,7 +236,7 @@ class MySQLDatabaseWrapper(BaseDatabaseWrapper):
         kwargs.update(options)
         return kwargs
 
-    def get_new_connection(self, conn_params: dict[str, Any]) -> Any:
+    def get_new_connection(self, conn_params: dict[str, Any]) -> MySQLConnection:
         connection = Database.connect(**conn_params)
         # bytes encoder in mysqlclient doesn't work and was added only to
         # prevent KeyErrors in Plain < 2.0. We can remove this workaround when

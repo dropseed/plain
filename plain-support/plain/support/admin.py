@@ -33,6 +33,9 @@ class UserSupportFormEntriesCard(Card):
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
 
-        context["entries"] = SupportFormEntry.query.filter(user=self.view.object)
+        # self.view has an object attribute when used in DetailView context
+        context["entries"] = SupportFormEntry.query.filter(
+            user=self.view.object  # type: ignore[attr-defined]
+        )
 
         return context

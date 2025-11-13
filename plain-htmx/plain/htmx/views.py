@@ -10,9 +10,12 @@ from .templates import render_template_fragment
 
 
 class HTMXViewMixin:
+    """Mixin for View classes to add HTMX-specific functionality."""
+
     def render_template(self) -> str:
-        template = self.get_template()
-        context = self.get_template_context()
+        # These methods are provided by the View base class
+        template = self.get_template()  # type: ignore[attr-defined]
+        context = self.get_template_context()  # type: ignore[attr-defined]
 
         if self.is_htmx_request() and self.get_htmx_fragment_name():
             return render_template_fragment(
@@ -24,7 +27,7 @@ class HTMXViewMixin:
         return template.render(context)
 
     def get_response(self) -> Response:
-        response = super().get_response()
+        response = super().get_response()  # type: ignore[misc]
         # Tell browser caching to also consider the fragment header,
         # not just the url/cookie.
         patch_vary_headers(
@@ -36,7 +39,7 @@ class HTMXViewMixin:
         if self.is_htmx_request():
             # You can use an htmx_{method} method on views
             # (or htmx_{method}_{action} for specific actions)
-            method = f"htmx_{self.request.method.lower()}"
+            method = f"htmx_{self.request.method.lower()}"  # type: ignore[attr-defined]
 
             if action := self.get_htmx_action_name():
                 # If an action is specified, we throw an error if
@@ -49,14 +52,14 @@ class HTMXViewMixin:
                 # to a regular post method if it's not found
                 return handler
 
-        return super().get_request_handler()
+        return super().get_request_handler()  # type: ignore[misc]
 
     def is_htmx_request(self) -> bool:
-        return self.request.headers.get("HX-Request") == "true"
+        return self.request.headers.get("HX-Request") == "true"  # type: ignore[attr-defined]
 
     def get_htmx_fragment_name(self) -> str:
         # A custom header that we pass with the {% htmxfragment %} tag
-        return self.request.headers.get("Plain-HX-Fragment", "")
+        return self.request.headers.get("Plain-HX-Fragment", "")  # type: ignore[attr-defined]
 
     def get_htmx_action_name(self) -> str:
-        return self.request.headers.get("Plain-HX-Action", "")
+        return self.request.headers.get("Plain-HX-Action", "")  # type: ignore[attr-defined]

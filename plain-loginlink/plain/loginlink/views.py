@@ -4,6 +4,7 @@ from typing import Any
 
 from plain.auth import login, logout
 from plain.auth.views import AuthViewMixin
+from plain.forms import BaseForm
 from plain.http import Response, ResponseRedirect
 from plain.runtime import settings
 from plain.urls import reverse, reverse_lazy
@@ -34,7 +35,7 @@ class LoginLinkFormView(AuthViewMixin, FormView):
         form.maybe_send_link(self.request)
         return super().form_valid(form)
 
-    def get_success_url(self, form: LoginLinkForm) -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         if next_url := form.cleaned_data.get("next"):
             # Keep the next URL in the query string so the sent
             # view can redirect to it if reloaded and logged in already.

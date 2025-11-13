@@ -5,7 +5,7 @@ import math
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from plain.exceptions import ValidationError
@@ -15,13 +15,16 @@ from plain.utils.ipv6 import is_valid_ipv6_address
 from plain.utils.regex_helper import _lazy_re_compile
 from plain.utils.text import pluralize_lazy
 
+if TYPE_CHECKING:
+    from plain.utils.functional import SimpleLazyObject
+
 # These values, if given to validate(), will trigger the self.required check.
 EMPTY_VALUES = (None, "", [], (), {})
 
 
 @deconstructible
 class RegexValidator:
-    regex = ""
+    regex: str | re.Pattern[str] | SimpleLazyObject = ""
     message = "Enter a valid value."
     code = "invalid"
     inverse_match = False
@@ -35,8 +38,17 @@ class RegexValidator:
         inverse_match: bool | None = None,
         flags: int | None = None,
     ) -> None:
+        # Only compile regex if explicitly provided or if class default needs compilation
         if regex is not None:
-            self.regex = regex
+            regex_to_compile: str | re.Pattern[str] = regex
+        elif isinstance(self.regex, str | re.Pattern):
+            # Class-level regex is a string or pattern that needs compilation
+            regex_to_compile = self.regex
+        else:
+            # Class-level regex is already compiled (e.g., in URL Validator subclass)
+            # Don't recompile it
+            regex_to_compile = None  # type: ignore[assignment]
+
         if message is not None:
             self.message = message
         if code is not None:
@@ -45,19 +57,22 @@ class RegexValidator:
             self.inverse_match = inverse_match
         if flags is not None:
             self.flags = flags
-        if self.flags and not isinstance(self.regex, str):
-            raise TypeError(
-                "If the flags are set, regex must be a regular expression string."
-            )
 
-        self.regex = _lazy_re_compile(self.regex, self.flags)
+        # Only compile if we have a regex to compile
+        if regex_to_compile is not None:
+            if self.flags and not isinstance(regex_to_compile, str):
+                raise TypeError(
+                    "If the flags are set, regex must be a regular expression string."
+                )
+            self.regex = _lazy_re_compile(regex_to_compile, self.flags)
 
     def __call__(self, value: Any) -> None:
         """
         Validate that the input contains (or does *not* contain, if
         inverse_match is True) a match for the regular expression.
         """
-        regex_matches = self.regex.search(str(value))
+        # self.regex is always a SimpleLazyObject with search() after __init__
+        regex_matches = cast(re.Pattern[str], self.regex).search(str(value))
         invalid_input = regex_matches if self.inverse_match else not regex_matches
         if invalid_input:
             raise ValidationError(self.message, code=self.code, params={"value": value})

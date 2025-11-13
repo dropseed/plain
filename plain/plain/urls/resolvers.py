@@ -110,7 +110,7 @@ class URLResolver:
     ):
         self.pattern = pattern
         self.router = router
-        self._reverse_dict: dict[Any, Any] = {}
+        self._reverse_dict: MultiValueDict = MultiValueDict()
         self._namespace_dict: dict[str, tuple[str, URLResolver]] = {}
         self._populated = False
         self._local = local()

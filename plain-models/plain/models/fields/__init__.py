@@ -11,7 +11,7 @@ import warnings
 from base64 import b64decode, b64encode
 from collections.abc import Callable, Sequence
 from functools import cached_property, total_ordering
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar, overload
 
 from plain import exceptions, validators
 from plain.models.constants import LOOKUP_SEP
@@ -127,8 +127,8 @@ class Field(RegisterLookupMixin, Generic[T]):
     # These track each time a Field instance is created. Used to retain order.
     # The auto_creation_counter is used for fields that Plain implicitly
     # creates, creation_counter is used for all user-specified fields.
-    creation_counter = 0
-    auto_creation_counter = -1
+    creation_counter: int = 0
+    auto_creation_counter: int = -1
     default_validators = []  # Default set of validators
     default_error_messages = {
         "invalid_choice": "Value %(value)r is not a valid choice.",
@@ -240,6 +240,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         Check if field name is valid, i.e. 1) does not end with an
         underscore, 2) does not contain "__" and 3) is not "id".
         """
+        assert self.name is not None, "Field name must be set before checking"
         if self.name.endswith("_"):
             return [
                 PreflightResult(
@@ -499,7 +500,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         elif path.startswith("plain.models.fields"):
             path = path.replace("plain.models.fields", "plain.models")
         # Return basic info - other fields should override this.
-        return (self.name, path, [], keywords)
+        return (self.name, path, [], keywords)  # type: ignore[return-value]
 
     def clone(self) -> Field:
         """
@@ -585,7 +586,8 @@ class Field(RegisterLookupMixin, Generic[T]):
         not a new copy of that field. So, use the app registry to load the
         model and then the field back.
         """
-        if not hasattr(self, "model"):
+        model = getattr(self, "model", None)
+        if model is None:
             # Fields are sometimes used without attaching them to models (for
             # example in aggregation). In this case give back a plain field
             # instance. The code below will create a new empty instance of
@@ -596,9 +598,11 @@ class Field(RegisterLookupMixin, Generic[T]):
             # usage.
             state.pop("_get_default", None)
             return _empty, (self.__class__,), state
+        assert self.name is not None
+        options = model.model_options
         return _load_field, (
-            self.model.model_options.package_label,
-            self.model.model_options.object_name,
+            options.package_label,
+            options.object_name,
             self.name,
         )
 
@@ -777,8 +781,8 @@ class Field(RegisterLookupMixin, Generic[T]):
     def get_db_converters(
         self, connection: BaseDatabaseWrapper
     ) -> list[Callable[..., Any]]:
-        if hasattr(self, "from_db_value"):
-            return [self.from_db_value]
+        if from_db_value := getattr(self, "from_db_value", None):
+            return [from_db_value]
         return []
 
     @property
@@ -881,6 +885,7 @@ class Field(RegisterLookupMixin, Generic[T]):
             )
 
     def get_attname(self) -> str:
+        assert self.name is not None  # Field name must be set
         return self.name
 
     def get_attname_column(self) -> tuple[str, str]:
@@ -938,6 +943,15 @@ class Field(RegisterLookupMixin, Generic[T]):
             return return_None
         return str  # return empty string
 
+    def get_limit_choices_to(self) -> Any:
+        """
+        Return ``limit_choices_to`` for this model field.
+        Overridden by related fields (ForeignKey, etc.).
+        """
+        raise NotImplementedError(
+            "get_limit_choices_to() should only be called on related fields"
+        )
+
     def get_choices(
         self,
         include_blank: bool = True,
@@ -958,13 +972,17 @@ class Field(RegisterLookupMixin, Generic[T]):
                 if not blank_defined:
                     choices = blank_choice + choices
             return choices
-        rel_model = self.remote_field.model
+        remote_field = getattr(self, "remote_field", None)
+        if remote_field is None or getattr(remote_field, "model", None) is None:
+            return blank_choice if include_blank else []
+        rel_model = remote_field.model
         limit_choices_to = limit_choices_to or self.get_limit_choices_to()
-        choice_func = operator.attrgetter(
-            self.remote_field.get_related_field().attname
-            if hasattr(self.remote_field, "get_related_field")
+        related_field_name = (
+            remote_field.get_related_field().attname
+            if hasattr(remote_field, "get_related_field")
             else "id"
         )
+        choice_func = operator.attrgetter(related_field_name)
         qs = rel_model.query.complex_filter(limit_choices_to)
         if ordering:
             qs = qs.order_by(*ordering)
@@ -994,6 +1012,7 @@ class Field(RegisterLookupMixin, Generic[T]):
     flatchoices = property(_get_flatchoices)
 
     def save_form_data(self, instance: Any, data: Any) -> None:
+        assert self.name is not None
         setattr(instance, self.name, data)
 
     def value_from_object(self, obj: Any) -> Any:
@@ -1143,10 +1162,10 @@ def _get_naive_now() -> datetime.datetime:
     return _to_naive(timezone.now())
 
 
-class DateTimeCheckMixin:
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:  # type: ignore[misc]
+class DateTimeCheckMixin(Field):  # type: ignore[type-arg]
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
-            *super().preflight(**kwargs),  # type: ignore[misc]
+            *super().preflight(**kwargs),
             *self._check_mutually_exclusive_options(),
             *self._check_fix_default_value(),
         ]
@@ -1890,7 +1909,17 @@ class GenericIPAddressField(Field[str]):
         return str(value)
 
 
-class PositiveIntegerRelDbTypeMixin:
+class _HasDbType(Protocol):
+    """Protocol for objects that have a db_type method and integer_field_class."""
+
+    integer_field_class: type[IntegerField]
+
+    def db_type(self, connection: BaseDatabaseWrapper) -> str | None: ...
+
+
+class PositiveIntegerRelDbTypeMixin(IntegerField):
+    integer_field_class: type[IntegerField]
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         if not hasattr(cls, "integer_field_class"):
@@ -1900,10 +1929,10 @@ class PositiveIntegerRelDbTypeMixin:
                     for parent in cls.__mro__[1:]
                     if issubclass(parent, IntegerField)
                 ),
-                None,
+                None,  # type: ignore[arg-type]
             )
 
-    def rel_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
+    def rel_db_type(self: _HasDbType, connection: BaseDatabaseWrapper) -> str | None:
         """
         Return the data type that a related field pointing to this field should
         use. In most cases, a foreign key pointing to a positive integer
@@ -2242,7 +2271,7 @@ class PrimaryKeyField(BigIntegerField):
 
     def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         # PrimaryKeyField takes no parameters, so we return an empty kwargs dict
-        return (self.name, "plain.models.PrimaryKeyField", [], {})
+        return (self.name, "plain.models.PrimaryKeyField", [], {})  # type: ignore[return-value]
 
     def validate(self, value: Any, model_instance: Any) -> None:
         pass

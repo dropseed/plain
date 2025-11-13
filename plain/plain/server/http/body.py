@@ -14,12 +14,12 @@ from typing import TYPE_CHECKING
 from .errors import ChunkMissingTerminator, InvalidChunkSize, NoMoreData
 
 if TYPE_CHECKING:
-    from .message import Request
+    from .message import Message
     from .unreader import Unreader
 
 
 class ChunkedReader:
-    def __init__(self, req: Request, unreader: Unreader) -> None:
+    def __init__(self, req: Message, unreader: Unreader) -> None:
         self.req = req
         self.parser: Generator[bytes, None, None] | None = self.parse_chunked(unreader)
         self.buf = io.BytesIO()

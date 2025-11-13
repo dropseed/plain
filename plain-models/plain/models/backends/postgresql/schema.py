@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from psycopg import sql  # type: ignore[import-untyped]
@@ -11,12 +12,16 @@ from plain.models.backends.utils import strip_quotes
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    from plain.models.backends.postgresql.base import PostgreSQLDatabaseWrapper
     from plain.models.base import Model
     from plain.models.fields import Field
     from plain.models.indexes import Index
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
+    # Type checker hint: connection is always PostgreSQLDatabaseWrapper in this class
+    connection: PostgreSQLDatabaseWrapper
+
     # Setting all constraints to IMMEDIATE to allow changing data in the same
     # transaction.
     sql_update_with_default = (
@@ -80,7 +85,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             output.append(like_index_statement)
         return output
 
-    def _field_data_type(self, field: Field) -> str | None:
+    def _field_data_type(
+        self, field: Field
+    ) -> str | None | Callable[[dict[str, Any]], str]:
         if field.is_relation:
             return field.rel_db_type(self.connection)
         return self.connection.data_types.get(

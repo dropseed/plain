@@ -68,7 +68,7 @@ class UpdateQuery(Query):
     def clone(self) -> UpdateQuery:
         obj = super().clone()
         obj.related_updates = self.related_updates.copy()
-        return obj  # type: ignore[return-value]
+        return obj
 
     def update_batch(self, id_list: list[Any], values: dict[str, Any]) -> None:
         self.add_update_values(values)
@@ -79,7 +79,7 @@ class UpdateQuery(Query):
             )
             self.get_compiler().execute_sql(NO_RESULTS)
 
-    def add_update_values(self, values: dict[str, Any]) -> list[tuple[Any, Any, Any]]:
+    def add_update_values(self, values: dict[str, Any]) -> None:
         """
         Convert a dictionary of field name to value mappings into an update
         query. This is the entry point for the public update() method on
@@ -164,7 +164,7 @@ class InsertQuery(Query):
     ) -> None:
         self.fields = fields
         self.objs = objs
-        self.raw = raw  # type: ignore[attr-defined]
+        self.raw = raw
 
 
 class AggregateQuery(Query):

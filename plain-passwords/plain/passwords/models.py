@@ -28,7 +28,7 @@ class PasswordField(models.CharField):
         name, path, args, kwargs = super().deconstruct()
         if kwargs.get("max_length") == 128:
             del kwargs["max_length"]
-        return name, path, args, kwargs
+        return name, path, tuple(args), kwargs
 
     def pre_save(self, model_instance: models.Model, add: bool) -> str:
         value = super().pre_save(model_instance, add)

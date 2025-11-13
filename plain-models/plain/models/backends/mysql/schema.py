@@ -11,6 +11,7 @@ from plain.models.fields import NOT_PROVIDED
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from plain.models.backends.mysql.base import MySQLDatabaseWrapper
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
@@ -18,6 +19,9 @@ if TYPE_CHECKING:
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
+    # Type checker hint: connection is always MySQLDatabaseWrapper in this class
+    connection: MySQLDatabaseWrapper
+
     sql_rename_table = "RENAME TABLE %(old_table)s TO %(new_table)s"
 
     sql_alter_column_null = "MODIFY %(column)s %(type)s NULL"
@@ -236,7 +240,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         new_type: str,
         old_collation: str,
         new_collation: str,
-    ) -> tuple[str, list[Any]]:
+    ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         new_type = self._set_field_new_type_null_status(old_field, new_type)
         return super()._alter_column_type_sql(
             model, old_field, new_field, new_type, old_collation, new_collation

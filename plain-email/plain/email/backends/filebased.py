@@ -22,6 +22,10 @@ class EmailBackend(ConsoleEmailBackend):
             self.file_path = file_path
         else:
             self.file_path = getattr(settings, "EMAIL_FILE_PATH", None)
+        if not self.file_path:
+            raise ImproperlyConfigured(
+                "EMAIL_FILE_PATH must be set for the filebased email backend"
+            )
         self.file_path = os.path.abspath(self.file_path)
         try:
             os.makedirs(self.file_path, exist_ok=True)
@@ -45,6 +49,7 @@ class EmailBackend(ConsoleEmailBackend):
         super().__init__(*args, **kwargs)
 
     def write_message(self, message: EmailMessage) -> None:
+        assert self.stream is not None, "stream should be opened before writing"
         self.stream.write(message.message().as_bytes() + b"\n")
         self.stream.write(b"-" * 79)
         self.stream.write(b"\n")

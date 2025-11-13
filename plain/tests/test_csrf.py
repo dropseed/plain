@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -142,7 +143,7 @@ def test_origin_host_comparison(origin, expected_allowed, expected_reason_contai
     csrf_middleware = CsrfViewMiddleware(lambda request: None)
 
     # Configure request based on the origin
-    request_kwargs = {"headers": {"Origin": origin}}
+    request_kwargs: dict[str, Any] = {"headers": {"Origin": origin}}
     if origin == "https://testserver:443":
         request_kwargs.update(
             {

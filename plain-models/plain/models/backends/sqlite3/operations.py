@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import decimal
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, Any
 
@@ -19,9 +19,14 @@ from plain.utils.dateparse import parse_date, parse_datetime, parse_time
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.sqlite3.base import SQLiteDatabaseWrapper
+    from plain.models.fields import Field
 
 
 class DatabaseOperations(BaseDatabaseOperations):
+    # Type checker hint: connection is always SQLiteDatabaseWrapper in this class
+    connection: SQLiteDatabaseWrapper
+
     cast_char_field_without_max_length = "text"
     cast_data_types = {
         "DateField": "TEXT",
@@ -447,10 +452,10 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def on_conflict_suffix_sql(
         self,
-        fields: list[Any],
+        fields: list[Field],
         on_conflict: Any,
-        update_fields: list[Any],
-        unique_fields: list[Any],
+        update_fields: Iterable[str],
+        unique_fields: Iterable[str],
     ) -> str:
         if (
             on_conflict == OnConflict.UPDATE

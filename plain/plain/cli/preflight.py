@@ -1,5 +1,6 @@
 import json
 import sys
+from typing import Any
 
 import click
 
@@ -125,12 +126,12 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
 
     if format == "json":
         # Build JSON output
-        results = {"passed": not has_errors, "checks": []}
+        results: dict[str, Any] = {"passed": not has_errors, "checks": []}
 
         for check_class, check_name, issues in check_results:
             visible_issues = [issue for issue in issues if not issue.is_silenced()]
 
-            check_result = {
+            check_result: dict[str, Any] = {
                 "name": check_name,
                 "passed": len(visible_issues) == 0,
                 "issues": [],

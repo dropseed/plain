@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import decimal
 import json
+from collections.abc import Iterable
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
@@ -398,6 +399,25 @@ class BaseDatabaseOperations:
         """
         return None
 
+    def bulk_insert_sql(
+        self, fields: list[Field], placeholder_rows: list[list[str]]
+    ) -> str:
+        """
+        Return the SQL for bulk inserting rows.
+        """
+        raise NotImplementedError(
+            "subclasses of BaseDatabaseOperations may require a bulk_insert_sql() method"
+        )
+
+    def fetch_returned_insert_rows(self, cursor: Any) -> list[Any]:
+        """
+        Given a cursor object that has just performed an INSERT...RETURNING
+        statement into a table, return the list of returned data.
+        """
+        raise NotImplementedError(
+            "subclasses of BaseDatabaseOperations may require a fetch_returned_insert_rows() method"
+        )
+
     def compiler(self, compiler_name: str) -> type[Any]:
         """
         Return the SQLCompiler class corresponding to the given name,
@@ -558,7 +578,9 @@ class BaseDatabaseOperations:
         """
         return value or None
 
-    def adapt_json_value(self, value: Any, encoder: type[json.JSONEncoder]) -> str:
+    def adapt_json_value(
+        self, value: Any, encoder: type[json.JSONEncoder] | None
+    ) -> str:
         return json.dumps(value, cls=encoder)
 
     def year_lookup_bounds_for_date_field(
@@ -780,7 +802,7 @@ class BaseDatabaseOperations:
         self,
         fields: list[Field],
         on_conflict: Any,
-        update_fields: list[Field],
-        unique_fields: list[Field],
+        update_fields: Iterable[str],
+        unique_fields: Iterable[str],
     ) -> str:
         return ""

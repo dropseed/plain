@@ -161,7 +161,7 @@ class MultiValueDict(dict[str, list[Any]]):
         Return the list of values for the key. If key doesn't exist, return a
         default value.
         """
-        return self._getlist(key, default, force_list=True)
+        return self._getlist(key, default, force_list=True)  # type: ignore[return-value]
 
     def setlist(self, key: str, list_: list[Any]) -> None:
         super().__setitem__(key, list_)
@@ -182,7 +182,7 @@ class MultiValueDict(dict[str, list[Any]]):
             self.setlist(key, default_list)
             # Do not return default_list here because setlist() may store
             # another value -- QueryDict.setlist() does. Look it up.
-        return self._getlist(key)
+        return self._getlist(key)  # type: ignore[return-value]
 
     def appendlist(self, key: str, value: Any) -> None:
         """Append an item to the internal list associated with key."""
@@ -243,6 +243,8 @@ class ImmutableList(tuple):
             ...
         AttributeError: You cannot mutate this.
     """
+
+    warning: str  # Set in __new__
 
     def __new__(
         cls,

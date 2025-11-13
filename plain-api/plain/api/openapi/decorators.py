@@ -155,7 +155,8 @@ def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
 
         for field_name, field in form_class.base_fields.items():  # type: ignore[attr-defined]
             field_schema = field_mappings[field.__class__].copy()
-            _schema["requestBody"]["content"]["application/json"]["schema"][
+            # Complex nested dict access - type checker can't verify structure
+            _schema["requestBody"]["content"]["application/json"]["schema"][  # type: ignore[index]
                 "properties"
             ][field_name] = field_schema
 

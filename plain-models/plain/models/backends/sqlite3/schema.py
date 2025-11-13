@@ -14,6 +14,7 @@ from plain.models.registry import ModelsRegistry
 from plain.models.transaction import atomic
 
 if TYPE_CHECKING:
+    from plain.models.backends.sqlite3.base import SQLiteDatabaseWrapper
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
@@ -22,6 +23,9 @@ if TYPE_CHECKING:
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
+    # Type checker hint: connection is always SQLiteDatabaseWrapper in this class
+    connection: SQLiteDatabaseWrapper
+
     sql_delete_table = "DROP TABLE %(table)s"
     sql_create_fk = None
     sql_create_inline_fk = (

@@ -84,7 +84,7 @@ class EmailBackend(BaseEmailBackend):
 
         # If local_hostname is not specified, socket.getfqdn() gets used.
         # For performance, we use the cached FQDN for local_hostname.
-        connection_params = {"local_hostname": DNS_NAME.get_fqdn()}
+        connection_params: dict[str, Any] = {"local_hostname": DNS_NAME.get_fqdn()}
         if self.timeout is not None:
             connection_params["timeout"] = self.timeout
         if self.use_ssl:
@@ -158,6 +158,7 @@ class EmailBackend(BaseEmailBackend):
             sanitize_address(addr, encoding) for addr in email_message.recipients()
         ]
         message = email_message.message()
+        assert self.connection is not None, "connection should be open before sending"
         try:
             self.connection.sendmail(
                 from_email, recipients, message.as_bytes(linesep="\r\n")

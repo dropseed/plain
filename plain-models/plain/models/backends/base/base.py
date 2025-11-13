@@ -64,13 +64,14 @@ class BaseDatabaseWrapper:
     introspection_class: type[BaseDatabaseIntrospection] | None = None
     ops_class: type[BaseDatabaseOperations] | None = None
     validation_class: type[BaseDatabaseValidation] = BaseDatabaseValidation
+    Database: Any
 
     queries_limit: int = 9000
 
     def __init__(self, settings_dict: dict[str, Any]):
         # Connection related attributes.
-        # The underlying database connection.
-        self.connection: BaseDatabaseWrapper | None = None
+        # The underlying database connection (from the database library, not a wrapper).
+        self.connection: Any = None
         # `settings_dict` should be a dictionary containing keys such as
         # NAME, USER, etc. It's called `settings_dict` instead of `settings`
         # to disambiguate it from Plain settings modules.

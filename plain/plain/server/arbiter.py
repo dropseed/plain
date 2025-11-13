@@ -11,7 +11,6 @@ import os
 import random
 import select
 import signal
-import socket
 import sys
 import time
 import traceback
@@ -48,7 +47,7 @@ class Arbiter:
 
     START_CTX: dict[int | str, Any] = {}
 
-    LISTENERS: list[socket.socket] = []
+    LISTENERS: list[sock.BaseSocket] = []
     WORKERS: dict[int, Worker] = {}
     PIPE: list[int] = []
 
@@ -69,7 +68,6 @@ class Arbiter:
 
         self._num_workers: int | None = None
         self._last_logged_active_worker_count: int | None = None
-        self.log: Logger | None = None
 
         self.setup(app)
 
@@ -84,7 +82,8 @@ class Arbiter:
         # init start context
         self.START_CTX = {"args": args, "cwd": cwd, 0: sys.executable}
 
-    def _get_num_workers(self) -> int | None:
+    def _get_num_workers(self) -> int:
+        assert self._num_workers is not None, "num_workers not initialized"
         return self._num_workers
 
     def _set_num_workers(self, value: int) -> None:
@@ -97,10 +96,10 @@ class Arbiter:
         assert app.cfg is not None, "Application config must be initialized"
         self.cfg: Config = app.cfg
 
-        if self.log is None:
+        if not hasattr(self, "log"):
             from .glogging import Logger
 
-            self.log = Logger(self.cfg)
+            self.log: Logger = Logger(self.cfg)
 
         self.worker_class: type[Worker] = self.cfg.worker_class
         self.address: str = self.cfg.address
@@ -131,8 +130,8 @@ class Arbiter:
         )
 
         # check worker class requirements
-        if hasattr(self.worker_class, "check_config"):
-            self.worker_class.check_config(self.cfg, self.log)
+        if check_config := getattr(self.worker_class, "check_config", None):
+            check_config(self.cfg, self.log)
 
     def init_signals(self) -> None:
         """\
@@ -144,7 +143,8 @@ class Arbiter:
             os.close(p)
 
         # initialize the pipe
-        self.PIPE = pair = os.pipe()
+        pair = os.pipe()
+        self.PIPE = list(pair)
         for p in pair:
             util.set_non_blocking(p)
             util.close_on_exec(p)

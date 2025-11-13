@@ -52,6 +52,10 @@ class JobType(ABCMeta):
 
 
 class Job(metaclass=JobType):
+    # Set by JobType metaclass when the job is instantiated
+    _init_args: tuple[Any, ...]
+    _init_kwargs: dict[str, Any]
+
     # Set by JobProcess when the job is executed
     # Useful for jobs that need to query and exclude themselves
     job_process: JobProcess | None = None

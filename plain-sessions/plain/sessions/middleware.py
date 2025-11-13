@@ -63,6 +63,10 @@ class SessionMiddleware(HttpMiddleware):
                 # Skip session save for 5xx responses.
                 if response.status_code < 500:
                     session.save()
+                    # session_key must exist after save()
+                    assert session.session_key is not None, (
+                        "Session key should exist after save()"
+                    )
                     response.set_cookie(
                         settings.SESSION_COOKIE_NAME,
                         session.session_key,
@@ -70,8 +74,8 @@ class SessionMiddleware(HttpMiddleware):
                         expires=expires,
                         domain=settings.SESSION_COOKIE_DOMAIN,
                         path=settings.SESSION_COOKIE_PATH,
-                        secure=settings.SESSION_COOKIE_SECURE or None,
-                        httponly=settings.SESSION_COOKIE_HTTPONLY or None,
+                        secure=bool(settings.SESSION_COOKIE_SECURE),
+                        httponly=bool(settings.SESSION_COOKIE_HTTPONLY),
                         samesite=settings.SESSION_COOKIE_SAMESITE,
                     )
         return response

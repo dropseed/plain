@@ -85,7 +85,7 @@ class DevPdb(Pdb):
         if not self._quiet:
             cry(f"DevPdb accepted connection from {repr(address)}.")
         self.handle = LF2CRLF_FileWrapper(connection)
-        Pdb.__init__(self, completekey="tab", stdin=self.handle, stdout=self.handle)
+        Pdb.__init__(self, completekey="tab", stdin=self.handle, stdout=self.handle)  # type: ignore[arg-type]
         self.backup = []
         if patch_stdstreams:
             for name in (

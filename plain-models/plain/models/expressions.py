@@ -8,7 +8,7 @@ from collections import defaultdict
 from decimal import Decimal
 from functools import cached_property
 from types import NoneType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID
 
 from plain.models import fields
@@ -28,30 +28,10 @@ if TYPE_CHECKING:
 
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.fields import Field
+    from plain.models.lookups import Lookup, Transform
     from plain.models.query import QuerySet
     from plain.models.sql.compiler import SQLCompiler
     from plain.models.sql.query import Query
-
-
-class SQLiteNumericMixin:
-    """
-    Some expressions with output_field=DecimalField() must be cast to
-    numeric to be properly filtered.
-    """
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        sql, params = self.as_sql(compiler, connection, **extra_context)  # type: ignore[attr-defined]
-        try:
-            if self.output_field.get_internal_type() == "DecimalField":  # type: ignore[attr-defined]
-                sql = f"CAST({sql} AS NUMERIC)"
-        except FieldError:
-            pass
-        return sql, params
 
 
 class Combinable:
@@ -212,11 +192,11 @@ class BaseExpression:
     def get_db_converters(
         self, connection: BaseDatabaseWrapper
     ) -> list[Callable[..., Any]]:
-        return (
-            []
-            if self.convert_value is self._convert_value_noop  # type: ignore[attr-defined]
-            else [self.convert_value]  # type: ignore[attr-defined]
-        ) + self.output_field.get_db_converters(connection)  # type: ignore[attr-defined]
+        converters = []
+        if self.convert_value is not self._convert_value_noop:
+            converters.append(self.convert_value)
+        converters.extend(self.output_field.get_db_converters(connection))
+        return converters
 
     def get_source_expressions(self) -> list[Any]:
         return []
@@ -317,11 +297,12 @@ class BaseExpression:
 
     @property
     def conditional(self) -> bool:
-        return isinstance(self.output_field, fields.BooleanField)  # type: ignore[attr-defined]
+        output_field = getattr(self, "output_field", None)
+        return isinstance(output_field, fields.BooleanField)
 
     @property
     def field(self) -> Field:
-        return self.output_field  # type: ignore[attr-defined]
+        return self.output_field
 
     @cached_property
     def output_field(self) -> Field:
@@ -407,11 +388,11 @@ class BaseExpression:
             )
         return self._convert_value_noop
 
-    def get_lookup(self, lookup: str) -> type | None:
-        return self.output_field.get_lookup(lookup)  # type: ignore[attr-defined]
+    def get_lookup(self, lookup: str) -> type[Lookup] | None:
+        return self.output_field.get_lookup(lookup)
 
-    def get_transform(self, name: str) -> type | None:
-        return self.output_field.get_transform(name)  # type: ignore[attr-defined]
+    def get_transform(self, name: str) -> type[Transform] | None:
+        return self.output_field.get_transform(name)
 
     def relabeled_clone(self, change_map: dict[str, str]) -> BaseExpression:
         clone = self.copy()
@@ -444,10 +425,10 @@ class BaseExpression:
             refs |= expr.get_refs()
         return refs
 
-    def copy(self) -> BaseExpression:
+    def copy(self) -> Self:
         return copy.copy(self)
 
-    def prefix_references(self, prefix: str) -> BaseExpression:
+    def prefix_references(self, prefix: str) -> Self:
         clone = self.copy()
         clone.set_source_expressions(
             [
@@ -500,8 +481,9 @@ class BaseExpression:
         Custom format for select clauses. For example, EXISTS expressions need
         to be wrapped in CASE WHEN on Oracle.
         """
-        if hasattr(self.output_field, "select_format"):  # type: ignore[attr-defined]
-            return self.output_field.select_format(compiler, sql, params)  # type: ignore[attr-defined]
+        if output_field := getattr(self, "output_field", None):
+            if select_format := getattr(output_field, "select_format", None):
+                return select_format(compiler, sql, params)
         return sql, params
 
 
@@ -645,7 +627,10 @@ _connector_combinators = defaultdict(list)
 
 
 def register_combinable_fields(
-    lhs: type[Field], connector: str, rhs: type[Field], result: type[Field]
+    lhs: type[Field] | type[None],
+    connector: str,
+    rhs: type[Field] | type[None],
+    result: type[Field],
 ) -> None:
     """
     Register combinable types:
@@ -675,6 +660,27 @@ def _resolve_combined_type(
         ):
             return combined_type
     return None
+
+
+class SQLiteNumericMixin(Expression):
+    """
+    Some expressions with output_field=DecimalField() must be cast to
+    numeric to be properly filtered.
+    """
+
+    def as_sqlite(
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
+    ) -> tuple[str, Sequence[Any]]:
+        sql, params = self.as_sql(compiler, connection, **extra_context)
+        try:
+            if self.output_field.get_internal_type() == "DecimalField":
+                sql = f"CAST({sql} AS NUMERIC)"
+        except FieldError:
+            pass
+        return sql, params
 
 
 class CombinedExpression(SQLiteNumericMixin, Expression):
@@ -902,7 +908,7 @@ class F(Combinable):
     def __hash__(self) -> int:
         return hash(self.name)
 
-    def copy(self) -> F:
+    def copy(self) -> Self:
         return copy.copy(self)
 
 
@@ -977,7 +983,7 @@ class Func(SQLiteNumericMixin, Expression):
                 )
             )
         super().__init__(output_field=output_field)
-        self.source_expressions = self._parse_expressions(*expressions)
+        self.source_expressions: list[Any] = self._parse_expressions(*expressions)
         self.extra = extra
 
     def __repr__(self) -> str:
@@ -998,7 +1004,7 @@ class Func(SQLiteNumericMixin, Expression):
         return self.source_expressions
 
     def set_source_expressions(self, exprs: Sequence[Any]) -> None:
-        self.source_expressions = exprs
+        self.source_expressions = list(exprs)
 
     def resolve_expression(
         self,
@@ -1007,7 +1013,7 @@ class Func(SQLiteNumericMixin, Expression):
         reuse: Any = None,
         summarize: bool = False,
         for_save: bool = False,
-    ) -> Func:
+    ) -> Self:
         c = self.copy()
         c.is_summary = summarize
         for pos, arg in enumerate(c.source_expressions):
@@ -1055,11 +1061,11 @@ class Func(SQLiteNumericMixin, Expression):
         data["expressions"] = data["field"] = arg_joiner.join(sql_parts)
         return template % data, params
 
-    def copy(self) -> Func:
-        copy = super().copy()  # type: ignore[misc]
+    def copy(self) -> Self:
+        copy = super().copy()
         copy.source_expressions = self.source_expressions[:]
         copy.extra = self.extra.copy()
-        return copy
+        return copy  # type: ignore[return-value]
 
 
 @deconstructible(path="plain.models.Value")
@@ -1114,8 +1120,8 @@ class Value(SQLiteNumericMixin, Expression):
         for_save: bool = False,
     ) -> Value:
         c = super().resolve_expression(query, allow_joins, reuse, summarize, for_save)  # type: ignore[misc]
-        c.for_save = for_save
-        return c
+        c.for_save = for_save  # type: ignore[attr-defined]
+        return c  # type: ignore[return-value]
 
     def get_group_by_cols(self) -> list[Any]:
         return []
@@ -1399,9 +1405,9 @@ class NegatedExpression(ExpressionWrapper):
         resolved = super().resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
-        if not getattr(resolved.expression, "conditional", False):
+        if not getattr(resolved.expression, "conditional", False):  # type: ignore[attr-defined]
             raise TypeError("Cannot negate non-conditional expressions.")
-        return resolved
+        return resolved  # type: ignore[return-value]
 
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
@@ -1427,7 +1433,9 @@ class When(Expression):
     # This isn't a complete conditional expression, must be used in Case().
     conditional = False
 
-    def __init__(self, condition: Any = None, then: Any = None, **lookups: Any):
+    def __init__(
+        self, condition: Q | Expression | None = None, then: Any = None, **lookups: Any
+    ):
         lookups_dict: dict[str, Any] | None = lookups or None
         if lookups_dict:
             if condition is None:
@@ -1494,7 +1502,8 @@ class When(Expression):
         connection.ops.check_expression_support(self)
         template_params = extra_context
         sql_params = []
-        condition_sql, condition_params = compiler.compile(self.condition)
+        # After resolve_expression, condition is WhereNode | resolved Expression (both SQLCompilable)
+        condition_sql, condition_params = compiler.compile(self.condition)  # type: ignore[arg-type]
         template_params["condition"] = condition_sql
         result_sql, result_params = compiler.compile(self.result)
         template_params["result"] = result_sql
@@ -1578,10 +1587,10 @@ class Case(SQLiteNumericMixin, Expression):
         )
         return c
 
-    def copy(self) -> Case:
+    def copy(self) -> Self:
         c = super().copy()  # type: ignore[misc]
-        c.cases = c.cases[:]
-        return c
+        c.cases = c.cases[:]  # type: ignore[attr-defined]
+        return c  # type: ignore[return-value]
 
     def as_sql(
         self,
@@ -1667,14 +1676,14 @@ class Subquery(BaseExpression, Combinable):
     def _resolve_output_field(self) -> Field | None:
         return self.query.output_field
 
-    def copy(self) -> Subquery:
+    def copy(self) -> Self:
         clone = super().copy()
-        clone.query = clone.query.clone()
-        return clone
+        clone.query = clone.query.clone()  # type: ignore[attr-defined]
+        return clone  # type: ignore[return-value]
 
     @property
-    def external_aliases(self) -> list[str]:
-        return self.query.external_aliases
+    def external_aliases(self) -> dict[str, bool]:  # type: ignore[override]
+        return self.query.external_aliases  # type: ignore[return-value]
 
     def get_external_cols(self) -> list[Any]:
         return self.query.get_external_cols()
@@ -1813,6 +1822,8 @@ class Window(SQLiteNumericMixin, Expression):
     # be introduced in the query as a result is not desired.
     contains_aggregate = False
     contains_over_clause = True
+    partition_by: ExpressionList | None
+    order_by: OrderByList | None
 
     def __init__(
         self,
@@ -1832,9 +1843,12 @@ class Window(SQLiteNumericMixin, Expression):
             )
 
         if self.partition_by is not None:
-            if not isinstance(self.partition_by, tuple | list):
-                self.partition_by = (self.partition_by,)
-            self.partition_by = ExpressionList(*self.partition_by)
+            partition_by_values = (
+                self.partition_by
+                if isinstance(self.partition_by, tuple | list)
+                else (self.partition_by,)
+            )
+            self.partition_by = ExpressionList(*partition_by_values)
 
         if self.order_by is not None:
             if isinstance(self.order_by, list | tuple):
@@ -1938,6 +1952,7 @@ class WindowFrame(Expression):
     """
 
     template = "%(frame_type)s BETWEEN %(start)s AND %(end)s"
+    frame_type: str
 
     def __init__(self, start: int | None = None, end: int | None = None):
         self.start = Value(start)

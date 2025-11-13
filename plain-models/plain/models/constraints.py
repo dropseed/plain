@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 from types import NoneType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ValidationError
 from plain.models.exceptions import FieldError
@@ -11,6 +11,12 @@ from plain.models.indexes import IndexExpression
 from plain.models.lookups import Exact
 from plain.models.query_utils import Q
 from plain.models.sql.query import Query
+
+if TYPE_CHECKING:
+    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.backends.ddl_references import Statement
+    from plain.models.base import Model
+    from plain.models.expressions import Combinable
 
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]
 
@@ -39,17 +45,23 @@ class BaseConstraint:
     def contains_expressions(self) -> bool:
         return False
 
-    def constraint_sql(self, model: Any, schema_editor: Any) -> str:
+    def constraint_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> str | None:
         raise NotImplementedError("This method must be implemented by a subclass.")
 
-    def create_sql(self, model: Any, schema_editor: Any) -> str:
+    def create_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> str | Statement | None:
         raise NotImplementedError("This method must be implemented by a subclass.")
 
-    def remove_sql(self, model: Any, schema_editor: Any) -> str:
+    def remove_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> str | Statement | None:
         raise NotImplementedError("This method must be implemented by a subclass.")
 
     def validate(
-        self, model: Any, instance: Any, exclude: set[str] | None = None
+        self, model: type[Model], instance: Model, exclude: set[str] | None = None
     ) -> None:
         raise NotImplementedError("This method must be implemented by a subclass.")
 
@@ -94,26 +106,34 @@ class CheckConstraint(BaseConstraint):
             violation_error_message=violation_error_message,
         )
 
-    def _get_check_sql(self, model: Any, schema_editor: Any) -> str:
+    def _get_check_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> str:
         query = Query(model=model, alias_cols=False)
         where = query.build_where(self.check)
         compiler = query.get_compiler()
         sql, params = where.as_sql(compiler, schema_editor.connection)
         return sql % tuple(schema_editor.quote_value(p) for p in params)
 
-    def constraint_sql(self, model: Any, schema_editor: Any) -> str:
+    def constraint_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> str:
         check = self._get_check_sql(model, schema_editor)
         return schema_editor._check_sql(self.name, check)
 
-    def create_sql(self, model: Any, schema_editor: Any) -> str:
+    def create_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> Statement | None:
         check = self._get_check_sql(model, schema_editor)
         return schema_editor._create_check_sql(model, self.name, check)
 
-    def remove_sql(self, model: Any, schema_editor: Any) -> str:
+    def remove_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> Statement | None:
         return schema_editor._delete_check_sql(model, self.name)
 
     def validate(
-        self, model: Any, instance: Any, exclude: set[str] | None = None
+        self, model: type[Model], instance: Model, exclude: set[str] | None = None
     ) -> None:
         against = instance._get_field_value_map(meta=model._model_meta, exclude=exclude)
         try:
@@ -170,7 +190,7 @@ class Deferrable(Enum):
 class UniqueConstraint(BaseConstraint):
     def __init__(
         self,
-        *expressions: Any,
+        *expressions: str | Combinable,
         fields: tuple[str, ...] | list[str] = (),
         name: str | None = None,
         condition: Q | None = None,
@@ -238,7 +258,9 @@ class UniqueConstraint(BaseConstraint):
     def contains_expressions(self) -> bool:
         return bool(self.expressions)
 
-    def _get_condition_sql(self, model: Any, schema_editor: Any) -> str | None:
+    def _get_condition_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> str | None:
         if self.condition is None:
             return None
         query = Query(model=model, alias_cols=False)
@@ -247,7 +269,9 @@ class UniqueConstraint(BaseConstraint):
         sql, params = where.as_sql(compiler, schema_editor.connection)
         return sql % tuple(schema_editor.quote_value(p) for p in params)
 
-    def _get_index_expressions(self, model: Any, schema_editor: Any) -> Any:
+    def _get_index_expressions(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> Any:
         if not self.expressions:
             return None
         index_expressions = []
@@ -259,7 +283,9 @@ class UniqueConstraint(BaseConstraint):
             Query(model, alias_cols=False),
         )
 
-    def constraint_sql(self, model: Any, schema_editor: Any) -> str:
+    def constraint_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> str | None:
         fields = [model._model_meta.get_field(field_name) for field_name in self.fields]
         include = [
             model._model_meta.get_field(field_name).column
@@ -274,11 +300,13 @@ class UniqueConstraint(BaseConstraint):
             condition=condition,
             deferrable=self.deferrable,
             include=include,
-            opclasses=self.opclasses,
+            opclasses=tuple(self.opclasses) if self.opclasses else None,
             expressions=expressions,
         )
 
-    def create_sql(self, model: Any, schema_editor: Any) -> str:
+    def create_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> Statement | None:
         fields = [model._model_meta.get_field(field_name) for field_name in self.fields]
         include = [
             model._model_meta.get_field(field_name).column
@@ -293,11 +321,13 @@ class UniqueConstraint(BaseConstraint):
             condition=condition,
             deferrable=self.deferrable,
             include=include,
-            opclasses=self.opclasses,
+            opclasses=tuple(self.opclasses) if self.opclasses else None,
             expressions=expressions,
         )
 
-    def remove_sql(self, model: Any, schema_editor: Any) -> str:
+    def remove_sql(
+        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+    ) -> Statement | None:
         condition = self._get_condition_sql(model, schema_editor)
         include = [
             model._model_meta.get_field(field_name).column
@@ -310,7 +340,7 @@ class UniqueConstraint(BaseConstraint):
             condition=condition,
             deferrable=self.deferrable,
             include=include,
-            opclasses=self.opclasses,
+            opclasses=tuple(self.opclasses) if self.opclasses else None,
             expressions=expressions,
         )
 
@@ -367,7 +397,7 @@ class UniqueConstraint(BaseConstraint):
         return path, self.expressions, kwargs
 
     def validate(
-        self, model: Any, instance: Any, exclude: set[str] | None = None
+        self, model: type[Model], instance: Model, exclude: set[str] | None = None
     ) -> None:
         queryset = model.query
         if self.fields:
@@ -418,11 +448,14 @@ class UniqueConstraint(BaseConstraint):
                     )
                 # When fields are defined, use the unique_error_message() for
                 # backward compatibility.
-                for model, constraints in instance.get_constraints():
+                for constraint_model, constraints in instance.get_constraints():
                     for constraint in constraints:
                         if constraint is self:
                             raise ValidationError(
-                                instance.unique_error_message(model, self.fields),
+                                instance.unique_error_message(
+                                    constraint_model,  # type: ignore[arg-type]
+                                    self.fields,
+                                ),
                             )
         else:
             against = instance._get_field_value_map(

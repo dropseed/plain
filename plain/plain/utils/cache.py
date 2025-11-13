@@ -25,12 +25,12 @@ from .http import http_date
 from .regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
-    from plain.http import Response
+    from plain.http import ResponseBase
 
 cc_delim_re = _lazy_re_compile(r"\s*,\s*")
 
 
-def patch_response_headers(response: Response, cache_timeout: int | float) -> None:
+def patch_response_headers(response: ResponseBase, cache_timeout: int | float) -> None:
     """
     Add HTTP caching headers to the given HttpResponse: Expires and
     Cache-Control.
@@ -44,7 +44,7 @@ def patch_response_headers(response: Response, cache_timeout: int | float) -> No
     patch_cache_control(response, max_age=cache_timeout)
 
 
-def add_never_cache_headers(response: Response) -> None:
+def add_never_cache_headers(response: ResponseBase) -> None:
     """
     Add headers to a response to indicate that a page should never be cached.
     """
@@ -54,7 +54,7 @@ def add_never_cache_headers(response: Response) -> None:
     )
 
 
-def patch_cache_control(response: Response, **kwargs: Any) -> None:
+def patch_cache_control(response: ResponseBase, **kwargs: Any) -> None:
     """
     Patch the Cache-Control header by adding all keyword arguments to it.
     The transformation is as follows:
@@ -123,7 +123,7 @@ def patch_cache_control(response: Response, **kwargs: Any) -> None:
     response.headers["Cache-Control"] = cc
 
 
-def patch_vary_headers(response: Response, newheaders: list[str]) -> None:
+def patch_vary_headers(response: ResponseBase, newheaders: list[str]) -> None:
     """
     Add (or update) the "Vary" header in the given Response object.
     newheaders is a list of header names that should be in "Vary". If headers

@@ -53,7 +53,7 @@ class Message:
         self.unreader = unreader
         self.peer_addr = peer_addr
         self.remote_addr = peer_addr
-        self.version: tuple[int, int] | None = None
+        self.version: tuple[int, int] = (1, 1)
         self.headers: list[tuple[str, str]] = []
         self.trailers: list[tuple[str, str]] = []
         self.body: Body | None = None
@@ -216,6 +216,7 @@ class Message:
             # two potentially dangerous cases:
             #  a) CL + TE (TE overrides CL.. only safe if the recipient sees it that way too)
             #  b) chunked HTTP/1.0 (always faulty)
+            assert self.version is not None, "version should be set during parsing"
             if self.version < (1, 1):
                 # framing wonky, see RFC 9112 Section 6.1
                 raise InvalidHeader("TRANSFER-ENCODING", req=self)
@@ -252,7 +253,7 @@ class Message:
                 elif v == "keep-alive":
                     return False
                 break
-        return self.version <= (1, 0)  # type: ignore[operator]
+        return self.version <= (1, 0)
 
 
 class Request(Message):

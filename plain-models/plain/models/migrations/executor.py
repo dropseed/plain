@@ -42,7 +42,8 @@ class MigrationExecutor:
         if clean_start:
             applied = {}
         else:
-            applied = dict(self.loader.applied_migrations)
+            applied_source = self.loader.applied_migrations or {}
+            applied = dict(applied_source)
         for target in targets:
             for migration in self.loader.graph.forwards_plan(target):
                 if migration not in applied:
@@ -63,9 +64,10 @@ class MigrationExecutor:
             full_plan = self.migration_plan(
                 self.loader.graph.leaf_nodes(), clean_start=True
             )
+            applied_source = self.loader.applied_migrations or {}
             applied_migrations = {
                 self.loader.graph.nodes[key]
-                for key in self.loader.applied_migrations
+                for key in applied_source
                 if key in self.loader.graph.nodes
             }
             for migration in full_plan:

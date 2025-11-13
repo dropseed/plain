@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
 
 from plain import models
 from plain.admin.cards import Card
@@ -15,7 +14,7 @@ from plain.http import ResponseRedirect
 from plain.models.expressions import Case, When
 from plain.runtime import settings
 
-from .models import JobProcess, JobRequest, JobResult
+from .models import JobProcess, JobRequest, JobResult, JobResultQuerySet
 
 
 def _td_format(td_object: timedelta) -> str:
@@ -198,8 +197,8 @@ class JobResultViewset(AdminViewset):
         ]
         allow_global_search = False
 
-        def get_initial_queryset(self) -> Any:
-            queryset = super().get_initial_queryset()
+        def get_initial_queryset(self) -> JobResultQuerySet:
+            queryset: JobResultQuerySet = super().get_initial_queryset()  # type: ignore[assignment]
             queryset = queryset.annotate(
                 retried=Case(
                     When(retry_job_request_uuid__isnull=False, then=True),

@@ -60,7 +60,7 @@ class JSONFormatter(logging.Formatter):
 
         # Add Plain's context data to the main JSON object
         if hasattr(record, "context") and isinstance(record.context, dict):
-            log_obj.update(record.context)
+            log_obj.update(record.context)  # type: ignore[arg-type]
 
         # Handle exceptions
         if record.exc_info:

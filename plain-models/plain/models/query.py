@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Callable, Iterator
 from functools import cached_property
 from itertools import chain, islice
-from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar, overload
 
 import plain.runtime
 from plain.exceptions import ValidationError
@@ -73,6 +73,11 @@ class BaseIterable:
         self.chunked_fetch = chunked_fetch
         self.chunk_size = chunk_size
 
+    def __iter__(self) -> Iterator[Any]:
+        raise NotImplementedError(
+            "subclasses of BaseIterable must provide an __iter__() method"
+        )
+
 
 class ModelIterable(BaseIterable):
     """Iterable that yields a model instance for each row."""
@@ -134,6 +139,8 @@ class RawModelIterable(BaseIterable):
     Iterable that yields a model instance for each row from a raw queryset.
     """
 
+    queryset: RawQuerySet
+
     def __iter__(self) -> Iterator[Model]:  # type: ignore[misc]
         # Cache some things for performance reasons outside the loop.
         query = self.queryset.sql_query
@@ -147,6 +154,7 @@ class RawModelIterable(BaseIterable):
                 annotation_fields,
             ) = self.queryset.resolve_model_init_order()
             model_cls = self.queryset.model
+            assert model_cls is not None
             if "id" not in model_init_names:
                 raise FieldDoesNotExist("Raw query must include the primary key")
             fields = [self.queryset.model_fields.get(c) for c in self.queryset.columns]
@@ -423,7 +431,13 @@ class QuerySet(Generic[T]):
         self._fetch_all()
         return bool(self._result_cache)
 
-    def __getitem__(self, k: int | slice) -> T | QuerySet[T]:
+    @overload
+    def __getitem__(self, k: int) -> T: ...
+
+    @overload
+    def __getitem__(self, k: slice) -> QuerySet[T] | list[T]: ...
+
+    def __getitem__(self, k: int | slice) -> T | QuerySet[T] | list[T]:
         """Retrieve an item or slice from the set of results."""
         if not isinstance(k, int | slice):
             raise TypeError(
@@ -457,6 +471,7 @@ class QuerySet(Generic[T]):
         qs = self._chain()
         qs.sql_query.set_limits(k, k + 1)  # type: ignore[unsupported-operator]
         qs._fetch_all()
+        assert qs._result_cache is not None  # _fetch_all guarantees this
         return qs._result_cache[0]
 
     def __class_getitem__(cls, *args: Any, **kwargs: Any) -> type[QuerySet[Any]]:
@@ -616,6 +631,7 @@ class QuerySet(Generic[T]):
             clone.sql_query.set_limits(high=limit)
         num = len(clone)
         if num == 1:
+            assert clone._result_cache is not None  # len() fetches results
             return clone._result_cache[0]
         if not num:
             raise self.model.DoesNotExist(
@@ -734,14 +750,16 @@ class QuerySet(Generic[T]):
         if not objs:
             return objs
         meta = self.model._model_meta
+        unique_fields_objs: list[Field] | None = None
+        update_fields_objs: list[Field] | None = None
         if unique_fields:
-            unique_fields = [meta.get_field(name) for name in unique_fields]
+            unique_fields_objs = [meta.get_field(name) for name in unique_fields]
         if update_fields:
-            update_fields = [meta.get_field(name) for name in update_fields]
+            update_fields_objs = [meta.get_field(name) for name in update_fields]
         on_conflict = self._check_bulk_create_options(
             update_conflicts,
-            update_fields,
-            unique_fields,
+            update_fields_objs,
+            unique_fields_objs,
         )
         self._for_write = True
         fields = meta.concrete_fields
@@ -753,10 +771,10 @@ class QuerySet(Generic[T]):
                 returned_columns = self._batched_insert(
                     objs_with_id,
                     fields,
-                    batch_size,
+                    batch_size,  # type: ignore[invalid-argument-type]
                     on_conflict=on_conflict,
-                    update_fields=update_fields,
-                    unique_fields=unique_fields,
+                    update_fields=update_fields_objs,
+                    unique_fields=unique_fields_objs,
                 )
                 id_field = meta.get_field("id")
                 for obj_with_id, results in zip(objs_with_id, returned_columns):
@@ -770,10 +788,10 @@ class QuerySet(Generic[T]):
                 returned_columns = self._batched_insert(
                     objs_without_id,
                     fields,
-                    batch_size,
+                    batch_size,  # type: ignore[invalid-argument-type]
                     on_conflict=on_conflict,
-                    update_fields=update_fields,
-                    unique_fields=unique_fields,
+                    update_fields=update_fields_objs,
+                    unique_fields=unique_fields_objs,
                 )
                 if (
                     db_connection.features.can_return_rows_from_bulk_insert
@@ -1144,7 +1162,8 @@ class QuerySet(Generic[T]):
 
     def _prefetch_related_objects(self) -> None:
         # This method can only be called once the result cache has been filled.
-        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)
+        assert self._result_cache is not None
+        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)  # type: ignore[arg-type]
         self._prefetch_done = True
 
     def explain(self, *, format: str | None = None, **options: Any) -> str:
@@ -1178,7 +1197,7 @@ class QuerySet(Generic[T]):
         if expressions:
             clone = clone.annotate(**expressions)
         clone._fields = fields  # type: ignore[assignment]
-        clone.sql_query.set_values(fields)
+        clone.sql_query.set_values(list(fields))
         return clone
 
     def values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
@@ -1438,7 +1457,7 @@ class QuerySet(Generic[T]):
         if fields == (None,):
             obj.sql_query.select_related = False
         elif fields:
-            obj.sql_query.add_select_related(fields)
+            obj.sql_query.add_select_related(list(fields))
         else:
             obj.sql_query.select_related = True
         return obj
@@ -1578,7 +1597,12 @@ class QuerySet(Generic[T]):
             raise TypeError("Cannot change a query once a slice has been taken.")
         clone = self._chain()
         clone.sql_query.add_extra(
-            select, select_params, where, params, tables, order_by
+            select or {},
+            select_params,
+            where or [],
+            params or [],
+            tables or [],
+            tuple(order_by) if order_by else (),
         )
         return clone
 
@@ -1604,7 +1628,7 @@ class QuerySet(Generic[T]):
         if fields == (None,):
             clone.sql_query.clear_deferred_loading()
         else:
-            clone.sql_query.add_deferred_loading(fields)
+            clone.sql_query.add_deferred_loading(frozenset(fields))
         return clone
 
     def only(self, *fields: str) -> QuerySet[T]:
@@ -1625,7 +1649,7 @@ class QuerySet(Generic[T]):
             if field in self.sql_query._filtered_relations:
                 raise ValueError("only() is not supported with FilteredRelation.")
         clone = self._chain()
-        clone.sql_query.add_immediate_loading(fields)
+        clone.sql_query.add_immediate_loading(set(fields))
         return clone
 
     ###################################
@@ -1644,7 +1668,7 @@ class QuerySet(Generic[T]):
             return True
         elif (
             self.sql_query.default_ordering
-            and self.sql_query.get_model_meta().ordering
+            and self.sql_query.get_model_meta().ordering  # type: ignore[unresolved-attribute]
             and
             # A default ordering doesn't affect GROUP BY queries.
             not self.sql_query.group_by
@@ -1701,7 +1725,7 @@ class QuerySet(Generic[T]):
         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
             if bulk_return and on_conflict is None:
                 inserted_rows.extend(
-                    self._insert(
+                    self._insert(  # type: ignore[invalid-argument-type]
                         item,
                         fields=fields,
                         returning_fields=self.model._model_meta.db_returning_fields,
@@ -1747,7 +1771,7 @@ class QuerySet(Generic[T]):
 
     def _fetch_all(self) -> None:
         if self._result_cache is None:
-            self._result_cache = list(self._iterable_class(self))
+            self._result_cache = list(self._iterable_class(self))  # type: ignore[invalid-argument-type]
         if self._prefetch_related_lookups and not self._prefetch_done:
             self._prefetch_related_objects()
 
@@ -1869,10 +1893,12 @@ class RawQuerySet:
     ) -> tuple[list[str], list[int], list[tuple[str, int]]]:
         """Resolve the init field names and value positions."""
         converter = db_connection.introspection.identifier_converter
+        model = self.model
+        assert model is not None
         model_init_fields = [
             f
-            for f in self.model._model_meta.fields
-            if converter(f.column) in self.columns
+            for f in model._model_meta.fields
+            if converter(f.column) in self.columns  # type: ignore[possibly-missing-attribute]
         ]
         annotation_fields = [
             (column, pos)
@@ -1895,7 +1921,7 @@ class RawQuerySet:
         return clone
 
     def _prefetch_related_objects(self) -> None:
-        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)
+        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)  # type: ignore[invalid-argument-type]
         self._prefetch_done = True
 
     def _clone(self) -> RawQuerySet:
@@ -1929,7 +1955,7 @@ class RawQuerySet:
         return iter(self._result_cache)  # type: ignore[arg-type]
 
     def iterator(self) -> Iterator[Model]:
-        yield from RawModelIterable(self)
+        yield from RawModelIterable(self)  # type: ignore[invalid-argument-type]
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.sql_query}>"
@@ -1960,7 +1986,9 @@ class RawQuerySet:
         """A dict mapping column names to model field names."""
         converter = db_connection.introspection.identifier_converter
         model_fields = {}
-        for field in self.model._model_meta.fields:
+        model = self.model
+        assert model is not None
+        for field in model._model_meta.fields:  # type: ignore[possibly-missing-attribute]
             name, column = field.get_attname_column()
             model_fields[converter(column)] = field
         return model_fields
@@ -2015,7 +2043,7 @@ class Prefetch:
     def get_current_to_attr(self, level: int) -> tuple[str, bool]:
         parts = self.prefetch_to.split(LOOKUP_SEP)
         to_attr = parts[level]
-        as_attr = self.to_attr and level == len(parts) - 1
+        as_attr = bool(self.to_attr and level == len(parts) - 1)
         return to_attr, as_attr
 
     def get_current_queryset(self, level: int) -> QuerySet[Any] | None:

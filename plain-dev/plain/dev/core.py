@@ -169,6 +169,8 @@ class DevProcess(ProcessManager):
         # another thread checking db stuff...
         self.console_status.start()
 
+        assert self.poncho is not None, "poncho should be initialized"
+
         self.add_server()
         self.add_entrypoints()
         self.add_pyproject_run()
@@ -183,6 +185,7 @@ class DevProcess(ProcessManager):
             self.rm_pidfile()
             self.close()
 
+        assert self.poncho.returncode is not None, "returncode should be set after loop"
         return self.poncho.returncode
 
     def symlink_plain_src(self) -> None:
@@ -297,6 +300,7 @@ class DevProcess(ProcessManager):
 
     def add_server(self) -> None:
         """Add the Plain HTTP server process."""
+        assert self.poncho is not None
         server_cmd = [
             sys.executable,
             "-m",
@@ -325,6 +329,7 @@ class DevProcess(ProcessManager):
         self.poncho.add_process("plain", server, env=self.plain_env)
 
     def add_entrypoints(self) -> None:
+        assert self.poncho is not None
         for entry_point in entry_points().select(group=ENTRYPOINT_GROUP):
             self.poncho.add_process(
                 entry_point.name,
@@ -334,6 +339,7 @@ class DevProcess(ProcessManager):
 
     def add_pyproject_run(self) -> None:
         """Additional processes that only run during `plain dev`."""
+        assert self.poncho is not None
         if not has_pyproject_toml(APP_PATH.parent):
             return
 

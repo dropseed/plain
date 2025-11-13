@@ -24,7 +24,7 @@ from .encoding import encode_multipart
 from .exceptions import RedirectCycleError
 
 if TYPE_CHECKING:
-    from plain.http import Response, ResponseBase
+    from plain.http import ResponseBase
     from plain.urls import ResolverMatch
 
 __all__ = (
@@ -165,7 +165,9 @@ class FakePayload(IOBase):
         self.__len += len(content)
 
 
-def _conditional_content_removal(request: WSGIRequest, response: Response) -> Response:
+def _conditional_content_removal(
+    request: WSGIRequest, response: ResponseBase
+) -> ResponseBase:
     """
     Simulate the behavior of most web servers by removing the content of
     responses for HEAD requests, 1xx, 204, and 304 responses. Ensure
@@ -175,12 +177,12 @@ def _conditional_content_removal(request: WSGIRequest, response: Response) -> Re
         if response.streaming:  # type: ignore[attr-defined]
             response.streaming_content = []  # type: ignore[attr-defined]
         else:
-            response.content = b""
+            response.content = b""  # type: ignore[attr-defined]
     if request.method == "HEAD":
         if response.streaming:  # type: ignore[attr-defined]
             response.streaming_content = []  # type: ignore[attr-defined]
         else:
-            response.content = b""
+            response.content = b""  # type: ignore[attr-defined]
     return response
 
 
@@ -194,7 +196,7 @@ class ClientHandler(BaseHandler):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
-    def __call__(self, environ: dict[str, Any]) -> Response:
+    def __call__(self, environ: dict[str, Any]) -> ResponseBase:
         # Set up middleware if needed. We couldn't do this earlier, because
         # settings weren't available.
         if self._middleware_chain is None:
@@ -211,7 +213,7 @@ class ClientHandler(BaseHandler):
 
         # Attach the originating request to the response so that it could be
         # later retrieved.
-        response.wsgi_request = request
+        response.wsgi_request = request  # type: ignore[attr-defined]
 
         # Emulate a WSGI server by calling the close method on completion.
         response.close()

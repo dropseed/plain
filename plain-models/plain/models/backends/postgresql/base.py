@@ -8,13 +8,14 @@ from contextlib import contextmanager
 from functools import cached_property, lru_cache
 from typing import Any
 
-import psycopg as Database  # type: ignore[import-untyped]
-from psycopg import IsolationLevel, adapt, adapters, sql  # type: ignore[import-untyped]
-from psycopg.postgres import types as pg_types  # type: ignore[import-untyped]
-from psycopg.pq import Format  # type: ignore[import-untyped]
-from psycopg.types.datetime import TimestamptzLoader  # type: ignore[import-untyped]
-from psycopg.types.range import Range, RangeDumper  # type: ignore[import-untyped]
-from psycopg.types.string import TextLoader  # type: ignore[import-untyped]
+import psycopg as Database
+from psycopg import IsolationLevel, adapt, adapters, sql
+from psycopg.abc import PyFormat
+from psycopg.postgres import types as pg_types
+from psycopg.pq import Format
+from psycopg.types.datetime import TimestamptzLoader
+from psycopg.types.range import BaseRangeDumper, Range, RangeDumper
+from psycopg.types.string import TextLoader
 
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends.base.base import BaseDatabaseWrapper
@@ -22,14 +23,18 @@ from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWra
 from plain.models.db import DatabaseError as WrappedDatabaseError
 from plain.models.db import db_connection
 
-# Some of these import psycopg, so import them after checking if it's installed.
-from .client import DatabaseClient  # NOQA isort:skip
-from .creation import DatabaseCreation  # NOQA isort:skip
-from .features import DatabaseFeatures  # NOQA isort:skip
-from .introspection import DatabaseIntrospection  # NOQA isort:skip
-from .operations import DatabaseOperations  # NOQA isort:skip
-from .schema import DatabaseSchemaEditor  # NOQA isort:skip
+# With psycopg stubs, we can now type the connection
+try:
+    from psycopg import Connection as PsycopgConnection
+except ImportError:
+    PsycopgConnection = Any  # type: ignore[misc, assignment]
 
+from .client import DatabaseClient
+from .creation import DatabaseCreation
+from .features import DatabaseFeatures
+from .introspection import DatabaseIntrospection
+from .operations import DatabaseOperations
+from .schema import DatabaseSchemaEditor
 
 # Type OIDs
 TIMESTAMPTZ_OID = adapters.types["timestamptz"].oid
@@ -60,7 +65,7 @@ def register_tzloader(tz: datetime.tzinfo | None, context: Any) -> None:
 class PlainRangeDumper(RangeDumper):
     """A Range dumper customized for Plain."""
 
-    def upgrade(self, obj: Any, format: Format) -> RangeDumper:
+    def upgrade(self, obj: Range[Any], format: PyFormat) -> BaseRangeDumper:
         dumper = super().upgrade(obj, format)
         if dumper is not self and dumper.oid == TSRANGE_OID:
             dumper.oid = TSTZRANGE_OID
@@ -87,6 +92,12 @@ def _get_varchar_column(data: dict[str, Any]) -> str:
 
 
 class PostgreSQLDatabaseWrapper(BaseDatabaseWrapper):
+    # Type checker hints: narrow base class attribute types to backend-specific classes
+    ops: DatabaseOperations
+    features: DatabaseFeatures
+    introspection: DatabaseIntrospection
+    creation: DatabaseCreation
+
     vendor = "postgresql"
     display_name = "PostgreSQL"
     # This dictionary maps Field objects to their associated PostgreSQL column
@@ -229,7 +240,7 @@ class PostgreSQLDatabaseWrapper(BaseDatabaseWrapper):
         conn_params["prepare_threshold"] = conn_params.pop("prepare_threshold", None)
         return conn_params
 
-    def get_new_connection(self, conn_params: dict[str, Any]) -> Any:
+    def get_new_connection(self, conn_params: dict[str, Any]) -> PsycopgConnection[Any]:
         # self.isolation_level must be set:
         # - after connecting to the database in order to obtain the database's
         #   default when no value is explicitly specified in options.
