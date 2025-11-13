@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.33.0](https://github.com/dropseed/plain/releases/plain-oauth@0.33.0) (2025-11-12)
+
+### What's changed
+
+- `OAuthProvider` is now an abstract base class (ABC) with `@abstractmethod` decorators on `refresh_oauth_token()`, `get_oauth_token()`, and `get_oauth_user()` ([dd950c6](https://github.com/dropseed/plain/commit/dd950c6))
+- Internal type improvements for better type checker compatibility ([f4dbcef](https://github.com/dropseed/plain/commit/f4dbcef))
+
+### Upgrade instructions
+
+- If you have custom OAuth providers that inherit from `OAuthProvider`, ensure you implement all three required methods: `refresh_oauth_token()`, `get_oauth_token()`, and `get_oauth_user()`. Type checkers will now enforce this requirement.
+
 ## [0.32.1](https://github.com/dropseed/plain/releases/plain-oauth@0.32.1) (2025-11-11)
 
 ### What's changed
