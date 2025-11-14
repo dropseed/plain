@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-passwords@0.17.0) (2025-11-13)
+
+### What's changed
+
+- Added typed `PasswordField` for better IDE and type checker support when using type annotations in model definitions ([dc1f9c4](https://github.com/dropseed/plain/commit/dc1f9c4808))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-passwords@0.16.0) (2025-11-12)
 
 ### What's changed
