@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-support@0.23.0) (2025-11-13)
+
+### What's changed
+
+- Model field definitions now use type stubs with explicit type annotations for improved IDE support and type checking ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-support@0.22.0) (2025-11-12)
 
 ### What's changed
