@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-cache@0.21.0) (2025-11-13)
+
+### What's changed
+
+- Model field definitions now use type stub syntax with `plain.models.types` for improved type checking and IDE support ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc75a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.2](https://github.com/dropseed/plain/releases/plain-cache@0.20.2) (2025-11-03)
 
 ### What's changed
