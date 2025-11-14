@@ -1,5 +1,17 @@
 # plain-models changelog
 
+## [0.60.0](https://github.com/dropseed/plain/releases/plain-models@0.60.0) (2025-11-13)
+
+### What's changed
+
+- Type annotations for QuerySets using `ClassVar` to improve type checking when accessing `Model.query` ([c3b00a6](https://github.com/dropseed/plain/commit/c3b00a693c))
+- The `id` field on the Model base class now uses a type annotation (`id: int = types.PrimaryKeyField()`) for better type checking ([9febc80](https://github.com/dropseed/plain/commit/9febc801f4))
+- Replaced wildcard imports (`import *`) with explicit imports in internal modules for better code clarity ([eff36f3](https://github.com/dropseed/plain/commit/eff36f31e8))
+
+### Upgrade instructions
+
+- Optionally (but recommended) add `ClassVar` type annotations to custom QuerySets on your models using `query: ClassVar[models.QuerySet[YourModel]] = models.QuerySet()` for improved type checking and IDE autocomplete
+
 ## [0.59.1](https://github.com/dropseed/plain/releases/plain-models@0.59.1) (2025-11-13)
 
 ### What's changed
