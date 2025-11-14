@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.41.0](https://github.com/dropseed/plain/releases/plain-jobs@0.41.0) (2025-11-13)
+
+### What's changed
+
+- Model `query` attributes now use `ClassVar` type annotation to properly indicate they are class-level attributes that return QuerySets ([c3b00a693c](https://github.com/dropseed/plain/commit/c3b00a693c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.40.0](https://github.com/dropseed/plain/releases/plain-jobs@0.40.0) (2025-11-13)
 
 ### What's changed
