@@ -1,5 +1,17 @@
 # plain-jobs changelog
 
+## [0.40.0](https://github.com/dropseed/plain/releases/plain-jobs@0.40.0) (2025-11-13)
+
+### What's changed
+
+- Added explicit type stubs for all model fields using `plain.models.types` for better IDE support and type checking ([c8f40fc75a](https://github.com/dropseed/plain/commit/c8f40fc75a))
+- Model field definitions now use type-annotated syntax (e.g., `field_name: type = types.CharField()`) instead of plain field assignments ([c8f40fc75a](https://github.com/dropseed/plain/commit/c8f40fc75a))
+- Fixed potential issue where `parameters` could be `None` when loading a job by providing empty dict as default ([c8f40fc75a](https://github.com/dropseed/plain/commit/c8f40fc75a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.39.0](https://github.com/dropseed/plain/releases/plain-jobs@0.39.0) (2025-11-12)
 
 ### What's changed
