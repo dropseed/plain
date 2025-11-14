@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.34.0](https://github.com/dropseed/plain/releases/plain-oauth@0.34.0) (2025-11-13)
+
+### What's changed
+
+- Model fields now use the new type stubs pattern from `plain.models.types`, enabling better type checker inference for field attributes ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc))
+- Removed unnecessary `cast()` calls for datetime fields that now have proper type annotations ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.33.0](https://github.com/dropseed/plain/releases/plain-oauth@0.33.0) (2025-11-12)
 
 ### What's changed
