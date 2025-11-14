@@ -22,7 +22,7 @@ from uuid import UUID
 if TYPE_CHECKING:
     from plain.models.fields.related_managers import (
         ManyToManyManager,
-        ReverseManyToOneManager,
+        ReverseForeignKeyManager,
     )
 
 # TypeVar for generic ForeignKey/ManyToManyField support
@@ -708,7 +708,7 @@ class ReverseForeignKey(Generic[_T]):
     Type stub for ReverseForeignKey descriptor.
 
     Declares an explicit reverse relation from a parent model to its children.
-    Returns a ReverseManyToOneManager when accessed on an instance.
+    Returns a ReverseForeignKeyManager when accessed on an instance.
     """
 
     def __init__(
@@ -724,7 +724,7 @@ class ReverseForeignKey(Generic[_T]):
 
     # Instance access returns the manager
     @overload
-    def __get__(self, instance: Any, owner: type) -> ReverseManyToOneManager[_T]: ...
+    def __get__(self, instance: Any, owner: type) -> ReverseForeignKeyManager[_T]: ...
 
 class ReverseManyToMany(Generic[_T]):
     """

@@ -60,11 +60,11 @@ class BaseRelatedManager(ABC):
         ...
 
 
-class ReverseManyToOneManager(BaseRelatedManager):
+class ReverseForeignKeyManager(BaseRelatedManager):
     """
-    Manager for the reverse side of a many-to-one relation.
+    Manager for the reverse side of a foreign key relation.
 
-    This manager adds behaviors specific to many-to-one relations.
+    This manager adds behaviors specific to foreign key relations.
     """
 
     def __init__(self, instance: Any, field: Any, related_model: Any):

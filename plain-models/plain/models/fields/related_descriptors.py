@@ -17,11 +17,11 @@ example, with the following models::
     class Child(Model):
         parent: Parent = ForeignKey(Parent, on_delete=models.CASCADE)
 
- ``child.parent`` is a forward many-to-one relation. ``parent.children`` is a
-reverse many-to-one relation.
+ ``child.parent`` is a forward foreign key relation. ``parent.children`` is a
+reverse foreign key relation.
 
-1. Related instance on the forward side of a many-to-one relation:
-   ``ForwardManyToOneDescriptor``.
+1. Related instance on the forward side of a foreign key relation:
+   ``ForwardForeignKeyDescriptor``.
 
    Uniqueness of foreign key values is irrelevant to accessing the related
    instance, making the many-to-one and one-to-one cases identical as far as
@@ -50,16 +50,16 @@ from plain.utils.functional import LazyObject
 from .related_managers import ManyToManyManager
 
 
-class ForwardManyToOneDescriptor:
+class ForwardForeignKeyDescriptor:
     """
-    Accessor to the related object on the forward side of a many-to-one relation.
+    Accessor to the related object on the forward side of a foreign key relation.
 
     In the example::
 
         class Child(Model):
             parent: Parent = ForeignKey(Parent, on_delete=models.CASCADE)
 
-    ``Child.parent`` is a ``ForwardManyToOneDescriptor`` instance.
+    ``Child.parent`` is a ``ForwardForeignKeyDescriptor`` instance.
     """
 
     def __init__(self, field_with_rel: Any) -> None:
@@ -135,7 +135,7 @@ class ForwardManyToOneDescriptor:
 
     def __get__(
         self, instance: Any | None, cls: type | None = None
-    ) -> ForwardManyToOneDescriptor | Any | None:
+    ) -> ForwardForeignKeyDescriptor | Any | None:
         """
         Get the related instance through the forward relation.
 

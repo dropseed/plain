@@ -8,8 +8,8 @@ from app.examples.models import (
 from plain.models import QuerySet
 
 
-class TestForwardManyToOneDescriptor:
-    """Test ForwardManyToOneDescriptor (e.g., child.parent)"""
+class TestForwardForeignKeyDescriptor:
+    """Test ForwardForeignKeyDescriptor (e.g., child.parent)"""
 
     def test_get_related_object(self, db):
         parent = DeleteParent.query.create(name="Test Parent")

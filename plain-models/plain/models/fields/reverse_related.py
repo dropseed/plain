@@ -140,7 +140,7 @@ class ForeignObjectRel(FieldCacheMixin):
         state = self.__dict__.copy()
         # Delete the path_infos cached property because it can be recalculated
         # at first invocation after deserialization. The attribute must be
-        # removed because subclasses like ManyToOneRel may have a PathInfo
+        # removed because subclasses like ForeignKeyRel may have a PathInfo
         # which contains an intermediate M2M table that's been dynamically
         # created and doesn't exist in the .models module.
         # This is a reverse relation, so there is no reverse_path_infos to
@@ -205,7 +205,7 @@ class ForeignObjectRel(FieldCacheMixin):
         return self.field.related_query_name()
 
 
-class ManyToOneRel(ForeignObjectRel):
+class ForeignKeyRel(ForeignObjectRel):
     """
     Used by the ForeignKey field to store information about the relation.
 
@@ -214,9 +214,9 @@ class ManyToOneRel(ForeignObjectRel):
 
     Note: Because we somewhat abuse the Rel objects by using them as reverse
     fields we get the funny situation where
-    ``ManyToOneRel.many_to_one == False`` and
-    ``ManyToOneRel.one_to_many == True``. This is unfortunate but the actual
-    ManyToOneRel class is a private API and there is work underway to turn
+    ``ForeignKeyRel.many_to_one == False`` and
+    ``ForeignKeyRel.one_to_many == True``. This is unfortunate but the actual
+    ForeignKeyRel class is a private API and there is work underway to turn
     reverse relations into actual fields.
     """
 
@@ -303,7 +303,7 @@ class ManyToManyRel(ForeignObjectRel):
     def get_related_field(self) -> Any:
         """
         Return the field in the 'to' object to which this relationship is tied.
-        Provided for symmetry with ManyToOneRel.
+        Provided for symmetry with ForeignKeyRel.
         """
         meta = self.through._model_meta
         if self.through_fields:

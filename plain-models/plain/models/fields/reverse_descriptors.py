@@ -156,10 +156,10 @@ class ReverseForeignKey(BaseReverseDescriptor[T]):
             )
 
     def _create_manager(self, instance: Model) -> Any:
-        """Create a ReverseManyToOneManager for this instance."""
-        from plain.models.fields.related_managers import ReverseManyToOneManager
+        """Create a ReverseForeignKeyManager for this instance."""
+        from plain.models.fields.related_managers import ReverseForeignKeyManager
 
-        return ReverseManyToOneManager(
+        return ReverseForeignKeyManager(
             instance=instance,
             field=self._resolved_field,
             related_model=self._resolved_model,  # type: ignore[arg-type]

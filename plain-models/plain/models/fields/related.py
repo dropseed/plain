@@ -16,8 +16,8 @@ from ..registry import models_registry
 from . import Field
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
+    ForwardForeignKeyDescriptor,
     ForwardManyToManyDescriptor,
-    ForwardManyToOneDescriptor,
 )
 from .related_lookups import (
     RelatedExact,
@@ -28,7 +28,7 @@ from .related_lookups import (
     RelatedLessThan,
     RelatedLessThanOrEqual,
 )
-from .reverse_related import ManyToManyRel, ManyToOneRel
+from .reverse_related import ForeignKeyRel, ManyToManyRel
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
@@ -348,8 +348,6 @@ class ForeignKey(RelatedField):
     ForeignKey targets the primary key (id) of the remote model.
     """
 
-    forward_related_accessor_class = ForwardManyToOneDescriptor
-
     # Field flags - ForeignKey is many-to-one
     many_to_one = True
 
@@ -380,7 +378,7 @@ class ForeignKey(RelatedField):
         if not callable(on_delete):
             raise TypeError("on_delete must be callable.")
 
-        rel = ManyToOneRel(
+        rel = ForeignKeyRel(
             self,
             to,
             related_query_name=related_query_name,
@@ -520,7 +518,7 @@ class ForeignKey(RelatedField):
 
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
         super().contribute_to_class(cls, name)
-        setattr(cls, self.name, self.forward_related_accessor_class(self))  # type: ignore[attr-defined]
+        setattr(cls, name, ForwardForeignKeyDescriptor(self))
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:  # type: ignore[misc]
         return [
