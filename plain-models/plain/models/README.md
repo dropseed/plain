@@ -7,7 +7,7 @@
 - [Querying](#querying)
 - [Migrations](#migrations)
 - [Fields](#fields)
-- [Typed field definitions](#typed-field-definitions)
+- [Typing](#typing)
 - [Validation](#validation)
 - [Indexes and constraints](#indexes-and-constraints)
 - [Custom QuerySets](#custom-querysets)
@@ -174,7 +174,7 @@ Common field types include:
 - [`URLField`](./fields/__init__.py#URLField)
 - [`UUIDField`](./fields/__init__.py#UUIDField)
 
-## Typed field definitions
+## Typing
 
 For better IDE support and type checking, use `plain.models.types` with type annotations:
 
@@ -202,6 +202,28 @@ author: Author = types.ForeignKey(Author, on_delete=models.CASCADE)
 ```
 
 All field types from the [Fields](#fields) section are available through [`types`](./types.py). Typed and untyped fields can be mixed in the same model. The database behavior is identical - typed fields only add type checking.
+
+### Typing QuerySets
+
+For better type checking of query results, you can explicitly type the `query` attribute using `ClassVar`:
+
+```python
+from __future__ import annotations
+
+from typing import ClassVar
+
+from plain import models
+from plain.models import types
+
+@models.register_model
+class User(models.Model):
+    email: str = types.EmailField()
+    is_admin: bool = types.BooleanField(default=False)
+
+    query: ClassVar[models.QuerySet[User]] = models.QuerySet()
+```
+
+With this annotation, type checkers will know that `User.query.get()` returns a `User` instance and `User.query.filter()` returns `QuerySet[User]`. The `ClassVar` annotation tells type checkers that `query` is a class-level attribute, not an instance field. This is optional - the query attribute works without the annotation, but adding it improves IDE autocomplete and type checking.
 
 ## Validation
 

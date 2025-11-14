@@ -4,7 +4,7 @@ import copy
 import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import chain
-from typing import TYPE_CHECKING, Any, dataclass_transform
+from typing import TYPE_CHECKING, Any, ClassVar, dataclass_transform
 
 if TYPE_CHECKING:
     from plain.models.meta import Meta
@@ -95,7 +95,7 @@ class Model(metaclass=ModelBase):
     id = PrimaryKeyField()
 
     # Descriptors for other model behavior
-    query = QuerySet()
+    query: ClassVar[QuerySet[Model]] = QuerySet()
     model_options = Options()
     _model_meta = Meta()
     DoesNotExist = DoesNotExistDescriptor()

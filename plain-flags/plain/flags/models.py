@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from typing import ClassVar
 
 from plain import models
 from plain.exceptions import ValidationError
@@ -20,6 +21,8 @@ class FlagResult(models.Model):
     flag: Flag = types.ForeignKey("Flag", on_delete=models.CASCADE)
     key: str = types.CharField(max_length=255)
     value = types.JSONField()
+
+    query: ClassVar[models.QuerySet[FlagResult]] = models.QuerySet()
 
     model_options = models.Options(
         constraints=[
@@ -48,6 +51,8 @@ class Flag(models.Model):
 
     # To provide an easier way to see if a flag is still being used
     used_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
+
+    query: ClassVar[models.QuerySet[Flag]] = models.QuerySet()
 
     model_options = models.Options(
         constraints=[

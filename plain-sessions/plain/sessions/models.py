@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import ClassVar
 
 from plain import models
 from plain.models import types
@@ -10,6 +13,8 @@ class Session(models.Model):
     session_data: dict = types.JSONField(default=dict, required=False)
     created_at: datetime = types.DateTimeField(auto_now_add=True)
     expires_at: datetime | None = types.DateTimeField(allow_null=True)
+
+    query: ClassVar[models.QuerySet[Session]] = models.QuerySet()
 
     model_options = models.Options(
         indexes=[

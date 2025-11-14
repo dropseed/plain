@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from functools import cached_property
 from itertools import chain, islice
-from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, Never, Self, TypeVar, overload
 
 import plain.runtime
 from plain.exceptions import ValidationError
@@ -337,6 +337,12 @@ class QuerySet(Generic[T]):
         instance._defer_next_filter = False
         instance._deferred_filter = None
         return instance
+
+    @overload
+    def __get__(self, instance: None, owner: type[T]) -> Self: ...
+
+    @overload
+    def __get__(self, instance: Model, owner: type[T]) -> Never: ...
 
     def __get__(self, instance: Any, owner: type[T]) -> Self:
         """Descriptor protocol - return a new QuerySet bound to the model."""

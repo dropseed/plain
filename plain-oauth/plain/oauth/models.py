@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from plain import models
 from plain.auth import get_user_model
@@ -42,6 +44,8 @@ class OAuthConnection(models.Model):
         required=False, allow_null=True
     )
 
+    query: ClassVar[models.QuerySet[OAuthConnection]] = models.QuerySet()
+
     model_options = models.Options(
         constraints=[
             models.UniqueConstraint(
@@ -71,13 +75,13 @@ class OAuthConnection(models.Model):
         self.set_token_fields(refreshed_oauth_token)
         self.save()
 
-    def set_token_fields(self, oauth_token: "OAuthToken") -> None:
+    def set_token_fields(self, oauth_token: OAuthToken) -> None:
         self.access_token = oauth_token.access_token
         self.refresh_token = oauth_token.refresh_token
         self.access_token_expires_at = oauth_token.access_token_expires_at
         self.refresh_token_expires_at = oauth_token.refresh_token_expires_at
 
-    def set_user_fields(self, oauth_user: "OAuthUser") -> None:
+    def set_user_fields(self, oauth_user: OAuthUser) -> None:
         self.provider_user_id = oauth_user.provider_id
 
     def access_token_expired(self) -> bool:
@@ -94,8 +98,8 @@ class OAuthConnection(models.Model):
 
     @classmethod
     def get_or_create_user(
-        cls, *, provider_key: str, oauth_token: "OAuthToken", oauth_user: "OAuthUser"
-    ) -> "OAuthConnection":
+        cls, *, provider_key: str, oauth_token: OAuthToken, oauth_user: OAuthUser
+    ) -> OAuthConnection:
         try:
             connection = cls.query.get(
                 provider_key=provider_key,
@@ -129,9 +133,9 @@ class OAuthConnection(models.Model):
         *,
         user: Any,
         provider_key: str,
-        oauth_token: "OAuthToken",
-        oauth_user: "OAuthUser",
-    ) -> "OAuthConnection":
+        oauth_token: OAuthToken,
+        oauth_user: OAuthUser,
+    ) -> OAuthConnection:
         """
         Connect will either create a new connection or update an existing connection
         """

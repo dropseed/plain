@@ -6,7 +6,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import sqlparse
 from opentelemetry.sdk.trace import ReadableSpan
@@ -65,6 +65,8 @@ class Trace(models.Model):
 
         spans: BaseRelatedManager
         logs: BaseRelatedManager
+
+    query: ClassVar[models.QuerySet[Trace]] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["-start_time"],
@@ -335,7 +337,7 @@ class Span(models.Model):
     status: str = types.CharField(max_length=50, default="", required=False)
     span_data: dict = types.JSONField(default=dict, required=False)
 
-    query = SpanQuerySet()
+    query: ClassVar[SpanQuerySet] = SpanQuerySet()
 
     model_options = models.Options(
         ordering=["-start_time"],
@@ -522,6 +524,8 @@ class Log(models.Model):
     timestamp: datetime = types.DateTimeField()
     level: str = types.CharField(max_length=20)
     message: str = types.TextField()
+
+    query: ClassVar[models.QuerySet[Log]] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["timestamp"],

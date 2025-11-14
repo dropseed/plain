@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import binascii
 import os
 import uuid
 from datetime import datetime
+from typing import ClassVar
 from uuid import UUID
 
 from plain import models
@@ -25,6 +28,8 @@ class APIKey(models.Model):
     token: str = types.CharField(max_length=40, default=generate_token)
 
     api_version: str = types.CharField(max_length=255, required=False)
+
+    query: ClassVar[models.QuerySet[APIKey]] = models.QuerySet()
 
     model_options = models.Options(
         constraints=[
