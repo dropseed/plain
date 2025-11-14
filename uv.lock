@@ -462,7 +462,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-api"
-version = "0.17.0"
+version = "0.18.0"
 source = { editable = "plain-api" }
 dependencies = [
     { name = "plain" },
@@ -506,7 +506,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-cache"
-version = "0.20.2"
+version = "0.21.0"
 source = { editable = "plain-cache" }
 dependencies = [
     { name = "plain" },
@@ -600,7 +600,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-flags"
-version = "0.28.0"
+version = "0.29.0"
 source = { editable = "plain-flags" }
 dependencies = [
     { name = "plain" },
@@ -642,7 +642,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.39.0"
+version = "0.40.0"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
@@ -680,7 +680,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.58.0"
+version = "0.59.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -703,7 +703,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-oauth"
-version = "0.33.0"
+version = "0.34.0"
 source = { editable = "plain-oauth" }
 dependencies = [
     { name = "plain" },
@@ -730,7 +730,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-observer"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
@@ -774,7 +774,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-pageviews"
-version = "0.26.0"
+version = "0.27.0"
 source = { editable = "plain-pageviews" }
 dependencies = [
     { name = "plain" },
@@ -821,7 +821,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-redirection"
-version = "0.24.1"
+version = "0.25.0"
 source = { editable = "plain-redirection" }
 dependencies = [
     { name = "plain" },
@@ -859,7 +859,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-sessions"
-version = "0.37.0"
+version = "0.38.0"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
@@ -882,7 +882,7 @@ dev = [
 
 [[package]]
 name = "plain-support"
-version = "0.22.0"
+version = "0.23.0"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },

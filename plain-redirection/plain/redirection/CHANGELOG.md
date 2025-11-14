@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-redirection@0.25.0) (2025-11-13)
+
+### What's changed
+
+- Model fields now use explicit type annotations with `plain.models.types` field descriptors for improved IDE support and type checking ([c8f40fc75a](https://github.com/dropseed/plain/commit/c8f40fc75a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.1](https://github.com/dropseed/plain/releases/plain-redirection@0.24.1) (2025-10-31)
 
 ### What's changed
