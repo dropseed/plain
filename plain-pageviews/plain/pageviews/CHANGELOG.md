@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.27.0) (2025-11-13)
+
+### What's changed
+
+- Model fields now use type stub annotations for better IDE support and type checking ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc75aeb8f6a69f44cbe4a62b08bda45a425))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.26.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.26.0) (2025-11-12)
 
 ### What's changed
