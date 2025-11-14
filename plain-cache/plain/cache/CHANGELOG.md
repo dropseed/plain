@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-cache@0.22.0) (2025-11-13)
+
+### What's changed
+
+- QuerySet manager now uses `ClassVar` type annotation for improved type checking ([c3b00a6](https://github.com/dropseed/plain/commit/c3b00a693c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-cache@0.21.0) (2025-11-13)
 
 ### What's changed
