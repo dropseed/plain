@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-api@0.19.0) (2025-11-13)
+
+### What's changed
+
+- Added `query` type annotation using `ClassVar` for improved type checking support ([c3b00a6](https://github.com/dropseed/plain/commit/c3b00a6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-api@0.18.0) (2025-11-13)
 
 ### What's changed
