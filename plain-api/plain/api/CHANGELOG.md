@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-api@0.18.0) (2025-11-13)
+
+### What's changed
+
+- Added type stubs and improved type annotations for model fields using `plain.models.types` import pattern ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-api@0.17.0) (2025-11-12)
 
 ### What's changed
