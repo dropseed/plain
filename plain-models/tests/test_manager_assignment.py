@@ -1,4 +1,4 @@
-from app.examples.models import (  # type: ignore[import-untyped]
+from app.examples.models import (
     CustomQuerySet,
     CustomQuerySetModel,
     CustomSpecialQuerySetModel,
