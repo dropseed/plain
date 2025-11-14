@@ -7,6 +7,7 @@
 - [Querying](#querying)
 - [Migrations](#migrations)
 - [Fields](#fields)
+- [Typed field definitions](#typed-field-definitions)
 - [Validation](#validation)
 - [Indexes and constraints](#indexes-and-constraints)
 - [Custom QuerySets](#custom-querysets)
@@ -18,18 +19,21 @@
 
 ```python
 # app/users/models.py
+from datetime import datetime
+
 from plain import models
+from plain.models import types
 from plain.passwords.models import PasswordField
 
 
 @models.register_model
 class User(models.Model):
-    email = models.EmailField()
+    email: str = types.EmailField()
     password = PasswordField()
-    is_admin = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    is_admin: bool = types.BooleanField(default=False)
+    created_at: datetime = types.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.email
 ```
 
@@ -169,6 +173,35 @@ Common field types include:
 - [`EmailField`](./fields/__init__.py#EmailField)
 - [`URLField`](./fields/__init__.py#URLField)
 - [`UUIDField`](./fields/__init__.py#UUIDField)
+
+## Typed field definitions
+
+For better IDE support and type checking, use `plain.models.types` with type annotations:
+
+```python
+from plain import models
+from plain.models import types
+
+@models.register_model
+class User(models.Model):
+    email: str = types.EmailField()
+    username: str = types.CharField(max_length=150)
+    is_admin: bool = types.BooleanField(default=False)
+```
+
+For nullable fields, add `| None` to the annotation:
+
+```python
+published_at: datetime | None = types.DateTimeField(allow_null=True, required=False)
+```
+
+Foreign keys are typed with the related model:
+
+```python
+author: Author = types.ForeignKey(Author, on_delete=models.CASCADE)
+```
+
+All field types from the [Fields](#fields) section are available through [`types`](./types.py). Typed and untyped fields can be mixed in the same model. The database behavior is identical - typed fields only add type checking.
 
 ## Validation
 
