@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-observer@0.17.0) (2025-11-13)
+
+### What's changed
+
+- Model fields now use type stubs (from `plain.models.types`) with proper type annotations for improved IDE support and type checking ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc75aeb8f6a69f44cbe4a62b08bda45a425))
+- Removed unnecessary type casts in CLI code that are no longer needed with proper field type annotations ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc75aeb8f6a69f44cbe4a62b08bda45a425))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-observer@0.16.0) (2025-11-12)
 
 ### What's changed
