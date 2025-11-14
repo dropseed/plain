@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 import plain.runtime
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
-from plain.models import models_registry, transaction
+from plain.models import models_registry, transaction, types
 from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import CheckConstraint, UniqueConstraint
 from plain.models.db import (
@@ -27,7 +27,7 @@ from plain.models.exceptions import (
     MultipleObjectsReturnedDescriptor,
 )
 from plain.models.expressions import RawSQL, Value
-from plain.models.fields import NOT_PROVIDED, PrimaryKeyField
+from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.meta import Meta
 from plain.models.options import Options
@@ -92,7 +92,7 @@ class ModelState:
 
 class Model(metaclass=ModelBase):
     # Every model gets an automatic id field
-    id = PrimaryKeyField()
+    id: int = types.PrimaryKeyField()
 
     # Descriptors for other model behavior
     query: ClassVar[QuerySet[Model]] = QuerySet()
