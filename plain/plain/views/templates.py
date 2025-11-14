@@ -1,3 +1,5 @@
+from typing import Any
+
 from plain.exceptions import ImproperlyConfigured
 from plain.http import Response
 from plain.runtime import settings
@@ -17,7 +19,7 @@ class TemplateView(View):
         # Allow template_name to be passed in as_view()
         self.template_name = template_name or self.template_name
 
-    def get_template_context(self) -> dict:
+    def get_template_context(self) -> dict[str, Any]:
         return {
             "request": self.request,
             "template_names": self.get_template_names(),

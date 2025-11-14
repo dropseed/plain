@@ -65,7 +65,7 @@ class ObjectTemplateViewMixin(ABC):
     @abstractmethod
     def get_object(self) -> Any: ...
 
-    def get_template_context(self) -> dict:
+    def get_template_context(self) -> dict[str, Any]:
         """Insert the single object into the context dict."""
         context = super().get_template_context()  # type: ignore
         context["object"] = (
@@ -109,7 +109,7 @@ class UpdateView(ObjectTemplateViewMixin, FormView):
         form.save()  # type: ignore[attr-defined]
         return super().form_valid(form)
 
-    def get_form_kwargs(self) -> dict:
+    def get_form_kwargs(self) -> dict[str, Any]:
         """Return the keyword arguments for instantiating the form."""
         kwargs = super().get_form_kwargs()
         kwargs.update({"instance": self.object})
@@ -132,7 +132,7 @@ class DeleteView(ObjectTemplateViewMixin, FormView):
 
     form_class = EmptyDeleteForm
 
-    def get_form_kwargs(self) -> dict:
+    def get_form_kwargs(self) -> dict[str, Any]:
         """Return the keyword arguments for instantiating the form."""
         kwargs = super().get_form_kwargs()
         kwargs.update({"instance": self.object})
@@ -159,7 +159,7 @@ class ListView(TemplateView, ABC):
     @abstractmethod
     def get_objects(self) -> Any: ...
 
-    def get_template_context(self) -> dict:
+    def get_template_context(self) -> dict[str, Any]:
         """Insert the single object into the context dict."""
         context = super().get_template_context()  # type: ignore
         context["objects"] = self.objects

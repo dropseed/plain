@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ImproperlyConfigured
 from plain.http import Response, ResponseRedirect
@@ -25,7 +25,7 @@ class FormView(TemplateView):
             )
         return self.form_class(**self.get_form_kwargs())
 
-    def get_form_kwargs(self) -> dict:
+    def get_form_kwargs(self) -> dict[str, Any]:
         """Return the keyword arguments for instantiating the form."""
         return {
             "initial": {},
@@ -50,7 +50,7 @@ class FormView(TemplateView):
         }
         return Response(self.get_template().render(context))
 
-    def get_template_context(self) -> dict:
+    def get_template_context(self) -> dict[str, Any]:
         """Insert the form into the context dict."""
         context = super().get_template_context()
         context["form"] = self.get_form()

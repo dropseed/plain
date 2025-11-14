@@ -31,8 +31,8 @@ tracer = trace.get_tracer("plain")
 
 class View:
     request: Request
-    url_args: tuple
-    url_kwargs: dict
+    url_args: tuple[Any, ...]
+    url_kwargs: dict[str, Any]
 
     # View.as_view(example="foo") usage can be customized by defining your own __init__ method.
     # def __init__(self, *args, **kwargs):
