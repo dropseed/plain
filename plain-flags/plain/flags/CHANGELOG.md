@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-flags@0.29.0) (2025-11-13)
+
+### What's changed
+
+- Model field definitions now use type stubs with `types.Field` syntax instead of direct `models.Field` assignment for better type checker support ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc75a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-flags@0.28.0) (2025-11-12)
 
 ### What's changed
