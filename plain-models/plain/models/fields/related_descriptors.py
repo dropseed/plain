@@ -41,7 +41,6 @@ Reverse relations must be explicitly defined using ``ReverseForeignKey`` or
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import Any
 
@@ -245,51 +244,7 @@ class ForwardManyToOneDescriptor:
         return getattr, (self.field.model, self.field.name)
 
 
-class RelationDescriptorBase(ABC):
-    """
-    Base class for relation descriptors that don't allow direct assignment.
-
-    This is used for descriptors that manage collections of related objects
-    (reverse FK and M2M relations). Forward FK relations don't inherit from
-    this because they allow direct assignment.
-    """
-
-    def __init__(self, rel: Any) -> None:
-        self.rel = rel
-        self.field = rel.field
-
-    def __get__(
-        self, instance: Any | None, cls: type | None = None
-    ) -> RelationDescriptorBase | Any:
-        """
-        Get the related manager when the descriptor is accessed.
-
-        Subclasses must implement get_related_manager().
-        """
-        if instance is None:
-            return self
-        return self.get_related_manager(instance)
-
-    @abstractmethod
-    def get_related_manager(self, instance: Any) -> Any:
-        """Return the appropriate manager for this relation."""
-        ...
-
-    @abstractmethod
-    def _get_set_deprecation_msg_params(self) -> tuple[str, str]:
-        """Return parameters for the error message when direct assignment is attempted."""
-        ...
-
-    def __set__(self, instance: Any, value: Any) -> None:
-        """Prevent direct assignment to the relation."""
-        raise TypeError(
-            "Direct assignment to the {} is prohibited. Use {}.set() instead.".format(
-                *self._get_set_deprecation_msg_params()
-            ),
-        )
-
-
-class ForwardManyToManyDescriptor(RelationDescriptorBase):
+class ForwardManyToManyDescriptor:
     """
     Accessor to the related objects manager on the forward side of a
     many-to-many relation.
@@ -301,6 +256,26 @@ class ForwardManyToManyDescriptor(RelationDescriptorBase):
 
     ``Pizza.toppings`` is a ``ForwardManyToManyDescriptor`` instance.
     """
+
+    def __init__(self, rel: Any) -> None:
+        self.rel = rel
+        self.field = rel.field
+
+    def __get__(
+        self, instance: Any | None, cls: type | None = None
+    ) -> ForwardManyToManyDescriptor | Any:
+        """Get the related manager when the descriptor is accessed."""
+        if instance is None:
+            return self
+        return self.get_related_manager(instance)
+
+    def __set__(self, instance: Any, value: Any) -> None:
+        """Prevent direct assignment to the relation."""
+        raise TypeError(
+            "Direct assignment to the {} is prohibited. Use {}.set() instead.".format(
+                *self._get_set_deprecation_msg_params()
+            ),
+        )
 
     @property
     def through(self) -> Any:
