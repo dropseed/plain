@@ -553,21 +553,38 @@ class BaseManyToManyManager(BaseRelatedManager):
         raise NotImplementedError
 
 
-class ForwardManyToManyManager(BaseManyToManyManager):
+class ManyToManyManager(BaseManyToManyManager):
     """
-    Manager for the forward side of a many-to-many relation.
+    Manager for both forward and reverse sides of a many-to-many relation.
 
-    This manager adds behaviors specific to many-to-many relations.
+    This manager handles both directions of many-to-many relations with
+    conditional logic for symmetrical relationships (which only apply to
+    forward relations).
     """
 
     def __init__(self, instance: Any, rel: Any):
+        # Detect whether this is a forward or reverse relation
+        # Forward relations (ManyToManyRel) have both rel.model and rel.related_model
+        # Reverse relations (SimpleRel from ReverseManyToMany) only have rel.related_model
+        is_reverse = not hasattr(rel, "model")
+
         # Set required attributes before calling super().__init__
-        self.model = rel.model
-        self.query_field_name = rel.field.related_query_name()
-        self.prefetch_cache_name = rel.field.name
-        self.source_field_name = rel.field.m2m_field_name()
-        self.target_field_name = rel.field.m2m_reverse_field_name()
-        self.symmetrical = rel.symmetrical
+        if is_reverse:
+            # Reverse: accessing from the target model back to the source
+            self.model = rel.related_model
+            self.query_field_name = rel.field.name
+            self.prefetch_cache_name = rel.field.related_query_name()
+            self.source_field_name = rel.field.m2m_reverse_field_name()
+            self.target_field_name = rel.field.m2m_field_name()
+            self.symmetrical = False  # Reverse relations are never symmetrical
+        else:
+            # Forward: accessing from the source model to the target
+            self.model = rel.model
+            self.query_field_name = rel.field.related_query_name()
+            self.prefetch_cache_name = rel.field.name
+            self.source_field_name = rel.field.m2m_field_name()
+            self.target_field_name = rel.field.m2m_reverse_field_name()
+            self.symmetrical = rel.symmetrical
 
         super().__init__(instance, rel)
 
@@ -582,6 +599,7 @@ class ForwardManyToManyManager(BaseManyToManyManager):
             filters = filters & Q.create(  # type: ignore[unsupported-operator]
                 [(f"{self.target_field_name}__in", removed_vals)]
             )
+        # Add symmetrical filters for forward symmetrical relations
         if self.symmetrical:
             symmetrical_filters = Q.create([(self.target_field_name, self.related_val)])
             if removed_vals_filters:
@@ -609,54 +627,6 @@ class ForwardManyToManyManager(BaseManyToManyManager):
                     *objs,
                     through_defaults=through_defaults,
                 )
-
-    def remove(self, *objs: Any) -> None:
-        self._remove_prefetched_objects()
-        self._remove_items(self.source_field_name, self.target_field_name, *objs)
-
-
-class ReverseManyToManyManager(BaseManyToManyManager):
-    """
-    Manager for the reverse side of a many-to-many relation.
-
-    This manager adds behaviors specific to many-to-many relations.
-    """
-
-    def __init__(self, instance: Any, rel: Any):
-        # Set required attributes before calling super().__init__
-        self.model = rel.related_model
-        self.query_field_name = rel.field.name
-        self.prefetch_cache_name = rel.field.related_query_name()
-        self.source_field_name = rel.field.m2m_reverse_field_name()
-        self.target_field_name = rel.field.m2m_field_name()
-        self.symmetrical = False  # Reverse relations are never symmetrical
-
-        super().__init__(instance, rel)
-
-    def _build_remove_filters(self, removed_vals: Any) -> Any:
-        filters = Q.create([(self.source_field_name, self.related_val)])
-        # No need to add a subquery condition if removed_vals is a QuerySet without
-        # filters.
-        removed_vals_filters = (
-            not isinstance(removed_vals, QuerySet) or removed_vals._has_filters()
-        )
-        if removed_vals_filters:
-            filters = filters & Q.create(  # type: ignore[unsupported-operator]
-                [(f"{self.target_field_name}__in", removed_vals)]
-            )
-        # Note: reverse relations are never symmetrical, so no symmetrical logic here
-        return filters
-
-    def add(self, *objs: Any, through_defaults: dict[str, Any] | None = None) -> None:
-        self._remove_prefetched_objects()
-        with transaction.atomic(savepoint=False):
-            self._add_items(
-                self.source_field_name,
-                self.target_field_name,
-                *objs,
-                through_defaults=through_defaults,
-            )
-            # Reverse relations are never symmetrical, so no mirror entry logic
 
     def remove(self, *objs: Any) -> None:
         self._remove_prefetched_objects()

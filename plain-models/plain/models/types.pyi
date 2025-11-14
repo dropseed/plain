@@ -21,7 +21,7 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from plain.models.fields.related_managers import (
-        ReverseManyToManyManager,
+        ManyToManyManager,
         ReverseManyToOneManager,
     )
 
@@ -731,7 +731,7 @@ class ReverseManyToMany(Generic[_T]):
     Type stub for ReverseManyToMany descriptor.
 
     Declares an explicit reverse relation from a related model back through a ManyToManyField.
-    Returns a ReverseManyToManyManager when accessed on an instance.
+    Returns a ManyToManyManager when accessed on an instance.
     """
 
     def __init__(
@@ -747,4 +747,4 @@ class ReverseManyToMany(Generic[_T]):
 
     # Instance access returns the manager
     @overload
-    def __get__(self, instance: Any, owner: type) -> ReverseManyToManyManager[_T]: ...
+    def __get__(self, instance: Any, owner: type) -> ManyToManyManager[_T]: ...

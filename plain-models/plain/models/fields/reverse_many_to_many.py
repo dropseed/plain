@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 if TYPE_CHECKING:
     from plain.models import Model
-    from plain.models.fields.related_managers import ReverseManyToManyManager
+    from plain.models.fields.related_managers import ManyToManyManager
 
 T = TypeVar("T", bound="Model")
 
@@ -86,13 +86,11 @@ class ReverseManyToMany(Generic[T]):
     def __get__(self, instance: None, owner: type[Model]) -> ReverseManyToMany[T]: ...
 
     @overload
-    def __get__(
-        self, instance: Model, owner: type[Model]
-    ) -> ReverseManyToManyManager[T]: ...
+    def __get__(self, instance: Model, owner: type[Model]) -> ManyToManyManager[T]: ...
 
     def __get__(
         self, instance: Model | None, owner: type[Model]
-    ) -> ReverseManyToMany[T] | ReverseManyToManyManager[T]:
+    ) -> ReverseManyToMany[T] | ManyToManyManager[T]:
         """
         Get the related manager when accessed on an instance.
 
@@ -111,7 +109,7 @@ class ReverseManyToMany(Generic[T]):
             )
 
         # Return a manager bound to this instance
-        from plain.models.fields.related_managers import ReverseManyToManyManager
+        from plain.models.fields.related_managers import ManyToManyManager
 
         # Create a simple relation object to pass to the manager
         # The manager expects a rel object with field, related_model, and through attributes
@@ -123,7 +121,7 @@ class ReverseManyToMany(Generic[T]):
                 self.through = field.remote_field.through
 
         rel = SimpleRel(self._resolved_field, self._resolved_model)  # type: ignore[arg-type]
-        return ReverseManyToManyManager(instance, rel)
+        return ManyToManyManager(instance, rel)
 
     def __set__(self, instance: Model, value: Any) -> None:
         """Prevent direct assignment to reverse relations."""

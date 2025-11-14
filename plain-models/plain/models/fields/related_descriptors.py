@@ -47,7 +47,7 @@ from typing import Any
 from plain.models.query import QuerySet
 from plain.utils.functional import LazyObject
 
-from .related_managers import ForwardManyToManyManager
+from .related_managers import ManyToManyManager
 
 
 class ForwardManyToOneDescriptor:
@@ -267,14 +267,12 @@ class ForwardManyToManyDescriptor:
         """Get the related manager when the descriptor is accessed."""
         if instance is None:
             return self
-        return self.get_related_manager(instance)
+        return ManyToManyManager(instance, self.rel)
 
     def __set__(self, instance: Any, value: Any) -> None:
         """Prevent direct assignment to the relation."""
         raise TypeError(
-            "Direct assignment to the {} is prohibited. Use {}.set() instead.".format(
-                *self._get_set_deprecation_msg_params()
-            ),
+            f"Direct assignment to the forward side of a many-to-many set is prohibited. Use {self.field.name}.set() instead.",
         )
 
     @property
@@ -283,13 +281,3 @@ class ForwardManyToManyDescriptor:
         # model (Book.authors.through) for inlines, etc. This is done as
         # a property to ensure that the fully resolved value is returned.
         return self.rel.through
-
-    def get_related_manager(self, instance: Any) -> ForwardManyToManyManager:
-        """Return the ForwardManyToManyManager for this relation."""
-        return ForwardManyToManyManager(instance, self.rel)
-
-    def _get_set_deprecation_msg_params(self) -> tuple[str, str]:
-        return (
-            "forward side of a many-to-many set",
-            self.field.name,
-        )
