@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.28.0) (2025-11-13)
+
+### What's changed
+
+- Added `ClassVar` type annotation to the `query` attribute for improved type checking and IDE support ([c3b00a6](https://github.com/dropseed/plain/commit/c3b00a693c5869ce4861ea1eb5b953ccd1a77ef8))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.27.0) (2025-11-13)
 
 ### What's changed
