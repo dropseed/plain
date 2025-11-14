@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.88.0](https://github.com/dropseed/plain/releases/plain@0.88.0) (2025-11-13)
+
+### What's changed
+
+- The `plain.forms` module now uses explicit imports instead of wildcard imports, improving IDE autocomplete and type checking support ([eff36f3](https://github.com/dropseed/plain/commit/eff36f31e8e15f84e11164a44c833aeab096ffbd))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.87.0](https://github.com/dropseed/plain/releases/plain@0.87.0) (2025-11-12)
 
 ### What's changed
