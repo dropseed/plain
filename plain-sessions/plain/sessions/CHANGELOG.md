@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.38.0](https://github.com/dropseed/plain/releases/plain-sessions@0.38.0) (2025-11-13)
+
+### What's changed
+
+- Model fields now use the new typed field syntax with explicit type annotations and `types.CharField`, `types.JSONField`, and `types.DateTimeField` imports ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.0](https://github.com/dropseed/plain/releases/plain-sessions@0.37.0) (2025-11-12)
 
 ### What's changed
