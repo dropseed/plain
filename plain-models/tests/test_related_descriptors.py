@@ -35,7 +35,7 @@ class TestForwardManyToOneDescriptor:
         child = ChildCascade.query.create(parent=parent)
 
         # Setting a non-nullable FK to None should work but fail on save
-        child.parent = None
+        child.parent = None  # type: ignore[assignment]
         with pytest.raises(
             Exception, match="constraint|null|NOT NULL"
         ):  # Database constraint error

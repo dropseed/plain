@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING, ClassVar
 
 from plain import models
 from plain.models import types
@@ -8,6 +11,8 @@ from plain.models import types
 class Car(models.Model):
     make: str = types.CharField(max_length=100)
     model: str = types.CharField(max_length=100)
+
+    query: ClassVar[models.QuerySet[Car]] = models.QuerySet()
 
     model_options = models.Options(
         constraints=[
@@ -24,6 +29,15 @@ class UnregisteredModel(models.Model):
 class DeleteParent(models.Model):
     name: str = types.CharField(max_length=100)
 
+    query: ClassVar[models.QuerySet[DeleteParent]] = models.QuerySet()
+
+    # Reverse relations (created by ForeignKey with related_name)
+    # Declared for type checking purposes (not actual fields)
+    if TYPE_CHECKING:
+        from plain.models.fields.related_managers import ReverseManyToOneManager
+
+        childcascade_set: ReverseManyToOneManager[ChildCascade] = None  # type: ignore[assignment]
+
 
 @models.register_model
 class ChildCascade(models.Model):
@@ -31,15 +45,21 @@ class ChildCascade(models.Model):
         DeleteParent, on_delete=models.CASCADE, related_name="childcascade_set"
     )
 
+    query: ClassVar[models.QuerySet[ChildCascade]] = models.QuerySet()
+
 
 @models.register_model
 class ChildProtect(models.Model):
     parent: DeleteParent = types.ForeignKey(DeleteParent, on_delete=models.PROTECT)
 
+    query: ClassVar[models.QuerySet[ChildProtect]] = models.QuerySet()
+
 
 @models.register_model
 class ChildRestrict(models.Model):
     parent: DeleteParent = types.ForeignKey(DeleteParent, on_delete=models.RESTRICT)
+
+    query: ClassVar[models.QuerySet[ChildRestrict]] = models.QuerySet()
 
 
 @models.register_model
@@ -49,6 +69,9 @@ class ChildSetNull(models.Model):
         on_delete=models.SET_NULL,
         allow_null=True,
     )
+    parent_id: int | None
+
+    query: ClassVar[models.QuerySet[ChildSetNull]] = models.QuerySet()
 
 
 @models.register_model
@@ -61,11 +84,16 @@ class ChildSetDefault(models.Model):
         on_delete=models.SET_DEFAULT,
         default=default_parent_id,
     )
+    parent_id: int
+
+    query: ClassVar[models.QuerySet[ChildSetDefault]] = models.QuerySet()
 
 
 @models.register_model
 class ChildDoNothing(models.Model):
     parent: DeleteParent = types.ForeignKey(DeleteParent, on_delete=models.DO_NOTHING)
+
+    query: ClassVar[models.QuerySet[ChildDoNothing]] = models.QuerySet()
 
 
 # Models for testing QuerySet assignment behavior
@@ -74,6 +102,8 @@ class DefaultQuerySetModel(models.Model):
     """Model that uses the default objects QuerySet."""
 
     name: str = types.CharField(max_length=100)
+
+    query: ClassVar[models.QuerySet[DefaultQuerySetModel]] = models.QuerySet()
 
 
 class CustomQuerySet(models.QuerySet):
@@ -92,7 +122,7 @@ class CustomQuerySetModel(models.Model):
 
     name: str = types.CharField(max_length=100)
 
-    query = CustomQuerySet()
+    query: ClassVar[CustomQuerySet] = CustomQuerySet()
 
 
 @models.register_model
@@ -101,7 +131,7 @@ class CustomSpecialQuerySetModel(models.Model):
 
     name: str = types.CharField(max_length=100)
 
-    query = CustomSpecialQuerySet()
+    query: ClassVar[CustomSpecialQuerySet] = CustomSpecialQuerySet()
 
 
 # Test mixin pattern for field inheritance
@@ -117,6 +147,8 @@ class MixinTestModel(TimestampMixin, models.Model):
     """Model that inherits fields from a mixin."""
 
     name: str = types.CharField(max_length=100)
+
+    query: ClassVar[models.QuerySet[MixinTestModel]] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["-created_at"],
