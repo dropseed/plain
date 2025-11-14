@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-redirection@0.26.0) (2025-11-13)
+
+### What's changed
+
+- Model querysets now use `ClassVar` type annotations for improved type checking support ([c3b00a693c](https://github.com/dropseed/plain/commit/c3b00a693c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.0](https://github.com/dropseed/plain/releases/plain-redirection@0.25.0) (2025-11-13)
 
 ### What's changed
