@@ -80,81 +80,81 @@ class DatetimeRangeAliases(Enum):
         def end_of_year(dt: datetime.datetime) -> datetime.datetime:
             return end_of_month(dt.replace(month=12))
 
-        if value == cls.TODAY:
+        if value == cls.TODAY.value:
             return DatetimeRange(start_of_today, end_of_day(now))
-        if value == cls.THIS_WEEK:
+        if value == cls.THIS_WEEK.value:
             return DatetimeRange(
                 start_of_week, end_of_day(start_of_week + datetime.timedelta(days=6))
             )
-        if value == cls.THIS_WEEK_TO_DATE:
+        if value == cls.THIS_WEEK_TO_DATE.value:
             return DatetimeRange(start_of_week, now)
-        if value == cls.THIS_MONTH:
+        if value == cls.THIS_MONTH.value:
             return DatetimeRange(start_of_month, end_of_month(start_of_month))
-        if value == cls.THIS_MONTH_TO_DATE:
+        if value == cls.THIS_MONTH_TO_DATE.value:
             return DatetimeRange(start_of_month, now)
-        if value == cls.THIS_QUARTER:
+        if value == cls.THIS_QUARTER.value:
             return DatetimeRange(start_of_quarter, end_of_quarter(start_of_quarter))
-        if value == cls.THIS_QUARTER_TO_DATE:
+        if value == cls.THIS_QUARTER_TO_DATE.value:
             return DatetimeRange(start_of_quarter, now)
-        if value == cls.THIS_YEAR:
+        if value == cls.THIS_YEAR.value:
             return DatetimeRange(start_of_year, end_of_year(start_of_year))
-        if value == cls.THIS_YEAR_TO_DATE:
+        if value == cls.THIS_YEAR_TO_DATE.value:
             return DatetimeRange(start_of_year, now)
-        if value == cls.LAST_WEEK:
+        if value == cls.LAST_WEEK.value:
             last_week_start = start_of_week - datetime.timedelta(days=7)
             return DatetimeRange(
                 last_week_start,
                 end_of_day(last_week_start + datetime.timedelta(days=6)),
             )
-        if value == cls.LAST_WEEK_TO_DATE:
+        if value == cls.LAST_WEEK_TO_DATE.value:
             return DatetimeRange(start_of_week - datetime.timedelta(days=7), now)
-        if value == cls.LAST_MONTH:
+        if value == cls.LAST_MONTH.value:
             last_month = (start_of_month - datetime.timedelta(days=1)).replace(day=1)
             return DatetimeRange(last_month, end_of_month(last_month))
-        if value == cls.LAST_MONTH_TO_DATE:
+        if value == cls.LAST_MONTH_TO_DATE.value:
             last_month = (start_of_month - datetime.timedelta(days=1)).replace(day=1)
             return DatetimeRange(last_month, now)
-        if value == cls.LAST_QUARTER:
+        if value == cls.LAST_QUARTER.value:
             last_quarter = (start_of_quarter - datetime.timedelta(days=1)).replace(
                 day=1
             )
             return DatetimeRange(last_quarter, end_of_quarter(last_quarter))
-        if value == cls.LAST_QUARTER_TO_DATE:
+        if value == cls.LAST_QUARTER_TO_DATE.value:
             last_quarter = (start_of_quarter - datetime.timedelta(days=1)).replace(
                 day=1
             )
             return DatetimeRange(last_quarter, now)
-        if value == cls.LAST_YEAR:
+        if value == cls.LAST_YEAR.value:
             last_year = start_of_year.replace(year=start_of_year.year - 1)
             return DatetimeRange(last_year, end_of_year(last_year))
-        if value == cls.LAST_YEAR_TO_DATE:
+        if value == cls.LAST_YEAR_TO_DATE.value:
             last_year = start_of_year.replace(year=start_of_year.year - 1)
             return DatetimeRange(last_year, now)
-        if value == cls.SINCE_30_DAYS_AGO:
+        if value == cls.SINCE_30_DAYS_AGO.value:
             return DatetimeRange(now - datetime.timedelta(days=30), now)
-        if value == cls.SINCE_60_DAYS_AGO:
+        if value == cls.SINCE_60_DAYS_AGO.value:
             return DatetimeRange(now - datetime.timedelta(days=60), now)
-        if value == cls.SINCE_90_DAYS_AGO:
+        if value == cls.SINCE_90_DAYS_AGO.value:
             return DatetimeRange(now - datetime.timedelta(days=90), now)
-        if value == cls.SINCE_365_DAYS_AGO:
+        if value == cls.SINCE_365_DAYS_AGO.value:
             return DatetimeRange(now - datetime.timedelta(days=365), now)
-        if value == cls.NEXT_WEEK:
+        if value == cls.NEXT_WEEK.value:
             next_week_start = start_of_week + datetime.timedelta(days=7)
             return DatetimeRange(
                 next_week_start,
                 end_of_day(next_week_start + datetime.timedelta(days=6)),
             )
-        if value == cls.NEXT_4_WEEKS:
+        if value == cls.NEXT_4_WEEKS.value:
             return DatetimeRange(now, end_of_day(now + datetime.timedelta(days=28)))
-        if value == cls.NEXT_MONTH:
+        if value == cls.NEXT_MONTH.value:
             next_month = (start_of_month + datetime.timedelta(days=31)).replace(day=1)
             return DatetimeRange(next_month, end_of_month(next_month))
-        if value == cls.NEXT_QUARTER:
+        if value == cls.NEXT_QUARTER.value:
             next_quarter = (start_of_quarter + datetime.timedelta(days=90)).replace(
                 day=1
             )
             return DatetimeRange(next_quarter, end_of_quarter(next_quarter))
-        if value == cls.NEXT_YEAR:
+        if value == cls.NEXT_YEAR.value:
             next_year = start_of_year.replace(year=start_of_year.year + 1)
             return DatetimeRange(next_year, end_of_year(next_year))
         raise ValueError(f"Invalid range: {value}")

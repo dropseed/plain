@@ -27,7 +27,7 @@
                 class="text-xs py-1.5">
                 <option value="">(Reset to default)</option>
                 {% for preset in presets %}
-                <option {% if preset == current_preset %}selected{% endif %}>{{ preset }}</option>
+                <option value="{{ preset.value }}" {% if preset == current_preset %}selected{% endif %}>{{ preset }}</option>
                 {% endfor %}
             </select>
         </div>
