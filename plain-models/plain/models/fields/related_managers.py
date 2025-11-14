@@ -280,27 +280,50 @@ class ReverseManyToOneManager(BaseRelatedManager):
             self.add(*objs, bulk=bulk)
 
 
-class BaseManyToManyManager(BaseRelatedManager):
+class ManyToManyManager(BaseRelatedManager):
     """
-    Base class for many-to-many managers with common functionality.
+    Manager for both forward and reverse sides of a many-to-many relation.
 
-    Subclasses must set these attributes in __init__:
-    - model
-    - query_field_name
-    - prefetch_cache_name
-    - source_field_name
-    - target_field_name
-    - symmetrical (for forward relations)
+    This manager handles both directions of many-to-many relations with
+    conditional logic for symmetrical relationships (which only apply to
+    forward relations).
     """
 
-    # Type hints for attributes set by subclasses
+    # Type hints for attributes
     model: Any
     query_field_name: str
     prefetch_cache_name: str
     source_field_name: str
     target_field_name: str
 
-    def __init__(self, instance: Any, through: Any):
+    def __init__(
+        self,
+        instance: Any,
+        field: Any,
+        through: Any,
+        related_model: Any,
+        is_reverse: bool,
+        symmetrical: bool = False,
+    ):
+        # Set direction-specific attributes
+        if is_reverse:
+            # Reverse: accessing from the target model back to the source
+            self.model = related_model
+            self.query_field_name = field.name
+            self.prefetch_cache_name = field.related_query_name()
+            self.source_field_name = field.m2m_reverse_field_name()
+            self.target_field_name = field.m2m_field_name()
+            self.symmetrical = False  # Reverse relations are never symmetrical
+        else:
+            # Forward: accessing from the source model to the target
+            self.model = related_model
+            self.query_field_name = field.related_query_name()
+            self.prefetch_cache_name = field.name
+            self.source_field_name = field.m2m_field_name()
+            self.target_field_name = field.m2m_reverse_field_name()
+            self.symmetrical = symmetrical
+
+        # Initialize common M2M attributes
         self.instance = instance
         self.through = through
 
@@ -541,55 +564,6 @@ class BaseManyToManyManager(BaseRelatedManager):
                 old_vals = old_ids
             filters = self._build_remove_filters(old_vals)
             self.through.query.filter(filters).delete()
-
-    # Subclasses must implement these methods:
-    def _build_remove_filters(self, removed_vals: Any) -> Any:
-        raise NotImplementedError
-
-    def add(self, *objs: Any, through_defaults: dict[str, Any] | None = None) -> None:
-        raise NotImplementedError
-
-    def remove(self, *objs: Any) -> None:
-        raise NotImplementedError
-
-
-class ManyToManyManager(BaseManyToManyManager):
-    """
-    Manager for both forward and reverse sides of a many-to-many relation.
-
-    This manager handles both directions of many-to-many relations with
-    conditional logic for symmetrical relationships (which only apply to
-    forward relations).
-    """
-
-    def __init__(
-        self,
-        instance: Any,
-        field: Any,
-        through: Any,
-        related_model: Any,
-        is_reverse: bool,
-        symmetrical: bool = False,
-    ):
-        # Set required attributes before calling super().__init__
-        if is_reverse:
-            # Reverse: accessing from the target model back to the source
-            self.model = related_model
-            self.query_field_name = field.name
-            self.prefetch_cache_name = field.related_query_name()
-            self.source_field_name = field.m2m_reverse_field_name()
-            self.target_field_name = field.m2m_field_name()
-            self.symmetrical = False  # Reverse relations are never symmetrical
-        else:
-            # Forward: accessing from the source model to the target
-            self.model = related_model
-            self.query_field_name = field.related_query_name()
-            self.prefetch_cache_name = field.name
-            self.source_field_name = field.m2m_field_name()
-            self.target_field_name = field.m2m_reverse_field_name()
-            self.symmetrical = symmetrical
-
-        super().__init__(instance, through)
 
     def _build_remove_filters(self, removed_vals: Any) -> Any:
         filters = Q.create([(self.source_field_name, self.related_val)])
