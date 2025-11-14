@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-support@0.24.0) (2025-11-13)
+
+### What's changed
+
+- QuerySet type annotations now use `ClassVar` for improved type checking and IDE support ([c3b00a6](https://github.com/dropseed/plain/commit/c3b00a6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-support@0.23.0) (2025-11-13)
 
 ### What's changed
