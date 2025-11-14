@@ -1,5 +1,5 @@
 import pytest
-from app.examples.models import Car, MixinTestModel
+from app.examples.models import Car, CarFeature, Feature, MixinTestModel
 
 from plain.exceptions import ValidationError
 
@@ -41,3 +41,85 @@ def test_mixin_fields_inherited(db):
     assert instance.created_at is not None
     assert instance.updated_at is not None
     assert instance.name == "test"
+
+
+def test_many_to_many_forward_accessor(db):
+    """Test that the forward ManyToManyField accessor works."""
+    car = Car.query.create(make="Tesla", model="Model 3")
+    gps = Feature.query.create(name="GPS")
+    sunroof = Feature.query.create(name="Sunroof")
+
+    # Add features to the car
+    car.features.add(gps, sunroof)
+
+    # Verify features are accessible through forward accessor
+    assert car.features.query.count() == 2
+    feature_names = {f.name for f in car.features.query.all()}
+    assert feature_names == {"GPS", "Sunroof"}
+
+
+def test_many_to_many_reverse_accessor(db):
+    """Test that the reverse ManyToManyField accessor works."""
+    car1 = Car.query.create(make="Tesla", model="Model 3")
+    car2 = Car.query.create(make="Toyota", model="Camry")
+    gps = Feature.query.create(name="GPS")
+
+    # Add the same feature to multiple cars
+    car1.features.add(gps)
+    car2.features.add(gps)
+
+    # Verify cars are accessible through reverse accessor
+    assert gps.cars.query.count() == 2
+    car_models = {c.model for c in gps.cars.query.all()}
+    assert car_models == {"Model 3", "Camry"}
+
+
+def test_many_to_many_remove(db):
+    """Test removing items from a ManyToManyField."""
+    car = Car.query.create(make="Honda", model="Accord")
+    gps = Feature.query.create(name="GPS")
+    sunroof = Feature.query.create(name="Sunroof")
+    leather = Feature.query.create(name="Leather Seats")
+
+    car.features.add(gps, sunroof, leather)
+    assert car.features.query.count() == 3
+
+    # Remove one feature
+    car.features.remove(sunroof)
+    assert car.features.query.count() == 2
+    feature_names = {f.name for f in car.features.query.all()}
+    assert feature_names == {"GPS", "Leather Seats"}
+
+
+def test_many_to_many_clear(db):
+    """Test clearing all items from a ManyToManyField."""
+    car = Car.query.create(make="BMW", model="X5")
+    gps = Feature.query.create(name="GPS")
+    sunroof = Feature.query.create(name="Sunroof")
+
+    car.features.add(gps, sunroof)
+    assert car.features.query.count() == 2
+
+    # Clear all features
+    car.features.clear()
+    assert car.features.query.count() == 0
+
+
+def test_many_to_many_through_model(db):
+    """Test accessing the through model directly."""
+    car = Car.query.create(make="Ford", model="Mustang")
+    gps = Feature.query.create(name="GPS")
+
+    # Create relationship through the through model
+    CarFeature.query.create(car=car, feature=gps)
+
+    # Verify the relationship exists
+    assert car.features.query.count() == 1
+    assert car.features.query.first() == gps
+
+    # Verify we can query the through model
+    through_instances = CarFeature.query.filter(car=car)
+    assert through_instances.count() == 1
+    through_instance = through_instances.first()
+    assert through_instance is not None
+    assert through_instance.feature == gps

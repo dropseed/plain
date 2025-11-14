@@ -8,9 +8,38 @@ from plain.models import types
 
 
 @models.register_model
+class Feature(models.Model):
+    name: str = types.CharField(max_length=100)
+
+    query: ClassVar[models.QuerySet[Feature]] = models.QuerySet()
+
+    # Reverse relations (created by ManyToManyField with related_name)
+    # Declared for type checking purposes (not actual fields)
+    if TYPE_CHECKING:
+        from plain.models.fields.related_managers import ReverseManyToManyManager
+
+        cars: ReverseManyToManyManager[Car] = None  # type: ignore[assignment]
+
+
+@models.register_model
+class CarFeature(models.Model):
+    """Through model for Car-Feature many-to-many relationship."""
+
+    car: Car = types.ForeignKey("Car", on_delete=models.CASCADE)
+    car_id: int
+    feature: Feature = types.ForeignKey(Feature, on_delete=models.CASCADE)
+    feature_id: int
+
+    query: ClassVar[models.QuerySet[CarFeature]] = models.QuerySet()
+
+
+@models.register_model
 class Car(models.Model):
     make: str = types.CharField(max_length=100)
     model: str = types.CharField(max_length=100)
+    features: models.ManyToManyField[Feature] = types.ManyToManyField(
+        Feature, through=CarFeature, related_name="cars"
+    )
 
     query: ClassVar[models.QuerySet[Car]] = models.QuerySet()
 
