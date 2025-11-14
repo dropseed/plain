@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.35.0](https://github.com/dropseed/plain/releases/plain-oauth@0.35.0) (2025-11-13)
+
+### What's changed
+
+- The `OAuthConnection` model now includes a `query` attribute with proper type annotations using `ClassVar[models.QuerySet[OAuthConnection]]`, enabling better type checker inference ([c3b00a6](https://github.com/dropseed/plain/commit/c3b00a6))
+- Type annotations updated to use forward references without quotes by adding `from __future__ import annotations` ([c3b00a6](https://github.com/dropseed/plain/commit/c3b00a6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.34.0](https://github.com/dropseed/plain/releases/plain-oauth@0.34.0) (2025-11-13)
 
 ### What's changed
