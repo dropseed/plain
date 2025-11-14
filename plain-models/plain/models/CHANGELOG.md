@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.59.1](https://github.com/dropseed/plain/releases/plain-models@0.59.1) (2025-11-13)
+
+### What's changed
+
+- Added documentation for typed field definitions in the README, showing examples of using `plain.models.types` with type annotations ([f95d32d](https://github.com/dropseed/plain/commit/f95d32df5a))
+
+### Upgrade instructions
+
+- Optionally (but recommended) move to typed model field definitions by using `name: str = types.CharField(...)` instead of `name = models.CharField(...)`. Types can be imported with `from plain.models import types`.
+
 ## [0.59.0](https://github.com/dropseed/plain/releases/plain-models@0.59.0) (2025-11-13)
 
 ### What's changed
