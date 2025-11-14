@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.39.0](https://github.com/dropseed/plain/releases/plain-sessions@0.39.0) (2025-11-13)
+
+### What's changed
+
+- The `Session` model now includes a typed `query` class variable using `ClassVar[models.QuerySet[Session]]` for improved IDE autocomplete and type checking support ([c3b00a6](https://github.com/dropseed/plain/commit/c3b00a6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.38.0](https://github.com/dropseed/plain/releases/plain-sessions@0.38.0) (2025-11-13)
 
 ### What's changed
