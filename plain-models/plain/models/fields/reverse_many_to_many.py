@@ -111,17 +111,14 @@ class ReverseManyToMany(Generic[T]):
         # Return a manager bound to this instance
         from plain.models.fields.related_managers import ManyToManyManager
 
-        # Create a simple relation object to pass to the manager
-        # The manager expects a rel object with field, related_model, and through attributes
-        class SimpleRel:
-            def __init__(self, field: Any, related_model: type[T]):
-                self.field = field
-                self.related_model = related_model
-                # Get the through model from the ManyToManyField
-                self.through = field.remote_field.through
-
-        rel = SimpleRel(self._resolved_field, self._resolved_model)  # type: ignore[arg-type]
-        return ManyToManyManager(instance, rel)
+        return ManyToManyManager(
+            instance=instance,
+            field=self._resolved_field,
+            through=self._resolved_field.remote_field.through,
+            related_model=self._resolved_model,  # type: ignore[arg-type]
+            is_reverse=True,
+            symmetrical=False,
+        )
 
     def __set__(self, instance: Model, value: Any) -> None:
         """Prevent direct assignment to reverse relations."""

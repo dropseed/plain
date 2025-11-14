@@ -267,7 +267,14 @@ class ForwardManyToManyDescriptor:
         """Get the related manager when the descriptor is accessed."""
         if instance is None:
             return self
-        return ManyToManyManager(instance, self.rel)
+        return ManyToManyManager(
+            instance=instance,
+            field=self.rel.field,
+            through=self.rel.through,
+            related_model=self.rel.model,
+            is_reverse=False,
+            symmetrical=self.rel.symmetrical,
+        )
 
     def __set__(self, instance: Any, value: Any) -> None:
         """Prevent direct assignment to the relation."""

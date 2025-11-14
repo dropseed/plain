@@ -67,12 +67,12 @@ class ReverseManyToOneManager(BaseRelatedManager):
     This manager adds behaviors specific to many-to-one relations.
     """
 
-    def __init__(self, instance: Any, rel: Any):
-        self.model = rel.related_model
+    def __init__(self, instance: Any, field: Any, related_model: Any):
+        self.model = related_model
         self.instance = instance
-        self.field = rel.field
+        self.field = field
         self.core_filters = {self.field.name: instance}
-        self.allow_null = rel.field.allow_null
+        self.allow_null = self.field.allow_null
 
     def _check_fk_val(self) -> None:
         for field in self.field.foreign_related_fields:
@@ -300,9 +300,9 @@ class BaseManyToManyManager(BaseRelatedManager):
     source_field_name: str
     target_field_name: str
 
-    def __init__(self, instance: Any, rel: Any):
+    def __init__(self, instance: Any, through: Any):
         self.instance = instance
-        self.through = rel.through
+        self.through = through
 
         self.source_field = self.through._model_meta.get_field(self.source_field_name)
         self.target_field = self.through._model_meta.get_field(self.target_field_name)
@@ -562,31 +562,34 @@ class ManyToManyManager(BaseManyToManyManager):
     forward relations).
     """
 
-    def __init__(self, instance: Any, rel: Any):
-        # Detect whether this is a forward or reverse relation
-        # Forward relations (ManyToManyRel) have both rel.model and rel.related_model
-        # Reverse relations (SimpleRel from ReverseManyToMany) only have rel.related_model
-        is_reverse = not hasattr(rel, "model")
-
+    def __init__(
+        self,
+        instance: Any,
+        field: Any,
+        through: Any,
+        related_model: Any,
+        is_reverse: bool,
+        symmetrical: bool = False,
+    ):
         # Set required attributes before calling super().__init__
         if is_reverse:
             # Reverse: accessing from the target model back to the source
-            self.model = rel.related_model
-            self.query_field_name = rel.field.name
-            self.prefetch_cache_name = rel.field.related_query_name()
-            self.source_field_name = rel.field.m2m_reverse_field_name()
-            self.target_field_name = rel.field.m2m_field_name()
+            self.model = related_model
+            self.query_field_name = field.name
+            self.prefetch_cache_name = field.related_query_name()
+            self.source_field_name = field.m2m_reverse_field_name()
+            self.target_field_name = field.m2m_field_name()
             self.symmetrical = False  # Reverse relations are never symmetrical
         else:
             # Forward: accessing from the source model to the target
-            self.model = rel.model
-            self.query_field_name = rel.field.related_query_name()
-            self.prefetch_cache_name = rel.field.name
-            self.source_field_name = rel.field.m2m_field_name()
-            self.target_field_name = rel.field.m2m_reverse_field_name()
-            self.symmetrical = rel.symmetrical
+            self.model = related_model
+            self.query_field_name = field.related_query_name()
+            self.prefetch_cache_name = field.name
+            self.source_field_name = field.m2m_field_name()
+            self.target_field_name = field.m2m_reverse_field_name()
+            self.symmetrical = symmetrical
 
-        super().__init__(instance, rel)
+        super().__init__(instance, through)
 
     def _build_remove_filters(self, removed_vals: Any) -> Any:
         filters = Q.create([(self.source_field_name, self.related_val)])

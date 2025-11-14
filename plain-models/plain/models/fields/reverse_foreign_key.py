@@ -113,15 +113,11 @@ class ReverseForeignKey(Generic[T]):
         # Return a manager bound to this instance
         from plain.models.fields.related_managers import ReverseManyToOneManager
 
-        # Create a simple relation object to pass to the manager
-        # The manager expects a rel object with field and related_model attributes
-        class SimpleRel:
-            def __init__(self, field: Any, related_model: type[T]):
-                self.field = field
-                self.related_model = related_model
-
-        rel = SimpleRel(self._resolved_field, self._resolved_model)  # type: ignore[arg-type]
-        return ReverseManyToOneManager(instance, rel)
+        return ReverseManyToOneManager(
+            instance=instance,
+            field=self._resolved_field,
+            related_model=self._resolved_model,  # type: ignore[arg-type]
+        )
 
     def __set__(self, instance: Model, value: Any) -> None:
         """Prevent direct assignment to reverse relations."""
