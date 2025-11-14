@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.59.0](https://github.com/dropseed/plain/releases/plain-models@0.59.0) (2025-11-13)
+
+### What's changed
+
+- Added a new `plain.models.types` module with type stub support (.pyi) for improved IDE and type checker experience when defining models ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc75a))
+- Added `@dataclass_transform` decorator to `ModelBase` to enable better type checking for model field definitions ([c8f40fc](https://github.com/dropseed/plain/commit/c8f40fc75a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.58.0](https://github.com/dropseed/plain/releases/plain-models@0.58.0) (2025-11-12)
 
 ### What's changed
