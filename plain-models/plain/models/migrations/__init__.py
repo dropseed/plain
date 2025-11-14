@@ -1,2 +1,44 @@
-from .migration import Migration, settings_dependency  # NOQA
-from .operations import *  # NOQA
+from .migration import Migration, settings_dependency
+from .operations import (
+    AddConstraint,
+    AddField,
+    AddIndex,
+    AlterField,
+    AlterModelOptions,
+    AlterModelTable,
+    AlterModelTableComment,
+    CreateModel,
+    DeleteModel,
+    RemoveConstraint,
+    RemoveField,
+    RemoveIndex,
+    RenameField,
+    RenameIndex,
+    RenameModel,
+    RunPython,
+    RunSQL,
+    SeparateDatabaseAndState,
+)
+
+__all__ = [
+    "Migration",
+    "settings_dependency",
+    "CreateModel",
+    "DeleteModel",
+    "AlterModelTable",
+    "AlterModelTableComment",
+    "RenameModel",
+    "AlterModelOptions",
+    "AddIndex",
+    "RemoveIndex",
+    "RenameIndex",
+    "AddField",
+    "RemoveField",
+    "AlterField",
+    "RenameField",
+    "AddConstraint",
+    "RemoveConstraint",
+    "SeparateDatabaseAndState",
+    "RunSQL",
+    "RunPython",
+]
