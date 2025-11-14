@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-flags@0.30.0) (2025-11-13)
+
+### What's changed
+
+- Model `query` attributes now use `ClassVar` type annotations for better type checker support ([c3b00a6](https://github.com/dropseed/plain/commit/c3b00a693c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.29.0](https://github.com/dropseed/plain/releases/plain-flags@0.29.0) (2025-11-13)
 
 ### What's changed
