@@ -1,10 +1,10 @@
 import datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.auth import get_user_model
 from plain.exceptions import ValidationError
-from plain.models import transaction
+from plain.models import transaction, types
 from plain.models.db import IntegrityError
 from plain.runtime import SettingsReference
 from plain.utils import timezone
@@ -17,26 +17,30 @@ if TYPE_CHECKING:
 
 @models.register_model
 class OAuthConnection(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
+    updated_at: datetime.datetime = types.DateTimeField(auto_now=True)
 
-    user = models.ForeignKey(
+    user = types.ForeignKey(
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.CASCADE,
         related_name="oauth_connections",
     )
 
     # The key used to refer to this provider type (in settings)
-    provider_key = models.CharField(max_length=100)
+    provider_key: str = types.CharField(max_length=100)
 
     # The unique ID of the user on the provider's system
-    provider_user_id = models.CharField(max_length=100)
+    provider_user_id: str = types.CharField(max_length=100)
 
     # Token data
-    access_token = models.CharField(max_length=2000)
-    refresh_token = models.CharField(max_length=2000, required=False)
-    access_token_expires_at = models.DateTimeField(required=False, allow_null=True)
-    refresh_token_expires_at = models.DateTimeField(required=False, allow_null=True)
+    access_token: str = types.CharField(max_length=2000)
+    refresh_token: str = types.CharField(max_length=2000, required=False)
+    access_token_expires_at: datetime.datetime | None = types.DateTimeField(
+        required=False, allow_null=True
+    )
+    refresh_token_expires_at: datetime.datetime | None = types.DateTimeField(
+        required=False, allow_null=True
+    )
 
     model_options = models.Options(
         constraints=[
@@ -58,12 +62,8 @@ class OAuthConnection(models.Model):
         oauth_token = OAuthToken(
             access_token=self.access_token,
             refresh_token=self.refresh_token,
-            access_token_expires_at=cast(
-                datetime.datetime | None, self.access_token_expires_at
-            ),
-            refresh_token_expires_at=cast(
-                datetime.datetime | None, self.refresh_token_expires_at
-            ),
+            access_token_expires_at=self.access_token_expires_at,
+            refresh_token_expires_at=self.refresh_token_expires_at,
         )
         refreshed_oauth_token = provider_instance.refresh_oauth_token(
             oauth_token=oauth_token

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from typing import cast
 
 import click
 
@@ -367,8 +365,8 @@ def format_trace_output(trace: Trace) -> str:
 
     # Trace details with aligned labels
     label_width = 12
-    start_time = cast(datetime, trace.start_time)
-    end_time = cast(datetime, trace.end_time)
+    start_time = trace.start_time
+    end_time = trace.end_time
     output_lines.append(
         click.style(
             f"{'Trace:':<{label_width}} {trace.trace_id}", fg="bright_blue", bold=True

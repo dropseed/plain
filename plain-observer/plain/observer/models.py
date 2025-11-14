@@ -32,6 +32,7 @@ from opentelemetry.semconv.attributes.code_attributes import (
 from opentelemetry.trace import format_trace_id
 
 from plain import models
+from plain.models import types
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.utils import timezone
@@ -39,23 +40,25 @@ from plain.utils import timezone
 
 @models.register_model
 class Trace(models.Model):
-    trace_id = models.CharField(max_length=255)
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
+    trace_id: str = types.CharField(max_length=255)
+    start_time: datetime = types.DateTimeField()
+    end_time: datetime = types.DateTimeField()
 
-    root_span_name = models.TextField(default="", required=False)
-    summary = models.CharField(max_length=255, default="", required=False)
+    root_span_name: str = types.TextField(default="", required=False)
+    summary: str = types.CharField(max_length=255, default="", required=False)
 
     # Plain fields
-    request_id = models.CharField(max_length=255, default="", required=False)
-    session_id = models.CharField(max_length=255, default="", required=False)
-    user_id = models.CharField(max_length=255, default="", required=False)
-    app_name = models.CharField(max_length=255, default="", required=False)
-    app_version = models.CharField(max_length=255, default="", required=False)
+    request_id: str = types.CharField(max_length=255, default="", required=False)
+    session_id: str = types.CharField(max_length=255, default="", required=False)
+    user_id: str = types.CharField(max_length=255, default="", required=False)
+    app_name: str = types.CharField(max_length=255, default="", required=False)
+    app_version: str = types.CharField(max_length=255, default="", required=False)
 
     # Shareable URL fields
-    share_id = models.CharField(max_length=32, default="", required=False)
-    share_created_at = models.DateTimeField(allow_null=True, required=False)
+    share_id: str = types.CharField(max_length=32, default="", required=False)
+    share_created_at: datetime | None = types.DateTimeField(
+        allow_null=True, required=False
+    )
 
     if TYPE_CHECKING:
         from plain.models.fields.related_managers import BaseRelatedManager
@@ -318,17 +321,19 @@ class SpanQuerySet(models.QuerySet["Span"]):
 
 @models.register_model
 class Span(models.Model):
-    trace = models.ForeignKey(Trace, on_delete=models.CASCADE, related_name="spans")
+    trace: Trace = types.ForeignKey(
+        Trace, on_delete=models.CASCADE, related_name="spans"
+    )
 
-    span_id = models.CharField(max_length=255)
+    span_id: str = types.CharField(max_length=255)
 
-    name = models.CharField(max_length=255)
-    kind = models.CharField(max_length=50)
-    parent_id = models.CharField(max_length=255, default="", required=False)
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
-    status = models.CharField(max_length=50, default="", required=False)
-    span_data = models.JSONField(default=dict, required=False)
+    name: str = types.CharField(max_length=255)
+    kind: str = types.CharField(max_length=50)
+    parent_id: str = types.CharField(max_length=255, default="", required=False)
+    start_time: datetime = types.DateTimeField()
+    end_time: datetime = types.DateTimeField()
+    status: str = types.CharField(max_length=50, default="", required=False)
+    span_data: dict = types.JSONField(default=dict, required=False)
 
     query = SpanQuerySet()
 
@@ -503,8 +508,10 @@ class Span(models.Model):
 
 @models.register_model
 class Log(models.Model):
-    trace = models.ForeignKey(Trace, on_delete=models.CASCADE, related_name="logs")
-    span = models.ForeignKey(
+    trace: Trace = types.ForeignKey(
+        Trace, on_delete=models.CASCADE, related_name="logs"
+    )
+    span: Span | None = types.ForeignKey(
         Span,
         on_delete=models.SET_NULL,
         allow_null=True,
@@ -512,9 +519,9 @@ class Log(models.Model):
         related_name="logs",
     )
 
-    timestamp = models.DateTimeField()
-    level = models.CharField(max_length=20)
-    message = models.TextField()
+    timestamp: datetime = types.DateTimeField()
+    level: str = types.CharField(max_length=20)
+    message: str = types.TextField()
 
     model_options = models.Options(
         ordering=["timestamp"],

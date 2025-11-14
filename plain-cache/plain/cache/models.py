@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Self
+from datetime import datetime
+from typing import Any, Self
 
 from plain import models
+from plain.models import types
 from plain.utils import timezone
 
 
@@ -19,11 +21,11 @@ class CachedItemQuerySet(models.QuerySet["CachedItem"]):
 
 @models.register_model
 class CachedItem(models.Model):
-    key = models.CharField(max_length=255)
-    value = models.JSONField(required=False, allow_null=True)
-    expires_at = models.DateTimeField(required=False, allow_null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    key: str = types.CharField(max_length=255)
+    value: Any = types.JSONField(required=False, allow_null=True)
+    expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
+    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    updated_at: datetime = types.DateTimeField(auto_now=True)
 
     query = CachedItemQuerySet()
 

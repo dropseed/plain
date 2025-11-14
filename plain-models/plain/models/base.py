@@ -4,7 +4,7 @@ import copy
 import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import chain
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, dataclass_transform
 
 if TYPE_CHECKING:
     from plain.models.meta import Meta
@@ -48,6 +48,7 @@ class Deferred:
 DEFERRED = Deferred()
 
 
+@dataclass_transform(kw_only_default=True)
 class ModelBase(type):
     """Metaclass for all models."""
 

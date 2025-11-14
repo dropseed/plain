@@ -1,7 +1,8 @@
 from plain import models
+from plain.models import types
 
 
 @models.register_model
 class User(models.Model):
-    username = models.CharField(max_length=255)
-    is_admin = models.BooleanField(default=False)
+    username: str = types.CharField(max_length=255)
+    is_admin: bool = types.BooleanField(default=False)

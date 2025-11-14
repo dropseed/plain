@@ -1,10 +1,11 @@
 from plain import models
+from plain.models import types
 
 
 @models.register_model
 class User(models.Model):
-    email = models.EmailField()
-    username = models.CharField(max_length=100)
+    email: str = types.EmailField()
+    username: str = types.CharField(max_length=100)
 
     model_options = models.Options(
         constraints=[

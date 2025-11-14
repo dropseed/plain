@@ -41,6 +41,7 @@ from .indexes import Index
 from .options import Options
 from .query import QuerySet
 from .query_utils import Q
+from . import types
 
 # This module exports the user-facing API for defining model classes,
 # with a secondary focus on the most common query utilities like Q.
@@ -104,4 +105,6 @@ __all__ = [
     # From registry
     "register_model",
     "models_registry",
+    # Typed field imports
+    "types",
 ]

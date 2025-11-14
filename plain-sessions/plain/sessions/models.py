@@ -1,12 +1,15 @@
+from datetime import datetime
+
 from plain import models
+from plain.models import types
 
 
 @models.register_model
 class Session(models.Model):
-    session_key = models.CharField(max_length=40)
-    session_data = models.JSONField(default=dict, required=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(allow_null=True)
+    session_key: str = types.CharField(max_length=40)
+    session_data: dict = types.JSONField(default=dict, required=False)
+    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    expires_at: datetime | None = types.DateTimeField(allow_null=True)
 
     model_options = models.Options(
         indexes=[
