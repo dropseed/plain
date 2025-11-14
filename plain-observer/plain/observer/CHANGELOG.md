@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-observer@0.18.0) (2025-11-13)
+
+### What's changed
+
+- QuerySet type annotations now use `ClassVar` for improved type checking and IDE support ([c3b00a6](https://github.com/dropseed/plain/commit/c3b00a693c5869ce4861ea1eb5b953ccd1a77ef8))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-observer@0.17.0) (2025-11-13)
 
 ### What's changed
