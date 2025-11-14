@@ -16,8 +16,14 @@ from collections.abc import Callable, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from json import JSONDecoder, JSONEncoder
-from typing import Any, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, overload
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from plain.models.fields.related_managers import (
+        ReverseManyToManyManager,
+        ReverseManyToOneManager,
+    )
 
 # TypeVar for generic ForeignKey/ManyToManyField support
 _T = TypeVar("_T")
@@ -644,7 +650,6 @@ def ForeignKey(
     to: type[_T],
     on_delete: Any,
     *,
-    related_name: str | None = None,
     related_query_name: str | None = None,
     limit_choices_to: Any = None,
     db_index: bool = True,
@@ -664,7 +669,6 @@ def ForeignKey(
     to: type[_T],
     on_delete: Any,
     *,
-    related_name: str | None = None,
     related_query_name: str | None = None,
     limit_choices_to: Any = None,
     db_index: bool = True,
@@ -684,7 +688,6 @@ def ManyToManyField(
     *,
     through: Any,
     through_fields: tuple[str, str] | None = None,
-    related_name: str | None = None,
     related_query_name: str | None = None,
     limit_choices_to: Any = None,
     symmetrical: bool | None = None,
@@ -698,3 +701,50 @@ def ManyToManyField(
     error_messages: dict[str, str] | None = None,
     db_comment: str | None = None,
 ) -> Any: ...
+
+# Reverse relation descriptors
+class ReverseForeignKey(Generic[_T]):
+    """
+    Type stub for ReverseForeignKey descriptor.
+
+    Declares an explicit reverse relation from a parent model to its children.
+    Returns a ReverseManyToOneManager when accessed on an instance.
+    """
+
+    def __init__(
+        self,
+        *,
+        to: type[_T] | str,
+        field: str,
+    ) -> None: ...
+
+    # Class access returns the descriptor itself
+    @overload
+    def __get__(self, instance: None, owner: type) -> ReverseForeignKey[_T]: ...
+
+    # Instance access returns the manager
+    @overload
+    def __get__(self, instance: Any, owner: type) -> ReverseManyToOneManager[_T]: ...
+
+class ReverseManyToMany(Generic[_T]):
+    """
+    Type stub for ReverseManyToMany descriptor.
+
+    Declares an explicit reverse relation from a related model back through a ManyToManyField.
+    Returns a ReverseManyToManyManager when accessed on an instance.
+    """
+
+    def __init__(
+        self,
+        *,
+        to: type[_T] | str,
+        field: str,
+    ) -> None: ...
+
+    # Class access returns the descriptor itself
+    @overload
+    def __get__(self, instance: None, owner: type) -> ReverseManyToMany[_T]: ...
+
+    # Instance access returns the manager
+    @overload
+    def __get__(self, instance: Any, owner: type) -> ReverseManyToManyManager[_T]: ...

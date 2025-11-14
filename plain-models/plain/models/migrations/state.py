@@ -43,7 +43,7 @@ def _get_related_models(m: type[models.Model]) -> list[type[models.Model]]:
         if issubclass(subclass, models.Model)
     ]
     related_fields_models = set()
-    for f in m._model_meta.get_fields(include_hidden=True):
+    for f in m._model_meta.get_fields(include_reverse=True):
         if (
             f.is_relation  # type: ignore[attr-defined]
             and f.related_model is not None  # type: ignore[attr-defined]

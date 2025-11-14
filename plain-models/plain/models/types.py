@@ -43,6 +43,8 @@ from plain.models.fields import (
 )
 from plain.models.fields.json import JSONField
 from plain.models.fields.related import ForeignKey, ManyToManyField
+from plain.models.fields.reverse_foreign_key import ReverseForeignKey
+from plain.models.fields.reverse_many_to_many import ReverseManyToMany
 
 __all__ = [
     "BigIntegerField",
@@ -60,6 +62,8 @@ __all__ = [
     "IntegerField",
     "JSONField",
     "ManyToManyField",
+    "ReverseForeignKey",
+    "ReverseManyToMany",
     "PositiveBigIntegerField",
     "PositiveIntegerField",
     "PositiveSmallIntegerField",

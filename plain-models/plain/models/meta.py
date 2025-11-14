@@ -54,7 +54,6 @@ class Meta:
     _get_fields_cache: dict[Any, Any]
     local_fields: list[Field]
     local_many_to_many: list[Field]
-    related_fkey_lookups: list[Any]
 
     def __init__(self, models_registry: Any | None = None):
         """
@@ -104,7 +103,6 @@ class Meta:
         instance._get_fields_cache = {}
         instance.local_fields = []
         instance.local_many_to_many = []
-        instance.related_fkey_lookups = []
 
         # Cache the instance BEFORE processing fields to prevent recursion
         self._cache[model] = instance
@@ -279,16 +277,10 @@ class Meta:
         combined with filtering of field properties is the public API for
         obtaining this field list.
         """
-        all_related_fields = self._get_fields(
-            forward=False, reverse=True, include_hidden=True
-        )
+        all_related_fields = self._get_fields(forward=False, reverse=True)
         return make_immutable_fields_list(
             "related_objects",
-            (
-                obj
-                for obj in all_related_fields
-                if not obj.hidden or obj.field.many_to_many
-            ),
+            (obj for obj in all_related_fields if obj.many_to_many or obj.one_to_many),
         )
 
     @cached_property
@@ -309,7 +301,7 @@ class Meta:
     @cached_property
     def fields_map(self) -> dict[str, Any]:
         res = {}
-        fields = self._get_fields(forward=False, include_hidden=True)
+        fields = self._get_fields(forward=False, reverse=True)
         for field in fields:
             res[field.name] = field
             # Due to the way Plain's internals work, get_field() should also
@@ -398,29 +390,36 @@ class Meta:
                     delattr(self, cache_key)
         self._get_fields_cache = {}
 
-    def get_fields(self, include_hidden: bool = False) -> ImmutableList:
+    def get_fields(self, include_reverse: bool = False) -> ImmutableList:
         """
-        Return a list of fields associated to the model. By default, include
-        forward and reverse fields, fields derived from inheritance, but not
-        hidden fields. The returned fields can be changed using the parameters:
+        Return a list of fields associated to the model.
 
-        - include_hidden:  include fields that have a related_name that
-                           starts with a "+"
+        By default, returns only forward fields (fields explicitly defined on
+        this model). Set include_reverse=True to also include reverse relations
+        (fields from other models that point to this model).
+
+        Args:
+            include_reverse: Include reverse relation fields (fields from other
+                           models pointing to this model). Needed for framework
+                           operations like migrations and deletion cascading.
         """
-        return self._get_fields(include_hidden=include_hidden)
+        return self._get_fields(reverse=include_reverse)
 
     def _get_fields(
         self,
+        *,
         forward: bool = True,
         reverse: bool = True,
-        include_hidden: bool = False,
         seen_models: set[type[Any]] | None = None,
     ) -> ImmutableList:
         """
         Internal helper function to return fields of the model.
-        * If forward=True, then fields defined on this model are returned.
-        * If reverse=True, then relations pointing to this model are returned.
-        * If include_hidden=True, then fields with is_hidden=True are returned.
+
+        Args:
+            forward: If True, fields defined on this model are returned.
+            reverse: If True, reverse relations (fields from other models
+                    pointing to this model) are returned.
+            seen_models: Track visited models to prevent duplicates in recursion.
         """
 
         # This helper function is used to allow recursion in ``get_fields()``
@@ -435,7 +434,7 @@ class Meta:
         seen_models.add(self.model)
 
         # Creates a cache key composed of all arguments
-        cache_key = (forward, reverse, include_hidden, topmost_call)
+        cache_key = (forward, reverse, topmost_call)
 
         try:
             # In order to avoid list manipulation. Always return a shallow copy
@@ -448,14 +447,11 @@ class Meta:
 
         if reverse:
             # Tree is computed once and cached until the app cache is expired.
-            # It is composed of a list of fields pointing to the current model
-            # from other models.
+            # It is composed of a list of fields from other models pointing to
+            # the current model (reverse relations).
             all_fields = self._relation_tree
             for field in all_fields:
-                # If hidden fields should be included or the relation is not
-                # intentionally hidden, add to the fields dict.
-                if include_hidden or not field.remote_field.hidden:
-                    fields.append(field.remote_field)
+                fields.append(field.remote_field)
 
         if forward:
             fields += self.local_fields

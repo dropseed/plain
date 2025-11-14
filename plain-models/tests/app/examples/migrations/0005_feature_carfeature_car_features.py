@@ -40,7 +40,6 @@ class Migration(migrations.Migration):
             model_name="car",
             name="features",
             field=models.ManyToManyField(
-                related_name="cars",
                 through="examples.CarFeature",
                 to="examples.feature",
             ),

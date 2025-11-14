@@ -25,7 +25,6 @@ class OAuthConnection(models.Model):
     user = types.ForeignKey(
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.CASCADE,
-        related_name="oauth_connections",
     )
 
     # The key used to refer to this provider type (in settings)

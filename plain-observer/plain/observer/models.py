@@ -60,11 +60,13 @@ class Trace(models.Model):
         allow_null=True, required=False
     )
 
-    if TYPE_CHECKING:
-        from plain.models.fields.related_managers import BaseRelatedManager
-
-        spans: BaseRelatedManager
-        logs: BaseRelatedManager
+    # Explicit reverse relations
+    spans: types.ReverseForeignKey[Span] = types.ReverseForeignKey(
+        to="Span", field="trace"
+    )
+    logs: types.ReverseForeignKey[Log] = types.ReverseForeignKey(
+        to="Log", field="trace"
+    )
 
     query: ClassVar[models.QuerySet[Trace]] = models.QuerySet()
 
@@ -238,7 +240,7 @@ class Trace(models.Model):
         """Get chronological list of spans and logs for unified timeline display."""
         events: list[dict[str, Any]] = []
 
-        for span in self.spans.query.all().annotate_spans():  # type: ignore[attr-defined]
+        for span in self.spans.query.all().annotate_spans():
             events.append(
                 {
                     "type": "span",
@@ -323,9 +325,7 @@ class SpanQuerySet(models.QuerySet["Span"]):
 
 @models.register_model
 class Span(models.Model):
-    trace: Trace = types.ForeignKey(
-        Trace, on_delete=models.CASCADE, related_name="spans"
-    )
+    trace: Trace = types.ForeignKey(Trace, on_delete=models.CASCADE)
 
     span_id: str = types.CharField(max_length=255)
 
@@ -336,6 +336,9 @@ class Span(models.Model):
     end_time: datetime = types.DateTimeField()
     status: str = types.CharField(max_length=50, default="", required=False)
     span_data: dict = types.JSONField(default=dict, required=False)
+
+    # Explicit reverse relation
+    logs: types.ReverseForeignKey[Log] = types.ReverseForeignKey(to="Log", field="span")
 
     query: ClassVar[SpanQuerySet] = SpanQuerySet()
 
@@ -510,15 +513,12 @@ class Span(models.Model):
 
 @models.register_model
 class Log(models.Model):
-    trace: Trace = types.ForeignKey(
-        Trace, on_delete=models.CASCADE, related_name="logs"
-    )
+    trace: Trace = types.ForeignKey(Trace, on_delete=models.CASCADE)
     span: Span | None = types.ForeignKey(
         Span,
         on_delete=models.SET_NULL,
         allow_null=True,
         required=False,
-        related_name="logs",
     )
 
     timestamp: datetime = types.DateTimeField()

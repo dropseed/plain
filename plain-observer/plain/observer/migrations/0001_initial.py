@@ -67,7 +67,6 @@ class Migration(migrations.Migration):
             name="trace",
             field=models.ForeignKey(
                 on_delete=plain.models.deletion.CASCADE,
-                related_name="spans",
                 to="plainobserver.trace",
             ),
         ),

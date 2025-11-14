@@ -95,7 +95,7 @@ def get_candidate_relations_to_delete(meta: Meta) -> Generator[Any, None, None]:
     # N-N  (i.e., many-to-many) relations aren't candidates for deletion.
     return (
         f
-        for f in meta.get_fields(include_hidden=True)
+        for f in meta.get_fields(include_reverse=True)
         if f.auto_created and not f.concrete and f.one_to_many
     )
 

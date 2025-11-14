@@ -1,11 +1,25 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
+
 from plain import models
 from plain.models import types
+
+if TYPE_CHECKING:
+    from plain.oauth.models import OAuthConnection
 
 
 @models.register_model
 class User(models.Model):
     email: str = types.EmailField()
     username: str = types.CharField(max_length=100)
+
+    # Explicit reverse relation for OAuth connections
+    oauth_connections: types.ReverseForeignKey[OAuthConnection] = (
+        types.ReverseForeignKey(to="plainoauth.OAuthConnection", field="user")
+    )
+
+    query: ClassVar[models.QuerySet[User]] = models.QuerySet()
 
     model_options = models.Options(
         constraints=[
@@ -14,5 +28,5 @@ class User(models.Model):
         ],
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.username

@@ -60,7 +60,6 @@ def _all_related_fields(model: type[Model]) -> list[Any]:
         model._model_meta._get_fields(
             forward=False,
             reverse=True,
-            include_hidden=True,
         ),
         key=operator.attrgetter("name"),
     )

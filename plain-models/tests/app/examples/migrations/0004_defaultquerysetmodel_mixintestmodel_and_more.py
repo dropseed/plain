@@ -52,7 +52,6 @@ class Migration(migrations.Migration):
             name="parent",
             field=models.ForeignKey(
                 on_delete=plain.models.deletion.CASCADE,
-                related_name="childcascade_set",
                 to="examples.deleteparent",
             ),
         ),

@@ -36,7 +36,6 @@ class Migration(migrations.Migration):
                     "user",
                     models.ForeignKey(
                         on_delete=plain.models.deletion.CASCADE,
-                        related_name="oauth_connections",
                         to="users.user",
                     ),
                 ),

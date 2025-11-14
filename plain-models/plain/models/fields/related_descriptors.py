@@ -1,9 +1,9 @@
 """
 Accessors for related objects.
 
-When a field defines a relation between two models, each model class provides
-an attribute to access related instances of the other model class (unless the
-reverse accessor has been disabled with related_name='+').
+When a field defines a relation between two models, the forward model provides
+an attribute to access related instances. Reverse accessors must be explicitly
+defined using ReverseForeignKey or ReverseManyToMany descriptors.
 
 Accessors are implemented as descriptors in order to customize access and
 assignment. This module defines the descriptor classes.
@@ -12,10 +12,10 @@ Forward accessors follow foreign keys. Reverse accessors trace them back. For
 example, with the following models::
 
     class Parent(Model):
-        pass
+        children: ReverseForeignKey[Child] = ReverseForeignKey(to="Child", field="parent")
 
     class Child(Model):
-        parent = ForeignKey(Parent, related_name='children')
+        parent: Parent = ForeignKey(Parent, on_delete=models.CASCADE)
 
  ``child.parent`` is a forward many-to-one relation. ``parent.children`` is a
 reverse many-to-one relation.
@@ -28,22 +28,15 @@ reverse many-to-one relation.
    the descriptor is concerned. The constraint is checked upstream (unicity
    validation in forms) or downstream (unique indexes in the database).
 
-2. Related objects manager for related instances on the reverse side of a
-   many-to-one relation: ``ReverseManyToOneDescriptor``.
-
-   Unlike the previous two classes, this one provides access to a collection
-   of objects. It returns a manager rather than an instance.
-
-3. Related objects manager for related instances on the forward or reverse
-   sides of a many-to-many relation: ``ManyToManyDescriptor``.
+2. Related objects manager for related instances on the forward or reverse
+   sides of a many-to-many relation: ``ForwardManyToManyDescriptor``.
 
    Many-to-many relations are symmetrical. The syntax of Plain models
    requires declaring them on one side but that's an implementation detail.
    They could be declared on the other side without any change in behavior.
-   Therefore the forward and reverse descriptors can be the same.
 
-   If you're looking for ``ForwardManyToManyDescriptor`` or
-   ``ReverseManyToManyDescriptor``, use ``ManyToManyDescriptor`` instead.
+Reverse relations must be explicitly defined using ``ReverseForeignKey`` or
+``ReverseManyToMany`` descriptors on the model class.
 """
 
 from __future__ import annotations
@@ -55,11 +48,7 @@ from typing import Any
 from plain.models.query import QuerySet
 from plain.utils.functional import LazyObject
 
-from .related_managers import (
-    ForwardManyToManyManager,
-    ReverseManyToManyManager,
-    ReverseManyToOneManager,
-)
+from .related_managers import ForwardManyToManyManager
 
 
 class ForwardManyToOneDescriptor:
@@ -69,7 +58,7 @@ class ForwardManyToOneDescriptor:
     In the example::
 
         class Child(Model):
-            parent = ForeignKey(Parent, related_name='children')
+            parent: Parent = ForeignKey(Parent, on_delete=models.CASCADE)
 
     ``Child.parent`` is a ``ForwardManyToOneDescriptor`` instance.
     """
@@ -111,12 +100,11 @@ class ForwardManyToOneDescriptor:
         remote_field = self.field.remote_field
 
         # FIXME: This will need to be revisited when we introduce support for
-        # composite fields. In the meantime we take this practical approach to
-        # solve a regression on 1.6 when the reverse manager in hidden
-        # (related_name ends with a '+'). Refs #21410.
+        # composite fields. In the meantime we take this practical approach.
+        # Refs #21410.
         # The check for len(...) == 1 is a special case that allows the query
         # to be join-less and smaller. Refs #21760.
-        if remote_field.is_hidden() or len(self.field.foreign_related_fields) == 1:
+        if len(self.field.foreign_related_fields) == 1:
             query = {
                 f"{related_field.name}__in": {
                     instance_attr(inst)[0] for inst in instances
@@ -301,32 +289,6 @@ class RelationDescriptorBase(ABC):
         )
 
 
-class ReverseManyToOneDescriptor(RelationDescriptorBase):
-    """
-    Accessor to the related objects manager on the reverse side of a
-    many-to-one relation.
-
-    In the example::
-
-        class Child(Model):
-            parent = ForeignKey(Parent, related_name='children')
-
-    ``Parent.children`` is a ``ReverseManyToOneDescriptor`` instance.
-
-    Most of the implementation is delegated to the ReverseManyToOneManager class.
-    """
-
-    def get_related_manager(self, instance: Any) -> ReverseManyToOneManager:
-        """Return the ReverseManyToOneManager for this relation."""
-        return ReverseManyToOneManager(instance, self.rel)
-
-    def _get_set_deprecation_msg_params(self) -> tuple[str, str]:
-        return (
-            "reverse side of a related set",
-            self.rel.get_accessor_name(),
-        )
-
-
 class ForwardManyToManyDescriptor(RelationDescriptorBase):
     """
     Accessor to the related objects manager on the forward side of a
@@ -335,7 +297,7 @@ class ForwardManyToManyDescriptor(RelationDescriptorBase):
     In the example::
 
         class Pizza(Model):
-            toppings = ManyToManyField(Topping, related_name='pizzas')
+            toppings: ManyToManyField[Topping] = ManyToManyField(Topping, through=PizzaTopping)
 
     ``Pizza.toppings`` is a ``ForwardManyToManyDescriptor`` instance.
     """
@@ -355,35 +317,4 @@ class ForwardManyToManyDescriptor(RelationDescriptorBase):
         return (
             "forward side of a many-to-many set",
             self.field.name,
-        )
-
-
-class ReverseManyToManyDescriptor(RelationDescriptorBase):
-    """
-    Accessor to the related objects manager on the reverse side of a
-    many-to-many relation.
-
-    In the example::
-
-        class Pizza(Model):
-            toppings = ManyToManyField(Topping, related_name='pizzas')
-
-    ``Topping.pizzas`` is a ``ReverseManyToManyDescriptor`` instance.
-    """
-
-    @property
-    def through(self) -> Any:
-        # through is provided so that you have easy access to the through
-        # model (Book.authors.through) for inlines, etc. This is done as
-        # a property to ensure that the fully resolved value is returned.
-        return self.rel.through
-
-    def get_related_manager(self, instance: Any) -> ReverseManyToManyManager:
-        """Return the ReverseManyToManyManager for this relation."""
-        return ReverseManyToManyManager(instance, self.rel)
-
-    def _get_set_deprecation_msg_params(self) -> tuple[str, str]:
-        return (
-            "reverse side of a many-to-many set",
-            self.rel.get_accessor_name(),
         )

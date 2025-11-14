@@ -18,8 +18,6 @@ from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForwardManyToManyDescriptor,
     ForwardManyToOneDescriptor,
-    ReverseManyToManyDescriptor,
-    ReverseManyToOneDescriptor,
 )
 from .related_lookups import (
     RelatedExact,
@@ -106,12 +104,10 @@ class RelatedField(FieldCacheMixin, Field):
     def __init__(
         self,
         *,
-        related_name: str | None = None,
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         **kwargs: Any,
     ):
-        self._related_name = related_name
         self._related_query_name = related_query_name
         self._limit_choices_to = limit_choices_to
         super().__init__(**kwargs)  # type: ignore[misc]
@@ -125,34 +121,14 @@ class RelatedField(FieldCacheMixin, Field):
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:  # type: ignore[misc]
         return [
             *super().preflight(**kwargs),  # type: ignore[misc]
-            *self._check_related_name_is_valid(),
             *self._check_related_query_name_is_valid(),
             *self._check_relation_model_exists(),
             *self._check_clashes(),
         ]
 
-    def _check_related_name_is_valid(self) -> list[PreflightResult]:
-        import keyword
-
-        related_name = self.remote_field.related_name  # type: ignore[attr-defined]
-        if related_name is None:
-            return []
-        is_valid_id = (
-            not keyword.iskeyword(related_name) and related_name.isidentifier()
-        )
-        if not is_valid_id:
-            return [
-                PreflightResult(
-                    fix=f"The name '{self.remote_field.related_name}' is invalid related_name for field {self.model.model_options.object_name}.{self.name}. Related name must be a valid Python identifier.",
-                    obj=self,
-                    id="fields.invalid_related_name",
-                )
-            ]
-        return []
-
     def _check_related_query_name_is_valid(self) -> list[PreflightResult]:
-        if self.remote_field.is_hidden():  # type: ignore[attr-defined]
-            return []
+        # Always validate related_query_name since it's still used for ORM queries
+        # (e.g., User.query.filter(articles__title="..."))
         rel_query_name = self.related_query_name()
         errors: list[PreflightResult] = []
         if rel_query_name.endswith("_"):
@@ -160,8 +136,7 @@ class RelatedField(FieldCacheMixin, Field):
                 PreflightResult(
                     fix=(
                         f"Reverse query name '{rel_query_name}' must not end with an underscore. "
-                        "Add or change a related_name or related_query_name "
-                        "argument for this field."
+                        "Use a different related_query_name."
                     ),
                     obj=self,
                     id="fields.related_field_accessor_clash",
@@ -172,8 +147,7 @@ class RelatedField(FieldCacheMixin, Field):
                 PreflightResult(
                     fix=(
                         f"Reverse query name '{rel_query_name}' must not contain '{LOOKUP_SEP}'. "
-                        "Add or change a related_name or related_query_name "
-                        "argument for this field."
+                        "Use a different related_query_name."
                     ),
                     obj=self,
                     id="fields.related_field_query_name_clash",
@@ -229,85 +203,25 @@ class RelatedField(FieldCacheMixin, Field):
         # rel_options.object_name == "Target"
         rel_meta = self.remote_field.model._model_meta
         rel_options = self.remote_field.model.model_options
-        # If the field doesn't install a backward relation on the target model
-        # (so `is_hidden` returns True), then there are no clashes to check
-        # and we can skip these fields.
-        rel_is_hidden = self.remote_field.is_hidden()  # type: ignore[attr-defined]
-        rel_name = (
-            self.remote_field.get_accessor_name()
-        )  # i. e. "model_set"  # type: ignore[attr-defined]
         rel_query_name = self.related_query_name()  # i. e. "model"
         # i.e. "package_label.Model.field".
         field_name = f"{self.model.model_options.label}.{self.name}"
 
-        # Check clashes between accessor or reverse query name of `field`
-        # and any other field name -- i.e. accessor for Model.foreign is
-        # model_set and it clashes with Target.model_set.
+        # Check clashes between reverse query name of `field`
+        # and any other field name.
         potential_clashes = rel_meta.fields + rel_meta.many_to_many
         for clash_field in potential_clashes:
             # i.e. "package_label.Target.model_set".
             clash_name = f"{rel_options.label}.{clash_field.name}"
-            if not rel_is_hidden and clash_field.name == rel_name:
-                errors.append(
-                    PreflightResult(
-                        fix=(
-                            f"Reverse accessor '{rel_options.object_name}.{rel_name}' "
-                            f"for '{field_name}' clashes with field name "
-                            f"'{clash_name}'. "
-                            f"Rename field '{clash_name}', or add/change a related_name "
-                            f"argument to the definition for field '{field_name}'."
-                        ),
-                        obj=self,
-                        id="fields.related_accessor_clash_field",
-                    )
-                )
-
             if clash_field.name == rel_query_name:
                 errors.append(
                     PreflightResult(
                         fix=(
                             f"Reverse query name for '{field_name}' clashes with field name '{clash_name}'. "
-                            f"Rename field '{clash_name}', or add/change a related_name "
-                            f"argument to the definition for field '{field_name}'."
+                            f"Rename field '{clash_name}' or use a different related_query_name."
                         ),
                         obj=self,
                         id="fields.related_accessor_clash_manager",
-                    )
-                )
-
-        # Check clashes between accessors/reverse query names of `field` and
-        # any other field accessor -- i. e. Model.foreign accessor clashes with
-        # Model.m2m accessor.
-        potential_clashes = (r for r in rel_meta.related_objects if r.field is not self)
-        for clash_field in potential_clashes:
-            # i.e. "package_label.Model.m2m".
-            clash_name = f"{clash_field.related_model.model_options.label}.{clash_field.field.name}"
-            if not rel_is_hidden and clash_field.get_accessor_name() == rel_name:
-                errors.append(
-                    PreflightResult(
-                        fix=(
-                            f"Reverse accessor '{rel_options.object_name}.{rel_name}' "
-                            f"for '{field_name}' clashes with reverse accessor for "
-                            f"'{clash_name}'. "
-                            "Add or change a related_name argument "
-                            f"to the definition for '{field_name}' or '{clash_name}'."
-                        ),
-                        obj=self,
-                        id="fields.related_name_clash",
-                    )
-                )
-
-            if clash_field.get_accessor_name() == rel_query_name:
-                errors.append(
-                    PreflightResult(
-                        fix=(
-                            f"Reverse query name for '{field_name}' clashes with reverse query name "
-                            f"for '{clash_name}'. "
-                            "Add or change a related_name argument "
-                            f"to the definition for '{field_name}' or '{clash_name}'."
-                        ),
-                        obj=self,
-                        id="fields.related_query_name_clash",
                     )
                 )
 
@@ -322,15 +236,6 @@ class RelatedField(FieldCacheMixin, Field):
         super().contribute_to_class(cls, name)  # type: ignore[misc]
 
         self.meta = cls._model_meta
-
-        if self.remote_field.related_name:  # type: ignore[attr-defined]
-            related_name = self.remote_field.related_name  # type: ignore[attr-defined]
-            related_name %= {
-                "class": cls.__name__.lower(),
-                "model_name": cls.model_options.model_name.lower(),
-                "package_label": cls.model_options.package_label.lower(),
-            }
-            self.remote_field.related_name = related_name  # type: ignore[attr-defined]
 
         if self.remote_field.related_query_name:  # type: ignore[attr-defined]
             related_query_name = self.remote_field.related_query_name % {  # type: ignore[attr-defined]
@@ -356,8 +261,6 @@ class RelatedField(FieldCacheMixin, Field):
         name, path, args, kwargs = super().deconstruct()  # type: ignore[misc]
         if self._limit_choices_to:
             kwargs["limit_choices_to"] = self._limit_choices_to
-        if self._related_name is not None:
-            kwargs["related_name"] = self._related_name
         if self._related_query_name is not None:
             kwargs["related_query_name"] = self._related_query_name
         return name, path, args, kwargs
@@ -397,7 +300,6 @@ class RelatedField(FieldCacheMixin, Field):
 
     def do_related_class(self, other: type[Model], cls: type[Model]) -> None:
         self.set_attributes_from_rel()
-        self.contribute_to_related_class(other, self.remote_field)  # type: ignore[attr-defined]
 
     def get_limit_choices_to(self) -> Any:
         """
@@ -417,7 +319,6 @@ class RelatedField(FieldCacheMixin, Field):
         """
         return (
             self.remote_field.related_query_name  # type: ignore[attr-defined]
-            or self.remote_field.related_name  # type: ignore[attr-defined]
             or self.model.model_options.model_name  # type: ignore[attr-defined]
         )
 
@@ -447,9 +348,7 @@ class ForeignKey(RelatedField):
     ForeignKey targets the primary key (id) of the remote model.
     """
 
-    related_accessor_class = ReverseManyToOneDescriptor
     forward_related_accessor_class = ForwardManyToOneDescriptor
-    rel_class = ManyToOneRel
 
     # Field flags - ForeignKey is many-to-one
     many_to_one = True
@@ -464,7 +363,6 @@ class ForeignKey(RelatedField):
         self,
         to: type[Model] | str,
         on_delete: Any,
-        related_name: str | None = None,
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         db_index: bool = True,
@@ -482,10 +380,9 @@ class ForeignKey(RelatedField):
         if not callable(on_delete):
             raise TypeError("on_delete must be callable.")
 
-        rel = self.rel_class(
+        rel = ManyToOneRel(
             self,
             to,
-            related_name=related_name,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
             on_delete=on_delete,
@@ -493,7 +390,6 @@ class ForeignKey(RelatedField):
 
         super().__init__(
             rel=rel,
-            related_name=related_name,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
             **kwargs,
@@ -625,22 +521,6 @@ class ForeignKey(RelatedField):
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
         super().contribute_to_class(cls, name)
         setattr(cls, self.name, self.forward_related_accessor_class(self))  # type: ignore[attr-defined]
-
-    def contribute_to_related_class(self, cls: type[Model], related: Any) -> None:
-        # Internal FK's - i.e., those with a related name ending with '+'
-        if not self.remote_field.is_hidden():  # type: ignore[attr-defined]
-            setattr(
-                cls,
-                related.get_accessor_name(),
-                self.related_accessor_class(related),  # type: ignore[attr-defined]
-            )
-            # While 'limit_choices_to' might be a callable, simply pass
-            # it along for later - this is too early because it's still
-            # model load time.
-            if self.remote_field.limit_choices_to:  # type: ignore[attr-defined]
-                cls._model_meta.related_fkey_lookups.append(
-                    self.remote_field.limit_choices_to  # type: ignore[attr-defined]
-                )
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:  # type: ignore[misc]
         return [
@@ -826,8 +706,6 @@ class ManyToManyField(RelatedField):
     many_to_one = False
     one_to_many = False
 
-    rel_class = ManyToManyRel
-
     # ManyToManyField uses ManyToManyRel which has through/through_fields
     remote_field: ManyToManyRel
 
@@ -839,7 +717,6 @@ class ManyToManyField(RelatedField):
         *,
         through: type[Model] | str,
         through_fields: tuple[str, str] | None = None,
-        related_name: str | None = None,
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         symmetrical: bool | None = None,
@@ -860,10 +737,9 @@ class ManyToManyField(RelatedField):
         if not through:
             raise ValueError("ManyToManyField must have a 'through' argument.")
 
-        kwargs["rel"] = self.rel_class(
+        kwargs["rel"] = ManyToManyRel(
             self,
             to,
-            related_name=related_name,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
             symmetrical=symmetrical,
@@ -873,7 +749,6 @@ class ManyToManyField(RelatedField):
         self.has_null_arg = "allow_null" in kwargs
 
         super().__init__(
-            related_name=related_name,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
             **kwargs,
@@ -906,19 +781,6 @@ class ManyToManyField(RelatedField):
                     fix="ManyToManyField does not support validators. Remove validators from this field.",
                     obj=self,
                     id="fields.m2m_validators_not_supported",
-                    warning=True,
-                )
-            )
-        if self.remote_field.symmetrical and self._related_name:  # type: ignore[attr-defined]
-            warnings.append(
-                PreflightResult(
-                    fix=(
-                        "The 'related_name' argument has no effect on ManyToManyField "
-                        'with a symmetrical relationship, e.g. to "self". '
-                        "Remove the 'related_name' argument or set symmetrical=False."
-                    ),
-                    obj=self,
-                    id="fields.m2m_related_name_no_effect_symmetrical",
                     warning=True,
                 )
             )
@@ -1310,17 +1172,13 @@ class ManyToManyField(RelatedField):
         # Set up the accessor for the m2m table name for the relation.
         self.m2m_db_table = self._get_m2m_db_table  # type: ignore[method-assign]
 
-    def contribute_to_related_class(self, cls: type[Model], related: Any) -> None:
-        # Internal M2Ms (i.e., those with a related name ending with '+')
-        # don't get a related descriptor.
-        if not self.remote_field.is_hidden():  # type: ignore[attr-defined]
-            setattr(
-                cls,
-                related.get_accessor_name(),
-                ReverseManyToManyDescriptor(self.remote_field),  # type: ignore[attr-defined]
-            )
+    def do_related_class(self, other: type[Model], cls: type[Model]) -> None:
+        """Set up M2M metadata accessors for the through table."""
+        super().do_related_class(other, cls)
 
         # Set up the accessors for the column names on the m2m table.
+        # These are used during query construction and schema operations.
+        related = self.remote_field
         self.m2m_column_name = partial(self._get_m2m_attr, related, "column")  # type: ignore[method-assign]
         self.m2m_reverse_name = partial(self._get_m2m_reverse_attr, related, "column")  # type: ignore[method-assign]
 

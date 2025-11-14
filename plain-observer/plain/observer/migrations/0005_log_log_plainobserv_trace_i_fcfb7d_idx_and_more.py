@@ -24,7 +24,6 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         allow_null=True,
                         on_delete=plain.models.deletion.SET_NULL,
-                        related_name="logs",
                         required=False,
                         to="plainobserver.span",
                     ),
@@ -33,7 +32,6 @@ class Migration(migrations.Migration):
                     "trace",
                     models.ForeignKey(
                         on_delete=plain.models.deletion.CASCADE,
-                        related_name="logs",
                         to="plainobserver.trace",
                     ),
                 ),

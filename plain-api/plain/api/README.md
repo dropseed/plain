@@ -33,7 +33,7 @@ class BaseAPIView(APIView, APIKeyView):
     def use_api_key(self):
         super().use_api_key()
 
-        if user := self.api_key.users.first():
+        if user := User.query.filter(api_key=self.api_key).first():
             set_request_user(self.request, user)
         else:
             raise ResponseException(
@@ -106,11 +106,12 @@ Handling authentication in the API is pretty straightforward. If you use [API ke
 ```python
 class BaseAPIView(APIView, APIKeyView):
     def use_api_key(self):
-        from plain.auth import set_request_user
+        from plain.auth import get_request_user, set_request_user
+        from app.users.models import User
 
         super().use_api_key()
 
-        if user := self.api_key.users.first():
+        if user := User.query.filter(api_key=self.api_key).first():
             set_request_user(self.request, user)
         else:
             raise ResponseException(
@@ -216,7 +217,6 @@ class User(models.Model):
     api_key = models.ForeignKey(
         APIKey,
         on_delete=models.CASCADE,
-        related_name="users",
         allow_null=True,
         required=False,
     )
@@ -246,13 +246,16 @@ To use API keys in your views, you can inherit from `APIKeyView` and customize t
 # app/api/views.py
 from plain.api.views import APIKeyView, APIView
 from plain.auth import set_request_user
+from plain.views.exceptions import ResponseException
+
+from app.users.models import User
 
 
 class BaseAPIView(APIView, APIKeyView):
     def use_api_key(self):
         super().use_api_key()
 
-        if user := self.api_key.users.first():
+        if user := User.query.filter(api_key=self.api_key).first():
             set_request_user(self.request, user)
         else:
             raise ResponseException(

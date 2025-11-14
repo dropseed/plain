@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
 from plain import models
 from plain.models import types
@@ -13,12 +13,10 @@ class Feature(models.Model):
 
     query: ClassVar[models.QuerySet[Feature]] = models.QuerySet()
 
-    # Reverse relations (created by ManyToManyField with related_name)
-    # Declared for type checking purposes (not actual fields)
-    if TYPE_CHECKING:
-        from plain.models.fields.related_managers import ReverseManyToManyManager
-
-        cars: ReverseManyToManyManager[Car] = None  # type: ignore[assignment]
+    # Explicit reverse relation - no more TYPE_CHECKING hacks!
+    cars: types.ReverseManyToMany[Car] = types.ReverseManyToMany(
+        to="Car", field="features"
+    )
 
 
 @models.register_model
@@ -38,7 +36,7 @@ class Car(models.Model):
     make: str = types.CharField(max_length=100)
     model: str = types.CharField(max_length=100)
     features: models.ManyToManyField[Feature] = types.ManyToManyField(
-        Feature, through=CarFeature, related_name="cars"
+        Feature, through=CarFeature
     )
 
     query: ClassVar[models.QuerySet[Car]] = models.QuerySet()
@@ -60,19 +58,15 @@ class DeleteParent(models.Model):
 
     query: ClassVar[models.QuerySet[DeleteParent]] = models.QuerySet()
 
-    # Reverse relations (created by ForeignKey with related_name)
-    # Declared for type checking purposes (not actual fields)
-    if TYPE_CHECKING:
-        from plain.models.fields.related_managers import ReverseManyToOneManager
-
-        childcascade_set: ReverseManyToOneManager[ChildCascade] = None  # type: ignore[assignment]
+    # Explicit reverse relation - no more TYPE_CHECKING hacks!
+    childcascade_set: types.ReverseForeignKey[ChildCascade] = types.ReverseForeignKey(
+        to="ChildCascade", field="parent"
+    )
 
 
 @models.register_model
 class ChildCascade(models.Model):
-    parent: DeleteParent = types.ForeignKey(
-        DeleteParent, on_delete=models.CASCADE, related_name="childcascade_set"
-    )
+    parent: DeleteParent = types.ForeignKey(DeleteParent, on_delete=models.CASCADE)
 
     query: ClassVar[models.QuerySet[ChildCascade]] = models.QuerySet()
 

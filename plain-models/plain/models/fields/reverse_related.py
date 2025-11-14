@@ -46,14 +46,12 @@ class ForeignObjectRel(FieldCacheMixin):
         self,
         field: Any,
         to: Any,
-        related_name: str | None = None,
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         on_delete: Any = None,
     ):
         self.field = field
         self.model = to
-        self.related_name = related_name
         self.related_query_name = related_query_name
         self.limit_choices_to = {} if limit_choices_to is None else limit_choices_to
         self.on_delete = on_delete
@@ -65,10 +63,6 @@ class ForeignObjectRel(FieldCacheMixin):
     # __init__ as the field doesn't have its model yet. Calling these methods
     # before field.contribute_to_class() has been called will result in
     # AttributeError
-    @cached_property
-    def hidden(self) -> bool:
-        return self.is_hidden()
-
     @cached_property
     def name(self) -> str:
         return self.field.related_query_name()
@@ -127,7 +121,6 @@ class ForeignObjectRel(FieldCacheMixin):
         return (
             self.field,
             self.model,
-            self.related_name,
             self.related_query_name,
             make_hashable(self.limit_choices_to),
             self.on_delete,
@@ -175,10 +168,6 @@ class ForeignObjectRel(FieldCacheMixin):
             qs = qs.order_by(*ordering)
         return (blank_choice if include_blank else []) + [(x.id, str(x)) for x in qs]
 
-    def is_hidden(self) -> bool:
-        """Should the related object be hidden?"""
-        return not self.related_name
-
     def get_joining_columns(self) -> Any:
         return self.field.get_reverse_joining_columns()
 
@@ -195,21 +184,6 @@ class ForeignObjectRel(FieldCacheMixin):
         # example custom multicolumn joins currently have no remote field).
         self.field_name = None
 
-    def get_accessor_name(self, model: Any = None) -> str | None:
-        # This method encapsulates the logic that decides what name to give an
-        # accessor descriptor that retrieves related many-to-one or
-        # many-to-many objects.
-        model = model or self.related_model
-        if self.multiple:
-            # If this is a symmetrical m2m relation on self, there is no
-            # reverse accessor.
-            if self.symmetrical and model == self.model:
-                return None
-        # Only return a name if related_name is explicitly set
-        if self.related_name:
-            return self.related_name
-        return None
-
     def get_path_info(self, filtered_relation: Any = None) -> Any:
         if filtered_relation:
             return self.field.get_reverse_path_info(filtered_relation)
@@ -224,8 +198,11 @@ class ForeignObjectRel(FieldCacheMixin):
         """
         Return the name of the cache key to use for storing an instance of the
         forward model on the reverse model.
+
+        Uses the related_query_name for caching, which provides a stable name
+        for prefetch_related operations.
         """
-        return self.get_accessor_name()
+        return self.field.related_query_name()
 
 
 class ManyToOneRel(ForeignObjectRel):
@@ -247,7 +224,6 @@ class ManyToOneRel(ForeignObjectRel):
         self,
         field: Any,
         to: Any,
-        related_name: str | None = None,
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         on_delete: Any = None,
@@ -255,7 +231,6 @@ class ManyToOneRel(ForeignObjectRel):
         super().__init__(
             field,
             to,
-            related_name=related_name,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
             on_delete=on_delete,
@@ -300,7 +275,6 @@ class ManyToManyRel(ForeignObjectRel):
         *,
         through: Any,
         through_fields: tuple[str, str] | None = None,
-        related_name: str | None = None,
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         symmetrical: bool = True,
@@ -308,7 +282,6 @@ class ManyToManyRel(ForeignObjectRel):
         super().__init__(
             field,
             to,
-            related_name=related_name,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
         )

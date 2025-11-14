@@ -147,14 +147,11 @@ class Field(RegisterLookupMixin, Generic[T]):
         "limit_choices_to",
         # Database-level options are not supported, see #21961.
         "on_delete",
-        "related_name",
         "related_query_name",
         "validators",
     )
 
     # Field flags
-    hidden = False
-
     many_to_many = None
     many_to_one = None
     one_to_many = None

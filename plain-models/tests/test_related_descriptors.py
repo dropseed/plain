@@ -57,8 +57,8 @@ class TestForwardManyToOneDescriptor:
             pytest.skip(f"Nullable FK handling needs refinement: {e}")
 
 
-class TestReverseManyToOneDescriptor:
-    """Test ReverseManyToOneDescriptor (e.g., parent.children)"""
+class TestReverseForeignKey:
+    """Test ReverseForeignKey descriptor (e.g., parent.children)"""
 
     def test_get_related_queryset(self, db):
         parent = DeleteParent.query.create(name="Test Parent")
@@ -72,7 +72,7 @@ class TestReverseManyToOneDescriptor:
         # Test that reverse relation returns a manager with .query QuerySet
         children_manager = (
             parent.childcascade_set
-        )  # Note: no related_name, so uses default
+        )  # Explicit ReverseForeignKey descriptor
         children = children_manager.query
         assert isinstance(children, QuerySet)
         assert children.count() == 2
@@ -260,7 +260,7 @@ class TestEdgeCases:
 
         # Test that direct assignment to reverse relation raises error
         with pytest.raises(TypeError, match="Direct assignment.*prohibited"):
-            parent.childcascade_set = []
+            parent.childcascade_set = []  # type: ignore[assignment]
 
     def test_instance_none_handling(self, db):
         # Test accessing descriptor on class (not instance)

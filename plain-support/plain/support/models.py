@@ -13,7 +13,6 @@ class SupportFormEntry(models.Model):
     user = types.ForeignKey(
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.SET_NULL,
-        related_name="support_form_entries",
         allow_null=True,
         required=False,
     )

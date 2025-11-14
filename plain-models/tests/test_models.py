@@ -1,5 +1,11 @@
 import pytest
-from app.examples.models import Car, CarFeature, Feature, MixinTestModel
+from app.examples.models import (
+    Car,
+    CarFeature,
+    DeleteParent,
+    Feature,
+    MixinTestModel,
+)
 
 from plain.exceptions import ValidationError
 
@@ -123,3 +129,31 @@ def test_many_to_many_through_model(db):
     through_instance = through_instances.first()
     assert through_instance is not None
     assert through_instance.feature == gps
+
+
+def test_meta_related_objects_includes_reverse_fk(db):
+    """Test that Meta.related_objects includes reverse FK relations.
+
+    Regression test: related_objects was checking obj.field.one_to_many
+    instead of obj.one_to_many, which excluded all reverse FK relations.
+    """
+    # DeleteParent has multiple child models with FKs pointing to it
+    related_objs = DeleteParent._model_meta.related_objects
+
+    # Should have reverse FK relations from child models
+    assert len(related_objs) > 0, "related_objects should not be empty"
+
+    # Convert to list of field names for easier checking
+    related_fields = [obj.field for obj in related_objs]
+    related_names = [f.name for f in related_fields]
+
+    # Should include the FK from ChildCascade
+    assert "parent" in related_names, (
+        "ChildCascade.parent reverse FK should be in related_objects"
+    )
+
+    # Find the reverse relation and verify it's marked as one_to_many
+    parent_rel = next(obj for obj in related_objs if obj.field.name == "parent")
+    assert parent_rel.one_to_many is True, (
+        "Reverse FK should be one_to_many from parent's perspective"
+    )
