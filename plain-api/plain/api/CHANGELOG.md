@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-api@0.20.0) (2025-11-14)
+
+### What's changed
+
+- The `related_name` parameter has been removed from `ForeignKey` fields. Reverse relationships are now accessed using explicit reverse descriptor fields ([a4b6309](https://github.com/dropseed/plain/commit/a4b630969d))
+
+### Upgrade instructions
+
+- Update code that accesses reverse relationships to use the new pattern. For example, if you had `api_key.users.first()`, change it to `User.query.filter(api_key=api_key).first()`
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-api@0.19.0) (2025-11-13)
 
 ### What's changed
