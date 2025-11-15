@@ -206,7 +206,7 @@ def _check_lazy_references(
                 for func in models_registry._pending_operations[model_key]
             ),
         ),
-        key=lambda error: error.message,
+        key=lambda error: error.fix,
     )
 
 
