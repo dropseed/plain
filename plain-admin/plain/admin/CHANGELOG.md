@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.55.0](https://github.com/dropseed/plain/releases/plain-admin@0.55.0) (2025-11-14)
+
+### What's changed
+
+- Date range dropdowns now correctly compare enum values instead of enum instances when resolving aliases ([3b49eb0](https://github.com/dropseed/plain/commit/3b49eb0258))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.54.0](https://github.com/dropseed/plain/releases/plain-admin@0.54.0) (2025-11-12)
 
 ### What's changed
