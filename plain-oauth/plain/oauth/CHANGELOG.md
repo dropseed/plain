@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.36.0](https://github.com/dropseed/plain/releases/plain-oauth@0.36.0) (2025-11-14)
+
+### What's changed
+
+- The `related_name="oauth_connections"` parameter has been removed from the `user` ForeignKey field, requiring explicit reverse relationship descriptors on user models ([a4b6309](https://github.com/dropseed/plain/commit/a4b6309))
+
+### Upgrade instructions
+
+- If `user.oauth_connections` was in use, a `oauth_connections: types.ReverseForeignKey[OAuthConnection] = types.ReverseForeignKey(to="plainoauth.OAuthConnection", field="user")` will be required on your `User` model
+
 ## [0.35.0](https://github.com/dropseed/plain/releases/plain-oauth@0.35.0) (2025-11-13)
 
 ### What's changed
