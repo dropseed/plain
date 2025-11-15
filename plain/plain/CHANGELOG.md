@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.89.0](https://github.com/dropseed/plain/releases/plain@0.89.0) (2025-11-14)
+
+### What's changed
+
+- Improved type annotations in view classes: `url_args`, `url_kwargs`, and various template/form context dictionaries now have more specific type hints for better IDE support and type checking ([83bcb95](https://github.com/dropseed/plain/commit/83bcb95b09))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.88.0](https://github.com/dropseed/plain/releases/plain@0.88.0) (2025-11-13)
 
 ### What's changed
