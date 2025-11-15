@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-support@0.25.0) (2025-11-14)
+
+### What's changed
+
+- Foreign key fields no longer use `related_name` parameter, requiring explicit reverse queries instead ([a4b6309](https://github.com/dropseed/plain/commit/a4b6309))
+
+### Upgrade instructions
+
+- If you were accessing support form entries via `user.support_form_entries`, replace it with explicit queries like `SupportFormEntry.query.filter(user=user)`
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-support@0.24.0) (2025-11-13)
 
 ### What's changed
