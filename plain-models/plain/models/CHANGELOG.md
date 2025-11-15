@@ -1,5 +1,27 @@
 # plain-models changelog
 
+## [0.61.0](https://github.com/dropseed/plain/releases/plain-models@0.61.0) (2025-11-14)
+
+### What's changed
+
+- The `related_name` parameter has been removed from `ForeignKey` and `ManyToManyField` - reverse relationships are now declared explicitly using `ReverseForeignKey` and `ReverseManyToMany` descriptors on the related model ([a4b630969d](https://github.com/dropseed/plain/commit/a4b630969d))
+- Added `ReverseForeignKey` and `ReverseManyToMany` descriptor classes to `plain.models.types` for declaring reverse relationships with full type support ([a4b630969d](https://github.com/dropseed/plain/commit/a4b630969d))
+- The new reverse descriptors are exported from `plain.models` for easy access ([97fa112975](https://github.com/dropseed/plain/commit/97fa112975))
+- Renamed internal references from `ManyToOne` to `ForeignKey` for consistency ([93c30f9caf](https://github.com/dropseed/plain/commit/93c30f9caf))
+- Fixed a preflight check bug related to reverse relationships ([9191ae6e4b](https://github.com/dropseed/plain/commit/9191ae6e4b))
+- Added comprehensive documentation for reverse relationships in the README ([5abf330e06](https://github.com/dropseed/plain/commit/5abf330e06))
+
+### Upgrade instructions
+
+- Remove all `related_name` parameters from `ForeignKey` and `ManyToManyField` definitions
+- Remove `related_name` from all migrations
+- On the related model, add explicit reverse relationship descriptors using `ReverseForeignKey` or `ReverseManyToMany` from `plain.models.types`:
+    - For the reverse side of a `ForeignKey`, use: `children: types.ReverseForeignKey[Child] = types.ReverseForeignKey(to="Child", field="parent")`
+    - For the reverse side of a `ManyToManyField`, use: `cars: types.ReverseManyToMany[Car] = types.ReverseManyToMany(to="Car", field="features")`
+- Remove any `TYPE_CHECKING` blocks that were used to declare reverse relationship types - the new descriptors provide full type support without these hacks
+- The `to` parameter accepts either a string (model name) or the model class itself
+- The `field` parameter should be the name of the forward field on the related model
+
 ## [0.60.0](https://github.com/dropseed/plain/releases/plain-models@0.60.0) (2025-11-13)
 
 ### What's changed
