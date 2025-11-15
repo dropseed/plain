@@ -406,7 +406,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.88.0"
+version = "0.89.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -435,7 +435,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.54.0"
+version = "0.55.0"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -462,7 +462,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-api"
-version = "0.19.0"
+version = "0.20.0"
 source = { editable = "plain-api" }
 dependencies = [
     { name = "plain" },
@@ -680,7 +680,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.60.0"
+version = "0.61.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -703,7 +703,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-oauth"
-version = "0.35.0"
+version = "0.36.0"
 source = { editable = "plain-oauth" }
 dependencies = [
     { name = "plain" },
@@ -730,7 +730,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-observer"
-version = "0.18.0"
+version = "0.19.0"
 source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
@@ -882,7 +882,7 @@ dev = [
 
 [[package]]
 name = "plain-support"
-version = "0.24.0"
+version = "0.25.0"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },

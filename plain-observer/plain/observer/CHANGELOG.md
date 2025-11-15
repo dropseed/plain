@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-observer@0.19.0) (2025-11-14)
+
+### What's changed
+
+- Models now use explicit reverse relationship descriptors (e.g., `Trace.spans`, `Trace.logs`) instead of `related_name` parameters, providing better type hints and IDE support ([a4b6309](https://github.com/dropseed/plain/commit/a4b630969dbbfa5189d357647fd06a2207929b7c))
+- Removed unnecessary type ignore comments that are no longer needed with explicit reverse descriptors ([a4b6309](https://github.com/dropseed/plain/commit/a4b630969dbbfa5189d357647fd06a2207929b7c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-observer@0.18.0) (2025-11-13)
 
 ### What's changed
