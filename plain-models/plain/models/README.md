@@ -7,6 +7,7 @@
 - [Querying](#querying)
 - [Migrations](#migrations)
 - [Fields](#fields)
+- [Reverse relationships](#reverse-relationships)
 - [Typing](#typing)
 - [Validation](#validation)
 - [Indexes and constraints](#indexes-and-constraints)
@@ -174,6 +175,62 @@ Common field types include:
 - [`URLField`](./fields/__init__.py#URLField)
 - [`UUIDField`](./fields/__init__.py#UUIDField)
 
+## Reverse relationships
+
+When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates a reverse accessor on the related model (like `author.book_set`). You can explicitly declare these reverse relationships using [`ReverseForeignKey`](./fields/reverse_descriptors.py#ReverseForeignKey) and [`ReverseManyToMany`](./fields/reverse_descriptors.py#ReverseManyToMany):
+
+```python
+from plain import models
+
+@models.register_model
+class Author(models.Model):
+    name = models.CharField(max_length=200)
+    # Explicit reverse accessor for all books by this author
+    books = models.ReverseForeignKey(to="Book", field="author")
+
+@models.register_model
+class Book(models.Model):
+    title = models.CharField(max_length=200)
+    author = models.ForeignKey(Author, on_delete=models.CASCADE)
+
+# Usage
+author = Author.query.get(name="Jane Doe")
+for book in author.books.all():
+    print(book.title)
+
+# Add a new book
+author.books.create(title="New Book")
+```
+
+For many-to-many relationships:
+
+```python
+@models.register_model
+class Feature(models.Model):
+    name = models.CharField(max_length=100)
+    # Explicit reverse accessor for all cars with this feature
+    cars = models.ReverseManyToMany(to="Car", field="features")
+
+@models.register_model
+class Car(models.Model):
+    model = models.CharField(max_length=100)
+    features = models.ManyToManyField(Feature)
+
+# Usage
+feature = Feature.query.get(name="Sunroof")
+for car in feature.cars.all():
+    print(car.model)
+```
+
+**Why use explicit reverse relations?**
+
+- **Self-documenting**: The reverse accessor is visible in the model definition
+- **Better IDE support**: Autocomplete works for reverse accessors
+- **Type safety**: When combined with type annotations, type checkers understand the relationship
+- **Control**: You choose the accessor name instead of relying on automatic `_set` naming
+
+Reverse relations are optional - if you don't declare them, the automatic `{model}_set` accessor still works. You can also use both approaches in the same codebase.
+
 ## Typing
 
 For better IDE support and type checking, use `plain.models.types` with type annotations:
@@ -202,6 +259,8 @@ author: Author = types.ForeignKey(Author, on_delete=models.CASCADE)
 ```
 
 All field types from the [Fields](#fields) section are available through [`types`](./types.py). Typed and untyped fields can be mixed in the same model. The database behavior is identical - typed fields only add type checking.
+
+Reverse relationships can also be typed - see the [Reverse relationships](#reverse-relationships) section for details.
 
 ### Typing QuerySets
 
