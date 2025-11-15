@@ -37,6 +37,10 @@ from .fields.related import (
     ForeignKey,
     ManyToManyField,
 )
+from .fields.reverse_descriptors import (
+    ReverseForeignKey,
+    ReverseManyToMany,
+)
 from .indexes import Index
 from .options import Options
 from .query import QuerySet
@@ -99,6 +103,9 @@ __all__ = [
     # From fields.related
     "ForeignKey",
     "ManyToManyField",
+    # From fields.reverse_descriptors
+    "ReverseForeignKey",
+    "ReverseManyToMany",
     # From db
     "db_connection",
     "IntegrityError",
