@@ -2,8 +2,6 @@
 
 **Bootstrap a new Plain project from official starter templates.**
 
-## Contents
-
 - [Overview](#overview)
 - [Starter types](#starter-types)
 - [Options](#options)
@@ -18,8 +16,6 @@ Basic usage:
 
 ```bash
 uvx plain-start my-project
-cd my-project
-uv run plain dev
 ```
 
 This creates a new project called `my-project` using the full app starter template (with ORM, auth, admin, etc.).
@@ -79,38 +75,3 @@ Skip running the `./scripts/install` script after cloning. Useful if you want to
 ```bash
 uvx plain-start my-project --no-install
 ```
-
-## FAQs
-
-#### What does the install script do?
-
-The `./scripts/install` script sets up your Python environment using `uv`, installs dependencies, and runs initial migrations for the database. You can always run it manually later if you use `--no-install`.
-
-#### Can I use plain-start with a specific version?
-
-Yes, you can specify a version using `uvx`:
-
-```bash
-uvx plain-start@0.1.0 my-project
-```
-
-#### What gets replaced in the project?
-
-The command updates the `name` field in your `pyproject.toml` to match your project name. All other configuration remains as-is for you to customize.
-
-## Installation
-
-Install and run `plain-start` using `uvx` (recommended):
-
-```bash
-uvx plain-start my-project
-```
-
-Or install it globally:
-
-```bash
-uv tool install plain-start
-plain-start my-project
-```
-
-The command clones the starter template, configures your project name, initializes a new git repository, and runs the installation script (unless you pass `--no-install`).
