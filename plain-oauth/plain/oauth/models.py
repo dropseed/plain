@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.auth import get_user_model
@@ -43,7 +43,7 @@ class OAuthConnection(models.Model):
         required=False, allow_null=True
     )
 
-    query: ClassVar[models.QuerySet[OAuthConnection]] = models.QuerySet()
+    query: models.QuerySet[OAuthConnection] = models.QuerySet()
 
     model_options = models.Options(
         constraints=[

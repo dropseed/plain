@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import ClassVar
-
 from plain import models
 from plain.models import types
 from plain.passwords.types import PasswordField
@@ -13,4 +11,4 @@ class User(models.Model):
     password: str = PasswordField()
     is_admin: bool = types.BooleanField(default=False)
 
-    query: ClassVar[models.QuerySet[User]] = models.QuerySet()
+    query: models.QuerySet[User] = models.QuerySet()

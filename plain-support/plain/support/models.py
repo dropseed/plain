@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import ClassVar
 
 from plain import models
 from plain.models import types
@@ -24,7 +23,7 @@ class SupportFormEntry(models.Model):
     # referrer? source? session?
     # extra_data
 
-    query: ClassVar[models.QuerySet[SupportFormEntry]] = models.QuerySet()
+    query: models.QuerySet[SupportFormEntry] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["-created_at"],

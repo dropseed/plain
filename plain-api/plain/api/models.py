@@ -4,7 +4,6 @@ import binascii
 import os
 import uuid
 from datetime import datetime
-from typing import ClassVar
 from uuid import UUID
 
 from plain import models
@@ -29,7 +28,7 @@ class APIKey(models.Model):
 
     api_version: str = types.CharField(max_length=255, required=False)
 
-    query: ClassVar[models.QuerySet[APIKey]] = models.QuerySet()
+    query: models.QuerySet[APIKey] = models.QuerySet()
 
     model_options = models.Options(
         constraints=[

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models import types
@@ -52,7 +52,7 @@ class Pageview(models.Model):
     medium: str = types.CharField(max_length=200, required=False)
     campaign: str = types.CharField(max_length=200, required=False)
 
-    query: ClassVar[models.QuerySet[Pageview]] = models.QuerySet()
+    query: models.QuerySet[Pageview] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["-timestamp"],

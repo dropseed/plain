@@ -6,7 +6,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlparse
 from opentelemetry.sdk.trace import ReadableSpan
@@ -68,7 +68,7 @@ class Trace(models.Model):
         to="Log", field="trace"
     )
 
-    query: ClassVar[models.QuerySet[Trace]] = models.QuerySet()
+    query: models.QuerySet[Trace] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["-start_time"],
@@ -340,7 +340,7 @@ class Span(models.Model):
     # Explicit reverse relation
     logs: types.ReverseForeignKey[Log] = types.ReverseForeignKey(to="Log", field="span")
 
-    query: ClassVar[SpanQuerySet] = SpanQuerySet()
+    query: SpanQuerySet = SpanQuerySet()
 
     model_options = models.Options(
         ordering=["-start_time"],
@@ -525,7 +525,7 @@ class Log(models.Model):
     level: str = types.CharField(max_length=20)
     message: str = types.TextField()
 
-    query: ClassVar[models.QuerySet[Log]] = models.QuerySet()
+    query: models.QuerySet[Log] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["timestamp"],

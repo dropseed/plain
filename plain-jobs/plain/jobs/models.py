@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 import traceback
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID, uuid4
 
 from opentelemetry import trace
@@ -72,7 +72,7 @@ class JobRequest(models.Model):
 
     # expires_at = models.DateTimeField(required=False, allow_null=True)
 
-    query: ClassVar[models.QuerySet[JobRequest]] = models.QuerySet()
+    query: models.QuerySet[JobRequest] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["priority", "-created_at"],
@@ -182,7 +182,7 @@ class JobProcess(models.Model):
         max_length=18, required=False, allow_null=True
     )
 
-    query: ClassVar[JobQuerySet] = JobQuerySet()
+    query: JobQuerySet = JobQuerySet()
 
     model_options = models.Options(
         ordering=["-created_at"],
@@ -501,7 +501,7 @@ class JobResult(models.Model):
         max_length=18, required=False, allow_null=True
     )
 
-    query: ClassVar[JobResultQuerySet] = JobResultQuerySet()
+    query: JobResultQuerySet = JobResultQuerySet()
 
     model_options = models.Options(
         ordering=["-created_at"],

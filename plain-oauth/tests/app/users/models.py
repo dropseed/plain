@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from plain import models
 from plain.models import types
@@ -19,7 +19,7 @@ class User(models.Model):
         types.ReverseForeignKey(to="plainoauth.OAuthConnection", field="user")
     )
 
-    query: ClassVar[models.QuerySet[User]] = models.QuerySet()
+    query: models.QuerySet[User] = models.QuerySet()
 
     model_options = models.Options(
         constraints=[

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, ClassVar, Self
+from typing import Any, Self
 
 from plain import models
 from plain.models import types
@@ -27,7 +27,7 @@ class CachedItem(models.Model):
     created_at: datetime = types.DateTimeField(auto_now_add=True)
     updated_at: datetime = types.DateTimeField(auto_now=True)
 
-    query: ClassVar[CachedItemQuerySet] = CachedItemQuerySet()
+    query: CachedItemQuerySet = CachedItemQuerySet()
 
     model_options = models.Options(
         indexes=[

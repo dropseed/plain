@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from plain import models
 from plain.models import types
@@ -35,7 +35,7 @@ class Redirect(models.Model):
     # logged in or not? auth not required necessarily...
     # headers?
 
-    query: ClassVar[models.QuerySet[Redirect]] = models.QuerySet()
+    query: models.QuerySet[Redirect] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["order", "-created_at"],
@@ -101,7 +101,7 @@ class RedirectLog(models.Model):
 
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 
-    query: ClassVar[models.QuerySet[RedirectLog]] = models.QuerySet()
+    query: models.QuerySet[RedirectLog] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["-created_at"],
@@ -143,7 +143,7 @@ class NotFoundLog(models.Model):
 
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 
-    query: ClassVar[models.QuerySet[NotFoundLog]] = models.QuerySet()
+    query: models.QuerySet[NotFoundLog] = models.QuerySet()
 
     model_options = models.Options(
         ordering=["-created_at"],

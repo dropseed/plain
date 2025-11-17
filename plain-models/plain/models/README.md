@@ -264,12 +264,10 @@ Reverse relationships can also be typed - see the [Reverse relationships](#rever
 
 ### Typing QuerySets
 
-For better type checking of query results, you can explicitly type the `query` attribute using `ClassVar`:
+For better type checking of query results, you can explicitly type the `query` attribute:
 
 ```python
 from __future__ import annotations
-
-from typing import ClassVar
 
 from plain import models
 from plain.models import types
@@ -279,10 +277,10 @@ class User(models.Model):
     email: str = types.EmailField()
     is_admin: bool = types.BooleanField(default=False)
 
-    query: ClassVar[models.QuerySet[User]] = models.QuerySet()
+    query: models.QuerySet[User] = models.QuerySet()
 ```
 
-With this annotation, type checkers will know that `User.query.get()` returns a `User` instance and `User.query.filter()` returns `QuerySet[User]`. The `ClassVar` annotation tells type checkers that `query` is a class-level attribute, not an instance field. This is optional - the query attribute works without the annotation, but adding it improves IDE autocomplete and type checking.
+With this annotation, type checkers will know that `User.query.get()` returns a `User` instance and `User.query.filter()` returns `QuerySet[User]`. This is optional - the query attribute works without the annotation, but adding it improves IDE autocomplete and type checking.
 
 ## Validation
 
