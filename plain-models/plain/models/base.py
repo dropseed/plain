@@ -94,7 +94,7 @@ class Model(metaclass=ModelBase):
     id: int = types.PrimaryKeyField()
 
     # Descriptors for other model behavior
-    query = QuerySet()
+    query: QuerySet[Model] = QuerySet()
     model_options = Options()
     _model_meta = Meta()
     DoesNotExist = DoesNotExistDescriptor()
