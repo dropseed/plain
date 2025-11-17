@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.11.4](https://github.com/dropseed/plain/releases/plain-code@0.11.4) (2025-11-17)
+
+### What's changed
+
+- The `plain fix` command now displays styled output that matches the format of `plain code check`, showing the tool name in bold and the command being run in dim text ([cde9a8e](https://github.com/dropseed/plain/commit/cde9a8e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.3](https://github.com/dropseed/plain/releases/plain-code@0.11.3) (2025-11-03)
 
 ### What's changed
