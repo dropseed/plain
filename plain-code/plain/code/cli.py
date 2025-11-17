@@ -138,21 +138,32 @@ def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> No
         raise click.UsageError("Cannot use both --unsafe-fixes and --add-noqa")
 
     if unsafe_fixes:
-        print_event("Ruff fix (with unsafe fixes)")
+        print_event(
+            click.style("Ruff lint:", bold=True)
+            + click.style(" ruff check --fix --unsafe-fixes", dim=True)
+        )
         result = subprocess.run(
             ["ruff", "check", path, "--fix", "--unsafe-fixes", *ruff_args]
         )
     elif add_noqa:
-        print_event("Ruff fix (add noqa)")
+        print_event(
+            click.style("Ruff lint:", bold=True)
+            + click.style(" ruff check --add-noqa", dim=True)
+        )
         result = subprocess.run(["ruff", "check", path, "--add-noqa", *ruff_args])
     else:
-        print_event("Ruff fix")
+        print_event(
+            click.style("Ruff lint:", bold=True)
+            + click.style(" ruff check --fix", dim=True)
+        )
         result = subprocess.run(["ruff", "check", path, "--fix", *ruff_args])
 
     if result.returncode != 0:
         sys.exit(result.returncode)
 
-    print_event("Ruff format")
+    print_event(
+        click.style("Ruff format:", bold=True) + click.style(" ruff format", dim=True)
+    )
     result = subprocess.run(["ruff", "format", path, *ruff_args])
     if result.returncode != 0:
         sys.exit(result.returncode)
@@ -163,12 +174,19 @@ def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> No
         if biome.needs_update():
             ctx.invoke(install)
 
-        print_event("Biome format")
-
         args = ["check", path, "--write"]
 
         if unsafe_fixes:
             args.append("--unsafe")
+            print_event(
+                click.style("Biome:", bold=True)
+                + click.style(" biome check --write --unsafe", dim=True)
+            )
+        else:
+            print_event(
+                click.style("Biome:", bold=True)
+                + click.style(" biome check --write", dim=True)
+            )
 
         result = biome.invoke(*args)
 
