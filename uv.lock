@@ -29,6 +29,7 @@ members = [
     "plain-redirection",
     "plain-scan",
     "plain-sessions",
+    "plain-start",
     "plain-support",
     "plain-tailwind",
     "plain-toolbar",
@@ -879,6 +880,17 @@ dev = [
     { name = "plain-models", editable = "plain-models" },
     { name = "plain-pytest", editable = "plain-pytest" },
 ]
+
+[[package]]
+name = "plain-start"
+version = "0.0.0"
+source = { editable = "plain-start" }
+dependencies = [
+    { name = "click" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "click", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-support"
