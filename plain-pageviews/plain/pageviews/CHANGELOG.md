@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.28.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.28.1) (2025-11-17)
+
+### What's changed
+
+- Removed `ClassVar` type annotation from the `query` attribute for improved compatibility with type checkers ([1c624ff](https://github.com/dropseed/plain/commit/1c624ff29ebc750650c051094041a242c06b759d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.28.0) (2025-11-13)
 
 ### What's changed
