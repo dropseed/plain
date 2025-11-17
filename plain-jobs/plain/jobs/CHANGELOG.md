@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.41.1](https://github.com/dropseed/plain/releases/plain-jobs@0.41.1) (2025-11-17)
+
+### What's changed
+
+- Model `query` attributes no longer use `ClassVar` type annotation, reverting to simpler direct type annotations ([1c624ff29e](https://github.com/dropseed/plain/commit/1c624ff29e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.41.0](https://github.com/dropseed/plain/releases/plain-jobs@0.41.0) (2025-11-13)
 
 ### What's changed
