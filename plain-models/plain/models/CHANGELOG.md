@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.61.1](https://github.com/dropseed/plain/releases/plain-models@0.61.1) (2025-11-17)
+
+### What's changed
+
+- The `@dataclass_transform` decorator has been removed from `ModelBase` to avoid type checker issues ([e0dbedb](https://github.com/dropseed/plain/commit/e0dbedb73f))
+- Documentation and examples no longer suggest using `ClassVar` for QuerySet type annotations - the simpler `query: models.QuerySet[Model] = models.QuerySet()` pattern is now recommended ([1c624ff](https://github.com/dropseed/plain/commit/1c624ff29e), [99aecbc](https://github.com/dropseed/plain/commit/99aecbc17e))
+
+### Upgrade instructions
+
+- If you were using `ClassVar` annotations for the `query` attribute, you can optionally remove the `ClassVar` wrapper and the `from typing import ClassVar` import. Both patterns work, but the simpler version without `ClassVar` is now recommended.
+
 ## [0.61.0](https://github.com/dropseed/plain/releases/plain-models@0.61.0) (2025-11-14)
 
 ### What's changed
