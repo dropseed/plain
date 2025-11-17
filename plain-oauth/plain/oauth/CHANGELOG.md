@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.36.1](https://github.com/dropseed/plain/releases/plain-oauth@0.36.1) (2025-11-17)
+
+### What's changed
+
+- Removed `ClassVar` annotation from the `query` attribute on `OAuthConnection` model, simplifying type annotations while maintaining type checker compatibility ([1c624ff](https://github.com/dropseed/plain/commit/1c624ff))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.36.0](https://github.com/dropseed/plain/releases/plain-oauth@0.36.0) (2025-11-14)
 
 ### What's changed
