@@ -55,6 +55,7 @@ FULLY_TYPED_PATHS = [
     "plain-jobs",
     "plain-models",
     "plain-scan",
+    "plain-start",
 ]
 
 # Paths that should pass type checking but don't require 100% coverage
