@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.39.1](https://github.com/dropseed/plain/releases/plain-sessions@0.39.1) (2025-11-17)
+
+### What's changed
+
+- The `Session` model's `query` class variable no longer uses `ClassVar` type annotation, reverting to a simpler type annotation for improved type checker compatibility ([1c624ff](https://github.com/dropseed/plain/commit/1c624ff))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.39.0](https://github.com/dropseed/plain/releases/plain-sessions@0.39.0) (2025-11-13)
 
 ### What's changed
