@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.47.1](https://github.com/dropseed/plain/releases/plain-dev@0.47.1) (2025-11-17)
+
+### What's changed
+
+- The `plain pre-commit install` command is now a separate subcommand that uses `@without_runtime_setup` to avoid loading the full Plain runtime, improving performance and reliability during installation ([cfa4ed2](https://github.com/dropseed/plain/commit/cfa4ed2))
+
+### Upgrade instructions
+
+- Update any scripts or documentation that use `plain pre-commit --install` to use `plain pre-commit install` instead
+
 ## [0.47.0](https://github.com/dropseed/plain/releases/plain-dev@0.47.0) (2025-11-12)
 
 ### What's changed
