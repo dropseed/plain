@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.19.1](https://github.com/dropseed/plain/releases/plain-observer@0.19.1) (2025-11-17)
+
+### What's changed
+
+- QuerySet type annotations no longer use `ClassVar`, reverting to direct annotations for improved compatibility ([1c624ff](https://github.com/dropseed/plain/commit/1c624ff29ebc750650c051094041a242c06b759d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-observer@0.19.0) (2025-11-14)
 
 ### What's changed
