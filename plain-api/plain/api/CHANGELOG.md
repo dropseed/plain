@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.20.1](https://github.com/dropseed/plain/releases/plain-api@0.20.1) (2025-11-17)
+
+### What's changed
+
+- Removed `ClassVar` from `query` type annotation for improved type checker compatibility ([1c624ff](https://github.com/dropseed/plain/commit/1c624ff29e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-api@0.20.0) (2025-11-14)
 
 ### What's changed
