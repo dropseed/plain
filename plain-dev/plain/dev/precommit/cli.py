@@ -9,6 +9,7 @@ import click
 
 from plain.cli import register_cli
 from plain.cli.print import print_event
+from plain.cli.runtime import without_runtime_setup
 
 
 def install_git_hook() -> None:
@@ -26,13 +27,24 @@ plain pre-commit"""
 
 
 @register_cli("pre-commit")
-@click.command()
-@click.option("--install", is_flag=True)
-def cli(install: bool) -> None:
+@click.group(invoke_without_command=True)
+@click.pass_context
+def cli(ctx: click.Context) -> None:
     """Git pre-commit checks"""
-    if install:
-        install_git_hook()
-        return
+    # If no subcommand is provided, run the checks
+    if ctx.invoked_subcommand is None:
+        run_checks()
+
+
+@cli.command()
+@without_runtime_setup
+def install() -> None:
+    """Install the pre-commit git hook"""
+    install_git_hook()
+
+
+def run_checks() -> None:
+    """Run all pre-commit checks"""
 
     pyproject = Path("pyproject.toml")
 
