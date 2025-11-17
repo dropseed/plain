@@ -144,7 +144,7 @@ class CustomQuerySetModel(models.Model):
 
     name: str = types.CharField(max_length=100)
 
-    query: CustomQuerySet = CustomQuerySet()
+    query = CustomQuerySet()
 
 
 @models.register_model
@@ -153,7 +153,7 @@ class CustomSpecialQuerySetModel(models.Model):
 
     name: str = types.CharField(max_length=100)
 
-    query: CustomSpecialQuerySet = CustomSpecialQuerySet()
+    query = CustomSpecialQuerySet()
 
 
 # Test mixin pattern for field inheritance
