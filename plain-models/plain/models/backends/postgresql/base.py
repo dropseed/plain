@@ -27,7 +27,7 @@ from plain.models.db import db_connection
 try:
     from psycopg import Connection as PsycopgConnection
 except ImportError:
-    PsycopgConnection = Any
+    PsycopgConnection: type[Any] = Any  # type: ignore[misc]
 
 from .client import DatabaseClient
 from .creation import DatabaseCreation

@@ -29,6 +29,7 @@ from math import (
     tan,
 )
 from re import search as re_search
+from sqlite3 import Connection
 from typing import TYPE_CHECKING, Any
 
 from plain.models.backends.utils import (
@@ -40,10 +41,10 @@ from plain.utils import timezone
 from plain.utils.duration import duration_microseconds
 
 if TYPE_CHECKING:
-    from plain.models.backends.sqlite3.base import SQLiteDatabaseWrapper
+    pass
 
 
-def register(connection: SQLiteDatabaseWrapper) -> None:
+def register(connection: Connection) -> None:
     create_deterministic_function = functools.partial(
         connection.create_function,
         deterministic=True,
