@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from ..migrations.operations.base import Operation
 
 # Type annotation for type checkers; runtime value is _db_connection
-db_connection: BaseDatabaseWrapper = _db_connection  # type: ignore[assignment]
+db_connection: BaseDatabaseWrapper = _db_connection
 
 
 @register_cli("migrations")
@@ -414,7 +414,7 @@ def apply(
             and target in executor.loader.replacements
         ):
             incomplete_migration = executor.loader.replacements[target]
-            target = incomplete_migration.replaces[-1]  # type: ignore[assignment]
+            target = incomplete_migration.replaces[-1]
         targets = [target]
         target_package_labels_only = False
     elif package_label:
@@ -663,9 +663,9 @@ def list_migrations(
                     if plan_node not in shown and plan_node[0] == package_name:
                         # Give it a nice title if it's a squashed one
                         title = plan_node[1]
-                        if graph.nodes[plan_node].replaces:  # type: ignore[union-attr]
-                            title += f" ({len(graph.nodes[plan_node].replaces)} squashed migrations)"  # type: ignore[union-attr]
-                        applied_migration = loader.applied_migrations.get(plan_node)  # type: ignore[union-attr]
+                        if graph.nodes[plan_node].replaces:
+                            title += f" ({len(graph.nodes[plan_node].replaces)} squashed migrations)"
+                        applied_migration = loader.applied_migrations.get(plan_node)
                         # Mark it as applied/unapplied
                         if applied_migration:
                             if plan_node in recorded_migrations:
@@ -720,7 +720,7 @@ def list_migrations(
             deps = ""
             if verbosity >= 2:
                 deps = print_deps(node)
-            if node.key in loader.applied_migrations:  # type: ignore[operator]
+            if node.key in loader.applied_migrations:
                 click.echo(f"[X]  {node.key[0]}.{node.key[1]}{deps}")
             else:
                 click.echo(f"[ ]  {node.key[0]}.{node.key[1]}{deps}")
@@ -752,7 +752,7 @@ def prune(yes: bool) -> None:
     all_prunable = [
         migration
         for migration in recorded_migrations
-        if migration not in loader.disk_migrations  # type: ignore[operator]
+        if migration not in loader.disk_migrations
     ]
 
     if not all_prunable:

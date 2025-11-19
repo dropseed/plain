@@ -35,7 +35,7 @@ class RestrictedError(IntegrityError):
 def CASCADE(collector: Collector, field: Field, sub_objs: Any) -> None:
     collector.collect(
         sub_objs,
-        source=field.remote_field.model,  # type: ignore[attr-defined]
+        source=field.remote_field.model,
         nullable=field.allow_null,
         fail_on_restricted=False,
     )
@@ -45,7 +45,7 @@ def CASCADE(collector: Collector, field: Field, sub_objs: Any) -> None:
 
 def PROTECT(collector: Collector, field: Field, sub_objs: Any) -> None:
     raise ProtectedError(
-        f"Cannot delete some instances of model '{field.remote_field.model.__name__}' because they are "  # type: ignore[attr-defined]
+        f"Cannot delete some instances of model '{field.remote_field.model.__name__}' because they are "
         f"referenced through a protected foreign key: '{sub_objs[0].__class__.__name__}.{field.name}'",
         sub_objs,
     )
@@ -53,7 +53,7 @@ def PROTECT(collector: Collector, field: Field, sub_objs: Any) -> None:
 
 def RESTRICT(collector: Collector, field: Field, sub_objs: Any) -> None:
     collector.add_restricted_objects(field, sub_objs)
-    collector.add_dependency(field.remote_field.model, field.model)  # type: ignore[attr-defined]
+    collector.add_dependency(field.remote_field.model, field.model)
 
 
 def SET(value: Any) -> Callable[[Collector, Field, Any], None]:
@@ -67,8 +67,8 @@ def SET(value: Any) -> Callable[[Collector, Field, Any], None]:
         def set_on_delete(collector: Collector, field: Field, sub_objs: Any) -> None:
             collector.add_field_update(field, value, sub_objs)
 
-    set_on_delete.deconstruct = lambda: ("plain.models.SET", (value,), {})  # type: ignore[attr-defined]
-    set_on_delete.lazy_sub_objs = True  # type: ignore[attr-defined]
+    set_on_delete.deconstruct = lambda: ("plain.models.SET", (value,), {})
+    set_on_delete.lazy_sub_objs = True
     return set_on_delete
 
 
@@ -76,14 +76,14 @@ def SET_NULL(collector: Collector, field: Field, sub_objs: Any) -> None:
     collector.add_field_update(field, None, sub_objs)
 
 
-SET_NULL.lazy_sub_objs = True  # type: ignore[attr-defined]
+SET_NULL.lazy_sub_objs = True
 
 
 def SET_DEFAULT(collector: Collector, field: Field, sub_objs: Any) -> None:
     collector.add_field_update(field, field.get_default(), sub_objs)
 
 
-SET_DEFAULT.lazy_sub_objs = True  # type: ignore[attr-defined]
+SET_DEFAULT.lazy_sub_objs = True
 
 
 def DO_NOTHING(collector: Collector, field: Field, sub_objs: Any) -> None:

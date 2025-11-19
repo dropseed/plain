@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from psycopg import sql  # type: ignore[import-untyped]
+from psycopg import sql
 
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.backends.ddl_references import Columns, IndexColumns, Statement
@@ -97,10 +97,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def _field_base_data_types(self, field: Field) -> Generator[str | None, None, None]:
         # Yield base data types for array fields.
-        if field.base_field.get_internal_type() == "ArrayField":  # type: ignore[attr-defined]
-            yield from self._field_base_data_types(field.base_field)  # type: ignore[attr-defined]
+        if field.base_field.get_internal_type() == "ArrayField":
+            yield from self._field_base_data_types(field.base_field)
         else:
-            yield self._field_data_type(field.base_field)  # type: ignore[attr-defined]
+            yield self._field_data_type(field.base_field)
 
     def _create_like_index_sql(
         self, model: type[Model], field: Field
@@ -298,10 +298,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Added an index? Create any PostgreSQL-specific indexes.
         if (
             not (
-                (old_field.remote_field and old_field.db_index)  # type: ignore[attr-defined]
-                or old_field.primary_key
+                (old_field.remote_field and old_field.db_index) or old_field.primary_key
             )
-            and (new_field.remote_field and new_field.db_index)  # type: ignore[attr-defined]
+            and (new_field.remote_field and new_field.db_index)
         ) or (not old_field.primary_key and new_field.primary_key):
             like_index_statement = self._create_like_index_sql(model, new_field)
             if like_index_statement is not None:
@@ -309,8 +308,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
         # Removed an index? Drop any PostgreSQL-specific indexes.
         if old_field.primary_key and not (
-            (new_field.remote_field and new_field.db_index)  # type: ignore[attr-defined]
-            or new_field.primary_key
+            (new_field.remote_field and new_field.db_index) or new_field.primary_key
         ):
             index_to_remove = self._create_index_name(
                 model.model_options.db_table, [old_field.column], suffix="_like"

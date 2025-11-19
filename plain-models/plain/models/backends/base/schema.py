@@ -239,9 +239,9 @@ class BaseDatabaseSchemaEditor(ABC):
             if extra_params:
                 params.extend(extra_params)
             # FK.
-            if field.remote_field and field.db_constraint:  # type: ignore[attr-defined]
+            if field.remote_field and field.db_constraint:
                 # After checking these attributes, we know field is a ForeignKey
-                fk_field: ForeignKey = field  # type: ignore[assignment]
+                fk_field: ForeignKey = field
                 assert fk_field.remote_field is not None  # Checked in if condition
                 to_table = fk_field.remote_field.model.model_options.db_table
                 to_column = fk_field.remote_field.model._model_meta.get_field(
@@ -582,10 +582,10 @@ class BaseDatabaseSchemaEditor(ABC):
         if (
             field.remote_field
             and self.connection.features.supports_foreign_keys
-            and field.db_constraint  # type: ignore[attr-defined]
+            and field.db_constraint
         ):
             # After checking these attributes, we know field is a ForeignKey
-            fk_field: ForeignKey = field  # type: ignore[assignment]
+            fk_field: ForeignKey = field
             assert fk_field.remote_field is not None  # Checked in if condition
             constraint_suffix = "_fk_%(to_table)s_%(to_column)s"
             # Add FK constraint inline, if supported.
@@ -709,7 +709,7 @@ class BaseDatabaseSchemaEditor(ABC):
         elif (
             old_type is None
             and new_type is None
-            and (old_field.remote_field.through and new_field.remote_field.through)  # type: ignore[attr-defined]
+            and (old_field.remote_field.through and new_field.remote_field.through)
         ):
             # Both sides have through models; this is a no-op.
             return
@@ -761,7 +761,7 @@ class BaseDatabaseSchemaEditor(ABC):
         if (
             self.connection.features.supports_foreign_keys
             and old_field.remote_field
-            and old_field.db_constraint  # type: ignore[attr-defined]
+            and old_field.db_constraint
             and self._field_should_be_altered(
                 old_field,
                 new_field,
@@ -831,10 +831,10 @@ class BaseDatabaseSchemaEditor(ABC):
         # True               | False            | False              | True
         # True               | False            | True               | True
         if (
-            (old_field.remote_field and old_field.db_index)  # type: ignore[attr-defined]
+            (old_field.remote_field and old_field.db_index)
             and not old_field.primary_key
             and (
-                not (new_field.remote_field and new_field.db_index)  # type: ignore[attr-defined]
+                not (new_field.remote_field and new_field.db_index)
                 or new_field.primary_key
             )
         ):
@@ -998,10 +998,10 @@ class BaseDatabaseSchemaEditor(ABC):
         # True               | True             | True               | False
         if (
             (
-                not (old_field.remote_field and old_field.db_index)  # type: ignore[attr-defined]
+                not (old_field.remote_field and old_field.db_index)
                 or old_field.primary_key
             )
-            and (new_field.remote_field and new_field.db_index)  # type: ignore[attr-defined]
+            and (new_field.remote_field and new_field.db_index)
             and not new_field.primary_key
         ):
             self.execute(self._create_index_sql(model, fields=[new_field]))
@@ -1048,12 +1048,12 @@ class BaseDatabaseSchemaEditor(ABC):
             self.connection.features.supports_foreign_keys
             and new_field.remote_field
             and (
-                fks_dropped or not old_field.remote_field or not old_field.db_constraint  # type: ignore[attr-defined]
+                fks_dropped or not old_field.remote_field or not old_field.db_constraint
             )
-            and new_field.db_constraint  # type: ignore[attr-defined]
+            and new_field.db_constraint
         ):
             # After checking these attributes, we know new_field is a ForeignKey
-            fk_field: ForeignKey = new_field  # type: ignore[assignment]
+            fk_field: ForeignKey = new_field
             assert fk_field.remote_field is not None  # Checked in if condition
             self.execute(
                 self._create_fk_sql(model, fk_field, "_fk_%(to_table)s_%(to_column)s")
@@ -1237,8 +1237,8 @@ class BaseDatabaseSchemaEditor(ABC):
     ) -> None:
         """Alter M2Ms to repoint their to= endpoints."""
         # Type narrow for ManyToManyField.remote_field
-        old_rel: ManyToManyRel = old_field.remote_field  # type: ignore[assignment]
-        new_rel: ManyToManyRel = new_field.remote_field  # type: ignore[assignment]
+        old_rel: ManyToManyRel = old_field.remote_field
+        new_rel: ManyToManyRel = new_field.remote_field
 
         # Rename the through table
         if (
@@ -1256,12 +1256,8 @@ class BaseDatabaseSchemaEditor(ABC):
             # The field that points to the target model is needed, so we can
             # tell alter_field to change it - this is m2m_reverse_field_name()
             # (as opposed to m2m_field_name(), which points to our model).
-            old_rel.through._model_meta.get_field(
-                old_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
-            ),
-            new_rel.through._model_meta.get_field(
-                new_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
-            ),
+            old_rel.through._model_meta.get_field(old_field.m2m_reverse_field_name()),
+            new_rel.through._model_meta.get_field(new_field.m2m_reverse_field_name()),
         )
         self.alter_field(
             new_rel.through,
@@ -1432,16 +1428,16 @@ class BaseDatabaseSchemaEditor(ABC):
         # - changing an attribute that doesn't affect the schema
         # - changing an attribute in the provided set of ignored attributes
         # - adding only a db_column and the column name is not changed
-        for attr in ignore.union(old_field.non_db_attrs):  # type: ignore[attr-defined]
+        for attr in ignore.union(old_field.non_db_attrs):
             old_kwargs.pop(attr, None)
-        for attr in ignore.union(new_field.non_db_attrs):  # type: ignore[attr-defined]
+        for attr in ignore.union(new_field.non_db_attrs):
             new_kwargs.pop(attr, None)
         return self.quote_name(old_field.column) != self.quote_name(
             new_field.column
         ) or (old_path, old_args, old_kwargs) != (new_path, new_args, new_kwargs)
 
     def _field_should_be_indexed(self, model: type[Model], field: Field) -> bool:
-        return (field.remote_field and field.db_index) and not field.primary_key  # type: ignore[attr-defined]
+        return (field.remote_field and field.db_index) and not field.primary_key
 
     def _field_became_primary_key(self, old_field: Field, new_field: Field) -> bool:
         return not old_field.primary_key and new_field.primary_key
@@ -1467,7 +1463,7 @@ class BaseDatabaseSchemaEditor(ABC):
         )
         to_column = Columns(
             field.target_field.model.model_options.db_table,
-            [field.target_field.column],  # type: ignore[attr-defined]
+            [field.target_field.column],
             self.quote_name,
         )
         deferrable = self.connection.ops.deferrable_sql()
@@ -1491,7 +1487,7 @@ class BaseDatabaseSchemaEditor(ABC):
             model.model_options.db_table,
             [field.column],
             split_identifier(field.target_field.model.model_options.db_table)[1],
-            [field.target_field.column],  # type: ignore[attr-defined]
+            [field.target_field.column],
             suffix,
             create_fk_name,
         )

@@ -158,7 +158,7 @@ class RawQuery:
         if params_type is tuple:
             params = tuple(adapter(val) for val in self.params)
         elif params_type is dict:
-            params = {key: adapter(val) for key, val in self.params.items()}  # type: ignore[union-attr]
+            params = {key: adapter(val) for key, val in self.params.items()}
         elif params_type is None:
             params = None
         else:
@@ -275,7 +275,7 @@ class Query(BaseExpression):
         self._filtered_relations = {}
 
     @property
-    def output_field(self) -> Field | None:  # type: ignore[return]
+    def output_field(self) -> Field | None:
         if len(self.select) == 1:
             select = self.select[0]
             return getattr(select, "target", None) or select.field
@@ -321,21 +321,21 @@ class Query(BaseExpression):
         Return a copy of the current Query. A lightweight alternative to
         deepcopy().
         """
-        obj = Empty()  # type: ignore[misc]
-        obj.__class__ = self.__class__  # type: ignore[misc]
+        obj = Empty()
+        obj.__class__ = self.__class__
         # Copy references to everything.
-        obj.__dict__ = self.__dict__.copy()  # type: ignore[attr-defined]
+        obj.__dict__ = self.__dict__.copy()
         # Clone attributes that can't use shallow copy.
-        obj.alias_refcount = self.alias_refcount.copy()  # type: ignore[attr-defined]
-        obj.alias_map = self.alias_map.copy()  # type: ignore[attr-defined]
-        obj.external_aliases = self.external_aliases.copy()  # type: ignore[attr-defined]
-        obj.table_map = self.table_map.copy()  # type: ignore[attr-defined]
-        obj.where = self.where.clone()  # type: ignore[attr-defined]
-        obj.annotations = self.annotations.copy()  # type: ignore[attr-defined]
+        obj.alias_refcount = self.alias_refcount.copy()
+        obj.alias_map = self.alias_map.copy()
+        obj.external_aliases = self.external_aliases.copy()
+        obj.table_map = self.table_map.copy()
+        obj.where = self.where.clone()
+        obj.annotations = self.annotations.copy()
         if self.annotation_select_mask is not None:
-            obj.annotation_select_mask = self.annotation_select_mask.copy()  # type: ignore[attr-defined]
+            obj.annotation_select_mask = self.annotation_select_mask.copy()
         if self.combined_queries:
-            obj.combined_queries = tuple(  # type: ignore[attr-defined]
+            obj.combined_queries = tuple(
                 [query.clone() for query in self.combined_queries]
             )
         # _annotation_select_cache cannot be copied, as doing so breaks the
@@ -343,23 +343,23 @@ class Query(BaseExpression):
         # _annotation_select_cache point to the same underlying objects.
         # It will get re-populated in the cloned queryset the next time it's
         # used.
-        obj._annotation_select_cache = None  # type: ignore[attr-defined]
-        obj.extra = self.extra.copy()  # type: ignore[attr-defined]
+        obj._annotation_select_cache = None
+        obj.extra = self.extra.copy()
         if self.extra_select_mask is not None:
-            obj.extra_select_mask = self.extra_select_mask.copy()  # type: ignore[attr-defined]
+            obj.extra_select_mask = self.extra_select_mask.copy()
         if self._extra_select_cache is not None:
-            obj._extra_select_cache = self._extra_select_cache.copy()  # type: ignore[attr-defined]
+            obj._extra_select_cache = self._extra_select_cache.copy()
         if self.select_related is not False:
             # Use deepcopy because select_related stores fields in nested
             # dicts.
-            obj.select_related = copy.deepcopy(obj.select_related)  # type: ignore[attr-defined]
+            obj.select_related = copy.deepcopy(obj.select_related)
         if "subq_aliases" in self.__dict__:
-            obj.subq_aliases = self.subq_aliases.copy()  # type: ignore[attr-defined]
-        obj.used_aliases = self.used_aliases.copy()  # type: ignore[attr-defined]
-        obj._filtered_relations = self._filtered_relations.copy()  # type: ignore[attr-defined]
+            obj.subq_aliases = self.subq_aliases.copy()
+        obj.used_aliases = self.used_aliases.copy()
+        obj._filtered_relations = self._filtered_relations.copy()
         # Clear the cached_property, if it exists.
         obj.__dict__.pop("base_table", None)
-        return obj  # type: ignore[return-value]
+        return obj
 
     @overload
     def chain(self, klass: None = None) -> Self: ...
@@ -374,13 +374,13 @@ class Query(BaseExpression):
         """
         obj = self.clone()
         if klass and obj.__class__ != klass:
-            obj.__class__ = klass  # type: ignore[misc]
+            obj.__class__ = klass
         if not obj.filter_is_sticky:
-            obj.used_aliases = set()  # type: ignore[attr-defined]
+            obj.used_aliases = set()
         obj.filter_is_sticky = False
         if hasattr(obj, "_setup_query"):
-            obj._setup_query()  # type: ignore[attr-defined]
-        return obj  # type: ignore[return-value]
+            obj._setup_query()
+        return obj
 
     def relabeled_clone(self, change_map: dict[str, str]) -> Self:
         clone = self.clone()
@@ -1072,7 +1072,7 @@ class Query(BaseExpression):
             join.table_name, create=True, filtered_relation=join.filtered_relation
         )
         if join.join_type:
-            if self.alias_map[join.parent_alias].join_type == LOUTER or join.nullable:  # type: ignore[attr-defined]
+            if self.alias_map[join.parent_alias].join_type == LOUTER or join.nullable:
                 join_type = LOUTER
             else:
                 join_type = INNER
@@ -1214,7 +1214,7 @@ class Query(BaseExpression):
             raise FieldError(
                 f'Invalid lookup "{lookup}" for model {meta.model.__name__}".'
             )
-        return lookup_parts, field_parts, False  # type: ignore[return-value]
+        return lookup_parts, field_parts, False
 
     def check_query_object_type(self, value: Any, meta: Meta, field: Field) -> None:
         """
@@ -1294,7 +1294,7 @@ class Query(BaseExpression):
         if lookup.rhs is None and not lookup.can_use_none_as_rhs:
             if lookup_name not in ("exact", "iexact"):
                 raise ValueError("Cannot use None as a query value")
-            return lhs.get_lookup("isnull")(lhs, True)  # type: ignore[return-value]
+            return lhs.get_lookup("isnull")(lhs, True)
 
         return lookup
 
@@ -1305,7 +1305,7 @@ class Query(BaseExpression):
         Helper method for build_lookup(). Try to fetch and initialize
         a transform for name parameter from lhs.
         """
-        transform_class = lhs.get_transform(name)  # type: ignore[union-attr]
+        transform_class = lhs.get_transform(name)
         if transform_class:
             return transform_class(lhs)
         else:
@@ -1382,10 +1382,10 @@ class Query(BaseExpression):
                 raise TypeError("Cannot filter against a non-conditional expression.")
             condition = filter_expr.resolve_expression(
                 self, allow_joins=allow_joins, summarize=summarize
-            )  # type: ignore[attr-defined]
+            )
             if not isinstance(condition, Lookup):
                 condition = self.build_lookup(["exact"], condition, True)
-            return WhereNode([condition], connector=AND), []  # type: ignore[return-value]
+            return WhereNode([condition], connector=AND), []
         arg, value = filter_expr
         if not arg:
             raise FieldError(f"Cannot parse keyword query {arg!r}")
@@ -1408,7 +1408,7 @@ class Query(BaseExpression):
 
         if reffed_expression:
             condition = self.build_lookup(list(lookups), reffed_expression, value)
-            return WhereNode([condition], connector=AND), []  # type: ignore[return-value]
+            return WhereNode([condition], connector=AND), []
 
         assert self.model is not None, "Building filters requires a model"
         meta = self.model._model_meta
@@ -1438,7 +1438,7 @@ class Query(BaseExpression):
             return self.split_exclude(
                 filter_expr,
                 can_reuse or set(),
-                e.names_with_path,  # type: ignore[invalid-argument-type]
+                e.names_with_path,
             )
 
         # Update used_joins before trimming since they are reused to determine
@@ -1503,7 +1503,7 @@ class Query(BaseExpression):
     def add_filter(self, filter_lhs: str, filter_rhs: Any) -> None:
         self.add_q(Q((filter_lhs, filter_rhs)))
 
-    def add_q(self, q_object: Q) -> None:  # type: ignore[unsupported-operator]
+    def add_q(self, q_object: Q) -> None:
         """
         A preprocessor for the internal _add_q(). Responsible for doing final
         join promotion.
@@ -1540,7 +1540,7 @@ class Query(BaseExpression):
         split_subq: bool = True,
         check_filterable: bool = True,
         summarize: bool = False,
-    ) -> tuple[WhereNode, set[str] | tuple[()]]:  # type: ignore[unsupported-operator]
+    ) -> tuple[WhereNode, set[str] | tuple[()]]:
         """Add a Q-object to the current filter."""
         connector = q_object.connector
         current_negated ^= q_object.negated
@@ -1572,7 +1572,7 @@ class Query(BaseExpression):
         reuse: set[str],
         branch_negated: bool = False,
         current_negated: bool = False,
-    ) -> WhereNode:  # type: ignore[unsupported-operator]
+    ) -> WhereNode:
         """Add a FilteredRelation object to the current filter."""
         connector = q_object.connector
         current_negated ^= q_object.negated
@@ -1675,7 +1675,7 @@ class Query(BaseExpression):
                         )
                         path.extend(filtered_relation_path[:-1])
                     else:
-                        field = meta.get_field(filtered_relation.relation_name)  # type: ignore[attr-defined]
+                        field = meta.get_field(filtered_relation.relation_name)
             if field is not None:
                 # Fields that contain one-to-many relations with a generic
                 # model (like a GenericForeignKey) cannot generate reverse
@@ -1708,9 +1708,9 @@ class Query(BaseExpression):
             if hasattr(field, "path_infos"):
                 pathinfos: list[PathInfo]
                 if filtered_relation:
-                    pathinfos = field.get_path_info(filtered_relation)  # type: ignore[attr-defined]
+                    pathinfos = field.get_path_info(filtered_relation)
                 else:
-                    pathinfos = field.path_infos  # type: ignore[attr-defined]
+                    pathinfos = field.path_infos
                 if not allow_many:
                     for inner_pos, p in enumerate(pathinfos):
                         if p.m2m:
@@ -1784,7 +1784,7 @@ class Query(BaseExpression):
         def final_transformer(field: Field, alias: str | None) -> Col:
             if not self.alias_cols:
                 alias = None
-            return field.get_col(alias)  # type: ignore[arg-type]
+            return field.get_col(alias)
 
         # Try resolving all the names as fields first. If there's an error,
         # treat trailing names as lookups until a field can be resolved.
@@ -1824,10 +1824,10 @@ class Query(BaseExpression):
                     else:
                         raise
 
-            final_transformer = functools.partial(  # type: ignore[misc]
+            final_transformer = functools.partial(
                 transform, name=name, previous=final_transformer
             )
-            final_transformer.has_transforms = True  # type: ignore[attr-defined]
+            final_transformer.has_transforms = True
         # Then, add the path to the query's joins. Note that we can't trim
         # joins at this stage - we will need the information about join type
         # of the trimmed joins.
@@ -2405,7 +2405,7 @@ class Query(BaseExpression):
         | tuple[str, ...]
         | dict[str, Any]
         | None,
-    ) -> None:  # type: ignore[misc]
+    ) -> None:
         """Set the mask of annotations that will be returned by the SELECT."""
         if names is None:
             self.annotation_select_mask = None

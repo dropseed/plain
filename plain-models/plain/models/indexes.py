@@ -136,7 +136,7 @@ class Index:
             model,
             fields=fields,
             name=self.name,
-            col_suffixes=col_suffixes,  # type: ignore[arg-type]
+            col_suffixes=col_suffixes,
             opclasses=self.opclasses,
             condition=condition,
             include=include,
@@ -216,7 +216,7 @@ class Index:
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
-            return self.deconstruct() == other.deconstruct()  # type: ignore[attr-defined]
+            return self.deconstruct() == other.deconstruct()
         return NotImplemented
 
 

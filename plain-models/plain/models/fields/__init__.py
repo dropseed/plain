@@ -497,7 +497,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         elif path.startswith("plain.models.fields"):
             path = path.replace("plain.models.fields", "plain.models")
         # Return basic info - other fields should override this.
-        return (self.name, path, [], keywords)  # type: ignore[return-value]
+        return (self.name, path, [], keywords)
 
     def clone(self) -> Field:
         """
@@ -570,7 +570,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         obj = Empty()
         obj.__class__ = self.__class__
         obj.__dict__ = self.__dict__.copy()
-        return obj  # type: ignore[return-value]
+        return obj
 
     def __reduce__(
         self,
@@ -1159,7 +1159,7 @@ def _get_naive_now() -> datetime.datetime:
     return _to_naive(timezone.now())
 
 
-class DateTimeCheckMixin(Field):  # type: ignore[type-arg]
+class DateTimeCheckMixin(Field):
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *super().preflight(**kwargs),
@@ -1172,9 +1172,9 @@ class DateTimeCheckMixin(Field):  # type: ignore[type-arg]
         # options. The use of more than one of these options together
         # will trigger an Error
         mutually_exclusive_options = [
-            self.auto_now_add,  # type: ignore[attr-defined]
-            self.auto_now,  # type: ignore[attr-defined]
-            self.has_default(),  # type: ignore[attr-defined]
+            self.auto_now_add,
+            self.auto_now,
+            self.has_default(),
         ]
         enabled_options = [
             option not in (None, False) for option in mutually_exclusive_options
@@ -1926,7 +1926,7 @@ class PositiveIntegerRelDbTypeMixin(IntegerField):
                     for parent in cls.__mro__[1:]
                     if issubclass(parent, IntegerField)
                 ),
-                None,  # type: ignore[arg-type]
+                None,
             )
 
     def rel_db_type(self: _HasDbType, connection: BaseDatabaseWrapper) -> str | None:
@@ -2184,7 +2184,7 @@ class BinaryField(Field[bytes | memoryview]):
     ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
         if value is not None:
-            return connection.Database.Binary(value)  # type: ignore[attr-defined]
+            return connection.Database.Binary(value)
         return value
 
     def value_to_string(self, obj: Any) -> str:
@@ -2268,7 +2268,7 @@ class PrimaryKeyField(BigIntegerField):
 
     def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         # PrimaryKeyField takes no parameters, so we return an empty kwargs dict
-        return (self.name, "plain.models.PrimaryKeyField", [], {})  # type: ignore[return-value]
+        return (self.name, "plain.models.PrimaryKeyField", [], {})
 
     def validate(self, value: Any, model_instance: Any) -> None:
         pass

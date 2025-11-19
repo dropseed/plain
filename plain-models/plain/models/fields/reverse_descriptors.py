@@ -162,7 +162,7 @@ class ReverseForeignKey(BaseReverseDescriptor[T]):
         return ReverseForeignKeyManager(
             instance=instance,
             field=self._resolved_field,
-            related_model=self._resolved_model,  # type: ignore[arg-type]
+            related_model=self._resolved_model,
         )
 
 
@@ -207,7 +207,7 @@ class ReverseManyToMany(BaseReverseDescriptor[T]):
             instance=instance,
             field=self._resolved_field,
             through=self._resolved_field.remote_field.through,
-            related_model=self._resolved_model,  # type: ignore[arg-type]
+            related_model=self._resolved_model,
             is_reverse=True,
             symmetrical=False,
         )

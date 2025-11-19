@@ -288,7 +288,7 @@ class Model(metaclass=ModelBase):
             prefetched_objects_cache = getattr(self, "_prefetched_objects_cache", ())
             for field in fields:
                 if field in prefetched_objects_cache:
-                    del prefetched_objects_cache[field]  # type: ignore[misc]
+                    del prefetched_objects_cache[field]
                     fields.remove(field)
             if not fields:
                 return
@@ -545,10 +545,10 @@ class Model(metaclass=ModelBase):
         Do an INSERT. If returning_fields is defined then this method should
         return the newly created data for the model.
         """
-        return manager._insert(  # type: ignore[return-value, arg-type]
+        return manager._insert(
             [self],
-            fields=fields,  # type: ignore[arg-type]
-            returning_fields=returning_fields,  # type: ignore[arg-type]
+            fields=fields,
+            returning_fields=returning_fields,
             raw=raw,
         )
 
@@ -710,7 +710,7 @@ class Model(metaclass=ModelBase):
             if len(unique_check) != len(lookup_kwargs):
                 continue
 
-            qs = model_class.query.filter(**lookup_kwargs)  # type: ignore[attr-defined]
+            qs = model_class.query.filter(**lookup_kwargs)
 
             # Exclude the current object from the query if we are editing an
             # instance (as opposed to creating a new one)
@@ -1587,4 +1587,4 @@ def model_unpickle(model_id: tuple[str, str] | type[Model]) -> Model:
     return model.__new__(model)
 
 
-model_unpickle.__safe_for_unpickle__ = True  # type: ignore[attr-defined]
+model_unpickle.__safe_for_unpickle__ = True

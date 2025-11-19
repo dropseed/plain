@@ -74,7 +74,7 @@ def get_normalized_value(value: Any, lhs: Any) -> tuple[Any, ...]:
 
 
 class RelatedIn(In):
-    def get_prep_lookup(self) -> list[Any]:  # type: ignore[misc]
+    def get_prep_lookup(self) -> list[Any]:
         if not isinstance(self.lhs, MultiColSource):
             if self.rhs_is_direct_value():
                 # If we get here, we are dealing with single-column relations.

@@ -61,7 +61,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         try:
             import sqlite3
 
-            value = sqlite3.adapt(value)  # type: ignore[call-overload]
+            value = sqlite3.adapt(value)
         except ImportError:
             pass
         except sqlite3.ProgrammingError:
@@ -218,7 +218,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # the old model to ensure their remote_field.field_name doesn't refer
         # to an altered field.
         def is_self_referential(f: Field) -> bool:
-            return f.is_relation and f.remote_field.model is model  # type: ignore[attr-defined]
+            return f.is_relation and f.remote_field.model is model
 
         # Work out the new fields dict / mapping
         body = {
@@ -302,7 +302,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         )
         body_copy["model_options"] = meta_options
         body_copy["__module__"] = model.__module__
-        temp_model: type[Model] = type(  # type: ignore[assignment]
+        temp_model: type[Model] = type(
             model.model_options.object_name, model.__bases__, body_copy
         )
         models_registry.register_model(model.model_options.package_label, temp_model)
@@ -317,7 +317,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         )
         body_copy["model_options"] = meta_options
         body_copy["__module__"] = model.__module__
-        new_model: type[Model] = type(  # type: ignore[assignment]
+        new_model: type[Model] = type(
             f"New{model.model_options.object_name}", model.__bases__, body_copy
         )
         models_registry.register_model(model.model_options.package_label, new_model)
@@ -340,7 +340,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
         # Rename the new table to take way for the old
         self.alter_db_table(
-            new_model,  # type: ignore[arg-type]
+            new_model,
             new_model.model_options.db_table,
             model.model_options.db_table,
             disable_constraints=False,
@@ -403,8 +403,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             # Primary keys, unique fields, indexed fields, and foreign keys are
             # not supported in ALTER TABLE DROP COLUMN.
             and not field.primary_key
-            and not (field.remote_field and field.db_index)  # type: ignore[attr-defined]
-            and not (field.remote_field and field.db_constraint)  # type: ignore[attr-defined]
+            and not (field.remote_field and field.db_index)
+            and not (field.remote_field and field.db_constraint)
         ):
             super().remove_field(model, field)
         # For everything else, remake.
@@ -434,9 +434,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             and self.column_sql(model, old_field) == self.column_sql(model, new_field)
             and not (
                 old_field.remote_field
-                and old_field.db_constraint  # type: ignore[attr-defined]
+                and old_field.db_constraint
                 or new_field.remote_field
-                and new_field.db_constraint  # type: ignore[attr-defined]
+                and new_field.db_constraint
             )
         ):
             return self.execute(
@@ -478,8 +478,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     ) -> None:
         """Alter M2Ms to repoint their to= endpoints."""
         # Type narrow for ManyToManyField.remote_field
-        old_rel: ManyToManyRel = old_field.remote_field  # type: ignore[assignment]
-        new_rel: ManyToManyRel = new_field.remote_field  # type: ignore[assignment]
+        old_rel: ManyToManyRel = old_field.remote_field
+        new_rel: ManyToManyRel = new_field.remote_field
 
         if (
             old_rel.through.model_options.db_table
@@ -495,10 +495,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         # so that table can be remade with the new m2m field -
                         # this is m2m_reverse_field_name().
                         old_rel.through._model_meta.get_field(
-                            old_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
+                            old_field.m2m_reverse_field_name()
                         ),
                         new_rel.through._model_meta.get_field(
-                            new_field.m2m_reverse_field_name()  # type: ignore[attr-defined]
+                            new_field.m2m_reverse_field_name()
                         ),
                     ),
                     (
@@ -506,10 +506,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         # so that table can be remade with the new self field -
                         # this is m2m_field_name().
                         old_rel.through._model_meta.get_field(
-                            old_field.m2m_field_name()  # type: ignore[attr-defined]
+                            old_field.m2m_field_name()
                         ),
                         new_rel.through._model_meta.get_field(
-                            new_field.m2m_field_name()  # type: ignore[attr-defined]
+                            new_field.m2m_field_name()
                         ),
                     ),
                 ],
@@ -525,15 +525,15 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 ", ".join(
                     [
                         "id",
-                        new_field.m2m_column_name(),  # type: ignore[attr-defined]
-                        new_field.m2m_reverse_name(),  # type: ignore[attr-defined]
+                        new_field.m2m_column_name(),
+                        new_field.m2m_reverse_name(),
                     ]
                 ),
                 ", ".join(
                     [
                         "id",
-                        old_field.m2m_column_name(),  # type: ignore[attr-defined]
-                        old_field.m2m_reverse_name(),  # type: ignore[attr-defined]
+                        old_field.m2m_column_name(),
+                        old_field.m2m_reverse_name(),
                     ]
                 ),
                 self.quote_name(old_rel.through.model_options.db_table),

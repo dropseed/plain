@@ -477,7 +477,7 @@ class MigrationAutodetector:
     ) -> None:
         # Operation dependencies are 4-element tuples:
         # (package_label, model_name, field_name, create/delete as True/False or "alter")
-        operation._auto_deps = dependencies or []  # type: ignore[attr-defined]
+        operation._auto_deps = dependencies or []
         if beginning:
             self.generated_operations.setdefault(package_label, []).insert(0, operation)
         else:
@@ -1202,7 +1202,7 @@ class MigrationAutodetector:
         dependencies = [(dep_package_label, dep_object_name, None, True)]
         if getattr(field.remote_field, "through", None):
             through_package_label, through_object_name = resolve_relation(
-                field.remote_field.through,  # type: ignore[attr-defined]
+                field.remote_field.through,
                 package_label,
                 model_name,
             )

@@ -46,7 +46,7 @@ class CursorWrapper:
         # (#17671). Catch errors liberally because errors in cleanup code
         # aren't useful.
         try:
-            self.close()  # type: ignore[attr-defined]
+            self.close()
         except self.db.Database.Error:
             pass
 
@@ -136,7 +136,7 @@ class CursorDebugWrapper(CursorWrapper):
             if use_last_executed_query:
                 sql = self.db.ops.last_executed_query(self.cursor, sql, params)
             try:
-                times = len(params) if many else ""  # type: ignore[arg-type]
+                times = len(params) if many else ""
             except TypeError:
                 # params could be an iterator.
                 times = "?"
@@ -327,7 +327,7 @@ def format_number(
             decimal.Decimal(1).scaleb(-decimal_places), context=context
         )
     else:
-        context.traps[decimal.Rounded] = 1  # type: ignore[assignment]
+        context.traps[decimal.Rounded] = 1
         value = context.create_decimal(value)
     return f"{value:f}"
 

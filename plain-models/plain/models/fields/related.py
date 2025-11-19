@@ -110,17 +110,17 @@ class RelatedField(FieldCacheMixin, Field):
     ):
         self._related_query_name = related_query_name
         self._limit_choices_to = limit_choices_to
-        super().__init__(**kwargs)  # type: ignore[misc]
+        super().__init__(**kwargs)
 
     @cached_property
     def related_model(self) -> type[Model]:
         # Can't cache this property until all the models are loaded.
         models_registry.check_ready()
-        return self.remote_field.model  # type: ignore[attr-defined]
+        return self.remote_field.model
 
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:  # type: ignore[misc]
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
-            *super().preflight(**kwargs),  # type: ignore[misc]
+            *super().preflight(**kwargs),
             *self._check_related_query_name_is_valid(),
             *self._check_relation_model_exists(),
             *self._check_clashes(),
@@ -157,11 +157,11 @@ class RelatedField(FieldCacheMixin, Field):
 
     def _check_relation_model_exists(self) -> list[PreflightResult]:
         rel_is_missing = (
-            self.remote_field.model not in self.meta.models_registry.get_models()  # type: ignore[attr-defined]
+            self.remote_field.model not in self.meta.models_registry.get_models()
         )
-        rel_is_string = isinstance(self.remote_field.model, str)  # type: ignore[attr-defined]
+        rel_is_string = isinstance(self.remote_field.model, str)
         model_name = (
-            self.remote_field.model  # type: ignore[attr-defined]
+            self.remote_field.model
             if rel_is_string
             else self.remote_field.model.model_options.object_name
         )
@@ -186,7 +186,7 @@ class RelatedField(FieldCacheMixin, Field):
 
         # f.remote_field.model may be a string instead of a model. Skip if
         # model name is not resolved.
-        if not isinstance(self.remote_field.model, ModelBase):  # type: ignore[attr-defined]
+        if not isinstance(self.remote_field.model, ModelBase):
             return []
 
         # Consider that we are checking field `Model.foreign` and the models
@@ -233,7 +233,7 @@ class RelatedField(FieldCacheMixin, Field):
         return None
 
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
-        super().contribute_to_class(cls, name)  # type: ignore[misc]
+        super().contribute_to_class(cls, name)
 
         self.meta = cls._model_meta
 
@@ -258,7 +258,7 @@ class RelatedField(FieldCacheMixin, Field):
         )
 
     def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()  # type: ignore[misc]
+        name, path, args, kwargs = super().deconstruct()
         if self._limit_choices_to:
             kwargs["limit_choices_to"] = self._limit_choices_to
         if self._related_query_name is not None:
@@ -275,7 +275,7 @@ class RelatedField(FieldCacheMixin, Field):
         """
         return {
             f"{self.name}__{rh_field.name}": getattr(obj, rh_field.attname)
-            for _, rh_field in self.related_fields  # type: ignore[attr-defined]
+            for _, rh_field in self.related_fields
         }
 
     def get_reverse_related_filter(self, obj: Model) -> Any:
@@ -288,7 +288,7 @@ class RelatedField(FieldCacheMixin, Field):
         return Q.create(
             [
                 (rh_field.attname, getattr(obj, lh_field.attname))
-                for lh_field, rh_field in self.related_fields  # type: ignore[attr-defined]
+                for lh_field, rh_field in self.related_fields
             ]
         )
 
@@ -296,7 +296,7 @@ class RelatedField(FieldCacheMixin, Field):
         self.name = self.name or (
             self.remote_field.model.model_options.model_name + "_" + "id"
         )
-        self.remote_field.set_field_name()  # type: ignore[attr-defined]
+        self.remote_field.set_field_name()
 
     def do_related_class(self, other: type[Model], cls: type[Model]) -> None:
         self.set_attributes_from_rel()
@@ -308,9 +308,9 @@ class RelatedField(FieldCacheMixin, Field):
         If it is a callable, it will be invoked and the result will be
         returned.
         """
-        if callable(self.remote_field.limit_choices_to):  # type: ignore[attr-defined]
-            return self.remote_field.limit_choices_to()  # type: ignore[attr-defined]
-        return self.remote_field.limit_choices_to  # type: ignore[attr-defined]
+        if callable(self.remote_field.limit_choices_to):
+            return self.remote_field.limit_choices_to()
+        return self.remote_field.limit_choices_to
 
     def related_query_name(self) -> str:
         """
@@ -318,8 +318,7 @@ class RelatedField(FieldCacheMixin, Field):
         table-spanning query.
         """
         return (
-            self.remote_field.related_query_name  # type: ignore[attr-defined]
-            or self.model.model_options.model_name  # type: ignore[attr-defined]
+            self.remote_field.related_query_name or self.model.model_options.model_name
         )
 
     @property
@@ -328,7 +327,7 @@ class RelatedField(FieldCacheMixin, Field):
         When filtering against this relation, return the field on the remote
         model against which the filtering should happen.
         """
-        target_fields = self.path_infos[-1].target_fields  # type: ignore[attr-defined]
+        target_fields = self.path_infos[-1].target_fields
         if len(target_fields) > 1:
             raise FieldError(
                 "The relation has multiple target fields, but only single target field "
@@ -337,7 +336,7 @@ class RelatedField(FieldCacheMixin, Field):
         return target_fields[0]
 
     def get_cache_name(self) -> str:
-        return self.name  # type: ignore[return-value]
+        return self.name
 
 
 class ForeignKey(RelatedField):
@@ -396,7 +395,7 @@ class ForeignKey(RelatedField):
         self.db_constraint = db_constraint
 
     def __copy__(self) -> ForeignKey:
-        obj: ForeignKey = super().__copy__()  # type: ignore[misc]
+        obj: ForeignKey = super().__copy__()
         # Remove any cached PathInfo values.
         obj.__dict__.pop("path_infos", None)
         obj.__dict__.pop("reverse_path_infos", None)
@@ -440,9 +439,9 @@ class ForeignKey(RelatedField):
     def get_local_related_value(self, instance: Model) -> tuple[Any, ...]:
         # Always returns the value of the single local field
         field = self.local_related_fields[0]
-        if field.primary_key:  # type: ignore[attr-defined]
+        if field.primary_key:
             return (instance.id,)
-        return (getattr(instance, field.attname),)  # type: ignore[attr-defined]
+        return (getattr(instance, field.attname),)
 
     def get_foreign_related_value(self, instance: Model) -> tuple[Any, ...]:
         # Always returns the id of the foreign instance
@@ -454,10 +453,10 @@ class ForeignKey(RelatedField):
         # Always returns a single column pair
         if reverse_join:
             from_field, to_field = self.related_fields[0]
-            return ((to_field.column, from_field.column),)  # type: ignore[attr-defined]
+            return ((to_field.column, from_field.column),)
         else:
             from_field, to_field = self.related_fields[0]
-            return ((from_field.column, to_field.column),)  # type: ignore[attr-defined]
+            return ((from_field.column, to_field.column),)
 
     def get_reverse_joining_columns(self) -> tuple[tuple[str, str], ...]:
         return self.get_joining_columns(reverse_join=True)
@@ -491,8 +490,8 @@ class ForeignKey(RelatedField):
                 from_meta=from_meta,
                 to_meta=meta,
                 target_fields=(meta.get_field("id"),),
-                join_field=self.remote_field,  # type: ignore[attr-defined]
-                m2m=not self.primary_key,  # type: ignore[attr-defined]
+                join_field=self.remote_field,
+                m2m=not self.primary_key,
                 direct=False,
                 filtered_relation=filtered_relation,
             )
@@ -506,15 +505,15 @@ class ForeignKey(RelatedField):
         super().contribute_to_class(cls, name)
         setattr(cls, name, ForwardForeignKeyDescriptor(self))
 
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:  # type: ignore[misc]
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
-            *super().preflight(**kwargs),  # type: ignore[misc]
+            *super().preflight(**kwargs),
             *self._check_on_delete(),
         ]
 
     def _check_on_delete(self) -> list[PreflightResult]:
-        on_delete = getattr(self.remote_field, "on_delete", None)  # type: ignore[attr-defined]
-        if on_delete == SET_NULL and not self.allow_null:  # type: ignore[attr-defined]
+        on_delete = getattr(self.remote_field, "on_delete", None)
+        if on_delete == SET_NULL and not self.allow_null:
             return [
                 PreflightResult(
                     fix=(
@@ -525,7 +524,7 @@ class ForeignKey(RelatedField):
                     id="fields.foreign_key_null_constraint_violation",
                 )
             ]
-        elif on_delete == SET_DEFAULT and not self.has_default():  # type: ignore[attr-defined]
+        elif on_delete == SET_DEFAULT and not self.has_default():
             return [
                 PreflightResult(
                     fix=(
@@ -541,16 +540,16 @@ class ForeignKey(RelatedField):
 
     def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
-        kwargs["on_delete"] = self.remote_field.on_delete  # type: ignore[attr-defined]
+        kwargs["on_delete"] = self.remote_field.on_delete
 
-        if isinstance(self.remote_field.model, SettingsReference):  # type: ignore[attr-defined]
-            kwargs["to"] = self.remote_field.model  # type: ignore[attr-defined]
-        elif isinstance(self.remote_field.model, str):  # type: ignore[attr-defined]
-            if "." in self.remote_field.model:  # type: ignore[attr-defined]
-                package_label, model_name = self.remote_field.model.split(".")  # type: ignore[attr-defined]
+        if isinstance(self.remote_field.model, SettingsReference):
+            kwargs["to"] = self.remote_field.model
+        elif isinstance(self.remote_field.model, str):
+            if "." in self.remote_field.model:
+                package_label, model_name = self.remote_field.model.split(".")
                 kwargs["to"] = f"{package_label}.{model_name.lower()}"
             else:
-                kwargs["to"] = self.remote_field.model.lower()  # type: ignore[attr-defined]
+                kwargs["to"] = self.remote_field.model.lower()
         else:
             kwargs["to"] = self.remote_field.model.model_options.label_lower
 
@@ -563,44 +562,44 @@ class ForeignKey(RelatedField):
         return name, path, args, kwargs
 
     def to_python(self, value: Any) -> Any:
-        return self.target_field.to_python(value)  # type: ignore[attr-defined]
+        return self.target_field.to_python(value)
 
     @property
     def target_field(self) -> Field:
         return self.foreign_related_fields[0]
 
     def validate(self, value: Any, model_instance: Model) -> None:
-        super().validate(value, model_instance)  # type: ignore[misc]
+        super().validate(value, model_instance)
         if value is None:
             return None
 
         qs = self.remote_field.model._model_meta.base_queryset.filter(
-            **{self.remote_field.field_name: value}  # type: ignore[attr-defined]
+            **{self.remote_field.field_name: value}
         )
         qs = qs.complex_filter(self.get_limit_choices_to())
         if not qs.exists():
             raise exceptions.ValidationError(
-                self.error_messages["invalid"],  # type: ignore[attr-defined]
+                self.error_messages["invalid"],
                 code="invalid",
                 params={
                     "model": self.remote_field.model.model_options.model_name,
                     "id": value,
-                    "field": self.remote_field.field_name,  # type: ignore[attr-defined]
+                    "field": self.remote_field.field_name,
                     "value": value,
                 },
             )
 
     def resolve_related_fields(self) -> list[tuple[ForeignKey, Field]]:
-        if isinstance(self.remote_field.model, str):  # type: ignore[attr-defined]
+        if isinstance(self.remote_field.model, str):
             raise ValueError(
-                f"Related model {self.remote_field.model!r} cannot be resolved"  # type: ignore[attr-defined]
+                f"Related model {self.remote_field.model!r} cannot be resolved"
             )
         from_field = self
         to_field = self.remote_field.model._model_meta.get_field("id")
         related_fields: list[tuple[ForeignKey, Field]] = [(from_field, to_field)]
 
         for from_field, to_field in related_fields:
-            if to_field and to_field.model != self.remote_field.model:  # type: ignore[attr-defined]
+            if to_field and to_field.model != self.remote_field.model:
                 raise FieldError(
                     f"'{self.model.model_options.label}.{self.name}' refers to field '{to_field.name}' which is not local to model "
                     f"'{self.remote_field.model.model_options.label}'."
@@ -612,43 +611,43 @@ class ForeignKey(RelatedField):
 
     def get_attname_column(self) -> tuple[str, str]:
         attname = self.get_attname()
-        column = self.db_column or attname  # type: ignore[attr-defined]
+        column = self.db_column or attname
         return attname, column
 
     def get_default(self) -> Any:
         """Return the to_field if the default value is an object."""
-        field_default = super().get_default()  # type: ignore[misc]
-        if isinstance(field_default, self.remote_field.model):  # type: ignore[attr-defined]
-            return getattr(field_default, self.target_field.attname)  # type: ignore[attr-defined]
+        field_default = super().get_default()
+        if isinstance(field_default, self.remote_field.model):
+            return getattr(field_default, self.target_field.attname)
         return field_default
 
     def get_db_prep_save(self, value: Any, connection: BaseDatabaseWrapper) -> Any:
         if value is None or (
-            value == "" and not self.target_field.empty_strings_allowed  # type: ignore[attr-defined]
+            value == "" and not self.target_field.empty_strings_allowed
         ):
             return None
         else:
-            return self.target_field.get_db_prep_save(value, connection=connection)  # type: ignore[attr-defined]
+            return self.target_field.get_db_prep_save(value, connection=connection)
 
     def get_db_prep_value(
         self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
     ) -> Any:
-        return self.target_field.get_db_prep_value(value, connection, prepared)  # type: ignore[attr-defined]
+        return self.target_field.get_db_prep_value(value, connection, prepared)
 
     def get_prep_value(self, value: Any) -> Any:
-        return self.target_field.get_prep_value(value)  # type: ignore[attr-defined]
+        return self.target_field.get_prep_value(value)
 
     def db_check(self, connection: BaseDatabaseWrapper) -> None:
         return None
 
     def db_type(self, connection: BaseDatabaseWrapper) -> str | None:
-        return self.target_field.rel_db_type(connection=connection)  # type: ignore[attr-defined]
+        return self.target_field.rel_db_type(connection=connection)
 
     def cast_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
-        return self.target_field.cast_db_type(connection=connection)  # type: ignore[attr-defined]
+        return self.target_field.cast_db_type(connection=connection)
 
     def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, Any]:
-        target_db_parameters = self.target_field.db_parameters(connection)  # type: ignore[attr-defined]
+        target_db_parameters = self.target_field.db_parameters(connection)
         return {
             "type": self.db_type(connection),
             "check": self.db_check(connection),
@@ -662,7 +661,7 @@ class ForeignKey(RelatedField):
                 output_field = output_field.target_field
                 if output_field is self:
                     raise ValueError("Cannot resolve output_field.")
-        return super().get_col(alias, output_field)  # type: ignore[misc]
+        return super().get_col(alias, output_field)
 
 
 # Register lookups for ForeignKey
@@ -738,9 +737,9 @@ class ManyToManyField(RelatedField):
             **kwargs,
         )
 
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:  # type: ignore[misc]
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
-            *super().preflight(**kwargs),  # type: ignore[misc]
+            *super().preflight(**kwargs),
             *self._check_relationship_model(**kwargs),
             *self._check_ignored_options(**kwargs),
             *self._check_table_uniqueness(**kwargs),
@@ -749,7 +748,7 @@ class ManyToManyField(RelatedField):
     def _check_ignored_options(self, **kwargs: Any) -> list[PreflightResult]:
         warnings: list[PreflightResult] = []
 
-        if self.has_null_arg:  # type: ignore[attr-defined]
+        if self.has_null_arg:
             warnings.append(
                 PreflightResult(
                     fix="The 'null' option has no effect on ManyToManyField. Remove the 'null' argument.",
@@ -768,7 +767,7 @@ class ManyToManyField(RelatedField):
                     warning=True,
                 )
             )
-        if self.db_comment:  # type: ignore[attr-defined]
+        if self.db_comment:
             warnings.append(
                 PreflightResult(
                     fix="The 'db_comment' option has no effect on ManyToManyField. Remove the 'db_comment' argument.",
@@ -992,17 +991,17 @@ class ManyToManyField(RelatedField):
         return errors
 
     def _check_table_uniqueness(self, **kwargs: Any) -> list[PreflightResult]:
-        if isinstance(self.remote_field.through, str):  # type: ignore[attr-defined]
+        if isinstance(self.remote_field.through, str):
             return []
         registered_tables = {
             model.model_options.db_table: model
-            for model in self.meta.models_registry.get_models()  # type: ignore[attr-defined]
-            if model != self.remote_field.through  # type: ignore[attr-defined]
+            for model in self.meta.models_registry.get_models()
+            if model != self.remote_field.through
         }
-        m2m_db_table = self.m2m_db_table()  # type: ignore[attr-defined]
+        m2m_db_table = self.m2m_db_table()
         model = registered_tables.get(m2m_db_table)
         # Check if there's already a m2m field using the same through model.
-        if model and model != self.remote_field.through:  # type: ignore[attr-defined]
+        if model and model != self.remote_field.through:
             clashing_obj = model.model_options.label
             return [
                 PreflightResult(
@@ -1020,21 +1019,21 @@ class ManyToManyField(RelatedField):
     def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
 
-        if self.remote_field.db_constraint is not True:  # type: ignore[attr-defined]
-            kwargs["db_constraint"] = self.remote_field.db_constraint  # type: ignore[attr-defined]
+        if self.remote_field.db_constraint is not True:
+            kwargs["db_constraint"] = self.remote_field.db_constraint
 
         # Lowercase model names as they should be treated as case-insensitive.
-        if isinstance(self.remote_field.model, str):  # type: ignore[attr-defined]
-            if "." in self.remote_field.model:  # type: ignore[attr-defined]
-                package_label, model_name = self.remote_field.model.split(".")  # type: ignore[attr-defined]
+        if isinstance(self.remote_field.model, str):
+            if "." in self.remote_field.model:
+                package_label, model_name = self.remote_field.model.split(".")
                 kwargs["to"] = f"{package_label}.{model_name.lower()}"
             else:
-                kwargs["to"] = self.remote_field.model.lower()  # type: ignore[attr-defined]
+                kwargs["to"] = self.remote_field.model.lower()
         else:
             kwargs["to"] = self.remote_field.model.model_options.label_lower
 
-        if isinstance(self.remote_field.through, str):  # type: ignore[attr-defined]
-            kwargs["through"] = self.remote_field.through  # type: ignore[attr-defined]
+        if isinstance(self.remote_field.through, str):
+            kwargs["through"] = self.remote_field.through
         else:
             kwargs["through"] = self.remote_field.through.model_options.label
 
@@ -1044,21 +1043,21 @@ class ManyToManyField(RelatedField):
         self, direct: bool = False, filtered_relation: Any = None
     ) -> list[PathInfo]:
         """Called by both direct and indirect m2m traversal."""
-        int_model = self.remote_field.through  # type: ignore[attr-defined]
+        int_model = self.remote_field.through
         linkfield1 = int_model._model_meta.get_field(self.m2m_field_name())
         linkfield2 = int_model._model_meta.get_field(self.m2m_reverse_field_name())
         if direct:
-            join1infos = linkfield1.reverse_path_infos  # type: ignore[attr-defined]
+            join1infos = linkfield1.reverse_path_infos
             if filtered_relation:
-                join2infos = linkfield2.get_path_info(filtered_relation)  # type: ignore[attr-defined]
+                join2infos = linkfield2.get_path_info(filtered_relation)
             else:
-                join2infos = linkfield2.path_infos  # type: ignore[attr-defined]
+                join2infos = linkfield2.path_infos
         else:
-            join1infos = linkfield2.reverse_path_infos  # type: ignore[attr-defined]
+            join1infos = linkfield2.reverse_path_infos
             if filtered_relation:
-                join2infos = linkfield1.get_path_info(filtered_relation)  # type: ignore[attr-defined]
+                join2infos = linkfield1.get_path_info(filtered_relation)
             else:
-                join2infos = linkfield1.path_infos  # type: ignore[attr-defined]
+                join2infos = linkfield1.path_infos
 
         return [*join1infos, *join2infos]
 
@@ -1091,14 +1090,14 @@ class ManyToManyField(RelatedField):
         cache_attr = f"_m2m_{attr}_cache"
         if hasattr(self, cache_attr):
             return getattr(self, cache_attr)
-        if self.remote_field.through_fields is not None:  # type: ignore[attr-defined]
-            link_field_name: str | None = self.remote_field.through_fields[0]  # type: ignore[attr-defined]
+        if self.remote_field.through_fields is not None:
+            link_field_name: str | None = self.remote_field.through_fields[0]
         else:
             link_field_name = None
         for f in self.remote_field.through._model_meta.fields:
             if (
-                f.is_relation  # type: ignore[attr-defined]
-                and f.remote_field.model == related.related_model  # type: ignore[attr-defined]
+                f.is_relation
+                and f.remote_field.model == related.related_model
                 and (link_field_name is None or link_field_name == f.name)
             ):
                 setattr(self, cache_attr, getattr(f, attr))
@@ -1114,12 +1113,12 @@ class ManyToManyField(RelatedField):
         if hasattr(self, cache_attr):
             return getattr(self, cache_attr)
         found = False
-        if self.remote_field.through_fields is not None:  # type: ignore[attr-defined]
-            link_field_name: str | None = self.remote_field.through_fields[1]  # type: ignore[attr-defined]
+        if self.remote_field.through_fields is not None:
+            link_field_name: str | None = self.remote_field.through_fields[1]
         else:
             link_field_name = None
         for f in self.remote_field.through._model_meta.fields:
-            if f.is_relation and f.remote_field.model == related.model:  # type: ignore[attr-defined]
+            if f.is_relation and f.remote_field.model == related.model:
                 if link_field_name is None and related.related_model == related.model:
                     # If this is an m2m-intermediate to self,
                     # the first foreign key you find will be
@@ -1141,20 +1140,20 @@ class ManyToManyField(RelatedField):
         def resolve_through_model(
             _: Any, model: type[Model], field: ManyToManyField
         ) -> None:
-            field.remote_field.through = model  # type: ignore[attr-defined]
+            field.remote_field.through = model
 
         lazy_related_operation(
             resolve_through_model,
             cls,
             self.remote_field.through,
-            field=self,  # type: ignore[attr-defined]
+            field=self,
         )
 
         # Add the descriptor for the m2m relation.
-        setattr(cls, self.name, ForwardManyToManyDescriptor(self.remote_field))  # type: ignore[attr-defined]
+        setattr(cls, self.name, ForwardManyToManyDescriptor(self.remote_field))
 
         # Set up the accessor for the m2m table name for the relation.
-        self.m2m_db_table = self._get_m2m_db_table  # type: ignore[method-assign]
+        self.m2m_db_table = self._get_m2m_db_table
 
     def do_related_class(self, other: type[Model], cls: type[Model]) -> None:
         """Set up M2M metadata accessors for the through table."""
@@ -1163,29 +1162,29 @@ class ManyToManyField(RelatedField):
         # Set up the accessors for the column names on the m2m table.
         # These are used during query construction and schema operations.
         related = self.remote_field
-        self.m2m_column_name = partial(self._get_m2m_attr, related, "column")  # type: ignore[method-assign]
-        self.m2m_reverse_name = partial(self._get_m2m_reverse_attr, related, "column")  # type: ignore[method-assign]
+        self.m2m_column_name = partial(self._get_m2m_attr, related, "column")
+        self.m2m_reverse_name = partial(self._get_m2m_reverse_attr, related, "column")
 
-        self.m2m_field_name = partial(self._get_m2m_attr, related, "name")  # type: ignore[method-assign]
-        self.m2m_reverse_field_name = partial(  # type: ignore[method-assign]
+        self.m2m_field_name = partial(self._get_m2m_attr, related, "name")
+        self.m2m_reverse_field_name = partial(
             self._get_m2m_reverse_attr, related, "name"
         )
 
         get_m2m_rel = partial(self._get_m2m_attr, related, "remote_field")
-        self.m2m_target_field_name = lambda: get_m2m_rel().field_name  # type: ignore[method-assign,attr-defined]
+        self.m2m_target_field_name = lambda: get_m2m_rel().field_name
         get_m2m_reverse_rel = partial(
             self._get_m2m_reverse_attr, related, "remote_field"
         )
-        self.m2m_reverse_target_field_name = lambda: get_m2m_reverse_rel().field_name  # type: ignore[method-assign,attr-defined]
+        self.m2m_reverse_target_field_name = lambda: get_m2m_reverse_rel().field_name
 
     def set_attributes_from_rel(self) -> None:
         pass
 
     def value_from_object(self, obj: Model) -> list[Any]:
-        return [] if obj.id is None else list(getattr(obj, self.attname).all())  # type: ignore[attr-defined]
+        return [] if obj.id is None else list(getattr(obj, self.attname).all())
 
     def save_form_data(self, instance: Model, data: Any) -> None:
-        getattr(instance, self.attname).set(data)  # type: ignore[attr-defined]
+        getattr(instance, self.attname).set(data)
 
     def db_check(self, connection: BaseDatabaseWrapper) -> None:
         return None

@@ -45,7 +45,7 @@ if TYPE_CHECKING:
 
 def register(connection: SQLiteDatabaseWrapper) -> None:
     create_deterministic_function = functools.partial(
-        connection.create_function,  # type: ignore[attr-defined]
+        connection.create_function,
         deterministic=True,
     )
     create_deterministic_function("plain_date_extract", 2, _sqlite_datetime_extract)
@@ -79,14 +79,14 @@ def register(connection: SQLiteDatabaseWrapper) -> None:
     create_deterministic_function("SIGN", 1, _sqlite_sign)
     # Don't use the built-in RANDOM() function because it returns a value
     # in the range [-1 * 2^63, 2^63 - 1] instead of [0, 1).
-    connection.create_function("RAND", 0, random.random)  # type: ignore[attr-defined]
-    connection.create_aggregate("STDDEV_POP", 1, StdDevPop)  # type: ignore[attr-defined]
-    connection.create_aggregate("STDDEV_SAMP", 1, StdDevSamp)  # type: ignore[attr-defined]
-    connection.create_aggregate("VAR_POP", 1, VarPop)  # type: ignore[attr-defined]
-    connection.create_aggregate("VAR_SAMP", 1, VarSamp)  # type: ignore[attr-defined]
+    connection.create_function("RAND", 0, random.random)
+    connection.create_aggregate("STDDEV_POP", 1, StdDevPop)
+    connection.create_aggregate("STDDEV_SAMP", 1, StdDevSamp)
+    connection.create_aggregate("VAR_POP", 1, VarPop)
+    connection.create_aggregate("VAR_SAMP", 1, VarSamp)
     # Some math functions are enabled by default in SQLite 3.35+.
     sql = "select sqlite_compileoption_used('ENABLE_MATH_FUNCTIONS')"
-    if not connection.execute(sql).fetchone()[0]:  # type: ignore[union-attr]
+    if not connection.execute(sql).fetchone()[0]:
         create_deterministic_function("ACOS", 1, _sqlite_acos)
         create_deterministic_function("ASIN", 1, _sqlite_asin)
         create_deterministic_function("ATAN", 1, _sqlite_atan)
@@ -117,14 +117,14 @@ def _sqlite_datetime_parse(
     except (TypeError, ValueError):
         return None
     if conn_tzname:
-        parsed_dt = parsed_dt.replace(tzinfo=zoneinfo.ZoneInfo(conn_tzname))  # type: ignore[union-attr]
+        parsed_dt = parsed_dt.replace(tzinfo=zoneinfo.ZoneInfo(conn_tzname))
     if tzname is not None and tzname != conn_tzname:
         tzname, sign, offset = split_tzname_delta(tzname)
         if offset:
             hours, minutes = offset.split(":")
             offset_delta = timedelta(hours=int(hours), minutes=int(minutes))
-            parsed_dt += offset_delta if sign == "+" else -offset_delta  # type: ignore[assignment,operator]
-        parsed_dt = timezone.localtime(parsed_dt, zoneinfo.ZoneInfo(tzname))  # type: ignore[arg-type]
+            parsed_dt += offset_delta if sign == "+" else -offset_delta
+        parsed_dt = timezone.localtime(parsed_dt, zoneinfo.ZoneInfo(tzname))
     return parsed_dt
 
 
@@ -142,7 +142,7 @@ def _sqlite_date_trunc(
     elif lookup_type == "month":
         return f"{parsed_dt.year:04d}-{parsed_dt.month:02d}-01"
     elif lookup_type == "week":
-        parsed_dt -= timedelta(days=parsed_dt.weekday())  # type: ignore[operator]
+        parsed_dt -= timedelta(days=parsed_dt.weekday())
         return f"{parsed_dt.year:04d}-{parsed_dt.month:02d}-{parsed_dt.day:02d}"
     elif lookup_type == "day":
         return f"{parsed_dt.year:04d}-{parsed_dt.month:02d}-{parsed_dt.day:02d}"
@@ -164,11 +164,11 @@ def _sqlite_time_trunc(
     else:
         result = dt_parsed
     if lookup_type == "hour":
-        return f"{result.hour:02d}:00:00"  # type: ignore[union-attr]
+        return f"{result.hour:02d}:00:00"
     elif lookup_type == "minute":
-        return f"{result.hour:02d}:{result.minute:02d}:00"  # type: ignore[union-attr]
+        return f"{result.hour:02d}:{result.minute:02d}:00"
     elif lookup_type == "second":
-        return f"{result.hour:02d}:{result.minute:02d}:{result.second:02d}"  # type: ignore[union-attr]
+        return f"{result.hour:02d}:{result.minute:02d}:{result.second:02d}"
     raise ValueError(f"Unsupported lookup type: {lookup_type!r}")
 
 
@@ -178,7 +178,7 @@ def _sqlite_datetime_cast_date(
     parsed_dt = _sqlite_datetime_parse(dt, tzname, conn_tzname)
     if parsed_dt is None:
         return None
-    return parsed_dt.date().isoformat()  # type: ignore[union-attr]
+    return parsed_dt.date().isoformat()
 
 
 def _sqlite_datetime_cast_time(
@@ -187,7 +187,7 @@ def _sqlite_datetime_cast_time(
     parsed_dt = _sqlite_datetime_parse(dt, tzname, conn_tzname)
     if parsed_dt is None:
         return None
-    return parsed_dt.time().isoformat()  # type: ignore[union-attr]
+    return parsed_dt.time().isoformat()
 
 
 def _sqlite_datetime_extract(
@@ -200,15 +200,15 @@ def _sqlite_datetime_extract(
     if parsed_dt is None:
         return None
     if lookup_type == "week_day":
-        return (parsed_dt.isoweekday() % 7) + 1  # type: ignore[union-attr]
+        return (parsed_dt.isoweekday() % 7) + 1
     elif lookup_type == "iso_week_day":
-        return parsed_dt.isoweekday()  # type: ignore[union-attr]
+        return parsed_dt.isoweekday()
     elif lookup_type == "week":
-        return parsed_dt.isocalendar().week  # type: ignore[union-attr]
+        return parsed_dt.isocalendar().week
     elif lookup_type == "quarter":
         return ceil(parsed_dt.month / 3)
     elif lookup_type == "iso_year":
-        return parsed_dt.isocalendar().year  # type: ignore[union-attr]
+        return parsed_dt.isocalendar().year
     else:
         return getattr(parsed_dt, lookup_type)
 
@@ -227,7 +227,7 @@ def _sqlite_datetime_trunc(
     elif lookup_type == "month":
         return f"{parsed_dt.year:04d}-{parsed_dt.month:02d}-01 00:00:00"
     elif lookup_type == "week":
-        parsed_dt -= timedelta(days=parsed_dt.weekday())  # type: ignore[operator]
+        parsed_dt -= timedelta(days=parsed_dt.weekday())
         return (
             f"{parsed_dt.year:04d}-{parsed_dt.month:02d}-{parsed_dt.day:02d} 00:00:00"
         )
@@ -236,16 +236,16 @@ def _sqlite_datetime_trunc(
             f"{parsed_dt.year:04d}-{parsed_dt.month:02d}-{parsed_dt.day:02d} 00:00:00"
         )
     elif lookup_type == "hour":
-        return f"{parsed_dt.year:04d}-{parsed_dt.month:02d}-{parsed_dt.day:02d} {parsed_dt.hour:02d}:00:00"  # type: ignore[union-attr]
+        return f"{parsed_dt.year:04d}-{parsed_dt.month:02d}-{parsed_dt.day:02d} {parsed_dt.hour:02d}:00:00"
     elif lookup_type == "minute":
         return (
             f"{parsed_dt.year:04d}-{parsed_dt.month:02d}-{parsed_dt.day:02d} "
-            f"{parsed_dt.hour:02d}:{parsed_dt.minute:02d}:00"  # type: ignore[union-attr]
+            f"{parsed_dt.hour:02d}:{parsed_dt.minute:02d}:00"
         )
     elif lookup_type == "second":
         return (
             f"{parsed_dt.year:04d}-{parsed_dt.month:02d}-{parsed_dt.day:02d} "
-            f"{parsed_dt.hour:02d}:{parsed_dt.minute:02d}:{parsed_dt.second:02d}"  # type: ignore[union-attr]
+            f"{parsed_dt.hour:02d}:{parsed_dt.minute:02d}:{parsed_dt.second:02d}"
         )
     raise ValueError(f"Unsupported lookup type: {lookup_type!r}")
 
@@ -257,7 +257,7 @@ def _sqlite_time_extract(lookup_type: str, dt: str | None) -> int | None:
         parsed_time = typecast_time(dt)
     except (ValueError, TypeError):
         return None
-    return getattr(parsed_time, lookup_type)  # type: ignore[union-attr]
+    return getattr(parsed_time, lookup_type)
 
 
 def _sqlite_prepare_dtdelta_param(
@@ -291,13 +291,13 @@ def _sqlite_format_dtdelta(
     if connector == "+":
         # typecast_timestamp() returns a date or a datetime without timezone.
         # It will be formatted as "%Y-%m-%d" or "%Y-%m-%d %H:%M:%S[.%f]"
-        out = str(real_lhs + real_rhs)  # type: ignore[operator]
+        out = str(real_lhs + real_rhs)
     elif connector == "-":
-        out = str(real_lhs - real_rhs)  # type: ignore[operator]
+        out = str(real_lhs - real_rhs)
     elif connector == "*":
-        out = real_lhs * real_rhs  # type: ignore[operator]
+        out = real_lhs * real_rhs
     else:
-        out = real_lhs / real_rhs  # type: ignore[operator]
+        out = real_lhs / real_rhs
     return out
 
 
@@ -307,14 +307,14 @@ def _sqlite_time_diff(lhs: str | None, rhs: str | None) -> int | None:
     left = typecast_time(lhs)
     right = typecast_time(rhs)
     return (
-        (left.hour * 60 * 60 * 1000000)  # type: ignore[union-attr]
-        + (left.minute * 60 * 1000000)  # type: ignore[union-attr]
-        + (left.second * 1000000)  # type: ignore[union-attr]
-        + (left.microsecond)  # type: ignore[union-attr]
-        - (right.hour * 60 * 60 * 1000000)  # type: ignore[union-attr]
-        - (right.minute * 60 * 1000000)  # type: ignore[union-attr]
-        - (right.second * 1000000)  # type: ignore[union-attr]
-        - (right.microsecond)  # type: ignore[union-attr]
+        (left.hour * 60 * 60 * 1000000)
+        + (left.minute * 60 * 1000000)
+        + (left.second * 1000000)
+        + (left.microsecond)
+        - (right.hour * 60 * 60 * 1000000)
+        - (right.minute * 60 * 1000000)
+        - (right.second * 1000000)
+        - (right.microsecond)
     )
 
 
@@ -323,7 +323,7 @@ def _sqlite_timestamp_diff(lhs: str | None, rhs: str | None) -> int | None:
         return None
     left = typecast_timestamp(lhs)
     right = typecast_timestamp(rhs)
-    return duration_microseconds(left - right)  # type: ignore[arg-type,operator]
+    return duration_microseconds(left - right)
 
 
 def _sqlite_regexp(pattern: str | None, string: Any) -> bool | None:

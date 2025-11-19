@@ -119,7 +119,7 @@ class RunSQL(Operation):
                 if isinstance(sql_item, list | tuple):
                     elements = len(sql_item)
                     if elements == 2:
-                        sql, params = sql_item  # type: ignore[misc]
+                        sql, params = sql_item
                     else:
                         raise ValueError("Expected a 2-tuple but got %d" % elements)  # noqa: UP031
                 else:

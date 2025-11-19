@@ -41,7 +41,7 @@ class ModelOperation(Operation):
     def reduce(
         self, operation: Operation, package_label: str
     ) -> bool | list[Operation]:
-        return super().reduce(operation, package_label) or self.can_reduce_through(  # type: ignore[misc]
+        return super().reduce(operation, package_label) or self.can_reduce_through(
             operation, package_label
         )
 
@@ -110,7 +110,7 @@ class CreateModel(ModelOperation):
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
-        model = to_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
+        model = to_state.models_registry.get_model(package_label, self.name)
         if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.create_model(model)
 
@@ -258,7 +258,7 @@ class DeleteModel(ModelOperation):
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
-        model = from_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
+        model = from_state.models_registry.get_model(package_label, self.name)
         if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.delete_model(model)
 
@@ -308,9 +308,9 @@ class RenameModel(ModelOperation):
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
-        new_model = to_state.models_registry.get_model(package_label, self.new_name)  # type: ignore[attr-defined]
+        new_model = to_state.models_registry.get_model(package_label, self.new_name)
         if self.allow_migrate_model(schema_editor.connection, new_model):
-            old_model = from_state.models_registry.get_model(  # type: ignore[attr-defined]
+            old_model = from_state.models_registry.get_model(
                 package_label, self.old_name
             )
             # Move the main table
@@ -321,11 +321,11 @@ class RenameModel(ModelOperation):
             )
             # Alter the fields pointing to us
             for related_object in old_model._model_meta.related_objects:
-                if related_object.related_model == old_model:  # type: ignore[attr-defined]
+                if related_object.related_model == old_model:
                     model = new_model
                     related_key = (package_label, self.new_name_lower)
                 else:
-                    model = related_object.related_model  # type: ignore[attr-defined]
+                    model = related_object.related_model
                     related_key = (
                         related_object.related_model.model_options.package_label,
                         related_object.related_model.model_options.model_name,
@@ -366,7 +366,7 @@ class RenameModel(ModelOperation):
             ]
         # Skip `ModelOperation.reduce` as we want to run `references_model`
         # against self.new_name.
-        return super(ModelOperation, self).reduce(  # type: ignore[misc]
+        return super(ModelOperation, self).reduce(
             operation, package_label
         ) or not operation.references_model(self.new_name, package_label)
 
@@ -409,9 +409,9 @@ class AlterModelTable(ModelOptionOperation):
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
-        new_model = to_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
+        new_model = to_state.models_registry.get_model(package_label, self.name)
         if self.allow_migrate_model(schema_editor.connection, new_model):
-            old_model = from_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
+            old_model = from_state.models_registry.get_model(package_label, self.name)
             schema_editor.alter_db_table(
                 new_model,
                 old_model.model_options.db_table,
@@ -453,9 +453,9 @@ class AlterModelTableComment(ModelOptionOperation):
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
-        new_model = to_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
+        new_model = to_state.models_registry.get_model(package_label, self.name)
         if self.allow_migrate_model(schema_editor.connection, new_model):
-            old_model = from_state.models_registry.get_model(package_label, self.name)  # type: ignore[attr-defined]
+            old_model = from_state.models_registry.get_model(package_label, self.name)
             schema_editor.alter_db_table_comment(
                 new_model,
                 old_model.model_options.db_table_comment,
@@ -523,7 +523,7 @@ class IndexOperation(Operation):
 
     @cached_property
     def model_name_lower(self) -> str:
-        return self.model_name.lower()  # type: ignore[attr-defined]
+        return self.model_name.lower()
 
 
 class AddIndex(IndexOperation):
@@ -531,7 +531,7 @@ class AddIndex(IndexOperation):
 
     def __init__(self, model_name: str, index: Any) -> None:
         self.model_name = model_name
-        if not index.name:  # type: ignore[attr-defined]
+        if not index.name:
             raise ValueError(
                 "Indexes passed to AddIndex operations require a name "
                 f"argument. {index!r} doesn't have one."
@@ -548,7 +548,7 @@ class AddIndex(IndexOperation):
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
-        model = to_state.models_registry.get_model(package_label, self.model_name)  # type: ignore[attr-defined]
+        model = to_state.models_registry.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.add_index(model, self.index)
 
@@ -564,21 +564,21 @@ class AddIndex(IndexOperation):
         )
 
     def describe(self) -> str:
-        if self.index.expressions:  # type: ignore[attr-defined]
+        if self.index.expressions:
             return "Create index {} on {} on model {}".format(
-                self.index.name,  # type: ignore[attr-defined]
-                ", ".join([str(expression) for expression in self.index.expressions]),  # type: ignore[attr-defined]
+                self.index.name,
+                ", ".join([str(expression) for expression in self.index.expressions]),
                 self.model_name,
             )
         return "Create index {} on field(s) {} of model {}".format(
-            self.index.name,  # type: ignore[attr-defined]
-            ", ".join(self.index.fields),  # type: ignore[attr-defined]
+            self.index.name,
+            ", ".join(self.index.fields),
             self.model_name,
         )
 
     @property
     def migration_name_fragment(self) -> str:
-        return f"{self.model_name_lower}_{self.index.name.lower()}"  # type: ignore[attr-defined]
+        return f"{self.model_name_lower}_{self.index.name.lower()}"
 
 
 class RemoveIndex(IndexOperation):
@@ -598,7 +598,7 @@ class RemoveIndex(IndexOperation):
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
-        model = from_state.models_registry.get_model(package_label, self.model_name)  # type: ignore[attr-defined]
+        model = from_state.models_registry.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection, model):
             from_model_state = from_state.models[package_label, self.model_name_lower]
             index = from_model_state.get_index_by_name(self.name)
@@ -649,7 +649,7 @@ class RenameIndex(IndexOperation):
 
     @cached_property
     def old_name_lower(self) -> str:
-        return self.old_name.lower()  # type: ignore[union-attr]
+        return self.old_name.lower()
 
     @cached_property
     def new_name_lower(self) -> str:
@@ -679,7 +679,7 @@ class RenameIndex(IndexOperation):
                 package_label,
                 self.model_name_lower,
                 self.old_name,
-                self.new_name,  # type: ignore[arg-type]
+                self.new_name,
             )
 
     def database_forwards(
@@ -689,12 +689,12 @@ class RenameIndex(IndexOperation):
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
-        model = to_state.models_registry.get_model(package_label, self.model_name)  # type: ignore[attr-defined]
+        model = to_state.models_registry.get_model(package_label, self.model_name)
         if not self.allow_migrate_model(schema_editor.connection, model):
             return None
 
         if self.old_fields:
-            from_model = from_state.models_registry.get_model(  # type: ignore[attr-defined]
+            from_model = from_state.models_registry.get_model(
                 package_label, self.model_name
             )
             columns = [
@@ -719,9 +719,9 @@ class RenameIndex(IndexOperation):
         else:
             from_model_state = from_state.models[package_label, self.model_name_lower]
             assert self.old_name is not None
-            old_index = from_model_state.get_index_by_name(self.old_name)  # type: ignore[arg-type]
+            old_index = from_model_state.get_index_by_name(self.old_name)
         # Don't alter when the index name is not changed.
-        if old_index.name == self.new_name:  # type: ignore[attr-defined]
+        if old_index.name == self.new_name:
             return None
 
         to_model_state = to_state.models[package_label, self.model_name_lower]
@@ -745,7 +745,7 @@ class RenameIndex(IndexOperation):
             return f"rename_{self.old_name_lower}_{self.new_name_lower}"
         return "rename_{}_{}_{}".format(
             self.model_name_lower,
-            "_".join(self.old_fields),  # type: ignore[arg-type]
+            "_".join(self.old_fields),
             self.new_name_lower,
         )
 
@@ -786,7 +786,7 @@ class AddConstraint(IndexOperation):
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
-        model = to_state.models_registry.get_model(package_label, self.model_name)  # type: ignore[attr-defined]
+        model = to_state.models_registry.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.add_constraint(model, self.constraint)
 
@@ -801,11 +801,11 @@ class AddConstraint(IndexOperation):
         )
 
     def describe(self) -> str:
-        return f"Create constraint {self.constraint.name} on model {self.model_name}"  # type: ignore[attr-defined]
+        return f"Create constraint {self.constraint.name} on model {self.model_name}"
 
     @property
     def migration_name_fragment(self) -> str:
-        return f"{self.model_name_lower}_{self.constraint.name.lower()}"  # type: ignore[attr-defined]
+        return f"{self.model_name_lower}_{self.constraint.name.lower()}"
 
 
 class RemoveConstraint(IndexOperation):
@@ -825,7 +825,7 @@ class RemoveConstraint(IndexOperation):
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
-        model = to_state.models_registry.get_model(package_label, self.model_name)  # type: ignore[attr-defined]
+        model = to_state.models_registry.get_model(package_label, self.model_name)
         if self.allow_migrate_model(schema_editor.connection, model):
             from_model_state = from_state.models[package_label, self.model_name_lower]
             constraint = from_model_state.get_constraint_by_name(self.name)

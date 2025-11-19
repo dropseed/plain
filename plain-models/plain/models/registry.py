@@ -184,10 +184,10 @@ class ModelsRegistry:
             # has been imported and registered. The `func` attribute provides
             # duck-type compatibility with partials.
             def apply_next_model(model: type[Model]) -> None:
-                next_function = partial(apply_next_model.func, model)  # type: ignore[attr-defined]
+                next_function = partial(apply_next_model.func, model)
                 self.lazy_model_operation(next_function, *more_models)
 
-            apply_next_model.func = function  # type: ignore[attr-defined]
+            apply_next_model.func = function
 
             # If the model has already been imported and registered, partially
             # apply it to the function now. If not, add it to the list of
@@ -217,6 +217,6 @@ models_registry = ModelsRegistry()
 def register_model(model_class: M) -> M:
     model_class._model_meta.models_registry.register_model(
         model_class.model_options.package_label,
-        model_class,  # type: ignore[arg-type]
+        model_class,
     )
     return model_class

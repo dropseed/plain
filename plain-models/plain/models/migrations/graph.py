@@ -27,7 +27,7 @@ class Node:
         return self.key == other
 
     def __lt__(self, other: object) -> bool:
-        return self.key < other  # type: ignore[operator]
+        return self.key < other
 
     def __hash__(self) -> int:
         return hash(self.key)
@@ -125,13 +125,13 @@ class MigrationGraph:
                 f"Migration {migration} dependencies reference nonexistent"
                 f" child node {child!r}"
             )
-            self.add_dummy_node(child, migration, error_message)  # type: ignore[arg-type]
+            self.add_dummy_node(child, migration, error_message)
         if parent not in self.nodes:
             error_message = (
                 f"Migration {migration} dependencies reference nonexistent"
                 f" parent node {parent!r}"
             )
-            self.add_dummy_node(parent, migration, error_message)  # type: ignore[arg-type]
+            self.add_dummy_node(parent, migration, error_message)
         self.node_map[child].add_parent(self.node_map[parent])
         self.node_map[parent].add_child(self.node_map[child])
         if not skip_validation:
@@ -340,12 +340,12 @@ class MigrationGraph:
         if not nodes:
             return ProjectState()
         if not isinstance(nodes[0], tuple):
-            nodes = [nodes]  # type: ignore[list-item]
+            nodes = [nodes]
         assert isinstance(nodes, list)  # Type narrowing after checks above
         plan = self._generate_plan(nodes, at_end)
         project_state = ProjectState(real_packages=real_packages)
         for node in plan:
-            project_state = self.nodes[node].mutate_state(project_state, preserve=False)  # type: ignore[union-attr]
+            project_state = self.nodes[node].mutate_state(project_state, preserve=False)
         return project_state
 
     def __contains__(self, node: tuple[str, str]) -> bool:

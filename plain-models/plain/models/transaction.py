@@ -233,5 +233,5 @@ def atomic(
 ) -> F | Atomic:
     """Create an atomic transaction context or decorator."""
     if callable(func):
-        return Atomic(savepoint, durable)(func)  # type: ignore[return-value]
+        return Atomic(savepoint, durable)(func)
     return Atomic(savepoint, durable)

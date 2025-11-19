@@ -32,7 +32,7 @@ class MigrationRecorder:
     _migration_class: type[models.Model] | None = None
 
     @classproperty
-    def Migration(cls) -> type[models.Model]:  # type: ignore[misc]
+    def Migration(cls) -> type[models.Model]:
         """
         Lazy load to avoid PackageRegistryNotReady if installed packages import
         MigrationRecorder.

@@ -182,7 +182,7 @@ class SQLiteDatabaseWrapper(BaseDatabaseWrapper):
         return self.Database.sqlite_version_info
 
     def get_new_connection(self, conn_params: dict[str, Any]) -> Any:
-        conn = Database.connect(**conn_params)  # type: ignore[call-overload]
+        conn = Database.connect(**conn_params)
         register_functions(conn)
 
         conn.execute("PRAGMA foreign_keys = ON")
@@ -317,7 +317,7 @@ class SQLiteCursorWrapper(Database.Cursor):
     In both cases, if you want to use a literal "%s", you'll need to use "%%s".
     """
 
-    def execute(  # type: ignore[override]
+    def execute(
         self, query: str, params: Iterable[Any] | Mapping[str, Any] | None = None
     ) -> Any:
         if params is None:
@@ -327,7 +327,7 @@ class SQLiteCursorWrapper(Database.Cursor):
         query = self.convert_query(query, param_names=param_names)
         return super().execute(query, params)
 
-    def executemany(  # type: ignore[override]
+    def executemany(
         self,
         query: str,
         param_list: Iterable[Iterable[Any] | Mapping[str, Any]],

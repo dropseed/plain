@@ -165,7 +165,7 @@ class Migration:
         return name
 
 
-class SettingsTuple(tuple):  # type: ignore[type-arg]
+class SettingsTuple(tuple):
     """
     Subclass of tuple so Plain can tell this was originally a settings
     dependency when it reads the migration file.
@@ -173,8 +173,8 @@ class SettingsTuple(tuple):  # type: ignore[type-arg]
 
     def __new__(cls, value: tuple[str, str], setting: str) -> SettingsTuple:
         self = tuple.__new__(cls, value)
-        self.setting = setting  # type: ignore[attr-defined]
-        return self  # type: ignore[return-value]
+        self.setting = setting
+        return self
 
 
 def settings_dependency(value: str) -> SettingsTuple:

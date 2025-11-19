@@ -279,7 +279,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return value
 
         # MySQL doesn't support tz-aware times
-        if timezone.is_aware(value):  # type: ignore[arg-type]
+        if timezone.is_aware(value):
             raise ValueError("MySQL backend does not support timezone-aware times.")
 
         return value.isoformat(timespec="microseconds")

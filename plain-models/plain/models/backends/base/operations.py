@@ -311,7 +311,7 @@ class BaseDatabaseOperations(ABC):
         elif params is None:
             u_params = ()
         else:
-            u_params = {to_string(k): to_string(v) for k, v in params.items()}  # type: ignore[union-attr]
+            u_params = {to_string(k): to_string(v) for k, v in params.items()}
 
         return f"QUERY = {sql!r} - PARAMS = {u_params!r}"
 
@@ -539,7 +539,7 @@ class BaseDatabaseOperations(ABC):
         if hasattr(value, "resolve_expression"):
             return value
 
-        if timezone.is_aware(value):  # type: ignore[arg-type]
+        if timezone.is_aware(value):
             raise ValueError("Plain does not support timezone-aware times.")
         return str(value)
 
@@ -777,7 +777,7 @@ class BaseDatabaseOperations(ABC):
             raise ValueError(
                 "Unknown options: {}".format(", ".join(sorted(options.keys())))
             )
-        return self.explain_prefix  # type: ignore[return-value]
+        return self.explain_prefix
 
     def insert_statement(self, on_conflict: Any = None) -> str:
         return "INSERT INTO"

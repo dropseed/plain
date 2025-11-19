@@ -166,7 +166,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if (
             storage == "InnoDB"
             and field.get_internal_type() == "ForeignKey"
-            and field.db_constraint  # type: ignore[attr-defined]
+            and field.db_constraint
         ):
             return False
         return not self._is_limited_data_type(field)

@@ -129,11 +129,11 @@ class BaseDatabaseWrapper(ABC):
         # call execute(sql, params, many, context).
         self.execute_wrappers: list[Any] = []
 
-        self.client: BaseDatabaseClient = self.client_class(self)  # type: ignore[misc]
-        self.creation: BaseDatabaseCreation = self.creation_class(self)  # type: ignore[misc]
-        self.features: BaseDatabaseFeatures = self.features_class(self)  # type: ignore[misc]
-        self.introspection: BaseDatabaseIntrospection = self.introspection_class(self)  # type: ignore[misc]
-        self.ops: BaseDatabaseOperations = self.ops_class(self)  # type: ignore[misc]
+        self.client: BaseDatabaseClient = self.client_class(self)
+        self.creation: BaseDatabaseCreation = self.creation_class(self)
+        self.features: BaseDatabaseFeatures = self.features_class(self)
+        self.introspection: BaseDatabaseIntrospection = self.introspection_class(self)
+        self.ops: BaseDatabaseOperations = self.ops_class(self)
         self.validation: BaseDatabaseValidation = self.validation_class(self)
 
     def __repr__(self) -> str:
@@ -460,7 +460,7 @@ class BaseDatabaseWrapper(ABC):
         )
 
         if start_transaction_under_autocommit:
-            self._start_transaction_under_autocommit()  # type: ignore[attr-defined]
+            self._start_transaction_under_autocommit()
         elif autocommit:
             self._set_autocommit(autocommit)
         else:

@@ -23,7 +23,7 @@ from plain.utils.regex_helper import _lazy_re_compile
 try:
     from MySQLdb.connections import Connection as MySQLConnection
 except ImportError:
-    MySQLConnection = Any  # type: ignore[misc, assignment]
+    MySQLConnection = Any
 
 from .client import DatabaseClient
 from .creation import DatabaseCreation

@@ -35,9 +35,9 @@ def _filter_prefetch_queryset(
             expr for expr, _ in queryset.sql_query.get_compiler().get_order_by()
         ]
         window = Window(RowNumber(), partition_by=field_name, order_by=order_by)
-        predicate &= GreaterThan(window, low_mark)  # type: ignore[unsupported-operator]
+        predicate &= GreaterThan(window, low_mark)
         if high_mark is not None:
-            predicate &= LessThanOrEqual(window, high_mark)  # type: ignore[unsupported-operator]
+            predicate &= LessThanOrEqual(window, high_mark)
         queryset.sql_query.clear_limits()
     return queryset.filter(predicate)
 
@@ -573,17 +573,17 @@ class ManyToManyManager(BaseRelatedManager):
             not isinstance(removed_vals, QuerySet) or removed_vals._has_filters()
         )
         if removed_vals_filters:
-            filters = filters & Q.create(  # type: ignore[unsupported-operator]
+            filters = filters & Q.create(
                 [(f"{self.target_field_name}__in", removed_vals)]
             )
         # Add symmetrical filters for forward symmetrical relations
         if self.symmetrical:
             symmetrical_filters = Q.create([(self.target_field_name, self.related_val)])
             if removed_vals_filters:
-                symmetrical_filters = symmetrical_filters & Q.create(  # type: ignore[unsupported-operator]
+                symmetrical_filters = symmetrical_filters & Q.create(
                     [(f"{self.source_field_name}__in", removed_vals)]
                 )
-            filters = filters | symmetrical_filters  # type: ignore[unsupported-operator]
+            filters = filters | symmetrical_filters
         return filters
 
     def add(self, *objs: Any, through_defaults: dict[str, Any] | None = None) -> None:

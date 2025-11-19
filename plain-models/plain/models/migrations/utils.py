@@ -122,7 +122,7 @@ def get_references(
                 state_model_tuple,
                 field,
                 model_tuple,
-                *field_tuple,  # type: ignore[arg-type]
+                *field_tuple,
             )
             if reference:
                 yield model_state, name, field, reference

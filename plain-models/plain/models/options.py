@@ -82,7 +82,7 @@ class Options:
 
         # Skip for the base Model class - return descriptor
         if owner.__name__ == "Model" and owner.__module__ == "plain.models.base":
-            return self  # type: ignore
+            return self
 
         # Return cached instance or create new one
         if owner not in self._cache:

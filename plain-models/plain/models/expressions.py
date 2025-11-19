@@ -98,7 +98,7 @@ class Combinable:
 
     def __and__(self, other: Any) -> Q:
         if getattr(self, "conditional", False) and getattr(other, "conditional", False):
-            return Q(self) & Q(other)  # type: ignore[unsupported-operator]
+            return Q(self) & Q(other)
         raise NotImplementedError(
             "Use .bitand(), .bitor(), and .bitxor() for bitwise logical operations."
         )
@@ -114,7 +114,7 @@ class Combinable:
 
     def __xor__(self, other: Any) -> Q:
         if getattr(self, "conditional", False) and getattr(other, "conditional", False):
-            return Q(self) ^ Q(other)  # type: ignore[unsupported-operator]
+            return Q(self) ^ Q(other)
         raise NotImplementedError(
             "Use .bitand(), .bitor(), and .bitxor() for bitwise logical operations."
         )
@@ -124,7 +124,7 @@ class Combinable:
 
     def __or__(self, other: Any) -> Q:
         if getattr(self, "conditional", False) and getattr(other, "conditional", False):
-            return Q(self) | Q(other)  # type: ignore[unsupported-operator]
+            return Q(self) | Q(other)
         raise NotImplementedError(
             "Use .bitand(), .bitor(), and .bitxor() for bitwise logical operations."
         )
@@ -495,7 +495,7 @@ class Expression(BaseExpression, Combinable):
     @cached_property
     def identity(self) -> tuple[Any, ...]:
         constructor_signature = inspect.signature(self.__init__)
-        args, kwargs = self._constructor_args  # type: ignore[attr-defined]
+        args, kwargs = self._constructor_args
         signature = constructor_signature.bind_partial(*args, **kwargs)
         signature.apply_defaults()
         arguments = signature.arguments.items()
@@ -809,7 +809,7 @@ class DurationExpression(CombinedExpression):
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, list[Any]]:
         if connection.features.has_native_duration_field:
-            return super().as_sql(compiler, connection)  # type: ignore[misc]
+            return super().as_sql(compiler, connection)
         connection.ops.check_expression_support(self)
         expressions = []
         expression_params = []
@@ -890,7 +890,7 @@ class F(Combinable):
         summarize: bool = False,
         for_save: bool = False,
     ) -> Any:
-        return query.resolve_ref(self.name, allow_joins, reuse, summarize)  # type: ignore[union-attr]
+        return query.resolve_ref(self.name, allow_joins, reuse, summarize)
 
     def replace_expressions(self, replacements: dict[Any, Any]) -> F:
         return replacements.get(self, self)
@@ -902,9 +902,7 @@ class F(Combinable):
         return OrderBy(self, descending=True, **kwargs)
 
     def __eq__(self, other: object) -> bool:
-        return (
-            self.__class__ == other.__class__ and self.name == other.name  # type: ignore[attr-defined]
-        )
+        return self.__class__ == other.__class__ and self.name == other.name
 
     def __hash__(self) -> int:
         return hash(self.name)
@@ -931,7 +929,7 @@ class ResolvedOuterRef(F):
         )
 
     def resolve_expression(self, *args: Any, **kwargs: Any) -> Any:
-        col = super().resolve_expression(*args, **kwargs)  # type: ignore[misc]
+        col = super().resolve_expression(*args, **kwargs)
         if col.contains_over_clause:
             raise NotSupportedError(
                 f"Referencing outer query window expression is not supported: "
@@ -1066,7 +1064,7 @@ class Func(SQLiteNumericMixin, Expression):
         copy = super().copy()
         copy.source_expressions = self.source_expressions[:]
         copy.extra = self.extra.copy()
-        return copy  # type: ignore[return-value]
+        return copy
 
 
 @deconstructible(path="plain.models.Value")
@@ -1120,9 +1118,9 @@ class Value(SQLiteNumericMixin, Expression):
         summarize: bool = False,
         for_save: bool = False,
     ) -> Value:
-        c = super().resolve_expression(query, allow_joins, reuse, summarize, for_save)  # type: ignore[misc]
-        c.for_save = for_save  # type: ignore[attr-defined]
-        return c  # type: ignore[return-value]
+        c = super().resolve_expression(query, allow_joins, reuse, summarize, for_save)
+        c.for_save = for_save
+        return c
 
     def get_group_by_cols(self) -> list[Any]:
         return []
@@ -1324,7 +1322,7 @@ class OrderByList(Func):
     def as_sql(self, *args: Any, **kwargs: Any) -> tuple[str, tuple[Any, ...]]:
         if not self.source_expressions:
             return "", ()
-        return super().as_sql(*args, **kwargs)  # type: ignore[misc]
+        return super().as_sql(*args, **kwargs)
 
     def get_group_by_cols(self) -> list[Any]:
         group_by_cols = []
@@ -1357,7 +1355,7 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
             return expression.get_group_by_cols()
         # For non-expressions e.g. an SQL WHERE clause, the entire
         # `expression` must be included in the GROUP BY clause.
-        return super().get_group_by_cols()  # type: ignore[misc]
+        return super().get_group_by_cols()
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
@@ -1406,9 +1404,9 @@ class NegatedExpression(ExpressionWrapper):
         resolved = super().resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
-        if not getattr(resolved.expression, "conditional", False):  # type: ignore[attr-defined]
+        if not getattr(resolved.expression, "conditional", False):
             raise TypeError("Cannot negate non-conditional expressions.")
-        return resolved  # type: ignore[return-value]
+        return resolved
 
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
@@ -1504,7 +1502,7 @@ class When(Expression):
         template_params = extra_context
         sql_params = []
         # After resolve_expression, condition is WhereNode | resolved Expression (both SQLCompilable)
-        condition_sql, condition_params = compiler.compile(self.condition)  # type: ignore[arg-type]
+        condition_sql, condition_params = compiler.compile(self.condition)
         template_params["condition"] = condition_sql
         result_sql, result_params = compiler.compile(self.result)
         template_params["result"] = result_sql
@@ -1589,9 +1587,9 @@ class Case(SQLiteNumericMixin, Expression):
         return c
 
     def copy(self) -> Self:
-        c = super().copy()  # type: ignore[misc]
-        c.cases = c.cases[:]  # type: ignore[attr-defined]
-        return c  # type: ignore[return-value]
+        c = super().copy()
+        c.cases = c.cases[:]
+        return c
 
     def as_sql(
         self,
@@ -1634,7 +1632,7 @@ class Case(SQLiteNumericMixin, Expression):
     def get_group_by_cols(self) -> list[Any]:
         if not self.cases:
             return self.default.get_group_by_cols()
-        return super().get_group_by_cols()  # type: ignore[misc]
+        return super().get_group_by_cols()
 
 
 class Subquery(BaseExpression, Combinable):
@@ -1679,12 +1677,12 @@ class Subquery(BaseExpression, Combinable):
 
     def copy(self) -> Self:
         clone = super().copy()
-        clone.query = clone.query.clone()  # type: ignore[attr-defined]
-        return clone  # type: ignore[return-value]
+        clone.query = clone.query.clone()
+        return clone
 
     @property
-    def external_aliases(self) -> dict[str, bool]:  # type: ignore[override]
-        return self.query.external_aliases  # type: ignore[return-value]
+    def external_aliases(self) -> dict[str, bool]:
+        return self.query.external_aliases
 
     def get_external_cols(self) -> list[Any]:
         return self.query.get_external_cols()

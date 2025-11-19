@@ -81,7 +81,7 @@ class BaseIterable(ABC):
 class ModelIterable(BaseIterable):
     """Iterable that yields a model instance for each row."""
 
-    def __iter__(self) -> Iterator[Model]:  # type: ignore[misc]
+    def __iter__(self) -> Iterator[Model]:
         queryset = self.queryset
         compiler = queryset.sql_query.get_compiler()
         # Execute the query. This will also fill compiler.select, klass_info,
@@ -140,7 +140,7 @@ class RawModelIterable(BaseIterable):
 
     queryset: RawQuerySet
 
-    def __iter__(self) -> Iterator[Model]:  # type: ignore[misc]
+    def __iter__(self) -> Iterator[Model]:
         # Cache some things for performance reasons outside the loop.
         query = self.queryset.sql_query
         compiler = db_connection.ops.compiler("SQLCompiler")(query, db_connection)
@@ -184,7 +184,7 @@ class ValuesIterable(BaseIterable):
     Iterable returned by QuerySet.values() that yields a dict for each row.
     """
 
-    def __iter__(self) -> Iterator[dict[str, Any]]:  # type: ignore[misc]
+    def __iter__(self) -> Iterator[dict[str, Any]]:
         queryset = self.queryset
         query = queryset.sql_query
         compiler = query.get_compiler()
@@ -208,7 +208,7 @@ class ValuesListIterable(BaseIterable):
     for each row.
     """
 
-    def __iter__(self) -> Iterator[tuple[Any, ...]]:  # type: ignore[misc]
+    def __iter__(self) -> Iterator[tuple[Any, ...]]:
         queryset = self.queryset
         query = queryset.sql_query
         compiler = query.get_compiler()
@@ -247,7 +247,7 @@ class NamedValuesListIterable(ValuesListIterable):
     namedtuple for each row.
     """
 
-    def __iter__(self) -> Iterator[tuple[Any, ...]]:  # type: ignore[misc]
+    def __iter__(self) -> Iterator[tuple[Any, ...]]:
         queryset = self.queryset
         if queryset._fields:
             names = queryset._fields
@@ -270,7 +270,7 @@ class FlatValuesListIterable(BaseIterable):
     values.
     """
 
-    def __iter__(self) -> Iterator[Any]:  # type: ignore[misc]
+    def __iter__(self) -> Iterator[Any]:
         queryset = self.queryset
         compiler = queryset.sql_query.get_compiler()
         for row in compiler.results_iter(
@@ -473,10 +473,10 @@ class QuerySet(Generic[T]):
             else:
                 stop = None
             qs.sql_query.set_limits(start, stop)
-            return list(qs)[:: k.step] if k.step else qs  # type: ignore[return-value]
+            return list(qs)[:: k.step] if k.step else qs
 
         qs = self._chain()
-        qs.sql_query.set_limits(k, k + 1)  # type: ignore[unsupported-operator]
+        qs.sql_query.set_limits(k, k + 1)
         qs._fetch_all()
         assert qs._result_cache is not None  # _fetch_all guarantees this
         return qs._result_cache[0]
@@ -658,7 +658,7 @@ class QuerySet(Generic[T]):
         """
         try:
             return self.get(*args, **kwargs)
-        except self.model.DoesNotExist:  # type: ignore[attr-defined]
+        except self.model.DoesNotExist:
             return None
 
     def create(self, **kwargs: Any) -> T:
@@ -666,18 +666,18 @@ class QuerySet(Generic[T]):
         Create a new object with the given kwargs, saving it to the database
         and returning the created object.
         """
-        obj = self.model(**kwargs)  # type: ignore[misc]
+        obj = self.model(**kwargs)
         self._for_write = True
-        obj.save(force_insert=True)  # type: ignore[attr-defined]
+        obj.save(force_insert=True)
         return obj
 
     def _prepare_for_bulk_create(self, objs: list[T]) -> None:
         id_field = self.model._model_meta.get_field("id")
         for obj in objs:
-            if obj.id is None:  # type: ignore[attr-defined]
+            if obj.id is None:
                 # Populate new primary key values.
-                obj.id = id_field.get_id_value_on_save(obj)  # type: ignore[attr-defined]
-            obj._prepare_related_fields_for_save(operation_name="bulk_create")  # type: ignore[attr-defined]
+                obj.id = id_field.get_id_value_on_save(obj)
+            obj._prepare_related_fields_for_save(operation_name="bulk_create")
 
     def _check_bulk_create_options(
         self,
@@ -778,7 +778,7 @@ class QuerySet(Generic[T]):
                 returned_columns = self._batched_insert(
                     objs_with_id,
                     fields,
-                    batch_size,  # type: ignore[invalid-argument-type]
+                    batch_size,
                     on_conflict=on_conflict,
                     update_fields=update_fields_objs,
                     unique_fields=unique_fields_objs,
@@ -795,7 +795,7 @@ class QuerySet(Generic[T]):
                 returned_columns = self._batched_insert(
                     objs_without_id,
                     fields,
-                    batch_size,  # type: ignore[invalid-argument-type]
+                    batch_size,
                     on_conflict=on_conflict,
                     update_fields=update_fields_objs,
                     unique_fields=unique_fields_objs,
@@ -823,7 +823,7 @@ class QuerySet(Generic[T]):
         if not fields:
             raise ValueError("Field names must be given to bulk_update().")
         objs_tuple = tuple(objs)
-        if any(obj.id is None for obj in objs_tuple):  # type: ignore[attr-defined]
+        if any(obj.id is None for obj in objs_tuple):
             raise ValueError("All bulk_update() objects must have a primary key set.")
         fields_list = [self.model._model_meta.get_field(name) for name in fields]
         if any(not f.concrete or f.many_to_many for f in fields_list):
@@ -833,7 +833,7 @@ class QuerySet(Generic[T]):
         if not objs_tuple:
             return 0
         for obj in objs_tuple:
-            obj._prepare_related_fields_for_save(  # type: ignore[attr-defined]
+            obj._prepare_related_fields_for_save(
                 operation_name="bulk_update", fields=fields_list
             )
         # PK is used twice in the resulting update query, once in the filter
@@ -857,12 +857,12 @@ class QuerySet(Generic[T]):
                     attr = getattr(obj, field.attname)
                     if not hasattr(attr, "resolve_expression"):
                         attr = Value(attr, output_field=field)
-                    when_statements.append(When(id=obj.id, then=attr))  # type: ignore[attr-defined]
+                    when_statements.append(When(id=obj.id, then=attr))
                 case_statement = Case(*when_statements, output_field=field)
                 if requires_casting:
                     case_statement = Cast(case_statement, output_field=field)
                 update_kwargs[field.attname] = case_statement
-            updates.append(([obj.id for obj in batch_objs], update_kwargs))  # type: ignore[attr-defined,misc]
+            updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
         queryset = self._chain()
         with transaction.atomic(savepoint=False):
@@ -883,7 +883,7 @@ class QuerySet(Generic[T]):
         self._for_write = True
         try:
             return self.get(**kwargs), False
-        except self.model.DoesNotExist:  # type: ignore[attr-defined]
+        except self.model.DoesNotExist:
             params = self._extract_model_params(defaults, **kwargs)
             # Try to create an object using passed params.
             try:
@@ -900,7 +900,7 @@ class QuerySet(Generic[T]):
                 # and return an existing object.
                 try:
                     return self.get(**kwargs), False
-                except self.model.DoesNotExist:  # type: ignore[attr-defined]
+                except self.model.DoesNotExist:
                     pass
                 raise
 
@@ -949,9 +949,9 @@ class QuerySet(Generic[T]):
                         update_fields.add(field.name)
                         if field.name != field.attname:
                             update_fields.add(field.attname)
-                obj.save(update_fields=update_fields)  # type: ignore[attr-defined]
+                obj.save(update_fields=update_fields)
             else:
-                obj.save()  # type: ignore[attr-defined]
+                obj.save()
         return obj, False
 
     def _extract_model_params(
@@ -1161,11 +1161,11 @@ class QuerySet(Generic[T]):
                 return False
         except AttributeError:
             raise TypeError("'obj' must be a model instance.")
-        if obj.id is None:  # type: ignore[attr-defined]
+        if obj.id is None:
             raise ValueError("QuerySet.contains() cannot be used on unsaved objects.")
         if self._result_cache is not None:
             return obj in self._result_cache
-        return self.filter(id=obj.id).exists()  # type: ignore[attr-defined]
+        return self.filter(id=obj.id).exists()
 
     def _prefetch_related_objects(self) -> None:
         # This method can only be called once the result cache has been filled.
@@ -1203,7 +1203,7 @@ class QuerySet(Generic[T]):
         clone = self._chain()
         if expressions:
             clone = clone.annotate(**expressions)
-        clone._fields = fields  # type: ignore[assignment]
+        clone._fields = fields
         clone.sql_query.set_values(list(fields))
         return clone
 
@@ -1361,7 +1361,7 @@ class QuerySet(Generic[T]):
         self, negate: bool, args: tuple[Any, ...], kwargs: dict[str, Any]
     ) -> None:
         if negate:
-            self._query.add_q(~Q(*args, **kwargs))  # type: ignore[unsupported-operator]
+            self._query.add_q(~Q(*args, **kwargs))
         else:
             self._query.add_q(Q(*args, **kwargs))
 
@@ -1488,7 +1488,7 @@ class QuerySet(Generic[T]):
                 if isinstance(lookup, Prefetch):
                     lookup_str = lookup.prefetch_to
                 else:
-                    lookup_str = lookup  # type: ignore[assignment]
+                    lookup_str = lookup
                 lookup_str = lookup_str.split(LOOKUP_SEP, 1)[0]
                 if lookup_str in self.sql_query._filtered_relations:
                     raise ValueError(
@@ -1676,7 +1676,7 @@ class QuerySet(Generic[T]):
         elif (
             self.sql_query.default_ordering
             and self.sql_query.model
-            and self.sql_query.model._model_meta.ordering  # type: ignore[unresolved-attribute]
+            and self.sql_query.model._model_meta.ordering
             and
             # A default ordering doesn't affect GROUP BY queries.
             not self.sql_query.group_by
@@ -1706,7 +1706,7 @@ class QuerySet(Generic[T]):
         self._for_write = True
         query = sql.InsertQuery(
             self.model,
-            on_conflict=on_conflict.value if on_conflict else None,  # type: ignore[attr-defined]
+            on_conflict=on_conflict.value if on_conflict else None,
             update_fields=update_fields,
             unique_fields=unique_fields,
         )
@@ -1733,7 +1733,7 @@ class QuerySet(Generic[T]):
         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
             if bulk_return and on_conflict is None:
                 inserted_rows.extend(
-                    self._insert(  # type: ignore[invalid-argument-type]
+                    self._insert(
                         item,
                         fields=fields,
                         returning_fields=self.model._model_meta.db_returning_fields,
@@ -1779,7 +1779,7 @@ class QuerySet(Generic[T]):
 
     def _fetch_all(self) -> None:
         if self._result_cache is None:
-            self._result_cache = list(self._iterable_class(self))  # type: ignore[invalid-argument-type]
+            self._result_cache = list(self._iterable_class(self))
         if self._prefetch_related_lookups and not self._prefetch_done:
             self._prefetch_related_objects()
 
@@ -1904,9 +1904,7 @@ class RawQuerySet:
         model = self.model
         assert model is not None
         model_init_fields = [
-            f
-            for f in model._model_meta.fields
-            if converter(f.column) in self.columns  # type: ignore[possibly-missing-attribute]
+            f for f in model._model_meta.fields if converter(f.column) in self.columns
         ]
         annotation_fields = [
             (column, pos)
@@ -1966,7 +1964,7 @@ class RawQuerySet:
         return iter(self._result_cache)
 
     def iterator(self) -> Iterator[Model]:
-        yield from RawModelIterable(self)  # type: ignore[invalid-argument-type]
+        yield from RawModelIterable(self)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.sql_query}>"
@@ -1999,7 +1997,7 @@ class RawQuerySet:
         model_fields = {}
         model = self.model
         assert model is not None
-        for field in model._model_meta.fields:  # type: ignore[possibly-missing-attribute]
+        for field in model._model_meta.fields:
             name, column = field.get_attname_column()
             model_fields[converter(column)] = field
         return model_fields
@@ -2104,7 +2102,7 @@ def prefetch_related_objects(
     auto_lookups = set()  # we add to this as we go through.
     followed_descriptors = set()  # recursion protection
 
-    all_lookups = normalize_prefetch_lookups(reversed(related_lookups))  # type: ignore[arg-type]
+    all_lookups = normalize_prefetch_lookups(reversed(related_lookups))
     while all_lookups:
         lookup = all_lookups.pop()
         if lookup.prefetch_to in done_queries:
@@ -2200,7 +2198,7 @@ def prefetch_related_objects(
                 ):
                     done_queries[prefetch_to] = obj_list
                     new_lookups = normalize_prefetch_lookups(
-                        reversed(additional_lookups),  # type: ignore[arg-type]
+                        reversed(additional_lookups),
                         prefetch_to,
                     )
                     auto_lookups.update(new_lookups)
@@ -2219,7 +2217,7 @@ def prefetch_related_objects(
                     if through_attr in getattr(obj, "_prefetched_objects_cache", ()):
                         # If related objects have been prefetched, use the
                         # cache rather than the object's through_attr.
-                        new_obj = list(obj._prefetched_objects_cache.get(through_attr))  # type: ignore[arg-type]
+                        new_obj = list(obj._prefetched_objects_cache.get(through_attr))
                     else:
                         try:
                             new_obj = getattr(obj, through_attr)
@@ -2292,7 +2290,7 @@ def get_prefetcher(
                 else:
 
                     def in_prefetched_cache(instance: Model) -> bool:
-                        return through_attr in instance._prefetched_objects_cache  # type: ignore[attr-defined]
+                        return through_attr in instance._prefetched_objects_cache
 
                     is_fetched = in_prefetched_cache
     return prefetcher, rel_obj_descriptor, attr_found, is_fetched
@@ -2388,7 +2386,7 @@ def prefetch_one_level(
                 # No to_attr has been given for this prefetch operation and the
                 # cache_name does not point to a descriptor. Store the value of
                 # the field in the object's field cache.
-                obj._state.fields_cache[cache_name] = val  # type: ignore[index]
+                obj._state.fields_cache[cache_name] = val
         else:
             if as_attr:
                 setattr(obj, to_attr, vals)

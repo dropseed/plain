@@ -109,7 +109,7 @@ class SQLCompiler:
         self.setup_query(with_col_aliases=with_col_aliases)
         assert self.select is not None  # Set by setup_query()
         order_by = self.get_order_by()
-        self.where, self.having, self.qualify = self.query.where.split_having_qualify(  # type: ignore[attr-defined]
+        self.where, self.having, self.qualify = self.query.where.split_having_qualify(
             must_group_by=self.query.group_by is not None
         )
         extra_select = self.get_extra_select(order_by, self.select)
@@ -309,7 +309,7 @@ class SQLCompiler:
 
         if self.query.select_related:
             related_klass_infos = self.get_related_selections(select, select_mask)
-            klass_info["related_klass_infos"] = related_klass_infos  # type: ignore[index]
+            klass_info["related_klass_infos"] = related_klass_infos
 
         ret = []
         col_idx = 1
@@ -367,7 +367,7 @@ class SQLCompiler:
         for field in ordering:
             if hasattr(field, "resolve_expression"):
                 # field is a BaseExpression (has asc/desc/copy methods)
-                field_expr: BaseExpression = field  # type: ignore[assignment]
+                field_expr: BaseExpression = field
                 if isinstance(field_expr, Value):
                     # output_field must be resolved for constants.
                     field_expr = Cast(field_expr, field_expr.output_field)
@@ -377,24 +377,24 @@ class SQLCompiler:
                     field_expr = field_expr.copy()
                     field_expr.reverse_ordering()
                 field = field_expr
-                select_ref = selected_exprs.get(field.expression)  # type: ignore[attr-defined]
+                select_ref = selected_exprs.get(field.expression)
                 if select_ref or (
-                    isinstance(field.expression, F)  # type: ignore[attr-defined]
-                    and (select_ref := selected_exprs.get(field.expression.name))  # type: ignore[attr-defined]
+                    isinstance(field.expression, F)
+                    and (select_ref := selected_exprs.get(field.expression.name))
                 ):
                     # Emulation of NULLS (FIRST|LAST) cannot be combined with
                     # the usage of ordering by position.
                     if (
-                        field.nulls_first is None and field.nulls_last is None  # type: ignore[attr-defined]
+                        field.nulls_first is None and field.nulls_last is None
                     ) or self.connection.features.supports_order_by_nulls_modifier:
                         field = field.copy()
-                        field.expression = select_ref  # type: ignore[assignment]
+                        field.expression = select_ref
                     # Alias collisions are not possible when dealing with
                     # combined queries so fallback to it if emulation of NULLS
                     # handling is required.
                     elif self.query.combinator:
                         field = field.copy()
-                        field.expression = Ref(select_ref.refs, select_ref.source)  # type: ignore[assignment]
+                        field.expression = Ref(select_ref.refs, select_ref.source)
                 yield field, select_ref is not None
                 continue
             if field == "?":  # random
@@ -488,7 +488,7 @@ class SQLCompiler:
         for expr, is_ref in self._order_by_pairs():
             resolved = expr.resolve_expression(self.query, allow_joins=True, reuse=None)
             if not is_ref and self.query.combinator and self.select:
-                src = resolved.expression  # type: ignore[attr-defined]
+                src = resolved.expression
                 expr_src = expr.expression
                 for sel_expr, _, col_alias in self.select:
                     if src == sel_expr:
@@ -520,7 +520,7 @@ class SQLCompiler:
                                 "the result set."
                             )
                         q.add_annotation(expr_src, col_alias)
-                    self.query.add_select_col(resolved, col_alias)  # type: ignore[arg-type]
+                    self.query.add_select_col(resolved, col_alias)
                     resolved.set_source_expressions([Ref(col_alias, src)])
             sql, params = self.compile(resolved)
             # Don't add the same column twice, but the order direction is
@@ -1099,7 +1099,7 @@ class SQLCompiler:
                 if hasattr(item, "resolve_expression") and not isinstance(
                     item, OrderBy
                 ):
-                    item_expr: BaseExpression = item  # type: ignore[assignment]
+                    item_expr: BaseExpression = item
                     item = item_expr.desc() if descending else item_expr.asc()
                 if isinstance(item, OrderBy):
                     results.append(
@@ -1195,10 +1195,10 @@ class SQLCompiler:
         """
 
         def _get_field_choices() -> chain:
-            direct_choices = (f.name for f in opts.fields if f.is_relation)  # type: ignore[union-attr]
+            direct_choices = (f.name for f in opts.fields if f.is_relation)
             reverse_choices = (
                 f.field.related_query_name()
-                for f in opts.related_objects  # type: ignore[union-attr]
+                for f in opts.related_objects
                 if f.field.primary_key
             )
             return chain(
@@ -1223,7 +1223,7 @@ class SQLCompiler:
         if requested is None:
             restricted = isinstance(self.query.select_related, dict)
             if restricted:
-                requested = self.query.select_related  # type: ignore[assignment]
+                requested = self.query.select_related
 
         def get_related_klass_infos(
             klass_info: dict, related_klass_infos: list
@@ -1234,11 +1234,11 @@ class SQLCompiler:
             fields_found.add(f.name)
 
             if restricted:
-                next = requested.get(f.name, {})  # type: ignore[union-attr]
+                next = requested.get(f.name, {})
                 if not f.is_relation:
                     # If a non-related field is used like a relation,
                     # or if a single non-relational field is given.
-                    if next or f.name in requested:  # type: ignore[operator]
+                    if next or f.name in requested:
                         raise FieldError(
                             "Non-relational field given in select_related: '{}'. "
                             "Choices are: {}".format(
@@ -1249,7 +1249,7 @@ class SQLCompiler:
             else:
                 next = None
 
-            if not select_related_descend(f, restricted, requested, select_mask):  # type: ignore[arg-type]
+            if not select_related_descend(f, restricted, requested, select_mask):
                 continue
             related_select_mask = select_mask.get(f) or {}
             klass_info = {
@@ -1293,11 +1293,11 @@ class SQLCompiler:
             ]
             for related_field, model in related_fields:
                 related_select_mask = select_mask.get(related_field) or {}
-                # type: ignore[arg-type]
+
                 if not select_related_descend(
                     related_field,
                     restricted,
-                    requested,  # type: ignore[arg-type]
+                    requested,
                     related_select_mask,
                     reverse=True,
                 ):
@@ -1328,7 +1328,7 @@ class SQLCompiler:
                     select_fields.append(len(select))
                     select.append((col, None))
                 klass_info["select_fields"] = select_fields
-                next = requested.get(related_field.related_query_name(), {})  # type: ignore[union-attr]
+                next = requested.get(related_field.related_query_name(), {})
                 next_klass_infos = self.get_related_selections(
                     select,
                     related_select_mask,
@@ -1351,7 +1351,7 @@ class SQLCompiler:
             def remote_setter(name: str, obj: Any, from_obj: Any) -> None:
                 setattr(from_obj, name, obj)
 
-            for name in list(requested):  # type: ignore[arg-type]
+            for name in list(requested):
                 # Filtered relations work only on the topmost level.
                 if cur_depth > 1:
                     break
@@ -1385,7 +1385,7 @@ class SQLCompiler:
                         select_fields.append(len(select))
                         select.append((col, None))
                     klass_info["select_fields"] = select_fields
-                    next_requested = requested.get(name, {})  # type: ignore[union-attr]
+                    next_requested = requested.get(name, {})
                     next_klass_infos = self.get_related_selections(
                         select,
                         field_select_mask,
@@ -1396,7 +1396,7 @@ class SQLCompiler:
                         restricted=restricted,
                     )
                     get_related_klass_infos(klass_info, next_klass_infos)
-            fields_not_found = set(requested).difference(fields_found)  # type: ignore[arg-type]
+            fields_not_found = set(requested).difference(fields_found)
             if fields_not_found:
                 invalid_fields = (f"'{s}'" for s in fields_not_found)
                 raise FieldError(
@@ -1424,8 +1424,8 @@ class SQLCompiler:
             """
             model = klass_info["model"]
             for select_index in klass_info["select_fields"]:
-                if self.select[select_index][0].target.model == model:  # type: ignore[index]
-                    return self.select[select_index][0]  # type: ignore[index]
+                if self.select[select_index][0].target.model == model:
+                    return self.select[select_index][0]
             return None
 
         def _get_field_choices() -> Generator[str, None, None]:
@@ -1644,7 +1644,7 @@ class SQLCompiler:
 
 
 class SQLInsertCompiler(SQLCompiler):
-    query: InsertQuery  # type: ignore[assignment]
+    query: InsertQuery
     returning_fields: list | None = None
     returning_params: tuple = ()
 
@@ -1795,7 +1795,7 @@ class SQLInsertCompiler(SQLCompiler):
         placeholder_rows, param_rows = self.assemble_as_sql(fields, value_rows)
 
         on_conflict_suffix_sql = self.connection.ops.on_conflict_suffix_sql(
-            fields,  # type: ignore[arg-type]
+            fields,
             self.query.on_conflict,
             (f.column for f in self.query.update_fields),
             (f.column for f in self.query.unique_fields),
@@ -1806,7 +1806,7 @@ class SQLInsertCompiler(SQLCompiler):
         ):
             if self.connection.features.can_return_rows_from_bulk_insert:
                 result.append(
-                    self.connection.ops.bulk_insert_sql(fields, placeholder_rows)  # type: ignore[arg-type]
+                    self.connection.ops.bulk_insert_sql(fields, placeholder_rows)
                 )
                 params = param_rows
             else:
@@ -1827,7 +1827,7 @@ class SQLInsertCompiler(SQLCompiler):
             return [(" ".join(result), tuple(chain.from_iterable(params)))]
 
         if can_bulk:
-            result.append(self.connection.ops.bulk_insert_sql(fields, placeholder_rows))  # type: ignore[arg-type]
+            result.append(self.connection.ops.bulk_insert_sql(fields, placeholder_rows))
             if on_conflict_suffix_sql:
                 result.append(on_conflict_suffix_sql)
             return [(" ".join(result), tuple(p for ps in param_rows for p in ps))]
@@ -2080,7 +2080,7 @@ class SQLUpdateCompiler(SQLCompiler):
                 for parent, index in related_ids_index:
                     related_ids[parent].extend(r[index] for r in rows)
             self.query.add_filter("id__in", idents)
-            self.query.related_ids = related_ids  # type: ignore[invalid-assignment]
+            self.query.related_ids = related_ids
         else:
             # The fast path. Filters and updates in one query.
             self.query.add_filter("id__in", query)

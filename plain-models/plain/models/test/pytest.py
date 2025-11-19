@@ -28,12 +28,12 @@ def _db_disabled() -> Generator[None, None, None]:
     def cursor_disabled(self: Any) -> None:
         pytest.fail("Database access not allowed without the `db` fixture")
 
-    BaseDatabaseWrapper._enabled_cursor = BaseDatabaseWrapper.cursor  # type: ignore[attr-defined]
-    BaseDatabaseWrapper.cursor = cursor_disabled  # type: ignore[method-assign]
+    BaseDatabaseWrapper._enabled_cursor = BaseDatabaseWrapper.cursor
+    BaseDatabaseWrapper.cursor = cursor_disabled
 
     yield
 
-    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor  # type: ignore[method-assign]
+    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
 
 
 @pytest.fixture(scope="session")
@@ -67,14 +67,14 @@ def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
 
     # Set .cursor() back to the original implementation to unblock it
-    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor  # type: ignore[method-assign]
+    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
 
     if not db_connection.features.supports_transactions:
         pytest.fail("Database does not support transactions")
 
     with suppress_db_tracing():
         atomic = transaction.atomic()
-        atomic._from_testcase = True  # type: ignore[attr-defined]  # TODO remove this somehow?
+        atomic._from_testcase = True
         atomic.__enter__()
 
     yield
@@ -103,7 +103,7 @@ def isolated_db(request: Any) -> Generator[None, None, None]:
     if "db" in request.fixturenames:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
     # Set .cursor() back to the original implementation to unblock it
-    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor  # type: ignore[method-assign]
+    BaseDatabaseWrapper.cursor = BaseDatabaseWrapper._enabled_cursor
 
     verbosity = 1
 

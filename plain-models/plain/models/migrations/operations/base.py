@@ -40,8 +40,8 @@ class Operation(ABC):
     def __new__(cls, *args: Any, **kwargs: Any) -> Operation:
         # We capture the arguments to make returning them trivial
         self = object.__new__(cls)
-        self._constructor_args = (args, kwargs)  # type: ignore[attr-defined]
-        return self  # type: ignore[return-value]
+        self._constructor_args = (args, kwargs)
+        return self
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         """
@@ -51,8 +51,8 @@ class Operation(ABC):
         """
         return (
             self.__class__.__name__,
-            self._constructor_args[0],  # type: ignore[attr-defined]
-            self._constructor_args[1],  # type: ignore[attr-defined]
+            self._constructor_args[0],
+            self._constructor_args[1],
         )
 
     @abstractmethod
@@ -81,7 +81,7 @@ class Operation(ABC):
         """
         Output a brief summary of what the action does.
         """
-        return f"{self.__class__.__name__}: {self._constructor_args}"  # type: ignore[attr-defined]
+        return f"{self.__class__.__name__}: {self._constructor_args}"
 
     @property
     def migration_name_fragment(self) -> str | None:
@@ -136,6 +136,6 @@ class Operation(ABC):
     def __repr__(self) -> str:
         return "<{} {}{}>".format(
             self.__class__.__name__,
-            ", ".join(map(repr, self._constructor_args[0])),  # type: ignore[attr-defined]
-            ",".join(" {}={!r}".format(*x) for x in self._constructor_args[1].items()),  # type: ignore[attr-defined]
+            ", ".join(map(repr, self._constructor_args[0])),
+            ",".join(" {}={!r}".format(*x) for x in self._constructor_args[1].items()),
         )

@@ -117,7 +117,7 @@ def db_span(
     """
 
     # Fast-exit if instrumentation suppression flag set in context.
-    if otel_context.get_value(_SUPPRESS_KEY):  # type: ignore[arg-type]
+    if otel_context.get_value(_SUPPRESS_KEY):
         yield None
         return
 
@@ -188,7 +188,7 @@ def db_span(
 
 @contextmanager
 def suppress_db_tracing() -> Generator[None, None, None]:
-    token = otel_context.attach(otel_context.set_value(_SUPPRESS_KEY, True))  # type: ignore[arg-type]
+    token = otel_context.attach(otel_context.set_value(_SUPPRESS_KEY, True))
     try:
         yield
     finally:

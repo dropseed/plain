@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ..backends.base.base import BaseDatabaseWrapper
 
 # Type annotation for type checkers; runtime value is _db_connection
-db_connection: BaseDatabaseWrapper = _db_connection  # type: ignore[assignment]
+db_connection: BaseDatabaseWrapper = _db_connection
 
 
 @register_cli("db")

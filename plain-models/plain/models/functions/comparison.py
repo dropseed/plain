@@ -68,7 +68,7 @@ class Cast(Func):
         if output_type == "FloatField":
             template = "(%(expressions)s + 0.0)"
         # MariaDB doesn't support explicit cast to JSON.
-        elif output_type == "JSONField" and connection.mysql_is_mariadb:  # type: ignore[attr-defined]
+        elif output_type == "JSONField" and connection.mysql_is_mariadb:
             template = "JSON_EXTRACT(%(expressions)s, '$')"
         return self.as_sql(compiler, connection, template=template, **extra_context)
 

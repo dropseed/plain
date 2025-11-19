@@ -67,7 +67,7 @@ class BaseConstraint(ABC):
     ) -> None: ...
 
     def get_violation_error_message(self) -> str:
-        return self.violation_error_message % {"name": self.name}  # type: ignore[operator]
+        return self.violation_error_message % {"name": self.name}
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         path = f"{self.__class__.__module__}.{self.__class__.__name__}"
@@ -250,7 +250,7 @@ class UniqueConstraint(BaseConstraint):
             for expression in expressions
         )
         super().__init__(
-            name=name,  # type: ignore[arg-type]
+            name=name,
             violation_error_code=violation_error_code,
             violation_error_message=violation_error_message,
         )
@@ -454,7 +454,7 @@ class UniqueConstraint(BaseConstraint):
                         if constraint is self:
                             raise ValidationError(
                                 instance.unique_error_message(
-                                    constraint_model,  # type: ignore[arg-type]
+                                    constraint_model,
                                     self.fields,
                                 ),
                             )

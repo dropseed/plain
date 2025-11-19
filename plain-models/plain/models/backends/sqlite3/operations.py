@@ -227,7 +227,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             if isinstance(params, list | tuple):
                 params = self._quote_params_for_last_executed_query(params)
             else:
-                values = tuple(params.values())  # type: ignore[union-attr]
+                values = tuple(params.values())
                 values = self._quote_params_for_last_executed_query(values)
                 params = dict(zip(params, values))
             return sql % params
@@ -296,7 +296,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return value
 
         # SQLite doesn't support tz-aware datetimes
-        if timezone.is_aware(value):  # type: ignore[arg-type]
+        if timezone.is_aware(value):
             raise ValueError("SQLite backend does not support timezone-aware times.")
 
         return str(value)

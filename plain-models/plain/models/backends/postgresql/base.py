@@ -27,7 +27,7 @@ from plain.models.db import db_connection
 try:
     from psycopg import Connection as PsycopgConnection
 except ImportError:
-    PsycopgConnection = Any  # type: ignore[misc, assignment]
+    PsycopgConnection = Any
 
 from .client import DatabaseClient
 from .creation import DatabaseCreation
@@ -426,7 +426,7 @@ class CursorMixin:
 
         qparts.append(sql.SQL(")"))
         stmt = sql.Composed(qparts)
-        self.execute(stmt)  # type: ignore[attr-defined]
+        self.execute(stmt)
         return args
 
 

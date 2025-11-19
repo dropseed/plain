@@ -6,9 +6,9 @@ from collections.abc import Callable, Iterable
 from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any
 
-from psycopg import ClientCursor, errors  # type: ignore[import-untyped]
-from psycopg.types import numeric  # type: ignore[import-untyped]
-from psycopg.types.json import Jsonb  # type: ignore[import-untyped]
+from psycopg import ClientCursor, errors
+from psycopg.types import numeric
+from psycopg.types.json import Jsonb
 
 from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.backends.utils import split_tzname_delta

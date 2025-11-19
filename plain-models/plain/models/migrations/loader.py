@@ -146,7 +146,7 @@ class MigrationLoader:
                         f"Migration {migration_name} in app {package_config.package_label} has no Migration class"
                     )
                 self.disk_migrations[package_config.package_label, migration_name] = (
-                    migration_module.Migration(  # type: ignore[call-non-callable]
+                    migration_module.Migration(
                         migration_name,
                         package_config.package_label,
                     )
@@ -223,7 +223,7 @@ class MigrationLoader:
             # Ignore __first__ references to the same app.
             if parent[0] == key[0] and parent[1] != "__first__":
                 # Migration object is used only for error messages in add_dependency
-                self.graph.add_dependency(migration, key, parent, skip_validation=True)  # type: ignore[arg-type]
+                self.graph.add_dependency(migration, key, parent, skip_validation=True)
 
     def add_external_dependencies(
         self, key: tuple[str, str], migration: Migration
@@ -235,7 +235,7 @@ class MigrationLoader:
             parent = self.check_key(parent, key[0])
             if parent is not None:
                 # Migration object is used only for error messages in add_dependency
-                self.graph.add_dependency(migration, key, parent, skip_validation=True)  # type: ignore[arg-type]
+                self.graph.add_dependency(migration, key, parent, skip_validation=True)
 
     def build_graph(self) -> None:
         """
