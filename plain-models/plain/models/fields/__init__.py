@@ -36,6 +36,7 @@ from ..registry import models_registry
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.base import Model
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.sql.compiler import SQLCompiler
 
@@ -795,7 +796,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         self.attname, self.column = self.get_attname_column()
         self.concrete = self.column is not None
 
-    def contribute_to_class(self, cls: Any, name: str) -> None:
+    def contribute_to_class(self, cls: type[Model], name: str) -> None:
         """
         Register the field with the model class it belongs to.
 
