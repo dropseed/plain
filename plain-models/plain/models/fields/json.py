@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain import exceptions, preflight
 from plain.models import expressions, lookups
+from plain.models.backends.guards import is_mysql_connection, is_sqlite_connection
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import NotSupportedError, db_connection
 from plain.models.fields import TextField
@@ -19,8 +20,6 @@ from . import Field
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.backends.mysql.base import MySQLDatabaseWrapper
-    from plain.models.backends.sqlite3.base import SQLiteDatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
     from plain.preflight.results import PreflightResult
 
@@ -400,14 +399,11 @@ class KeyTransform(Transform):
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, tuple[Any, ...]]:
         # as_sqlite is only called for SQLite connections
-        sqlite_connection: SQLiteDatabaseWrapper = connection  # type: ignore[assignment]
+        assert is_sqlite_connection(connection)
         lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
         json_path = compile_json_path(key_transforms)
         datatype_values = ",".join(
-            [
-                repr(datatype)
-                for datatype in sqlite_connection.ops.jsonfield_datatype_values  # type: ignore[attr-defined]
-            ]
+            [repr(datatype) for datatype in connection.ops.jsonfield_datatype_values]
         )
         return (
             f"(CASE WHEN JSON_TYPE({lhs}, %s) IN ({datatype_values}) "
@@ -424,8 +420,8 @@ class KeyTextTransform(KeyTransform):
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, tuple[Any, ...]]:
         # as_mysql is only called for MySQL connections
-        mysql_connection: MySQLDatabaseWrapper = connection  # type: ignore[assignment]
-        if mysql_connection.mysql_is_mariadb:
+        assert is_mysql_connection(connection)
+        if connection.mysql_is_mariadb:
             # MariaDB doesn't support -> and ->> operators (see MDEV-13594).
             sql, params = super().as_mysql(compiler, connection)
             return f"JSON_UNQUOTE({sql})", params
@@ -504,15 +500,13 @@ class KeyTransformIn(lookups.In):
         ):
             if connection.vendor == "mysql":
                 sql = "JSON_EXTRACT(%s, '$')"
-            elif connection.vendor == "sqlite":
-                # After checking vendor, we know connection is SQLiteDatabaseWrapper
-                sqlite_connection: SQLiteDatabaseWrapper = connection  # type: ignore[assignment]
-                if params[0] not in sqlite_connection.ops.jsonfield_datatype_values:  # type: ignore[attr-defined]
+            elif is_sqlite_connection(connection):
+                # Type guard narrows connection to SQLiteDatabaseWrapper
+                if params[0] not in connection.ops.jsonfield_datatype_values:
                     sql = "JSON_EXTRACT(%s, '$')"
-        if connection.vendor == "mysql":
-            # After checking vendor, we know connection is MySQLDatabaseWrapper
-            mysql_connection: MySQLDatabaseWrapper = connection  # type: ignore[assignment]
-            if mysql_connection.mysql_is_mariadb:
+        if is_mysql_connection(connection):
+            # Type guard narrows connection to MySQLDatabaseWrapper
+            if connection.mysql_is_mariadb:
                 sql = f"JSON_UNQUOTE({sql})"
         return sql, tuple(params)
 
@@ -524,12 +518,11 @@ class KeyTransformExact(JSONExact):
         if isinstance(self.rhs, KeyTransform):
             return super(lookups.Exact, self).process_rhs(compiler, connection)
         rhs, rhs_params = super().process_rhs(compiler, connection)
-        if connection.vendor == "sqlite":
-            # After checking vendor, we know connection is SQLiteDatabaseWrapper
-            sqlite_connection: SQLiteDatabaseWrapper = connection  # type: ignore[assignment]
+        if is_sqlite_connection(connection):
+            # Type guard narrows connection to SQLiteDatabaseWrapper
             func = []
             for value in rhs_params:
-                if value in sqlite_connection.ops.jsonfield_datatype_values:  # type: ignore[attr-defined]
+                if value in connection.ops.jsonfield_datatype_values:
                     func.append("%s")
                 else:
                     func.append("JSON_EXTRACT(%s, '$')")

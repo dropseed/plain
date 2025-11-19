@@ -8,7 +8,7 @@ import copy
 import operator
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from functools import cached_property
 from itertools import chain, islice
 from typing import TYPE_CHECKING, Any, Generic, Never, Self, TypeVar, overload
@@ -412,7 +412,8 @@ class QuerySet(Generic[T]):
 
     def __len__(self) -> int:
         self._fetch_all()
-        return len(self._result_cache)  # type: ignore[arg-type]
+        assert self._result_cache is not None
+        return len(self._result_cache)
 
     def __iter__(self) -> Iterator[T]:
         """
@@ -430,7 +431,8 @@ class QuerySet(Generic[T]):
                - Responsible for turning the rows into model objects.
         """
         self._fetch_all()
-        return iter(self._result_cache)  # type: ignore[arg-type]
+        assert self._result_cache is not None
+        return iter(self._result_cache)
 
     def __bool__(self) -> bool:
         self._fetch_all()
@@ -1168,7 +1170,7 @@ class QuerySet(Generic[T]):
     def _prefetch_related_objects(self) -> None:
         # This method can only be called once the result cache has been filled.
         assert self._result_cache is not None
-        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)  # type: ignore[arg-type]
+        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)
         self._prefetch_done = True
 
     def explain(self, *, format: str | None = None, **options: Any) -> str:
@@ -1927,7 +1929,8 @@ class RawQuerySet:
         return clone
 
     def _prefetch_related_objects(self) -> None:
-        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)  # type: ignore[invalid-argument-type]
+        assert self._result_cache is not None
+        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)
         self._prefetch_done = True
 
     def _clone(self) -> RawQuerySet:
@@ -1950,7 +1953,8 @@ class RawQuerySet:
 
     def __len__(self) -> int:
         self._fetch_all()
-        return len(self._result_cache)  # type: ignore[arg-type]
+        assert self._result_cache is not None
+        return len(self._result_cache)
 
     def __bool__(self) -> bool:
         self._fetch_all()
@@ -1958,7 +1962,8 @@ class RawQuerySet:
 
     def __iter__(self) -> Iterator[Model]:
         self._fetch_all()
-        return iter(self._result_cache)  # type: ignore[arg-type]
+        assert self._result_cache is not None
+        return iter(self._result_cache)
 
     def iterator(self) -> Iterator[Model]:
         yield from RawModelIterable(self)  # type: ignore[invalid-argument-type]
@@ -2082,7 +2087,7 @@ def normalize_prefetch_lookups(
 
 
 def prefetch_related_objects(
-    model_instances: list[Model], *related_lookups: str | Prefetch
+    model_instances: Sequence[Model], *related_lookups: str | Prefetch
 ) -> None:
     """
     Populate prefetched object caches for a list of model instances based on

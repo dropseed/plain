@@ -15,6 +15,7 @@ from plain.utils.datastructures import ImmutableList
 if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.fields import Field
+    from plain.models.fields.reverse_related import ForeignObjectRel
 
 EMPTY_RELATION_TREE = ()
 
@@ -390,7 +391,9 @@ class Meta:
                     delattr(self, cache_key)
         self._get_fields_cache = {}
 
-    def get_fields(self, include_reverse: bool = False) -> ImmutableList:
+    def get_fields(
+        self, include_reverse: bool = False
+    ) -> ImmutableList[Field | ForeignObjectRel]:
         """
         Return a list of fields associated to the model.
 
@@ -411,7 +414,7 @@ class Meta:
         forward: bool = True,
         reverse: bool = True,
         seen_models: set[type[Any]] | None = None,
-    ) -> ImmutableList:
+    ) -> ImmutableList[Field | ForeignObjectRel]:
         """
         Internal helper function to return fields of the model.
 
