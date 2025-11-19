@@ -5,7 +5,7 @@ import copy
 import inspect
 from collections import defaultdict
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterable, TypeVar
 
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.query import QuerySet
@@ -24,8 +24,10 @@ IMMUTABLE_WARNING = (
     "list for your own use, make a copy first."
 )
 
+T = TypeVar("T")
 
-def make_immutable_fields_list(name: str, data: Any) -> ImmutableList:
+
+def make_immutable_fields_list(name: str, data: Iterable[T]) -> ImmutableList[T]:
     return ImmutableList(data, warning=IMMUTABLE_WARNING % name)
 
 
@@ -182,7 +184,7 @@ class Meta:
             self._expire_cache(reverse=False)
 
     @cached_property
-    def fields(self) -> ImmutableList:
+    def fields(self) -> ImmutableList[Field]:
         """
         Return a list of all forward fields on the model and its parents,
         excluding ManyToManyFields.
@@ -224,7 +226,7 @@ class Meta:
         )
 
     @cached_property
-    def concrete_fields(self) -> ImmutableList:
+    def concrete_fields(self) -> ImmutableList[Field]:
         """
         Return a list of all concrete fields on the model and its parents.
 
@@ -237,7 +239,7 @@ class Meta:
         )
 
     @cached_property
-    def local_concrete_fields(self) -> ImmutableList:
+    def local_concrete_fields(self) -> ImmutableList[Field]:
         """
         Return a list of all concrete fields on the model.
 
@@ -250,7 +252,7 @@ class Meta:
         )
 
     @cached_property
-    def many_to_many(self) -> ImmutableList:
+    def many_to_many(self) -> ImmutableList[Field]:
         """
         Return a list of all many to many fields on the model and its parents.
 
@@ -268,7 +270,7 @@ class Meta:
         )
 
     @cached_property
-    def related_objects(self) -> ImmutableList:
+    def related_objects(self) -> ImmutableList[ForeignObjectRel]:
         """
         Return all related objects pointing to the current model. The related
         objects can come from a one-to-one, one-to-many, or many-to-many field
@@ -285,7 +287,7 @@ class Meta:
         )
 
     @cached_property
-    def _forward_fields_map(self) -> dict[str, Any]:
+    def _forward_fields_map(self) -> dict[str, Field]:
         res = {}
         fields = self._get_fields(reverse=False)
         for field in fields:
@@ -300,7 +302,7 @@ class Meta:
         return res
 
     @cached_property
-    def fields_map(self) -> dict[str, Any]:
+    def fields_map(self) -> dict[str, Field | ForeignObjectRel]:
         res = {}
         fields = self._get_fields(forward=False, reverse=True)
         for field in fields:
@@ -314,7 +316,7 @@ class Meta:
                 pass
         return res
 
-    def get_field(self, field_name: str) -> Any:
+    def get_field(self, field_name: str) -> Field | ForeignObjectRel:
         """
         Return a field instance given the name of a forward or reverse field.
         """
@@ -339,7 +341,7 @@ class Meta:
         except KeyError:
             raise FieldDoesNotExist(f"{self.model} has no field named '{field_name}'")
 
-    def _populate_directed_relation_graph(self) -> Any:
+    def _populate_directed_relation_graph(self) -> list[Field]:
         """
         This method is used by each model to find its reverse objects. As this
         method is very expensive and is accessed frequently (it looks up every
@@ -375,7 +377,7 @@ class Meta:
         return self.__dict__.get("_relation_tree", EMPTY_RELATION_TREE)
 
     @cached_property
-    def _relation_tree(self) -> Any:
+    def _relation_tree(self) -> list[Field]:
         return self._populate_directed_relation_graph()
 
     def _expire_cache(self, forward: bool = True, reverse: bool = True) -> None:
