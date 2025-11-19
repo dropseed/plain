@@ -12,6 +12,7 @@ from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, NotSupportedError
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.expressions import F, OrderBy, RawSQL, Ref, Value
+from plain.models.fields import Field
 from plain.models.functions import Cast, Random
 from plain.models.lookups import Lookup
 from plain.models.meta import Meta
@@ -1766,7 +1767,13 @@ class SQLInsertCompiler(SQLCompiler):
             on_conflict=self.query.on_conflict,
         )
         result = [f"{insert_statement} {qn(options.db_table)}"]
-        fields = self.query.fields or [meta.get_field("id")]
+        if self.query.fields:
+            fields = self.query.fields
+        else:
+            id_field = meta.get_field("id")
+            if not isinstance(id_field, Field):
+                raise ValueError("Primary key field must be a Field")
+            fields = [id_field]
         result.append("({})".format(", ".join(qn(f.column) for f in fields)))
 
         if self.query.fields:
@@ -1868,12 +1875,15 @@ class SQLInsertCompiler(SQLCompiler):
                     )
                 ]
             else:
+                id_field = meta.get_field("id")
+                if not isinstance(id_field, Field):
+                    raise ValueError("Primary key field must be a Field")
                 rows = [
                     (
                         self.connection.ops.last_insert_id(
                             cursor,
                             options.db_table,
-                            meta.get_field("id").column,
+                            id_field.column,
                         ),
                     )
                 ]

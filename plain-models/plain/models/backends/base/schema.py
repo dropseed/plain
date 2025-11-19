@@ -20,6 +20,7 @@ from plain.models.backends.ddl_references import (
 )
 from plain.models.backends.utils import names_digest, split_identifier, truncate_name
 from plain.models.constraints import Deferrable
+from plain.models.fields import Field
 from plain.models.fields.related import ForeignKey
 from plain.models.indexes import Index
 from plain.models.sql import Query
@@ -246,9 +247,15 @@ class BaseDatabaseSchemaEditor(ABC):
                 and field.db_constraint
             ):
                 to_table = field.remote_field.model.model_options.db_table
-                to_column = field.remote_field.model._model_meta.get_field(
-                    field.remote_field.field_name
-                ).column
+                field_name = field.remote_field.field_name
+                if field_name is None:
+                    raise ValueError("Foreign key field_name cannot be None")
+                to_field = field.remote_field.model._model_meta.get_field(field_name)
+                if not isinstance(to_field, Field):
+                    raise ValueError(
+                        f"Foreign key target field must be a Field, not {to_field}"
+                    )
+                to_column = to_field.column
                 if self.sql_create_inline_fk:
                     definition += " " + self.sql_create_inline_fk % {
                         "to_table": self.quote_name(to_table),
@@ -591,9 +598,15 @@ class BaseDatabaseSchemaEditor(ABC):
             # Add FK constraint inline, if supported.
             if self.sql_create_column_inline_fk:
                 to_table = field.remote_field.model.model_options.db_table
-                to_column = field.remote_field.model._model_meta.get_field(
-                    field.remote_field.field_name
-                ).column
+                field_name = field.remote_field.field_name
+                if field_name is None:
+                    raise ValueError("Foreign key field_name cannot be None")
+                to_field = field.remote_field.model._model_meta.get_field(field_name)
+                if not isinstance(to_field, Field):
+                    raise ValueError(
+                        f"Foreign key target field must be a Field, not {to_field}"
+                    )
+                to_column = to_field.column
                 namespace, _ = split_identifier(model.model_options.db_table)
                 definition += " " + self.sql_create_column_inline_fk % {
                     "name": self._fk_constraint_name(model, field, constraint_suffix),
@@ -1263,19 +1276,41 @@ class BaseDatabaseSchemaEditor(ABC):
                 new_rel.through.model_options.db_table,
             )
         # Repoint the FK to the other side
+        old_reverse_field = old_rel.through._model_meta.get_field(
+            old_field.m2m_reverse_field_name()
+        )
+        new_reverse_field = new_rel.through._model_meta.get_field(
+            new_field.m2m_reverse_field_name()
+        )
+        if not isinstance(old_reverse_field, Field) or not isinstance(
+            new_reverse_field, Field
+        ):
+            raise ValueError(
+                "M2M through model fields must be Field instances for alter_field"
+            )
         self.alter_field(
             new_rel.through,
             # The field that points to the target model is needed, so we can
             # tell alter_field to change it - this is m2m_reverse_field_name()
             # (as opposed to m2m_field_name(), which points to our model).
-            old_rel.through._model_meta.get_field(old_field.m2m_reverse_field_name()),
-            new_rel.through._model_meta.get_field(new_field.m2m_reverse_field_name()),
+            old_reverse_field,
+            new_reverse_field,
         )
+        old_m2m_field = old_rel.through._model_meta.get_field(
+            old_field.m2m_field_name()
+        )
+        new_m2m_field = new_rel.through._model_meta.get_field(
+            new_field.m2m_field_name()
+        )
+        if not isinstance(old_m2m_field, Field) or not isinstance(new_m2m_field, Field):
+            raise ValueError(
+                "M2M through model fields must be Field instances for alter_field"
+            )
         self.alter_field(
             new_rel.through,
             # for self-referential models we need to alter field from the other end too
-            old_rel.through._model_meta.get_field(old_field.m2m_field_name()),
-            new_rel.through._model_meta.get_field(new_field.m2m_field_name()),
+            old_m2m_field,
+            new_m2m_field,
         )
 
     def _create_index_name(

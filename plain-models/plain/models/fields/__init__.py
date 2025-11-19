@@ -120,6 +120,19 @@ T = TypeVar("T")
 class Field(RegisterLookupMixin, Generic[T]):
     """Base class for all field types"""
 
+    # Instance attributes set during field lifecycle
+    # Set by __init__
+    name: str | None
+    max_length: int | None
+    db_column: str | None
+    remote_field: ForeignObjectRel | None
+    # Set by set_attributes_from_name (called by contribute_to_class)
+    attname: str
+    column: str
+    concrete: bool
+    # Set by contribute_to_class
+    model: type[Model]
+
     # Designates whether empty strings fundamentally are allowed at the
     # database level.
     empty_strings_allowed = True
