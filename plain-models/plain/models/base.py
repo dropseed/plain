@@ -95,8 +95,8 @@ class Model(metaclass=ModelBase):
 
     # Descriptors for other model behavior
     query: QuerySet[Model] = QuerySet()
-    model_options = Options()
-    _model_meta = Meta()
+    model_options: Options = Options()
+    _model_meta: Meta = Meta()
     DoesNotExist = DoesNotExistDescriptor()
     MultipleObjectsReturned = MultipleObjectsReturnedDescriptor()
 

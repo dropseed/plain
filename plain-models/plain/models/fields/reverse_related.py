@@ -21,7 +21,22 @@ from . import BLANK_CHOICE_DASH
 from .mixins import FieldCacheMixin
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from plain.models.base import Model
+    from plain.models.deletion import Collector
+    from plain.models.fields import Field
+    from plain.models.fields.related import (
+        ForeignKey,
+        ManyToManyField,
+        RelatedField,
+    )
     from plain.models.lookups import Lookup
+    from plain.models.query_utils import PathInfo, Q
+    from plain.models.sql.compiler import SQLCompilable
+
+    # Type alias for on_delete callbacks
+    OnDeleteCallback = Callable[[Collector, Any, Any], None]
 
 
 class ForeignObjectRel(FieldCacheMixin):
@@ -42,13 +57,19 @@ class ForeignObjectRel(FieldCacheMixin):
     allow_null = True
     empty_strings_allowed = False
 
+    # Type annotations for instance attributes
+    model: str | type[Model]
+    field: RelatedField
+    on_delete: OnDeleteCallback | None
+    limit_choices_to: dict[str, Any] | Q
+
     def __init__(
         self,
-        field: Any,
-        to: Any,
+        field: RelatedField,
+        to: str | type[Model],
         related_query_name: str | None = None,
-        limit_choices_to: Any = None,
-        on_delete: Any = None,
+        limit_choices_to: dict[str, Any] | Q | None = None,
+        on_delete: OnDeleteCallback | None = None,
     ):
         self.field = field
         self.model = to
@@ -68,11 +89,11 @@ class ForeignObjectRel(FieldCacheMixin):
         return self.field.related_query_name()
 
     @property
-    def remote_field(self) -> Any:
+    def remote_field(self) -> RelatedField:
         return self.field
 
     @property
-    def target_field(self) -> Any:
+    def target_field(self) -> Field:
         """
         When filtering against this relation, return the field on the remote
         model against which the filtering should happen.
@@ -83,7 +104,7 @@ class ForeignObjectRel(FieldCacheMixin):
         return target_fields[0]
 
     @cached_property
-    def related_model(self) -> Any:
+    def related_model(self) -> type[Model]:
         if not self.field.model:
             raise AttributeError(
                 "This property can't be accessed before self.field.contribute_to_class "
@@ -110,7 +131,7 @@ class ForeignObjectRel(FieldCacheMixin):
         return self.field.get_internal_type()
 
     @property
-    def db_type(self) -> Any:
+    def db_type(self) -> str | None:
         return self.field.db_type
 
     def __repr__(self) -> str:
@@ -168,10 +189,10 @@ class ForeignObjectRel(FieldCacheMixin):
             qs = qs.order_by(*ordering)
         return (blank_choice if include_blank else []) + [(x.id, str(x)) for x in qs]
 
-    def get_joining_columns(self) -> Any:
+    def get_joining_columns(self) -> tuple[tuple[str, str], ...]:
         return self.field.get_reverse_joining_columns()
 
-    def get_extra_restriction(self, alias: str, related_alias: str) -> Any:
+    def get_extra_restriction(self, alias: str, related_alias: str) -> SQLCompilable | None:
         return self.field.get_extra_restriction(related_alias, alias)
 
     def set_field_name(self) -> None:
@@ -184,14 +205,14 @@ class ForeignObjectRel(FieldCacheMixin):
         # example custom multicolumn joins currently have no remote field).
         self.field_name = None
 
-    def get_path_info(self, filtered_relation: Any = None) -> Any:
+    def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
         if filtered_relation:
             return self.field.get_reverse_path_info(filtered_relation)
         else:
             return self.field.reverse_path_infos
 
     @cached_property
-    def path_infos(self) -> Any:
+    def path_infos(self) -> list[PathInfo]:
         return self.get_path_info()
 
     def get_cache_name(self) -> str | None:
@@ -220,13 +241,16 @@ class ForeignKeyRel(ForeignObjectRel):
     reverse relations into actual fields.
     """
 
+    # Type annotations for instance attributes
+    field: ForeignKey
+
     def __init__(
         self,
-        field: Any,
-        to: Any,
+        field: ForeignKey,
+        to: str | type[Model],
         related_query_name: str | None = None,
-        limit_choices_to: Any = None,
-        on_delete: Any = None,
+        limit_choices_to: dict[str, Any] | Q | None = None,
+        on_delete: OnDeleteCallback | None = None,
     ):
         super().__init__(
             field,
@@ -247,7 +271,7 @@ class ForeignKeyRel(ForeignObjectRel):
     def identity(self) -> tuple[Any, ...]:
         return super().identity + (self.field_name,)
 
-    def get_related_field(self) -> Any:
+    def get_related_field(self) -> Field:
         """
         Return the Field in the 'to' object to which this relationship is tied.
         """
@@ -268,15 +292,20 @@ class ManyToManyRel(ForeignObjectRel):
     flags for the reverse relation.
     """
 
+    # Type annotations for instance attributes
+    field: ManyToManyField
+    through: str | type[Model]
+    through_fields: tuple[str, str] | None
+
     def __init__(
         self,
-        field: Any,
-        to: Any,
+        field: ManyToManyField,
+        to: str | type[Model],
         *,
-        through: Any,
+        through: str | type[Model],
         through_fields: tuple[str, str] | None = None,
         related_query_name: str | None = None,
-        limit_choices_to: Any = None,
+        limit_choices_to: dict[str, Any] | Q | None = None,
         symmetrical: bool = True,
     ):
         super().__init__(
@@ -300,7 +329,7 @@ class ManyToManyRel(ForeignObjectRel):
             self.db_constraint,
         )
 
-    def get_related_field(self) -> Any:
+    def get_related_field(self) -> Field:
         """
         Return the field in the 'to' object to which this relationship is tied.
         Provided for symmetry with ForeignKeyRel.

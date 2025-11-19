@@ -237,24 +237,24 @@ class RelatedField(FieldCacheMixin, Field):
 
         self.meta = cls._model_meta
 
-        if self.remote_field.related_query_name:  # type: ignore[attr-defined]
-            related_query_name = self.remote_field.related_query_name % {  # type: ignore[attr-defined]
+        if self.remote_field.related_query_name:
+            related_query_name = self.remote_field.related_query_name % {
                 "class": cls.__name__.lower(),
                 "package_label": cls.model_options.package_label.lower(),
             }
-            self.remote_field.related_query_name = related_query_name  # type: ignore[attr-defined]
+            self.remote_field.related_query_name = related_query_name
 
         def resolve_related_class(
             model: type[Model], related: type[Model], field: RelatedField
         ) -> None:
-            field.remote_field.model = related  # type: ignore[attr-defined]
+            field.remote_field.model = related
             field.do_related_class(related, model)
 
         lazy_related_operation(
             resolve_related_class,
             cls,
             self.remote_field.model,
-            field=self,  # type: ignore[attr-defined]
+            field=self,
         )
 
     def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
