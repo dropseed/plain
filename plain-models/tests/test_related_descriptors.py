@@ -35,7 +35,7 @@ class TestForwardForeignKeyDescriptor:
         child = ChildCascade.query.create(parent=parent)
 
         # Setting a non-nullable FK to None should work but fail on save
-        child.parent = None
+        child.parent = None  # type: ignore[assignment]
         with pytest.raises(
             Exception, match="constraint|null|NOT NULL"
         ):  # Database constraint error
@@ -260,7 +260,7 @@ class TestEdgeCases:
 
         # Test that direct assignment to reverse relation raises error
         with pytest.raises(TypeError, match="Direct assignment.*prohibited"):
-            parent.childcascade_set = []
+            parent.childcascade_set = []  # type: ignore[assignment]
 
     def test_instance_none_handling(self, db):
         # Test accessing descriptor on class (not instance)
