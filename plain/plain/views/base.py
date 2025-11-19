@@ -95,13 +95,13 @@ class View:
             return ResponseNotAllowed(self._allowed_methods())
 
         try:
-            result = handler()
+            result: Any = handler()
         except ResponseException as e:
             return e.response
 
         return self.convert_value_to_response(result)
 
-    def convert_value_to_response(self, value: object) -> ResponseBase:
+    def convert_value_to_response(self, value: Any) -> ResponseBase:
         """Convert a return value to a Response."""
         if isinstance(value, ResponseBase):
             return value
@@ -120,8 +120,8 @@ class View:
                     "Tuple response must be of length 2 (status_code, value)"
                 )
 
-            status_code = value[0]
-            value = value[1]
+            status_code: int = value[0]
+            value: Any = value[1]
 
         if isinstance(value, str):
             return Response(value, status_code=status_code)
