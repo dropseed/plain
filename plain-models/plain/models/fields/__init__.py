@@ -11,7 +11,7 @@ import warnings
 from base64 import b64decode, b64encode
 from collections.abc import Callable, Sequence
 from functools import cached_property, total_ordering
-from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, Protocol, Self, TypeVar, cast, overload
 
 from plain import exceptions, validators
 from plain.models.constants import LOOKUP_SEP
@@ -82,7 +82,9 @@ class NOT_PROVIDED:
 BLANK_CHOICE_DASH = [("", "---------")]
 
 
-def _load_field(package_label: str, model_name: str, field_name: str) -> Field:
+def _load_field(
+    package_label: str, model_name: str, field_name: str
+) -> Field[Any] | ForeignObjectRel:
     return models_registry.get_model(package_label, model_name)._model_meta.get_field(
         field_name
     )
@@ -511,15 +513,16 @@ class Field(RegisterLookupMixin, Generic[T]):
         elif path.startswith("plain.models.fields"):
             path = path.replace("plain.models.fields", "plain.models")
         # Return basic info - other fields should override this.
+        assert self.name is not None, "Field must have a name when deconstructed"
         return (self.name, path, [], keywords)
 
-    def clone(self) -> Field:
+    def clone(self) -> Self:
         """
         Uses deconstruct() to clone a new copy of this Field.
         Will not preserve any class attachments/attribute names.
         """
         name, path, args, kwargs = self.deconstruct()
-        return self.__class__(*args, **kwargs)
+        return cast(Self, self.__class__(*args, **kwargs))
 
     def __eq__(self, other: object) -> bool:
         # Needed for @total_ordering
@@ -567,7 +570,7 @@ class Field(RegisterLookupMixin, Generic[T]):
     def __hash__(self) -> int:
         return hash(self.creation_counter)
 
-    def __deepcopy__(self, memodict: dict[int, Any]) -> Field:
+    def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         # We don't have to deepcopy very much here, since most things are not
         # intended to be altered after initial creation.
         obj = copy.copy(self)
@@ -578,19 +581,19 @@ class Field(RegisterLookupMixin, Generic[T]):
         memodict[id(self)] = obj
         return obj
 
-    def __copy__(self) -> Field:
+    def __copy__(self) -> Self:
         # We need to avoid hitting __reduce__, so define this
         # slightly weird copy construct.
         obj = Empty()
         obj.__class__ = self.__class__
         obj.__dict__ = self.__dict__.copy()
-        return obj
+        return cast(Self, obj)
 
     def __reduce__(
         self,
     ) -> (
         tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]
-        | tuple[Callable[..., Field], tuple[str, str, str]]
+        | tuple[Callable[..., Field[Any] | ForeignObjectRel], tuple[str, str, str]]
     ):
         """
         Pickling should return the model._model_meta.fields instance of the field,
@@ -827,12 +830,12 @@ class Field(RegisterLookupMixin, Generic[T]):
 
     # Descriptor protocol implementation
     @overload
-    def __get__(self, instance: None, owner: type) -> Field[T]: ...
+    def __get__(self, instance: None, owner: type) -> Self: ...
 
     @overload
     def __get__(self, instance: Any, owner: type) -> T: ...
 
-    def __get__(self, instance: Any | None, owner: type) -> Field[T] | T:
+    def __get__(self, instance: Any | None, owner: type) -> Self | T:
         """
         Descriptor __get__ for attribute access.
 

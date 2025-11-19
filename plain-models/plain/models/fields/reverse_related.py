@@ -273,8 +273,10 @@ class ForeignKeyRel(ForeignObjectRel):
         """
         Return the Field in the 'to' object to which this relationship is tied.
         """
+        from plain.models.fields import Field
+
         field = self.model._model_meta.get_field("id")
-        if not field.concrete:
+        if not isinstance(field, Field):
             raise FieldDoesNotExist("No related field named 'id'")
         return field
 

@@ -336,6 +336,7 @@ class RelatedField(FieldCacheMixin, Field):
         return target_fields[0]
 
     def get_cache_name(self) -> str:
+        assert self.name is not None, "Field name must be set"
         return self.name
 
 
@@ -395,7 +396,7 @@ class ForeignKey(RelatedField):
         self.db_constraint = db_constraint
 
     def __copy__(self) -> ForeignKey:
-        obj: ForeignKey = super().__copy__()
+        obj = super().__copy__()
         # Remove any cached PathInfo values.
         obj.__dict__.pop("path_infos", None)
         obj.__dict__.pop("reverse_path_infos", None)
