@@ -41,10 +41,7 @@ from plain.models.fields import (
 from plain.models.functions import Cast, Trunc
 from plain.models.query_utils import FilteredRelation, Q
 from plain.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE
-from plain.models.utils import (
-    create_namedtuple_class,
-    resolve_callables,
-)
+from plain.models.utils import resolve_callables
 from plain.utils import timezone
 from plain.utils.functional import partition
 
@@ -239,29 +236,6 @@ class ValuesListIterable(BaseIterable):
             chunked_fetch=self.chunked_fetch,
             chunk_size=self.chunk_size,
         )
-
-
-class NamedValuesListIterable(ValuesListIterable):
-    """
-    Iterable returned by QuerySet.values_list(named=True) that yields a
-    namedtuple for each row.
-    """
-
-    def __iter__(self) -> Iterator[tuple[Any, ...]]:
-        queryset = self.queryset
-        if queryset._fields:
-            names = queryset._fields
-        else:
-            query = queryset.sql_query
-            names = [
-                *query.extra_select,
-                *query.values_select,
-                *query.annotation_select,
-            ]
-        tuple_class = create_namedtuple_class(*names)
-        new = tuple.__new__
-        for row in super().__iter__():
-            yield new(tuple_class, row)
 
 
 class FlatValuesListIterable(BaseIterable):
@@ -1213,11 +1187,7 @@ class QuerySet(Generic[T]):
         clone._iterable_class = ValuesIterable
         return clone
 
-    def values_list(
-        self, *fields: str, flat: bool = False, named: bool = False
-    ) -> QuerySet[Any]:
-        if flat and named:
-            raise TypeError("'flat' and 'named' can't be used together.")
+    def values_list(self, *fields: str, flat: bool = False) -> QuerySet[Any]:
         if flat and len(fields) > 1:
             raise TypeError(
                 "'flat' is not valid when values_list is called with more than one "
@@ -1244,13 +1214,7 @@ class QuerySet(Generic[T]):
                 _fields.append(field)
 
         clone = self._values(*_fields, **expressions)
-        clone._iterable_class = (
-            NamedValuesListIterable
-            if named
-            else FlatValuesListIterable
-            if flat
-            else ValuesListIterable
-        )
+        clone._iterable_class = FlatValuesListIterable if flat else ValuesListIterable
         return clone
 
     def dates(self, field_name: str, kind: str, order: str = "ASC") -> QuerySet[Any]:
