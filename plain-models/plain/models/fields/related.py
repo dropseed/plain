@@ -462,20 +462,6 @@ class ForeignKey(RelatedField):
     def get_reverse_joining_columns(self) -> tuple[tuple[str, str], ...]:
         return self.get_joining_columns(reverse_join=True)
 
-    def get_extra_restriction(self, alias: str, related_alias: str) -> None:
-        """
-        Return a pair condition used for joining and subquery pushdown. The
-        condition is something that responds to as_sql(compiler, connection)
-        method.
-
-        Note that currently referring both the 'alias' and 'related_alias'
-        will not work in some conditions, like subquery pushdown.
-
-        A parallel method is get_extra_descriptor_filter() which is used in
-        instance.fieldname related object fetching.
-        """
-        return None
-
     def get_path_info(self, filtered_relation: Any = None) -> list[PathInfo]:
         """Get path from this field to the related model."""
         meta = self.remote_field.model._model_meta

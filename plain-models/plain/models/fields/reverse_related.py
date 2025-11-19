@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     )
     from plain.models.lookups import Lookup
     from plain.models.query_utils import PathInfo, Q
-    from plain.models.sql.compiler import SQLCompilable
 
     # Type alias for on_delete callbacks
     OnDeleteCallback = Callable[[Collector, Any, Any], None]
@@ -191,9 +190,6 @@ class ForeignObjectRel(FieldCacheMixin):
 
     def get_joining_columns(self) -> tuple[tuple[str, str], ...]:
         return self.field.get_reverse_joining_columns()
-
-    def get_extra_restriction(self, alias: str, related_alias: str) -> SQLCompilable | None:
-        return self.field.get_extra_restriction(related_alias, alias)
 
     def set_field_name(self) -> None:
         """

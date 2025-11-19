@@ -2573,11 +2573,6 @@ class Query(BaseExpression):
             select_fields = [r[0] for r in join_field.related_fields]
             select_alias = lookup_tables[trimmed_paths + 1]
             self.unref_alias(lookup_tables[trimmed_paths])
-            extra_restriction = join_field.get_extra_restriction(
-                None, lookup_tables[trimmed_paths + 1]
-            )
-            if extra_restriction:
-                self.where.add(extra_restriction, AND)
         else:
             # TODO: It might be possible to trim more joins from the start of the
             # inner query if it happens to have a longer join chain containing the

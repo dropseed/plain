@@ -98,15 +98,6 @@ class Join:
                 f"{qn(self.parent_alias)}.{qn2(lhs_col)} = {qn(self.table_alias)}.{qn2(rhs_col)}"
             )
 
-        # Add a single condition inside parentheses for whatever
-        # get_extra_restriction() returns.
-        extra_cond = self.join_field.get_extra_restriction(  # type: ignore[attr-defined]
-            self.table_alias, self.parent_alias
-        )
-        if extra_cond:
-            extra_sql, extra_params = compiler.compile(extra_cond)
-            join_conditions.append(f"({extra_sql})")
-            params.extend(extra_params)
         if self.filtered_relation:
             try:
                 extra_sql, extra_params = compiler.compile(self.filtered_relation)
