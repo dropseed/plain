@@ -2,16 +2,22 @@ from __future__ import annotations
 
 import datetime
 import re
-from collections import namedtuple
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
 
 if TYPE_CHECKING:
     from plain.models.fields import Field
+    from plain.models.fields.reverse_related import ForeignObjectRel
 
-FieldReference = namedtuple("FieldReference", "to through")
+
+class FieldReference(NamedTuple):
+    """Reference to a field in migrations, tracking direct and through relationships."""
+
+    to: tuple[ForeignObjectRel, list[str]] | None
+    through: tuple[ForeignObjectRel, tuple[str, ...] | None] | None
+
 
 COMPILED_REGEX_TYPE = type(re.compile(""))
 

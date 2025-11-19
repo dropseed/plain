@@ -58,12 +58,12 @@ class BaseDatabaseWrapper(ABC):
     vendor: str = "unknown"
     display_name: str = "unknown"
     SchemaEditorClass: type[BaseDatabaseSchemaEditor] | None = None
-    # Classes instantiated in __init__().
-    client_class: type[BaseDatabaseClient] | None = None
-    creation_class: type[BaseDatabaseCreation] | None = None
-    features_class: type[BaseDatabaseFeatures] | None = None
-    introspection_class: type[BaseDatabaseIntrospection] | None = None
-    ops_class: type[BaseDatabaseOperations] | None = None
+    # Classes instantiated in __init__() - subclasses must set these.
+    client_class: type[BaseDatabaseClient]
+    creation_class: type[BaseDatabaseCreation]
+    features_class: type[BaseDatabaseFeatures]
+    introspection_class: type[BaseDatabaseIntrospection]
+    ops_class: type[BaseDatabaseOperations]
     validation_class: type[BaseDatabaseValidation] = BaseDatabaseValidation
     Database: Any
 

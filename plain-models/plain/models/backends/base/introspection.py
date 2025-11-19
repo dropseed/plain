@@ -1,22 +1,32 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections import namedtuple
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
 
-# Structure returned by DatabaseIntrospection.get_table_list()
-TableInfo = namedtuple("TableInfo", ["name", "type"])
 
-# Structure returned by the DB-API cursor.description interface (PEP 249)
-FieldInfo = namedtuple(
-    "FieldInfo",
-    "name type_code display_size internal_size precision scale null_ok "
-    "default collation",
-)
+class TableInfo(NamedTuple):
+    """Structure returned by DatabaseIntrospection.get_table_list()."""
+
+    name: str
+    type: str
+
+
+class FieldInfo(NamedTuple):
+    """Structure returned by the DB-API cursor.description interface (PEP 249)."""
+
+    name: str
+    type_code: Any
+    display_size: int | None
+    internal_size: int | None
+    precision: int | None
+    scale: int | None
+    null_ok: bool | None
+    default: Any
+    collation: str | None
 
 
 class BaseDatabaseIntrospection(ABC):

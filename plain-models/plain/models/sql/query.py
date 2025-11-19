@@ -13,13 +13,13 @@ import copy
 import difflib
 import functools
 import sys
-from collections import Counter, namedtuple
-from collections.abc import Iterable, Iterator, Mapping
+from collections import Counter
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from collections.abc import Iterator as TypingIterator
 from functools import cached_property
 from itertools import chain, count, product
 from string import ascii_uppercase
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeVar, overload
 
 if TYPE_CHECKING:
     from typing import Self
@@ -89,10 +89,17 @@ def get_children_from_q(q: Q) -> TypingIterator[tuple[str, Any]]:
             yield child
 
 
-JoinInfo = namedtuple(
-    "JoinInfo",
-    ("final_field", "targets", "meta", "joins", "path", "transform_function"),
-)
+class JoinInfo(NamedTuple):
+    """Information about a join operation in a query."""
+
+    final_field: Field[Any]
+    targets: tuple[Field[Any], ...]
+    meta: Meta
+    joins: list[str]
+    path: list[PathInfo]
+    transform_function: Callable[
+        [Field[Any], str | None], BaseExpression | MultiColSource
+    ]
 
 
 class RawQuery:
@@ -168,7 +175,33 @@ class RawQuery:
         self.cursor.execute(self.sql, params)
 
 
-ExplainInfo = namedtuple("ExplainInfo", ("format", "options"))
+class ExplainInfo(NamedTuple):
+    """Information about an EXPLAIN query."""
+
+    format: str | None
+    options: dict[str, Any]
+
+
+class TransformWrapper:
+    """Wrapper for transform functions that supports the has_transforms attribute.
+
+    This replaces functools.partial for transform functions, allowing proper
+    type checking while supporting dynamic attribute assignment.
+    """
+
+    def __init__(
+        self,
+        func: Callable[..., BaseExpression | MultiColSource],
+        **kwargs: Any,
+    ):
+        self._partial = functools.partial(func, **kwargs)
+        self.has_transforms: bool = False
+
+    def __call__(
+        self, field: Field[Any], alias: str | None
+    ) -> BaseExpression | MultiColSource:
+        return self._partial(field, alias)
+
 
 QueryType = TypeVar("QueryType", bound="Query")
 
@@ -1781,10 +1814,14 @@ class Query(BaseExpression):
         # directly, compute transforms here and create a partial that converts
         # fields to the appropriate wrapped version.
 
-        def final_transformer(field: Field, alias: str | None) -> Col:
+        def _base_transformer(field: Field, alias: str | None) -> Col:
             if not self.alias_cols:
                 alias = None
             return field.get_col(alias)
+
+        final_transformer: TransformWrapper | Callable[[Field, str | None], Col] = (
+            _base_transformer
+        )
 
         # Try resolving all the names as fields first. If there's an error,
         # treat trailing names as lookups until a field can be resolved.
@@ -1824,7 +1861,7 @@ class Query(BaseExpression):
                     else:
                         raise
 
-            final_transformer = functools.partial(
+            final_transformer = TransformWrapper(
                 transform, name=name, previous=final_transformer
             )
             final_transformer.has_transforms = True

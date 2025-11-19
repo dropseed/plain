@@ -11,9 +11,8 @@ from __future__ import annotations
 import functools
 import inspect
 import logging
-from collections import namedtuple
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, db_connection
@@ -31,13 +30,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("plain.models")
 
-# PathInfo is used when converting lookups (fk__somecol). The contents
-# describe the relation in Model terms (Meta and Fields for both
-# sides of the relation). The join_field is the field backing the relation.
-PathInfo = namedtuple(
-    "PathInfo",
-    "from_meta to_meta target_fields join_field m2m direct filtered_relation",
-)
+
+class PathInfo(NamedTuple):
+    """Information about a relation path when converting lookups (fk__somecol).
+
+    Describes the relation in Model terms (Meta and Fields for both
+    sides of the relation). The join_field is the field backing the relation.
+    """
+
+    from_meta: Meta
+    to_meta: Meta
+    target_fields: tuple[Field, ...]
+    join_field: Field
+    m2m: bool
+    direct: bool
+    filtered_relation: FilteredRelation | None
 
 
 def subclasses(cls: type) -> Generator[type, None, None]:

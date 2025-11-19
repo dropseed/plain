@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections import namedtuple
 from collections.abc import Generator
-from typing import Any
+from typing import Any, NamedTuple
 
 import sqlparse
 import sqlparse.sql
@@ -13,13 +12,27 @@ from plain.models.backends.base.introspection import (
     BaseDatabaseIntrospection,
     TableInfo,
 )
-from plain.models.backends.base.introspection import FieldInfo as BaseFieldInfo
 from plain.models.db import DatabaseError
 from plain.utils.regex_helper import _lazy_re_compile
 
-FieldInfo = namedtuple(
-    "FieldInfo", BaseFieldInfo._fields + ("pk", "has_json_constraint")
-)
+
+class FieldInfo(NamedTuple):
+    """SQLite-specific FieldInfo extending base with pk and JSON constraint tracking."""
+
+    # Fields from BaseFieldInfo
+    name: str
+    type_code: Any
+    display_size: int | None
+    internal_size: int | None
+    precision: int | None
+    scale: int | None
+    null_ok: bool | None
+    default: Any
+    collation: str | None
+    # SQLite-specific extensions
+    pk: bool
+    has_json_constraint: bool
+
 
 field_size_re = _lazy_re_compile(r"^\s*(?:var)?char\s*\(\s*(\d+)\s*\)\s*$")
 

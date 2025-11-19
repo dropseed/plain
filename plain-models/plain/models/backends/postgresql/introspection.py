@@ -1,15 +1,37 @@
 from __future__ import annotations
 
-from collections import namedtuple
-from typing import Any
+from typing import Any, NamedTuple
 
 from plain.models.backends.base.introspection import BaseDatabaseIntrospection
-from plain.models.backends.base.introspection import FieldInfo as BaseFieldInfo
-from plain.models.backends.base.introspection import TableInfo as BaseTableInfo
 from plain.models.indexes import Index
 
-FieldInfo = namedtuple("FieldInfo", BaseFieldInfo._fields + ("is_autofield", "comment"))
-TableInfo = namedtuple("TableInfo", BaseTableInfo._fields + ("comment",))
+
+class FieldInfo(NamedTuple):
+    """PostgreSQL-specific FieldInfo extending base with autofield and comment."""
+
+    # Fields from BaseFieldInfo
+    name: str
+    type_code: Any
+    display_size: int | None
+    internal_size: int | None
+    precision: int | None
+    scale: int | None
+    null_ok: bool | None
+    default: Any
+    collation: str | None
+    # PostgreSQL-specific extensions
+    is_autofield: bool
+    comment: str | None
+
+
+class TableInfo(NamedTuple):
+    """PostgreSQL-specific TableInfo extending base with comment support."""
+
+    # Fields from BaseTableInfo
+    name: str
+    type: str
+    # PostgreSQL-specific extension
+    comment: str | None
 
 
 class DatabaseIntrospection(BaseDatabaseIntrospection):

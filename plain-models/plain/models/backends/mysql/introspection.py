@@ -1,30 +1,63 @@
 from __future__ import annotations
 
-from collections import namedtuple
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import sqlparse
 from MySQLdb.constants import FIELD_TYPE
 
-from plain.models.backends.base.introspection import BaseDatabaseIntrospection
-from plain.models.backends.base.introspection import FieldInfo as BaseFieldInfo
-from plain.models.backends.base.introspection import TableInfo as BaseTableInfo
+from plain.models.backends.base.introspection import (
+    BaseDatabaseIntrospection,
+)
 from plain.models.indexes import Index
 from plain.utils.datastructures import OrderedSet
 
 if TYPE_CHECKING:
     from .base import MySQLDatabaseWrapper
 
-FieldInfo = namedtuple(
-    "FieldInfo",
-    BaseFieldInfo._fields + ("extra", "is_unsigned", "has_json_constraint", "comment"),
-)
-InfoLine = namedtuple(
-    "InfoLine",
-    "col_name data_type max_len num_prec num_scale extra column_default "
-    "collation is_unsigned comment",
-)
-TableInfo = namedtuple("TableInfo", BaseTableInfo._fields + ("comment",))
+
+class FieldInfo(NamedTuple):
+    """MySQL-specific FieldInfo extending base with additional metadata."""
+
+    # Fields from BaseFieldInfo
+    name: str
+    type_code: Any
+    display_size: int | None
+    internal_size: int | None
+    precision: int | None
+    scale: int | None
+    null_ok: bool | None
+    default: Any
+    collation: str | None
+    # MySQL-specific extensions
+    extra: str
+    is_unsigned: bool
+    has_json_constraint: bool
+    comment: str | None
+
+
+class InfoLine(NamedTuple):
+    """Information about a column from MySQL's information schema."""
+
+    col_name: str
+    data_type: str
+    max_len: int | None
+    num_prec: int | None
+    num_scale: int | None
+    extra: str
+    column_default: Any
+    collation: str | None
+    is_unsigned: bool
+    comment: str | None
+
+
+class TableInfo(NamedTuple):
+    """MySQL-specific TableInfo extending base with comment support."""
+
+    # Fields from BaseTableInfo
+    name: str
+    type: str
+    # MySQL-specific extension
+    comment: str | None
 
 
 class DatabaseIntrospection(BaseDatabaseIntrospection):
@@ -165,18 +198,19 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             info = field_info[line[0]]
             fields.append(
                 FieldInfo(
-                    *line[:2],
-                    to_int(info.max_len) or line[2],
-                    to_int(info.max_len) or line[3],
-                    to_int(info.num_prec) or line[4],
-                    to_int(info.num_scale) or line[5],
-                    line[6],
-                    info.column_default,
-                    info.collation,
-                    info.extra,
-                    info.is_unsigned,
-                    line[0] in json_constraints,
-                    info.comment,
+                    name=line[0],
+                    type_code=line[1],
+                    display_size=to_int(info.max_len) or line[2],
+                    internal_size=to_int(info.max_len) or line[3],
+                    precision=to_int(info.num_prec) or line[4],
+                    scale=to_int(info.num_scale) or line[5],
+                    null_ok=line[6],
+                    default=info.column_default,
+                    collation=info.collation,
+                    extra=info.extra,
+                    is_unsigned=info.is_unsigned,
+                    has_json_constraint=line[0] in json_constraints,
+                    comment=info.comment,
                 )
             )
         return fields
