@@ -195,11 +195,6 @@ class BaseDatabaseFeatures:
         self.connection = connection
 
     @cached_property
-    def supports_explaining_query_execution(self) -> bool:
-        """Does this backend support explaining query execution?"""
-        return self.connection.ops.explain_prefix is not None
-
-    @cached_property
     def supports_transactions(self) -> bool:
         """Confirm support for transactions."""
         with self.connection.cursor() as cursor:

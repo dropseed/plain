@@ -60,8 +60,8 @@ class BaseDatabaseOperations(ABC):
     UNBOUNDED_FOLLOWING: str = "UNBOUNDED " + FOLLOWING
     CURRENT_ROW: str = "CURRENT ROW"
 
-    # Prefix for EXPLAIN queries, or None EXPLAIN isn't supported.
-    explain_prefix: str | None = None
+    # Prefix for EXPLAIN queries
+    explain_prefix: str
 
     def __init__(self, connection: BaseDatabaseWrapper):
         self.connection = connection
@@ -755,10 +755,6 @@ class BaseDatabaseOperations(ABC):
         return start_, end_
 
     def explain_query_prefix(self, format: str | None = None, **options: Any) -> str:
-        if not self.connection.features.supports_explaining_query_execution:
-            raise NotSupportedError(
-                "This backend does not support explaining query execution."
-            )
         if format:
             supported_formats = self.connection.features.supported_explain_formats
             normalized_format = format.upper()
