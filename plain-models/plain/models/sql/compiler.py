@@ -12,7 +12,6 @@ from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, NotSupportedError
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.expressions import F, OrderBy, RawSQL, Ref, Value
-from plain.models.fields import Field
 from plain.models.functions import Cast, Random
 from plain.models.lookups import Lookup
 from plain.models.meta import Meta
@@ -1770,10 +1769,7 @@ class SQLInsertCompiler(SQLCompiler):
         if self.query.fields:
             fields = self.query.fields
         else:
-            id_field = meta.get_field("id")
-            if not isinstance(id_field, Field):
-                raise ValueError("Primary key field must be a Field")
-            fields = [id_field]
+            fields = [meta.get_forward_field("id")]
         result.append("({})".format(", ".join(qn(f.column) for f in fields)))
 
         if self.query.fields:
@@ -1875,9 +1871,7 @@ class SQLInsertCompiler(SQLCompiler):
                     )
                 ]
             else:
-                id_field = meta.get_field("id")
-                if not isinstance(id_field, Field):
-                    raise ValueError("Primary key field must be a Field")
+                id_field = meta.get_forward_field("id")
                 rows = [
                     (
                         self.connection.ops.last_insert_id(
@@ -1940,7 +1934,7 @@ class SQLDeleteCompiler(SQLCompiler):
         innerq.__class__ = Query
         innerq.clear_select_clause()
         assert self.query.model is not None, "DELETE requires a model"
-        id_field = self.query.model._model_meta.get_field("id")
+        id_field = self.query.model._model_meta.get_forward_field("id")
         innerq.select = [id_field.get_col(self.query.get_initial_alias())]
         outerq = Query(self.query.model)
         if not self.connection.features.update_can_self_select:

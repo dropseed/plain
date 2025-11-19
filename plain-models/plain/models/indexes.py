@@ -107,7 +107,7 @@ class Index:
         self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor, **kwargs: Any
     ) -> Statement:
         include = [
-            model._model_meta.get_field(field_name).column
+            model._model_meta.get_forward_field(field_name).column
             for field_name in self.include
         ]
         condition = self._get_condition_sql(model, schema_editor)
@@ -124,7 +124,7 @@ class Index:
             col_suffixes = None
         else:
             fields = [
-                model._model_meta.get_field(field_name)
+                model._model_meta.get_forward_field(field_name)
                 for field_name, _ in self.fields_orders
             ]
             if schema_editor.connection.features.supports_index_column_ordering:
@@ -178,7 +178,7 @@ class Index:
         """
         _, table_name = split_identifier(model.model_options.db_table)
         column_names = [
-            model._model_meta.get_field(field_name).column
+            model._model_meta.get_forward_field(field_name).column
             for field_name, order in self.fields_orders
         ]
         column_names_with_order = [

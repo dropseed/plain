@@ -646,7 +646,7 @@ class QuerySet(Generic[T]):
         return obj
 
     def _prepare_for_bulk_create(self, objs: list[T]) -> None:
-        id_field = self.model._model_meta.get_field("id")
+        id_field = self.model._model_meta.get_forward_field("id")
         for obj in objs:
             if obj.id is None:
                 # Populate new primary key values.
@@ -734,9 +734,13 @@ class QuerySet(Generic[T]):
         unique_fields_objs: list[Field] | None = None
         update_fields_objs: list[Field] | None = None
         if unique_fields:
-            unique_fields_objs = [meta.get_field(name) for name in unique_fields]
+            unique_fields_objs = [
+                meta.get_forward_field(name) for name in unique_fields
+            ]
         if update_fields:
-            update_fields_objs = [meta.get_field(name) for name in update_fields]
+            update_fields_objs = [
+                meta.get_forward_field(name) for name in update_fields
+            ]
         on_conflict = self._check_bulk_create_options(
             update_conflicts,
             update_fields_objs,
@@ -757,7 +761,7 @@ class QuerySet(Generic[T]):
                     update_fields=update_fields_objs,
                     unique_fields=unique_fields_objs,
                 )
-                id_field = meta.get_field("id")
+                id_field = meta.get_forward_field("id")
                 for obj_with_id, results in zip(objs_with_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
                         if field != id_field:
@@ -799,7 +803,9 @@ class QuerySet(Generic[T]):
         objs_tuple = tuple(objs)
         if any(obj.id is None for obj in objs_tuple):
             raise ValueError("All bulk_update() objects must have a primary key set.")
-        fields_list = [self.model._model_meta.get_field(name) for name in fields]
+        fields_list = [
+            self.model._model_meta.get_forward_field(name) for name in fields
+        ]
         if any(not f.concrete or f.many_to_many for f in fields_list):
             raise ValueError("bulk_update() can only be used with concrete fields.")
         if any(f.primary_key for f in fields_list):
@@ -986,7 +992,7 @@ class QuerySet(Generic[T]):
         ]
         if (
             field_name != "id"
-            and not meta.get_field(field_name).primary_key
+            and not meta.get_forward_field(field_name).primary_key
             and field_name not in unique_fields
             and self.sql_query.distinct_fields != (field_name,)
         ):

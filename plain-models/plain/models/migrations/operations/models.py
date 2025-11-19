@@ -698,7 +698,7 @@ class RenameIndex(IndexOperation):
                 package_label, self.model_name
             )
             columns = [
-                from_model._model_meta.get_field(field).column
+                from_model._model_meta.get_forward_field(field).column
                 for field in self.old_fields
             ]
             matching_index_name = schema_editor._constraint_names(

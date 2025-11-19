@@ -287,9 +287,12 @@ class UniqueConstraint(BaseConstraint):
     def constraint_sql(
         self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
     ) -> str | None:
-        fields = [model._model_meta.get_field(field_name) for field_name in self.fields]
+        fields = [
+            model._model_meta.get_forward_field(field_name)
+            for field_name in self.fields
+        ]
         include = [
-            model._model_meta.get_field(field_name).column
+            model._model_meta.get_forward_field(field_name).column
             for field_name in self.include
         ]
         condition = self._get_condition_sql(model, schema_editor)
@@ -308,9 +311,12 @@ class UniqueConstraint(BaseConstraint):
     def create_sql(
         self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
     ) -> Statement | None:
-        fields = [model._model_meta.get_field(field_name) for field_name in self.fields]
+        fields = [
+            model._model_meta.get_forward_field(field_name)
+            for field_name in self.fields
+        ]
         include = [
-            model._model_meta.get_field(field_name).column
+            model._model_meta.get_forward_field(field_name).column
             for field_name in self.include
         ]
         condition = self._get_condition_sql(model, schema_editor)
@@ -331,7 +337,7 @@ class UniqueConstraint(BaseConstraint):
     ) -> Statement | None:
         condition = self._get_condition_sql(model, schema_editor)
         include = [
-            model._model_meta.get_field(field_name).column
+            model._model_meta.get_forward_field(field_name).column
             for field_name in self.include
         ]
         expressions = self._get_index_expressions(model, schema_editor)
@@ -406,7 +412,7 @@ class UniqueConstraint(BaseConstraint):
             for field_name in self.fields:
                 if exclude and field_name in exclude:
                     return
-                field = model._model_meta.get_field(field_name)
+                field = model._model_meta.get_forward_field(field_name)
                 lookup_value = getattr(instance, field.attname)
                 if lookup_value is None:
                     # A composite constraint containing NULL value cannot cause

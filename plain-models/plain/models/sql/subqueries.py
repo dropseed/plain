@@ -38,7 +38,7 @@ class DeleteQuery(Query):
         num_deleted = 0
         assert self.model is not None, "DELETE requires a model"
         meta = self.model._model_meta
-        field = meta.get_field("id")
+        field = meta.get_forward_field("id")
         for offset in range(0, len(id_list), GET_ITERATOR_CHUNK_SIZE):
             self.clear_where()
             self.add_filter(

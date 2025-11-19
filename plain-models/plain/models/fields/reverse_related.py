@@ -14,7 +14,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain.models.exceptions import FieldDoesNotExist, FieldError
+from plain.models.exceptions import FieldError
 from plain.utils.hashable import make_hashable
 
 from . import BLANK_CHOICE_DASH
@@ -273,12 +273,7 @@ class ForeignKeyRel(ForeignObjectRel):
         """
         Return the Field in the 'to' object to which this relationship is tied.
         """
-        from plain.models.fields import Field
-
-        field = self.model._model_meta.get_field("id")
-        if not isinstance(field, Field):
-            raise FieldDoesNotExist("No related field named 'id'")
-        return field
+        return self.model._model_meta.get_forward_field("id")
 
     def set_field_name(self) -> None:
         pass
@@ -338,7 +333,7 @@ class ManyToManyRel(ForeignObjectRel):
         """
         meta = self.through._model_meta
         if self.through_fields:
-            field = meta.get_field(self.through_fields[0])
+            field = meta.get_forward_field(self.through_fields[0])
         else:
             for field in meta.fields:
                 rel = getattr(field, "remote_field", None)

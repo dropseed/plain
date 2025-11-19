@@ -202,7 +202,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if not first_field_name:
             return
 
-        first_field = model._model_meta.get_field(first_field_name)
+        first_field = model._model_meta.get_forward_field(first_field_name)
         if first_field.get_internal_type() == "ForeignKey":
             column = self.connection.introspection.identifier_converter(
                 first_field.column

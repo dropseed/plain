@@ -250,11 +250,9 @@ class BaseDatabaseSchemaEditor(ABC):
                 field_name = field.remote_field.field_name
                 if field_name is None:
                     raise ValueError("Foreign key field_name cannot be None")
-                to_field = field.remote_field.model._model_meta.get_field(field_name)
-                if not isinstance(to_field, Field):
-                    raise ValueError(
-                        f"Foreign key target field must be a Field, not {to_field}"
-                    )
+                to_field = field.remote_field.model._model_meta.get_forward_field(
+                    field_name
+                )
                 to_column = to_field.column
                 if self.sql_create_inline_fk:
                     definition += " " + self.sql_create_inline_fk % {
@@ -601,11 +599,9 @@ class BaseDatabaseSchemaEditor(ABC):
                 field_name = field.remote_field.field_name
                 if field_name is None:
                     raise ValueError("Foreign key field_name cannot be None")
-                to_field = field.remote_field.model._model_meta.get_field(field_name)
-                if not isinstance(to_field, Field):
-                    raise ValueError(
-                        f"Foreign key target field must be a Field, not {to_field}"
-                    )
+                to_field = field.remote_field.model._model_meta.get_forward_field(
+                    field_name
+                )
                 to_column = to_field.column
                 namespace, _ = split_identifier(model.model_options.db_table)
                 definition += " " + self.sql_create_column_inline_fk % {
@@ -1276,18 +1272,12 @@ class BaseDatabaseSchemaEditor(ABC):
                 new_rel.through.model_options.db_table,
             )
         # Repoint the FK to the other side
-        old_reverse_field = old_rel.through._model_meta.get_field(
+        old_reverse_field = old_rel.through._model_meta.get_forward_field(
             old_field.m2m_reverse_field_name()
         )
-        new_reverse_field = new_rel.through._model_meta.get_field(
+        new_reverse_field = new_rel.through._model_meta.get_forward_field(
             new_field.m2m_reverse_field_name()
         )
-        if not isinstance(old_reverse_field, Field) or not isinstance(
-            new_reverse_field, Field
-        ):
-            raise ValueError(
-                "M2M through model fields must be Field instances for alter_field"
-            )
         self.alter_field(
             new_rel.through,
             # The field that points to the target model is needed, so we can
@@ -1296,16 +1286,12 @@ class BaseDatabaseSchemaEditor(ABC):
             old_reverse_field,
             new_reverse_field,
         )
-        old_m2m_field = old_rel.through._model_meta.get_field(
+        old_m2m_field = old_rel.through._model_meta.get_forward_field(
             old_field.m2m_field_name()
         )
-        new_m2m_field = new_rel.through._model_meta.get_field(
+        new_m2m_field = new_rel.through._model_meta.get_forward_field(
             new_field.m2m_field_name()
         )
-        if not isinstance(old_m2m_field, Field) or not isinstance(new_m2m_field, Field):
-            raise ValueError(
-                "M2M through model fields must be Field instances for alter_field"
-            )
         self.alter_field(
             new_rel.through,
             # for self-referential models we need to alter field from the other end too

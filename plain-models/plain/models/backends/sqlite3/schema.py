@@ -503,10 +503,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         # The field that points to the target model is needed,
                         # so that table can be remade with the new m2m field -
                         # this is m2m_reverse_field_name().
-                        old_rel.through._model_meta.get_field(
+                        old_rel.through._model_meta.get_forward_field(
                             old_field.m2m_reverse_field_name()
                         ),
-                        new_rel.through._model_meta.get_field(
+                        new_rel.through._model_meta.get_forward_field(
                             new_field.m2m_reverse_field_name()
                         ),
                     ),
@@ -514,10 +514,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         # The field that points to the model itself is needed,
                         # so that table can be remade with the new self field -
                         # this is m2m_field_name().
-                        old_rel.through._model_meta.get_field(
+                        old_rel.through._model_meta.get_forward_field(
                             old_field.m2m_field_name()
                         ),
-                        new_rel.through._model_meta.get_field(
+                        new_rel.through._model_meta.get_forward_field(
                             new_field.m2m_field_name()
                         ),
                     ),

@@ -490,7 +490,7 @@ class ForeignKey(RelatedField):
             PathInfo(
                 from_meta=from_meta,
                 to_meta=meta,
-                target_fields=(meta.get_field("id"),),
+                target_fields=(meta.get_forward_field("id"),),
                 join_field=self.remote_field,
                 m2m=not self.primary_key,
                 direct=False,
@@ -596,7 +596,7 @@ class ForeignKey(RelatedField):
                 f"Related model {self.remote_field.model!r} cannot be resolved"
             )
         from_field = self
-        to_field = self.remote_field.model._model_meta.get_field("id")
+        to_field = self.remote_field.model._model_meta.get_forward_field("id")
         related_fields: list[tuple[ForeignKey, Field]] = [(from_field, to_field)]
 
         for from_field, to_field in related_fields:
@@ -966,7 +966,7 @@ class ManyToManyField(RelatedField):
                         fix = ""
 
                     try:
-                        field = through._model_meta.get_field(field_name)
+                        field = through._model_meta.get_forward_field(field_name)
                     except FieldDoesNotExist:
                         errors.append(
                             PreflightResult(
@@ -1045,8 +1045,10 @@ class ManyToManyField(RelatedField):
     ) -> list[PathInfo]:
         """Called by both direct and indirect m2m traversal."""
         int_model = self.remote_field.through
-        linkfield1 = int_model._model_meta.get_field(self.m2m_field_name())
-        linkfield2 = int_model._model_meta.get_field(self.m2m_reverse_field_name())
+        linkfield1 = int_model._model_meta.get_forward_field(self.m2m_field_name())
+        linkfield2 = int_model._model_meta.get_forward_field(
+            self.m2m_reverse_field_name()
+        )
         if direct:
             join1infos = linkfield1.reverse_path_infos
             if filtered_relation:

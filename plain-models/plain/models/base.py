@@ -341,7 +341,7 @@ class Model(metaclass=ModelBase):
         and not use this method.
         """
         try:
-            field = self._model_meta.get_field(field_name)
+            field = self._model_meta.get_forward_field(field_name)
         except FieldDoesNotExist:
             return getattr(self, field_name)
         return getattr(self, field.attname)
@@ -464,7 +464,7 @@ class Model(metaclass=ModelBase):
 
         id_val = self.id
         if id_val is None:
-            id_field = meta.get_field("id")
+            id_field = meta.get_forward_field("id")
             id_val = id_field.get_id_value_on_save(self)
             setattr(self, id_field.attname, id_val)
         id_set = id_val is not None
@@ -476,8 +476,8 @@ class Model(metaclass=ModelBase):
             not raw
             and not force_insert
             and self._state.adding
-            and meta.get_field("id").default
-            and meta.get_field("id").default is not NOT_PROVIDED
+            and meta.get_forward_field("id").default
+            and meta.get_forward_field("id").default is not NOT_PROVIDED
         ):
             force_insert = True
         # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.
@@ -502,7 +502,7 @@ class Model(metaclass=ModelBase):
         if not updated:
             fields = meta.local_concrete_fields
             if not id_set:
-                id_field = meta.get_field("id")
+                id_field = meta.get_forward_field("id")
                 fields = [f for f in fields if f is not id_field]
 
             returning_fields = meta.db_returning_fields
@@ -604,7 +604,7 @@ class Model(metaclass=ModelBase):
     def get_field_display(self, field_name: str) -> str:
         """Get the display value for a field, especially useful for fields with choices."""
         # Get the field object from the field name
-        field = self._model_meta.get_field(field_name)
+        field = self._model_meta.get_forward_field(field_name)
         value = getattr(self, field.attname)
 
         # If field has no choices, just return the value as string
@@ -695,7 +695,7 @@ class Model(metaclass=ModelBase):
 
             lookup_kwargs = {}
             for field_name in unique_check:
-                f = self._model_meta.get_field(field_name)
+                f = self._model_meta.get_forward_field(field_name)
                 lookup_value = getattr(self, f.attname)
                 # TODO: Handle multiple backends with different feature flags.
                 if lookup_value is None:
@@ -743,7 +743,7 @@ class Model(metaclass=ModelBase):
         }
 
         if len(unique_check) == 1:
-            field = meta.get_field(unique_check[0])
+            field = meta.get_forward_field(unique_check[0])
             params["field_label"] = field.name
             return ValidationError(
                 message=field.error_messages["unique"],
@@ -751,7 +751,7 @@ class Model(metaclass=ModelBase):
                 params=params,
             )
         else:
-            field_names = [meta.get_field(f).name for f in unique_check]
+            field_names = [meta.get_forward_field(f).name for f in unique_check]
 
             # Put an "and" before the last one
             field_names[-1] = f"and {field_names[-1]}"
@@ -764,7 +764,7 @@ class Model(metaclass=ModelBase):
                 params["field_label"] = " ".join(field_names)
 
             # Use the first field as the message format...
-            message = meta.get_field(unique_check[0]).error_messages["unique"]
+            message = meta.get_forward_field(unique_check[0]).error_messages["unique"]
 
             return ValidationError(
                 message=message,

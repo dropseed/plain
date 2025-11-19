@@ -56,6 +56,7 @@ from plain.utils.tree import Node
 if TYPE_CHECKING:
     from plain.models import Model
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.meta import Meta
     from plain.models.sql.compiler import SQLCompiler
 
@@ -489,7 +490,7 @@ class Query(BaseExpression):
                 if inner_query.default_cols and has_existing_aggregation:
                     assert self.model is not None, "Aggregation requires a model"
                     inner_query.group_by = (
-                        self.model._model_meta.get_field("id").get_col(
+                        self.model._model_meta.get_forward_field("id").get_col(
                             inner_query.get_initial_alias()
                         ),
                     )
@@ -534,7 +535,7 @@ class Query(BaseExpression):
                 # So, make sure at least one field is selected.
                 assert self.model is not None, "Count with slicing requires a model"
                 inner_query.select = (
-                    self.model._model_meta.get_field("id").get_col(
+                    self.model._model_meta.get_forward_field("id").get_col(
                         inner_query.get_initial_alias()
                     ),
                 )
@@ -752,7 +753,7 @@ class Query(BaseExpression):
     ) -> dict[Any, Any]:
         if select_mask is None:
             select_mask = {}
-        select_mask[meta.get_field("id")] = {}
+        select_mask[meta.get_forward_field("id")] = {}
         # All concrete fields that are not part of the defer mask must be
         # loaded. If a relational field is encountered it gets added to the
         # mask for it be considered if `select_related` and the cycle continues
@@ -774,11 +775,11 @@ class Query(BaseExpression):
         # a malformed defer entry.
         for field_name, field_mask in mask.items():
             if filtered_relation := self._filtered_relations.get(field_name):
-                relation = meta.get_field(filtered_relation.relation_name)
+                relation = meta.get_reverse_relation(filtered_relation.relation_name)
                 field_select_mask = select_mask.setdefault((field_name, relation), {})
                 field = relation.field
             else:
-                field = meta.get_field(field_name).field
+                field = meta.get_reverse_relation(field_name).field
                 field_select_mask = select_mask.setdefault(field, {})
             related_model = field.model
             self._get_defer_select_mask(
@@ -794,7 +795,7 @@ class Query(BaseExpression):
     ) -> dict[Any, Any]:
         if select_mask is None:
             select_mask = {}
-        select_mask[meta.get_field("id")] = {}
+        select_mask[meta.get_forward_field("id")] = {}
         # Only include fields mentioned in the mask.
         for field_name, field_mask in mask.items():
             field = meta.get_field(field_name)
@@ -1668,7 +1669,7 @@ class Query(BaseExpression):
         meta: Meta,
         allow_many: bool = True,
         fail_on_missing: bool = False,
-    ) -> tuple[list[Any], Field, tuple[Field, ...], list[str]]:
+    ) -> tuple[list[Any], Field | ForeignObjectRel, tuple[Field, ...], list[str]]:
         """
         Walk the list of names and turns them into PathInfo tuples. A single
         name in 'names' can generate multiple PathInfos (m2m, for example).
@@ -1738,7 +1739,12 @@ class Query(BaseExpression):
                     )
                 break
 
-            if hasattr(field, "path_infos"):
+            # Lazy import to avoid circular dependency
+            from plain.models.fields.related import ForeignKey as FK
+            from plain.models.fields.related import ManyToManyField as M2M
+            from plain.models.fields.reverse_related import ForeignObjectRel as FORel
+
+            if isinstance(field, FK | M2M | FORel):
                 pathinfos: list[PathInfo]
                 if filtered_relation:
                     pathinfos = field.get_path_info(filtered_relation)
@@ -2066,7 +2072,7 @@ class Query(BaseExpression):
         select_field = col.target
         alias = col.alias
         if alias in can_reuse:
-            id_field = select_field.model._model_meta.get_field("id")
+            id_field = select_field.model._model_meta.get_forward_field("id")
             # Need to add a restriction so that outer query's filters are in effect for
             # the subquery, too.
             query.bump_prefix(self)

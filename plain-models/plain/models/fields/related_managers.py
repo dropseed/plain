@@ -352,8 +352,12 @@ class ManyToManyManager(BaseRelatedManager):
         self.instance = instance
         self.through = through
 
-        self.source_field = self.through._model_meta.get_field(self.source_field_name)
-        self.target_field = self.through._model_meta.get_field(self.target_field_name)
+        self.source_field = self.through._model_meta.get_forward_field(
+            self.source_field_name
+        )
+        self.target_field = self.through._model_meta.get_forward_field(
+            self.target_field_name
+        )
 
         self.core_filters = {}
         self.id_field_names = {}
@@ -407,7 +411,7 @@ class ManyToManyManager(BaseRelatedManager):
 
         # M2M: need to annotate the query in order to get the primary model
         # that the secondary model was actually related to.
-        fk = self.through._model_meta.get_field(self.source_field_name)
+        fk = self.through._model_meta.get_forward_field(self.source_field_name)
         join_table = fk.model.model_options.db_table
         qn = db_connection.ops.quote_name
         queryset = queryset.extra(
@@ -506,7 +510,7 @@ class ManyToManyManager(BaseRelatedManager):
         from plain.models import Model
 
         target_ids = set()
-        target_field = self.through._model_meta.get_field(target_field_name)
+        target_field = self.through._model_meta.get_forward_field(target_field_name)
         for obj in objs:
             if isinstance(obj, self.model):
                 target_id = target_field.get_foreign_related_value(obj)[0]

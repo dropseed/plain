@@ -342,6 +342,44 @@ class Meta:
         except KeyError:
             raise FieldDoesNotExist(f"{self.model} has no field named '{field_name}'")
 
+    def get_forward_field(self, field_name: str) -> Field:
+        """
+        Return a forward field instance given the field name.
+
+        Raises FieldDoesNotExist if the field doesn't exist or is a reverse relation.
+        """
+        try:
+            return self._forward_fields_map[field_name]
+        except KeyError:
+            raise FieldDoesNotExist(
+                f"{self.model} has no forward field named '{field_name}'"
+            )
+
+    def get_reverse_relation(self, field_name: str) -> ForeignObjectRel:
+        """
+        Return a reverse relation instance given the field name.
+
+        Raises FieldDoesNotExist if the field doesn't exist or is a forward field.
+        """
+        # If the app registry is not ready, reverse fields are unavailable
+        if not self.models_registry.ready:
+            raise FieldDoesNotExist(
+                f"{self.model} has no reverse relation named '{field_name}'. The app cache isn't ready yet."
+            )
+
+        # Check if it's a forward field first
+        if field_name in self._forward_fields_map:
+            raise FieldDoesNotExist(
+                f"'{field_name}' is a forward field, not a reverse relation"
+            )
+
+        try:
+            return self.fields_map[field_name]
+        except KeyError:
+            raise FieldDoesNotExist(
+                f"{self.model} has no reverse relation named '{field_name}'"
+            )
+
     def _populate_directed_relation_graph(self) -> list[Field]:
         """
         This method is used by each model to find its reverse objects. As this

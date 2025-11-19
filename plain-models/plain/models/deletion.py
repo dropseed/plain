@@ -414,7 +414,9 @@ class Collector:
             if self.can_fast_delete(instance):
                 with transaction.mark_for_rollback_on_error():
                     count = sql.DeleteQuery(model).delete_batch([instance.id])
-                setattr(instance, model._model_meta.get_field("id").attname, None)
+                setattr(
+                    instance, model._model_meta.get_forward_field("id").attname, None
+                )
                 return count, {model.model_options.label: count}
 
         with transaction.atomic(savepoint=False):
@@ -461,5 +463,7 @@ class Collector:
 
         for model, instances in self.data.items():
             for instance in instances:
-                setattr(instance, model._model_meta.get_field("id").attname, None)
+                setattr(
+                    instance, model._model_meta.get_forward_field("id").attname, None
+                )
         return sum(deleted_counter.values()), dict(deleted_counter)
