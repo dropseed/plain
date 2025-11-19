@@ -8,7 +8,13 @@ through foreign key and many-to-many relationships.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from plain.models.base import Model
+    from plain.models.fields.related import ForeignKey, ManyToManyField
 
 from plain.models import transaction
 from plain.models.db import NotSupportedError, db_connection
@@ -21,9 +27,10 @@ from plain.models.utils import resolve_callables
 
 
 def _filter_prefetch_queryset(
-    queryset: QuerySet, field_name: str, instances: Any
+    queryset: QuerySet, field_name: str, instances: Iterable[Model]
 ) -> QuerySet:
-    predicate = Q(**{f"{field_name}__in": instances})
+    filter_kwargs: dict[str, Any] = {f"{field_name}__in": instances}
+    predicate = Q(**filter_kwargs)
     if queryset.sql_query.is_sliced:
         if not db_connection.features.supports_over_clause:
             raise NotSupportedError(
@@ -67,7 +74,15 @@ class ReverseForeignKeyManager(BaseRelatedManager):
     This manager adds behaviors specific to foreign key relations.
     """
 
-    def __init__(self, instance: Any, field: Any, related_model: Any):
+    # Type hints for attributes
+    model: type[Model]
+    instance: Model
+    field: ForeignKey
+    core_filters: dict[str, Model]
+    allow_null: bool
+
+    def __init__(self, instance: Model, field: ForeignKey, related_model: type[Model]):
+        assert field.name is not None, "Field must have a name"
         self.model = related_model
         self.instance = instance
         self.field = field
@@ -141,8 +156,10 @@ class ReverseForeignKeyManager(BaseRelatedManager):
             return self._apply_rel_filters(queryset)
 
     def get_prefetch_queryset(
-        self, instances: Any, queryset: QuerySet | None = None
-    ) -> tuple[QuerySet, Any, Any, bool, str, bool]:
+        self, instances: Iterable[Model], queryset: QuerySet | None = None
+    ) -> tuple[
+        QuerySet, Callable[[Model], Any], Callable[[Model], Any], bool, str, bool
+    ]:
         if queryset is None:
             queryset = self.model.query
 
@@ -192,17 +209,17 @@ class ReverseForeignKeyManager(BaseRelatedManager):
                     check_and_update_obj(obj)
                     obj.save()
 
-    def create(self, **kwargs: Any) -> Any:
+    def create(self, **kwargs: Any) -> Model:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
         return self.model.query.create(**kwargs)
 
-    def get_or_create(self, **kwargs: Any) -> tuple[Any, bool]:
+    def get_or_create(self, **kwargs: Any) -> tuple[Model, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
         return self.model.query.get_or_create(**kwargs)
 
-    def update_or_create(self, **kwargs: Any) -> tuple[Any, bool]:
+    def update_or_create(self, **kwargs: Any) -> tuple[Model, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
         return self.model.query.update_or_create(**kwargs)
@@ -290,21 +307,29 @@ class ManyToManyManager(BaseRelatedManager):
     """
 
     # Type hints for attributes
-    model: Any
+    model: type[Model]
+    instance: Model
+    field: ManyToManyField
+    through: type[Model]
     query_field_name: str
     prefetch_cache_name: str
     source_field_name: str
     target_field_name: str
+    symmetrical: bool
+    core_filters: dict[str, Any]
+    id_field_names: dict[str, str]
+    related_val: tuple[Any, ...]
 
     def __init__(
         self,
-        instance: Any,
-        field: Any,
-        through: Any,
-        related_model: Any,
+        instance: Model,
+        field: ManyToManyField,
+        through: type[Model],
+        related_model: type[Model],
         is_reverse: bool,
         symmetrical: bool = False,
     ):
+        assert field.name is not None, "Field must have a name"
         # Set direction-specific attributes
         if is_reverse:
             # Reverse: accessing from the target model back to the source
@@ -369,8 +394,10 @@ class ManyToManyManager(BaseRelatedManager):
             return self._apply_rel_filters(queryset)
 
     def get_prefetch_queryset(
-        self, instances: Any, queryset: QuerySet | None = None
-    ) -> tuple[QuerySet, Any, Any, bool, str, bool]:
+        self, instances: Iterable[Model], queryset: QuerySet | None = None
+    ) -> tuple[
+        QuerySet, Callable[[Model], Any], Callable[[Model], Any], bool, str, bool
+    ]:
         if queryset is None:
             queryset = self.model.query
 
@@ -449,14 +476,14 @@ class ManyToManyManager(BaseRelatedManager):
 
     def create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
-    ) -> Any:
+    ) -> Model:
         new_obj = self.model.query.create(**kwargs)
         self.add(new_obj, through_defaults=through_defaults)
         return new_obj
 
     def get_or_create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
-    ) -> tuple[Any, bool]:
+    ) -> tuple[Model, bool]:
         obj, created = self.model.query.get_or_create(**kwargs)
         # We only need to add() if created because if we got an object back
         # from get() then the relationship already exists.
@@ -466,7 +493,7 @@ class ManyToManyManager(BaseRelatedManager):
 
     def update_or_create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
-    ) -> tuple[Any, bool]:
+    ) -> tuple[Model, bool]:
         obj, created = self.model.query.update_or_create(**kwargs)
         # We only need to add() if created because if we got an object back
         # from get() then the relationship already exists.
