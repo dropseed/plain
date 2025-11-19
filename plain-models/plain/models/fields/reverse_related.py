@@ -57,7 +57,7 @@ class ForeignObjectRel(FieldCacheMixin):
     empty_strings_allowed = False
 
     # Type annotations for instance attributes
-    model: str | type[Model]
+    model: type[Model]
     field: RelatedField
     on_delete: OnDeleteCallback | None
     limit_choices_to: dict[str, Any] | Q
@@ -71,7 +71,9 @@ class ForeignObjectRel(FieldCacheMixin):
         on_delete: OnDeleteCallback | None = None,
     ):
         self.field = field
-        self.model = to
+        # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
+        # (see related.py:250 where field.remote_field.model is overwritten)
+        self.model = to  # type: ignore[assignment]
         self.related_query_name = related_query_name
         self.limit_choices_to = {} if limit_choices_to is None else limit_choices_to
         self.on_delete = on_delete
@@ -290,7 +292,7 @@ class ManyToManyRel(ForeignObjectRel):
 
     # Type annotations for instance attributes
     field: ManyToManyField
-    through: str | type[Model]
+    through: type[Model]
     through_fields: tuple[str, str] | None
 
     def __init__(
@@ -311,7 +313,9 @@ class ManyToManyRel(ForeignObjectRel):
             limit_choices_to=limit_choices_to,
         )
 
-        self.through = through
+        # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
+        # (see related.py:1143 where field.remote_field.through is overwritten)
+        self.through = through  # type: ignore[assignment]
         self.through_fields = through_fields
 
         self.symmetrical = symmetrical
