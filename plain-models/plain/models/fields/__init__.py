@@ -1177,6 +1177,9 @@ def _get_naive_now() -> datetime.datetime:
 
 
 class DateTimeCheckMixin(Field):
+    auto_now: bool
+    auto_now_add: bool
+
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *super().preflight(**kwargs),
