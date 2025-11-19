@@ -7,7 +7,7 @@ Requires mysqlclient: https://pypi.org/project/mysqlclient/
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any
+from typing import Any, cast
 
 import MySQLdb as Database
 from MySQLdb.constants import CLIENT, FIELD_TYPE
@@ -374,7 +374,7 @@ class MySQLDatabaseWrapper(BaseDatabaseWrapper):
             raise Exception(
                 f"Unable to determine MySQL version from version string {self.mysql_server_info!r}"
             )
-        return tuple(int(x) for x in match.groups())
+        return cast(tuple[int, int, int], tuple(int(x) for x in match.groups()))
 
     @cached_property
     def mysql_is_mariadb(self) -> bool:

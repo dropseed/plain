@@ -6,7 +6,7 @@ import inspect
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.query import QuerySet
@@ -432,6 +432,16 @@ class Meta:
                     delattr(self, cache_key)
         self._get_fields_cache = {}
 
+    @overload
+    def get_fields(
+        self, include_reverse: Literal[False] = False
+    ) -> ImmutableList[Field]: ...
+
+    @overload
+    def get_fields(
+        self, include_reverse: Literal[True]
+    ) -> ImmutableList[Field | ForeignObjectRel]: ...
+
     def get_fields(
         self, include_reverse: bool = False
     ) -> ImmutableList[Field | ForeignObjectRel]:
@@ -448,6 +458,33 @@ class Meta:
                            operations like migrations and deletion cascading.
         """
         return self._get_fields(reverse=include_reverse)
+
+    @overload
+    def _get_fields(
+        self,
+        *,
+        forward: Literal[True] = True,
+        reverse: Literal[False],
+        seen_models: set[type[Any]] | None = None,
+    ) -> ImmutableList[Field]: ...
+
+    @overload
+    def _get_fields(
+        self,
+        *,
+        forward: Literal[False],
+        reverse: Literal[True] = True,
+        seen_models: set[type[Any]] | None = None,
+    ) -> ImmutableList[ForeignObjectRel]: ...
+
+    @overload
+    def _get_fields(
+        self,
+        *,
+        forward: bool = True,
+        reverse: bool = True,
+        seen_models: set[type[Any]] | None = None,
+    ) -> ImmutableList[Field | ForeignObjectRel]: ...
 
     def _get_fields(
         self,

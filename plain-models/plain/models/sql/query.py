@@ -19,10 +19,16 @@ from collections.abc import Iterator as TypingIterator
 from functools import cached_property
 from itertools import chain, count, product
 from string import ascii_uppercase
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeVar, overload
-
-if TYPE_CHECKING:
-    from typing import Self
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    NamedTuple,
+    Self,
+    TypeVar,
+    cast,
+    overload,
+)
 
 from plain.models.aggregates import Count
 from plain.models.constants import LOOKUP_SEP
@@ -393,7 +399,8 @@ class Query(BaseExpression):
         obj._filtered_relations = self._filtered_relations.copy()
         # Clear the cached_property, if it exists.
         obj.__dict__.pop("base_table", None)
-        return obj
+        # Cast needed because Empty().__class__ = Query doesn't narrow type
+        return cast(Self, obj)
 
     @overload
     def chain(self, klass: None = None) -> Self: ...

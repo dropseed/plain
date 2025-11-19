@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property, partial
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from plain import exceptions
 from plain.models.constants import LOOKUP_SEP
@@ -1045,9 +1045,13 @@ class ManyToManyField(RelatedField):
     ) -> list[PathInfo]:
         """Called by both direct and indirect m2m traversal."""
         int_model = self.remote_field.through
-        linkfield1 = int_model._model_meta.get_forward_field(self.m2m_field_name())
-        linkfield2 = int_model._model_meta.get_forward_field(
-            self.m2m_reverse_field_name()
+        # M2M through model fields are always ForeignKey
+        linkfield1 = cast(
+            ForeignKey, int_model._model_meta.get_forward_field(self.m2m_field_name())
+        )
+        linkfield2 = cast(
+            ForeignKey,
+            int_model._model_meta.get_forward_field(self.m2m_reverse_field_name()),
         )
         if direct:
             join1infos = linkfield1.reverse_path_infos

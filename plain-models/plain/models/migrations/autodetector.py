@@ -12,6 +12,7 @@ from plain.models.fields import (
     Field,
     TimeField,
 )
+from plain.models.fields.reverse_related import ManyToManyRel
 from plain.models.migrations import operations
 from plain.models.migrations.migration import Migration, SettingsTuple
 from plain.models.migrations.operations.models import AlterModelOptions
@@ -1200,7 +1201,7 @@ class MigrationAutodetector:
             model_name,
         )
         dependencies = [(dep_package_label, dep_object_name, None, True)]
-        if getattr(field.remote_field, "through", None):
+        if isinstance(field.remote_field, ManyToManyRel):
             through_package_label, through_object_name = resolve_relation(
                 field.remote_field.through,
                 package_label,

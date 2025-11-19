@@ -22,6 +22,7 @@ from plain.models.backends.utils import names_digest, split_identifier, truncate
 from plain.models.constraints import Deferrable
 from plain.models.fields import Field
 from plain.models.fields.related import ForeignKey
+from plain.models.fields.reverse_related import ManyToManyRel
 from plain.models.indexes import Index
 from plain.models.sql import Query
 from plain.models.transaction import TransactionManagementError, atomic
@@ -716,7 +717,8 @@ class BaseDatabaseSchemaEditor(ABC):
         elif (
             old_type is None
             and new_type is None
-            and (old_field.remote_field.through and new_field.remote_field.through)
+            and isinstance(old_field.remote_field, ManyToManyRel)
+            and isinstance(new_field.remote_field, ManyToManyRel)
         ):
             # Both sides have through models; this is a no-op.
             return

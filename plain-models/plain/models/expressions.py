@@ -9,7 +9,7 @@ from collections import defaultdict
 from decimal import Decimal
 from functools import cached_property
 from types import NoneType
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 from uuid import UUID
 
 from plain.models import fields
@@ -1587,7 +1587,7 @@ class Case(SQLiteNumericMixin, Expression):
         return c
 
     def copy(self) -> Self:
-        c = super().copy()
+        c = cast(Self, super().copy())
         c.cases = c.cases[:]
         return c
 
@@ -1676,7 +1676,7 @@ class Subquery(BaseExpression, Combinable):
         return self.query.output_field
 
     def copy(self) -> Self:
-        clone = super().copy()
+        clone = cast(Self, super().copy())
         clone.query = clone.query.clone()
         return clone
 

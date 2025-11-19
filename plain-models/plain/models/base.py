@@ -27,7 +27,7 @@ from plain.models.exceptions import (
     MultipleObjectsReturnedDescriptor,
 )
 from plain.models.expressions import RawSQL, Value
-from plain.models.fields import NOT_PROVIDED
+from plain.models.fields import NOT_PROVIDED, Field
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.meta import Meta
 from plain.models.options import Options
@@ -875,7 +875,7 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def preflight(cls) -> list[PreflightResult]:
-        errors = []
+        errors: list[PreflightResult] = []
 
         errors += [
             *cls._check_fields(),
@@ -907,7 +907,7 @@ class Model(metaclass=ModelBase):
     def _check_db_table_comment(cls) -> list[PreflightResult]:
         if not cls.model_options.db_table_comment:
             return []
-        errors = []
+        errors: list[PreflightResult] = []
         if not (
             db_connection.features.supports_comments
             or "supports_comments" in cls.model_options.required_db_features
@@ -926,7 +926,7 @@ class Model(metaclass=ModelBase):
     @classmethod
     def _check_fields(cls) -> list[PreflightResult]:
         """Perform all field checks."""
-        errors = []
+        errors: list[PreflightResult] = []
         for field in cls._model_meta.local_fields:
             errors.extend(field.preflight(from_model=cls))
         for field in cls._model_meta.local_many_to_many:
@@ -937,7 +937,7 @@ class Model(metaclass=ModelBase):
     def _check_m2m_through_same_relationship(cls) -> list[PreflightResult]:
         """Check if no relationship model is used by more than one m2m field."""
 
-        errors = []
+        errors: list[PreflightResult] = []
         seen_intermediary_signatures = []
 
         fields = cls._model_meta.local_many_to_many
@@ -988,7 +988,7 @@ class Model(metaclass=ModelBase):
     @classmethod
     def _check_field_name_clashes(cls) -> list[PreflightResult]:
         """Forbid field shadowing in multi-table inheritance."""
-        errors = []
+        errors: list[PreflightResult] = []
         used_fields = {}  # name or attname -> field
 
         for f in cls._model_meta.local_fields:
@@ -1017,8 +1017,8 @@ class Model(metaclass=ModelBase):
     @classmethod
     def _check_column_name_clashes(cls) -> list[PreflightResult]:
         # Store a list of column names which have already been used by other fields.
-        used_column_names = []
-        errors = []
+        used_column_names: list[str] = []
+        errors: list[PreflightResult] = []
 
         for f in cls._model_meta.local_fields:
             _, column_name = f.get_attname_column()
@@ -1040,7 +1040,7 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_model_name_db_lookup_clashes(cls) -> list[PreflightResult]:
-        errors = []
+        errors: list[PreflightResult] = []
         model_name = cls.__name__
         if model_name.startswith("_") or model_name.endswith("_"):
             errors.append(
@@ -1066,7 +1066,7 @@ class Model(metaclass=ModelBase):
     def _check_property_name_related_field_accessor_clashes(
         cls,
     ) -> list[PreflightResult]:
-        errors = []
+        errors: list[PreflightResult] = []
         property_names = cls._model_meta._property_names
         related_field_accessors = (
             f.get_attname()
@@ -1087,7 +1087,7 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_single_primary_key(cls) -> list[PreflightResult]:
-        errors = []
+        errors: list[PreflightResult] = []
         if sum(1 for f in cls._model_meta.local_fields if f.primary_key) > 1:
             errors.append(
                 PreflightResult(
@@ -1102,8 +1102,8 @@ class Model(metaclass=ModelBase):
     @classmethod
     def _check_indexes(cls) -> list[PreflightResult]:
         """Check fields, names, and conditions of indexes."""
-        errors = []
-        references = set()
+        errors: list[PreflightResult] = []
+        references: set[str] = set()
         for index in cls.model_options.indexes:
             # Index name can't start with an underscore or a number, restricted
             # for cross-database compatibility with Oracle.
@@ -1192,13 +1192,13 @@ class Model(metaclass=ModelBase):
 
         # In order to avoid hitting the relation tree prematurely, we use our
         # own fields_map instead of using get_field()
-        forward_fields_map = {}
+        forward_fields_map: dict[str, Field] = {}
         for field in cls._model_meta._get_fields(reverse=False):
             forward_fields_map[field.name] = field
             if hasattr(field, "attname"):
                 forward_fields_map[field.attname] = field
 
-        errors = []
+        errors: list[PreflightResult] = []
         for field_name in fields:
             try:
                 field = forward_fields_map[field_name]
@@ -1251,7 +1251,7 @@ class Model(metaclass=ModelBase):
                 )
             ]
 
-        errors = []
+        errors: list[PreflightResult] = []
         fields = cls.model_options.ordering
 
         # Skip expressions and '?' fields.
@@ -1328,7 +1328,7 @@ class Model(metaclass=ModelBase):
         Check that any auto-generated column names are shorter than the limits
         for each database in which the model will be created.
         """
-        errors = []
+        errors: list[PreflightResult] = []
         allowed_len = None
 
         max_name_length = db_connection.ops.max_name_length()
@@ -1403,7 +1403,7 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_constraints(cls) -> list[PreflightResult]:
-        errors = []
+        errors: list[PreflightResult] = []
         if not (
             db_connection.features.supports_table_check_constraints
             or "supports_table_check_constraints"
