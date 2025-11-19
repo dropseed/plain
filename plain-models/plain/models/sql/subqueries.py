@@ -36,7 +36,10 @@ class DeleteQuery(Query):
         """
         # number of objects deleted
         num_deleted = 0
-        field = self.get_model_meta().get_field("id")
+        meta = self.get_model_meta()
+        assert meta is not None, "DELETE requires model metadata"
+        assert self.model is not None, "DELETE requires a model"
+        field = meta.get_field("id")
         for offset in range(0, len(id_list), GET_ITERATOR_CHUNK_SIZE):
             self.clear_where()
             self.add_filter(
@@ -85,9 +88,11 @@ class UpdateQuery(Query):
         query. This is the entry point for the public update() method on
         querysets.
         """
+        meta = self.get_model_meta()
+        assert meta is not None, "UPDATE requires model metadata"
         values_seq = []
         for name, val in values.items():
-            field = self.get_model_meta().get_field(name)
+            field = meta.get_field(name)
             direct = (
                 not (field.auto_created and not field.concrete) or not field.concrete
             )
@@ -97,7 +102,7 @@ class UpdateQuery(Query):
                     f"Cannot update model field {field!r} (only non-relations and "
                     "foreign keys permitted)."
                 )
-            if model is not self.get_model_meta().model:
+            if model is not meta.model:
                 self.add_related_update(model, field, val)
                 continue
             values_seq.append((field, model, val))

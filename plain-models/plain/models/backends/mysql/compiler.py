@@ -65,6 +65,7 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler, SQLCompiler):
         update_query, update_params = super().as_sql()
         # MySQL and MariaDB support UPDATE ... ORDER BY syntax.
         if self.query.order_by:
+            assert self.query.model is not None, "UPDATE requires a model"
             order_by_sql = []
             order_by_params = []
             db_table = self.query.model.model_options.db_table

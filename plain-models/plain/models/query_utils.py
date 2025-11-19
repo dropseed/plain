@@ -147,7 +147,7 @@ class Q(tree.Node):
         from plain.models.sql import Query
         from plain.models.sql.constants import SINGLE
 
-        query = Query(None)  # type: ignore[arg-type]
+        query = Query(None)
         for name, value in against.items():
             if not hasattr(value, "resolve_expression"):
                 value = Value(value)
