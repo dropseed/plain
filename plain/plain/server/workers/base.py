@@ -136,7 +136,7 @@ class Worker(ABC):
             util.close_on_exec(s.fileno())
         util.close_on_exec(self.tmp.fileno())
 
-        self.wait_fds = self.sockets + [self.PIPE[0]]
+        self.wait_fds: list[sock.BaseSocket | int] = self.sockets + [self.PIPE[0]]
 
         self.log.close_on_exec()
 

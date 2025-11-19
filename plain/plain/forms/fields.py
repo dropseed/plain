@@ -793,6 +793,9 @@ class URLField(CharField):
             ValidationError for some malformed URLs.
             """
             try:
+                # Ensure url is a string for consistent typing
+                if isinstance(url, bytes):
+                    url = url.decode("utf-8")
                 return list(urlsplit(url))
             except ValueError:
                 # urlparse.urlsplit can raise a ValueError with some
