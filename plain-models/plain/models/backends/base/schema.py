@@ -20,6 +20,7 @@ from plain.models.backends.ddl_references import (
 )
 from plain.models.backends.utils import names_digest, split_identifier, truncate_name
 from plain.models.constraints import Deferrable
+from plain.models.fields.related import ForeignKey
 from plain.models.indexes import Index
 from plain.models.sql import Query
 from plain.models.transaction import TransactionManagementError, atomic
@@ -239,13 +240,14 @@ class BaseDatabaseSchemaEditor(ABC):
             if extra_params:
                 params.extend(extra_params)
             # FK.
-            if field.remote_field and field.db_constraint:
-                # After checking these attributes, we know field is a ForeignKey
-                fk_field: ForeignKey = field
-                assert fk_field.remote_field is not None  # Checked in if condition
-                to_table = fk_field.remote_field.model.model_options.db_table
-                to_column = fk_field.remote_field.model._model_meta.get_field(
-                    fk_field.remote_field.field_name
+            if (
+                isinstance(field, ForeignKey)
+                and field.remote_field
+                and field.db_constraint
+            ):
+                to_table = field.remote_field.model.model_options.db_table
+                to_column = field.remote_field.model._model_meta.get_field(
+                    field.remote_field.field_name
                 ).column
                 if self.sql_create_inline_fk:
                     definition += " " + self.sql_create_inline_fk % {
@@ -255,7 +257,7 @@ class BaseDatabaseSchemaEditor(ABC):
                 elif self.connection.features.supports_foreign_keys:
                     self.deferred_sql.append(
                         self._create_fk_sql(
-                            model, fk_field, "_fk_%(to_table)s_%(to_column)s"
+                            model, field, "_fk_%(to_table)s_%(to_column)s"
                         )
                     )
             # Add the SQL to our big list.
@@ -580,27 +582,23 @@ class BaseDatabaseSchemaEditor(ABC):
         if db_params["check"]:
             definition += " " + self.sql_check_constraint % db_params
         if (
-            field.remote_field
+            isinstance(field, ForeignKey)
+            and field.remote_field
             and self.connection.features.supports_foreign_keys
             and field.db_constraint
         ):
-            # After checking these attributes, we know field is a ForeignKey
-            fk_field: ForeignKey = field
-            assert fk_field.remote_field is not None  # Checked in if condition
             constraint_suffix = "_fk_%(to_table)s_%(to_column)s"
             # Add FK constraint inline, if supported.
             if self.sql_create_column_inline_fk:
-                to_table = fk_field.remote_field.model.model_options.db_table
-                to_column = fk_field.remote_field.model._model_meta.get_field(
-                    fk_field.remote_field.field_name
+                to_table = field.remote_field.model.model_options.db_table
+                to_column = field.remote_field.model._model_meta.get_field(
+                    field.remote_field.field_name
                 ).column
                 namespace, _ = split_identifier(model.model_options.db_table)
                 definition += " " + self.sql_create_column_inline_fk % {
-                    "name": self._fk_constraint_name(
-                        model, fk_field, constraint_suffix
-                    ),
+                    "name": self._fk_constraint_name(model, field, constraint_suffix),
                     "namespace": f"{self.quote_name(namespace)}." if namespace else "",
-                    "column": self.quote_name(fk_field.column),
+                    "column": self.quote_name(field.column),
                     "to_table": self.quote_name(to_table),
                     "to_column": self.quote_name(to_column),
                     "deferrable": self.connection.ops.deferrable_sql(),
@@ -608,7 +606,7 @@ class BaseDatabaseSchemaEditor(ABC):
             # Otherwise, add FK constraints later.
             else:
                 self.deferred_sql.append(
-                    self._create_fk_sql(model, fk_field, constraint_suffix)
+                    self._create_fk_sql(model, field, constraint_suffix)
                 )
         # Build the SQL and run it
         sql = self.sql_create_column % {
@@ -760,6 +758,7 @@ class BaseDatabaseSchemaEditor(ABC):
         fks_dropped = set()
         if (
             self.connection.features.supports_foreign_keys
+            and isinstance(old_field, ForeignKey)
             and old_field.remote_field
             and old_field.db_constraint
             and self._field_should_be_altered(
@@ -831,10 +830,16 @@ class BaseDatabaseSchemaEditor(ABC):
         # True               | False            | False              | True
         # True               | False            | True               | True
         if (
-            (old_field.remote_field and old_field.db_index)
+            isinstance(old_field, ForeignKey)
+            and old_field.remote_field
+            and old_field.db_index
             and not old_field.primary_key
             and (
-                not (new_field.remote_field and new_field.db_index)
+                not (
+                    isinstance(new_field, ForeignKey)
+                    and new_field.remote_field
+                    and new_field.db_index
+                )
                 or new_field.primary_key
             )
         ):
@@ -998,10 +1003,16 @@ class BaseDatabaseSchemaEditor(ABC):
         # True               | True             | True               | False
         if (
             (
-                not (old_field.remote_field and old_field.db_index)
+                not (
+                    isinstance(old_field, ForeignKey)
+                    and old_field.remote_field
+                    and old_field.db_index
+                )
                 or old_field.primary_key
             )
-            and (new_field.remote_field and new_field.db_index)
+            and isinstance(new_field, ForeignKey)
+            and new_field.remote_field
+            and new_field.db_index
             and not new_field.primary_key
         ):
             self.execute(self._create_index_sql(model, fields=[new_field]))
@@ -1046,22 +1057,23 @@ class BaseDatabaseSchemaEditor(ABC):
         # Does it have a foreign key?
         if (
             self.connection.features.supports_foreign_keys
+            and isinstance(new_field, ForeignKey)
             and new_field.remote_field
             and (
-                fks_dropped or not old_field.remote_field or not old_field.db_constraint
+                fks_dropped
+                or not isinstance(old_field, ForeignKey)
+                or not old_field.remote_field
+                or not old_field.db_constraint
             )
             and new_field.db_constraint
         ):
-            # After checking these attributes, we know new_field is a ForeignKey
-            fk_field: ForeignKey = new_field
-            assert fk_field.remote_field is not None  # Checked in if condition
             self.execute(
-                self._create_fk_sql(model, fk_field, "_fk_%(to_table)s_%(to_column)s")
+                self._create_fk_sql(model, new_field, "_fk_%(to_table)s_%(to_column)s")
             )
         # Rebuild FKs that pointed to us if we previously had to drop them
         if drop_foreign_keys:
             for _, rel in rels_to_update:
-                if rel.field.db_constraint:
+                if isinstance(rel.field, ForeignKey) and rel.field.db_constraint:
                     self.execute(
                         self._create_fk_sql(rel.related_model, rel.field, "_fk")
                     )
@@ -1437,7 +1449,9 @@ class BaseDatabaseSchemaEditor(ABC):
         ) or (old_path, old_args, old_kwargs) != (new_path, new_args, new_kwargs)
 
     def _field_should_be_indexed(self, model: type[Model], field: Field) -> bool:
-        return (field.remote_field and field.db_index) and not field.primary_key
+        if isinstance(field, ForeignKey):
+            return bool(field.remote_field) and field.db_index and not field.primary_key
+        return False
 
     def _field_became_primary_key(self, old_field: Field, new_field: Field) -> bool:
         return not old_field.primary_key and new_field.primary_key

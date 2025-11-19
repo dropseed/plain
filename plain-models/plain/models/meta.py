@@ -4,8 +4,9 @@ import bisect
 import copy
 import inspect
 from collections import defaultdict
+from collections.abc import Iterable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Iterable, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.query import QuerySet

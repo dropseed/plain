@@ -10,6 +10,7 @@ from plain.models.backends.ddl_references import Statement
 from plain.models.backends.utils import strip_quotes
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import NotSupportedError
+from plain.models.fields.related import ForeignKey
 from plain.models.registry import ModelsRegistry
 from plain.models.transaction import atomic
 
@@ -403,8 +404,14 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             # Primary keys, unique fields, indexed fields, and foreign keys are
             # not supported in ALTER TABLE DROP COLUMN.
             and not field.primary_key
-            and not (field.remote_field and field.db_index)
-            and not (field.remote_field and field.db_constraint)
+            and not (
+                isinstance(field, ForeignKey) and field.remote_field and field.db_index
+            )
+            and not (
+                isinstance(field, ForeignKey)
+                and field.remote_field
+                and field.db_constraint
+            )
         ):
             super().remove_field(model, field)
         # For everything else, remake.
@@ -433,9 +440,11 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             and old_field.column != new_field.column
             and self.column_sql(model, old_field) == self.column_sql(model, new_field)
             and not (
-                old_field.remote_field
+                isinstance(old_field, ForeignKey)
+                and old_field.remote_field
                 and old_field.db_constraint
-                or new_field.remote_field
+                or isinstance(new_field, ForeignKey)
+                and new_field.remote_field
                 and new_field.db_constraint
             )
         ):

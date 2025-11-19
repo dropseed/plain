@@ -7,6 +7,7 @@ from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import UniqueConstraint
 from plain.models.expressions import F
 from plain.models.fields import NOT_PROVIDED
+from plain.models.fields.related import ForeignKey
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -165,7 +166,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # created.
         if (
             storage == "InnoDB"
-            and field.get_internal_type() == "ForeignKey"
+            and isinstance(field, ForeignKey)
             and field.db_constraint
         ):
             return False
