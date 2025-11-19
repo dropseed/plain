@@ -316,15 +316,6 @@ class Query(BaseExpression):
             self, db_connection, elide_empty
         )
 
-    def get_model_meta(self) -> Meta | None:
-        """
-        Return the Meta instance (the model._model_meta) from which to start
-        processing. Normally, this is self.model._model_meta, but it can be changed
-        by subclasses.
-        """
-        if self.model:
-            return self.model._model_meta
-
     def clone(self) -> Self:
         """
         Return a copy of the current Query. A lightweight alternative to
@@ -801,8 +792,8 @@ class Query(BaseExpression):
             part_mask = mask
             for part in field_name.split(LOOKUP_SEP):
                 part_mask = part_mask.setdefault(part, {})
-        meta = self.get_model_meta()
-        assert meta is not None, "Deferred/only field loading requires a model"
+        assert self.model is not None, "Deferred/only field loading requires a model"
+        meta = self.model._model_meta
         if defer:
             return self._get_defer_select_mask(meta, mask)
         return self._get_only_select_mask(meta, mask)
@@ -1215,8 +1206,8 @@ class Query(BaseExpression):
                 if summarize:
                     expression = Ref(annotation, expression)
                 return expression_lookups, (), expression
-        meta = self.get_model_meta()
-        assert meta is not None, "Field lookups require a model"
+        assert self.model is not None, "Field lookups require a model"
+        meta = self.model._model_meta
         _, field, _, lookup_parts = self.names_to_path(lookup_splitted, meta)
         field_parts = lookup_splitted[0 : len(lookup_splitted) - len(lookup_parts)]
         if len(lookup_parts) > 1 and not field_parts:
@@ -1419,10 +1410,10 @@ class Query(BaseExpression):
             condition = self.build_lookup(list(lookups), reffed_expression, value)
             return WhereNode([condition], connector=AND), []  # type: ignore[return-value]
 
-        meta = self.get_model_meta()
+        assert self.model is not None, "Building filters requires a model"
+        meta = self.model._model_meta
         alias = self.get_initial_alias()
         assert alias is not None
-        assert meta is not None, "Building filters requires a model"
         allow_many = not branch_negated or not split_subq
 
         try:
@@ -1970,8 +1961,8 @@ class Query(BaseExpression):
                 return annotation
             initial_alias = self.get_initial_alias()
             assert initial_alias is not None
-            meta = self.get_model_meta()
-            assert meta is not None, "Resolving field references requires a model"
+            assert self.model is not None, "Resolving field references requires a model"
+            meta = self.model._model_meta
             join_info = self.setup_joins(
                 field_list,
                 meta,
@@ -2163,8 +2154,8 @@ class Query(BaseExpression):
         """
         alias = self.get_initial_alias()
         assert alias is not None
-        meta = self.get_model_meta()
-        assert meta is not None, "add_fields() requires a model"
+        assert self.model is not None, "add_fields() requires a model"
+        meta = self.model._model_meta
 
         try:
             cols = []

@@ -464,8 +464,10 @@ class SQLCompiler:
                 else:
                     # 'col' is of the form 'field' or 'field1__field2' or
                     # '-field1__field2__field', etc.
-                    meta = self.query.get_model_meta()
-                    assert meta is not None, "Ordering by fields requires a model"
+                    assert self.query.model is not None, (
+                        "Ordering by fields requires a model"
+                    )
+                    meta = self.query.model._model_meta
                     yield from self.find_ordering_name(
                         field,
                         meta,
@@ -998,8 +1000,9 @@ class SQLCompiler:
         """
         result = []
         if opts is None:
-            if (opts := self.query.get_model_meta()) is None:
+            if self.query.model is None:
                 return result
+            opts = self.query.model._model_meta
         start_alias = start_alias or self.query.get_initial_alias()
 
         for field in opts.concrete_fields:
@@ -1027,9 +1030,9 @@ class SQLCompiler:
         if not self.query.distinct_fields:
             return result, params
 
-        opts = self.query.get_model_meta()
-        if opts is None:
+        if self.query.model is None:
             return result, params
+        opts = self.query.model._model_meta
 
         for name in self.query.distinct_fields:
             parts = name.split(LOOKUP_SEP)
@@ -1208,11 +1211,11 @@ class SQLCompiler:
             return related_klass_infos
 
         if not opts:
-            opts = self.query.get_model_meta()
+            assert self.query.model is not None, "select_related requires a model"
+            opts = self.query.model._model_meta
             root_alias = self.query.get_initial_alias()
 
         assert root_alias is not None  # Must be provided or set above
-        assert opts is not None  # select_related requires a model
 
         # Setup for the case when only particular related fields should be
         # included in the related selection.
@@ -1756,9 +1759,8 @@ class SQLInsertCompiler(SQLCompiler):
         # We don't need quote_name_unless_alias() here, since these are all
         # going to be column names (so we can avoid the extra overhead).
         qn = self.connection.ops.quote_name
-        meta = self.query.get_model_meta()
         assert self.query.model is not None, "INSERT requires a model"
-        assert meta is not None, "INSERT requires model metadata"
+        meta = self.query.model._model_meta
         options = self.query.model.model_options
         insert_statement = self.connection.ops.insert_statement(
             on_conflict=self.query.on_conflict,
@@ -1843,9 +1845,8 @@ class SQLInsertCompiler(SQLCompiler):
             and len(self.query.objs) != 1
             and not self.connection.features.can_return_rows_from_bulk_insert
         )
-        meta = self.query.get_model_meta()
         assert self.query.model is not None, "INSERT execution requires a model"
-        assert meta is not None, "INSERT execution requires model metadata"
+        meta = self.query.model._model_meta
         options = self.query.model.model_options
         self.returning_fields = returning_fields
         with self.connection.cursor() as cursor:

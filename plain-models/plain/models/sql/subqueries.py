@@ -36,9 +36,8 @@ class DeleteQuery(Query):
         """
         # number of objects deleted
         num_deleted = 0
-        meta = self.get_model_meta()
-        assert meta is not None, "DELETE requires model metadata"
         assert self.model is not None, "DELETE requires a model"
+        meta = self.model._model_meta
         field = meta.get_field("id")
         for offset in range(0, len(id_list), GET_ITERATOR_CHUNK_SIZE):
             self.clear_where()
@@ -88,8 +87,8 @@ class UpdateQuery(Query):
         query. This is the entry point for the public update() method on
         querysets.
         """
-        meta = self.get_model_meta()
-        assert meta is not None, "UPDATE requires model metadata"
+        assert self.model is not None, "UPDATE requires model metadata"
+        meta = self.model._model_meta
         values_seq = []
         for name, val in values.items():
             field = meta.get_field(name)
