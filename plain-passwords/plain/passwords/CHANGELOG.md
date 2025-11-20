@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.17.1](https://github.com/dropseed/plain/releases/plain-passwords@0.17.1) (2025-11-20)
+
+### What's changed
+
+- Improved type annotations for better compatibility with type checkers ([a43145e](https://github.com/dropseed/plain/commit/a43145e697))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-passwords@0.17.0) (2025-11-13)
 
 ### What's changed
