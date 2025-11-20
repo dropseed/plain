@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.62.1](https://github.com/dropseed/plain/releases/plain-models@0.62.1) (2025-11-20)
+
+### What's changed
+
+- Fixed a bug where non-related fields could cause errors in migrations and schema operations by incorrectly assuming all fields have a `remote_field` attribute ([60b1bcc](https://github.com/dropseed/plain/commit/60b1bcc1c5))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.62.0](https://github.com/dropseed/plain/releases/plain-models@0.62.0) (2025-11-20)
 
 ### What's changed
