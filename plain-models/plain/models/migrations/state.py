@@ -166,6 +166,8 @@ class ProjectState:
         for model_state, name, field, reference in get_references(
             self, old_model_tuple
         ):
+            if not isinstance(field, RelatedField):
+                continue
             changed_field = None
             if reference.to:
                 changed_field = field.clone()
@@ -483,6 +485,9 @@ class ProjectState:
         field: Field,
         concretes: dict[tuple[str, str], tuple[str, str]] | None = None,
     ) -> None:
+        # Only process fields that have relations
+        if not isinstance(field, RelatedField):
+            return None
         remote_field = field.remote_field
         if not remote_field:
             return None

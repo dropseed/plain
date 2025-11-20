@@ -518,6 +518,7 @@ class MigrationAutodetector:
                                     package_label, model_name
                                 ].values()
                                 for field in relations.values()
+                                if isinstance(field, RelatedField)
                             ]
                             for field in fields:
                                 if isinstance(field, RelatedField):
@@ -783,7 +784,8 @@ class MigrationAutodetector:
                     old_field = old_model_state.get_field(rem_field_name)
                     old_field_dec = self.deep_deconstruct(old_field)
                     if (
-                        field.remote_field
+                        isinstance(field, RelatedField)
+                        and field.remote_field
                         and field.remote_field.model
                         and "to" in old_field_dec[2]
                     ):
@@ -1197,6 +1199,7 @@ class MigrationAutodetector:
                 if any(
                     field == related_field.remote_field
                     for related_field in fields.values()
+                    if isinstance(related_field, RelatedField)
                 ):
                     remote_field_model = f"{remote_package_label}.{remote_model_name}"
                     break
@@ -1206,7 +1209,9 @@ class MigrationAutodetector:
             model_name,
         )
         dependencies = [(dep_package_label, dep_object_name, None, True)]
-        if isinstance(field.remote_field, ManyToManyRel):
+        if isinstance(field, RelatedField) and isinstance(
+            field.remote_field, ManyToManyRel
+        ):
             through_package_label, through_object_name = resolve_relation(
                 field.remote_field.through,
                 package_label,

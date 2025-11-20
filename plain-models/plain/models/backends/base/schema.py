@@ -714,7 +714,9 @@ class BaseDatabaseSchemaEditor(ABC):
         elif (
             old_type is None
             and new_type is None
+            and isinstance(old_field, RelatedField)
             and isinstance(old_field.remote_field, ManyToManyRel)
+            and isinstance(new_field, RelatedField)
             and isinstance(new_field.remote_field, ManyToManyRel)
         ):
             # Both sides have through models; this is a no-op.

@@ -127,7 +127,6 @@ class Field(RegisterLookupMixin, Generic[T]):
     name: str | None
     max_length: int | None
     db_column: str | None
-    remote_field: ForeignObjectRel | None
     # Set by set_attributes_from_name (called by contribute_to_class)
     attname: str
     column: str
