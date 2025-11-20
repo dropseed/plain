@@ -1,5 +1,20 @@
 # plain-models changelog
 
+## [0.62.0](https://github.com/dropseed/plain/releases/plain-models@0.62.0) (2025-11-20)
+
+### What's changed
+
+- The `named` parameter has been removed from `QuerySet.values_list()` - named tuples are no longer supported for values lists ([0e39711](https://github.com/dropseed/plain/commit/0e397114c2))
+- Internal method `get_extra_restriction()` has been removed from related fields and query data structures ([6157bd9](https://github.com/dropseed/plain/commit/6157bd90385137faf2cafbbd423a99326eedcd3b))
+- Internal helper function `get_model_meta()` has been removed in favor of direct attribute access ([cb5a50e](https://github.com/dropseed/plain/commit/cb5a50ef1a0c5af61b97b96459bb14ed85df6f7f))
+- Extensive type annotation improvements across the entire package, including database backends, query compilers, fields, migrations, and SQL modules ([a43145e](https://github.com/dropseed/plain/commit/a43145e69732a792b376e6548c6aac384df0ce28))
+- Added `isinstance` checks for related fields and improved type narrowing throughout the codebase ([5b4bdf4](https://github.com/dropseed/plain/commit/5b4bdf47e74964780300e20c5fabfce68fa424c7))
+- Improved type annotations for `Options.get_fields()` and related meta methods with more specific return types ([2c26f86](https://github.com/dropseed/plain/commit/2c26f86573df0cef473153d6224abdb99082e893))
+
+### Upgrade instructions
+
+- Remove any usage of the `named=True` parameter in `values_list()` calls - if you need named access to query results, use `.values()` which returns dictionaries instead
+
 ## [0.61.1](https://github.com/dropseed/plain/releases/plain-models@0.61.1) (2025-11-17)
 
 ### What's changed
