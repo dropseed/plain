@@ -48,6 +48,12 @@ class BaseDatabaseWrapper(ABC):
     data_types_suffix: dict[str, str] = {}
     # Mapping of Field objects to their SQL for CHECK constraints.
     data_type_check_constraints: dict[str, str] = {}
+    # Mapping of lookup operators to SQL templates (defined on backend subclasses)
+    operators: dict[str, str]
+    # Mapping of pattern lookup operators to SQL templates using str.format syntax (defined on backend subclasses)
+    pattern_ops: dict[str, str]
+    # SQL template for escaping patterns in LIKE queries using str.format syntax (defined on backend subclasses)
+    pattern_esc: str
     # Instance attributes - always assigned in __init__
     ops: BaseDatabaseOperations
     client: BaseDatabaseClient
@@ -268,7 +274,7 @@ class BaseDatabaseWrapper(ABC):
 
     # ##### Backend-specific wrappers for PEP-249 connection methods #####
 
-    def _prepare_cursor(self, cursor: Any) -> utils.CursorWrapper:
+    def _prepare_cursor(self, cursor: utils.DBAPICursor) -> utils.CursorWrapper:
         """
         Validate the connection is usable and perform database cursor wrapping.
         """
@@ -460,7 +466,7 @@ class BaseDatabaseWrapper(ABC):
         )
 
         if start_transaction_under_autocommit:
-            self._start_transaction_under_autocommit()
+            self._start_transaction_under_autocommit()  # type: ignore[attr-defined]
         elif autocommit:
             self._set_autocommit(autocommit)
         else:
@@ -629,11 +635,11 @@ class BaseDatabaseWrapper(ABC):
         """
         return self.cursor()
 
-    def make_debug_cursor(self, cursor: Any) -> utils.CursorDebugWrapper:
+    def make_debug_cursor(self, cursor: utils.DBAPICursor) -> utils.CursorDebugWrapper:
         """Create a cursor that logs all queries in self.queries_log."""
         return utils.CursorDebugWrapper(cursor, self)
 
-    def make_cursor(self, cursor: Any) -> utils.CursorWrapper:
+    def make_cursor(self, cursor: utils.DBAPICursor) -> utils.CursorWrapper:
         """Create a cursor without debug logging."""
         return utils.CursorWrapper(cursor, self)
 

@@ -193,7 +193,7 @@ def _check_lazy_references(
         args: list[Any],
         keywords: dict[str, Any],
     ) -> PreflightResult | None:
-        key = (func.__module__, func.__name__)
+        key = (func.__module__, func.__name__)  # type: ignore[attr-defined]
         error_fn = known_lazy.get(key, default_error)
         return error_fn(model_key, func, args, keywords) if error_fn else None
 

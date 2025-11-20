@@ -12,6 +12,7 @@ from plain.models.backends.base.introspection import (
     BaseDatabaseIntrospection,
     TableInfo,
 )
+from plain.models.backends.utils import CursorWrapper
 from plain.models.db import DatabaseError
 from plain.utils.regex_helper import _lazy_re_compile
 
@@ -88,7 +89,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             return "JSONField"
         return field_type
 
-    def get_table_list(self, cursor: Any) -> list[TableInfo]:
+    def get_table_list(self, cursor: CursorWrapper) -> list[TableInfo]:
         """Return a list of table and view names in the current database."""
         # Skip the sqlite_sequence system table used for autoincrement key
         # generation.
@@ -100,7 +101,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         )
         return [TableInfo(row[0], row[1][0]) for row in cursor.fetchall()]
 
-    def get_table_description(self, cursor: Any, table_name: str) -> list[FieldInfo]:
+    def get_table_description(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> list[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface.
@@ -148,12 +151,14 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         ]
 
     def get_sequences(
-        self, cursor: Any, table_name: str, table_fields: tuple[Any, ...] = ()
+        self, cursor: CursorWrapper, table_name: str, table_fields: tuple[Any, ...] = ()
     ) -> list[dict[str, Any]]:
         pk_col = self.get_primary_key_column(cursor, table_name)
         return [{"table": table_name, "column": pk_col}]
 
-    def get_relations(self, cursor: Any, table_name: str) -> dict[str, tuple[str, str]]:
+    def get_relations(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> dict[str, tuple[str, str]]:
         """
         Return a dictionary of {column_name: (ref_column_name, ref_table_name)}
         representing all foreign keys in the given table.
@@ -173,7 +178,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             ) in cursor.fetchall()
         }
 
-    def get_primary_key_columns(self, cursor: Any, table_name: str) -> list[str]:
+    def get_primary_key_columns(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> list[str]:
         cursor.execute(
             f"PRAGMA table_info({self.connection.ops.quote_name(table_name)})"
         )
@@ -323,7 +330,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         return constraints
 
     def get_constraints(
-        self, cursor: Any, table_name: str
+        self, cursor: CursorWrapper, table_name: str
     ) -> dict[str, dict[str, Any]]:
         """
         Retrieve any constraints or keys (unique, pk, fk, check, index) across
@@ -429,7 +436,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         return None
 
     def _get_column_collations(
-        self, cursor: Any, table_name: str
+        self, cursor: CursorWrapper, table_name: str
     ) -> dict[str, str | None]:
         row = cursor.execute(
             """

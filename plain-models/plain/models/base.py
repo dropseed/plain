@@ -4,7 +4,7 @@ import copy
 import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import chain
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from plain.models.meta import Meta
@@ -290,7 +290,7 @@ class Model(metaclass=ModelBase):
         if fields is None:
             self._prefetched_objects_cache = {}
         else:
-            prefetched_objects_cache = getattr(self, "_prefetched_objects_cache", ())
+            prefetched_objects_cache = getattr(self, "_prefetched_objects_cache", {})
             for field in fields:
                 if field in prefetched_objects_cache:
                     del prefetched_objects_cache[field]
@@ -545,15 +545,15 @@ class Model(metaclass=ModelBase):
         fields: Sequence[Any],
         returning_fields: Sequence[Any],
         raw: bool,
-    ) -> list[Any]:
+    ) -> list[tuple[Any, ...]] | None:
         """
         Do an INSERT. If returning_fields is defined then this method should
         return the newly created data for the model.
         """
         return manager._insert(
             [self],
-            fields=fields,
-            returning_fields=returning_fields,
+            fields=list(fields),
+            returning_fields=list(returning_fields) if returning_fields else None,
             raw=raw,
         )
 
@@ -763,10 +763,10 @@ class Model(metaclass=ModelBase):
 
             if len(field_names) > 2:
                 # Comma join if more than 2
-                params["field_label"] = ", ".join(field_names)
+                params["field_label"] = ", ".join(cast(list[str], field_names))
             else:
                 # Just a space if there are only 2
-                params["field_label"] = " ".join(field_names)
+                params["field_label"] = " ".join(cast(list[str], field_names))
 
             # Use the first field as the message format...
             message = meta.get_forward_field(unique_check[0]).error_messages["unique"]
@@ -777,7 +777,7 @@ class Model(metaclass=ModelBase):
                 params=params,
             )
 
-    def get_constraints(self) -> list[tuple[type, list[Any]]]:
+    def get_constraints(self) -> list[tuple[type[Model], list[Any]]]:
         constraints = [(self.__class__, list(self.model_options.constraints))]
         return constraints
 
@@ -1599,4 +1599,5 @@ def model_unpickle(model_id: tuple[str, str] | type[Model]) -> Model:
     return model.__new__(model)
 
 
-model_unpickle.__safe_for_unpickle__ = True
+# Pickle protocol marker - functions don't normally have this attribute
+model_unpickle.__safe_for_unpickle__ = True  # type: ignore[attr-defined]

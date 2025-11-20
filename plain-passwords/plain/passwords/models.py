@@ -24,7 +24,7 @@ class PasswordField(models.CharField):
         )
         super().__init__(*args, **kwargs)
 
-    def deconstruct(self) -> tuple[str, str, tuple[Any, ...], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, tuple[Any, ...], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if kwargs.get("max_length") == 128:
             del kwargs["max_length"]

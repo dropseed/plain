@@ -60,8 +60,8 @@ class MigrationQuestioner:
         except ImportError:
             return self.defaults.get("ask_initial", False)
         else:
-            if getattr(migrations_module, "__file__", None):
-                filenames = os.listdir(os.path.dirname(migrations_module.__file__))
+            if file := getattr(migrations_module, "__file__", None):
+                filenames = os.listdir(os.path.dirname(file))
             elif hasattr(migrations_module, "__path__"):
                 if len(migrations_module.__path__) > 1:
                     return False
@@ -306,7 +306,7 @@ class NonInteractiveMigrationQuestioner(MigrationQuestioner):
     def log_lack_of_migration(
         self, field_name: str, model_name: str, reason: str
     ) -> None:
-        if self.verbosity > 0:
+        if self.verbosity > 0 and self.log:
             self.log(
                 f"Field '{field_name}' on model '{model_name}' not migrated: {reason}."
             )
@@ -322,10 +322,11 @@ class NonInteractiveMigrationQuestioner(MigrationQuestioner):
 
     def ask_not_null_alteration(self, field_name: str, model_name: str) -> Any:
         # We can't ask the user, so set as not provided.
-        self.log(
-            f"Field '{field_name}' on model '{model_name}' given a default of "
-            f"NOT PROVIDED and must be corrected."
-        )
+        if self.log:
+            self.log(
+                f"Field '{field_name}' on model '{model_name}' given a default of "
+                f"NOT PROVIDED and must be corrected."
+            )
         return NOT_PROVIDED
 
     def ask_auto_now_add_addition(self, field_name: str, model_name: str) -> Any:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, NamedTuple
 
 from plain.models.backends.base.introspection import BaseDatabaseIntrospection
+from plain.models.backends.utils import CursorWrapper
 from plain.models.indexes import Index
 
 
@@ -73,7 +74,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 return "PrimaryKeyField"
         return field_type
 
-    def get_table_list(self, cursor: Any) -> list[TableInfo]:
+    def get_table_list(self, cursor: CursorWrapper) -> list[TableInfo]:
         """Return a list of table and view names in the current database."""
         cursor.execute(
             """
@@ -98,7 +99,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             if row[0] not in self.ignored_tables
         ]
 
-    def get_table_description(self, cursor: Any, table_name: str) -> list[FieldInfo]:
+    def get_table_description(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> list[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface.
@@ -146,7 +149,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         ]
 
     def get_sequences(
-        self, cursor: Any, table_name: str, table_fields: tuple[Any, ...] = ()
+        self, cursor: CursorWrapper, table_name: str, table_fields: tuple[Any, ...] = ()
     ) -> list[dict[str, Any]]:
         cursor.execute(
             """
@@ -173,7 +176,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             for row in cursor.fetchall()
         ]
 
-    def get_relations(self, cursor: Any, table_name: str) -> dict[str, tuple[str, str]]:
+    def get_relations(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> dict[str, tuple[str, str]]:
         """
         Return a dictionary of {field_name: (field_name_other_table, other_table)}
         representing all foreign keys in the given table.
@@ -199,7 +204,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         return {row[0]: (row[2], row[1]) for row in cursor.fetchall()}
 
     def get_constraints(
-        self, cursor: Any, table_name: str
+        self, cursor: CursorWrapper, table_name: str
     ) -> dict[str, dict[str, Any]]:
         """
         Retrieve any constraints or keys (unique, pk, fk, check, index) across

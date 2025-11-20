@@ -6,7 +6,7 @@ and database field objects.
 from __future__ import annotations
 
 from itertools import chain
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from plain.exceptions import (
     NON_FIELD_ERRORS,
@@ -169,7 +169,7 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
         attrs: dict[str, Any],
     ) -> type[BaseModelForm]:
         # Metaclass __new__ returns a type, specifically type[BaseModelForm]
-        new_class: type[BaseModelForm] = super().__new__(mcs, name, bases, attrs)
+        new_class = cast(type[BaseModelForm], super().__new__(mcs, name, bases, attrs))
 
         if bases == (BaseModelForm,):
             return new_class
@@ -218,12 +218,18 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
         else:
             fields = new_class.declared_fields
 
-        new_class.base_fields = fields
+        # After validation and update, all fields should be non-None
+        new_class.base_fields = cast(dict[str, Field], fields)
 
         return new_class
 
 
 class BaseModelForm(BaseForm):
+    # Set by DeclarativeFieldsMetaclass
+    declared_fields: dict[str, Field]
+    # Set by ModelFormMetaclass
+    _meta: ModelFormOptions
+
     def __init__(
         self,
         *,
@@ -280,7 +286,7 @@ class BaseModelForm(BaseForm):
 
             # Exclude fields that failed form validation. There's no need for
             # the model fields to validate them as well.
-            elif field in self._errors:
+            elif self._errors and field in self._errors:
                 exclude.add(f.name)
 
             # Exclude empty fields that are not required by the form, if the
@@ -515,8 +521,7 @@ class ModelChoiceField(ChoiceField):
         # the property self.choices. In this case, just return self._choices.
         if hasattr(self, "_choices"):
             # After checking hasattr, we know _choices exists and is ModelChoiceIterator
-            choices: ModelChoiceIterator = self._choices
-            return choices
+            return cast(ModelChoiceIterator, self._choices)
 
         # Otherwise, execute the QuerySet in self.queryset to determine the
         # choices dynamically. Return a fresh ModelChoiceIterator that has not been

@@ -10,10 +10,11 @@ from typing import TYPE_CHECKING, Any
 from plain import models
 from plain.models.aggregates import Aggregate, Avg, StdDev, Sum, Variance
 from plain.models.backends.base.operations import BaseDatabaseOperations
+from plain.models.backends.utils import CursorWrapper
 from plain.models.constants import OnConflict
 from plain.models.db import DatabaseError, NotSupportedError
 from plain.models.exceptions import FieldError
-from plain.models.expressions import Col
+from plain.models.expressions import Col, ResolvableExpression
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
 
@@ -90,7 +91,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         """
         return f"plain_date_extract(%s, {sql})", (lookup_type.lower(), *params)
 
-    def fetch_returned_insert_rows(self, cursor: Any) -> list[Any]:
+    def fetch_returned_insert_rows(self, cursor: CursorWrapper) -> list[Any]:
         """
         Given a cursor object that has just performed an INSERT...RETURNING
         statement into a table, return the list of returned data.
@@ -215,7 +216,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def last_executed_query(
         self,
-        cursor: Any,
+        cursor: CursorWrapper,
         sql: str,
         params: list[Any] | tuple[Any, ...] | dict[str, Any] | None,
     ) -> str:
@@ -276,7 +277,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return None
 
         # Expression values are adapted by the database.
-        if hasattr(value, "resolve_expression"):
+        if isinstance(value, ResolvableExpression):
             return value
 
         # SQLite doesn't support tz-aware datetimes
@@ -292,11 +293,11 @@ class DatabaseOperations(BaseDatabaseOperations):
             return None
 
         # Expression values are adapted by the database.
-        if hasattr(value, "resolve_expression"):
+        if isinstance(value, ResolvableExpression):
             return value
 
         # SQLite doesn't support tz-aware datetimes
-        if timezone.is_aware(value):
+        if isinstance(value, datetime.time) and value.utcoffset() is not None:
             raise ValueError("SQLite backend does not support timezone-aware times.")
 
         return str(value)

@@ -41,7 +41,8 @@ from opentelemetry.trace import SpanKind
 
 from plain.runtime import settings
 
-_SUPPRESS_KEY = object()
+# Use a stable string key so OpenTelemetry context APIs receive the expected type.
+_SUPPRESS_KEY = "plain.models.suppress_db_tracing"
 
 tracer = trace.get_tracer("plain.models")
 

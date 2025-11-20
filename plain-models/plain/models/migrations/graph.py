@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import total_ordering
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from plain.models.migrations.state import ProjectState
 
@@ -24,10 +24,16 @@ class Node:
         self.parents: set[Node] = set()
 
     def __eq__(self, other: object) -> bool:
+        if isinstance(other, Node):
+            return self.key == other.key
         return self.key == other
 
     def __lt__(self, other: object) -> bool:
-        return self.key < other
+        if isinstance(other, Node):
+            return self.key < other.key
+        if isinstance(other, tuple):
+            return self.key < other  # type: ignore[operator]
+        return NotImplemented
 
     def __hash__(self) -> int:
         return hash(self.key)
@@ -58,7 +64,10 @@ class DummyNode(Node):
     """
 
     def __init__(
-        self, key: tuple[str, str], origin: tuple[str, str], error_message: str
+        self,
+        key: tuple[str, str],
+        origin: Migration | tuple[str, str] | None,
+        error_message: str,
     ):
         super().__init__(key)
         self.origin = origin
@@ -102,7 +111,10 @@ class MigrationGraph:
         self.nodes[key] = migration
 
     def add_dummy_node(
-        self, key: tuple[str, str], origin: tuple[str, str], error_message: str
+        self,
+        key: tuple[str, str],
+        origin: Migration | tuple[str, str] | None,
+        error_message: str,
     ) -> None:
         node = DummyNode(key, origin, error_message)
         self.node_map[key] = node
@@ -110,7 +122,7 @@ class MigrationGraph:
 
     def add_dependency(
         self,
-        migration: tuple[str, str] | None,
+        migration: Migration | tuple[str, str] | None,
         child: tuple[str, str],
         parent: tuple[str, str],
         skip_validation: bool = False,
@@ -340,12 +352,12 @@ class MigrationGraph:
         if not nodes:
             return ProjectState()
         if not isinstance(nodes[0], tuple):
-            nodes = [nodes]
+            nodes = cast(list[tuple[str, str]], [nodes])
         assert isinstance(nodes, list)  # Type narrowing after checks above
         plan = self._generate_plan(nodes, at_end)
         project_state = ProjectState(real_packages=real_packages)
         for node in plan:
-            project_state = self.nodes[node].mutate_state(project_state, preserve=False)
+            project_state = self.nodes[node].mutate_state(project_state, preserve=False)  # type: ignore[possibly-missing-attribute]
         return project_state
 
     def __contains__(self, node: tuple[str, str]) -> bool:

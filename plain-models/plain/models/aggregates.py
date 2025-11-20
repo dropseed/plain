@@ -3,7 +3,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain.models.exceptions import FieldError, FullResultSet
-from plain.models.expressions import Case, Func, Star, Value, When
+from plain.models.expressions import (
+    Case,
+    Func,
+    ResolvableExpression,
+    Star,
+    Value,
+    When,
+)
 from plain.models.fields import IntegerField
 from plain.models.functions.comparison import Coalesce
 from plain.models.functions.mixins import (
@@ -99,7 +106,7 @@ class Aggregate(Func):
                     )
         if (default := c.default) is None:
             return c
-        if hasattr(default, "resolve_expression"):
+        if isinstance(default, ResolvableExpression):
             default = default.resolve_expression(query, allow_joins, reuse, summarize)
             if default._output_field_or_none is None:
                 default.output_field = c._output_field_or_none
@@ -132,7 +139,7 @@ class Aggregate(Func):
         if self.filter is not None:
             if connection.features.supports_aggregate_filter_clause:
                 try:
-                    filter_sql, filter_params = self.filter.as_sql(compiler, connection)
+                    filter_sql, filter_params = self.filter.as_sql(compiler, connection)  # type: ignore[possibly-missing-attribute]
                 except FullResultSet:
                     pass
                 else:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import click
 
@@ -34,8 +34,8 @@ if TYPE_CHECKING:
     from ..backends.base.base import BaseDatabaseWrapper
     from ..migrations.operations.base import Operation
 
-# Type annotation for type checkers; runtime value is _db_connection
-db_connection: BaseDatabaseWrapper = _db_connection
+# Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
+db_connection = cast("BaseDatabaseWrapper", _db_connection)
 
 
 @register_cli("migrations")
@@ -663,9 +663,16 @@ def list_migrations(
                     if plan_node not in shown and plan_node[0] == package_name:
                         # Give it a nice title if it's a squashed one
                         title = plan_node[1]
-                        if graph.nodes[plan_node].replaces:
-                            title += f" ({len(graph.nodes[plan_node].replaces)} squashed migrations)"
-                        applied_migration = loader.applied_migrations.get(plan_node)
+                        migration_node = graph.nodes[plan_node]
+                        if migration_node and migration_node.replaces:
+                            title += (
+                                f" ({len(migration_node.replaces)} squashed migrations)"
+                            )
+                        applied_migration = (
+                            loader.applied_migrations.get(plan_node)
+                            if loader.applied_migrations
+                            else None
+                        )
                         # Mark it as applied/unapplied
                         if applied_migration:
                             if plan_node in recorded_migrations:
@@ -690,6 +697,7 @@ def list_migrations(
         """
         # Load migrations from disk/DB
         loader = MigrationLoader(db_connection)
+        assert loader.applied_migrations is not None
         graph = loader.graph
         if package_names:
             _validate_package_names(package_names)
@@ -745,6 +753,7 @@ def prune(yes: bool) -> None:
     """Remove stale migration records from the database"""
     # Load migrations from disk and database
     loader = MigrationLoader(db_connection, ignore_no_migrations=True)
+    assert loader.disk_migrations is not None
     recorder = MigrationRecorder(db_connection)
     recorded_migrations = recorder.applied_migrations()
 

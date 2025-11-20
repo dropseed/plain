@@ -11,8 +11,9 @@ from psycopg.types import numeric
 from psycopg.types.json import Jsonb
 
 from plain.models.backends.base.operations import BaseDatabaseOperations
-from plain.models.backends.utils import split_tzname_delta
+from plain.models.backends.utils import CursorWrapper, split_tzname_delta
 from plain.models.constants import OnConflict
+from plain.models.expressions import ResolvableExpression
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
@@ -182,7 +183,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     def deferrable_sql(self) -> str:
         return " DEFERRABLE INITIALLY DEFERRED"
 
-    def fetch_returned_insert_rows(self, cursor: Any) -> list[Any]:
+    def fetch_returned_insert_rows(self, cursor: CursorWrapper) -> list[Any]:
         """
         Given a cursor object that has just performed an INSERT...RETURNING
         statement into a table, return the tuple of returned data.
@@ -264,7 +265,9 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             return ["DISTINCT"], []
 
-    def last_executed_query(self, cursor: Any, sql: str, params: Any) -> str | None:
+    def last_executed_query(
+        self, cursor: CursorWrapper, sql: str, params: Any
+    ) -> str | None:
         try:
             return self.compose_sql(sql, params)
         except errors.DataError:
@@ -289,7 +292,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     def adapt_integerfield_value(
         self, value: int | Any | None, internal_type: str
     ) -> int | Any | None:
-        if value is None or hasattr(value, "resolve_expression"):
+        if value is None or isinstance(value, ResolvableExpression):
             return value
         return self.integerfield_type_map[internal_type](value)
 

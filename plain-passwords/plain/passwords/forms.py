@@ -105,7 +105,7 @@ class PasswordSetForm(forms.Form):
         assert isinstance(password2, str), "new_password2 must be a string"
 
         # Clean it as if it were being put into the model directly
-        self.user._model_meta.get_field("password").clean(password2, self.user)
+        self.user._model_meta.get_field("password").clean(password2, self.user)  # type: ignore[possibly-missing-attribute]
 
         return password2
 

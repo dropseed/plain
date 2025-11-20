@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Any, NamedTuple
 
+from plain.models.backends.utils import CursorWrapper
+
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
 
@@ -55,7 +57,9 @@ class BaseDatabaseIntrospection(ABC):
         """
         return name
 
-    def table_names(self, cursor: Any = None, include_views: bool = False) -> list[str]:
+    def table_names(
+        self, cursor: CursorWrapper | None = None, include_views: bool = False
+    ) -> list[str]:
         """
         Return a list of names of all tables that exist in the database.
         Sort the returned table list by Python's default sorting. Do NOT use
@@ -63,7 +67,7 @@ class BaseDatabaseIntrospection(ABC):
         order between databases.
         """
 
-        def get_names(cursor: Any) -> list[str]:
+        def get_names(cursor: CursorWrapper) -> list[str]:
             return sorted(
                 ti.name
                 for ti in self.get_table_list(cursor)
@@ -76,7 +80,7 @@ class BaseDatabaseIntrospection(ABC):
         return get_names(cursor)
 
     @abstractmethod
-    def get_table_list(self, cursor: Any) -> list[TableInfo]:
+    def get_table_list(self, cursor: CursorWrapper) -> list[TableInfo]:
         """
         Return an unsorted list of TableInfo named tuples of all tables and
         views that exist in the database.
@@ -84,7 +88,9 @@ class BaseDatabaseIntrospection(ABC):
         ...
 
     @abstractmethod
-    def get_table_description(self, cursor: Any, table_name: str) -> list[FieldInfo]:
+    def get_table_description(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> list[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface.
@@ -146,7 +152,7 @@ class BaseDatabaseIntrospection(ABC):
 
     @abstractmethod
     def get_sequences(
-        self, cursor: Any, table_name: str, table_fields: tuple[Any, ...] = ()
+        self, cursor: CursorWrapper, table_name: str, table_fields: tuple[Any, ...] = ()
     ) -> list[dict[str, Any]]:
         """
         Return a list of introspected sequences for table_name. Each sequence
@@ -156,21 +162,27 @@ class BaseDatabaseIntrospection(ABC):
         ...
 
     @abstractmethod
-    def get_relations(self, cursor: Any, table_name: str) -> dict[str, tuple[str, str]]:
+    def get_relations(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> dict[str, tuple[str, str]]:
         """
         Return a dictionary of {field_name: (field_name_other_table, other_table)}
         representing all foreign keys in the given table.
         """
         ...
 
-    def get_primary_key_column(self, cursor: Any, table_name: str) -> str | None:
+    def get_primary_key_column(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> str | None:
         """
         Return the name of the primary key column for the given table.
         """
         columns = self.get_primary_key_columns(cursor, table_name)
         return columns[0] if columns else None
 
-    def get_primary_key_columns(self, cursor: Any, table_name: str) -> list[str] | None:
+    def get_primary_key_columns(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> list[str] | None:
         """Return a list of primary key columns for the given table."""
         for constraint in self.get_constraints(cursor, table_name).values():
             if constraint["primary_key"]:
@@ -179,7 +191,7 @@ class BaseDatabaseIntrospection(ABC):
 
     @abstractmethod
     def get_constraints(
-        self, cursor: Any, table_name: str
+        self, cursor: CursorWrapper, table_name: str
     ) -> dict[str, dict[str, Any]]:
         """
         Retrieve any constraints or keys (unique, pk, fk, check, index)

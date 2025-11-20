@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from plain.runtime import PLAIN_TEMP_PATH
 
@@ -13,8 +13,8 @@ from .clients import PostgresBackupClient, SQLiteBackupClient
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
 
-# Type annotation for type checkers; runtime value is _db_connection
-db_connection: BaseDatabaseWrapper = _db_connection
+# Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
+db_connection = cast("BaseDatabaseWrapper", _db_connection)
 
 
 class DatabaseBackups:

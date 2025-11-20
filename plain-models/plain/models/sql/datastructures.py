@@ -24,7 +24,9 @@ class MultiJoin(Exception):
     exceptionally).
     """
 
-    def __init__(self, names_pos: int, path_with_names: list[str]) -> None:
+    def __init__(
+        self, names_pos: int, path_with_names: list[tuple[str, list[Any]]]
+    ) -> None:
         self.level = names_pos
         # The path travelled, this includes the path to the multijoin.
         self.names_with_path = path_with_names

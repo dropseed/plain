@@ -4,7 +4,7 @@ import copy
 from collections import defaultdict
 from contextlib import contextmanager
 from functools import cached_property, partial
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from plain import models
 from plain.models.exceptions import FieldDoesNotExist
@@ -30,7 +30,11 @@ def _get_package_label_and_model_name(
 ) -> tuple[str, str]:
     if isinstance(model, str):
         split = model.split(".", 1)
-        return tuple(split) if len(split) == 2 else (package_label, split[0])
+        return (
+            cast(tuple[str, str], tuple(split))
+            if len(split) == 2
+            else (package_label, split[0])
+        )
     else:
         return model.model_options.package_label, model.model_options.model_name
 
@@ -47,7 +51,7 @@ def _get_related_models(m: type[models.Model]) -> list[type[models.Model]]:
     related_fields_models = set()
     for f in m._model_meta.get_fields(include_reverse=True):
         if (
-            isinstance(f, (RelatedField, ForeignObjectRel))
+            isinstance(f, RelatedField | ForeignObjectRel)
             and f.related_model is not None
             and not isinstance(f.related_model, str)
         ):
@@ -121,6 +125,7 @@ class ProjectState:
     ) -> dict[tuple[str, str], dict[tuple[str, str], dict[str, Field]]]:
         if self._relations is None:
             self.resolve_fields_and_relations()
+        assert self._relations is not None
         return self._relations
 
     def add_model(self, model_state: ModelState) -> None:
@@ -164,11 +169,13 @@ class ProjectState:
             changed_field = None
             if reference.to:
                 changed_field = field.clone()
-                changed_field.remote_field.model = new_remote_model
+                assert changed_field.remote_field is not None
+                changed_field.remote_field.model = new_remote_model  # type: ignore[assignment]
             if reference.through:
                 if changed_field is None:
                     changed_field = field.clone()
-                changed_field.remote_field.through = new_remote_model
+                assert changed_field.remote_field is not None
+                changed_field.remote_field.through = new_remote_model  # type: ignore[assignment]
             if changed_field:
                 model_state.fields[name] = changed_field
                 to_reload.add((model_state.package_label, model_state.name_lower))
@@ -450,6 +457,7 @@ class ProjectState:
         field: Field,
         concretes: dict[tuple[str, str], tuple[str, str]],
     ) -> None:
+        assert self._relations is not None
         remote_model_key = resolve_relation(model, *model_key)
         if (
             remote_model_key[0] not in self.real_packages
@@ -594,7 +602,7 @@ class StateModelsRegistry(ModelsRegistry):
         from plain.models.preflight import _check_lazy_references
 
         if errors := _check_lazy_references(self, packages_registry):
-            raise ValueError("\n".join(error.message for error in errors))
+            raise ValueError("\n".join(error.fix for error in errors))
 
     @contextmanager
     def bulk_update(self) -> Generator[None, None, None]:
@@ -825,7 +833,7 @@ class ModelState:
         body["__module__"] = "__fake__"
 
         # Then, make a Model object (models_registry.register_model is called in __new__)
-        model_class = type(self.name, bases, body)
+        model_class = cast(type[models.Model], type(self.name, bases, body))
         from plain.models import register_model
 
         # Register it to the models_registry associated with the model meta

@@ -47,9 +47,9 @@ class ATan2(NumericOutputFieldMixin, Func):
         connection: BaseDatabaseWrapper,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
-        if not getattr(
-            connection.ops, "spatialite", False
-        ) or connection.ops.spatial_version >= (5, 0, 0):
+        if not getattr(connection.ops, "spatialite", False) or getattr(
+            connection.ops, "spatial_version", (0, 0, 0)
+        ) >= (5, 0, 0):
             return self.as_sql(compiler, connection)
         # This function is usually ATan2(y, x), returning the inverse tangent
         # of y / x, but it's ATan2(x, y) on SpatiaLite < 5.0.0.

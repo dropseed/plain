@@ -4,11 +4,15 @@ Query subclasses which provide extra functionality beyond simple data retrieval.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.models.exceptions import FieldError
+from plain.models.expressions import ResolvableExpression
 from plain.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE, NO_RESULTS
 from plain.models.sql.query import Query
+
+if TYPE_CHECKING:
+    from plain.models.fields import Field
 
 __all__ = ["DeleteQuery", "UpdateQuery", "InsertQuery", "AggregateQuery"]
 
@@ -117,7 +121,7 @@ class UpdateQuery(Query):
         called add_update_targets() to hint at the extra information here.
         """
         for field, model, val in values_seq:
-            if hasattr(val, "resolve_expression"):
+            if isinstance(val, ResolvableExpression):
                 # Resolve expressions here so that annotations are no longer needed
                 val = val.resolve_expression(self, allow_joins=False, for_save=True)
             self.values.append((field, model, val))
@@ -155,16 +159,16 @@ class InsertQuery(Query):
         self,
         *args: Any,
         on_conflict: str | None = None,
-        update_fields: list[Any] | None = None,
-        unique_fields: list[Any] | None = None,
+        update_fields: list[Field] | None = None,
+        unique_fields: list[Field] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.fields: list[Any] = []
+        self.fields: list[Field] = []
         self.objs: list[Any] = []
         self.on_conflict = on_conflict
-        self.update_fields = update_fields or []
-        self.unique_fields = unique_fields or []
+        self.update_fields: list[Field] = update_fields or []
+        self.unique_fields: list[Field] = unique_fields or []
 
     def insert_values(
         self, fields: list[Any], objs: list[Any], raw: bool = False

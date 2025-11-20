@@ -7,7 +7,7 @@ Requires mysqlclient: https://pypi.org/project/mysqlclient/
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import MySQLdb as Database
 from MySQLdb.constants import CLIENT, FIELD_TYPE
@@ -19,11 +19,14 @@ from plain.models.backends.base.base import BaseDatabaseWrapper
 from plain.models.db import IntegrityError
 from plain.utils.regex_helper import _lazy_re_compile
 
-# With mysqlclient stubs, we can now type the connection
-try:
+# Type checkers always see the proper type; runtime falls back to Any if needed
+if TYPE_CHECKING:
     from MySQLdb.connections import Connection as MySQLConnection
-except ImportError:
-    MySQLConnection: type[Any] = Any  # type: ignore[misc]
+else:
+    try:
+        from MySQLdb.connections import Connection as MySQLConnection
+    except ImportError:
+        MySQLConnection = Any  # type: ignore[misc]
 
 from .client import DatabaseClient
 from .creation import DatabaseCreation

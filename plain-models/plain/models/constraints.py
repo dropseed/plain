@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ValidationError
 from plain.models.exceptions import FieldError
-from plain.models.expressions import Exists, ExpressionList, F, OrderBy
+from plain.models.expressions import (
+    Exists,
+    ExpressionList,
+    F,
+    OrderBy,
+    ReplaceableExpression,
+)
 from plain.models.indexes import IndexExpression
 from plain.models.lookups import Exact
 from plain.models.query_utils import Q
@@ -17,7 +23,6 @@ if TYPE_CHECKING:
     from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
     from plain.models.backends.ddl_references import Statement
     from plain.models.base import Model
-    from plain.models.expressions import Combinable
 
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]
 
@@ -67,6 +72,7 @@ class BaseConstraint(ABC):
     ) -> None: ...
 
     def get_violation_error_message(self) -> str:
+        assert self.violation_error_message is not None
         return self.violation_error_message % {"name": self.name}
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
@@ -189,9 +195,11 @@ class Deferrable(Enum):
 
 
 class UniqueConstraint(BaseConstraint):
+    expressions: tuple[ReplaceableExpression, ...]
+
     def __init__(
         self,
-        *expressions: str | Combinable,
+        *expressions: str | ReplaceableExpression,
         fields: tuple[str, ...] | list[str] = (),
         name: str | None = None,
         condition: Q | None = None,
@@ -425,12 +433,12 @@ class UniqueConstraint(BaseConstraint):
             if exclude:
                 for expression in self.expressions:
                     if hasattr(expression, "flatten"):
-                        for expr in expression.flatten():
+                        for expr in expression.flatten():  # type: ignore[call-non-callable]
                             if isinstance(expr, F) and expr.name in exclude:
                                 return
                     elif isinstance(expression, F) and expression.name in exclude:
                         return
-            replacements = {
+            replacements: dict[Any, Any] = {
                 F(field): value
                 for field, value in instance._get_field_value_map(
                     meta=model._model_meta, exclude=exclude

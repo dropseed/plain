@@ -7,7 +7,7 @@ from __future__ import annotations
 import functools
 import zoneinfo
 from contextlib import ContextDecorator
-from datetime import UTC, datetime, timedelta, timezone, tzinfo
+from datetime import UTC, datetime, time, timedelta, timezone, tzinfo
 from threading import local
 from types import TracebackType
 
@@ -183,9 +183,9 @@ def now() -> datetime:
 # The caller should ensure that they don't receive an invalid value like None.
 
 
-def is_aware(value: datetime) -> bool:
+def is_aware(value: datetime | time) -> bool:
     """
-    Determine if a given datetime.datetime is aware.
+    Determine if a given datetime.datetime or datetime.time is aware.
 
     The concept is defined in Python's docs:
     https://docs.python.org/library/datetime.html#datetime.tzinfo
@@ -196,9 +196,9 @@ def is_aware(value: datetime) -> bool:
     return value.utcoffset() is not None
 
 
-def is_naive(value: datetime) -> bool:
+def is_naive(value: datetime | time) -> bool:
     """
-    Determine if a given datetime.datetime is naive.
+    Determine if a given datetime.datetime or datetime.time is naive.
 
     The concept is defined in Python's docs:
     https://docs.python.org/library/datetime.html#datetime.tzinfo

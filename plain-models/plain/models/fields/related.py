@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import copy
 from functools import cached_property, partial
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from plain import exceptions
 from plain.models.constants import LOOKUP_SEP
@@ -95,6 +96,8 @@ class RelatedField(FieldCacheMixin, Field):
 
     # RelatedField always has a remote_field (never None)
     remote_field: ForeignObjectRel
+    # path_infos is implemented as @cached_property in subclasses (ForeignKey, ManyToManyField)
+    path_infos: list[PathInfo]
 
     def __init__(
         self,
@@ -106,6 +109,14 @@ class RelatedField(FieldCacheMixin, Field):
         self._related_query_name = related_query_name
         self._limit_choices_to = limit_choices_to
         super().__init__(**kwargs)
+
+    def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
+        # Handle remote_field deepcopy for RelatedFields
+        obj = super().__deepcopy__(memodict)
+        obj.remote_field = copy.copy(self.remote_field)
+        if hasattr(self.remote_field, "field") and self.remote_field.field is self:
+            obj.remote_field.field = obj
+        return cast(Self, obj)
 
     @cached_property
     def related_model(self) -> type[Model]:
@@ -252,40 +263,13 @@ class RelatedField(FieldCacheMixin, Field):
             field=self,
         )
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self._limit_choices_to:
             kwargs["limit_choices_to"] = self._limit_choices_to
         if self._related_query_name is not None:
             kwargs["related_query_name"] = self._related_query_name
         return name, path, args, kwargs
-
-    def get_forward_related_filter(self, obj: Model) -> dict[str, Any]:
-        """
-        Return the keyword arguments that when supplied to
-        self.model.object.filter(), would select all instances related through
-        this field to the remote obj. This is used to build the querysets
-        returned by related descriptors. obj is an instance of
-        self.related_field.model.
-        """
-        return {
-            f"{self.name}__{rh_field.name}": getattr(obj, rh_field.attname)
-            for _, rh_field in self.related_fields
-        }
-
-    def get_reverse_related_filter(self, obj: Model) -> Any:
-        """
-        Complement to get_forward_related_filter(). Return the keyword
-        arguments that when passed to self.related_field.model.object.filter()
-        select all instances of self.related_field.model related through
-        this field to obj. obj is an instance of self.model.
-        """
-        return Q.create(
-            [
-                (rh_field.attname, getattr(obj, lh_field.attname))
-                for lh_field, rh_field in self.related_fields
-            ]
-        )
 
     def set_attributes_from_rel(self) -> None:
         self.name = self.name or (
@@ -428,6 +412,33 @@ class ForeignKey(RelatedField):
             rhs_field for lhs_field, rhs_field in self.related_fields if rhs_field
         )
 
+    def get_forward_related_filter(self, obj: Model) -> dict[str, Any]:
+        """
+        Return the keyword arguments that when supplied to
+        self.model.object.filter(), would select all instances related through
+        this field to the remote obj. This is used to build the querysets
+        returned by related descriptors. obj is an instance of
+        self.related_field.model.
+        """
+        return {
+            f"{self.name}__{rh_field.name}": getattr(obj, rh_field.attname)
+            for _, rh_field in self.related_fields
+        }
+
+    def get_reverse_related_filter(self, obj: Model) -> Q:
+        """
+        Complement to get_forward_related_filter(). Return the keyword
+        arguments that when passed to self.related_field.model.object.filter()
+        select all instances of self.related_field.model related through
+        this field to obj. obj is an instance of self.model.
+        """
+        return Q.create(
+            [
+                (rh_field.attname, getattr(obj, lh_field.attname))
+                for lh_field, rh_field in self.related_fields
+            ]
+        )
+
     def get_local_related_value(self, instance: Model) -> tuple[Any, ...]:
         # Always returns the value of the single local field
         field = self.local_related_fields[0]
@@ -530,7 +541,7 @@ class ForeignKey(RelatedField):
         else:
             return []
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         kwargs["on_delete"] = self.remote_field.on_delete
 
@@ -565,8 +576,11 @@ class ForeignKey(RelatedField):
         if value is None:
             return None
 
+        field_name = self.remote_field.field_name
+        if field_name is None:
+            raise ValueError("remote_field.field_name cannot be None")
         qs = self.remote_field.model._model_meta.base_queryset.filter(
-            **{self.remote_field.field_name: value}
+            **{field_name: value}
         )
         qs = qs.complex_filter(self.get_limit_choices_to())
         if not qs.exists():
@@ -1003,7 +1017,7 @@ class ManyToManyField(RelatedField):
             ]
         return []
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
 
         if self.remote_field.db_constraint is not True:
@@ -1143,7 +1157,7 @@ class ManyToManyField(RelatedField):
         )
 
         # Add the descriptor for the m2m relation.
-        setattr(cls, self.name, ForwardManyToManyDescriptor(self.remote_field))
+        setattr(cls, self.name, ForwardManyToManyDescriptor(self.remote_field))  # type: ignore[arg-type]
 
         # Set up the accessor for the m2m table name for the relation.
         self.m2m_db_table = self._get_m2m_db_table

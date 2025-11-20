@@ -83,7 +83,7 @@ class Index:
         self.opclasses: tuple[str, ...] = tuple(opclasses)
         self.condition = condition
         self.include = tuple(include) if include else ()
-        self.expressions = tuple(
+        self.expressions: tuple[Expression, ...] = tuple(
             F(expression) if isinstance(expression, str) else expression
             for expression in expressions
         )
@@ -121,7 +121,7 @@ class Index:
                 Query(model, alias_cols=False),
             )
             fields = None
-            col_suffixes = None
+            col_suffixes = ()
         else:
             fields = [
                 model._model_meta.get_forward_field(field_name)
@@ -215,7 +215,7 @@ class Index:
         )
 
     def __eq__(self, other: object) -> bool:
-        if self.__class__ == other.__class__:
+        if isinstance(other, Index):
             return self.deconstruct() == other.deconstruct()
         return NotImplemented
 

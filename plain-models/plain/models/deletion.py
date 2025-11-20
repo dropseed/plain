@@ -72,8 +72,8 @@ def SET(value: Any) -> Callable[[Collector, RelatedField, Any], None]:
         ) -> None:
             collector.add_field_update(field, value, sub_objs)
 
-    set_on_delete.deconstruct = lambda: ("plain.models.SET", (value,), {})
-    set_on_delete.lazy_sub_objs = True
+    set_on_delete.deconstruct = lambda: ("plain.models.SET", (value,), {})  # type: ignore[attr-defined]
+    set_on_delete.lazy_sub_objs = True  # type: ignore[attr-defined]
     return set_on_delete
 
 
@@ -81,14 +81,14 @@ def SET_NULL(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     collector.add_field_update(field, None, sub_objs)
 
 
-SET_NULL.lazy_sub_objs = True
+SET_NULL.lazy_sub_objs = True  # type: ignore[attr-defined]
 
 
 def SET_DEFAULT(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     collector.add_field_update(field, field.get_default(), sub_objs)
 
 
-SET_DEFAULT.lazy_sub_objs = True
+SET_DEFAULT.lazy_sub_objs = True  # type: ignore[attr-defined]
 
 
 def DO_NOTHING(collector: Collector, field: RelatedField, sub_objs: Any) -> None:

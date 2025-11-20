@@ -59,4 +59,8 @@ class NumericOutputFieldMixin(Func):
             return DecimalField()
         if any(isinstance(s, IntegerField) for s in source_fields):
             return FloatField()
-        return super()._resolve_output_field() if source_fields else FloatField()
+        if source_fields:
+            result = super()._resolve_output_field()
+            if isinstance(result, DecimalField | FloatField):
+                return result
+        return FloatField()

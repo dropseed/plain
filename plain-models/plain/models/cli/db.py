@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import click
 
@@ -16,8 +16,8 @@ from ..db import db_connection as _db_connection
 if TYPE_CHECKING:
     from ..backends.base.base import BaseDatabaseWrapper
 
-# Type annotation for type checkers; runtime value is _db_connection
-db_connection: BaseDatabaseWrapper = _db_connection
+# Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
+db_connection = cast("BaseDatabaseWrapper", _db_connection)
 
 
 @register_cli("db")

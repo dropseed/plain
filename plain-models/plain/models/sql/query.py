@@ -41,6 +41,7 @@ from plain.models.expressions import (
     F,
     OuterRef,
     Ref,
+    ResolvableExpression,
     ResolvedOuterRef,
     Value,
 )
@@ -105,9 +106,7 @@ class JoinInfo(NamedTuple):
     meta: Meta
     joins: list[str]
     path: list[PathInfo]
-    transform_function: Callable[
-        [Field[Any], str | None], BaseExpression | MultiColSource
-    ]
+    transform_function: Callable[[Field[Any], str | None], BaseExpression]
 
 
 class RawQuery:
@@ -171,8 +170,10 @@ class RawQuery:
         params_type = self.params_type
         adapter = db_connection.ops.adapt_unknown_value
         if params_type is tuple:
+            assert isinstance(self.params, tuple)
             params = tuple(adapter(val) for val in self.params)
         elif params_type is dict:
+            assert isinstance(self.params, dict)
             params = {key: adapter(val) for key, val in self.params.items()}
         elif params_type is None:
             params = None
@@ -199,15 +200,13 @@ class TransformWrapper:
 
     def __init__(
         self,
-        func: Callable[..., BaseExpression | MultiColSource],
+        func: Callable[..., BaseExpression],
         **kwargs: Any,
     ):
         self._partial = functools.partial(func, **kwargs)
         self.has_transforms: bool = False
 
-    def __call__(
-        self, field: Field[Any], alias: str | None
-    ) -> BaseExpression | MultiColSource:
+    def __call__(self, field: Field[Any], alias: str | None) -> BaseExpression:
         return self._partial(field, alias)
 
 
@@ -364,6 +363,7 @@ class Query(BaseExpression):
         """
         obj = Empty()
         obj.__class__ = self.__class__
+        obj = cast(Self, obj)  # Type checker doesn't understand __class__ reassignment
         # Copy references to everything.
         obj.__dict__ = self.__dict__.copy()
         # Clone attributes that can't use shallow copy.
@@ -400,8 +400,7 @@ class Query(BaseExpression):
         obj._filtered_relations = self._filtered_relations.copy()
         # Clear the cached_property, if it exists.
         obj.__dict__.pop("base_table", None)
-        # Cast needed because Empty().__class__ = Query doesn't narrow type
-        return cast(Self, obj)
+        return obj
 
     @overload
     def chain(self, klass: None = None) -> Self: ...
@@ -421,7 +420,7 @@ class Query(BaseExpression):
             obj.used_aliases = set()
         obj.filter_is_sticky = False
         if hasattr(obj, "_setup_query"):
-            obj._setup_query()
+            obj._setup_query()  # type: ignore[call-non-callable]
         return obj
 
     def relabeled_clone(self, change_map: dict[str, str]) -> Self:
@@ -1117,7 +1116,7 @@ class Query(BaseExpression):
         alias, _ = self.table_alias(
             join.table_name, create=True, filtered_relation=join.filtered_relation
         )
-        if join.join_type:
+        if isinstance(join, Join):
             if self.alias_map[join.parent_alias].join_type == LOUTER or join.nullable:
                 join_type = LOUTER
             else:
@@ -1215,7 +1214,7 @@ class Query(BaseExpression):
     def resolve_lookup_value(
         self, value: Any, can_reuse: set[str] | None, allow_joins: bool
     ) -> Any:
-        if hasattr(value, "resolve_expression"):
+        if isinstance(value, ResolvableExpression):
             value = value.resolve_expression(
                 self,
                 reuse=can_reuse,
@@ -1260,14 +1259,18 @@ class Query(BaseExpression):
             raise FieldError(
                 f'Invalid lookup "{lookup}" for model {meta.model.__name__}".'
             )
-        return lookup_parts, field_parts, False
+        return lookup_parts, tuple(field_parts), False
 
-    def check_query_object_type(self, value: Any, meta: Meta, field: Field) -> None:
+    def check_query_object_type(
+        self, value: Any, meta: Meta, field: Field | ForeignObjectRel
+    ) -> None:
         """
         Check whether the object passed while querying is of the correct type.
         If not, raise a ValueError specifying the wrong object.
         """
-        if hasattr(value, "_model_meta"):
+        from plain.models import Model
+
+        if isinstance(value, Model):
             if not check_rel_lookup_compatibility(value._model_meta.model, meta, field):
                 raise ValueError(
                     f'Cannot query "{value}": Must be "{meta.model.model_options.object_name}" instance.'
@@ -1277,6 +1280,8 @@ class Query(BaseExpression):
         self, field: RelatedField | ForeignObjectRel, value: Any, meta: Meta
     ) -> None:
         """Check the type of object passed to query relations."""
+        from plain.models import Model
+
         # Check that the field and the queryset use the same model in a
         # query like .filter(author=Author.query.all()). For example, the
         # meta would be Author's (from the author field) and value.model
@@ -1290,15 +1295,15 @@ class Query(BaseExpression):
             raise ValueError(
                 f'Cannot use QuerySet for "{value.model.model_options.object_name}": Use a QuerySet for "{meta.model.model_options.object_name}".'
             )
-        elif hasattr(value, "_model_meta"):
+        elif isinstance(value, Model):
             self.check_query_object_type(value, meta, field)
-        elif hasattr(value, "__iter__"):
+        elif isinstance(value, Iterable):
             for v in value:
                 self.check_query_object_type(v, meta, field)
 
     def check_filterable(self, expression: Any) -> None:
         """Raise an error if expression cannot be used in a WHERE clause."""
-        if hasattr(expression, "resolve_expression") and not getattr(
+        if isinstance(expression, ResolvableExpression) and not getattr(
             expression, "filterable", True
         ):
             raise NotSupportedError(
@@ -1321,14 +1326,24 @@ class Query(BaseExpression):
         """
         # __exact is the default lookup if one isn't given.
         *transforms, lookup_name = lookups or ["exact"]
-        for name in transforms:
-            lhs = self.try_transform(lhs, name)
+        if transforms:
+            if isinstance(lhs, MultiColSource):
+                raise FieldError(
+                    "Transforms are not supported on multi-column relations."
+                )
+            # At this point, lhs must be BaseExpression
+            for name in transforms:
+                lhs = self.try_transform(lhs, name)
         # First try get_lookup() so that the lookup takes precedence if the lhs
         # supports both transform and lookup for the name.
         lookup_class = lhs.get_lookup(lookup_name)
         if not lookup_class:
             # A lookup wasn't found. Try to interpret the name as a transform
             # and do an Exact lookup against it.
+            if isinstance(lhs, MultiColSource):
+                raise FieldError(
+                    "Transforms are not supported on multi-column relations."
+                )
             lhs = self.try_transform(lhs, lookup_name)
             lookup_name = "exact"
             lookup_class = lhs.get_lookup(lookup_name)
@@ -1341,13 +1356,13 @@ class Query(BaseExpression):
         if lookup.rhs is None and not lookup.can_use_none_as_rhs:
             if lookup_name not in ("exact", "iexact"):
                 raise ValueError("Cannot use None as a query value")
-            return lhs.get_lookup("isnull")(lhs, True)
+            isnull_lookup = lhs.get_lookup("isnull")
+            assert isnull_lookup is not None
+            return isnull_lookup(lhs, True)
 
         return lookup
 
-    def try_transform(
-        self, lhs: BaseExpression | MultiColSource, name: str
-    ) -> BaseExpression | MultiColSource:
+    def try_transform(self, lhs: BaseExpression, name: str) -> BaseExpression:
         """
         Helper method for build_lookup(). Try to fetch and initialize
         a transform for name parameter from lhs.
@@ -1426,15 +1441,17 @@ class Query(BaseExpression):
                 check_filterable=check_filterable,
                 summarize=summarize,
             )
-        if hasattr(filter_expr, "resolve_expression"):
+        if isinstance(filter_expr, ResolvableExpression):
             if not getattr(filter_expr, "conditional", False):
                 raise TypeError("Cannot filter against a non-conditional expression.")
-            condition = filter_expr.resolve_expression(
+            condition = filter_expr.resolve_expression(  # type: ignore[call-non-callable]
                 self, allow_joins=allow_joins, summarize=summarize
             )
             if not isinstance(condition, Lookup):
                 condition = self.build_lookup(["exact"], condition, True)
             return WhereNode([condition], connector=AND), set()
+        if isinstance(filter_expr, BaseExpression):
+            raise TypeError(f"Unexpected BaseExpression type: {type(filter_expr)}")
         arg, value = filter_expr
         if not arg:
             raise FieldError(f"Cannot parse keyword query {arg!r}")
@@ -1877,7 +1894,7 @@ class Query(BaseExpression):
 
             def transform(
                 field: Field, alias: str | None, *, name: str, previous: Any
-            ) -> BaseExpression | MultiColSource:
+            ) -> BaseExpression:
                 try:
                     wrapped = previous(field, alias)
                     return self.try_transform(wrapped, name)
@@ -1994,7 +2011,7 @@ class Query(BaseExpression):
         allow_joins: bool = True,
         reuse: set[str] | None = None,
         summarize: bool = False,
-    ) -> BaseExpression | MultiColSource:
+    ) -> BaseExpression:
         annotation = self.annotations.get(name)
         if annotation is not None:
             if not allow_joins:
@@ -2194,7 +2211,7 @@ class Query(BaseExpression):
         self.select = ()
         self.values_select = ()
 
-    def add_select_col(self, col: Col, name: str) -> None:
+    def add_select_col(self, col: BaseExpression, name: str) -> None:
         self.select += (col,)
         self.values_select += (name,)
 
@@ -2287,7 +2304,7 @@ class Query(BaseExpression):
                 # FieldError will be raise if it's not.
                 assert self.model is not None, "ORDER BY field names require a model"
                 self.names_to_path(item.split(LOOKUP_SEP), self.model._model_meta)
-            elif not hasattr(item, "resolve_expression"):
+            elif not isinstance(item, ResolvableExpression):
                 errors.append(item)
             if getattr(item, "contains_aggregate", False):
                 raise FieldError(

@@ -5,7 +5,10 @@ import re
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
+from plain.models.fields.related import (
+    RECURSIVE_RELATIONSHIP_CONSTANT,
+    RelatedField,
+)
 
 if TYPE_CHECKING:
     from plain.models.fields import Field
@@ -81,6 +84,9 @@ def field_references(
     incurs. This should not be an issue when this function is used to determine
     whether or not an optimization can take place.
     """
+    # Only RelatedFields have remote_field attribute
+    if not isinstance(field, RelatedField):
+        return False
     remote_field = field.remote_field
     if not remote_field:
         return False

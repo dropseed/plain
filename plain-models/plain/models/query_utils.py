@@ -12,7 +12,7 @@ import functools
 import inspect
 import logging
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, Self
 
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, db_connection
@@ -150,7 +150,7 @@ class Q(tree.Node):
         matches against the expressions.
         """
         # Avoid circular imports.
-        from plain.models.expressions import Value
+        from plain.models.expressions import ResolvableExpression, Value
         from plain.models.fields import BooleanField
         from plain.models.functions import Coalesce
         from plain.models.sql import Query
@@ -158,7 +158,7 @@ class Q(tree.Node):
 
         query = Query(None)
         for name, value in against.items():
-            if not hasattr(value, "resolve_expression"):
+            if not isinstance(value, ResolvableExpression):
                 value = Value(value)
             query.add_annotation(value, name, select=False)
         query.add_annotation(Value(1), "_check")
@@ -204,24 +204,24 @@ class class_or_instance_method:
 
 
 class RegisterLookupMixin:
-    def _get_lookup(self, lookup_name: str) -> type | None:
+    def _get_lookup(self, lookup_name: str) -> type[Lookup | Transform] | None:
         return self.get_lookups().get(lookup_name, None)
 
     @functools.cache
-    def get_class_lookups(cls: type) -> dict[str, type]:
+    def get_class_lookups(cls: type[Self]) -> dict[str, type[Lookup | Transform]]:
         class_lookups = [
             parent.__dict__.get("class_lookups", {}) for parent in inspect.getmro(cls)
         ]
         return cls.merge_dicts(class_lookups)
 
-    def get_instance_lookups(self) -> dict[str, type]:
+    def get_instance_lookups(self) -> dict[str, type[Lookup | Transform]]:
         class_lookups = self.get_class_lookups()
         if instance_lookups := getattr(self, "instance_lookups", None):
             return {**class_lookups, **instance_lookups}
         return class_lookups
 
     get_lookups = class_or_instance_method(get_class_lookups, get_instance_lookups)
-    get_class_lookups = classmethod(get_class_lookups)
+    get_class_lookups = classmethod(get_class_lookups)  # type: ignore[assignment]
 
     def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
         from plain.models.lookups import Lookup
@@ -248,37 +248,41 @@ class RegisterLookupMixin:
         return found
 
     @staticmethod
-    def merge_dicts(dicts: list[dict[str, type]]) -> dict[str, type]:
+    def merge_dicts(
+        dicts: list[dict[str, type[Lookup | Transform]]],
+    ) -> dict[str, type[Lookup | Transform]]:
         """
         Merge dicts in reverse to preference the order of the original list. e.g.,
         merge_dicts([a, b]) will preference the keys in 'a' over those in 'b'.
         """
-        merged: dict[str, type] = {}
+        merged: dict[str, type[Lookup | Transform]] = {}
         for d in reversed(dicts):
             merged.update(d)
         return merged
 
     @classmethod
-    def _clear_cached_class_lookups(cls) -> None:
+    def _clear_cached_class_lookups(cls: type[Self]) -> None:
         for subclass in subclasses(cls):
-            subclass.get_class_lookups.cache_clear()
+            subclass.get_class_lookups.cache_clear()  # type: ignore[attr-defined]
 
     def register_class_lookup(
-        cls: type, lookup: type, lookup_name: str | None = None
-    ) -> type:
+        cls: type[Self],
+        lookup: type[Lookup | Transform],
+        lookup_name: str | None = None,
+    ) -> type[Lookup | Transform]:
         if lookup_name is None:
-            lookup_name = lookup.lookup_name
+            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
         if "class_lookups" not in cls.__dict__:
-            cls.class_lookups = {}
-        cls.class_lookups[lookup_name] = lookup
+            cls.class_lookups = {}  # type: ignore[attr-defined]
+        cls.class_lookups[lookup_name] = lookup  # type: ignore[attr-defined]
         cls._clear_cached_class_lookups()
         return lookup
 
     def register_instance_lookup(
-        self, lookup: type, lookup_name: str | None = None
-    ) -> type:
+        self, lookup: type[Lookup | Transform], lookup_name: str | None = None
+    ) -> type[Lookup | Transform]:
         if lookup_name is None:
-            lookup_name = lookup.lookup_name
+            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
         if "instance_lookups" not in self.__dict__:
             self.instance_lookups = {}
         self.instance_lookups[lookup_name] = lookup
@@ -287,41 +291,43 @@ class RegisterLookupMixin:
     register_lookup = class_or_instance_method(
         register_class_lookup, register_instance_lookup
     )
-    register_class_lookup = classmethod(register_class_lookup)
+    register_class_lookup = classmethod(register_class_lookup)  # type: ignore[assignment]
 
     def _unregister_class_lookup(
-        cls: type, lookup: type, lookup_name: str | None = None
+        cls: type[Self],
+        lookup: type[Lookup | Transform],
+        lookup_name: str | None = None,
     ) -> None:
         """
         Remove given lookup from cls lookups. For use in tests only as it's
         not thread-safe.
         """
         if lookup_name is None:
-            lookup_name = lookup.lookup_name
-        del cls.class_lookups[lookup_name]
+            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
+        del cls.class_lookups[lookup_name]  # type: ignore[attr-defined]
         cls._clear_cached_class_lookups()
 
     def _unregister_instance_lookup(
-        self, lookup: type, lookup_name: str | None = None
+        self, lookup: type[Lookup | Transform], lookup_name: str | None = None
     ) -> None:
         """
         Remove given lookup from instance lookups. For use in tests only as
         it's not thread-safe.
         """
         if lookup_name is None:
-            lookup_name = lookup.lookup_name
+            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
         del self.instance_lookups[lookup_name]
 
     _unregister_lookup = class_or_instance_method(
         _unregister_class_lookup, _unregister_instance_lookup
     )
-    _unregister_class_lookup = classmethod(_unregister_class_lookup)
+    _unregister_class_lookup = classmethod(_unregister_class_lookup)  # type: ignore[assignment]
 
 
 def select_related_descend(
     field: Any,
-    restricted: bool,
-    requested: dict[str, Any],
+    restricted: bool | None,
+    requested: dict[str, Any] | None,
     select_mask: Any,
     reverse: bool = False,
 ) -> bool:
@@ -344,6 +350,7 @@ def select_related_descend(
     if not isinstance(field, RelatedField):
         return False
     if restricted:
+        assert requested is not None, "requested must be provided when restricted=True"
         if reverse and field.related_query_name() not in requested:
             return False
         if not reverse and field.name not in requested:
@@ -353,7 +360,7 @@ def select_related_descend(
     if (
         restricted
         and select_mask
-        and field.name in requested
+        and field.name in requested  # type: ignore[unsupported-operator]
         and field not in select_mask
     ):
         raise FieldError(
@@ -379,7 +386,7 @@ def refs_expression(
 
 
 def check_rel_lookup_compatibility(
-    model: type[Model], target_meta: Meta, field: Field
+    model: type[Model], target_meta: Meta, field: Field | ForeignObjectRel
 ) -> bool:
     """
     Check that model is compatible with target_meta. Compatibility

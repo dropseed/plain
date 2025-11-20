@@ -6,12 +6,19 @@ import re
 from collections.abc import Generator, Iterable, Sequence
 from functools import cached_property, partial
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, NotSupportedError
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
-from plain.models.expressions import F, OrderBy, RawSQL, Ref, Value
+from plain.models.expressions import (
+    F,
+    OrderBy,
+    RawSQL,
+    Ref,
+    ResolvableExpression,
+    Value,
+)
 from plain.models.fields.related import RelatedField
 from plain.models.functions import Cast, Random
 from plain.models.lookups import Lookup
@@ -310,7 +317,8 @@ class SQLCompiler:
 
         if self.query.select_related:
             related_klass_infos = self.get_related_selections(select, select_mask)
-            klass_info["related_klass_infos"] = related_klass_infos
+            if klass_info is not None:
+                klass_info["related_klass_infos"] = related_klass_infos
 
         ret = []
         col_idx = 1
@@ -366,9 +374,9 @@ class SQLCompiler:
                 selected_exprs[expr] = pos_expr
 
         for field in ordering:
-            if hasattr(field, "resolve_expression"):
+            if isinstance(field, ResolvableExpression):
                 # field is a BaseExpression (has asc/desc/copy methods)
-                field_expr: BaseExpression = field
+                field_expr = cast(BaseExpression, field)
                 if isinstance(field_expr, Value):
                     # output_field must be resolved for constants.
                     field_expr = Cast(field_expr, field_expr.output_field)
@@ -1097,10 +1105,10 @@ class SQLCompiler:
 
             results = []
             for item in meta.model.model_options.ordering:
-                if hasattr(item, "resolve_expression") and not isinstance(
+                if isinstance(item, ResolvableExpression) and not isinstance(
                     item, OrderBy
                 ):
-                    item_expr: BaseExpression = item
+                    item_expr: BaseExpression = cast(BaseExpression, item)
                     item = item_expr.desc() if descending else item_expr.asc()
                 if isinstance(item, OrderBy):
                     results.append(
@@ -1195,6 +1203,19 @@ class SQLCompiler:
             opts: Meta for the model being queried (internal metadata)
         """
 
+        related_klass_infos = []
+        if not restricted and cur_depth > self.query.max_depth:
+            # We've recursed far enough; bail out.
+            return related_klass_infos
+
+        if not opts:
+            assert self.query.model is not None, "select_related requires a model"
+            opts = self.query.model._model_meta
+            root_alias = self.query.get_initial_alias()
+
+        assert root_alias is not None  # Must be provided or set above
+        assert opts is not None
+
         def _get_field_choices() -> chain:
             direct_choices = (
                 f.name for f in opts.fields if isinstance(f, RelatedField)
@@ -1208,25 +1229,13 @@ class SQLCompiler:
                 direct_choices, reverse_choices, self.query._filtered_relations
             )
 
-        related_klass_infos = []
-        if not restricted and cur_depth > self.query.max_depth:
-            # We've recursed far enough; bail out.
-            return related_klass_infos
-
-        if not opts:
-            assert self.query.model is not None, "select_related requires a model"
-            opts = self.query.model._model_meta
-            root_alias = self.query.get_initial_alias()
-
-        assert root_alias is not None  # Must be provided or set above
-
         # Setup for the case when only particular related fields should be
         # included in the related selection.
         fields_found = set()
         if requested is None:
             restricted = isinstance(self.query.select_related, dict)
             if restricted:
-                requested = self.query.select_related
+                requested = cast(dict, self.query.select_related)
 
         def get_related_klass_infos(
             klass_info: dict, related_klass_infos: list
@@ -1430,6 +1439,7 @@ class SQLCompiler:
             select_fields is filled recursively, so it also contains fields
             from the parent models.
             """
+            assert self.select is not None
             model = klass_info["model"]
             for select_index in klass_info["select_fields"]:
                 if self.select[select_index][0].target.model == model:
@@ -1694,7 +1704,7 @@ class SQLInsertCompiler(SQLCompiler):
         Prepare a value to be used in a query by resolving it if it is an
         expression and otherwise calling the field's get_db_prep_save().
         """
-        if hasattr(value, "resolve_expression"):
+        if isinstance(value, ResolvableExpression):
             value = value.resolve_expression(
                 self.query, allow_joins=False, for_save=True
             )
@@ -1806,7 +1816,7 @@ class SQLInsertCompiler(SQLCompiler):
         placeholder_rows, param_rows = self.assemble_as_sql(fields, value_rows)
 
         on_conflict_suffix_sql = self.connection.ops.on_conflict_suffix_sql(
-            fields,
+            fields,  # type: ignore[arg-type]
             self.query.on_conflict,
             (f.column for f in self.query.update_fields),
             (f.column for f in self.query.unique_fields),
@@ -1817,7 +1827,7 @@ class SQLInsertCompiler(SQLCompiler):
         ):
             if self.connection.features.can_return_rows_from_bulk_insert:
                 result.append(
-                    self.connection.ops.bulk_insert_sql(fields, placeholder_rows)
+                    self.connection.ops.bulk_insert_sql(fields, placeholder_rows)  # type: ignore[arg-type]
                 )
                 params = param_rows
             else:
@@ -1838,7 +1848,7 @@ class SQLInsertCompiler(SQLCompiler):
             return [(" ".join(result), tuple(chain.from_iterable(params)))]
 
         if can_bulk:
-            result.append(self.connection.ops.bulk_insert_sql(fields, placeholder_rows))
+            result.append(self.connection.ops.bulk_insert_sql(fields, placeholder_rows))  # type: ignore[arg-type]
             if on_conflict_suffix_sql:
                 result.append(on_conflict_suffix_sql)
             return [(" ".join(result), tuple(p for ps in param_rows for p in ps))]
@@ -1967,7 +1977,7 @@ class SQLUpdateCompiler(SQLCompiler):
         qn = self.quote_name_unless_alias
         values, update_params = [], []
         for field, model, val in query_values:
-            if hasattr(val, "resolve_expression"):
+            if isinstance(val, ResolvableExpression):
                 val = val.resolve_expression(
                     self.query, allow_joins=False, for_save=True
                 )
@@ -2092,7 +2102,7 @@ class SQLUpdateCompiler(SQLCompiler):
                 for parent, index in related_ids_index:
                     related_ids[parent].extend(r[index] for r in rows)
             self.query.add_filter("id__in", idents)
-            self.query.related_ids = related_ids
+            self.query.related_ids = related_ids  # type: ignore[assignment]
         else:
             # The fast path. Filters and updates in one query.
             self.query.add_filter("id__in", query)

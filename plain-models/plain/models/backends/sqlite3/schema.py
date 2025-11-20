@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from plain.models import Options
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
@@ -62,7 +62,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         try:
             import sqlite3
 
-            value = sqlite3.adapt(value)
+            value = sqlite3.adapt(value)  # type: ignore[no-matching-overload]
         except ImportError:
             pass
         except sqlite3.ProgrammingError:
@@ -305,8 +305,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         )
         body_copy["model_options"] = meta_options
         body_copy["__module__"] = model.__module__
-        temp_model: type[Model] = type(
-            model.model_options.object_name, model.__bases__, body_copy
+        temp_model = cast(
+            "type[Model]",
+            type(model.model_options.object_name, model.__bases__, body_copy),
         )
         models_registry.register_model(model.model_options.package_label, temp_model)
 
@@ -320,8 +321,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         )
         body_copy["model_options"] = meta_options
         body_copy["__module__"] = model.__module__
-        new_model: type[Model] = type(
-            f"New{model.model_options.object_name}", model.__bases__, body_copy
+        new_model = cast(
+            "type[Model]",
+            type(f"New{model.model_options.object_name}", model.__bases__, body_copy),
         )
         models_registry.register_model(model.model_options.package_label, new_model)
 

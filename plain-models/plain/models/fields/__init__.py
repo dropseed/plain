@@ -406,7 +406,7 @@ class Field(RegisterLookupMixin, Generic[T]):
                 )
         return errors
 
-    def get_col(self, alias: str, output_field: Field | None = None) -> Any:
+    def get_col(self, alias: str | None, output_field: Field | None = None) -> Any:
         if alias == self.model.model_options.db_table and (
             output_field is None or output_field == self
         ):
@@ -431,7 +431,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         """
         return sql, params
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         """
         Return enough information to recreate the field as a 4-tuple:
 
@@ -504,7 +504,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         elif path.startswith("plain.models.fields"):
             path = path.replace("plain.models.fields", "plain.models")
         # Return basic info - other fields should override this.
-        assert self.name is not None, "Field must have a name when deconstructed"
+        # Note: self.name can be None during migration state rendering when fields are cloned
         return (self.name, path, [], keywords)
 
     def clone(self) -> Self:
@@ -564,13 +564,7 @@ class Field(RegisterLookupMixin, Generic[T]):
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         # We don't have to deepcopy very much here, since most things are not
         # intended to be altered after initial creation.
-        from plain.models.fields.related import RelatedField
-
         obj = copy.copy(self)
-        if isinstance(self, RelatedField):
-            obj.remote_field = copy.copy(self.remote_field)
-            if hasattr(self.remote_field, "field") and self.remote_field.field is self:
-                obj.remote_field.field = obj
         memodict[id(self)] = obj
         return obj
 
@@ -1152,7 +1146,7 @@ class CharField(Field[str]):
         value = super().get_prep_value(value)
         return self.to_python(value)
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.db_collation:
             kwargs["db_collation"] = self.db_collation
@@ -1283,7 +1277,7 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
         # At this point, value is a date object.
         return self._check_if_value_fixed(value)
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.auto_now:
             kwargs["auto_now"] = True
@@ -1569,7 +1563,7 @@ class DecimalField(Field[decimal.Decimal]):
     def context(self) -> decimal.Context:
         return decimal.Context(prec=self.max_digits)
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.max_digits is not None:
             kwargs["max_digits"] = self.max_digits
@@ -1685,7 +1679,7 @@ class EmailField(CharField):
         kwargs.setdefault("max_length", 254)
         super().__init__(**kwargs)
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         # We do not exclude max_length if it matches default as we want to change
         # the default in future.
@@ -1875,7 +1869,7 @@ class GenericIPAddressField(Field[str]):
             ]
         return []
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.unpack_ipv4 is not False:
             kwargs["unpack_ipv4"] = self.unpack_ipv4
@@ -2026,7 +2020,7 @@ class TextField(Field[str]):
         value = super().get_prep_value(value)
         return self.to_python(value)
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.db_collation:
             kwargs["db_collation"] = self.db_collation
@@ -2071,7 +2065,7 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
         # At this point, value is a datetime object.
         return self._check_if_value_fixed(value, now=now)
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.auto_now is not False:
             kwargs["auto_now"] = self.auto_now
@@ -2145,7 +2139,7 @@ class URLField(CharField):
         kwargs.setdefault("max_length", 200)
         super().__init__(**kwargs)
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if kwargs.get("max_length") == 200:
             del kwargs["max_length"]
@@ -2222,7 +2216,7 @@ class UUIDField(Field[uuid.UUID]):
         kwargs["max_length"] = 32
         super().__init__(**kwargs)
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         del kwargs["max_length"]
         return name, path, args, kwargs
@@ -2279,9 +2273,14 @@ class PrimaryKeyField(BigIntegerField):
         errors = [e for e in errors if e.id != "fields.reserved_field_name_id"]
         return errors
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         # PrimaryKeyField takes no parameters, so we return an empty kwargs dict
-        return (self.name, "plain.models.PrimaryKeyField", [], {})
+        return (
+            self.name,
+            "plain.models.PrimaryKeyField",
+            cast(list[Any], []),
+            cast(dict[str, Any], {}),
+        )
 
     def validate(self, value: Any, model_instance: Any) -> None:
         pass

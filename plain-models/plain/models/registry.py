@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, TypeVar
 if TYPE_CHECKING:
     from plain.models.base import Model
 
+# Model classes are registered, not instances.
 M = TypeVar("M", bound="Model")
 
 
@@ -181,13 +182,10 @@ class ModelsRegistry:
             next_model, *more_models = model_keys
 
             # This will be executed after the class corresponding to next_model
-            # has been imported and registered. The `func` attribute provides
-            # duck-type compatibility with partials.
+            # has been imported and registered.
             def apply_next_model(model: type[Model]) -> None:
-                next_function = partial(apply_next_model.func, model)
+                next_function = partial(function, model)
                 self.lazy_model_operation(next_function, *more_models)
-
-            apply_next_model.func = function
 
             # If the model has already been imported and registered, partially
             # apply it to the function now. If not, add it to the list of
@@ -214,7 +212,7 @@ models_registry = ModelsRegistry()
 
 
 # Decorator to register a model (using the internal registry for the correct state).
-def register_model(model_class: M) -> M:
+def register_model(model_class: type[M]) -> type[M]:
     model_class._model_meta.models_registry.register_model(
         model_class.model_options.package_label,
         model_class,

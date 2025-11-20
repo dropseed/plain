@@ -11,7 +11,9 @@ from typing import TYPE_CHECKING, Any
 import sqlparse
 
 from plain.models.backends import utils
+from plain.models.backends.utils import CursorWrapper
 from plain.models.db import NotSupportedError
+from plain.models.expressions import ResolvableExpression
 from plain.utils import timezone
 from plain.utils.encoding import force_str
 
@@ -223,7 +225,9 @@ class BaseDatabaseOperations(ABC):
         else:
             return ["DISTINCT"], []
 
-    def fetch_returned_insert_columns(self, cursor: Any, returning_params: Any) -> Any:
+    def fetch_returned_insert_columns(
+        self, cursor: CursorWrapper, returning_params: Any
+    ) -> Any:
         """
         Given a cursor object that has just performed an INSERT...RETURNING
         statement into a table, return the newly created data.
@@ -287,7 +291,7 @@ class BaseDatabaseOperations(ABC):
 
     def last_executed_query(
         self,
-        cursor: Any,
+        cursor: CursorWrapper,
         sql: str,
         params: list[Any] | tuple[Any, ...] | dict[str, Any] | None,
     ) -> str:
@@ -315,7 +319,9 @@ class BaseDatabaseOperations(ABC):
 
         return f"QUERY = {sql!r} - PARAMS = {u_params!r}"
 
-    def last_insert_id(self, cursor: Any, table_name: str, pk_name: str) -> int:
+    def last_insert_id(
+        self, cursor: CursorWrapper, table_name: str, pk_name: str
+    ) -> int:
         """
         Given a cursor object that has just performed an INSERT statement into
         a table that has an auto-incrementing ID, return the newly created ID.
@@ -396,7 +402,7 @@ class BaseDatabaseOperations(ABC):
         ...
 
     @abstractmethod
-    def fetch_returned_insert_rows(self, cursor: Any) -> list[Any]:
+    def fetch_returned_insert_rows(self, cursor: CursorWrapper) -> list[Any]:
         """
         Given a cursor object that has just performed an INSERT...RETURNING
         statement into a table, return the list of returned data.
@@ -521,7 +527,7 @@ class BaseDatabaseOperations(ABC):
         if value is None:
             return None
         # Expression values are adapted by the database.
-        if hasattr(value, "resolve_expression"):
+        if isinstance(value, ResolvableExpression):
             return value
 
         return str(value)
@@ -536,7 +542,7 @@ class BaseDatabaseOperations(ABC):
         if value is None:
             return None
         # Expression values are adapted by the database.
-        if hasattr(value, "resolve_expression"):
+        if isinstance(value, ResolvableExpression):
             return value
 
         if timezone.is_aware(value):

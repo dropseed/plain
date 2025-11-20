@@ -9,7 +9,7 @@ from collections import defaultdict
 from decimal import Decimal
 from functools import cached_property
 from types import NoneType
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast, runtime_checkable
 from uuid import UUID
 
 from plain.models import fields
@@ -31,8 +31,29 @@ if TYPE_CHECKING:
     from plain.models.fields import Field
     from plain.models.lookups import Lookup, Transform
     from plain.models.query import QuerySet
-    from plain.models.sql.compiler import SQLCompiler
+    from plain.models.sql.compiler import SQLCompilable, SQLCompiler
     from plain.models.sql.query import Query
+
+
+@runtime_checkable
+class ResolvableExpression(Protocol):
+    """Protocol for expressions that can be resolved in query context."""
+
+    def resolve_expression(
+        self,
+        query: Any = None,
+        allow_joins: bool = True,
+        reuse: Any = None,
+        summarize: bool = False,
+        for_save: bool = False,
+    ) -> Any: ...
+
+
+@runtime_checkable
+class ReplaceableExpression(Protocol):
+    """Protocol for expressions that support expression replacement."""
+
+    def replace_expressions(self, replacements: dict[Any, Any]) -> Self: ...
 
 
 class Combinable:
@@ -63,7 +84,7 @@ class Combinable:
     def _combine(
         self, other: Any, connector: str, reversed: bool
     ) -> CombinedExpression:
-        if not hasattr(other, "resolve_expression"):
+        if not isinstance(other, ResolvableExpression):
             # everything must be resolvable to an expression
             other = Value(other)
 
@@ -208,7 +229,7 @@ class BaseExpression:
     def _parse_expressions(self, *expressions: Any) -> list[Any]:
         return [
             arg
-            if hasattr(arg, "resolve_expression")
+            if isinstance(arg, ResolvableExpression)
             else (F(arg) if isinstance(arg, str) else Value(arg))
             for arg in expressions
         ]
@@ -269,7 +290,7 @@ class BaseExpression:
         reuse: Any = None,
         summarize: bool = False,
         for_save: bool = False,
-    ) -> BaseExpression:
+    ) -> Self:
         """
         Provide the chance to do any preprocessing or validation before being
         added to the query.
@@ -395,7 +416,7 @@ class BaseExpression:
     def get_transform(self, name: str) -> type[Transform] | None:
         return self.output_field.get_transform(name)
 
-    def relabeled_clone(self, change_map: dict[str, str]) -> BaseExpression:
+    def relabeled_clone(self, change_map: dict[str, str]) -> Self:
         clone = self.copy()
         clone.set_source_expressions(
             [
@@ -405,9 +426,7 @@ class BaseExpression:
         )
         return clone
 
-    def replace_expressions(
-        self, replacements: dict[BaseExpression, Any]
-    ) -> BaseExpression:
+    def replace_expressions(self, replacements: dict[BaseExpression, Any]) -> Self:
         if replacement := replacements.get(self):
             return replacement
         clone = self.copy()
@@ -459,7 +478,7 @@ class BaseExpression:
     def desc(self, **kwargs: Any) -> OrderBy:
         return OrderBy(self, descending=True, **kwargs)
 
-    def reverse_ordering(self) -> BaseExpression:
+    def reverse_ordering(self) -> Self:
         return self
 
     def flatten(self) -> Iterable[Any]:
@@ -491,6 +510,9 @@ class BaseExpression:
 @deconstructible
 class Expression(BaseExpression, Combinable):
     """An expression that can be combined with other expressions."""
+
+    # Set by @deconstructible decorator in __new__
+    _constructor_args: tuple[tuple[Any, ...], dict[str, Any]]
 
     @cached_property
     def identity(self) -> tuple[Any, ...]:
@@ -902,6 +924,8 @@ class F(Combinable):
         return OrderBy(self, descending=True, **kwargs)
 
     def __eq__(self, other: object) -> bool:
+        if not isinstance(other, F):
+            return NotImplemented
         return self.__class__ == other.__class__ and self.name == other.name
 
     def __hash__(self) -> int:
@@ -1061,10 +1085,10 @@ class Func(SQLiteNumericMixin, Expression):
         return template % data, params
 
     def copy(self) -> Self:
-        copy = super().copy()
-        copy.source_expressions = self.source_expressions[:]
-        copy.extra = self.extra.copy()
-        return copy
+        clone = super().copy()
+        clone.source_expressions = self.source_expressions[:]
+        clone.extra = self.extra.copy()
+        return cast(Self, clone)
 
 
 @deconstructible(path="plain.models.Value")
@@ -1321,8 +1345,9 @@ class OrderByList(Func):
 
     def as_sql(self, *args: Any, **kwargs: Any) -> tuple[str, tuple[Any, ...]]:
         if not self.source_expressions:
-            return "", ()
-        return super().as_sql(*args, **kwargs)
+            return "", cast(tuple[Any, ...], ())
+        sql, params = super().as_sql(*args, **kwargs)
+        return sql, tuple(params)
 
     def get_group_by_cols(self) -> list[Any]:
         group_by_cols = []
@@ -1431,6 +1456,7 @@ class When(Expression):
     template = "WHEN %(condition)s THEN %(result)s"
     # This isn't a complete conditional expression, must be used in Case().
     conditional = False
+    condition: SQLCompilable
 
     def __init__(
         self, condition: Q | Expression | None = None, then: Any = None, **lookups: Any
@@ -1453,7 +1479,7 @@ class When(Expression):
         if isinstance(condition, Q) and not condition:
             raise ValueError("An empty Q() can't be used as a When() condition.")
         super().__init__(output_field=None)
-        self.condition = condition
+        self.condition = condition  # type: ignore[assignment]
         self.result = self._parse_expressions(then)[0]
 
     def __str__(self) -> str:
@@ -1482,7 +1508,7 @@ class When(Expression):
     ) -> When:
         c = self.copy()
         c.is_summary = summarize
-        if hasattr(c.condition, "resolve_expression"):
+        if isinstance(c.condition, ResolvableExpression):
             c.condition = c.condition.resolve_expression(
                 query, allow_joins, reuse, summarize, False
             )
@@ -1587,9 +1613,9 @@ class Case(SQLiteNumericMixin, Expression):
         return c
 
     def copy(self) -> Self:
-        c = cast(Self, super().copy())
+        c = super().copy()
         c.cases = c.cases[:]
-        return c
+        return cast(Self, c)
 
     def as_sql(
         self,
@@ -1676,9 +1702,9 @@ class Subquery(BaseExpression, Combinable):
         return self.query.output_field
 
     def copy(self) -> Self:
-        clone = cast(Self, super().copy())
+        clone = super().copy()
         clone.query = clone.query.clone()
-        return clone
+        return cast(Self, clone)
 
     @property
     def external_aliases(self) -> dict[str, bool]:
@@ -1746,7 +1772,7 @@ class OrderBy(Expression):
         self.nulls_first = nulls_first
         self.nulls_last = nulls_last
         self.descending = descending
-        if not hasattr(expression, "resolve_expression"):
+        if not isinstance(expression, ResolvableExpression):
             raise ValueError("expression must be an expression type")
         self.expression = expression
 

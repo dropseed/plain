@@ -91,6 +91,9 @@ class BaseReverseDescriptor(Generic[T], ABC):
                 f"has not been resolved yet. The target model may not be registered."
             )
 
+        # _resolved_model is set alongside _resolved_field in resolve_related_field
+        assert self._resolved_model is not None, "Model should be resolved with field"
+
         # Return a manager bound to this instance
         return self._create_manager(instance)
 
@@ -161,6 +164,7 @@ class ReverseForeignKey(BaseReverseDescriptor[T]):
         """Create a ReverseForeignKeyManager for this instance."""
         from plain.models.fields.related_managers import ReverseForeignKeyManager
 
+        assert self._resolved_model is not None
         return ReverseForeignKeyManager(
             instance=instance,
             field=self._resolved_field,
@@ -207,6 +211,7 @@ class ReverseManyToMany(BaseReverseDescriptor[T]):
         """Create a ManyToManyManager for this instance."""
         from plain.models.fields.related_managers import ManyToManyManager
 
+        assert self._resolved_model is not None
         return ManyToManyManager(
             instance=instance,
             field=self._resolved_field,

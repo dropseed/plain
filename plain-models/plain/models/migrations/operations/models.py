@@ -520,6 +520,7 @@ class AlterModelOptions(ModelOptionOperation):
 
 class IndexOperation(Operation):
     option_name = "indexes"
+    model_name: str  # Set by subclasses
 
     @cached_property
     def model_name_lower(self) -> str:
@@ -649,6 +650,7 @@ class RenameIndex(IndexOperation):
 
     @cached_property
     def old_name_lower(self) -> str:
+        assert self.old_name is not None, "old_name is set during initialization"
         return self.old_name.lower()
 
     @cached_property
@@ -743,6 +745,7 @@ class RenameIndex(IndexOperation):
     def migration_name_fragment(self) -> str:
         if self.old_name:
             return f"rename_{self.old_name_lower}_{self.new_name_lower}"
+        assert self.old_fields is not None, "old_fields is set when old_name is None"
         return "rename_{}_{}_{}".format(
             self.model_name_lower,
             "_".join(self.old_fields),

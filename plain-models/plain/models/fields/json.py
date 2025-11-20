@@ -99,7 +99,7 @@ class JSONField(Field):
             )
         return errors
 
-    def deconstruct(self) -> tuple[str, str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.encoder is not None:
             kwargs["encoder"] = self.encoder

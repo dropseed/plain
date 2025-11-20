@@ -312,6 +312,8 @@ class ManyToManyRel(ForeignObjectRel):
         Return the field in the 'to' object to which this relationship is tied.
         Provided for symmetry with ForeignKeyRel.
         """
+        from plain.models.fields.related import ForeignKey
+
         meta = self.through._model_meta
         if self.through_fields:
             field = meta.get_forward_field(self.through_fields[0])
@@ -320,4 +322,7 @@ class ManyToManyRel(ForeignObjectRel):
                 rel = getattr(field, "remote_field", None)
                 if rel and rel.model == self.model:
                     break
+
+        if not isinstance(field, ForeignKey):
+            raise ValueError(f"Expected ForeignKey, got {type(field)}")
         return field.foreign_related_fields[0]

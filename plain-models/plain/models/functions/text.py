@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from plain.models.expressions import Func, Value
+from plain.models.expressions import Func, ResolvableExpression, Value
 from plain.models.fields import CharField, IntegerField, TextField
 from plain.models.functions import Cast, Coalesce
 from plain.models.lookups import Transform
@@ -180,7 +180,7 @@ class Left(Func):
         expression: the name of a field, or an expression returning a string
         length: the number of characters to return from the start of the string
         """
-        if not hasattr(length, "resolve_expression"):
+        if not isinstance(length, ResolvableExpression):
             if length < 1:
                 raise ValueError("'length' must be greater than 0.")
         super().__init__(expression, length, **extra)
@@ -228,7 +228,7 @@ class LPad(Func):
         self, expression: Any, length: Any, fill_text: Any = Value(" "), **extra: Any
     ) -> None:
         if (
-            not hasattr(length, "resolve_expression")
+            not isinstance(length, ResolvableExpression)
             and length is not None
             and length < 0
         ):
@@ -274,7 +274,7 @@ class Repeat(Func):
 
     def __init__(self, expression: Any, number: Any, **extra: Any) -> None:
         if (
-            not hasattr(number, "resolve_expression")
+            not isinstance(number, ResolvableExpression)
             and number is not None
             and number < 0
         ):
@@ -371,7 +371,7 @@ class Substr(Func):
         pos: an integer > 0, or an expression returning an integer
         length: an optional number of characters to return
         """
-        if not hasattr(pos, "resolve_expression"):
+        if not isinstance(pos, ResolvableExpression):
             if pos < 1:
                 raise ValueError("'pos' must be greater than 0")
         expressions = [expression, pos]

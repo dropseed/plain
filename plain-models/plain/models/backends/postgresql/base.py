@@ -6,7 +6,7 @@ import warnings
 from collections.abc import Generator
 from contextlib import contextmanager
 from functools import cached_property, lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import psycopg as Database
 from psycopg import IsolationLevel, adapt, adapters, sql
@@ -23,11 +23,14 @@ from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWra
 from plain.models.db import DatabaseError as WrappedDatabaseError
 from plain.models.db import db_connection
 
-# With psycopg stubs, we can now type the connection
-try:
+# Type checkers always see the proper type; runtime falls back to Any if needed
+if TYPE_CHECKING:
     from psycopg import Connection as PsycopgConnection
-except ImportError:
-    PsycopgConnection: type[Any] = Any  # type: ignore[misc]
+else:
+    try:
+        from psycopg import Connection as PsycopgConnection
+    except ImportError:
+        PsycopgConnection = Any  # type: ignore[misc]
 
 from .client import DatabaseClient
 from .creation import DatabaseCreation
@@ -426,7 +429,7 @@ class CursorMixin:
 
         qparts.append(sql.SQL(")"))
         stmt = sql.Composed(qparts)
-        self.execute(stmt)
+        self.execute(stmt)  # type: ignore[attr-defined]
         return args
 
 
@@ -441,4 +444,4 @@ class Cursor(CursorMixin, Database.ClientCursor):
 class CursorDebugWrapper(BaseCursorDebugWrapper):
     def copy(self, statement: Any) -> Any:
         with self.debug_sql(statement):
-            return self.cursor.copy(statement)
+            return self.cursor.copy(statement)  # type: ignore[possibly-missing-attribute]

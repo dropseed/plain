@@ -9,7 +9,7 @@ from functools import cached_property, reduce
 from typing import TYPE_CHECKING, Any
 
 from plain.models.exceptions import EmptyResultSet, FullResultSet
-from plain.models.expressions import Case, When
+from plain.models.expressions import Case, ResolvableExpression, When
 from plain.models.lookups import Exact
 from plain.utils import tree
 
@@ -271,7 +271,7 @@ class WhereNode(tree.Node):
 
     @staticmethod
     def _resolve_leaf(expr: Any, query: Any, *args: Any, **kwargs: Any) -> Any:
-        if hasattr(expr, "resolve_expression"):
+        if isinstance(expr, ResolvableExpression):
             expr = expr.resolve_expression(query, *args, **kwargs)
         return expr
 

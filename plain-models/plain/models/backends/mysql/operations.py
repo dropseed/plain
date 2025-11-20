@@ -6,9 +6,9 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from plain.models.backends.base.operations import BaseDatabaseOperations
-from plain.models.backends.utils import split_tzname_delta
+from plain.models.backends.utils import CursorWrapper, split_tzname_delta
 from plain.models.constants import OnConflict
-from plain.models.expressions import Exists, ExpressionWrapper
+from plain.models.expressions import Exists, ExpressionWrapper, ResolvableExpression
 from plain.models.lookups import Lookup
 from plain.utils import timezone
 from plain.utils.encoding import force_str
@@ -191,7 +191,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             return f"TIME({sql})", params
 
-    def fetch_returned_insert_rows(self, cursor: Any) -> list[Any]:
+    def fetch_returned_insert_rows(self, cursor: CursorWrapper) -> list[Any]:
         """
         Given a cursor object that has just performed an INSERT...RETURNING
         statement into a table, return the tuple of returned data.
@@ -217,7 +217,9 @@ class DatabaseOperations(BaseDatabaseOperations):
     ) -> Any:
         return value
 
-    def last_executed_query(self, cursor: Any, sql: str, params: Any) -> str | None:
+    def last_executed_query(
+        self, cursor: CursorWrapper, sql: str, params: Any
+    ) -> str | None:
         # With MySQLdb, cursor objects have an (undocumented) "_executed"
         # attribute where the exact query sent to the database is saved.
         # See MySQLdb/cursors.py in the source distribution.
@@ -260,7 +262,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return None
 
         # Expression values are adapted by the database.
-        if hasattr(value, "resolve_expression"):
+        if isinstance(value, ResolvableExpression):
             return value
 
         # MySQL doesn't support tz-aware datetimes
@@ -275,7 +277,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             return None
 
         # Expression values are adapted by the database.
-        if hasattr(value, "resolve_expression"):
+        if isinstance(value, ResolvableExpression):
             return value
 
         # MySQL doesn't support tz-aware times

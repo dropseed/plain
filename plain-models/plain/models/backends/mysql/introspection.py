@@ -8,6 +8,7 @@ from MySQLdb.constants import FIELD_TYPE
 from plain.models.backends.base.introspection import (
     BaseDatabaseIntrospection,
 )
+from plain.models.backends.utils import CursorWrapper
 from plain.models.indexes import Index
 from plain.utils.datastructures import OrderedSet
 
@@ -106,7 +107,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             return "JSONField"
         return field_type
 
-    def get_table_list(self, cursor: Any) -> list[TableInfo]:
+    def get_table_list(self, cursor: CursorWrapper) -> list[TableInfo]:
         """Return a list of table and view names in the current database."""
         cursor.execute(
             """
@@ -119,11 +120,13 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             """
         )
         return [
-            TableInfo(row[0], {"BASE TABLE": "t", "VIEW": "v"}.get(row[1]), row[2])
+            TableInfo(row[0], {"BASE TABLE": "t", "VIEW": "v"}.get(row[1], "t"), row[2])
             for row in cursor.fetchall()
         ]
 
-    def get_table_description(self, cursor: Any, table_name: str) -> list[FieldInfo]:
+    def get_table_description(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> list[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface."
@@ -216,7 +219,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         return fields
 
     def get_sequences(
-        self, cursor: Any, table_name: str, table_fields: tuple[Any, ...] = ()
+        self, cursor: CursorWrapper, table_name: str, table_fields: tuple[Any, ...] = ()
     ) -> list[dict[str, Any]]:
         for field_info in self.get_table_description(cursor, table_name):
             if "auto_increment" in field_info.extra:
@@ -224,7 +227,9 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 return [{"table": table_name, "column": field_info.name}]
         return []
 
-    def get_relations(self, cursor: Any, table_name: str) -> dict[str, tuple[str, str]]:
+    def get_relations(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> dict[str, tuple[str, str]]:
         """
         Return a dictionary of {field_name: (field_name_other_table, other_table)}
         representing all foreign keys in the given table.
@@ -245,7 +250,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             for field_name, other_field, other_table in cursor.fetchall()
         }
 
-    def get_storage_engine(self, cursor: Any, table_name: str) -> str:
+    def get_storage_engine(self, cursor: CursorWrapper, table_name: str) -> str:
         """
         Retrieve the storage engine for a given table. Return the default
         storage engine if the table doesn't exist.
@@ -281,7 +286,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         return check_columns
 
     def get_constraints(
-        self, cursor: Any, table_name: str
+        self, cursor: CursorWrapper, table_name: str
     ) -> dict[str, dict[str, Any]]:
         """
         Retrieve any constraints or keys (unique, pk, fk, check, index) across

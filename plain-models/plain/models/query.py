@@ -31,7 +31,7 @@ from plain.models.exceptions import (
     FieldError,
     ObjectDoesNotExist,
 )
-from plain.models.expressions import Case, F, Value, When
+from plain.models.expressions import Case, F, ResolvableExpression, Value, When
 from plain.models.fields import (
     DateField,
     DateTimeField,
@@ -846,7 +846,7 @@ class QuerySet(Generic[T]):
                 when_statements = []
                 for obj in batch_objs:
                     attr = getattr(obj, field.attname)
-                    if not hasattr(attr, "resolve_expression"):
+                    if not isinstance(attr, ResolvableExpression):
                         attr = Value(attr, output_field=field)
                     when_statements.append(When(id=obj.id, then=attr))
                 case_statement = Case(*when_statements, output_field=field)
@@ -1211,12 +1211,12 @@ class QuerySet(Generic[T]):
                 "field."
             )
 
-        field_names = {f for f in fields if not hasattr(f, "resolve_expression")}
+        field_names = {f for f in fields if not isinstance(f, ResolvableExpression)}
         _fields = []
         expressions = {}
         counter = 1
         for field in fields:
-            if hasattr(field, "resolve_expression"):
+            if isinstance(field, ResolvableExpression):
                 field_id_prefix = getattr(
                     field, "default_alias", field.__class__.__name__.lower()
                 )
@@ -1445,7 +1445,7 @@ class QuerySet(Generic[T]):
         if fields == (None,):
             obj.sql_query.select_related = False
         elif fields:
-            obj.sql_query.add_select_related(list(fields))
+            obj.sql_query.add_select_related(list(fields))  # type: ignore[arg-type]
         else:
             obj.sql_query.select_related = True
         return obj
@@ -1469,6 +1469,7 @@ class QuerySet(Generic[T]):
                 if isinstance(lookup, Prefetch):
                     lookup_str = lookup.prefetch_to
                 else:
+                    assert isinstance(lookup, str)
                     lookup_str = lookup
                 lookup_str = lookup_str.split(LOOKUP_SEP, 1)[0]
                 if lookup_str in self.sql_query._filtered_relations:
@@ -1616,7 +1617,7 @@ class QuerySet(Generic[T]):
         if fields == (None,):
             clone.sql_query.clear_deferred_loading()
         else:
-            clone.sql_query.add_deferred_loading(frozenset(fields))
+            clone.sql_query.add_deferred_loading(frozenset(fields))  # type: ignore[arg-type]
         return clone
 
     def only(self, *fields: str) -> QuerySet[T]:
@@ -1657,7 +1658,7 @@ class QuerySet(Generic[T]):
         elif (
             self.sql_query.default_ordering
             and self.sql_query.model
-            and self.sql_query.model._model_meta.ordering
+            and self.sql_query.model._model_meta.ordering  # type: ignore[possibly-missing-attribute]
             and
             # A default ordering doesn't affect GROUP BY queries.
             not self.sql_query.group_by
@@ -1698,7 +1699,7 @@ class QuerySet(Generic[T]):
         self,
         objs: list[T],
         fields: list[Field],
-        batch_size: int,
+        batch_size: int | None,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
@@ -1714,7 +1715,7 @@ class QuerySet(Generic[T]):
         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
             if bulk_return and on_conflict is None:
                 inserted_rows.extend(
-                    self._insert(
+                    self._insert(  # type: ignore[arg-type]
                         item,
                         fields=fields,
                         returning_fields=self.model._model_meta.db_returning_fields,
@@ -1818,7 +1819,7 @@ class QuerySet(Generic[T]):
         values: tuple[Any, ...], method_name: str
     ) -> None:
         invalid_args = sorted(
-            str(arg) for arg in values if not hasattr(arg, "resolve_expression")
+            str(arg) for arg in values if not isinstance(arg, ResolvableExpression)
         )
         if invalid_args:
             raise TypeError(
@@ -1945,7 +1946,7 @@ class RawQuerySet:
         return iter(self._result_cache)
 
     def iterator(self) -> Iterator[Model]:
-        yield from RawModelIterable(self)
+        yield from RawModelIterable(self)  # type: ignore[arg-type]
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.sql_query}>"
@@ -2083,7 +2084,7 @@ def prefetch_related_objects(
     auto_lookups = set()  # we add to this as we go through.
     followed_descriptors = set()  # recursion protection
 
-    all_lookups = normalize_prefetch_lookups(reversed(related_lookups))
+    all_lookups = normalize_prefetch_lookups(reversed(related_lookups))  # type: ignore[arg-type]
     while all_lookups:
         lookup = all_lookups.pop()
         if lookup.prefetch_to in done_queries:
@@ -2179,7 +2180,7 @@ def prefetch_related_objects(
                 ):
                     done_queries[prefetch_to] = obj_list
                     new_lookups = normalize_prefetch_lookups(
-                        reversed(additional_lookups),
+                        reversed(additional_lookups),  # type: ignore[arg-type]
                         prefetch_to,
                     )
                     auto_lookups.update(new_lookups)
@@ -2198,7 +2199,7 @@ def prefetch_related_objects(
                     if through_attr in getattr(obj, "_prefetched_objects_cache", ()):
                         # If related objects have been prefetched, use the
                         # cache rather than the object's through_attr.
-                        new_obj = list(obj._prefetched_objects_cache.get(through_attr))
+                        new_obj = list(obj._prefetched_objects_cache.get(through_attr))  # type: ignore[arg-type]
                     else:
                         try:
                             new_obj = getattr(obj, through_attr)
@@ -2367,7 +2368,7 @@ def prefetch_one_level(
                 # No to_attr has been given for this prefetch operation and the
                 # cache_name does not point to a descriptor. Store the value of
                 # the field in the object's field cache.
-                obj._state.fields_cache[cache_name] = val
+                obj._state.fields_cache[cache_name] = val  # type: ignore[assignment]
         else:
             if as_attr:
                 setattr(obj, to_attr, vals)

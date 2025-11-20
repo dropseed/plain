@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
@@ -66,13 +66,16 @@ class DoesNotExistDescriptor:
         # Create a unique exception class for this model if we haven't already
         if owner not in self._exceptions_by_class:
             # type() returns a subclass of ObjectDoesNotExist
-            exc_class: type[ObjectDoesNotExist] = type(
-                "DoesNotExist",
-                (ObjectDoesNotExist,),
-                {
-                    "__module__": owner.__module__,
-                    "__qualname__": f"{owner.__qualname__}.DoesNotExist",
-                },
+            exc_class: type[ObjectDoesNotExist] = cast(
+                type[ObjectDoesNotExist],
+                type(
+                    "DoesNotExist",
+                    (ObjectDoesNotExist,),
+                    {
+                        "__module__": owner.__module__,
+                        "__qualname__": f"{owner.__qualname__}.DoesNotExist",
+                    },
+                ),
             )
             self._exceptions_by_class[owner] = exc_class
 
@@ -97,13 +100,16 @@ class MultipleObjectsReturnedDescriptor:
         # Create a unique exception class for this model if we haven't already
         if owner not in self._exceptions_by_class:
             # type() returns a subclass of MultipleObjectsReturned
-            exc_class: type[MultipleObjectsReturned] = type(
-                "MultipleObjectsReturned",
-                (MultipleObjectsReturned,),
-                {
-                    "__module__": owner.__module__,
-                    "__qualname__": f"{owner.__qualname__}.MultipleObjectsReturned",
-                },
+            exc_class = cast(
+                type[MultipleObjectsReturned],
+                type(
+                    "MultipleObjectsReturned",
+                    (MultipleObjectsReturned,),
+                    {
+                        "__module__": owner.__module__,
+                        "__qualname__": f"{owner.__qualname__}.MultipleObjectsReturned",
+                    },
+                ),
             )
             self._exceptions_by_class[owner] = exc_class
 
@@ -210,4 +216,4 @@ class DatabaseErrorWrapper:
             with self:
                 return func(*args, **kwargs)
 
-        return inner
+        return cast(F, inner)

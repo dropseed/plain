@@ -110,13 +110,18 @@ def register(connection: Connection) -> None:
 
 def _sqlite_datetime_parse(
     dt: str | None, tzname: str | None = None, conn_tzname: str | None = None
-) -> date | datetime | None:
+) -> datetime | None:
     if dt is None:
         return None
     try:
         parsed_dt: date | datetime | None = typecast_timestamp(dt)
     except (TypeError, ValueError):
         return None
+    if parsed_dt is None:
+        return None
+    # Convert date to datetime if needed
+    if isinstance(parsed_dt, date) and not isinstance(parsed_dt, datetime):
+        parsed_dt = datetime.combine(parsed_dt, datetime.min.time())
     if conn_tzname:
         parsed_dt = parsed_dt.replace(tzinfo=zoneinfo.ZoneInfo(conn_tzname))
     if tzname is not None and tzname != conn_tzname:
@@ -156,7 +161,7 @@ def _sqlite_time_trunc(
     if dt is None:
         return None
     dt_parsed = _sqlite_datetime_parse(dt, tzname, conn_tzname)
-    result: date | datetime | time | None
+    result: datetime | time | None
     if dt_parsed is None:
         try:
             result = typecast_time(dt)
@@ -164,6 +169,8 @@ def _sqlite_time_trunc(
             return None
     else:
         result = dt_parsed
+    if result is None:
+        return None
     if lookup_type == "hour":
         return f"{result.hour:02d}:00:00"
     elif lookup_type == "minute":
@@ -292,13 +299,13 @@ def _sqlite_format_dtdelta(
     if connector == "+":
         # typecast_timestamp() returns a date or a datetime without timezone.
         # It will be formatted as "%Y-%m-%d" or "%Y-%m-%d %H:%M:%S[.%f]"
-        out = str(real_lhs + real_rhs)
+        out = str(real_lhs + real_rhs)  # type: ignore[operator]
     elif connector == "-":
-        out = str(real_lhs - real_rhs)
+        out = str(real_lhs - real_rhs)  # type: ignore[operator]
     elif connector == "*":
-        out = real_lhs * real_rhs
+        out = real_lhs * real_rhs  # type: ignore[operator]
     else:
-        out = real_lhs / real_rhs
+        out = real_lhs / real_rhs  # type: ignore[operator]
     return out
 
 
@@ -307,6 +314,8 @@ def _sqlite_time_diff(lhs: str | None, rhs: str | None) -> int | None:
         return None
     left = typecast_time(lhs)
     right = typecast_time(rhs)
+    if left is None or right is None:
+        return None
     return (
         (left.hour * 60 * 60 * 1000000)
         + (left.minute * 60 * 1000000)
@@ -324,6 +333,8 @@ def _sqlite_timestamp_diff(lhs: str | None, rhs: str | None) -> int | None:
         return None
     left = typecast_timestamp(lhs)
     right = typecast_timestamp(rhs)
+    if left is None or right is None:
+        return None
     return duration_microseconds(left - right)
 
 

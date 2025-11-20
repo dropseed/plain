@@ -25,6 +25,12 @@ class Operation(ABC):
     considered immutable.
     """
 
+    # Set by __new__ to capture constructor arguments for deconstruction
+    _constructor_args: tuple[tuple[Any, ...], dict[str, Any]]
+    # Set by autodetector to track operation dependencies
+    # Each dependency is a 4-tuple: (package_label, model_name, field_name, create/delete/alter)
+    _auto_deps: list[tuple[str, str, str | None, bool | str]]
+
     # Can this migration be represented as SQL? (things like RunPython cannot)
     reduces_to_sql = True
 
