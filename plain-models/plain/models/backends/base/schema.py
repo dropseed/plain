@@ -21,7 +21,7 @@ from plain.models.backends.ddl_references import (
 from plain.models.backends.utils import names_digest, split_identifier, truncate_name
 from plain.models.constraints import Deferrable
 from plain.models.fields import Field
-from plain.models.fields.related import ForeignKey
+from plain.models.fields.related import ForeignKey, RelatedField
 from plain.models.fields.reverse_related import ManyToManyRel
 from plain.models.indexes import Index
 from plain.models.sql import Query
@@ -46,8 +46,10 @@ def _is_relevant_relation(relation: Any, altered_field: Field) -> bool:
     When altering the given field, must constraints on its model from the given
     relation be temporarily dropped?
     """
+    from plain.models.fields.related import ManyToManyField
+
     field = relation.field
-    if field.many_to_many:
+    if isinstance(field, ManyToManyField):
         # M2M reverse field
         return False
     if altered_field.primary_key:
@@ -242,11 +244,7 @@ class BaseDatabaseSchemaEditor(ABC):
             if extra_params:
                 params.extend(extra_params)
             # FK.
-            if (
-                isinstance(field, ForeignKey)
-                and field.remote_field
-                and field.db_constraint
-            ):
+            if isinstance(field, ForeignKey) and field.db_constraint:
                 to_table = field.remote_field.model.model_options.db_table
                 field_name = field.remote_field.field_name
                 if field_name is None:
@@ -589,7 +587,6 @@ class BaseDatabaseSchemaEditor(ABC):
             definition += " " + self.sql_check_constraint % db_params
         if (
             isinstance(field, ForeignKey)
-            and field.remote_field
             and self.connection.features.supports_foreign_keys
             and field.db_constraint
         ):
@@ -666,7 +663,7 @@ class BaseDatabaseSchemaEditor(ABC):
         if field.db_parameters(connection=self.connection)["type"] is None:
             return
         # Drop any FK constraints, MySQL requires explicit deletion
-        if field.remote_field:
+        if isinstance(field, RelatedField):
             fk_names = self._constraint_names(model, [field.column], foreign_key=True)
             for fk_name in fk_names:
                 self.execute(self._delete_fk_sql(model, fk_name))
@@ -707,8 +704,8 @@ class BaseDatabaseSchemaEditor(ABC):
         old_type = old_db_params["type"]
         new_db_params = new_field.db_parameters(connection=self.connection)
         new_type = new_db_params["type"]
-        if (old_type is None and old_field.remote_field is None) or (
-            new_type is None and new_field.remote_field is None
+        if (old_type is None and not isinstance(old_field, RelatedField)) or (
+            new_type is None and not isinstance(new_field, RelatedField)
         ):
             raise ValueError(
                 f"Cannot alter field {old_field} into {new_field} - they do not properly define "
@@ -770,7 +767,6 @@ class BaseDatabaseSchemaEditor(ABC):
         if (
             self.connection.features.supports_foreign_keys
             and isinstance(old_field, ForeignKey)
-            and old_field.remote_field
             and old_field.db_constraint
             and self._field_should_be_altered(
                 old_field,
@@ -842,15 +838,10 @@ class BaseDatabaseSchemaEditor(ABC):
         # True               | False            | True               | True
         if (
             isinstance(old_field, ForeignKey)
-            and old_field.remote_field
             and old_field.db_index
             and not old_field.primary_key
             and (
-                not (
-                    isinstance(new_field, ForeignKey)
-                    and new_field.remote_field
-                    and new_field.db_index
-                )
+                not (isinstance(new_field, ForeignKey) and new_field.db_index)
                 or new_field.primary_key
             )
         ):
@@ -1014,15 +1005,10 @@ class BaseDatabaseSchemaEditor(ABC):
         # True               | True             | True               | False
         if (
             (
-                not (
-                    isinstance(old_field, ForeignKey)
-                    and old_field.remote_field
-                    and old_field.db_index
-                )
+                not (isinstance(old_field, ForeignKey) and old_field.db_index)
                 or old_field.primary_key
             )
             and isinstance(new_field, ForeignKey)
-            and new_field.remote_field
             and new_field.db_index
             and not new_field.primary_key
         ):
@@ -1069,11 +1055,9 @@ class BaseDatabaseSchemaEditor(ABC):
         if (
             self.connection.features.supports_foreign_keys
             and isinstance(new_field, ForeignKey)
-            and new_field.remote_field
             and (
                 fks_dropped
                 or not isinstance(old_field, ForeignKey)
-                or not old_field.remote_field
                 or not old_field.db_constraint
             )
             and new_field.db_constraint
@@ -1205,8 +1189,12 @@ class BaseDatabaseSchemaEditor(ABC):
         else:
             collate_sql = ""
         # Comment change?
+        from plain.models.fields.related import ManyToManyField
+
         comment_sql = ""
-        if self.connection.features.supports_comments and not new_field.many_to_many:
+        if self.connection.features.supports_comments and not isinstance(
+            new_field, ManyToManyField
+        ):
             if old_field.db_comment != new_field.db_comment:
                 # PostgreSQL and Oracle can't execute 'ALTER COLUMN ...' and
                 # 'COMMENT ON ...' at the same time.

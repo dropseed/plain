@@ -152,8 +152,10 @@ def test_meta_related_objects_includes_reverse_fk(db):
         "ChildCascade.parent reverse FK should be in related_objects"
     )
 
-    # Find the reverse relation and verify it's marked as one_to_many
+    # Find the reverse relation and verify it's a ForeignKeyRel (one_to_many)
+    from plain.models.fields.reverse_related import ForeignKeyRel
+
     parent_rel = next(obj for obj in related_objs if obj.field.name == "parent")
-    assert parent_rel.one_to_many is True, (
-        "Reverse FK should be one_to_many from parent's perspective"
+    assert isinstance(parent_rel, ForeignKeyRel), (
+        "Reverse FK should be ForeignKeyRel (one_to_many from parent's perspective)"
     )

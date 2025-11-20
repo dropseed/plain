@@ -49,7 +49,6 @@ class ForeignObjectRel(FieldCacheMixin):
     # Field flags
     auto_created = True
     concrete = False
-    is_relation = True
 
     # Reverse relations are always nullable (Plain can't enforce that a
     # foreign key on the related model points to this model).
@@ -112,18 +111,6 @@ class ForeignObjectRel(FieldCacheMixin):
                 "has been called."
             )
         return self.field.model
-
-    @cached_property
-    def many_to_many(self) -> bool:
-        return self.field.many_to_many
-
-    @cached_property
-    def many_to_one(self) -> bool:
-        return self.field.one_to_many
-
-    @cached_property
-    def one_to_many(self) -> bool:
-        return self.field.many_to_one
 
     def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
         return self.field.get_lookup(lookup_name)
@@ -228,15 +215,9 @@ class ForeignKeyRel(ForeignObjectRel):
     """
     Used by the ForeignKey field to store information about the relation.
 
-    ``_model_meta.get_fields()`` returns this class to provide access to the field
-    flags for the reverse relation.
-
-    Note: Because we somewhat abuse the Rel objects by using them as reverse
-    fields we get the funny situation where
-    ``ForeignKeyRel.many_to_one == False`` and
-    ``ForeignKeyRel.one_to_many == True``. This is unfortunate but the actual
-    ForeignKeyRel class is a private API and there is work underway to turn
-    reverse relations into actual fields.
+    ``_model_meta.get_fields()`` returns this class to provide access to the
+    reverse relation. Use ``isinstance(rel, ForeignKeyRel)`` to identify
+    one-to-many reverse relations.
     """
 
     # Type annotations for instance attributes

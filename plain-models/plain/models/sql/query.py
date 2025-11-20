@@ -62,6 +62,7 @@ from plain.utils.tree import Node
 if TYPE_CHECKING:
     from plain.models import Model
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.fields.related import RelatedField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.meta import Meta
     from plain.models.sql.compiler import SQLCompiler
@@ -758,6 +759,8 @@ class Query(BaseExpression):
         mask: dict[str, Any],
         select_mask: dict[Any, Any] | None = None,
     ) -> dict[Any, Any]:
+        from plain.models.fields.related import RelatedField
+
         if select_mask is None:
             select_mask = {}
         select_mask[meta.get_forward_field("id")] = {}
@@ -770,7 +773,7 @@ class Query(BaseExpression):
             if field_mask is None:
                 select_mask.setdefault(field, {})
             elif field_mask:
-                if not field.is_relation:
+                if not isinstance(field, RelatedField):
                     raise FieldError(next(iter(field_mask)))
                 field_select_mask = select_mask.setdefault(field, {})
                 related_model = field.remote_field.model
@@ -800,6 +803,8 @@ class Query(BaseExpression):
         mask: dict[str, Any],
         select_mask: dict[Any, Any] | None = None,
     ) -> dict[Any, Any]:
+        from plain.models.fields.related import RelatedField
+
         if select_mask is None:
             select_mask = {}
         select_mask[meta.get_forward_field("id")] = {}
@@ -808,7 +813,7 @@ class Query(BaseExpression):
             field = meta.get_field(field_name)
             field_select_mask = select_mask.setdefault(field, {})
             if field_mask:
-                if not field.is_relation:
+                if not isinstance(field, RelatedField):
                     raise FieldError(next(iter(field_mask)))
                 related_model = field.remote_field.model
                 self._get_only_select_mask(
@@ -1268,27 +1273,28 @@ class Query(BaseExpression):
                     f'Cannot query "{value}": Must be "{meta.model.model_options.object_name}" instance.'
                 )
 
-    def check_related_objects(self, field: Field, value: Any, meta: Meta) -> None:
+    def check_related_objects(
+        self, field: RelatedField | ForeignObjectRel, value: Any, meta: Meta
+    ) -> None:
         """Check the type of object passed to query relations."""
-        if field.is_relation:
-            # Check that the field and the queryset use the same model in a
-            # query like .filter(author=Author.query.all()). For example, the
-            # meta would be Author's (from the author field) and value.model
-            # would be Author.query.all() queryset's .model (Author also).
-            # The field is the related field on the lhs side.
-            if (
-                isinstance(value, Query)
-                and not value.has_select_fields
-                and not check_rel_lookup_compatibility(value.model, meta, field)
-            ):
-                raise ValueError(
-                    f'Cannot use QuerySet for "{value.model.model_options.object_name}": Use a QuerySet for "{meta.model.model_options.object_name}".'
-                )
-            elif hasattr(value, "_model_meta"):
-                self.check_query_object_type(value, meta, field)
-            elif hasattr(value, "__iter__"):
-                for v in value:
-                    self.check_query_object_type(v, meta, field)
+        # Check that the field and the queryset use the same model in a
+        # query like .filter(author=Author.query.all()). For example, the
+        # meta would be Author's (from the author field) and value.model
+        # would be Author.query.all() queryset's .model (Author also).
+        # The field is the related field on the lhs side.
+        if (
+            isinstance(value, Query)
+            and not value.has_select_fields
+            and not check_rel_lookup_compatibility(value.model, meta, field)
+        ):
+            raise ValueError(
+                f'Cannot use QuerySet for "{value.model.model_options.object_name}": Use a QuerySet for "{meta.model.model_options.object_name}".'
+            )
+        elif hasattr(value, "_model_meta"):
+            self.check_query_object_type(value, meta, field)
+        elif hasattr(value, "__iter__"):
+            for v in value:
+                self.check_query_object_type(v, meta, field)
 
     def check_filterable(self, expression: Any) -> None:
         """Raise an error if expression cannot be used in a WHERE clause."""
@@ -1377,6 +1383,8 @@ class Query(BaseExpression):
         check_filterable: bool = True,
         summarize: bool = False,
     ) -> tuple[WhereNode, set[str] | tuple[()]]:
+        from plain.models.fields.related import RelatedField
+
         """
         Build a WhereNode for a single filter clause but don't add it
         to this Query. Query.add_q() will then add this filter to the where
@@ -1426,7 +1434,7 @@ class Query(BaseExpression):
             )
             if not isinstance(condition, Lookup):
                 condition = self.build_lookup(["exact"], condition, True)
-            return WhereNode([condition], connector=AND), []
+            return WhereNode([condition], connector=AND), set()
         arg, value = filter_expr
         if not arg:
             raise FieldError(f"Cannot parse keyword query {arg!r}")
@@ -1449,7 +1457,7 @@ class Query(BaseExpression):
 
         if reffed_expression:
             condition = self.build_lookup(list(lookups), reffed_expression, value)
-            return WhereNode([condition], connector=AND), []
+            return WhereNode([condition], connector=AND), set()
 
         assert self.model is not None, "Building filters requires a model"
         meta = self.model._model_meta
@@ -1470,7 +1478,11 @@ class Query(BaseExpression):
             # Prevent iterator from being consumed by check_related_objects()
             if isinstance(value, Iterator):
                 value = list(value)
-            self.check_related_objects(join_info.final_field, value, join_info.meta)
+            from plain.models.fields.related import RelatedField
+            from plain.models.fields.reverse_related import ForeignObjectRel
+
+            if isinstance(join_info.final_field, RelatedField | ForeignObjectRel):
+                self.check_related_objects(join_info.final_field, value, join_info.meta)
 
             # split_exclude() needs to know which joins were generated for the
             # lookup parts
@@ -1491,7 +1503,7 @@ class Query(BaseExpression):
         if can_reuse is not None:
             can_reuse.update(join_list)
 
-        if join_info.final_field.is_relation:
+        if isinstance(join_info.final_field, RelatedField | ForeignObjectRel):
             if len(targets) == 1:
                 col = self._get_col(targets[0], join_info.final_field, alias)
             else:
@@ -1677,6 +1689,8 @@ class Query(BaseExpression):
         allow_many: bool = True,
         fail_on_missing: bool = False,
     ) -> tuple[list[Any], Field | ForeignObjectRel, tuple[Field, ...], list[str]]:
+        from plain.models.fields.related import RelatedField
+
         """
         Walk the list of names and turns them into PathInfo tuples. A single
         name in 'names' can generate multiple PathInfos (m2m, for example).
@@ -1721,7 +1735,7 @@ class Query(BaseExpression):
                 # Fields that contain one-to-many relations with a generic
                 # model (like a GenericForeignKey) cannot generate reverse
                 # relations and therefore cannot be used for reverse querying.
-                if field.is_relation and not field.related_model:
+                if isinstance(field, RelatedField) and not field.related_model:
                     raise FieldError(
                         f"Field {name!r} does not generate an automatic reverse "
                         "relation and therefore cannot be used for reverse "

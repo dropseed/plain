@@ -12,6 +12,7 @@ from plain.models.fields import (
     Field,
     TimeField,
 )
+from plain.models.fields.related import ManyToManyField, RelatedField
 from plain.models.fields.reverse_related import ManyToManyRel
 from plain.models.migrations import operations
 from plain.models.migrations.migration import Migration, SettingsTuple
@@ -120,7 +121,7 @@ class MigrationAutodetector:
         fields_def = []
         for name, field in sorted(fields.items()):
             deconstruction = self.deep_deconstruct(field)
-            if field.remote_field and field.remote_field.model:
+            if isinstance(field, RelatedField) and field.remote_field.model:
                 deconstruction[2].pop("to", None)
             fields_def.append(deconstruction)
         return fields_def
@@ -519,7 +520,7 @@ class MigrationAutodetector:
                                 for field in relations.values()
                             ]
                             for field in fields:
-                                if field.is_relation:
+                                if isinstance(field, RelatedField):
                                     dependencies.extend(
                                         self._get_dependencies_for_foreign_key(
                                             package_label,
@@ -567,13 +568,13 @@ class MigrationAutodetector:
             related_fields = {}
             primary_key_rel = None
             for field_name, field in model_state.fields.items():
-                if field.remote_field:
+                if isinstance(field, RelatedField):
                     if field.remote_field.model:
                         if field.primary_key:
                             primary_key_rel = field.remote_field.model
                         else:
                             related_fields[field_name] = field
-                    if getattr(field.remote_field, "through", None):
+                    if isinstance(field.remote_field, ManyToManyRel):
                         related_fields[field_name] = field
 
             # Are there indexes to defer?
@@ -702,10 +703,10 @@ class MigrationAutodetector:
             # Gather related fields
             related_fields = {}
             for field_name, field in model_state.fields.items():
-                if field.remote_field:
+                if isinstance(field, RelatedField):
                     if field.remote_field.model:
                         related_fields[field_name] = field
-                    if getattr(field.remote_field, "through", None):
+                    if isinstance(field.remote_field, ManyToManyRel):
                         related_fields[field_name] = field
 
             # Then remove each related field
@@ -731,7 +732,7 @@ class MigrationAutodetector:
                     dependencies.append(
                         (related_object_package_label, object_name, field_name, False),
                     )
-                    if not field.many_to_many:
+                    if not isinstance(field, ManyToManyField):
                         dependencies.append(
                             (
                                 related_object_package_label,
@@ -875,7 +876,7 @@ class MigrationAutodetector:
         # Adding a field always depends at least on its removal.
         dependencies = [(package_label, model_name, field_name, False)]
         # Fields that are foreignkeys/m2ms depend on stuff.
-        if field.remote_field and field.remote_field.model:
+        if isinstance(field, RelatedField) and field.remote_field.model:
             dependencies.extend(
                 self._get_dependencies_for_foreign_key(
                     package_label,
@@ -890,7 +891,7 @@ class MigrationAutodetector:
         preserve_default = (
             field.allow_null
             or field.has_default()
-            or field.many_to_many
+            or isinstance(field, ManyToManyField)
             or (not field.required and field.empty_strings_allowed)
             or (isinstance(field, time_fields) and field.auto_now)
         )
@@ -1000,8 +1001,12 @@ class MigrationAutodetector:
             # db_column was allowed to change which generate_renamed_fields()
             # already accounts for by adding an AlterField operation.
             if old_field_dec != new_field_dec and old_field_name == field_name:
-                both_m2m = old_field.many_to_many and new_field.many_to_many
-                neither_m2m = not old_field.many_to_many and not new_field.many_to_many
+                both_m2m = isinstance(old_field, ManyToManyField) and isinstance(
+                    new_field, ManyToManyField
+                )
+                neither_m2m = not isinstance(
+                    old_field, ManyToManyField
+                ) and not isinstance(new_field, ManyToManyField)
                 if both_m2m or neither_m2m:
                     # Either both fields are m2m or neither is
                     preserve_default = True
@@ -1009,7 +1014,7 @@ class MigrationAutodetector:
                         old_field.allow_null
                         and not new_field.allow_null
                         and not new_field.has_default()
-                        and not new_field.many_to_many
+                        and not isinstance(new_field, ManyToManyField)
                     ):
                         field = new_field.clone()
                         new_default = self.questioner.ask_not_null_alteration(
@@ -1184,7 +1189,7 @@ class MigrationAutodetector:
         package_label: str, model_name: str, field: Field, project_state: ProjectState
     ) -> list[tuple[str, str, str | None, bool | str]]:
         remote_field_model = None
-        if hasattr(field.remote_field, "model"):
+        if isinstance(field, RelatedField):
             remote_field_model = field.remote_field.model
         else:
             relations = project_state.relations[package_label, model_name]
@@ -1219,7 +1224,7 @@ class MigrationAutodetector:
         dependencies = []
         model_state = self.to_state.models[package_label, model_name]
         for field in model_state.fields.values():
-            if field.is_relation:
+            if isinstance(field, RelatedField):
                 dependencies.extend(
                     self._get_dependencies_for_foreign_key(
                         package_label,

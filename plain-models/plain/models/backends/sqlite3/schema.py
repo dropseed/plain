@@ -10,7 +10,7 @@ from plain.models.backends.ddl_references import Statement
 from plain.models.backends.utils import strip_quotes
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import NotSupportedError
-from plain.models.fields.related import ForeignKey
+from plain.models.fields.related import ForeignKey, RelatedField
 from plain.models.registry import ModelsRegistry
 from plain.models.transaction import atomic
 
@@ -219,7 +219,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # the old model to ensure their remote_field.field_name doesn't refer
         # to an altered field.
         def is_self_referential(f: Field) -> bool:
-            return f.is_relation and f.remote_field.model is model
+            return isinstance(f, RelatedField) and f.remote_field.model is model
 
         # Work out the new fields dict / mapping
         body = {
@@ -255,7 +255,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if create_field:
             body[create_field.name] = create_field
             # Choose a default and insert it into the copy map
-            if not create_field.many_to_many and create_field.concrete:
+            from plain.models.fields.related import ManyToManyField
+
+            if not isinstance(create_field, ManyToManyField) and create_field.concrete:
                 mapping[create_field.column] = self.prepare_default(
                     self.effective_default(create_field),
                 )
@@ -395,8 +397,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         Remove a field from a model. Usually involves deleting a column,
         but for M2Ms may involve deleting a table.
         """
+        from plain.models.fields.related import ManyToManyField
+
         # M2M fields are a special case
-        if field.many_to_many:
+        if isinstance(field, ManyToManyField):
             # For explicit "through" M2M fields, do nothing
             pass
         elif (
@@ -404,14 +408,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             # Primary keys, unique fields, indexed fields, and foreign keys are
             # not supported in ALTER TABLE DROP COLUMN.
             and not field.primary_key
-            and not (
-                isinstance(field, ForeignKey) and field.remote_field and field.db_index
-            )
-            and not (
-                isinstance(field, ForeignKey)
-                and field.remote_field
-                and field.db_constraint
-            )
+            and not (isinstance(field, ForeignKey) and field.db_index)
+            and not (isinstance(field, ForeignKey) and field.db_constraint)
         ):
             super().remove_field(model, field)
         # For everything else, remake.
@@ -441,10 +439,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             and self.column_sql(model, old_field) == self.column_sql(model, new_field)
             and not (
                 isinstance(old_field, ForeignKey)
-                and old_field.remote_field
                 and old_field.db_constraint
                 or isinstance(new_field, ForeignKey)
-                and new_field.remote_field
                 and new_field.db_constraint
             )
         ):
@@ -461,13 +457,15 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         if new_field.primary_key and (
             old_type != new_type or old_collation != new_collation
         ):
+            from plain.models.fields.reverse_related import ManyToManyRel
+
             related_models = set()
             meta = new_field.model._model_meta
             for remote_field in meta.related_objects:
                 # Ignore self-relationship since the table was already rebuilt.
                 if remote_field.related_model == model:
                     continue
-                if not remote_field.many_to_many:
+                if not isinstance(remote_field, ManyToManyRel):
                     if remote_field.field_name == new_field.name:
                         related_models.add(remote_field.related_model)
             if new_field.primary_key:

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from plain import models
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.fields import NOT_PROVIDED
-from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
+from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT, RelatedField
 from plain.models.meta import Meta
 from plain.models.migrations.utils import field_is_referenced, get_references
 from plain.models.registry import ModelsRegistry
@@ -42,10 +42,12 @@ def _get_related_models(m: type[models.Model]) -> list[type[models.Model]]:
         for subclass in m.__subclasses__()
         if issubclass(subclass, models.Model)
     ]
+    from plain.models.fields.reverse_related import ForeignObjectRel
+
     related_fields_models = set()
     for f in m._model_meta.get_fields(include_reverse=True):
         if (
-            f.is_relation
+            isinstance(f, (RelatedField, ForeignObjectRel))
             and f.related_model is not None
             and not isinstance(f.related_model, str)
         ):
@@ -271,7 +273,7 @@ class ProjectState:
         if self._relations is not None:
             self.resolve_model_field_relations(model_key, name, field)
         # Delay rendering of relationships if it's not a relational field.
-        delay = not field.is_relation
+        delay = not isinstance(field, RelatedField)
         self.reload_model(*model_key, delay=delay)
 
     def remove_field(self, package_label: str, model_name: str, name: str) -> None:
@@ -281,7 +283,7 @@ class ProjectState:
         if self._relations is not None:
             self.resolve_model_field_relations(model_key, name, old_field)
         # Delay rendering of relationships if it's not a relational field.
-        delay = not old_field.is_relation
+        delay = not isinstance(old_field, RelatedField)
         self.reload_model(*model_key, delay=delay)
 
     def alter_field(
@@ -301,10 +303,10 @@ class ProjectState:
         fields = self.models[model_key].fields
         if self._relations is not None:
             old_field = fields.pop(name)
-            if old_field.is_relation:
+            if isinstance(old_field, RelatedField):
                 self.resolve_model_field_relations(model_key, name, old_field)
             fields[name] = field
-            if field.is_relation:
+            if isinstance(field, RelatedField):
                 self.resolve_model_field_relations(model_key, name, field)
         else:
             fields[name] = field
@@ -312,7 +314,7 @@ class ProjectState:
         # it's sufficient if the new field is (#27737).
         # Delay rendering of relationships if it's not a relational field and
         # not referenced by a foreign key.
-        delay = not field.is_relation and not field_is_referenced(
+        delay = not isinstance(field, RelatedField) and not field_is_referenced(
             self, model_key, (name, field)
         )
         self.reload_model(*model_key, delay=delay)
@@ -369,7 +371,7 @@ class ProjectState:
         # Directly related models are the models pointed to by ForeignKeys and ManyToManyFields.
         direct_related_models = set()
         for field in model_state.fields.values():
-            if field.is_relation:
+            if isinstance(field, RelatedField):
                 if field.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT:
                     continue
                 rel_package_label, rel_model_name = _get_package_label_and_model_name(
@@ -685,12 +687,16 @@ class ModelState:
                     f'ModelState.fields cannot be bound to a model - "{name}" is.'
                 )
             # Sanity-check that relation fields are NOT referring to a model class.
-            if field.is_relation and hasattr(field.related_model, "_model_meta"):
+            if isinstance(field, RelatedField) and hasattr(
+                field.related_model, "_model_meta"
+            ):
                 raise ValueError(
                     f'ModelState.fields cannot refer to a model class - "{name}.to" does. '
                     "Use a string reference instead."
                 )
-            if field.many_to_many and hasattr(
+            from plain.models.fields.related import ManyToManyField
+
+            if isinstance(field, ManyToManyField) and hasattr(
                 field.remote_field.through, "_model_meta"
             ):
                 raise ValueError(

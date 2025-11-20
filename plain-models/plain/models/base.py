@@ -28,6 +28,7 @@ from plain.models.exceptions import (
 )
 from plain.models.expressions import RawSQL, Value
 from plain.models.fields import NOT_PROVIDED, Field
+from plain.models.fields.related import RelatedField
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.meta import Meta
 from plain.models.options import Options
@@ -112,11 +113,15 @@ class Model(metaclass=ModelBase):
 
         # Process all fields from kwargs or use defaults
         for field in meta.fields:
+            from plain.models.fields.related import RelatedField
+
             is_related_object = False
             # Virtual field
             if field.attname not in kwargs and field.column is None:
                 continue
-            if isinstance(field.remote_field, ForeignObjectRel):
+            if isinstance(field, RelatedField) and isinstance(
+                field.remote_field, ForeignObjectRel
+            ):
                 try:
                     # Assume object instance was passed in.
                     rel_obj = kwargs.pop(field.name)
@@ -321,7 +326,7 @@ class Model(metaclass=ModelBase):
                 continue
             setattr(self, field.attname, getattr(db_instance, field.attname))
             # Clear cached foreign keys.
-            if field.is_relation and field.is_cached(self):
+            if isinstance(field, RelatedField) and field.is_cached(self):
                 field.delete_cached_value(self)
 
         # Clear cached relations.
@@ -562,7 +567,7 @@ class Model(metaclass=ModelBase):
                 continue
             # If the related field isn't cached, then an instance hasn't been
             # assigned and there's no need to worry about this check.
-            if field.is_relation and field.is_cached(self):
+            if isinstance(field, RelatedField) and field.is_cached(self):
                 obj = getattr(self, field.name, None)
                 if not obj:
                     continue
@@ -1071,7 +1076,7 @@ class Model(metaclass=ModelBase):
         related_field_accessors = (
             f.get_attname()
             for f in cls._model_meta._get_fields(reverse=False)
-            if f.is_relation and f.related_model is not None
+            if isinstance(f, RelatedField) and f.related_model is not None
         )
         for accessor in related_field_accessors:
             if accessor in property_names:
@@ -1188,8 +1193,6 @@ class Model(metaclass=ModelBase):
     def _check_local_fields(
         cls, fields: Iterable[str], option: str
     ) -> list[PreflightResult]:
-        from plain.models.fields.reverse_related import ManyToManyRel
-
         # In order to avoid hitting the relation tree prematurely, we use our
         # own fields_map instead of using get_field()
         forward_fields_map: dict[str, Field] = {}
@@ -1211,7 +1214,9 @@ class Model(metaclass=ModelBase):
                     )
                 )
             else:
-                if isinstance(field.remote_field, ManyToManyRel):
+                from plain.models.fields.related import ManyToManyField
+
+                if isinstance(field, ManyToManyField):
                     errors.append(
                         PreflightResult(
                             fix=f"'{option}' refers to a ManyToManyField '{field_name}', but "
@@ -1277,7 +1282,7 @@ class Model(metaclass=ModelBase):
             for part in field.split(LOOKUP_SEP):
                 try:
                     fld = _cls._model_meta.get_field(part)
-                    if fld.is_relation:
+                    if isinstance(fld, RelatedField):
                         _cls = fld.path_infos[-1].to_meta.model
                     else:
                         _cls = None
@@ -1549,7 +1554,14 @@ class Model(metaclass=ModelBase):
                 continue
             try:
                 field = cls._model_meta.get_field(field_name)
-                if not field.is_relation or field.many_to_many or field.one_to_many:
+                from plain.models.fields.related import ManyToManyField
+                from plain.models.fields.reverse_related import ForeignKeyRel
+
+                if (
+                    not isinstance(field, RelatedField)
+                    or isinstance(field, ManyToManyField)
+                    or isinstance(field, ForeignKeyRel)
+                ):
                     continue
             except FieldDoesNotExist:
                 continue

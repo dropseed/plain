@@ -93,11 +93,6 @@ def lazy_related_operation(
 class RelatedField(FieldCacheMixin, Field):
     """Base class that all relational fields inherit from."""
 
-    # Field flags
-    one_to_many = False
-    many_to_many = False
-    many_to_one = False
-
     # RelatedField always has a remote_field (never None)
     remote_field: ForeignObjectRel
 
@@ -348,9 +343,6 @@ class ForeignKey(RelatedField):
     ForeignKey targets the primary key (id) of the remote model.
     """
 
-    # Field flags - ForeignKey is many-to-one
-    many_to_one = True
-
     empty_strings_allowed = False
     default_error_messages = {
         "invalid": "%(model)s instance with %(field)s %(value)r does not exist."
@@ -378,7 +370,7 @@ class ForeignKey(RelatedField):
         if not callable(on_delete):
             raise TypeError("on_delete must be callable.")
 
-        rel = ForeignKeyRel(
+        self.remote_field = ForeignKeyRel(
             self,
             to,
             related_query_name=related_query_name,
@@ -387,7 +379,6 @@ class ForeignKey(RelatedField):
         )
 
         super().__init__(
-            rel=rel,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
             **kwargs,
@@ -685,11 +676,6 @@ class ManyToManyField(RelatedField):
     the intermediary model.
     """
 
-    # Field flags
-    many_to_many = True
-    many_to_one = False
-    one_to_many = False
-
     # ManyToManyField uses ManyToManyRel which has through/through_fields
     remote_field: ManyToManyRel
 
@@ -721,7 +707,7 @@ class ManyToManyField(RelatedField):
         if not through:
             raise ValueError("ManyToManyField must have a 'through' argument.")
 
-        kwargs["rel"] = ManyToManyRel(
+        self.remote_field = ManyToManyRel(
             self,
             to,
             related_query_name=related_query_name,
@@ -1103,7 +1089,7 @@ class ManyToManyField(RelatedField):
             link_field_name = None
         for f in self.remote_field.through._model_meta.fields:
             if (
-                f.is_relation
+                isinstance(f, RelatedField)
                 and f.remote_field.model == related.related_model
                 and (link_field_name is None or link_field_name == f.name)
             ):
@@ -1125,7 +1111,7 @@ class ManyToManyField(RelatedField):
         else:
             link_field_name = None
         for f in self.remote_field.through._model_meta.fields:
-            if f.is_relation and f.remote_field.model == related.model:
+            if isinstance(f, RelatedField) and f.remote_field.model == related.model:
                 if link_field_name is None and related.related_model == related.model:
                     # If this is an m2m-intermediate to self,
                     # the first foreign key you find will be

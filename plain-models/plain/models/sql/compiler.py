@@ -12,6 +12,7 @@ from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError, NotSupportedError
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.expressions import F, OrderBy, RawSQL, Ref, Value
+from plain.models.fields.related import RelatedField
 from plain.models.functions import Cast, Random
 from plain.models.lookups import Lookup
 from plain.models.meta import Meta
@@ -1080,7 +1081,7 @@ class SQLCompiler:
         # attribute name of the field that is specified or
         # there are transforms to process.
         if (
-            field.is_relation
+            isinstance(field, RelatedField)
             and meta.model.model_options.ordering
             and getattr(field, "attname", None) != pieces[-1]
             and not getattr(transform_function, "has_transforms", False)
@@ -1195,7 +1196,9 @@ class SQLCompiler:
         """
 
         def _get_field_choices() -> chain:
-            direct_choices = (f.name for f in opts.fields if f.is_relation)
+            direct_choices = (
+                f.name for f in opts.fields if isinstance(f, RelatedField)
+            )
             reverse_choices = (
                 f.field.related_query_name()
                 for f in opts.related_objects
@@ -1234,8 +1237,9 @@ class SQLCompiler:
             fields_found.add(f.name)
 
             if restricted:
+                assert requested is not None
                 next = requested.get(f.name, {})
-                if not f.is_relation:
+                if not isinstance(f, RelatedField):
                     # If a non-related field is used like a relation,
                     # or if a single non-relational field is given.
                     if next or f.name in requested:
@@ -1286,10 +1290,12 @@ class SQLCompiler:
             get_related_klass_infos(klass_info, next_klass_infos)
 
         if restricted:
+            from plain.models.fields.reverse_related import ManyToManyRel
+
             related_fields = [
                 (o.field, o.related_model)
                 for o in opts.related_objects
-                if o.field.primary_key and not o.many_to_many
+                if o.field.primary_key and not isinstance(o, ManyToManyRel)
             ]
             for related_field, model in related_fields:
                 related_select_mask = select_mask.get(related_field) or {}
@@ -1328,6 +1334,7 @@ class SQLCompiler:
                     select_fields.append(len(select))
                     select.append((col, None))
                 klass_info["select_fields"] = select_fields
+                assert requested is not None
                 next = requested.get(related_field.related_query_name(), {})
                 next_klass_infos = self.get_related_selections(
                     select,
@@ -1351,6 +1358,7 @@ class SQLCompiler:
             def remote_setter(name: str, obj: Any, from_obj: Any) -> None:
                 setattr(from_obj, name, obj)
 
+            assert requested is not None
             for name in list(requested):
                 # Filtered relations work only on the topmost level.
                 if cur_depth > 1:
@@ -1974,7 +1982,7 @@ class SQLUpdateCompiler(SQLCompiler):
                         f"({field.name}={val!r})."
                     )
             elif hasattr(val, "prepare_database_save"):
-                if field.remote_field:
+                if isinstance(field, RelatedField):
                     val = val.prepare_database_save(field)
                 else:
                     raise TypeError(

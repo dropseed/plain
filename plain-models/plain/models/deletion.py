@@ -18,6 +18,7 @@ from plain.models.query import QuerySet
 
 if TYPE_CHECKING:
     from plain.models.fields import Field
+    from plain.models.fields.related import RelatedField
 
 
 class ProtectedError(IntegrityError):
@@ -32,7 +33,7 @@ class RestrictedError(IntegrityError):
         super().__init__(msg, restricted_objects)
 
 
-def CASCADE(collector: Collector, field: Field, sub_objs: Any) -> None:
+def CASCADE(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     collector.collect(
         sub_objs,
         source=field.remote_field.model,
@@ -43,7 +44,7 @@ def CASCADE(collector: Collector, field: Field, sub_objs: Any) -> None:
         collector.add_field_update(field, None, sub_objs)
 
 
-def PROTECT(collector: Collector, field: Field, sub_objs: Any) -> None:
+def PROTECT(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     raise ProtectedError(
         f"Cannot delete some instances of model '{field.remote_field.model.__name__}' because they are "
         f"referenced through a protected foreign key: '{sub_objs[0].__class__.__name__}.{field.name}'",
@@ -51,20 +52,24 @@ def PROTECT(collector: Collector, field: Field, sub_objs: Any) -> None:
     )
 
 
-def RESTRICT(collector: Collector, field: Field, sub_objs: Any) -> None:
+def RESTRICT(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     collector.add_restricted_objects(field, sub_objs)
     collector.add_dependency(field.remote_field.model, field.model)
 
 
-def SET(value: Any) -> Callable[[Collector, Field, Any], None]:
+def SET(value: Any) -> Callable[[Collector, RelatedField, Any], None]:
     if callable(value):
 
-        def set_on_delete(collector: Collector, field: Field, sub_objs: Any) -> None:
+        def set_on_delete(
+            collector: Collector, field: RelatedField, sub_objs: Any
+        ) -> None:
             collector.add_field_update(field, value(), sub_objs)
 
     else:
 
-        def set_on_delete(collector: Collector, field: Field, sub_objs: Any) -> None:
+        def set_on_delete(
+            collector: Collector, field: RelatedField, sub_objs: Any
+        ) -> None:
             collector.add_field_update(field, value, sub_objs)
 
     set_on_delete.deconstruct = lambda: ("plain.models.SET", (value,), {})
@@ -72,31 +77,33 @@ def SET(value: Any) -> Callable[[Collector, Field, Any], None]:
     return set_on_delete
 
 
-def SET_NULL(collector: Collector, field: Field, sub_objs: Any) -> None:
+def SET_NULL(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     collector.add_field_update(field, None, sub_objs)
 
 
 SET_NULL.lazy_sub_objs = True
 
 
-def SET_DEFAULT(collector: Collector, field: Field, sub_objs: Any) -> None:
+def SET_DEFAULT(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     collector.add_field_update(field, field.get_default(), sub_objs)
 
 
 SET_DEFAULT.lazy_sub_objs = True
 
 
-def DO_NOTHING(collector: Collector, field: Field, sub_objs: Any) -> None:
+def DO_NOTHING(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     pass
 
 
 def get_candidate_relations_to_delete(meta: Meta) -> Generator[Any, None, None]:
+    from plain.models.fields.reverse_related import ForeignKeyRel
+
     # The candidate relations are the ones that come from N-1 and 1-1 relations.
     # N-N  (i.e., many-to-many) relations aren't candidates for deletion.
     return (
         f
         for f in meta.get_fields(include_reverse=True)
-        if f.auto_created and not f.concrete and f.one_to_many
+        if f.auto_created and not f.concrete and isinstance(f, ForeignKeyRel)
     )
 
 
@@ -164,14 +171,16 @@ class Collector:
         self.dependencies[model].add(dependency)
         self.data.setdefault(dependency, set())
 
-    def add_field_update(self, field: Field, value: Any, objs: Iterable[Any]) -> None:
+    def add_field_update(
+        self, field: RelatedField, value: Any, objs: Iterable[Any]
+    ) -> None:
         """
         Schedule a field update. 'objs' must be a homogeneous iterable
         collection of model instances (e.g. a QuerySet).
         """
         self.field_updates[field, value].append(objs)
 
-    def add_restricted_objects(self, field: Field, objs: Iterable[Any]) -> None:
+    def add_restricted_objects(self, field: RelatedField, objs: Iterable[Any]) -> None:
         if objs:
             model = objs[0].__class__
             self.restricted_objects[model][field].update(objs)
@@ -207,7 +216,12 @@ class Collector:
         skipping parent -> child -> parent chain preventing fast delete of
         the child.
         """
-        if from_field and from_field.remote_field.on_delete is not CASCADE:
+        from plain.models.fields.related import RelatedField
+
+        if (
+            isinstance(from_field, RelatedField)
+            and from_field.remote_field.on_delete is not CASCADE
+        ):
             return False
         if hasattr(objs, "_model_meta"):
             model = objs._model_meta.model

@@ -87,6 +87,7 @@ class UpdateQuery(Query):
         query. This is the entry point for the public update() method on
         querysets.
         """
+
         assert self.model is not None, "UPDATE requires model metadata"
         meta = self.model._model_meta
         values_seq = []
@@ -96,7 +97,9 @@ class UpdateQuery(Query):
                 not (field.auto_created and not field.concrete) or not field.concrete
             )
             model = field.model
-            if not direct or (field.is_relation and field.many_to_many):
+            from plain.models.fields.related import ManyToManyField
+
+            if not direct or isinstance(field, ManyToManyField):
                 raise FieldError(
                     f"Cannot update model field {field!r} (only non-relations and "
                     "foreign keys permitted)."

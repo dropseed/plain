@@ -8,7 +8,7 @@ through foreign key and many-to-many relationships.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -109,7 +109,9 @@ class ReverseForeignKeyManager(BaseRelatedManager):
             val = getattr(self.instance, field.attname)
             if val is None:
                 return queryset.none()
-        if self.field.many_to_one:
+        from plain.models.fields.related import ForeignKey
+
+        if isinstance(self.field, ForeignKey):
             # Guard against field-like objects such as GenericRelation
             # that abuse create_reverse_many_to_one_manager() with reverse
             # one-to-many relationships instead and break known related
@@ -352,11 +354,14 @@ class ManyToManyManager(BaseRelatedManager):
         self.instance = instance
         self.through = through
 
-        self.source_field = self.through._model_meta.get_forward_field(
-            self.source_field_name
+        # M2M through model fields are always ForeignKey
+        self.source_field = cast(
+            "ForeignKey",
+            self.through._model_meta.get_forward_field(self.source_field_name),
         )
-        self.target_field = self.through._model_meta.get_forward_field(
-            self.target_field_name
+        self.target_field = cast(
+            "ForeignKey",
+            self.through._model_meta.get_forward_field(self.target_field_name),
         )
 
         self.core_filters = {}
@@ -411,7 +416,14 @@ class ManyToManyManager(BaseRelatedManager):
 
         # M2M: need to annotate the query in order to get the primary model
         # that the secondary model was actually related to.
-        fk = self.through._model_meta.get_forward_field(self.source_field_name)
+        from typing import cast
+
+        from plain.models.fields.related import ForeignKey
+
+        fk = cast(
+            ForeignKey,
+            self.through._model_meta.get_forward_field(self.source_field_name),
+        )  # M2M through model fields are always ForeignKey
         join_table = fk.model.model_options.db_table
         qn = db_connection.ops.quote_name
         queryset = queryset.extra(
@@ -507,10 +519,16 @@ class ManyToManyManager(BaseRelatedManager):
 
     def _get_target_ids(self, target_field_name: str, objs: Any) -> set[Any]:
         """Return the set of ids of `objs` that the target field references."""
+        from typing import cast
+
         from plain.models import Model
+        from plain.models.fields.related import ForeignKey
 
         target_ids = set()
-        target_field = self.through._model_meta.get_forward_field(target_field_name)
+        target_field = cast(
+            ForeignKey,
+            self.through._model_meta.get_forward_field(target_field_name),
+        )  # M2M through model fields are always ForeignKey
         for obj in objs:
             if isinstance(obj, self.model):
                 target_id = target_field.get_foreign_related_value(obj)[0]

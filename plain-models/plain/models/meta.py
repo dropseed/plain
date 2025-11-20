@@ -154,11 +154,13 @@ class Meta:
         return QuerySet.from_model(self.model)
 
     def add_field(self, field: Field) -> None:
+        from plain.models.fields.related import ManyToManyField, RelatedField
+
         # Insert the given field in the order in which it was created, using
         # the "creation_counter" attribute of the field.
         # Move many-to-many related fields from self.fields into
         # self.many_to_many.
-        if field.is_relation and field.many_to_many:
+        if isinstance(field, ManyToManyField):
             bisect.insort(self.local_many_to_many, field)
         else:
             bisect.insort(self.local_fields, field)
@@ -171,11 +173,7 @@ class Meta:
         # ideally, we'd just ask for field.related_model. However, related_model
         # is a cached property, and all the models haven't been loaded yet, so
         # we need to make sure we don't cache a string reference.
-        if (
-            field.is_relation
-            and hasattr(field.remote_field, "model")
-            and field.remote_field.model
-        ):
+        if isinstance(field, RelatedField) and field.remote_field.model:
             try:
                 field.remote_field.model._model_meta._expire_cache(forward=False)
             except AttributeError:
@@ -186,6 +184,8 @@ class Meta:
 
     @cached_property
     def fields(self) -> ImmutableList[Field]:
+        from plain.models.fields.related import RelatedField
+
         """
         Return a list of all forward fields on the model and its parents,
         excluding ManyToManyFields.
@@ -203,17 +203,23 @@ class Meta:
         # and all the models may not have been loaded yet; we don't want to cache
         # the string reference to the related_model.
         def is_not_an_m2m_field(f: Any) -> bool:
-            return not (f.is_relation and f.many_to_many)
+            from plain.models.fields.related import ManyToManyField
+
+            return not isinstance(f, ManyToManyField)
 
         def is_not_a_generic_relation(f: Any) -> bool:
-            return not (f.is_relation and f.one_to_many)
+            from plain.models.fields.related import ForeignKey, ManyToManyField
+
+            # Only ForeignKey and ManyToManyField are valid RelatedFields
+            # Anything else is a generic relation
+            if not isinstance(f, RelatedField):
+                return True
+            return isinstance(f, ForeignKey | ManyToManyField)
 
         def is_not_a_generic_foreign_key(f: Any) -> bool:
-            return not (
-                f.is_relation
-                and f.many_to_one
-                and not (hasattr(f.remote_field, "model") and f.remote_field.model)
-            )
+            from plain.models.fields.related import ForeignKey
+
+            return not (isinstance(f, ForeignKey) and not f.remote_field.model)
 
         return make_immutable_fields_list(
             "fields",
@@ -261,12 +267,14 @@ class Meta:
         combined with filtering of field properties is the public API for
         obtaining this list.
         """
+        from plain.models.fields.related import ManyToManyField
+
         return make_immutable_fields_list(
             "many_to_many",
             (
                 f
                 for f in self._get_fields(reverse=False)
-                if f.is_relation and f.many_to_many
+                if isinstance(f, ManyToManyField)
             ),
         )
 
@@ -281,10 +289,16 @@ class Meta:
         combined with filtering of field properties is the public API for
         obtaining this field list.
         """
+        from plain.models.fields.reverse_related import ForeignKeyRel, ManyToManyRel
+
         all_related_fields = self._get_fields(forward=False, reverse=True)
         return make_immutable_fields_list(
             "related_objects",
-            (obj for obj in all_related_fields if obj.many_to_many or obj.one_to_many),
+            (
+                obj
+                for obj in all_related_fields
+                if isinstance(obj, ManyToManyRel | ForeignKeyRel)
+            ),
         )
 
     @cached_property
@@ -381,6 +395,8 @@ class Meta:
             )
 
     def _populate_directed_relation_graph(self) -> list[Field]:
+        from plain.models.fields.related import RelatedField
+
         """
         This method is used by each model to find its reverse objects. As this
         method is very expensive and is accessed frequently (it looks up every
@@ -396,7 +412,7 @@ class Meta:
             fields_with_relations = (
                 f
                 for f in meta._get_fields(reverse=False)
-                if f.is_relation and f.related_model is not None
+                if isinstance(f, RelatedField) and f.related_model is not None
             )
             for f in fields_with_relations:
                 if not isinstance(f.remote_field.model, str):

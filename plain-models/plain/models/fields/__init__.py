@@ -167,12 +167,6 @@ class Field(RegisterLookupMixin, Generic[T]):
         "validators",
     )
 
-    # Field flags
-    many_to_many = None
-    many_to_one = None
-    one_to_many = None
-    related_model = None
-
     # Generic field type description, usually overridden by subclasses
     def _description(self) -> str:
         return f"Field of type: {self.__class__.__name__}"
@@ -185,7 +179,6 @@ class Field(RegisterLookupMixin, Generic[T]):
         max_length: int | None = None,
         required: bool = True,
         allow_null: bool = False,
-        rel: ForeignObjectRel | None = None,
         default: Any = NOT_PROVIDED,
         choices: Any = None,
         db_column: str | None = None,
@@ -196,8 +189,6 @@ class Field(RegisterLookupMixin, Generic[T]):
         self.name = None  # Set by set_attributes_from_name
         self.max_length = max_length
         self.required, self.allow_null = required, allow_null
-        self.remote_field = rel
-        self.is_relation = self.remote_field is not None
         self.default = default
         if isinstance(choices, ChoicesMeta):
             choices = choices.choices
@@ -573,8 +564,10 @@ class Field(RegisterLookupMixin, Generic[T]):
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         # We don't have to deepcopy very much here, since most things are not
         # intended to be altered after initial creation.
+        from plain.models.fields.related import RelatedField
+
         obj = copy.copy(self)
-        if self.remote_field:
+        if isinstance(self, RelatedField):
             obj.remote_field = copy.copy(self.remote_field)
             if hasattr(self.remote_field, "field") and self.remote_field.field is self:
                 obj.remote_field.field = obj

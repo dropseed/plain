@@ -339,7 +339,9 @@ def select_related_descend(
      * select_mask - the dictionary of selected fields.
      * reverse - boolean, True if we are checking a reverse select related
     """
-    if not field.remote_field:
+    from plain.models.fields.related import RelatedField
+
+    if not isinstance(field, RelatedField):
         return False
     if restricted:
         if reverse and field.related_query_name() not in requested:

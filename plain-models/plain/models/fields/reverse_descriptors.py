@@ -149,7 +149,9 @@ class ReverseForeignKey(BaseReverseDescriptor[T]):
 
     def _validate_field_type(self, related_model: type[Model]) -> None:
         """Validate that the field is a ForeignKey."""
-        if not hasattr(self._resolved_field, "many_to_one"):
+        from plain.models.fields.related import ForeignKey
+
+        if not isinstance(self._resolved_field, ForeignKey):
             raise ValueError(
                 f"Field '{self.field_name}' on '{related_model.__name__}' is not a "
                 f"ForeignKey. ReverseForeignKey requires a ForeignKey field."
@@ -193,7 +195,9 @@ class ReverseManyToMany(BaseReverseDescriptor[T]):
 
     def _validate_field_type(self, related_model: type[Model]) -> None:
         """Validate that the field is a ManyToManyField."""
-        if not hasattr(self._resolved_field, "many_to_many"):
+        from plain.models.fields.related import ManyToManyField
+
+        if not isinstance(self._resolved_field, ManyToManyField):
             raise ValueError(
                 f"Field '{self.field_name}' on '{related_model.__name__}' is not a "
                 f"ManyToManyField. ReverseManyToMany requires a ManyToManyField."

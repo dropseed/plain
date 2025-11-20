@@ -681,7 +681,11 @@ class QuerySet(Generic[T]):
                     "Unique fields that can trigger the upsert must be provided."
                 )
             # Updating primary keys and non-concrete fields is forbidden.
-            if any(not f.concrete or f.many_to_many for f in update_fields):
+            from plain.models.fields.related import ManyToManyField
+
+            if any(
+                not f.concrete or isinstance(f, ManyToManyField) for f in update_fields
+            ):
                 raise ValueError(
                     "bulk_create() can only be used with concrete fields in "
                     "update_fields."
@@ -691,7 +695,12 @@ class QuerySet(Generic[T]):
                     "bulk_create() cannot be used with primary keys in update_fields."
                 )
             if unique_fields:
-                if any(not f.concrete or f.many_to_many for f in unique_fields):
+                from plain.models.fields.related import ManyToManyField
+
+                if any(
+                    not f.concrete or isinstance(f, ManyToManyField)
+                    for f in unique_fields
+                ):
                     raise ValueError(
                         "bulk_create() can only be used with concrete fields "
                         "in unique_fields."
@@ -806,7 +815,9 @@ class QuerySet(Generic[T]):
         fields_list = [
             self.model._model_meta.get_forward_field(name) for name in fields
         ]
-        if any(not f.concrete or f.many_to_many for f in fields_list):
+        from plain.models.fields.related import ManyToManyField
+
+        if any(not f.concrete or isinstance(f, ManyToManyField) for f in fields_list):
             raise ValueError("bulk_update() can only be used with concrete fields.")
         if any(f.primary_key for f in fields_list):
             raise ValueError("bulk_update() cannot be used with primary key fields.")

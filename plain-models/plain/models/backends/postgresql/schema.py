@@ -8,7 +8,7 @@ from psycopg import sql
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.backends.ddl_references import Columns, IndexColumns, Statement
 from plain.models.backends.utils import strip_quotes
-from plain.models.fields.related import ForeignKey
+from plain.models.fields.related import ForeignKey, RelatedField
 
 if TYPE_CHECKING:
     from plain.models.backends.postgresql.base import PostgreSQLDatabaseWrapper
@@ -87,7 +87,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     def _field_data_type(
         self, field: Field
     ) -> str | None | Callable[[dict[str, Any]], str]:
-        if field.is_relation:
+        if isinstance(field, RelatedField):
             return field.rel_db_type(self.connection)
         return self.connection.data_types.get(
             field.get_internal_type(),
@@ -282,15 +282,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Added an index? Create any PostgreSQL-specific indexes.
         if (
             not (
-                (
-                    isinstance(old_field, ForeignKey)
-                    and old_field.remote_field
-                    and old_field.db_index
-                )
+                (isinstance(old_field, ForeignKey) and old_field.db_index)
                 or old_field.primary_key
             )
             and isinstance(new_field, ForeignKey)
-            and new_field.remote_field
             and new_field.db_index
         ) or (not old_field.primary_key and new_field.primary_key):
             like_index_statement = self._create_like_index_sql(model, new_field)
@@ -299,11 +294,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
         # Removed an index? Drop any PostgreSQL-specific indexes.
         if old_field.primary_key and not (
-            (
-                isinstance(new_field, ForeignKey)
-                and new_field.remote_field
-                and new_field.db_index
-            )
+            (isinstance(new_field, ForeignKey) and new_field.db_index)
             or new_field.primary_key
         ):
             index_to_remove = self._create_index_name(
