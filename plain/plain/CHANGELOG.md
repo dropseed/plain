@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.90.0](https://github.com/dropseed/plain/releases/plain@0.90.0) (2025-11-20)
+
+### What's changed
+
+- Improved type annotations in `timezone.py`: `is_aware()` and `is_naive()` now accept both `datetime` and `time` objects for more flexible type checking ([a43145e](https://github.com/dropseed/plain/commit/a43145e697))
+- Enhanced type annotations in view classes: `convert_value_to_response()` and handler result variables now use more explicit type hints for better IDE support ([dc4454e](https://github.com/dropseed/plain/commit/dc4454e196))
+- Fixed type errors in forms and server workers: URL field now handles bytes properly, and worker wait_fds has explicit type annotation ([fc98d66](https://github.com/dropseed/plain/commit/fc98d666d4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.89.0](https://github.com/dropseed/plain/releases/plain@0.89.0) (2025-11-14)
 
 ### What's changed
