@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.37.0](https://github.com/dropseed/plain/releases/plain-oauth@0.37.0) (2025-11-21)
+
+### What's changed
+
+- `ForeignKey` has been renamed to `ForeignKeyField` in the `OAuthConnection` model and migration ([8010204](https://github.com/dropseed/plain/commit/8010204))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.36.1](https://github.com/dropseed/plain/releases/plain-oauth@0.36.1) (2025-11-17)
 
 ### What's changed
