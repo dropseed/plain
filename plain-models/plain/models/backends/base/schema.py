@@ -21,7 +21,7 @@ from plain.models.backends.ddl_references import (
 from plain.models.backends.utils import names_digest, split_identifier, truncate_name
 from plain.models.constraints import Deferrable
 from plain.models.fields import Field
-from plain.models.fields.related import ForeignKey, RelatedField
+from plain.models.fields.related import ForeignKeyField, RelatedField
 from plain.models.fields.reverse_related import ManyToManyRel
 from plain.models.indexes import Index
 from plain.models.sql import Query
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
-    from plain.models.fields.related import ForeignKey, ManyToManyField
+    from plain.models.fields.related import ForeignKeyField, ManyToManyField
     from plain.models.fields.reverse_related import ManyToManyRel
 
 logger = logging.getLogger("plain.models.backends.schema")
@@ -55,7 +55,7 @@ def _is_relevant_relation(relation: Any, altered_field: Field) -> bool:
     if altered_field.primary_key:
         # Foreign key constraint on the primary key, which is being altered.
         return True
-    # ForeignKey always targets 'id'
+    # ForeignKeyField always targets 'id'
     return altered_field.name == "id"
 
 
@@ -244,7 +244,7 @@ class BaseDatabaseSchemaEditor(ABC):
             if extra_params:
                 params.extend(extra_params)
             # FK.
-            if isinstance(field, ForeignKey) and field.db_constraint:
+            if isinstance(field, ForeignKeyField) and field.db_constraint:
                 to_table = field.remote_field.model.model_options.db_table
                 field_name = field.remote_field.field_name
                 if field_name is None:
@@ -586,7 +586,7 @@ class BaseDatabaseSchemaEditor(ABC):
         if db_params["check"]:
             definition += " " + self.sql_check_constraint % db_params
         if (
-            isinstance(field, ForeignKey)
+            isinstance(field, ForeignKeyField)
             and self.connection.features.supports_foreign_keys
             and field.db_constraint
         ):
@@ -768,7 +768,7 @@ class BaseDatabaseSchemaEditor(ABC):
         fks_dropped = set()
         if (
             self.connection.features.supports_foreign_keys
-            and isinstance(old_field, ForeignKey)
+            and isinstance(old_field, ForeignKeyField)
             and old_field.db_constraint
             and self._field_should_be_altered(
                 old_field,
@@ -839,11 +839,11 @@ class BaseDatabaseSchemaEditor(ABC):
         # True               | False            | False              | True
         # True               | False            | True               | True
         if (
-            isinstance(old_field, ForeignKey)
+            isinstance(old_field, ForeignKeyField)
             and old_field.db_index
             and not old_field.primary_key
             and (
-                not (isinstance(new_field, ForeignKey) and new_field.db_index)
+                not (isinstance(new_field, ForeignKeyField) and new_field.db_index)
                 or new_field.primary_key
             )
         ):
@@ -1007,10 +1007,10 @@ class BaseDatabaseSchemaEditor(ABC):
         # True               | True             | True               | False
         if (
             (
-                not (isinstance(old_field, ForeignKey) and old_field.db_index)
+                not (isinstance(old_field, ForeignKeyField) and old_field.db_index)
                 or old_field.primary_key
             )
-            and isinstance(new_field, ForeignKey)
+            and isinstance(new_field, ForeignKeyField)
             and new_field.db_index
             and not new_field.primary_key
         ):
@@ -1056,10 +1056,10 @@ class BaseDatabaseSchemaEditor(ABC):
         # Does it have a foreign key?
         if (
             self.connection.features.supports_foreign_keys
-            and isinstance(new_field, ForeignKey)
+            and isinstance(new_field, ForeignKeyField)
             and (
                 fks_dropped
-                or not isinstance(old_field, ForeignKey)
+                or not isinstance(old_field, ForeignKeyField)
                 or not old_field.db_constraint
             )
             and new_field.db_constraint
@@ -1070,7 +1070,7 @@ class BaseDatabaseSchemaEditor(ABC):
         # Rebuild FKs that pointed to us if we previously had to drop them
         if drop_foreign_keys:
             for _, rel in rels_to_update:
-                if isinstance(rel.field, ForeignKey) and rel.field.db_constraint:
+                if isinstance(rel.field, ForeignKeyField) and rel.field.db_constraint:
                     self.execute(
                         self._create_fk_sql(rel.related_model, rel.field, "_fk")
                     )
@@ -1462,7 +1462,7 @@ class BaseDatabaseSchemaEditor(ABC):
         ) or (old_path, old_args, old_kwargs) != (new_path, new_args, new_kwargs)
 
     def _field_should_be_indexed(self, model: type[Model], field: Field) -> bool:
-        if isinstance(field, ForeignKey):
+        if isinstance(field, ForeignKeyField):
             return bool(field.remote_field) and field.db_index and not field.primary_key
         return False
 
@@ -1480,7 +1480,7 @@ class BaseDatabaseSchemaEditor(ABC):
         }
 
     def _create_fk_sql(
-        self, model: type[Model], field: ForeignKey, suffix: str
+        self, model: type[Model], field: ForeignKeyField, suffix: str
     ) -> Statement:
         table = Table(model.model_options.db_table, self.quote_name)
         name = self._fk_constraint_name(model, field, suffix)
@@ -1505,7 +1505,7 @@ class BaseDatabaseSchemaEditor(ABC):
         )
 
     def _fk_constraint_name(
-        self, model: type[Model], field: ForeignKey, suffix: str
+        self, model: type[Model], field: ForeignKeyField, suffix: str
     ) -> ForeignKeyName:
         def create_fk_name(*args: Any, **kwargs: Any) -> str:
             return self.quote_name(self._create_index_name(*args, **kwargs))

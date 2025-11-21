@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
     from plain.models.base import Model
-    from plain.models.fields.related import ForeignKey, ManyToManyField
+    from plain.models.fields.related import ForeignKeyField, ManyToManyField
 
 from plain.models import transaction
 from plain.models.db import NotSupportedError, db_connection
@@ -77,11 +77,13 @@ class ReverseForeignKeyManager(BaseRelatedManager):
     # Type hints for attributes
     model: type[Model]
     instance: Model
-    field: ForeignKey
+    field: ForeignKeyField
     core_filters: dict[str, Model]
     allow_null: bool
 
-    def __init__(self, instance: Model, field: ForeignKey, related_model: type[Model]):
+    def __init__(
+        self, instance: Model, field: ForeignKeyField, related_model: type[Model]
+    ):
         assert field.name is not None, "Field must have a name"
         self.model = related_model
         self.instance = instance
@@ -109,9 +111,9 @@ class ReverseForeignKeyManager(BaseRelatedManager):
             val = getattr(self.instance, field.attname)
             if val is None:
                 return queryset.none()
-        from plain.models.fields.related import ForeignKey
+        from plain.models.fields.related import ForeignKeyField
 
-        if isinstance(self.field, ForeignKey):
+        if isinstance(self.field, ForeignKeyField):
             # Guard against field-like objects such as GenericRelation
             # that abuse create_reverse_many_to_one_manager() with reverse
             # one-to-many relationships instead and break known related
@@ -227,7 +229,7 @@ class ReverseForeignKeyManager(BaseRelatedManager):
         return self.model.query.update_or_create(**kwargs)
 
     def remove(self, *objs: Any, bulk: bool = True) -> None:
-        # remove() is only provided if the ForeignKey can have a value of null
+        # remove() is only provided if the ForeignKeyField can have a value of null
         if not self.allow_null:
             raise AttributeError(
                 f"Cannot call remove() on a related manager for field "
@@ -253,7 +255,7 @@ class ReverseForeignKeyManager(BaseRelatedManager):
         self._clear(self.query.filter(id__in=old_ids), bulk)
 
     def clear(self, *, bulk: bool = True) -> None:
-        # clear() is only provided if the ForeignKey can have a value of null
+        # clear() is only provided if the ForeignKeyField can have a value of null
         if not self.allow_null:
             raise AttributeError(
                 f"Cannot call clear() on a related manager for field "
@@ -356,11 +358,11 @@ class ManyToManyManager(BaseRelatedManager):
 
         # M2M through model fields are always ForeignKey
         self.source_field = cast(
-            "ForeignKey",
+            "ForeignKeyField",
             self.through._model_meta.get_forward_field(self.source_field_name),
         )
         self.target_field = cast(
-            "ForeignKey",
+            "ForeignKeyField",
             self.through._model_meta.get_forward_field(self.target_field_name),
         )
 
@@ -418,10 +420,10 @@ class ManyToManyManager(BaseRelatedManager):
         # that the secondary model was actually related to.
         from typing import cast
 
-        from plain.models.fields.related import ForeignKey
+        from plain.models.fields.related import ForeignKeyField
 
         fk = cast(
-            ForeignKey,
+            ForeignKeyField,
             self.through._model_meta.get_forward_field(self.source_field_name),
         )  # M2M through model fields are always ForeignKey
         join_table = fk.model.model_options.db_table
@@ -522,11 +524,11 @@ class ManyToManyManager(BaseRelatedManager):
         from typing import cast
 
         from plain.models import Model
-        from plain.models.fields.related import ForeignKey
+        from plain.models.fields.related import ForeignKeyField
 
         target_ids = set()
         target_field = cast(
-            ForeignKey,
+            ForeignKeyField,
             self.through._model_meta.get_forward_field(target_field_name),
         )  # M2M through model fields are always ForeignKey
         for obj in objs:

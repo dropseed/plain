@@ -1430,7 +1430,7 @@ class QuerySet(Generic[T]):
         """
         Return a new QuerySet instance that will select related objects.
 
-        If fields are specified, they must be ForeignKey fields and only those
+        If fields are specified, they must be ForeignKeyField fields and only those
         related objects are included in the selection.
 
         If select_related(None) is called, clear the list.

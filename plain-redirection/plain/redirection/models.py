@@ -87,7 +87,7 @@ class Redirect(models.Model):
 
 @models.register_model
 class RedirectLog(models.Model):
-    redirect: Redirect = types.ForeignKey(Redirect, on_delete=models.CASCADE)
+    redirect: Redirect = types.ForeignKeyField(Redirect, on_delete=models.CASCADE)
 
     # The actuals that were used to redirect
     from_url: str = types.URLField(max_length=512)

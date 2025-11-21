@@ -1,6 +1,6 @@
 # plain-models: Consolidate Related Field Descriptors
 
-**Remove descriptor indirection by making ForeignKey and ManyToManyField act as their own descriptors.**
+**Remove descriptor indirection by making ForeignKeyField and ManyToManyField act as their own descriptors.**
 
 ## Problem
 

@@ -12,7 +12,7 @@ from plain.models.sql.constants import INNER, LOUTER
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.fields.related import ForeignKey
+    from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.sql.compiler import SQLCompiler
 
@@ -61,7 +61,7 @@ class Join:
         parent_alias: str,
         table_alias: str,
         join_type: str,
-        join_field: ForeignKey | ForeignObjectRel,
+        join_field: ForeignKeyField | ForeignObjectRel,
         nullable: bool,
         filtered_relation: Any = None,
     ) -> None:

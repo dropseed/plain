@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from plain.models.deletion import Collector
     from plain.models.fields import Field
     from plain.models.fields.related import (
-        ForeignKey,
+        ForeignKeyField,
         ManyToManyField,
         RelatedField,
     )
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 class ForeignObjectRel(FieldCacheMixin):
     """
-    Used by ForeignKey to store information about the relation.
+    Used by ForeignKeyField to store information about the relation.
 
     ``_model_meta.get_fields()`` returns this class to provide access to the field
     flags for the reverse relation.
@@ -213,7 +213,7 @@ class ForeignObjectRel(FieldCacheMixin):
 
 class ForeignKeyRel(ForeignObjectRel):
     """
-    Used by the ForeignKey field to store information about the relation.
+    Used by the ForeignKeyField field to store information about the relation.
 
     ``_model_meta.get_fields()`` returns this class to provide access to the
     reverse relation. Use ``isinstance(rel, ForeignKeyRel)`` to identify
@@ -221,11 +221,11 @@ class ForeignKeyRel(ForeignObjectRel):
     """
 
     # Type annotations for instance attributes
-    field: ForeignKey
+    field: ForeignKeyField
 
     def __init__(
         self,
-        field: ForeignKey,
+        field: ForeignKeyField,
         to: str | type[Model],
         related_query_name: str | None = None,
         limit_choices_to: dict[str, Any] | Q | None = None,
@@ -312,7 +312,7 @@ class ManyToManyRel(ForeignObjectRel):
         Return the field in the 'to' object to which this relationship is tied.
         Provided for symmetry with ForeignKeyRel.
         """
-        from plain.models.fields.related import ForeignKey
+        from plain.models.fields.related import ForeignKeyField
 
         meta = self.through._model_meta
         if self.through_fields:
@@ -323,6 +323,6 @@ class ManyToManyRel(ForeignObjectRel):
                 if rel and rel.model == self.model:
                     break
 
-        if not isinstance(field, ForeignKey):
-            raise ValueError(f"Expected ForeignKey, got {type(field)}")
+        if not isinstance(field, ForeignKeyField):
+            raise ValueError(f"Expected ForeignKeyField, got {type(field)}")
         return field.foreign_related_fields[0]

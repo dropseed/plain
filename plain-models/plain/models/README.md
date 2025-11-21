@@ -159,7 +159,7 @@ class Product(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     # Relationships
-    category = models.ForeignKey("Category", on_delete=models.CASCADE)
+    category = models.ForeignKeyField("Category", on_delete=models.CASCADE)
     tags = models.ManyToManyField("Tag")
 ```
 
@@ -191,7 +191,7 @@ class Author(models.Model):
 @models.register_model
 class Book(models.Model):
     title = models.CharField(max_length=200)
-    author = models.ForeignKey(Author, on_delete=models.CASCADE)
+    author = models.ForeignKeyField(Author, on_delete=models.CASCADE)
 
 # Usage
 author = Author.query.get(name="Jane Doe")
@@ -255,7 +255,7 @@ published_at: datetime | None = types.DateTimeField(allow_null=True, required=Fa
 Foreign keys are typed with the related model:
 
 ```python
-author: Author = types.ForeignKey(Author, on_delete=models.CASCADE)
+author: Author = types.ForeignKeyField(Author, on_delete=models.CASCADE)
 ```
 
 All field types from the [Fields](#fields) section are available through [`types`](./types.py). Typed and untyped fields can be mixed in the same model. The database behavior is identical - typed fields only add type checking.

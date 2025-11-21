@@ -1,7 +1,7 @@
 """
 Reverse relation descriptors for explicit reverse relation declarations.
 
-This module contains descriptors for the reverse side of ForeignKey and
+This module contains descriptors for the reverse side of ForeignKeyField and
 ManyToManyField relations, allowing explicit declaration of reverse accessors
 without relying on automatic related_name generation.
 """
@@ -127,7 +127,7 @@ class BaseReverseDescriptor(Generic[T], ABC):
 
 class ReverseForeignKey(BaseReverseDescriptor[T]):
     """
-    Descriptor for the reverse side of a ForeignKey relation.
+    Descriptor for the reverse side of a ForeignKeyField relation.
 
     Provides access to the related instances on the "one" side of a one-to-many
     relationship.
@@ -137,7 +137,7 @@ class ReverseForeignKey(BaseReverseDescriptor[T]):
             children: ReverseForeignKey[Child] = ReverseForeignKey(to="Child", field="parent")
 
         class Child(Model):
-            parent: Parent = ForeignKey(Parent, on_delete=models.CASCADE)
+            parent: Parent = ForeignKeyField(Parent, on_delete=models.CASCADE)
 
     Args:
         to: The related model (string name or model class)
@@ -152,12 +152,12 @@ class ReverseForeignKey(BaseReverseDescriptor[T]):
 
     def _validate_field_type(self, related_model: type[Model]) -> None:
         """Validate that the field is a ForeignKey."""
-        from plain.models.fields.related import ForeignKey
+        from plain.models.fields.related import ForeignKeyField
 
-        if not isinstance(self._resolved_field, ForeignKey):
+        if not isinstance(self._resolved_field, ForeignKeyField):
             raise ValueError(
                 f"Field '{self.field_name}' on '{related_model.__name__}' is not a "
-                f"ForeignKey. ReverseForeignKey requires a ForeignKey field."
+                f"ForeignKey. ReverseForeignKey requires a ForeignKeyField field."
             )
 
     def _create_manager(self, instance: Model) -> Any:

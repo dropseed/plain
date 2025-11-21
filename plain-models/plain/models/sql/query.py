@@ -1778,7 +1778,7 @@ class Query(BaseExpression):
                 break
 
             # Lazy import to avoid circular dependency
-            from plain.models.fields.related import ForeignKey as FK
+            from plain.models.fields.related import ForeignKeyField as FK
             from plain.models.fields.related import ManyToManyField as M2M
             from plain.models.fields.reverse_related import ForeignObjectRel as FORel
 

@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ("id", models.PrimaryKeyField()),
                 (
                     "parent",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         allow_null=True,
                         on_delete=plain.models.deletion.SET_NULL,
                         to="examples.deleteparent",
@@ -38,7 +38,7 @@ class Migration(migrations.Migration):
                 ("id", models.PrimaryKeyField()),
                 (
                     "parent",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         default=1,
                         on_delete=plain.models.deletion.SET_DEFAULT,
                         to="examples.deleteparent",
@@ -52,7 +52,7 @@ class Migration(migrations.Migration):
                 ("id", models.PrimaryKeyField()),
                 (
                     "parent",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         on_delete=plain.models.deletion.DO_NOTHING,
                         to="examples.deleteparent",
                     ),
@@ -65,7 +65,7 @@ class Migration(migrations.Migration):
                 ("id", models.PrimaryKeyField()),
                 (
                     "parent",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         on_delete=plain.models.deletion.CASCADE,
                         to="examples.deleteparent",
                     ),
@@ -78,7 +78,7 @@ class Migration(migrations.Migration):
                 ("id", models.PrimaryKeyField()),
                 (
                     "parent",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         on_delete=plain.models.deletion.RESTRICT,
                         to="examples.deleteparent",
                     ),
@@ -91,7 +91,7 @@ class Migration(migrations.Migration):
                 ("id", models.PrimaryKeyField()),
                 (
                     "parent",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         on_delete=plain.models.deletion.PROTECT,
                         to="examples.deleteparent",
                     ),

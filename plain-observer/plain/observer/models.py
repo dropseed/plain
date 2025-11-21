@@ -325,7 +325,7 @@ class SpanQuerySet(models.QuerySet["Span"]):
 
 @models.register_model
 class Span(models.Model):
-    trace: Trace = types.ForeignKey(Trace, on_delete=models.CASCADE)
+    trace: Trace = types.ForeignKeyField(Trace, on_delete=models.CASCADE)
 
     span_id: str = types.CharField(max_length=255)
 
@@ -513,8 +513,8 @@ class Span(models.Model):
 
 @models.register_model
 class Log(models.Model):
-    trace: Trace = types.ForeignKey(Trace, on_delete=models.CASCADE)
-    span: Span | None = types.ForeignKey(
+    trace: Trace = types.ForeignKeyField(Trace, on_delete=models.CASCADE)
+    span: Span | None = types.ForeignKeyField(
         Span,
         on_delete=models.SET_NULL,
         allow_null=True,

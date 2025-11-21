@@ -24,13 +24,13 @@ class Migration(migrations.Migration):
                 ("id", models.PrimaryKeyField()),
                 (
                     "car",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         on_delete=plain.models.deletion.CASCADE, to="examples.car"
                     ),
                 ),
                 (
                     "feature",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         on_delete=plain.models.deletion.CASCADE, to="examples.feature"
                     ),
                 ),

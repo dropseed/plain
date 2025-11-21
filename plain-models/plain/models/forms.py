@@ -753,7 +753,7 @@ def modelfield_to_formfield(
             encoder=modelfield.encoder, decoder=modelfield.decoder, **defaults
         )
 
-    if isinstance(modelfield, models.ForeignKey):
+    if isinstance(modelfield, models.ForeignKeyField):
         return ModelChoiceField(
             queryset=modelfield.remote_field.model.query,
             **defaults,

@@ -9,7 +9,7 @@ from plain.runtime import SettingsReference
 
 @models.register_model
 class SupportFormEntry(models.Model):
-    user = types.ForeignKey(
+    user = types.ForeignKeyField(
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.SET_NULL,
         allow_null=True,

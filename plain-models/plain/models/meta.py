@@ -208,18 +208,18 @@ class Meta:
             return not isinstance(f, ManyToManyField)
 
         def is_not_a_generic_relation(f: Any) -> bool:
-            from plain.models.fields.related import ForeignKey, ManyToManyField
+            from plain.models.fields.related import ForeignKeyField, ManyToManyField
 
-            # Only ForeignKey and ManyToManyField are valid RelatedFields
+            # Only ForeignKeyField and ManyToManyField are valid RelatedFields
             # Anything else is a generic relation
             if not isinstance(f, RelatedField):
                 return True
-            return isinstance(f, ForeignKey | ManyToManyField)
+            return isinstance(f, ForeignKeyField | ManyToManyField)
 
         def is_not_a_generic_foreign_key(f: Any) -> bool:
-            from plain.models.fields.related import ForeignKey
+            from plain.models.fields.related import ForeignKeyField
 
-            return not (isinstance(f, ForeignKey) and not f.remote_field.model)
+            return not (isinstance(f, ForeignKeyField) and not f.remote_field.model)
 
         return make_immutable_fields_list(
             "fields",

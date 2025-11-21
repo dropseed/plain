@@ -67,7 +67,7 @@ class BaseDatabaseFeatures:
     # Can an object have an autoincrement primary key of 0?
     allows_auto_pk_0 = True
 
-    # Do we need to NULL a ForeignKey out, or can the constraint check be
+    # Do we need to NULL a ForeignKeyField out, or can the constraint check be
     # deferred
     can_defer_constraint_checks = False
 

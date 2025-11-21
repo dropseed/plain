@@ -22,7 +22,7 @@ class OAuthConnection(models.Model):
     created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
     updated_at: datetime.datetime = types.DateTimeField(auto_now=True)
 
-    user = types.ForeignKey(
+    user = types.ForeignKeyField(
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=models.CASCADE,
     )

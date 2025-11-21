@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="childcascade",
             name="parent",
-            field=models.ForeignKey(
+            field=models.ForeignKeyField(
                 on_delete=plain.models.deletion.CASCADE,
                 to="examples.deleteparent",
             ),
@@ -58,7 +58,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="childsetdefault",
             name="parent",
-            field=models.ForeignKey(
+            field=models.ForeignKeyField(
                 default=app.examples.models.ChildSetDefault.default_parent_id,  # type: ignore[attr-defined]
                 on_delete=plain.models.deletion.SET_DEFAULT,
                 to="examples.deleteparent",

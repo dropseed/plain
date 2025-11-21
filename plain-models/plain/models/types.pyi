@@ -640,7 +640,7 @@ def JSONField(
 
 # Related fields
 @overload
-def ForeignKey(
+def ForeignKeyField(
     to: type[_T] | str,
     on_delete: Any,
     *,
@@ -659,7 +659,7 @@ def ForeignKey(
     db_comment: str | None = None,
 ) -> _T | None: ...
 @overload
-def ForeignKey(
+def ForeignKeyField(
     to: type[_T] | str,
     on_delete: Any,
     *,

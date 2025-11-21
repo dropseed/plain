@@ -561,7 +561,7 @@ class Model(metaclass=ModelBase):
         self, operation_name: str, fields: Sequence[Any] | None = None
     ) -> None:
         # Ensure that a model instance without a PK hasn't been assigned to
-        # a ForeignKey on this model. If the field is nullable, allowing the save would result in silent data loss.
+        # a ForeignKeyField on this model. If the field is nullable, allowing the save would result in silent data loss.
         for field in self._model_meta.concrete_fields:
             if fields and field not in fields:
                 continue

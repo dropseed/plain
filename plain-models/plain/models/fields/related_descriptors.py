@@ -15,7 +15,7 @@ example, with the following models::
         children: ReverseForeignKey[Child] = ReverseForeignKey(to="Child", field="parent")
 
     class Child(Model):
-        parent: Parent = ForeignKey(Parent, on_delete=models.CASCADE)
+        parent: Parent = ForeignKeyField(Parent, on_delete=models.CASCADE)
 
  ``child.parent`` is a forward foreign key relation. ``parent.children`` is a
 reverse foreign key relation.
@@ -57,7 +57,7 @@ class ForwardForeignKeyDescriptor:
     In the example::
 
         class Child(Model):
-            parent: Parent = ForeignKey(Parent, on_delete=models.CASCADE)
+            parent: Parent = ForeignKeyField(Parent, on_delete=models.CASCADE)
 
     ``Child.parent`` is a ``ForwardForeignKeyDescriptor`` instance.
     """
@@ -184,7 +184,7 @@ class ForwardForeignKeyDescriptor:
         - ``instance`` is the ``child`` instance
         - ``value`` is the ``parent`` instance on the right of the equal sign
         """
-        # If value is a LazyObject, force its evaluation. For ForeignKey fields,
+        # If value is a LazyObject, force its evaluation. For ForeignKeyField fields,
         # the value should only be None or a model instance, never a boolean or
         # other type.
         if isinstance(value, LazyObject):

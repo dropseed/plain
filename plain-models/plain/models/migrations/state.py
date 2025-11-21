@@ -77,7 +77,7 @@ def get_related_models_recursive(model: type[models.Model]) -> set[tuple[str, st
     to the given model.
 
     Relationships are either defined by explicit relational fields, like
-    ForeignKey or ManyToManyField, or by inheriting from another
+    ForeignKeyField or ManyToManyField, or by inheriting from another
     model (a superclass is related to its subclasses, but not vice versa).
     """
     seen = set()

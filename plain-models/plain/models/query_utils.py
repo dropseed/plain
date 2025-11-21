@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
     from plain.models.fields import Field
-    from plain.models.fields.related import ForeignKey
+    from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.lookups import Lookup, Transform
     from plain.models.meta import Meta
@@ -43,7 +43,7 @@ class PathInfo(NamedTuple):
     from_meta: Meta
     to_meta: Meta
     target_fields: tuple[Field, ...]
-    join_field: ForeignKey | ForeignObjectRel
+    join_field: ForeignKeyField | ForeignObjectRel
     m2m: bool
     direct: bool
     filtered_relation: FilteredRelation | None

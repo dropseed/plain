@@ -83,8 +83,8 @@ class RelatedIn(In):
                 # If we get here, we are dealing with single-column relations.
                 self.rhs = [get_normalized_value(val, self.lhs)[0] for val in self.rhs]
                 # We need to run the related field's get_prep_value(). Consider
-                # case ForeignKey to IntegerField given value 'abc'. The
-                # ForeignKey itself doesn't have validation for non-integers,
+                # case ForeignKeyField to IntegerField given value 'abc'. The
+                # ForeignKeyField itself doesn't have validation for non-integers,
                 # so we must run validation using the target field.
                 if hasattr(self.lhs.output_field, "path_infos"):
                     # Run the target field's get_prep_value. We can safely
@@ -168,7 +168,7 @@ class RelatedLookupMixin(Lookup):
             # If we get here, we are dealing with single-column relations.
             self.rhs = get_normalized_value(self.rhs, self.lhs)[0]
             # We need to run the related field's get_prep_value(). Consider case
-            # ForeignKey to IntegerField given value 'abc'. The ForeignKey itself
+            # ForeignKeyField to IntegerField given value 'abc'. The ForeignKeyField itself
             # doesn't have validation for non-integers, so we must run validation
             # using the target field.
             if self.prepare_rhs and hasattr(self.lhs.output_field, "path_infos"):

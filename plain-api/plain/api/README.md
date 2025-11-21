@@ -214,7 +214,7 @@ from plain.api.models import APIKey
 @models.register_model
 class User(models.Model):
     # other fields...
-    api_key = models.ForeignKey(
+    api_key = models.ForeignKeyField(
         APIKey,
         on_delete=models.CASCADE,
         allow_null=True,

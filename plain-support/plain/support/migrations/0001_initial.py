@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
                 ("form_slug", models.CharField(max_length=255)),
                 (
                     "user",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         allow_null=True,
                         on_delete=plain.models.deletion.SET_NULL,
                         required=False,

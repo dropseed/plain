@@ -22,9 +22,9 @@ class Feature(models.Model):
 class CarFeature(models.Model):
     """Through model for Car-Feature many-to-many relationship."""
 
-    car: Car = types.ForeignKey("Car", on_delete=models.CASCADE)
+    car: Car = types.ForeignKeyField("Car", on_delete=models.CASCADE)
     car_id: int
-    feature: Feature = types.ForeignKey(Feature, on_delete=models.CASCADE)
+    feature: Feature = types.ForeignKeyField(Feature, on_delete=models.CASCADE)
     feature_id: int
 
     query: models.QuerySet[CarFeature] = models.QuerySet()
@@ -65,28 +65,30 @@ class DeleteParent(models.Model):
 
 @models.register_model
 class ChildCascade(models.Model):
-    parent: DeleteParent = types.ForeignKey(DeleteParent, on_delete=models.CASCADE)
+    parent: DeleteParent = types.ForeignKeyField(DeleteParent, on_delete=models.CASCADE)
 
     query: models.QuerySet[ChildCascade] = models.QuerySet()
 
 
 @models.register_model
 class ChildProtect(models.Model):
-    parent: DeleteParent = types.ForeignKey(DeleteParent, on_delete=models.PROTECT)
+    parent: DeleteParent = types.ForeignKeyField(DeleteParent, on_delete=models.PROTECT)
 
     query: models.QuerySet[ChildProtect] = models.QuerySet()
 
 
 @models.register_model
 class ChildRestrict(models.Model):
-    parent: DeleteParent = types.ForeignKey(DeleteParent, on_delete=models.RESTRICT)
+    parent: DeleteParent = types.ForeignKeyField(
+        DeleteParent, on_delete=models.RESTRICT
+    )
 
     query: models.QuerySet[ChildRestrict] = models.QuerySet()
 
 
 @models.register_model
 class ChildSetNull(models.Model):
-    parent: DeleteParent | None = types.ForeignKey(
+    parent: DeleteParent | None = types.ForeignKeyField(
         DeleteParent,
         on_delete=models.SET_NULL,
         allow_null=True,
@@ -101,7 +103,7 @@ class ChildSetDefault(models.Model):
     def default_parent_id():
         return DeleteParent.query.get(name="default").id
 
-    parent: DeleteParent = types.ForeignKey(
+    parent: DeleteParent = types.ForeignKeyField(
         DeleteParent,
         on_delete=models.SET_DEFAULT,
         default=default_parent_id,
@@ -113,7 +115,9 @@ class ChildSetDefault(models.Model):
 
 @models.register_model
 class ChildDoNothing(models.Model):
-    parent: DeleteParent = types.ForeignKey(DeleteParent, on_delete=models.DO_NOTHING)
+    parent: DeleteParent = types.ForeignKeyField(
+        DeleteParent, on_delete=models.DO_NOTHING
+    )
 
     query: models.QuerySet[ChildDoNothing] = models.QuerySet()
 

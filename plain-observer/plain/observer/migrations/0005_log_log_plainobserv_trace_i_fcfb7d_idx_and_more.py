@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ("message", models.TextField()),
                 (
                     "span",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         allow_null=True,
                         on_delete=plain.models.deletion.SET_NULL,
                         required=False,
@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "trace",
-                    models.ForeignKey(
+                    models.ForeignKeyField(
                         on_delete=plain.models.deletion.CASCADE,
                         to="plainobserver.trace",
                     ),

@@ -42,7 +42,7 @@ from plain.models.fields import (
     UUIDField,
 )
 from plain.models.fields.json import JSONField
-from plain.models.fields.related import ForeignKey, ManyToManyField
+from plain.models.fields.related import ForeignKeyField, ManyToManyField
 from plain.models.fields.related_managers import (
     ManyToManyManager,
     ReverseForeignKeyManager,
@@ -63,7 +63,7 @@ __all__ = [
     "DurationField",
     "EmailField",
     "FloatField",
-    "ForeignKey",
+    "ForeignKeyField",
     "GenericIPAddressField",
     "IntegerField",
     "JSONField",

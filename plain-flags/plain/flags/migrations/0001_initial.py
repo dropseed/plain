@@ -59,7 +59,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="flagresult",
             name="flag",
-            field=models.ForeignKey(
+            field=models.ForeignKeyField(
                 on_delete=plain.models.deletion.CASCADE, to="plainflags.flag"
             ),
         ),

@@ -40,7 +40,7 @@ class MigrationAutodetector:
 
     Note that this naturally operates on entire projects at a time,
     as it's likely that changes interact (for example, you can't
-    add a ForeignKey without having a migration to add the table it
+    add a ForeignKeyField without having a migration to add the table it
     depends on first). A user interface may offer single-app usage
     if it wishes, with the caveat that it may not always be possible.
     """
@@ -974,7 +974,7 @@ class MigrationAutodetector:
                 )
                 if rename_key in self.renamed_models:
                     new_field.remote_field.model = old_field.remote_field.model
-                # Handle ForeignKey which can only have a single to_field.
+                # Handle ForeignKeyField which can only have a single to_field.
                 remote_field_name = getattr(new_field.remote_field, "field_name", None)
                 if remote_field_name:
                     to_field_rename_key = rename_key + (remote_field_name,)

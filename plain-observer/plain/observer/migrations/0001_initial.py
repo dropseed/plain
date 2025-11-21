@@ -65,7 +65,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="span",
             name="trace",
-            field=models.ForeignKey(
+            field=models.ForeignKeyField(
                 on_delete=plain.models.deletion.CASCADE,
                 to="plainobserver.trace",
             ),

@@ -203,7 +203,7 @@ class RelatedField(FieldCacheMixin, Field):
         #         model_set = models.IntegerField()
         #
         #     class Model(models.Model):
-        #         foreign = models.ForeignKey(Target)
+        #         foreign = models.ForeignKeyField(Target)
         #         m2m = models.ManyToManyField(Target)
 
         # rel_options.object_name == "Target"
@@ -319,12 +319,12 @@ class RelatedField(FieldCacheMixin, Field):
         return self.name
 
 
-class ForeignKey(RelatedField):
+class ForeignKeyField(RelatedField):
     """
     Provide a many-to-one relation by adding a column to the local model
     to hold the remote value.
 
-    ForeignKey targets the primary key (id) of the remote model.
+    ForeignKeyField targets the primary key (id) of the remote model.
     """
 
     empty_strings_allowed = False
@@ -348,7 +348,7 @@ class ForeignKey(RelatedField):
                 to.model_options.model_name
             except AttributeError:
                 raise TypeError(
-                    f"{self.__class__.__name__}({to!r}) is invalid. First parameter to ForeignKey must be "
+                    f"{self.__class__.__name__}({to!r}) is invalid. First parameter to ForeignKeyField must be "
                     f"either a model, a model name, or the string {RECURSIVE_RELATIONSHIP_CONSTANT!r}"
                 )
         if not callable(on_delete):
@@ -370,7 +370,7 @@ class ForeignKey(RelatedField):
         self.db_index = db_index
         self.db_constraint = db_constraint
 
-    def __copy__(self) -> ForeignKey:
+    def __copy__(self) -> ForeignKeyField:
         obj = super().__copy__()
         # Remove any cached PathInfo values.
         obj.__dict__.pop("path_infos", None)
@@ -395,7 +395,7 @@ class ForeignKey(RelatedField):
         super().__set__(instance, value)
 
     @cached_property
-    def related_fields(self) -> list[tuple[ForeignKey, Field]]:
+    def related_fields(self) -> list[tuple[ForeignKeyField, Field]]:
         return self.resolve_related_fields()
 
     @cached_property
@@ -595,14 +595,14 @@ class ForeignKey(RelatedField):
                 },
             )
 
-    def resolve_related_fields(self) -> list[tuple[ForeignKey, Field]]:
+    def resolve_related_fields(self) -> list[tuple[ForeignKeyField, Field]]:
         if isinstance(self.remote_field.model, str):
             raise ValueError(
                 f"Related model {self.remote_field.model!r} cannot be resolved"
             )
         from_field = self
         to_field = self.remote_field.model._model_meta.get_forward_field("id")
-        related_fields: list[tuple[ForeignKey, Field]] = [(from_field, to_field)]
+        related_fields: list[tuple[ForeignKeyField, Field]] = [(from_field, to_field)]
 
         for from_field, to_field in related_fields:
             if to_field and to_field.model != self.remote_field.model:
@@ -663,7 +663,7 @@ class ForeignKey(RelatedField):
     def get_col(self, alias: str, output_field: Field | None = None) -> Any:
         if output_field is None:
             output_field = self.target_field
-            while isinstance(output_field, ForeignKey):
+            while isinstance(output_field, ForeignKeyField):
                 output_field = output_field.target_field
                 if output_field is self:
                     raise ValueError("Cannot resolve output_field.")
@@ -671,19 +671,19 @@ class ForeignKey(RelatedField):
 
 
 # Register lookups for ForeignKey
-ForeignKey.register_lookup(RelatedIn)
-ForeignKey.register_lookup(RelatedExact)
-ForeignKey.register_lookup(RelatedLessThan)
-ForeignKey.register_lookup(RelatedGreaterThan)
-ForeignKey.register_lookup(RelatedGreaterThanOrEqual)
-ForeignKey.register_lookup(RelatedLessThanOrEqual)
-ForeignKey.register_lookup(RelatedIsNull)
+ForeignKeyField.register_lookup(RelatedIn)
+ForeignKeyField.register_lookup(RelatedExact)
+ForeignKeyField.register_lookup(RelatedLessThan)
+ForeignKeyField.register_lookup(RelatedGreaterThan)
+ForeignKeyField.register_lookup(RelatedGreaterThanOrEqual)
+ForeignKeyField.register_lookup(RelatedLessThanOrEqual)
+ForeignKeyField.register_lookup(RelatedIsNull)
 
 
 class ManyToManyField(RelatedField):
     """
     Provide a many-to-many relation by using an intermediary model that
-    holds two ForeignKey fields pointed at the two sides of the relation.
+    holds two ForeignKeyField fields pointed at the two sides of the relation.
 
     Unless a ``through`` model was provided, ManyToManyField will use the
     create_many_to_many_intermediary_model factory to automatically generate
@@ -1047,10 +1047,11 @@ class ManyToManyField(RelatedField):
         int_model = self.remote_field.through
         # M2M through model fields are always ForeignKey
         linkfield1 = cast(
-            ForeignKey, int_model._model_meta.get_forward_field(self.m2m_field_name())
+            ForeignKeyField,
+            int_model._model_meta.get_forward_field(self.m2m_field_name()),
         )
         linkfield2 = cast(
-            ForeignKey,
+            ForeignKeyField,
             int_model._model_meta.get_forward_field(self.m2m_reverse_field_name()),
         )
         if direct:

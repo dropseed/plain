@@ -7,7 +7,7 @@ from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import UniqueConstraint
 from plain.models.expressions import F
 from plain.models.fields import NOT_PROVIDED
-from plain.models.fields.related import ForeignKey
+from plain.models.fields.related import ForeignKeyField
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -161,12 +161,12 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         storage = self.connection.introspection.get_storage_engine(
             self.connection.cursor(), model.model_options.db_table
         )
-        # No need to create an index for ForeignKey fields except if
+        # No need to create an index for ForeignKeyField fields except if
         # db_constraint=False because the index from that constraint won't be
         # created.
         if (
             storage == "InnoDB"
-            and isinstance(field, ForeignKey)
+            and isinstance(field, ForeignKeyField)
             and field.db_constraint
         ):
             return False
@@ -203,7 +203,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return
 
         first_field = model._model_meta.get_forward_field(first_field_name)
-        if first_field.get_internal_type() == "ForeignKey":
+        if first_field.get_internal_type() == "ForeignKeyField":
             column = self.connection.introspection.identifier_converter(
                 first_field.column
             )

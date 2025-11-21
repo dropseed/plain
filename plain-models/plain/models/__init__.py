@@ -34,7 +34,7 @@ from .fields import (
 )
 from .fields.json import JSONField
 from .fields.related import (
-    ForeignKey,
+    ForeignKeyField,
     ManyToManyField,
 )
 from .fields.reverse_descriptors import (
@@ -101,7 +101,7 @@ __all__ = [
     # From base
     "Model",
     # From fields.related
-    "ForeignKey",
+    "ForeignKeyField",
     "ManyToManyField",
     # From fields.reverse_descriptors
     "ReverseForeignKey",
