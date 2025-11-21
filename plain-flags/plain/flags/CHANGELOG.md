@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-flags@0.31.0) (2025-11-21)
+
+### What's changed
+
+- `ForeignKey` has been renamed to `ForeignKeyField` in model definitions and migrations ([8010204](https://github.com/dropseed/plain/commit/8010204b36))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.30.1](https://github.com/dropseed/plain/releases/plain-flags@0.30.1) (2025-11-17)
 
 ### What's changed
