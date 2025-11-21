@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-observer@0.20.0) (2025-11-21)
+
+### What's changed
+
+- Internal model field type updated from `ForeignKey` to `ForeignKeyField` to align with the Plain framework naming conventions ([8010204](https://github.com/dropseed/plain/commit/8010204b360a170433ee081385d2311a1631805c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.19.1](https://github.com/dropseed/plain/releases/plain-observer@0.19.1) (2025-11-17)
 
 ### What's changed
