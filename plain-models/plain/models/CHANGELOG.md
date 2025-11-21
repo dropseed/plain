@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.63.1](https://github.com/dropseed/plain/releases/plain-models@0.63.1) (2025-11-21)
+
+### What's changed
+
+- Fixed `ManyToManyField` preflight checks that could fail when the intermediate model contained non-related fields (e.g., `CharField`, `IntegerField`) by properly filtering to only check `RelatedField` instances when counting foreign keys ([4a3fe5d](https://github.com/dropseed/plain/commit/4a3fe5d530))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.63.0](https://github.com/dropseed/plain/releases/plain-models@0.63.0) (2025-11-21)
 
 ### What's changed
