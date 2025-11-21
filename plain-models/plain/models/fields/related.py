@@ -824,8 +824,9 @@ class ManyToManyField(RelatedField):
             # Count foreign keys in intermediate model
             if self_referential:
                 seen_self = sum(
-                    from_model == getattr(field.remote_field, "model", None)
+                    from_model == field.remote_field.model
                     for field in self.remote_field.through._model_meta.fields
+                    if isinstance(field, RelatedField)
                 )
 
                 if seen_self > 2 and not self.remote_field.through_fields:
@@ -846,12 +847,14 @@ class ManyToManyField(RelatedField):
             else:
                 # Count foreign keys in relationship model
                 seen_from = sum(
-                    from_model == getattr(field.remote_field, "model", None)
+                    from_model == field.remote_field.model
                     for field in self.remote_field.through._model_meta.fields
+                    if isinstance(field, RelatedField)
                 )
                 seen_to = sum(
-                    to_model == getattr(field.remote_field, "model", None)
+                    to_model == field.remote_field.model
                     for field in self.remote_field.through._model_meta.fields
+                    if isinstance(field, RelatedField)
                 )
 
                 if seen_from > 1 and not self.remote_field.through_fields:
@@ -977,9 +980,8 @@ class ManyToManyField(RelatedField):
                         )
                     else:
                         if not (
-                            hasattr(field, "remote_field")
-                            and getattr(field.remote_field, "model", None)
-                            == related_model
+                            isinstance(field, RelatedField)
+                            and field.remote_field.model == related_model
                         ):
                             errors.append(
                                 PreflightResult(
