@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-support@0.26.0) (2025-11-21)
+
+### What's changed
+
+- `ForeignKey` has been renamed to `ForeignKeyField` for consistency with other field types ([8010204](https://github.com/dropseed/plain/commit/8010204))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.1](https://github.com/dropseed/plain/releases/plain-support@0.25.1) (2025-11-17)
 
 ### What's changed
