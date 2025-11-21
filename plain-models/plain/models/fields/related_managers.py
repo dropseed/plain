@@ -8,7 +8,7 @@ through foreign key and many-to-many relationships.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -24,6 +24,9 @@ from plain.models.lookups import GreaterThan, LessThanOrEqual
 from plain.models.query import QuerySet
 from plain.models.query_utils import Q
 from plain.models.utils import resolve_callables
+
+# TypeVar for generic manager support
+T = TypeVar("T", bound="Model")
 
 
 def _filter_prefetch_queryset(
@@ -67,7 +70,7 @@ class BaseRelatedManager(ABC):
         ...
 
 
-class ReverseForeignKeyManager(BaseRelatedManager):
+class ReverseForeignKeyManager(BaseRelatedManager, Generic[T]):
     """
     Manager for the reverse side of a foreign key relation.
 
@@ -75,7 +78,7 @@ class ReverseForeignKeyManager(BaseRelatedManager):
     """
 
     # Type hints for attributes
-    model: type[Model]
+    model: type[T]
     instance: Model
     field: ForeignKeyField
     core_filters: dict[str, Model]
@@ -181,7 +184,7 @@ class ReverseForeignKeyManager(BaseRelatedManager):
         cache_name = self.field.remote_field.get_cache_name()
         return queryset, rel_obj_attr, instance_attr, False, cache_name, False
 
-    def add(self, *objs: Any, bulk: bool = True) -> None:
+    def add(self, *objs: T, bulk: bool = True) -> None:
         self._check_fk_val()
         self._remove_prefetched_objects()
 
@@ -213,22 +216,22 @@ class ReverseForeignKeyManager(BaseRelatedManager):
                     check_and_update_obj(obj)
                     obj.save()
 
-    def create(self, **kwargs: Any) -> Model:
+    def create(self, **kwargs: Any) -> T:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
         return self.model.query.create(**kwargs)
 
-    def get_or_create(self, **kwargs: Any) -> tuple[Model, bool]:
+    def get_or_create(self, **kwargs: Any) -> tuple[T, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
         return self.model.query.get_or_create(**kwargs)
 
-    def update_or_create(self, **kwargs: Any) -> tuple[Model, bool]:
+    def update_or_create(self, **kwargs: Any) -> tuple[T, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
         return self.model.query.update_or_create(**kwargs)
 
-    def remove(self, *objs: Any, bulk: bool = True) -> None:
+    def remove(self, *objs: T, bulk: bool = True) -> None:
         # remove() is only provided if the ForeignKeyField can have a value of null
         if not self.allow_null:
             raise AttributeError(
@@ -301,7 +304,7 @@ class ReverseForeignKeyManager(BaseRelatedManager):
             self.add(*objs, bulk=bulk)
 
 
-class ManyToManyManager(BaseRelatedManager):
+class ManyToManyManager(BaseRelatedManager, Generic[T]):
     """
     Manager for both forward and reverse sides of a many-to-many relation.
 
@@ -311,7 +314,7 @@ class ManyToManyManager(BaseRelatedManager):
     """
 
     # Type hints for attributes
-    model: type[Model]
+    model: type[T]
     instance: Model
     field: ManyToManyField
     through: type[Model]
@@ -494,14 +497,14 @@ class ManyToManyManager(BaseRelatedManager):
 
     def create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
-    ) -> Model:
+    ) -> T:
         new_obj = self.model.query.create(**kwargs)
         self.add(new_obj, through_defaults=through_defaults)
         return new_obj
 
     def get_or_create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
-    ) -> tuple[Model, bool]:
+    ) -> tuple[T, bool]:
         obj, created = self.model.query.get_or_create(**kwargs)
         # We only need to add() if created because if we got an object back
         # from get() then the relationship already exists.
@@ -511,7 +514,7 @@ class ManyToManyManager(BaseRelatedManager):
 
     def update_or_create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
-    ) -> tuple[Model, bool]:
+    ) -> tuple[T, bool]:
         obj, created = self.model.query.update_or_create(**kwargs)
         # We only need to add() if created because if we got an object back
         # from get() then the relationship already exists.
@@ -637,7 +640,7 @@ class ManyToManyManager(BaseRelatedManager):
             filters = filters | symmetrical_filters
         return filters
 
-    def add(self, *objs: Any, through_defaults: dict[str, Any] | None = None) -> None:
+    def add(self, *objs: T, through_defaults: dict[str, Any] | None = None) -> None:
         self._remove_prefetched_objects()
         with transaction.atomic(savepoint=False):
             self._add_items(
@@ -656,6 +659,6 @@ class ManyToManyManager(BaseRelatedManager):
                     through_defaults=through_defaults,
                 )
 
-    def remove(self, *objs: Any) -> None:
+    def remove(self, *objs: T) -> None:
         self._remove_prefetched_objects()
         self._remove_items(self.source_field_name, self.target_field_name, *objs)

@@ -16,11 +16,18 @@ from collections.abc import Callable, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from json import JSONDecoder, JSONEncoder
-from typing import Any, Generic, Literal, TypeVar, overload
+from typing import Any, Literal, TypeVar, overload
 from uuid import UUID
 
+# Import manager types from runtime (will be Generic[T] there)
+from plain.models.base import Model
+from plain.models.fields.related_managers import (
+    ManyToManyManager,
+    ReverseForeignKeyManager,
+)
+
 # TypeVar for generic ForeignKey/ManyToManyField support
-_T = TypeVar("_T")
+_T = TypeVar("_T", bound=Model)
 
 # String fields
 @overload
@@ -708,44 +715,34 @@ def ReverseManyToMany(
     field: str,
 ) -> ManyToManyManager[_T]: ...
 
-# Manager type stubs
-class ReverseForeignKeyManager(Generic[_T]):
-    """
-    Manager for the reverse side of a foreign key relation.
-
-    Provides methods to work with collections of related objects.
-    """
-
-    @property
-    def query(self) -> Any: ...  # Returns QuerySet but avoiding circular import
-    def get_queryset(self) -> Any: ...
-    def add(self, *objs: _T, bulk: bool = True) -> None: ...
-    def create(self, **kwargs: Any) -> _T: ...
-    def remove(self, *objs: _T, bulk: bool = True) -> None: ...
-    def clear(self, *, bulk: bool = True) -> None: ...
-    def set(self, objs: Any, *, bulk: bool = True, clear: bool = False) -> None: ...
-
-class ManyToManyManager(Generic[_T]):
-    """
-    Manager for many-to-many relationships.
-
-    Provides methods to work with many-to-many related objects.
-    """
-
-    @property
-    def query(self) -> Any: ...  # Returns QuerySet but avoiding circular import
-    def get_queryset(self) -> Any: ...
-    def add(
-        self, *objs: _T, through_defaults: dict[str, Any] | None = None
-    ) -> None: ...
-    def create(self, **kwargs: Any) -> _T: ...
-    def remove(self, *objs: _T) -> None: ...
-    def clear(self) -> None: ...
-    def set(
-        self,
-        objs: Any,
-        *,
-        bulk: bool = True,
-        clear: bool = False,
-        through_defaults: dict[str, Any] | None = None,
-    ) -> None: ...
+# Export all types (should match types.py)
+__all__ = [
+    "BigIntegerField",
+    "BinaryField",
+    "BooleanField",
+    "CharField",
+    "DateField",
+    "DateTimeField",
+    "DecimalField",
+    "DurationField",
+    "EmailField",
+    "FloatField",
+    "ForeignKeyField",
+    "GenericIPAddressField",
+    "IntegerField",
+    "JSONField",
+    "ManyToManyField",
+    "ManyToManyManager",
+    "PositiveBigIntegerField",
+    "PositiveIntegerField",
+    "PositiveSmallIntegerField",
+    "PrimaryKeyField",
+    "ReverseForeignKey",
+    "ReverseForeignKeyManager",
+    "ReverseManyToMany",
+    "SmallIntegerField",
+    "TextField",
+    "TimeField",
+    "URLField",
+    "UUIDField",
+]

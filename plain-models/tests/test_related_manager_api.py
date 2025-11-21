@@ -99,6 +99,7 @@ class TestNewRelatedManagerAPI:
             .order_by("id")
             .first()
         )
+        assert result is not None
         assert result.id == child1.id
 
         # values_list via .query
