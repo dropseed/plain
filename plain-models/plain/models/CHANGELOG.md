@@ -1,5 +1,20 @@
 # plain-models changelog
 
+## [0.63.0](https://github.com/dropseed/plain/releases/plain-models@0.63.0) (2025-11-21)
+
+### What's changed
+
+- `ForeignKey` has been renamed to `ForeignKeyField` for consistency with other field naming conventions ([8010204](https://github.com/dropseed/plain/commit/8010204b36))
+- Improved type annotations for `ManyToManyField` - now returns `ManyToManyManager[T]` instead of `Any` for better IDE support ([4536097](https://github.com/dropseed/plain/commit/4536097be1))
+- Related managers (`ReverseForeignKeyManager` and `ManyToManyManager`) are now generic classes with proper type parameters for improved type checking ([3f61b6e](https://github.com/dropseed/plain/commit/3f61b6e51f))
+- Added `ManyToManyManager` and `ReverseForeignKeyManager` exports to `plain.models.types` for use in type annotations ([4536097](https://github.com/dropseed/plain/commit/4536097be1))
+
+### Upgrade instructions
+
+- Replace all usage of `models.ForeignKey` with `models.ForeignKeyField` (e.g., `category = models.ForeignKey("Category", on_delete=models.CASCADE)` becomes `category = models.ForeignKeyField("Category", on_delete=models.CASCADE)`)
+- Replace all usage of `types.ForeignKey` with `types.ForeignKeyField` in typed model definitions
+- Update migrations to use `ForeignKeyField` instead of `ForeignKey`
+
 ## [0.62.1](https://github.com/dropseed/plain/releases/plain-models@0.62.1) (2025-11-20)
 
 ### What's changed
