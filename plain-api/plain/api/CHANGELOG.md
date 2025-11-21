@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-api@0.21.0) (2025-11-21)
+
+### What's changed
+
+- Updated documentation to use `ForeignKeyField` instead of `ForeignKey` to match the `plain-models` rename ([8010204](https://github.com/dropseed/plain/commit/8010204b36))
+
+### Upgrade instructions
+
+- If you followed the README examples using `models.ForeignKey`, update your code to use `models.ForeignKeyField` instead
+
 ## [0.20.1](https://github.com/dropseed/plain/releases/plain-api@0.20.1) (2025-11-17)
 
 ### What's changed
