@@ -13,7 +13,7 @@ class Feature(models.Model):
     query: models.QuerySet[Feature] = models.QuerySet()
 
     # Explicit reverse relation - no more TYPE_CHECKING hacks!
-    cars: types.ReverseManyToMany[Car] = types.ReverseManyToMany(
+    cars: types.ManyToManyManager[Car] = types.ReverseManyToMany(
         to="Car", field="features"
     )
 
@@ -34,7 +34,7 @@ class CarFeature(models.Model):
 class Car(models.Model):
     make: str = types.CharField(max_length=100)
     model: str = types.CharField(max_length=100)
-    features: models.ManyToManyField[Feature] = types.ManyToManyField(
+    features: types.ManyToManyManager[Feature] = types.ManyToManyField(
         Feature, through=CarFeature
     )
 
@@ -58,8 +58,8 @@ class DeleteParent(models.Model):
     query: models.QuerySet[DeleteParent] = models.QuerySet()
 
     # Explicit reverse relation - no more TYPE_CHECKING hacks!
-    childcascade_set: types.ReverseForeignKey[ChildCascade] = types.ReverseForeignKey(
-        to="ChildCascade", field="parent"
+    childcascade_set: types.ReverseForeignKeyManager[ChildCascade] = (
+        types.ReverseForeignKey(to="ChildCascade", field="parent")
     )
 
 

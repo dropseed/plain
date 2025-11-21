@@ -16,14 +16,8 @@ from collections.abc import Callable, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from json import JSONDecoder, JSONEncoder
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, overload
+from typing import Any, Generic, Literal, TypeVar, overload
 from uuid import UUID
-
-if TYPE_CHECKING:
-    from plain.models.fields.related_managers import (
-        ManyToManyManager,
-        ReverseForeignKeyManager,
-    )
 
 # TypeVar for generic ForeignKey/ManyToManyField support
 _T = TypeVar("_T")
@@ -647,7 +641,7 @@ def JSONField(
 # Related fields
 @overload
 def ForeignKey(
-    to: type[_T],
+    to: type[_T] | str,
     on_delete: Any,
     *,
     related_query_name: str | None = None,
@@ -666,7 +660,7 @@ def ForeignKey(
 ) -> _T | None: ...
 @overload
 def ForeignKey(
-    to: type[_T],
+    to: type[_T] | str,
     on_delete: Any,
     *,
     related_query_name: str | None = None,
@@ -684,7 +678,7 @@ def ForeignKey(
     db_comment: str | None = None,
 ) -> _T: ...
 def ManyToManyField(
-    to: type[_T],
+    to: type[_T] | str,
     *,
     through: Any,
     through_fields: tuple[str, str] | None = None,
@@ -700,51 +694,58 @@ def ManyToManyField(
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
     db_comment: str | None = None,
-) -> Any: ...
+) -> ManyToManyManager[_T]: ...
 
 # Reverse relation descriptors
-class ReverseForeignKey(Generic[_T]):
-    """
-    Type stub for ReverseForeignKey descriptor.
+def ReverseForeignKey(
+    *,
+    to: type[_T] | str,
+    field: str,
+) -> ReverseForeignKeyManager[_T]: ...
+def ReverseManyToMany(
+    *,
+    to: type[_T] | str,
+    field: str,
+) -> ManyToManyManager[_T]: ...
 
-    Declares an explicit reverse relation from a parent model to its children.
-    Returns a ReverseForeignKeyManager when accessed on an instance.
+# Manager type stubs
+class ReverseForeignKeyManager(Generic[_T]):
+    """
+    Manager for the reverse side of a foreign key relation.
+
+    Provides methods to work with collections of related objects.
     """
 
-    def __init__(
-        self,
-        *,
-        to: type[_T] | str,
-        field: str,
+    @property
+    def query(self) -> Any: ...  # Returns QuerySet but avoiding circular import
+    def get_queryset(self) -> Any: ...
+    def add(self, *objs: _T, bulk: bool = True) -> None: ...
+    def create(self, **kwargs: Any) -> _T: ...
+    def remove(self, *objs: _T, bulk: bool = True) -> None: ...
+    def clear(self, *, bulk: bool = True) -> None: ...
+    def set(self, objs: Any, *, bulk: bool = True, clear: bool = False) -> None: ...
+
+class ManyToManyManager(Generic[_T]):
+    """
+    Manager for many-to-many relationships.
+
+    Provides methods to work with many-to-many related objects.
+    """
+
+    @property
+    def query(self) -> Any: ...  # Returns QuerySet but avoiding circular import
+    def get_queryset(self) -> Any: ...
+    def add(
+        self, *objs: _T, through_defaults: dict[str, Any] | None = None
     ) -> None: ...
-
-    # Class access returns the descriptor itself
-    @overload
-    def __get__(self, instance: None, owner: type) -> ReverseForeignKey[_T]: ...
-
-    # Instance access returns the manager
-    @overload
-    def __get__(self, instance: Any, owner: type) -> ReverseForeignKeyManager[_T]: ...
-
-class ReverseManyToMany(Generic[_T]):
-    """
-    Type stub for ReverseManyToMany descriptor.
-
-    Declares an explicit reverse relation from a related model back through a ManyToManyField.
-    Returns a ManyToManyManager when accessed on an instance.
-    """
-
-    def __init__(
+    def create(self, **kwargs: Any) -> _T: ...
+    def remove(self, *objs: _T) -> None: ...
+    def clear(self) -> None: ...
+    def set(
         self,
+        objs: Any,
         *,
-        to: type[_T] | str,
-        field: str,
+        bulk: bool = True,
+        clear: bool = False,
+        through_defaults: dict[str, Any] | None = None,
     ) -> None: ...
-
-    # Class access returns the descriptor itself
-    @overload
-    def __get__(self, instance: None, owner: type) -> ReverseManyToMany[_T]: ...
-
-    # Instance access returns the manager
-    @overload
-    def __get__(self, instance: Any, owner: type) -> ManyToManyManager[_T]: ...
