@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.40.0](https://github.com/dropseed/plain/releases/plain-sessions@0.40.0) (2025-11-24)
+
+### What's changed
+
+- `SessionViewMixin` has been replaced with `SessionView`, a class that directly inherits from `View`. This provides better type inference for IDE autocomplete and type checkers ([569afd6](https://github.com/dropseed/plain/commit/569afd6))
+
+### Upgrade instructions
+
+- Replace `class MyView(SessionViewMixin, View)` with `class MyView(SessionView)` and update your import from `from plain.sessions.views import SessionViewMixin` to `from plain.sessions.views import SessionView`
+
 ## [0.39.1](https://github.com/dropseed/plain/releases/plain-sessions@0.39.1) (2025-11-17)
 
 ### What's changed
