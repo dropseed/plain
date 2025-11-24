@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.29.0) (2025-11-24)
+
+### What's changed
+
+- Updated to use `request.json_data` for cleaner JSON parsing in the pageview tracking endpoint ([90332a9](https://github.com/dropseed/plain/commit/90332a9c21364644732159a539d362a7108214ac))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.28.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.28.1) (2025-11-17)
 
 ### What's changed
