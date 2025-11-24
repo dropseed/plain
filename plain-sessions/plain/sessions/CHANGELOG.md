@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.40.1](https://github.com/dropseed/plain/releases/plain-sessions@0.40.1) (2025-11-24)
+
+### What's changed
+
+- Documentation updated to fix remaining references to `SessionViewMixin` that should be `SessionView` ([d0b41a0](https://github.com/dropseed/plain/commit/d0b41a0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.40.0](https://github.com/dropseed/plain/releases/plain-sessions@0.40.0) (2025-11-24)
 
 ### What's changed
