@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.15.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.15.0) (2025-11-24)
+
+### What's changed
+
+- Views now inherit from `AuthView` instead of using `AuthViewMixin` for improved type checking support ([569afd6](https://github.com/dropseed/plain/commit/569afd606d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.14.0) (2025-11-13)
 
 ### What's changed
