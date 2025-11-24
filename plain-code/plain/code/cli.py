@@ -116,9 +116,7 @@ def check(
         maybe_exit(result.returncode)
 
     if not skip_ty and config.get("ty", {}).get("enabled", True):
-        print_event(
-            click.style("Ty:", bold=True) + click.style(" ty check", dim=True)
-        )
+        print_event(click.style("Ty:", bold=True) + click.style(" ty check", dim=True))
         result = subprocess.run(["ty", "check", path])
         maybe_exit(result.returncode)
 
