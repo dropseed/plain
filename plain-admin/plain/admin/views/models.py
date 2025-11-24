@@ -16,6 +16,7 @@ from .objects import (
 
 if TYPE_CHECKING:
     from plain import models
+    from plain.forms import BaseForm
 
 
 def get_model_field(instance: models.Model, field: str) -> Any:
@@ -195,7 +196,7 @@ class AdminModelDetailView(AdminDetailView):
 
 class AdminModelCreateView(AdminCreateView):
     model: type[models.Model]
-    form_class = None  # TODO type annotation
+    form_class: type[BaseForm] | None = None
 
     def get_title(self) -> str:
         if title := super().get_title():
@@ -213,7 +214,7 @@ class AdminModelCreateView(AdminCreateView):
 
 class AdminModelUpdateView(AdminUpdateView):
     model: type[models.Model]
-    form_class = None  # TODO type annotation
+    form_class: type[BaseForm] | None = None
     success_url = "."  # Redirect back to the same update page by default
 
     def get_title(self) -> str:
