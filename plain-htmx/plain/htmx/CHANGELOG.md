@@ -1,5 +1,16 @@
 # plain-htmx changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-htmx@0.13.0) (2025-11-24)
+
+### What's changed
+
+- Replaced `HTMXViewMixin` with `HTMXView` class that inherits from `TemplateView` for better type checking support ([569afd6](https://github.com/dropseed/plain/commit/569afd6))
+
+### Upgrade instructions
+
+- Replace `class MyView(HTMXViewMixin, TemplateView)` with `class MyView(HTMXView)` - the new `HTMXView` class already inherits from `TemplateView`
+- Update imports from `from plain.htmx.views import HTMXViewMixin` to `from plain.htmx.views import HTMXView`
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-htmx@0.12.0) (2025-11-12)
 
 ### What's changed
