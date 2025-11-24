@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-passwords@0.18.0) (2025-11-24)
+
+### What's changed
+
+- Password views now inherit from `AuthView` instead of using `AuthViewMixin` for better type checking support ([569afd6](https://github.com/dropseed/plain/commit/569afd606d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.1](https://github.com/dropseed/plain/releases/plain-passwords@0.17.1) (2025-11-20)
 
 ### What's changed
