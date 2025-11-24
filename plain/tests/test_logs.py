@@ -65,7 +65,7 @@ class TestLoggerFormats:
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
-        logger.info("Test message", key="value")
+        logger.info("Test message", context={"key": "value"})
 
         output = stream.getvalue().strip()
         parsed = json.loads(output)
@@ -89,7 +89,12 @@ class TestLoggerFormats:
         logger.setLevel(logging.INFO)
 
         logger.info(
-            "Test", key="value", spaces="value with spaces", quotes='has "quotes"'
+            "Test",
+            context={
+                "key": "value",
+                "spaces": "value with spaces",
+                "quotes": 'has "quotes"',
+            },
         )
 
         output = stream.getvalue().strip()
@@ -114,7 +119,7 @@ class TestAppLogger:
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
-        logger.info("Test message", user_id=123, action="login")
+        logger.info("Test message", context={"user_id": 123, "action": "login"})
 
         output = stream.getvalue().strip()
         parsed = json.loads(output)
@@ -174,7 +179,7 @@ class TestAppLogger:
         try:
             raise ValueError("Test exception")
         except ValueError:
-            logger.error("Error occurred", exc_info=True, user_id=123)
+            logger.error("Error occurred", exc_info=True, context={"user_id": 123})
 
         output = stream.getvalue()
         json_line = output.split("\n")[0]
@@ -200,7 +205,7 @@ class TestAppLogger:
             "Test message",
             extra={"standard_extra": "ignored"},
             stacklevel=2,  # Standard param, won't appear
-            user_id=456,  # Context param, will appear
+            context={"user_id": 456},  # Context param, will appear
         )
 
         parsed = json.loads(stream.getvalue().strip())

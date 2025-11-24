@@ -9,11 +9,11 @@ from .debug import DebugMode
 
 
 class AppLogger(logging.Logger):
-    """Enhanced logger that supports kwargs-style logging and context management."""
+    """Enhanced logger that supports context dict logging and context management."""
 
     def __init__(self, name: str):
         super().__init__(name)
-        self.context = {}  # Public, mutable context dict
+        self.context: dict[str, Any] = {}  # Public, mutable context dict
         self.debug_mode = DebugMode(self)
 
     @contextmanager
@@ -44,7 +44,7 @@ class AppLogger(logging.Logger):
         extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        **context: Any,
+        context: dict[str, Any] | None = None,
     ) -> None:
         if self.isEnabledFor(logging.DEBUG):
             self._log(
@@ -55,7 +55,7 @@ class AppLogger(logging.Logger):
                 extra=extra,
                 stack_info=stack_info,
                 stacklevel=stacklevel,
-                **context,
+                context=context,
             )
 
     def info(
@@ -66,7 +66,7 @@ class AppLogger(logging.Logger):
         extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        **context: Any,
+        context: dict[str, Any] | None = None,
     ) -> None:
         if self.isEnabledFor(logging.INFO):
             self._log(
@@ -77,7 +77,7 @@ class AppLogger(logging.Logger):
                 extra=extra,
                 stack_info=stack_info,
                 stacklevel=stacklevel,
-                **context,
+                context=context,
             )
 
     def warning(
@@ -88,7 +88,7 @@ class AppLogger(logging.Logger):
         extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        **context: Any,
+        context: dict[str, Any] | None = None,
     ) -> None:
         if self.isEnabledFor(logging.WARNING):
             self._log(
@@ -99,7 +99,7 @@ class AppLogger(logging.Logger):
                 extra=extra,
                 stack_info=stack_info,
                 stacklevel=stacklevel,
-                **context,
+                context=context,
             )
 
     def error(
@@ -110,7 +110,7 @@ class AppLogger(logging.Logger):
         extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        **context: Any,
+        context: dict[str, Any] | None = None,
     ) -> None:
         if self.isEnabledFor(logging.ERROR):
             self._log(
@@ -121,7 +121,7 @@ class AppLogger(logging.Logger):
                 extra=extra,
                 stack_info=stack_info,
                 stacklevel=stacklevel,
-                **context,
+                context=context,
             )
 
     def critical(
@@ -132,7 +132,7 @@ class AppLogger(logging.Logger):
         extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        **context: Any,
+        context: dict[str, Any] | None = None,
     ) -> None:
         if self.isEnabledFor(logging.CRITICAL):
             self._log(
@@ -143,7 +143,7 @@ class AppLogger(logging.Logger):
                 extra=extra,
                 stack_info=stack_info,
                 stacklevel=stacklevel,
-                **context,
+                context=context,
             )
 
     def _log(
@@ -155,7 +155,7 @@ class AppLogger(logging.Logger):
         extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        **context: Any,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """Low-level logging routine which creates a LogRecord and then calls all handlers."""
         # Check if extra already has a 'context' key
@@ -167,9 +167,9 @@ class AppLogger(logging.Logger):
         # Build final extra with context
         extra = extra.copy() if extra else {}
 
-        # Add our context (persistent + kwargs) to extra["context"]
+        # Add our context (persistent + passed context) to extra["context"]
         if self.context or context:
-            extra["context"] = {**self.context, **context}
+            extra["context"] = {**self.context, **(context or {})}
 
         # Call the parent logger's _log method with explicit parameters
         super()._log(
