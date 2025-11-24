@@ -14,5 +14,4 @@ __all__ = [
     "UpdateView",
     "DeleteView",
     "ListView",
-    "AuthViewMixin",
 ]
