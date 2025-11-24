@@ -1,5 +1,17 @@
 # plain-code changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-code@0.12.0) (2025-11-24)
+
+### What's changed
+
+- Added [ty](https://astral.sh/ty) type checker integration, running automatically as part of `plain code check` ([40db43a](https://github.com/dropseed/plain/commit/40db43a))
+- Added `--skip-ruff`, `--skip-ty`, and `--skip-biome` flags to `plain code check` for selectively skipping tools ([40db43a](https://github.com/dropseed/plain/commit/40db43a))
+- ty can be disabled in configuration via `[tool.plain.code.ty]` with `enabled = false` ([40db43a](https://github.com/dropseed/plain/commit/40db43a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.11.4](https://github.com/dropseed/plain/releases/plain-code@0.11.4) (2025-11-17)
 
 ### What's changed
