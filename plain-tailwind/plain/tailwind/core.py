@@ -10,6 +10,7 @@ from typing import Any
 import click
 import requests
 import tomlkit
+from requests.adapters import HTTPAdapter
 
 from plain.internal import internalcode
 from plain.packages import packages_registry
@@ -133,7 +134,7 @@ class Tailwind:
         session = requests.Session()
 
         # Better connection pooling
-        adapter = requests.adapters.HTTPAdapter(  # type: ignore[attr-defined]
+        adapter = HTTPAdapter(
             pool_connections=1, pool_maxsize=10, max_retries=3, pool_block=True
         )
         session.mount("https://", adapter)
