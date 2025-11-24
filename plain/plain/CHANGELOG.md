@@ -1,5 +1,31 @@
 # plain changelog
 
+## [0.91.0](https://github.com/dropseed/plain/releases/plain@0.91.0) (2025-11-24)
+
+### What's changed
+
+- Request body parsing refactored: the `request.data` attribute has been replaced with `request.json_data` and `request.form_data` for explicit content-type handling ([90332a9](https://github.com/dropseed/plain/commit/90332a9c21))
+- `QueryDict` now has proper type annotations for `get()`, `pop()`, `getlist()`, and `__getitem__()` methods that reflect string return types ([90332a9](https://github.com/dropseed/plain/commit/90332a9c21))
+- Forms now automatically select between `json_data` and `form_data` based on request content-type ([90332a9](https://github.com/dropseed/plain/commit/90332a9c21))
+- View mixins `ObjectTemplateViewMixin` removed in favor of class inheritance for better typing - `UpdateView` and `DeleteView` now inherit from `DetailView` ([569afd6](https://github.com/dropseed/plain/commit/569afd606d))
+- `AppLogger` context logging now uses a `context` dict parameter instead of `**kwargs` for better type checking ([581b406](https://github.com/dropseed/plain/commit/581b4060d3))
+- Removed erroneous `AuthViewMixin` export from `plain.views` ([334bbb6](https://github.com/dropseed/plain/commit/334bbb6e7a))
+
+### Upgrade instructions
+
+- Replace `request.data` with the appropriate method:
+    - For JSON requests: use `request.json_data` (returns a dict, raises `BadRequest` for invalid JSON)
+    - For form data: use `request.form_data` (returns a `QueryDict`)
+- Update `app_logger` calls that pass context as kwargs to use the `context` parameter:
+
+    ```python
+    # Before
+    app_logger.info("Message", user_id=123, action="login")
+
+    # After
+    app_logger.info("Message", context={"user_id": 123, "action": "login"})
+    ```
+
 ## [0.90.0](https://github.com/dropseed/plain/releases/plain@0.90.0) (2025-11-20)
 
 ### What's changed
