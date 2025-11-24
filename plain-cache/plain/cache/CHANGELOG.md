@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-cache@0.23.0) (2025-11-24)
+
+### What's changed
+
+- Removed unused type ignore comment for improved code cleanliness ([bfb851f](https://github.com/dropseed/plain/commit/bfb851f9b5))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.22.1](https://github.com/dropseed/plain/releases/plain-cache@0.22.1) (2025-11-17)
 
 ### What's changed
