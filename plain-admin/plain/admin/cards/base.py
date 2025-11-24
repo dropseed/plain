@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.http import Request
 from plain.templates import Template
-from plain.views import View
+
+if TYPE_CHECKING:
+    from plain.admin.views import AdminView
 
 
 class Card:
@@ -29,10 +33,10 @@ class Card:
     presets: list[str] | Enum | None = None
 
     # These will be accessible at render time
-    view: View
+    view: AdminView
     request: Request
 
-    def render(self, view: View, request: Request) -> str:
+    def render(self, view: AdminView, request: Request) -> str:
         self.view = view
         self.request = request
         return Template(self.template_name).render(self.get_template_context())

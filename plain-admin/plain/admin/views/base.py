@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from plain.auth.views import AuthView
 from plain.runtime import settings
@@ -16,6 +18,7 @@ if TYPE_CHECKING:
     from plain.http import ResponseBase
 
     from ..cards import Card
+    from .viewsets import AdminViewset
 
 
 URL_NAMESPACE = "admin"
@@ -39,12 +42,15 @@ class AdminView(AuthView, TemplateView):
 
     links: dict[str, str] = {}
 
-    parent_view_class: Optional["AdminView"] = None
+    parent_view_class: AdminView | None = None
+
+    # Set dynamically by AdminViewset.get_views()
+    viewset: type[AdminViewset] | None = None
 
     template_name = "admin/page.html"
-    cards: list["Card"] = []
+    cards: list[Card] = []
 
-    def get_response(self) -> "ResponseBase":
+    def get_response(self) -> ResponseBase:
         response = super().get_response()
         response.headers["Cache-Control"] = (
             "no-cache, no-store, must-revalidate, max-age=0"
@@ -87,7 +93,7 @@ class AdminView(AuthView, TemplateView):
         return cls.path
 
     @classmethod
-    def get_parent_view_classes(cls) -> list["AdminView"]:
+    def get_parent_view_classes(cls) -> list[AdminView]:
         parents = []
         parent = cls.parent_view_class
         while parent:
@@ -118,5 +124,5 @@ class AdminView(AuthView, TemplateView):
     def get_links(self) -> dict[str, str]:
         return self.links.copy()
 
-    def get_cards(self) -> list["Card"]:
+    def get_cards(self) -> list[Card]:
         return self.cards.copy()
