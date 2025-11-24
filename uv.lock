@@ -525,6 +525,7 @@ dependencies = [
     { name = "requests" },
     { name = "ruff" },
     { name = "tomlkit" },
+    { name = "ty" },
 ]
 
 [package.metadata]
@@ -533,6 +534,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
     { name = "tomlkit", specifier = ">=0.11.0" },
+    { name = "ty", specifier = ">=0.0.1a27" },
 ]
 
 [[package]]

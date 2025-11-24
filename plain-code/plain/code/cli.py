@@ -75,7 +75,16 @@ def update() -> None:
 @cli.command()
 @click.pass_context
 @click.argument("path", default=".")
-def check(ctx: click.Context, path: str) -> None:
+@click.option("--skip-ruff", is_flag=True, help="Skip Ruff checks")
+@click.option("--skip-ty", is_flag=True, help="Skip ty type checks")
+@click.option("--skip-biome", is_flag=True, help="Skip Biome checks")
+def check(
+    ctx: click.Context,
+    path: str,
+    skip_ruff: bool,
+    skip_ty: bool,
+    skip_biome: bool,
+) -> None:
     """Check for formatting and linting issues"""
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
     config = get_code_config()
@@ -92,20 +101,28 @@ def check(ctx: click.Context, path: str) -> None:
             )
             sys.exit(return_code)
 
-    print_event(
-        click.style("Ruff lint:", bold=True) + click.style(" ruff check", dim=True)
-    )
-    result = subprocess.run(["ruff", "check", path, *ruff_args])
-    maybe_exit(result.returncode)
+    if not skip_ruff:
+        print_event(
+            click.style("Ruff lint:", bold=True) + click.style(" ruff check", dim=True)
+        )
+        result = subprocess.run(["ruff", "check", path, *ruff_args])
+        maybe_exit(result.returncode)
 
-    print_event(
-        click.style("Ruff format:", bold=True)
-        + click.style(" ruff format --check", dim=True)
-    )
-    result = subprocess.run(["ruff", "format", path, "--check", *ruff_args])
-    maybe_exit(result.returncode)
+        print_event(
+            click.style("Ruff format:", bold=True)
+            + click.style(" ruff format --check", dim=True)
+        )
+        result = subprocess.run(["ruff", "format", path, "--check", *ruff_args])
+        maybe_exit(result.returncode)
 
-    if config.get("biome", {}).get("enabled", True):
+    if not skip_ty and config.get("ty", {}).get("enabled", True):
+        print_event(
+            click.style("Ty:", bold=True) + click.style(" ty check", dim=True)
+        )
+        result = subprocess.run(["ty", "check", path])
+        maybe_exit(result.returncode)
+
+    if not skip_biome and config.get("biome", {}).get("enabled", True):
         biome = Biome()
 
         if biome.needs_update():
