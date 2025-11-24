@@ -21,13 +21,12 @@ Sessions are implemented as a dictionary-like object that automatically handles 
 
 ## Basic usage
 
-In views that inherit from `SessionViewMixin`, you can use `self.session` like a standard Python dictionary:
+In views that inherit from `SessionView`, you can use `self.session` like a standard Python dictionary:
 
 ```python
-from plain.sessions.views import SessionViewMixin
-from plain.views import View
+from plain.sessions.views import SessionView
 
-class MyView(SessionViewMixin, View):
+class MyView(SessionView):
     def get(self):
         # Store values in the session
         self.session['username'] = 'jane'
@@ -109,7 +108,7 @@ The [`SessionStore`](./core.py#SessionStore) class provides additional methods f
 To completely remove the current session data and regenerate the session key:
 
 ```python
-# In a view with SessionViewMixin
+# In a view with SessionView
 self.session.flush()
 
 # Outside a view
@@ -123,7 +122,7 @@ session.flush()
 To create a new session key while retaining the current session data (useful for security purposes):
 
 ```python
-# In a view with SessionViewMixin
+# In a view with SessionView
 self.session.cycle_key()
 
 # Outside a view
@@ -135,7 +134,7 @@ session.cycle_key()
 ### Checking if session is empty
 
 ```python
-# In a view with SessionViewMixin
+# In a view with SessionView
 if self.session.is_empty():
     # No session data exists
     pass
