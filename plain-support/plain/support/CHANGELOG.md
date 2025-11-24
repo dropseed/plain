@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-support@0.27.0) (2025-11-24)
+
+### What's changed
+
+- `SupportFormView` now inherits from `AuthView` instead of using `AuthViewMixin` for improved type checking ([569afd6](https://github.com/dropseed/plain/commit/569afd6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.26.0](https://github.com/dropseed/plain/releases/plain-support@0.26.0) (2025-11-21)
 
 ### What's changed
