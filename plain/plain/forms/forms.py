@@ -9,6 +9,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import NON_FIELD_ERRORS
+from plain.utils.datastructures import MultiValueDict
 
 from .exceptions import ValidationError
 from .fields import Field, FileField
@@ -78,12 +79,16 @@ class BaseForm:
         prefix: str | None = None,
         initial: dict[str, Any] | None = None,
     ):
-        self.data = request.data
-        self.files = request.files
-
+        # Forms can handle both JSON and form data
         self.is_json_request = request.headers.get("Content-Type", "").startswith(
             "application/json"
         )
+        if self.is_json_request:
+            self.data = request.json_data
+            self.files = MultiValueDict()
+        else:
+            self.data = request.form_data
+            self.files = request.files
 
         self.is_bound = bool(self.data or self.files)
 

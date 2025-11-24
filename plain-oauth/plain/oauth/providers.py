@@ -137,8 +137,8 @@ class OAuthProvider(ABC):
         # Store next url in session so we can get it on the callback request
         if redirect_to:
             session[SESSION_NEXT_KEY] = redirect_to
-        elif "next" in request.data:
-            session[SESSION_NEXT_KEY] = request.data["next"]
+        elif "next" in request.form_data:
+            session[SESSION_NEXT_KEY] = request.form_data["next"]
 
         # Sort authorization params for consistency
         sorted_authorization_params = sorted(authorization_params.items())
@@ -151,7 +151,7 @@ class OAuthProvider(ABC):
         return self.handle_login_request(request=request, redirect_to=redirect_to)
 
     def handle_disconnect_request(self, *, request: Request) -> Response:
-        provider_user_id = request.data["provider_user_id"]
+        provider_user_id = request.form_data["provider_user_id"]
         connection = OAuthConnection.query.get(
             provider_key=self.provider_key, provider_user_id=provider_user_id
         )
@@ -198,7 +198,7 @@ class OAuthProvider(ABC):
         return session.pop(SESSION_NEXT_KEY, "/")
 
     def get_disconnect_redirect_url(self, *, request: Request) -> str:
-        return request.data.get("next", "/")
+        return request.form_data.get("next", "/")
 
     def get_redirect_response(self, redirect_url: str) -> Response:
         """

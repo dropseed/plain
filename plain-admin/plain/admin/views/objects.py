@@ -39,7 +39,7 @@ class AdminListView(HTMXView, AdminView):
         self.objects = self.get_objects()
 
         page_size = self.request.query_params.get("page_size", self.page_size)
-        paginator = Paginator(self.objects, page_size)
+        paginator = Paginator(self.objects, int(page_size))
         self._page = paginator.get_page(self.request.query_params.get("page", 1))
 
         context["paginator"] = paginator
@@ -84,10 +84,10 @@ class AdminListView(HTMXView, AdminView):
 
     def post(self) -> Response:
         # won't be "key" anymore, just list
-        action_name = self.request.data.get("action_name")
+        action_name = self.request.form_data.get("action_name")
         actions = self.get_actions()
         if action_name and action_name in actions:
-            action_ids_param = self.request.data["action_ids"]
+            action_ids_param = self.request.form_data["action_ids"]
             if action_ids_param == "__all__":
                 target_ids = [self.get_object_id(obj) for obj in self.get_objects()]
             else:

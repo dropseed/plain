@@ -1,5 +1,3 @@
-import json
-
 from plain.views import View
 
 from .models import Pageview
@@ -7,10 +5,7 @@ from .models import Pageview
 
 class TrackView(View):
     def post(self) -> int:
-        try:
-            data = self.request.data
-        except json.JSONDecodeError:
-            return 400
+        data = self.request.json_data
 
         try:
             pageview = Pageview.create_from_request(

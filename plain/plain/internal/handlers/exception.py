@@ -7,10 +7,7 @@ from typing import TYPE_CHECKING
 from plain.exceptions import (
     BadRequest,
     PermissionDenied,
-    RequestDataTooBig,
     SuspiciousOperation,
-    TooManyFieldsSent,
-    TooManyFilesSent,
 )
 from plain.http import Http404, ResponseServerError
 from plain.http.multipartparser import MultiPartParserError
@@ -93,11 +90,6 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
             exc_info=exc,
         )
     elif isinstance(exc, SuspiciousOperation):
-        if isinstance(exc, RequestDataTooBig | TooManyFieldsSent | TooManyFilesSent):
-            # POST data can't be accessed again, otherwise the original
-            # exception would be raised.
-            request._mark_post_parse_error()
-
         # The request logger receives events for any problematic request
         # The security logger receives events for all SuspiciousOperations
         security_logger = logging.getLogger(f"plain.security.{exc.__class__.__name__}")

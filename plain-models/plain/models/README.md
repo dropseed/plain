@@ -388,7 +388,7 @@ class UserForm(forms.ModelForm):
         fields = ["email", "is_admin"]
 
 # Usage
-form = UserForm(data=request.data)
+form = UserForm(request=request)
 if form.is_valid():
     user = form.save()
 ```

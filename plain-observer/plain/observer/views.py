@@ -42,7 +42,7 @@ class ObserverTracesView(AuthView, HTMXView, ListView):
 
     def htmx_put_mode(self) -> Response:
         """Set observer mode via HTMX PUT."""
-        mode = self.request.data.get("mode")
+        mode = self.request.form_data.get("mode")
         observer = Observer.from_request(self.request)
 
         response = Response(status_code=204)
@@ -68,7 +68,7 @@ class ObserverTracesView(AuthView, HTMXView, ListView):
 
     def post(self) -> Response:
         """Handle POST requests to set observer mode."""
-        action = self.request.data.get("observe_action")
+        action = self.request.form_data.get("observe_action")
         if action == "summary":
             observer = Observer.from_request(self.request)
             response = Response(status_code=204)

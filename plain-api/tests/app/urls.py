@@ -31,7 +31,9 @@ class TestVersionedAPIView(VersionedAPIView):
     }
 
     def post(self):
-        name = self.request.data["name"]
+        data = self.request.json_data
+        assert isinstance(data, dict)
+        name = data["name"]
         return {"message": f"Hello, {name}!"}
 
 

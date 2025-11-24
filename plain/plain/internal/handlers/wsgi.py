@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import uuid
+import codecs
 from functools import cached_property
 from io import IOBase
 from typing import TYPE_CHECKING
@@ -9,7 +9,7 @@ from urllib.parse import quote
 from plain import signals
 from plain.http import FileResponse, QueryDict, Request, parse_cookie
 from plain.internal.handlers import base
-from plain.utils.datastructures import MultiValueDict
+from plain.utils.http import parse_header_parameters
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
@@ -64,13 +64,11 @@ class LimitedStream(IOBase):
 
 class WSGIRequest(Request):
     non_picklable_attrs = Request.non_picklable_attrs | frozenset(["environ"])
-    meta_non_picklable_attrs = frozenset(["wsgi.errors", "wsgi.input"])
 
     method: str  # Always set from environ, overrides Request.method: str | None
 
     def __init__(self, environ: dict[str, Any]) -> None:
-        # A unique ID we can use to trace this request
-        self.unique_id = str(uuid.uuid4())
+        super().__init__()
 
         script_name = get_script_name(environ)
         # If PATH_INFO is empty (e.g. accessing the SCRIPT_NAME URL without a
@@ -88,19 +86,29 @@ class WSGIRequest(Request):
         self.meta["PATH_INFO"] = path_info
         self.meta["SCRIPT_NAME"] = script_name
         self.method = environ["REQUEST_METHOD"].upper()
-        # Set content_type, content_params, and encoding.
-        self._set_content_type_params(environ)
+
+        # Set content_type, content_params, and encoding
+        self.content_type, self.content_params = parse_header_parameters(
+            environ.get("CONTENT_TYPE", "")
+        )
+        if "charset" in self.content_params:
+            try:
+                codecs.lookup(self.content_params["charset"])
+            except LookupError:
+                pass
+            else:
+                self.encoding = self.content_params["charset"]
+
         try:
             content_length = int(environ.get("CONTENT_LENGTH"))
         except (ValueError, TypeError):
             content_length = 0
         self._stream = LimitedStream(self.environ["wsgi.input"], content_length)
         self._read_started = False
-        self.resolver_match = None
 
     def __getstate__(self) -> dict[str, Any]:
         state = super().__getstate__()
-        for attr in self.meta_non_picklable_attrs:
+        for attr in frozenset(["wsgi.errors", "wsgi.input"]):
             if attr in state["meta"]:
                 del state["meta"][attr]
         return state
@@ -112,28 +120,12 @@ class WSGIRequest(Request):
     def query_params(self) -> QueryDict:
         # The WSGI spec says 'QUERY_STRING' may be absent.
         raw_query_string = get_bytes_from_wsgi(self.environ, "QUERY_STRING", "")
-        return QueryDict(raw_query_string, encoding=self._encoding)
-
-    def _get_data(self) -> QueryDict:
-        if not hasattr(self, "_data"):
-            self._load_data_and_files()
-        return self._data
-
-    def _set_data(self, data: QueryDict) -> None:
-        self._data = data
+        return QueryDict(raw_query_string, encoding=self.encoding)
 
     @cached_property
     def cookies(self) -> dict[str, str]:
         raw_cookie = get_str_from_wsgi(self.environ, "HTTP_COOKIE", "")
         return parse_cookie(raw_cookie)
-
-    @property
-    def files(self) -> MultiValueDict:
-        if not hasattr(self, "_files"):
-            self._load_data_and_files()
-        return self._files
-
-    data = property(_get_data, _set_data)
 
 
 class WSGIHandler(base.BaseHandler):

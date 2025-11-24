@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import codecs
 import copy
 import json
 import secrets
@@ -9,13 +8,14 @@ from collections.abc import Iterator
 from functools import cached_property
 from io import BytesIO
 from itertools import chain
-from typing import IO, TYPE_CHECKING, Any
+from typing import IO, TYPE_CHECKING, Any, TypeVar, overload
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 if TYPE_CHECKING:
     from plain.urls import ResolverMatch
 
 from plain.exceptions import (
+    BadRequest,
     ImproperlyConfigured,
     RequestDataTooBig,
     TooManyFieldsSent,
@@ -23,19 +23,18 @@ from plain.exceptions import (
 from plain.http.cookie import unsign_cookie_value
 from plain.http.multipartparser import (
     MultiPartParser,
-    MultiPartParserError,
-    TooManyFilesSent,
 )
 from plain.internal.files import uploadhandler
 from plain.internal.files.uploadhandler import FileUploadHandler
 from plain.runtime import settings
 from plain.utils.datastructures import (
     CaseInsensitiveMapping,
-    ImmutableList,
     MultiValueDict,
 )
 from plain.utils.encoding import iri_to_uri
 from plain.utils.http import parse_header_parameters
+
+_T = TypeVar("_T")
 
 
 class UnreadablePostError(OSError):
@@ -56,8 +55,7 @@ class Request:
     """A basic HTTP request."""
 
     # The encoding used in GET/POST dicts. None means use default setting.
-    _encoding = None
-    _upload_handlers: list[FileUploadHandler] = []
+    encoding: str | None = None
 
     non_picklable_attrs = frozenset(["resolver_match", "_stream"])
 
@@ -65,27 +63,22 @@ class Request:
     resolver_match: ResolverMatch | None
     content_type: str | None
     content_params: dict[str, str] | None
+    query_params: QueryDict
+    cookies: dict[str, str]
+    meta: dict[str, Any]
+    path: str
+    path_info: str
+    upload_handlers: list[FileUploadHandler]
 
     def __init__(self):
-        # WARNING: The `WSGIRequest` subclass doesn't call `super`.
-        # Any variable assignment made here should also happen in
-        # `WSGIRequest.__init__()`.
-
         # A unique ID we can use to trace this request
         self.unique_id = str(uuid.uuid4())
-
-        self.query_params = QueryDict(mutable=True)
-        self.data = QueryDict(mutable=True)
-        self.cookies = {}
-        self.meta = {}
-        self.files = MultiValueDict()
-
-        self.path = ""
-        self.path_info = ""
-        self.method = None
         self.resolver_match = None
-        self.content_type = None
-        self.content_params = None
+        # Initialize upload handlers from settings
+        self.upload_handlers = [
+            uploadhandler.load_handler(handler, self)
+            for handler in settings.FILE_UPLOAD_HANDLERS
+        ]
 
     def __repr__(self) -> str:
         if self.method is None or not self.get_full_path():
@@ -153,19 +146,6 @@ class Request:
     def accepts(self, media_type: str) -> bool:
         """Check if the given media type is accepted."""
         return self.get_preferred_type(media_type) is not None
-
-    def _set_content_type_params(self, meta: dict[str, Any]) -> None:
-        """Set content_type, content_params, and encoding."""
-        self.content_type, self.content_params = parse_header_parameters(
-            meta.get("CONTENT_TYPE", "")
-        )
-        if "charset" in self.content_params:
-            try:
-                codecs.lookup(self.content_params["charset"])
-            except LookupError:
-                pass
-            else:
-                self.encoding = self.content_params["charset"]
 
     @cached_property
     def host(self) -> str:
@@ -299,60 +279,6 @@ class Request:
         return self.scheme == "https"
 
     @property
-    def encoding(self) -> str | None:
-        return self._encoding
-
-    @encoding.setter
-    def encoding(self, val: str) -> None:
-        """
-        Set the encoding used for query_params/data accesses. If the query_params or data
-        dictionary has already been created, remove and recreate it on the
-        next access (so that it is decoded correctly).
-        """
-        self._encoding = val
-        if hasattr(self, "query_params"):
-            del self.query_params
-        if hasattr(self, "_data"):
-            del self._data
-
-    def _initialize_handlers(self) -> None:
-        self._upload_handlers = [
-            uploadhandler.load_handler(handler, self)
-            for handler in settings.FILE_UPLOAD_HANDLERS
-        ]
-
-    @property
-    def upload_handlers(self) -> list[FileUploadHandler]:
-        if not self._upload_handlers:
-            # If there are no upload handlers defined, initialize them from settings.
-            self._initialize_handlers()
-        return self._upload_handlers
-
-    @upload_handlers.setter
-    def upload_handlers(
-        self, upload_handlers: list[FileUploadHandler] | ImmutableList
-    ) -> None:
-        if hasattr(self, "_files"):
-            raise AttributeError(
-                "You cannot set the upload handlers after the upload has been "
-                "processed."
-            )
-        self._upload_handlers = upload_handlers  # type: ignore[assignment]
-
-    def parse_file_upload(
-        self, meta: dict[str, Any], post_data: IO[bytes]
-    ) -> tuple[Any, MultiValueDict]:
-        """Return a tuple of (data QueryDict, files MultiValueDict)."""
-        self.upload_handlers = ImmutableList(
-            self.upload_handlers,
-            warning=(
-                "You cannot alter upload handlers after the upload has been processed."
-            ),
-        )
-        parser = MultiPartParser(meta, post_data, self.upload_handlers, self.encoding)
-        return parser.parse()
-
-    @property
     def body(self) -> bytes:
         if not hasattr(self, "_body"):
             if self._read_started:
@@ -379,62 +305,105 @@ class Request:
             self._stream = BytesIO(self._body)
         return self._body
 
-    def _mark_post_parse_error(self) -> None:
-        self._data = QueryDict()
-        self._files = MultiValueDict()
+    def _parse_file_upload(
+        self, meta: dict[str, Any], post_data: IO[bytes]
+    ) -> tuple[Any, MultiValueDict]:
+        """Return a tuple of (data QueryDict, files MultiValueDict)."""
+        parser = MultiPartParser(meta, post_data, self.upload_handlers, self.encoding)
+        return parser.parse()
 
-    def _load_data_and_files(self) -> None:
-        """Populate self._data and self._files"""
+    @cached_property
+    def _multipart_data(self) -> tuple[QueryDict, MultiValueDict]:
+        """Parse multipart/form-data. Used internally by form_data and files properties.
 
-        if self._read_started and not hasattr(self, "_body"):
-            self._mark_post_parse_error()
-            return
-
-        if self.content_type and self.content_type.startswith("application/json"):
-            try:
-                self._data = json.loads(self.body)
-                self._files = MultiValueDict()
-            except json.JSONDecodeError:
-                self._mark_post_parse_error()
-                raise
-        elif self.content_type == "multipart/form-data":
-            if hasattr(self, "_body"):
-                # Use already read data
-                data = BytesIO(self._body)
-            else:
-                data = self
-            try:
-                self._data, self._files = self.parse_file_upload(self.meta, data)
-            except (MultiPartParserError, TooManyFilesSent):
-                # An error occurred while parsing POST data. Since when
-                # formatting the error the request handler might access
-                # self.POST, set self._post and self._file to prevent
-                # attempts to parse POST data again.
-                self._mark_post_parse_error()
-                raise
-        elif self.content_type == "application/x-www-form-urlencoded":
-            self._data, self._files = (
-                QueryDict(self.body, encoding=self._encoding),
-                MultiValueDict(),
-            )
+        Raises MultiPartParserError or TooManyFilesSent for malformed uploads,
+        which are handled by response_for_exception() as 400 errors.
+        """
+        if hasattr(self, "_body"):
+            # Use already read data
+            data = BytesIO(self._body)
         else:
-            self._data, self._files = (
-                QueryDict(encoding=self._encoding),
-                MultiValueDict(),
+            data = self
+        return self._parse_file_upload(self.meta, data)
+
+    @cached_property
+    def json_data(self) -> dict[str, Any]:
+        """
+        Parsed JSON object from request body.
+
+        Returns dict for JSON objects.
+        Raises BadRequest (400) if JSON is invalid or not an object.
+        Raises ValueError if request content-type is not JSON.
+
+        Use this when you expect JSON object data and want type-safe dict access.
+        """
+        if not self.content_type or not self.content_type.startswith(
+            "application/json"
+        ):
+            raise ValueError(
+                f"Request content-type is not JSON (got: {self.content_type})"
             )
+        try:
+            parsed = json.loads(self.body)
+        except json.JSONDecodeError as e:
+            raise BadRequest(f"Invalid JSON in request body: {e}") from e
+
+        if not isinstance(parsed, dict):
+            raise BadRequest(f"Expected JSON object, got {type(parsed).__name__}")
+        return parsed
+
+    @cached_property
+    def form_data(self) -> QueryDict:
+        """
+        Form data from POST body.
+
+        Returns QueryDict for application/x-www-form-urlencoded or
+        multipart/form-data content types.
+        Returns empty QueryDict if Content-Type is missing (e.g., GET requests).
+        Raises ValueError if request has a different content-type with a body.
+
+        Use this when you expect form data and want type-safe QueryDict access.
+        """
+        if self.content_type == "application/x-www-form-urlencoded":
+            return QueryDict(self.body, encoding=self.encoding)
+        elif self.content_type == "multipart/form-data":
+            return self._multipart_data[0]
+        elif not self.content_type:
+            # No Content-Type (e.g., GET requests) - return empty QueryDict
+            return QueryDict(b"", encoding=self.encoding)
+        else:
+            raise ValueError(
+                f"Request content-type is not form data (got: {self.content_type})"
+            )
+
+    @cached_property
+    def files(self) -> MultiValueDict:
+        """
+        File uploads from multipart/form-data requests.
+
+        Returns MultiValueDict of uploaded files for multipart requests,
+        or empty MultiValueDict for other content types.
+        """
+        if self.content_type == "multipart/form-data":
+            return self._multipart_data[1]
+        return MultiValueDict()
 
     def close(self) -> None:
-        if hasattr(self, "_files"):
-            for f in chain.from_iterable(list_[1] for list_ in self._files.lists()):
+        # Close any uploaded files if they were accessed
+        if self.content_type == "multipart/form-data" and hasattr(
+            self, "_multipart_data"
+        ):
+            _, files = self._multipart_data
+            for f in chain.from_iterable(list_[1] for list_ in files.lists()):
                 f.close()
 
     # File-like and iterator interface.
     #
     # Expects self._stream to be set to an appropriate source of bytes by
     # a corresponding request subclass (e.g. WSGIRequest).
-    # Also when request data has already been read by request.data or
-    # request.body, self._stream points to a BytesIO instance
-    # containing that data.
+    # Also when request data has already been read by request.json_data,
+    # request.form_data, or request.body, self._stream points to a BytesIO
+    # instance containing that data.
 
     def read(self, *args: Any, **kwargs: Any) -> bytes:
         self._read_started = True
@@ -616,6 +585,13 @@ class QueryDict(MultiValueDict):
         self._assert_mutable()
         super().__delitem__(key)
 
+    def __getitem__(self, key: str) -> str:
+        """
+        Return the last data value for this key as a string.
+        QueryDict values are always strings.
+        """
+        return super().__getitem__(key)
+
     def __copy__(self) -> QueryDict:
         result = self.__class__("", mutable=True, encoding=self.encoding)
         for key, value in self.lists():
@@ -647,7 +623,58 @@ class QueryDict(MultiValueDict):
         value = self.bytes_to_text(value, self.encoding)
         super().appendlist(key, value)
 
-    def pop(self, key: str, *args: Any) -> Any:
+    def getlist(self, key: str, default: list[str] | None = None) -> list[str]:
+        """
+        Return the list of values for the key as strings.
+        QueryDict values are always strings.
+        """
+        return super().getlist(key, default)  # type: ignore[arg-type,return-value]
+
+    @overload
+    def get(self, key: str) -> str | None: ...
+
+    @overload
+    def get(self, key: str, default: str) -> str: ...
+
+    @overload
+    def get(self, key: str, default: _T) -> str | _T: ...
+
+    def get(self, key: str, default: Any = None) -> str | Any:
+        """
+        Return the last data value for the passed key. If key doesn't exist
+        or value is an empty list, return `default`.
+
+        QueryDict values are always strings (from URL parsing), but the
+        return type preserves the type of the default parameter for type safety.
+
+        Examples:
+            get("page")         -> str | None
+            get("page", "1")    -> str
+            get("page", 1)      -> str | int
+        """
+        return super().get(key, default)
+
+    @overload
+    def pop(self, key: str) -> str: ...
+
+    @overload
+    def pop(self, key: str, default: str) -> str: ...
+
+    @overload
+    def pop(self, key: str, default: _T) -> str | _T: ...
+
+    def pop(self, key: str, *args: Any) -> str | Any:
+        """
+        Remove and return a value for the key.
+
+        QueryDict values are always strings, but the return type preserves
+        the type of the default parameter for type safety.
+
+        Examples:
+            pop("page")         -> str (or raises KeyError)
+            pop("page", "1")    -> str
+            pop("page", 1)      -> str | int
+        """
         self._assert_mutable()
         return super().pop(key, *args)
 
