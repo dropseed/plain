@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.38.0](https://github.com/dropseed/plain/releases/plain-oauth@0.38.0) (2025-11-24)
+
+### What's changed
+
+- `OAuthConnectView` and `OAuthDisconnectView` now inherit from `AuthView` instead of using `AuthViewMixin` ([569afd6](https://github.com/dropseed/plain/commit/569afd6))
+- Form data access in OAuth providers now uses `request.form_data` instead of `request.data` ([90332a9](https://github.com/dropseed/plain/commit/90332a9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.37.0](https://github.com/dropseed/plain/releases/plain-oauth@0.37.0) (2025-11-21)
 
 ### What's changed
