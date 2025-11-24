@@ -42,7 +42,7 @@ class AdminModelListView(AdminListView):
     show_search = True
     allow_global_search = True
 
-    model: models.Model
+    model: type[models.Model]
 
     fields: list = ["id"]
     queryset_order = []
@@ -141,7 +141,7 @@ class AdminModelListView(AdminListView):
 
 
 class AdminModelDetailView(AdminDetailView):
-    model: models.Model
+    model: type[models.Model]
 
     def get_title(self) -> str:
         return str(self.object)
@@ -194,7 +194,7 @@ class AdminModelDetailView(AdminDetailView):
 
 
 class AdminModelCreateView(AdminCreateView):
-    model: models.Model
+    model: type[models.Model]
     form_class = None  # TODO type annotation
 
     def get_title(self) -> str:
@@ -212,7 +212,7 @@ class AdminModelCreateView(AdminCreateView):
 
 
 class AdminModelUpdateView(AdminUpdateView):
-    model: models.Model
+    model: type[models.Model]
     form_class = None  # TODO type annotation
     success_url = "."  # Redirect back to the same update page by default
 
@@ -234,7 +234,7 @@ class AdminModelUpdateView(AdminUpdateView):
 
 
 class AdminModelDeleteView(AdminDeleteView):
-    model: models.Model
+    model: type[models.Model]
 
     def get_title(self) -> str:
         return f"Delete {self.object}"
