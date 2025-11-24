@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-observer@0.21.0) (2025-11-24)
+
+### What's changed
+
+- Updated views to use `AuthView` and `HTMXView` base classes instead of mixins for improved type safety ([569afd6](https://github.com/dropseed/plain/commit/569afd606d9eb0c4d805b17487ee4a26477b3fb9))
+- Updated request data access to use `request.form_data` instead of `request.data` for form submissions ([90332a9](https://github.com/dropseed/plain/commit/90332a9c21364644732159a539d362a7108214ac))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-observer@0.20.0) (2025-11-21)
 
 ### What's changed
