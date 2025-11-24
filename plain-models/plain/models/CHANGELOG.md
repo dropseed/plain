@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.64.0](https://github.com/dropseed/plain/releases/plain-models@0.64.0) (2025-11-24)
+
+### What's changed
+
+- `bulk_create()` and `bulk_update()` now accept any `Sequence` type (e.g., tuples, generators) instead of requiring a `list` ([6c7469f](https://github.com/dropseed/plain/commit/6c7469f92a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.63.1](https://github.com/dropseed/plain/releases/plain-models@0.63.1) (2025-11-21)
 
 ### What's changed
