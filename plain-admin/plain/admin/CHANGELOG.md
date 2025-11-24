@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.56.0](https://github.com/dropseed/plain/releases/plain-admin@0.56.0) (2025-11-24)
+
+### What's changed
+
+- Admin views now use `request.form_data` instead of `request.data` for processing form submissions, following the new request data API ([90332a9](https://github.com/dropseed/plain/commit/90332a9c21))
+- View mixins (`AuthViewMixin`, `HTMXViewMixin`, `SessionViewMixin`) have been replaced with view inheritance (`AuthView`, `HTMXView`, `SessionView`) for better type checking support ([569afd6](https://github.com/dropseed/plain/commit/569afd606d))
+- Type annotations have been improved throughout admin views, including `form_class`, model types, and response types ([793c57b](https://github.com/dropseed/plain/commit/793c57b200), [3c3a984](https://github.com/dropseed/plain/commit/3c3a984428), [0466ee2](https://github.com/dropseed/plain/commit/0466ee2f74))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.55.0](https://github.com/dropseed/plain/releases/plain-admin@0.55.0) (2025-11-14)
 
 ### What's changed
