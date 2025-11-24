@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-auth@0.22.0) (2025-11-24)
+
+### What's changed
+
+- Replaced `AuthViewMixin` with `AuthView` class that inherits from `SessionView` for better typing and simpler view inheritance ([569afd6](https://github.com/dropseed/plain/commit/569afd606d))
+
+### Upgrade instructions
+
+- Replace `class MyView(AuthViewMixin, View)` with `class MyView(AuthView)` - the new `AuthView` class already inherits from the appropriate base classes
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-auth@0.21.0) (2025-11-12)
 
 ### What's changed
