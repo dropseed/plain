@@ -710,7 +710,7 @@ class QuerySet(Generic[T]):
 
     def bulk_create(
         self,
-        objs: list[T],
+        objs: Sequence[T],
         batch_size: int | None = None,
         update_conflicts: bool = False,
         update_fields: list[str] | None = None,
@@ -737,6 +737,7 @@ class QuerySet(Generic[T]):
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
 
+        objs = list(objs)
         if not objs:
             return objs
         meta = self.model._model_meta
@@ -757,7 +758,6 @@ class QuerySet(Generic[T]):
         )
         self._for_write = True
         fields = meta.concrete_fields
-        objs = list(objs)
         self._prepare_for_bulk_create(objs)
         with transaction.atomic(savepoint=False):
             objs_with_id, objs_without_id = partition(lambda o: o.id is None, objs)
@@ -800,7 +800,7 @@ class QuerySet(Generic[T]):
         return objs
 
     def bulk_update(
-        self, objs: list[T], fields: list[str], batch_size: int | None = None
+        self, objs: Sequence[T], fields: list[str], batch_size: int | None = None
     ) -> int:
         """
         Update the given fields in each of the given objects in the database.
