@@ -1,10 +1,9 @@
-from plain.htmx.views import HTMXViewMixin
+from plain.htmx.views import HTMXView
 from plain.http import Response
 from plain.test import RequestFactory
-from plain.views import View
 
 
-class V(HTMXViewMixin, View):
+class V(HTMXView):
     def get(self):
         return Response("Ok")
 

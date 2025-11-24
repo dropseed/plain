@@ -9,8 +9,11 @@ from collections.abc import Iterator
 from functools import cached_property
 from io import BytesIO
 from itertools import chain
-from typing import IO, Any
+from typing import IO, TYPE_CHECKING, Any
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
+
+if TYPE_CHECKING:
+    from plain.urls import ResolverMatch
 
 from plain.exceptions import (
     ImproperlyConfigured,
@@ -57,6 +60,11 @@ class Request:
     _upload_handlers: list[FileUploadHandler] = []
 
     non_picklable_attrs = frozenset(["resolver_match", "_stream"])
+
+    method: str | None
+    resolver_match: ResolverMatch | None
+    content_type: str | None
+    content_params: dict[str, str] | None
 
     def __init__(self):
         # WARNING: The `WSGIRequest` subclass doesn't call `super`.

@@ -8,7 +8,7 @@ from plain import signing
 from plain.auth import get_user_model
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
-from plain.auth.views import AuthViewMixin
+from plain.auth.views import AuthView
 from plain.exceptions import BadRequest
 from plain.forms import BaseForm
 from plain.http import (
@@ -60,7 +60,7 @@ class PasswordForgotView(FormView):
         return super().form_valid(form)
 
 
-class PasswordResetView(AuthViewMixin, FormView):
+class PasswordResetView(AuthView, FormView):
     form_class = PasswordSetForm
     reset_token_max_age = 60 * 60  # 1 hour
     _reset_token_session_key = "_password_reset_token"
@@ -141,7 +141,7 @@ class PasswordResetView(AuthViewMixin, FormView):
         return super().form_valid(form)
 
 
-class PasswordChangeView(AuthViewMixin, FormView):
+class PasswordChangeView(AuthView, FormView):
     # Change to PasswordSetForm if you want to set new passwords
     # without confirming the old one.
     form_class = PasswordChangeForm
@@ -159,7 +159,7 @@ class PasswordChangeView(AuthViewMixin, FormView):
         return super().form_valid(form)
 
 
-class PasswordLoginView(AuthViewMixin, FormView):
+class PasswordLoginView(AuthView, FormView):
     form_class = PasswordLoginForm
     success_url = "/"
 

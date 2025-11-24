@@ -1,7 +1,7 @@
 import logging
 
 from plain.auth.requests import get_request_user
-from plain.auth.views import AuthViewMixin
+from plain.auth.views import AuthView
 from plain.http import Response, ResponseRedirect
 from plain.views import TemplateView, View
 
@@ -50,7 +50,7 @@ class OAuthCallbackView(TemplateView):
         return context
 
 
-class OAuthConnectView(AuthViewMixin, View):
+class OAuthConnectView(AuthView):
     def post(self) -> Response:
         request = self.request
         provider = self.url_kwargs["provider"]
@@ -58,7 +58,7 @@ class OAuthConnectView(AuthViewMixin, View):
         return provider_instance.handle_connect_request(request=request)
 
 
-class OAuthDisconnectView(AuthViewMixin, View):
+class OAuthDisconnectView(AuthView):
     def post(self) -> Response:
         request = self.request
         provider = self.url_kwargs["provider"]

@@ -66,6 +66,8 @@ class WSGIRequest(Request):
     non_picklable_attrs = Request.non_picklable_attrs | frozenset(["environ"])
     meta_non_picklable_attrs = frozenset(["wsgi.errors", "wsgi.input"])
 
+    method: str  # Always set from environ, overrides Request.method: str | None
+
     def __init__(self, environ: dict[str, Any]) -> None:
         # A unique ID we can use to trace this request
         self.unique_id = str(uuid.uuid4())

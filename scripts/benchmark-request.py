@@ -26,7 +26,9 @@ import plain.runtime  # noqa: E402
 
 plain.runtime.setup()
 
+from collections.abc import Iterable  # noqa: E402
 from io import BytesIO  # noqa: E402
+from typing import cast  # noqa: E402
 
 from plain.internal.handlers.wsgi import WSGIHandler  # noqa: E402
 
@@ -62,13 +64,13 @@ def main():
     environ = create_environ()
 
     print("Warmup request...")
-    list(handler(environ.copy(), start_response))
+    list(cast(Iterable[bytes], handler(environ.copy(), start_response)))
 
     print("Running 100 requests for profiling...")
     for i in range(100):
         env = environ.copy()
         env["wsgi.input"] = BytesIO(b"")
-        list(handler(env, start_response))
+        list(cast(Iterable[bytes], handler(env, start_response)))
 
     print("Done!")
 

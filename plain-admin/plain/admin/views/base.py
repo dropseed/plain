@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, Optional
 
-from plain.auth.views import AuthViewMixin
+from plain.auth.views import AuthView
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.utils import timezone
@@ -13,7 +13,7 @@ from .registry import registry
 from .types import Img
 
 if TYPE_CHECKING:
-    from plain.http import Response
+    from plain.http import ResponseBase
 
     from ..cards import Card
 
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 URL_NAMESPACE = "admin"
 
 
-class AdminView(AuthViewMixin, TemplateView):
+class AdminView(AuthView, TemplateView):
     admin_required = True
 
     title: str = ""
@@ -44,7 +44,7 @@ class AdminView(AuthViewMixin, TemplateView):
     template_name = "admin/page.html"
     cards: list["Card"] = []
 
-    def get_response(self) -> "Response":
+    def get_response(self) -> "ResponseBase":
         response = super().get_response()
         response.headers["Cache-Control"] = (
             "no-cache, no-store, must-revalidate, max-age=0"

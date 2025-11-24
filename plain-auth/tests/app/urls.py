@@ -1,4 +1,4 @@
-from plain.auth.views import AuthViewMixin
+from plain.auth.views import AuthView
 from plain.urls import Router, path
 from plain.views import View
 
@@ -8,28 +8,28 @@ class LoginView(View):
         return "login"
 
 
-class ProtectedView(AuthViewMixin, View):
+class ProtectedView(AuthView):
     login_required = True
 
     def get(self):
         return "protected"
 
 
-class OpenView(AuthViewMixin, View):
+class OpenView(AuthView):
     # login_required = False
 
     def get(self):
         return "open"
 
 
-class AdminView(AuthViewMixin, View):
+class AdminView(AuthView):
     admin_required = True
 
     def get(self):
         return "admin"
 
 
-class NoLoginUrlView(AuthViewMixin, View):
+class NoLoginUrlView(AuthView):
     login_required = True
     login_url = None
 

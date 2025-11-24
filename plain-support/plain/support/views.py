@@ -3,15 +3,15 @@ from __future__ import annotations
 from typing import Any
 
 from plain.assets.urls import get_asset_url
-from plain.auth.views import AuthViewMixin
+from plain.auth.views import AuthView
 from plain.forms import Form
-from plain.http import Response, ResponseRedirect
+from plain.http import Response, ResponseBase, ResponseRedirect
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
 from plain.views import FormView, View
 
 
-class SupportFormView(AuthViewMixin, FormView):
+class SupportFormView(AuthView, FormView):
     template_name = "support/page.html"
 
     def get_form(self) -> Form:
@@ -48,7 +48,7 @@ class SupportFormView(AuthViewMixin, FormView):
 class SupportIFrameView(SupportFormView):
     template_name = "support/iframe.html"
 
-    def get_response(self) -> Response:
+    def get_response(self) -> ResponseBase:
         response = super().get_response()
 
         # X-Frame-Options are typically in DEFAULT_RESPONSE_HEADERS.

@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from plain import models
-from plain.auth.views import AuthViewMixin
-from plain.htmx.views import HTMXViewMixin
-from plain.http import JsonResponse, Response
+from plain.auth.views import AuthView
+from plain.htmx.views import HTMXView
+from plain.http import JsonResponse, Response, ResponseBase
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.views import DetailView, ListView
@@ -14,7 +14,7 @@ from .core import Observer
 from .models import Trace
 
 
-class ObserverTracesView(AuthViewMixin, HTMXViewMixin, ListView):
+class ObserverTracesView(AuthView, HTMXView, ListView):
     template_name = "observer/traces.html"
     context_object_name = "traces"
     admin_required = True
@@ -29,7 +29,7 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, ListView):
 
         super().check_auth()
 
-    def get_response(self) -> Response:
+    def get_response(self) -> ResponseBase:
         response = super().get_response()
         # So we can load it in the toolbar
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
@@ -77,7 +77,7 @@ class ObserverTracesView(AuthViewMixin, HTMXViewMixin, ListView):
         return Response("Invalid action", status_code=400)
 
 
-class ObserverTraceDetailView(AuthViewMixin, HTMXViewMixin, DetailView):
+class ObserverTraceDetailView(AuthView, HTMXView, DetailView):
     """Detail view for a specific trace."""
 
     template_name = "observer/trace_detail.html"

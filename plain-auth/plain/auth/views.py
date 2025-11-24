@@ -1,27 +1,24 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 from plain.exceptions import PermissionDenied
 from plain.http import (
     Http404,
     QueryDict,
-    Response,
+    ResponseBase,
     ResponseRedirect,
 )
 from plain.runtime import settings
-from plain.sessions.views import SessionViewMixin
+from plain.sessions.views import SessionView
 from plain.urls import reverse
 from plain.utils.cache import patch_cache_control
 from plain.views import View
 
 from .sessions import logout
 from .utils import resolve_url
-
-if TYPE_CHECKING:
-    from plain.http import Request
 
 try:
     from plain.admin.impersonate import get_request_impersonator
@@ -35,12 +32,10 @@ class LoginRequired(Exception):
         self.redirect_field_name = redirect_field_name
 
 
-class AuthViewMixin(SessionViewMixin):
+class AuthView(SessionView):
     login_required = False
     admin_required = False  # Implies login_required
     login_url = settings.AUTH_LOGIN_URL
-
-    request: Request
 
     @cached_property
     def user(self) -> Any | None:
@@ -84,7 +79,7 @@ class AuthViewMixin(SessionViewMixin):
                 # Show a 404 so we don't expose admin urls to non-admin users
                 raise Http404()
 
-    def get_response(self) -> Response:
+    def get_response(self) -> ResponseBase:
         try:
             self.check_auth()
         except LoginRequired as e:
@@ -110,8 +105,7 @@ class AuthViewMixin(SessionViewMixin):
             else:
                 raise PermissionDenied("Login required")
 
-        # Mixin expects to be used with View base class
-        response = super().get_response()  # type: ignore[misc]
+        response = super().get_response()
 
         if self.user:
             # Make sure it at least has private as a default

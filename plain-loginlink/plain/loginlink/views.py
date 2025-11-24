@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from plain.auth import login, logout
-from plain.auth.views import AuthViewMixin
+from plain.auth.views import AuthView
 from plain.forms import BaseForm
 from plain.http import Response, ResponseRedirect
 from plain.runtime import settings
@@ -19,7 +19,7 @@ from .links import (
 )
 
 
-class LoginLinkFormView(AuthViewMixin, FormView):
+class LoginLinkFormView(AuthView, FormView):
     form_class = LoginLinkForm
     success_url = reverse_lazy("loginlink:sent")
 
@@ -44,7 +44,7 @@ class LoginLinkFormView(AuthViewMixin, FormView):
             return self.success_url
 
 
-class LoginLinkSentView(AuthViewMixin, TemplateView):
+class LoginLinkSentView(AuthView, TemplateView):
     template_name = "loginlink/sent.html"
 
     def get(self) -> Response:
@@ -66,7 +66,7 @@ class LoginLinkFailedView(TemplateView):
         return context
 
 
-class LoginLinkLoginView(AuthViewMixin, View):
+class LoginLinkLoginView(AuthView, View):
     success_url = "/"
 
     def get(self) -> Response:

@@ -1,11 +1,11 @@
-from plain.auth.views import AuthViewMixin, LogoutView
+from plain.auth.views import AuthView, LogoutView
 from plain.oauth.providers import get_provider_keys
 from plain.oauth.urls import OAuthRouter
 from plain.urls import Router, include, path
 from plain.views import TemplateView
 
 
-class LoggedInView(AuthViewMixin, TemplateView):
+class LoggedInView(AuthView, TemplateView):
     template_name = "index.html"
     login_required = True
 

@@ -42,7 +42,14 @@ class CreateView(FormView):
         return super().form_valid(form)
 
 
-class ObjectTemplateViewMixin(ABC):
+class DetailView(TemplateView, ABC):
+    """
+    Render a "detail" view of an object.
+
+    By default this is a model instance looked up from `self.queryset`, but the
+    view will support display of *any* object by overriding `self.get_object()`.
+    """
+
     context_object_name = ""
 
     @cached_property
@@ -67,7 +74,7 @@ class ObjectTemplateViewMixin(ABC):
 
     def get_template_context(self) -> dict[str, Any]:
         """Insert the single object into the context dict."""
-        context = super().get_template_context()  # type: ignore
+        context = super().get_template_context()
         context["object"] = (
             self.object
         )  # Some templates can benefit by always knowing a primary "object" can be present
@@ -76,18 +83,7 @@ class ObjectTemplateViewMixin(ABC):
         return context
 
 
-class DetailView(ObjectTemplateViewMixin, TemplateView):
-    """
-    Render a "detail" view of an object.
-
-    By default this is a model instance looked up from `self.queryset`, but the
-    view will support display of *any* object by overriding `self.get_object()`.
-    """
-
-    pass
-
-
-class UpdateView(ObjectTemplateViewMixin, FormView):
+class UpdateView(DetailView, FormView):
     """View for updating an object, with a response rendered by a template."""
 
     def get_success_url(self, form: BaseForm) -> str:
@@ -116,7 +112,7 @@ class UpdateView(ObjectTemplateViewMixin, FormView):
         return kwargs
 
 
-class DeleteView(ObjectTemplateViewMixin, FormView):
+class DeleteView(DetailView, FormView):
     """
     View for deleting an object retrieved with self.get_object(), with a
     response rendered by a template.
@@ -161,7 +157,7 @@ class ListView(TemplateView, ABC):
 
     def get_template_context(self) -> dict[str, Any]:
         """Insert the single object into the context dict."""
-        context = super().get_template_context()  # type: ignore
+        context = super().get_template_context()
         context["objects"] = self.objects
         if self.context_object_name:
             context[self.context_object_name] = self.objects

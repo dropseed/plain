@@ -1,7 +1,7 @@
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain.htmx.views import HTMXViewMixin
+from plain.htmx.views import HTMXView
 from plain.http import Response, ResponseRedirect
 from plain.models import Model
 from plain.paginator import Paginator
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from plain.forms import BaseForm
 
 
-class AdminListView(HTMXViewMixin, AdminView):
+class AdminListView(HTMXView, AdminView):
     template_name = "admin/list.html"
     fields: list[str]
     actions: list[str] = []
