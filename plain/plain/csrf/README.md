@@ -11,6 +11,8 @@
 
 Plain provides modern CSRF protection based on [Filippo Valsorda's 2025 research](https://words.filippo.io/csrf/) using `Sec-Fetch-Site` headers and origin validation.
 
+Note: The `Sec-Fetch-Site` header is only sent by browsers to HTTPS and localhost origins. For HTTP origins, the middleware falls back to `Origin` header validation.
+
 ## Usage
 
 The `CsrfViewMiddleware` is [automatically installed](../internal/handlers/base.py#BUILTIN_BEFORE_MIDDLEWARE) and works transparently. **No changes to your forms or templates are needed.**
