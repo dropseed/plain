@@ -9,6 +9,7 @@ import click
 
 import plain.runtime
 from plain.assets.compile import compile_assets, get_compiled_path
+from plain.cli.print import print_event
 
 
 @click.command()
@@ -54,18 +55,16 @@ def build(keep_original: bool, fingerprint: bool, compress: bool) -> None:
             .get("run", {})
             .items()
         ):
-            click.secho(f"Running {name} from pyproject.toml", bold=True)
+            print_event(f"{name}...")
             result = subprocess.run(data["cmd"], shell=True)
-            print()
             if result.returncode:
                 click.secho(f"Error in {name} (exit {result.returncode})", fg="red")
                 sys.exit(result.returncode)
 
     # Then run installed package build steps (like tailwind, typically should run last...)
     for entry_point in entry_points(group="plain.build"):
-        click.secho(f"Running {entry_point.name}", bold=True)
-        result = entry_point.load()()
-        print()
+        print_event(f"{entry_point.name}...")
+        entry_point.load()()
 
     # Compile our assets
     target_dir = get_compiled_path()

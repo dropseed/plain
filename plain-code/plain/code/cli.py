@@ -102,21 +102,16 @@ def check(
             sys.exit(return_code)
 
     if not skip_ruff:
-        print_event(
-            click.style("Ruff lint:", bold=True) + click.style(" ruff check", dim=True)
-        )
+        print_event("ruff check...", newline=False)
         result = subprocess.run(["ruff", "check", path, *ruff_args])
         maybe_exit(result.returncode)
 
-        print_event(
-            click.style("Ruff format:", bold=True)
-            + click.style(" ruff format --check", dim=True)
-        )
+        print_event("ruff format --check...", newline=False)
         result = subprocess.run(["ruff", "format", path, "--check", *ruff_args])
         maybe_exit(result.returncode)
 
     if not skip_ty and config.get("ty", {}).get("enabled", True):
-        print_event(click.style("Ty:", bold=True) + click.style(" ty check", dim=True))
+        print_event("ty check...", newline=False)
         result = subprocess.run(["ty", "check", path])
         maybe_exit(result.returncode)
 
@@ -126,9 +121,7 @@ def check(
         if biome.needs_update():
             ctx.invoke(install)
 
-        print_event(
-            click.style("Biome:", bold=True) + click.style(" biome check", dim=True)
-        )
+        print_event("biome check...")
         result = biome.invoke("check", path)
         maybe_exit(result.returncode)
 
@@ -153,32 +146,21 @@ def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> No
         raise click.UsageError("Cannot use both --unsafe-fixes and --add-noqa")
 
     if unsafe_fixes:
-        print_event(
-            click.style("Ruff lint:", bold=True)
-            + click.style(" ruff check --fix --unsafe-fixes", dim=True)
-        )
+        print_event("ruff check --fix --unsafe-fixes...", newline=False)
         result = subprocess.run(
             ["ruff", "check", path, "--fix", "--unsafe-fixes", *ruff_args]
         )
     elif add_noqa:
-        print_event(
-            click.style("Ruff lint:", bold=True)
-            + click.style(" ruff check --add-noqa", dim=True)
-        )
+        print_event("ruff check --add-noqa...", newline=False)
         result = subprocess.run(["ruff", "check", path, "--add-noqa", *ruff_args])
     else:
-        print_event(
-            click.style("Ruff lint:", bold=True)
-            + click.style(" ruff check --fix", dim=True)
-        )
+        print_event("ruff check --fix...", newline=False)
         result = subprocess.run(["ruff", "check", path, "--fix", *ruff_args])
 
     if result.returncode != 0:
         sys.exit(result.returncode)
 
-    print_event(
-        click.style("Ruff format:", bold=True) + click.style(" ruff format", dim=True)
-    )
+    print_event("ruff format...", newline=False)
     result = subprocess.run(["ruff", "format", path, *ruff_args])
     if result.returncode != 0:
         sys.exit(result.returncode)
@@ -193,15 +175,9 @@ def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> No
 
         if unsafe_fixes:
             args.append("--unsafe")
-            print_event(
-                click.style("Biome:", bold=True)
-                + click.style(" biome check --write --unsafe", dim=True)
-            )
+            print_event("biome check --write --unsafe...")
         else:
-            print_event(
-                click.style("Biome:", bold=True)
-                + click.style(" biome check --write", dim=True)
-            )
+            print_event("biome check --write...")
 
         result = biome.invoke(*args)
 

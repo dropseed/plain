@@ -13,6 +13,7 @@ from rich.columns import Columns
 from rich.console import Console
 from rich.text import Text
 
+from plain.cli.print import print_event
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .mkcert import MkcertManager
@@ -140,7 +141,7 @@ class DevProcess(ProcessManager):
         self.generate_agents_md()
         self.modify_hosts_file()
 
-        click.secho("→ Running preflight checks... ", dim=True, nl=False)
+        print_event("Running preflight checks...", newline=False)
         self.run_preflight()
 
         # if ServicesProcess.running_pid():
@@ -150,20 +151,21 @@ class DevProcess(ProcessManager):
         #     )
 
         if find_spec("plain.models"):
-            click.secho("→ Waiting for database... ", dim=True, nl=False)
+            print_event("Waiting for database...", newline=False)
             subprocess.run(
                 [sys.executable, "-m", "plain", "db", "wait"],
                 env=self.plain_env,
                 check=True,
             )
-            click.secho("→ Running migrations...", dim=True)
+            print_event("Running migrations...")
             subprocess.run(
                 [sys.executable, "-m", "plain", "migrate", "--backup"],
                 env=self.plain_env,
                 check=True,
             )
 
-        click.secho("\n→ Starting app...", dim=True)
+        click.echo()
+        print_event("Starting app...")
 
         # Manually start the status bar now so it isn't bungled by
         # another thread checking db stuff...
