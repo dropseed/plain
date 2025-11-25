@@ -108,7 +108,10 @@ def plain_db_connected() -> bool:
 
 def check_short(message: str, *args: str) -> None:
     print_event(message, newline=False)
-    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    env = {**os.environ, "FORCE_COLOR": "1"}
+    result = subprocess.run(
+        args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env
+    )
     if result.returncode != 0:
         click.secho("✘", fg="red")
         click.secho(result.stdout.decode("utf-8"))
