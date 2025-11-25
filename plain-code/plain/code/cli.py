@@ -121,7 +121,7 @@ def check(
         if biome.needs_update():
             ctx.invoke(install)
 
-        print_event("biome check...")
+        print_event("biome check...", newline=False)
         result = biome.invoke("check", path)
         maybe_exit(result.returncode)
 
@@ -175,9 +175,9 @@ def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> No
 
         if unsafe_fixes:
             args.append("--unsafe")
-            print_event("biome check --write --unsafe...")
+            print_event("biome check --write --unsafe...", newline=False)
         else:
-            print_event("biome check --write...")
+            print_event("biome check --write...", newline=False)
 
         result = biome.invoke(*args)
 
