@@ -12,7 +12,8 @@
       "!**/*.min.*",
       "!**/tests/**",
       "!**/htmlcov/**",
-      "!**/.venv/**"
+      "!**/.venv/**",
+      "!**/.pytest_cache/**"
     ]
   },
   "formatter": {
