@@ -3,10 +3,10 @@
 if [ "$1" = "--check" ]; then
     shift
     uv run plain-code check . "$@"
-    # Check formatting of markdown files
-    npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --check
+    echo "--> prettier --check..."
+    npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --log-level warn --check
 else
     uv run plain-code fix . "$@"
-    # Format all markdown files
-    npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --write
+    echo "--> prettier --write..."
+    npx prettier '**/*.md' --embedded-language-formatting off --tab-width 4 --log-level warn --write
 fi
