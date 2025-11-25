@@ -72,6 +72,6 @@ jobs:
         uses: astral-sh/setup-uv@v2
       - name: Set up Python
         run: uv python install
-      - working-directory: plain-code
-        run: uv sync
-      - run: uv run --package plain-code --isolated plain-code check .
+      - run: uv sync
+      - run: uv run plain-code check . --skip-ty
+      - run: ./scripts/type-validate
