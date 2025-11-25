@@ -112,7 +112,7 @@ def check(
 
     if not skip_ty and config.get("ty", {}).get("enabled", True):
         print_event("ty check...", newline=False)
-        result = subprocess.run(["ty", "check", path])
+        result = subprocess.run(["ty", "check", path, "--no-progress"])
         maybe_exit(result.returncode)
 
     if not skip_biome and config.get("biome", {}).get("enabled", True):
