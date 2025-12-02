@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.48.0](https://github.com/dropseed/plain/releases/plain-dev@0.48.0) (2025-12-01)
+
+### What's changed
+
+- Pre-commit checks now preserve colored output from subprocesses by setting `FORCE_COLOR=1` ([a56158394b](https://github.com/dropseed/plain/commit/a56158394b))
+- Simplified and streamlined the pre-commit check output formatting for improved readability ([b09edfd2a1](https://github.com/dropseed/plain/commit/b09edfd2a1))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.47.1](https://github.com/dropseed/plain/releases/plain-dev@0.47.1) (2025-11-17)
 
 ### What's changed
