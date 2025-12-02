@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-redirection@0.28.0) (2025-12-01)
+
+### What's changed
+
+- Uses new `request.client_ip` property instead of custom IP detection logic for logging redirects and 404s ([cb0bc5d08f](https://github.com/dropseed/plain/commit/cb0bc5d08f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-redirection@0.27.0) (2025-11-21)
 
 ### What's changed
