@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.92.0](https://github.com/dropseed/plain/releases/plain@0.92.0) (2025-12-01)
+
+### What's changed
+
+- Added `request.client_ip` property to get the client's IP address, with support for `X-Forwarded-For` header when behind a trusted proxy ([cb0bc5d](https://github.com/dropseed/plain/commit/cb0bc5d08f))
+- Added `USE_X_FORWARDED_FOR` setting to enable reading client IP from `X-Forwarded-For` header ([cb0bc5d](https://github.com/dropseed/plain/commit/cb0bc5d08f))
+- Improved `print_event` CLI output styling with dimmed text for less visual noise ([b09edfd](https://github.com/dropseed/plain/commit/b09edfd2a1))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.91.0](https://github.com/dropseed/plain/releases/plain@0.91.0) (2025-11-24)
 
 ### What's changed
