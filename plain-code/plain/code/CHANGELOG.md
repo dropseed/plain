@@ -1,5 +1,17 @@
 # plain-code changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-code@0.13.0) (2025-12-01)
+
+### What's changed
+
+- Simplified CLI output with cleaner single-line status messages for all check and fix operations ([b09edfd](https://github.com/dropseed/plain/commit/b09edfd))
+- The ty type checker now runs with `--no-progress` for cleaner output ([5b70918](https://github.com/dropseed/plain/commit/5b70918))
+- Biome now ignores `.pytest_cache` directories by default ([f9963d0](https://github.com/dropseed/plain/commit/f9963d0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-code@0.12.0) (2025-11-24)
 
 ### What's changed
