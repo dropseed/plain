@@ -15,6 +15,13 @@ class IndexView(TemplateView):
     template_name = "index.html"
 
 
+class ErrorView(TemplateView):
+    template_name = "index.html"
+
+    def get(self):
+        raise ValueError("This is a test exception to demonstrate the toolbar")
+
+
 class AppRouter(Router):
     namespace = ""
     urls = [
@@ -23,5 +30,6 @@ class AppRouter(Router):
         include("observer/", ObserverRouter),
         path("login/", LoginView, name="login"),
         path("logout/", LogoutView, name="logout"),
+        path("error/", ErrorView, name="error"),
         path("", IndexView, name="index"),
     ]
