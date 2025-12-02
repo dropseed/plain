@@ -178,7 +178,7 @@ class Request:
         return str(port)
 
     @cached_property
-    def client_ip(self) -> str | None:
+    def client_ip(self) -> str:
         """Return the client's IP address.
 
         If USE_X_FORWARDED_FOR is True, checks the X-Forwarded-For header first
@@ -190,7 +190,7 @@ class Request:
         if settings.USE_X_FORWARDED_FOR:
             if xff := self.headers.get("X-Forwarded-For"):
                 return xff.split(",")[0].strip()
-        return self.meta.get("REMOTE_ADDR")
+        return self.meta["REMOTE_ADDR"]
 
     def get_full_path(self, force_append_slash: bool = False) -> str:
         """
