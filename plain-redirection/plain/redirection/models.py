@@ -11,13 +11,6 @@ if TYPE_CHECKING:
     from plain.http import Request
 
 
-def _get_client_ip(request: Request) -> str | None:
-    if x_forwarded_for := request.headers.get("X-Forwarded-For"):
-        return x_forwarded_for.split(",")[0].strip()
-    else:
-        return request.meta.get("REMOTE_ADDR")
-
-
 @models.register_model
 class Redirect(models.Model):
     from_pattern: str = types.CharField(max_length=255)
@@ -126,7 +119,7 @@ class RedirectLog(models.Model):
             from_url=from_url,
             to_url=to_url,
             http_status=redirect.http_status,
-            ip_address=_get_client_ip(request),
+            ip_address=request.client_ip,
             user_agent=request.headers.get("User-Agent", ""),
             referrer=request.headers.get("Referer", ""),
         )
@@ -156,7 +149,7 @@ class NotFoundLog(models.Model):
     def from_request(cls, request: Request) -> NotFoundLog:
         return cls.query.create(
             url=request.build_absolute_uri(),
-            ip_address=_get_client_ip(request),
+            ip_address=request.client_ip,
             user_agent=request.headers.get("User-Agent", ""),
             referrer=request.headers.get("Referer", ""),
         )

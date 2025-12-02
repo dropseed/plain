@@ -177,6 +177,21 @@ class Request:
             port = self.meta["SERVER_PORT"]
         return str(port)
 
+    @cached_property
+    def client_ip(self) -> str | None:
+        """Return the client's IP address.
+
+        If USE_X_FORWARDED_FOR is True, checks the X-Forwarded-For header first
+        (using the first/leftmost IP). Otherwise returns REMOTE_ADDR directly.
+
+        Only enable USE_X_FORWARDED_FOR when behind a trusted proxy that
+        overwrites the X-Forwarded-For header.
+        """
+        if settings.USE_X_FORWARDED_FOR:
+            if xff := self.headers.get("X-Forwarded-For"):
+                return xff.split(",")[0].strip()
+        return self.meta.get("REMOTE_ADDR")
+
     def get_full_path(self, force_append_slash: bool = False) -> str:
         """
         Return the full path for the request, including query string.
