@@ -19,7 +19,8 @@ class ErrorView(TemplateView):
     template_name = "index.html"
 
     def get(self):
-        raise ValueError("This is a test exception to demonstrate the toolbar")
+        text = "This is a test exception to demonstrate the toolbar"
+        raise ValueError(text)
 
 
 class AppRouter(Router):
