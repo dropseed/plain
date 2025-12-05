@@ -759,9 +759,6 @@ class SQLCompiler:
                         no_key=no_key,
                     )
 
-                if for_update_part and features.for_update_after_from:
-                    result.append(for_update_part)
-
                 if where:
                     result.append(f"WHERE {where}")
                     params.extend(w_params)
@@ -806,7 +803,7 @@ class SQLCompiler:
                     )
                 )
 
-            if for_update_part and not features.for_update_after_from:
+            if for_update_part:
                 result.append(for_update_part)
 
             if self.query.subquery and extra_select:
@@ -1352,10 +1349,7 @@ class SQLCompiler:
                     continue
                 col = _get_first_selected_col_from_model(klass_info)
             if col is not None:
-                if self.connection.features.select_for_update_of_column:
-                    result.append(self.compile(col)[0])
-                else:
-                    result.append(self.quote_name_unless_alias(col.alias))
+                result.append(self.quote_name_unless_alias(col.alias))
         if invalid_names:
             raise FieldError(
                 "Invalid field name(s) given in select_for_update(of=(...)): {}. "

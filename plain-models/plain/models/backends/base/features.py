@@ -32,9 +32,6 @@ class BaseDatabaseFeatures:
     has_select_for_update_skip_locked = False
     has_select_for_update_of = False
     has_select_for_no_key_update = False
-    # Does the database's SELECT FOR UPDATE OF syntax require a column rather
-    # than a table?
-    select_for_update_of_column = False
 
     # Does the backend truncate names properly when they are too long?
     truncates_names = False
@@ -113,9 +110,6 @@ class BaseDatabaseFeatures:
     # Does the backend consider table names with different casing to
     # be equal?
     ignores_table_name_case = False
-
-    # Place FOR UPDATE right after FROM clause. Used on MSSQL.
-    for_update_after_from = False
 
     # Does the database support SQL 2003 FILTER (WHERE ...) in aggregate
     # expressions?
