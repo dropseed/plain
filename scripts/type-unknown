@@ -1,0 +1,529 @@
+#!/usr/bin/env python3
+"""
+Detect Unknown types using ty's Language Server Protocol.
+
+Analyzes Python files to find parameters and variables that ty cannot
+infer (reported as "Unknown").
+"""
+
+import argparse
+import ast
+import json
+import os
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, field
+from fnmatch import fnmatch
+from pathlib import Path
+
+
+@dataclass
+class UnknownType:
+    """A location with Unknown type."""
+
+    name: str
+    file: str
+    line: int
+    column: int
+    context: str  # function/method name or "<module>"
+    kind: str  # "param", "variable"
+
+
+@dataclass
+class FileStats:
+    """Statistics for a single Python file."""
+
+    path: str
+    total_checked: int = 0
+    unknowns: list[UnknownType] = field(default_factory=list)
+
+    @property
+    def unknown_count(self) -> int:
+        return len(self.unknowns)
+
+    @property
+    def known_count(self) -> int:
+        return self.total_checked - self.unknown_count
+
+    @property
+    def inference_percentage(self) -> float:
+        if self.total_checked == 0:
+            return 100.0
+        return (self.known_count / self.total_checked) * 100
+
+
+class TyLspClient:
+    """Client for ty's Language Server Protocol."""
+
+    def __init__(self, cwd: str):
+        self.cwd = cwd
+        self.proc = subprocess.Popen(
+            ["uv", "run", "ty", "server"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=cwd,
+        )
+        self.request_id = 0
+        self._initialize()
+
+    def _send_request(self, method: str, params: dict | None, req_id: int) -> None:
+        msg = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
+        content = json.dumps(msg)
+        self.proc.stdin.write(f"Content-Length: {len(content)}\r\n\r\n{content}")
+        self.proc.stdin.flush()
+
+    def _send_notification(self, method: str, params: dict) -> None:
+        msg = {"jsonrpc": "2.0", "method": method, "params": params}
+        content = json.dumps(msg)
+        self.proc.stdin.write(f"Content-Length: {len(content)}\r\n\r\n{content}")
+        self.proc.stdin.flush()
+
+    def _read_message(self) -> dict | None:
+        headers: dict[str, str] = {}
+        while True:
+            line = self.proc.stdout.readline()
+            if line in ("\r\n", "\n", ""):
+                break
+            if ":" in line:
+                key, val = line.split(":", 1)
+                headers[key.strip()] = val.strip()
+
+        length = int(headers.get("Content-Length", 0))
+        if length:
+            content = self.proc.stdout.read(length)
+            return json.loads(content)
+        return None
+
+    def _read_until_id(self, target_id: int, max_messages: int = 50) -> dict | None:
+        """Read messages until we get response with target id."""
+        for _ in range(max_messages):
+            msg = self._read_message()
+            if msg and msg.get("id") == target_id:
+                return msg
+        return None
+
+    def _initialize(self) -> None:
+        self.request_id += 1
+        self._send_request(
+            "initialize",
+            {
+                "processId": None,
+                "rootUri": f"file://{self.cwd}",
+                "capabilities": {},
+            },
+            self.request_id,
+        )
+        self._read_until_id(self.request_id)
+        self._send_notification("initialized", {})
+
+    def open_file(self, path: str) -> None:
+        """Open a file in the language server."""
+        with open(path) as f:
+            content = f.read()
+
+        self._send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": f"file://{path}",
+                    "languageId": "python",
+                    "version": 1,
+                    "text": content,
+                }
+            },
+        )
+        # Give ty a moment to process
+        time.sleep(0.05)
+
+    def close_file(self, path: str) -> None:
+        """Close a file in the language server."""
+        self._send_notification(
+            "textDocument/didClose", {"textDocument": {"uri": f"file://{path}"}}
+        )
+
+    def get_type_at(self, path: str, line: int, column: int) -> str | None:
+        """Get the inferred type at a position. Returns None if no result."""
+        self.request_id += 1
+        self._send_request(
+            "textDocument/hover",
+            {
+                "textDocument": {"uri": f"file://{path}"},
+                "position": {"line": line, "character": column},
+            },
+            self.request_id,
+        )
+
+        resp = self._read_until_id(self.request_id)
+        if resp and resp.get("result"):
+            contents = resp["result"].get("contents", {})
+            if isinstance(contents, dict):
+                # Extract just the type, not docstrings
+                value = contents.get("value", "")
+                # ty returns type on first line, docstring after separator
+                return value.split("\n")[0].strip() if value else None
+            elif isinstance(contents, str):
+                return contents.split("\n")[0].strip()
+        return None
+
+    def close(self) -> None:
+        """Shutdown the language server."""
+        self.request_id += 1
+        self._send_request("shutdown", None, self.request_id)
+        self._send_notification("exit", {})
+        try:
+            self.proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+
+
+class TypeLocationFinder(ast.NodeVisitor):
+    """AST visitor to find locations where types should be checked."""
+
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+        # (name, context, line, col, kind)
+        self.locations: list[tuple[str, str, int, int, str]] = []
+        self.context_stack: list[str] = ["<module>"]
+
+    @property
+    def current_context(self) -> str:
+        return self.context_stack[-1]
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._visit_function(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._visit_function(node)
+
+    def _visit_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        self.context_stack.append(node.name)
+
+        # Process parameters
+        for arg in node.args.posonlyargs + node.args.args + node.args.kwonlyargs:
+            if arg.arg not in ("self", "cls"):
+                # Line is 1-indexed in AST, LSP uses 0-indexed
+                self.locations.append(
+                    (arg.arg, node.name, arg.lineno - 1, arg.col_offset, "param")
+                )
+
+        if node.args.vararg and node.args.vararg.arg not in ("self", "cls"):
+            arg = node.args.vararg
+            self.locations.append(
+                (arg.arg, node.name, arg.lineno - 1, arg.col_offset, "param")
+            )
+
+        if node.args.kwarg and node.args.kwarg.arg not in ("self", "cls"):
+            arg = node.args.kwarg
+            self.locations.append(
+                (arg.arg, node.name, arg.lineno - 1, arg.col_offset, "param")
+            )
+
+        # Visit function body for assignments
+        self.generic_visit(node)
+        self.context_stack.pop()
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        """Track simple variable assignments."""
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                # Simple assignment: x = ...
+                self.locations.append(
+                    (target.id, self.current_context, target.lineno - 1, target.col_offset, "variable")
+                )
+            elif isinstance(target, ast.Tuple | ast.List):
+                # Tuple/list unpacking: x, y = ...
+                for elt in target.elts:
+                    if isinstance(elt, ast.Name):
+                        self.locations.append(
+                            (elt.id, self.current_context, elt.lineno - 1, elt.col_offset, "variable")
+                        )
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        """Track annotated assignments."""
+        if isinstance(node.target, ast.Name) and node.value is not None:
+            # Annotated assignment with value: x: int = ...
+            self.locations.append(
+                (node.target.id, self.current_context, node.target.lineno - 1, node.target.col_offset, "variable")
+            )
+        self.generic_visit(node)
+
+    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+        """Track walrus operator assignments."""
+        if isinstance(node.target, ast.Name):
+            self.locations.append(
+                (node.target.id, self.current_context, node.target.lineno - 1, node.target.col_offset, "variable")
+            )
+        self.generic_visit(node)
+
+
+def find_python_files(
+    directory: Path, exclude_patterns: list[str] | None = None
+) -> list[Path]:
+    """Find all Python files in a directory, excluding certain patterns."""
+    default_patterns = [
+        "__pycache__",
+        ".git",
+        ".venv",
+        "venv",
+        "env",
+        ".tox",
+        "build",
+        "dist",
+        "*.egg-info",
+        ".mypy_cache",
+        ".pytest_cache",
+        "test_*.py",
+        "*_test.py",
+        "tests",
+        "test",
+    ]
+
+    patterns = list(default_patterns)
+    if exclude_patterns:
+        patterns.extend(exclude_patterns)
+
+    def should_exclude(path: Path) -> bool:
+        try:
+            relative = path.relative_to(directory).as_posix()
+        except ValueError:
+            relative = path.as_posix()
+
+        candidates = {relative, path.as_posix(), path.name}
+        return any(
+            fnmatch(candidate, pattern)
+            for candidate in candidates
+            for pattern in patterns
+        )
+
+    python_files = []
+
+    for root, dirs, files in os.walk(directory):
+        root_path = Path(root)
+        dirs[:] = [d for d in dirs if not should_exclude(root_path / d)]
+
+        for file in files:
+            if file.endswith(".py"):
+                file_path = root_path / file
+                if not should_exclude(file_path):
+                    python_files.append(file_path)
+
+    return python_files
+
+
+def analyze_file(client: TyLspClient, file_path: Path) -> FileStats | None:
+    """Analyze a single Python file for Unknown types."""
+    try:
+        with open(file_path) as f:
+            content = f.read()
+
+        tree = ast.parse(content, filename=str(file_path))
+        finder = TypeLocationFinder(str(file_path))
+        finder.visit(tree)
+
+        stats = FileStats(path=str(file_path), total_checked=len(finder.locations))
+
+        if not finder.locations:
+            return stats
+
+        # Open file in LSP
+        abs_path = str(file_path.absolute())
+        client.open_file(abs_path)
+
+        # Query each location
+        for name, context, line, col, kind in finder.locations:
+            type_str = client.get_type_at(abs_path, line, col)
+            if type_str == "Unknown":
+                stats.unknowns.append(
+                    UnknownType(
+                        name=name,
+                        file=str(file_path),
+                        line=line + 1,  # Convert back to 1-indexed
+                        column=col,
+                        context=context,
+                        kind=kind,
+                    )
+                )
+
+        client.close_file(abs_path)
+        return stats
+
+    except (SyntaxError, UnicodeDecodeError) as e:
+        print(f"Warning: Could not parse {file_path}: {e}", file=sys.stderr)
+        return None
+
+
+def format_report(
+    all_stats: list[FileStats],
+    show_details: bool = False,
+) -> str:
+    """Format the Unknown types report."""
+    lines = []
+
+    total_checked = sum(s.total_checked for s in all_stats)
+    total_unknown = sum(s.unknown_count for s in all_stats)
+    total_known = total_checked - total_unknown
+
+    if total_checked > 0:
+        inference_pct = (total_known / total_checked) * 100
+    else:
+        inference_pct = 100.0
+
+    # Count by kind
+    all_unknowns = [u for s in all_stats for u in s.unknowns]
+    param_unknowns = sum(1 for u in all_unknowns if u.kind == "param")
+    var_unknowns = sum(1 for u in all_unknowns if u.kind == "variable")
+
+    lines.append(f"Type Inference: {inference_pct:.1f}%")
+    lines.append(f"Locations checked: {total_checked}")
+    lines.append(f"Known types: {total_known}")
+    lines.append(f"Unknown types: {total_unknown}")
+    if total_unknown > 0:
+        lines.append(f"  - parameters: {param_unknowns}")
+        lines.append(f"  - variables: {var_unknowns}")
+    lines.append("")
+
+    if show_details and total_unknown > 0:
+        lines.append("-" * 80)
+        lines.append("UNKNOWN TYPES")
+        lines.append("-" * 80)
+
+        # Sort by file, then by line
+        sorted_stats = sorted(all_stats, key=lambda s: s.path)
+
+        for stats in sorted_stats:
+            if stats.unknowns:
+                lines.append(f"\n{stats.path}")
+                for u in sorted(stats.unknowns, key=lambda x: x.line):
+                    if u.kind == "param":
+                        lines.append(f"  {u.line}:{u.column} {u.context}({u.name})")
+                    else:
+                        lines.append(f"  {u.line}:{u.column} {u.name} = ...")
+
+    return "\n".join(lines)
+
+
+def main() -> None:
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description="Detect Unknown types using ty's LSP"
+    )
+    parser.add_argument("path", type=str, help="File or directory to analyze")
+    parser.add_argument(
+        "--details", action="store_true", help="Show each unknown location"
+    )
+    parser.add_argument("--json", action="store_true", help="Output results as JSON")
+    parser.add_argument(
+        "--exclude",
+        type=str,
+        action="append",
+        help="Additional patterns to exclude (can be used multiple times)",
+    )
+    parser.add_argument(
+        "--fail-under",
+        type=float,
+        metavar="PERCENT",
+        help="Exit with error if inference percentage is below threshold",
+    )
+
+    args = parser.parse_args()
+
+    path = Path(args.path)
+    if not path.exists():
+        print(f"Error: Path '{path}' does not exist", file=sys.stderr)
+        sys.exit(1)
+
+    if path.is_file():
+        if not path.suffix == ".py":
+            print(f"Error: '{path}' is not a Python file", file=sys.stderr)
+            sys.exit(1)
+        python_files = [path]
+        print(f"Analyzing 1 Python file...", file=sys.stderr)
+    elif path.is_dir():
+        exclude_patterns = args.exclude if args.exclude else None
+        python_files = find_python_files(path, exclude_patterns)
+
+        if not python_files:
+            print(f"No Python files found in '{path}'", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"Analyzing {len(python_files)} Python files...", file=sys.stderr)
+    else:
+        print(f"Error: '{path}' is not a file or directory", file=sys.stderr)
+        sys.exit(1)
+
+    # Start LSP client
+    cwd = str(Path.cwd())
+    client = TyLspClient(cwd)
+
+    try:
+        all_stats = []
+        for file_path in python_files:
+            stats = analyze_file(client, file_path)
+            if stats:
+                all_stats.append(stats)
+    finally:
+        client.close()
+
+    # Output results
+    if args.json:
+        total_checked = sum(s.total_checked for s in all_stats)
+        total_unknown = sum(s.unknown_count for s in all_stats)
+        inference_pct = (
+            ((total_checked - total_unknown) / total_checked * 100)
+            if total_checked > 0
+            else 100.0
+        )
+
+        result = {
+            "inference_percentage": inference_pct,
+            "total_checked": total_checked,
+            "unknown_count": total_unknown,
+            "files": [
+                {
+                    "path": s.path,
+                    "total_checked": s.total_checked,
+                    "unknown_count": s.unknown_count,
+                    "unknowns": [
+                        {
+                            "name": u.name,
+                            "context": u.context,
+                            "kind": u.kind,
+                            "line": u.line,
+                            "column": u.column,
+                        }
+                        for u in s.unknowns
+                    ],
+                }
+                for s in all_stats
+                if s.unknowns
+            ],
+        }
+        print(json.dumps(result, indent=2))
+    else:
+        report = format_report(all_stats, show_details=args.details)
+        print(report)
+
+    # Check fail-under threshold
+    if args.fail_under is not None:
+        total_checked = sum(s.total_checked for s in all_stats)
+        total_unknown = sum(s.unknown_count for s in all_stats)
+        inference_pct = (
+            ((total_checked - total_unknown) / total_checked * 100)
+            if total_checked > 0
+            else 100.0
+        )
+
+        if inference_pct < args.fail_under:
+            print(
+                f"\nError: Inference {inference_pct:.1f}% is below threshold {args.fail_under}%",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
