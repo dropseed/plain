@@ -38,7 +38,8 @@ class Dependency:
         self.url: str = str(config.get("url", ""))
         self.installed: str = str(config.get("installed", ""))
         self.filename: str = str(config.get("filename", ""))
-        self.sourcemap: str = str(config.get("sourcemap", ""))
+        # sourcemap can be bool (True/False) or str (custom filename)
+        self.sourcemap: bool | str = config.get("sourcemap", False)
 
     @staticmethod
     def parse_version_from_url(url: str) -> str:
@@ -185,12 +186,12 @@ class Dependency:
 
         # If a sourcemap is requested, download it as well
         if self.sourcemap:
-            if isinstance(self.sourcemap, str):
-                # Use a specific filename from config
-                sourcemap_filename = self.sourcemap
-            else:
-                # Otherwise, append .map to the URL
+            if self.sourcemap is True:
+                # Default: append .map to the filename
                 sourcemap_filename = f"{filename}.map"
+            else:
+                # Use a specific filename from config
+                sourcemap_filename = str(self.sourcemap)
 
             sourcemap_url = "/".join(
                 response.url.split("/")[:-1] + [sourcemap_filename]  # type: ignore
