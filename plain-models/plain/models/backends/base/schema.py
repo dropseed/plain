@@ -331,7 +331,7 @@ class BaseDatabaseSchemaEditor(ABC):
 
         if not null:
             yield "NOT NULL"
-        elif not self.connection.features.implied_column_null:
+        else:
             yield "NULL"
 
         if field.primary_key:
@@ -650,9 +650,6 @@ class BaseDatabaseSchemaEditor(ABC):
             )
         # Add an index, if required
         self.deferred_sql.extend(self._field_indexes_sql(model, field))
-        # Reset connection if required
-        if self.connection.features.connection_persists_old_columns:
-            self.connection.close()
 
     def remove_field(self, model: type[Model], field: Field) -> None:
         """
@@ -673,9 +670,6 @@ class BaseDatabaseSchemaEditor(ABC):
             "column": self.quote_name(field.column),
         }
         self.execute(sql)
-        # Reset connection if required
-        if self.connection.features.connection_persists_old_columns:
-            self.connection.close()
         # Remove all deferred statements referencing the deleted column.
         for sql in list(self.deferred_sql):
             if isinstance(sql, Statement) and sql.references_column(
@@ -1093,9 +1087,6 @@ class BaseDatabaseSchemaEditor(ABC):
                 "changes": changes_sql,
             }
             self.execute(sql, params)
-        # Reset connection if required
-        if self.connection.features.connection_persists_old_columns:
-            self.connection.close()
 
     def _alter_column_null_sql(
         self, model: type[Model], old_field: Field, new_field: Field

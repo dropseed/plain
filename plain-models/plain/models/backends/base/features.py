@@ -95,14 +95,8 @@ class BaseDatabaseFeatures:
     # Does the backend require literal defaults, rather than parameterized ones?
     requires_literal_defaults = False
 
-    # Does the backend require a connection reset after each material schema change?
-    connection_persists_old_columns = False
-
     # Suffix for backends that don't support "SELECT xxx;" queries.
     bare_select_suffix = ""
-
-    # If NULL is implied on columns without needing to be explicitly specified
-    implied_column_null = False
 
     # Does the backend support "select for update" queries with limit (and offset)?
     supports_select_for_update_with_limit = True

@@ -1543,13 +1543,6 @@ class SQLInsertCompiler(SQLCompiler):
             # Return the common case for the placeholder
             sql, params = "%s", [val]
 
-        # The following hook is only used by Oracle Spatial, which sometimes
-        # needs to yield 'NULL' and [] as its placeholder and params instead
-        # of '%s' and [None]. The 'NULL' placeholder is produced earlier by
-        # OracleOperations.get_geom_placeholder(). The following line removes
-        # the corresponding None parameter. See ticket #10888.
-        params = self.connection.ops.modify_insert_params(sql, params)
-
         return sql, list(params)  # Ensure params is a list
 
     def prepare_value(self, field: Any, value: Any) -> Any:

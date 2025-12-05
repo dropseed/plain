@@ -679,15 +679,6 @@ class BaseDatabaseOperations(ABC):
         """
         return "%s"
 
-    def modify_insert_params(
-        self, placeholder: str, params: list[Any] | tuple[Any, ...]
-    ) -> list[Any] | tuple[Any, ...]:
-        """
-        Allow modification of insert parameters. Needed for Oracle Spatial
-        backend due to #10888.
-        """
-        return params
-
     def integer_field_range(self, internal_type: str) -> tuple[int, int]:
         """
         Given an integer field internal type (e.g. 'PositiveIntegerField'),
