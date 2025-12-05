@@ -6,7 +6,7 @@ from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import UniqueConstraint
 from plain.models.expressions import F
-from plain.models.fields import NOT_PROVIDED
+from plain.models.fields import NOT_PROVIDED, DbParameters
 from plain.models.fields.related import ForeignKeyField
 
 if TYPE_CHECKING:
@@ -248,7 +248,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         )
 
     def _field_db_check(
-        self, field: Field, field_db_params: dict[str, Any]
+        self, field: Field, field_db_params: DbParameters
     ) -> str | None:
         if self.connection.mysql_is_mariadb and self.connection.mysql_version >= (
             10,

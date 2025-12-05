@@ -8,6 +8,7 @@ from psycopg import sql
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.backends.ddl_references import Columns, IndexColumns, Statement
 from plain.models.backends.utils import strip_quotes
+from plain.models.fields import DbParameters
 from plain.models.fields.related import ForeignKeyField, RelatedField
 
 if TYPE_CHECKING:
@@ -158,6 +159,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # different type.
         old_db_params = old_field.db_parameters(connection=self.connection)
         old_type = old_db_params["type"]
+        assert old_type is not None, "old_type cannot be None for primary key field"
         if old_field.primary_key and (
             (old_type.startswith("varchar") and not new_type.startswith("varchar"))
             or (old_type.startswith("text") and not new_type.startswith("text"))
@@ -265,8 +267,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         new_field: Field,
         old_type: str,
         new_type: str,
-        old_db_params: dict[str, Any],
-        new_db_params: dict[str, Any],
+        old_db_params: DbParameters,
+        new_db_params: DbParameters,
         strict: bool = False,
     ) -> None:
         super()._alter_field(

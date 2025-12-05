@@ -20,9 +20,9 @@ from plain.models.backends.ddl_references import (
 )
 from plain.models.backends.utils import names_digest, split_identifier, truncate_name
 from plain.models.constraints import Deferrable
-from plain.models.fields import Field
+from plain.models.fields import DbParameters, Field
 from plain.models.fields.related import ForeignKeyField, RelatedField
-from plain.models.fields.reverse_related import ManyToManyRel
+from plain.models.fields.reverse_related import ForeignObjectRel, ManyToManyRel
 from plain.models.indexes import Index
 from plain.models.sql import Query
 from plain.models.transaction import TransactionManagementError, atomic
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("plain.models.backends.schema")
 
 
-def _is_relevant_relation(relation: Any, altered_field: Field) -> bool:
+def _is_relevant_relation(relation: ForeignObjectRel, altered_field: Field) -> bool:
     """
     When altering the given field, must constraints on its model from the given
     relation be temporarily dropped?
@@ -59,7 +59,7 @@ def _is_relevant_relation(relation: Any, altered_field: Field) -> bool:
     return altered_field.name == "id"
 
 
-def _all_related_fields(model: type[Model]) -> list[Any]:
+def _all_related_fields(model: type[Model]) -> list[ForeignObjectRel]:
     # Related fields must be returned in a deterministic order.
     return sorted(
         model._model_meta._get_fields(
@@ -72,7 +72,7 @@ def _all_related_fields(model: type[Model]) -> list[Any]:
 
 def _related_non_m2m_objects(
     old_field: Field, new_field: Field
-) -> Generator[tuple[Any, Any], None, None]:
+) -> Generator[tuple[ForeignObjectRel, ForeignObjectRel], None, None]:
     # Filter out m2m objects from reverse relations.
     # Return (old_relation, new_relation) tuples.
     related_fields = zip(
@@ -288,7 +288,7 @@ class BaseDatabaseSchemaEditor(ABC):
         params: list[Any],
         model: type[Model],
         field: Field,
-        field_db_params: dict[str, Any],
+        field_db_params: DbParameters,
         include_default: bool,
     ) -> Generator[str, None, None]:
         yield column_db_type
@@ -455,6 +455,7 @@ class BaseDatabaseSchemaEditor(ABC):
                             connection=self.connection
                         )
                         field_type = field_db_params["type"]
+                        assert field_type is not None
                         self.execute(
                             *self._alter_column_comment_sql(
                                 model, field, field_type, field.db_comment
@@ -635,6 +636,7 @@ class BaseDatabaseSchemaEditor(ABC):
             and not self.connection.features.supports_comments_inline
         ):
             field_type = db_params["type"]
+            assert field_type is not None
             self.execute(
                 *self._alter_column_comment_sql(
                     model, field, field_type, field.db_comment
@@ -726,7 +728,7 @@ class BaseDatabaseSchemaEditor(ABC):
         )
 
     def _field_db_check(
-        self, field: Field, field_db_params: dict[str, Any]
+        self, field: Field, field_db_params: DbParameters
     ) -> str | None:
         # Always check constraints with the same mocked column name to avoid
         # recreating constrains when the column is renamed.
@@ -745,8 +747,8 @@ class BaseDatabaseSchemaEditor(ABC):
         new_field: Field,
         old_type: str,
         new_type: str,
-        old_db_params: dict[str, Any],
-        new_db_params: dict[str, Any],
+        old_db_params: DbParameters,
+        new_db_params: DbParameters,
         strict: bool = False,
     ) -> None:
         """Perform a "physical" (non-ManyToMany) field update."""
@@ -1065,7 +1067,9 @@ class BaseDatabaseSchemaEditor(ABC):
             constraint_name = self._create_index_name(
                 model.model_options.db_table, [new_field.column], suffix="_check"
             )
-            sql = self._create_check_sql(model, constraint_name, new_db_params["check"])
+            new_check = new_db_params["check"]
+            assert new_check is not None  # Guaranteed by new_db_check check above
+            sql = self._create_check_sql(model, constraint_name, new_check)
             if sql is not None:
                 self.execute(sql)
         # Drop the default if we need to

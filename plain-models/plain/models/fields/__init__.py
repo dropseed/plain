@@ -11,7 +11,17 @@ import warnings
 from base64 import b64decode, b64encode
 from collections.abc import Callable, Sequence
 from functools import cached_property, total_ordering
-from typing import TYPE_CHECKING, Any, Generic, Protocol, Self, TypeVar, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Protocol,
+    Self,
+    TypedDict,
+    TypeVar,
+    cast,
+    overload,
+)
 
 from plain import exceptions, validators
 from plain.models.constants import LOOKUP_SEP
@@ -41,8 +51,18 @@ if TYPE_CHECKING:
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.sql.compiler import SQLCompiler
 
+
+class DbParameters(TypedDict, total=False):
+    """Return type for Field.db_parameters()."""
+
+    type: str | None
+    check: str | None
+    collation: str | None
+
+
 __all__ = [
     "BLANK_CHOICE_DASH",
+    "DbParameters",
     "PrimaryKeyField",
     "BigIntegerField",
     "BinaryField",
@@ -763,7 +783,7 @@ class Field(RegisterLookupMixin, Generic[T]):
             return db_type % self.db_type_parameters(connection)
         return self.db_type(connection)
 
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, Any]:
+    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
         """
         Extension of db_type(), providing a range of different return values
         (type, checks). This will look at db_type(), allowing custom model
@@ -1129,7 +1149,7 @@ class CharField(Field[str]):
             return connection.ops.cast_char_field_without_max_length
         return super().cast_db_type(connection)
 
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, Any]:
+    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
         db_params = super().db_parameters(connection)
         db_params["collation"] = self.db_collation
         return db_params
@@ -2005,7 +2025,7 @@ class TextField(Field[str]):
             )
         return errors
 
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, Any]:
+    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
         db_params = super().db_parameters(connection)
         db_params["collation"] = self.db_collation
         return db_params

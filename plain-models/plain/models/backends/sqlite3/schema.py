@@ -10,6 +10,7 @@ from plain.models.backends.ddl_references import Statement
 from plain.models.backends.utils import strip_quotes
 from plain.models.constraints import UniqueConstraint
 from plain.models.db import NotSupportedError
+from plain.models.fields import DbParameters
 from plain.models.fields.related import ForeignKeyField, RelatedField
 from plain.models.registry import ModelsRegistry
 from plain.models.transaction import atomic
@@ -428,8 +429,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         new_field: Field,
         old_type: str,
         new_type: str,
-        old_db_params: dict[str, Any],
-        new_db_params: dict[str, Any],
+        old_db_params: DbParameters,
+        new_db_params: DbParameters,
         strict: bool = False,
     ) -> None:
         """Perform a "physical" (non-ManyToMany) field update."""

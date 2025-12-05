@@ -14,7 +14,7 @@ from plain.preflight import PreflightResult
 from plain.runtime import SettingsReference
 
 from ..registry import models_registry
-from . import Field
+from . import DbParameters, Field
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForwardForeignKeyDescriptor,
@@ -652,7 +652,7 @@ class ForeignKeyField(RelatedField):
     def cast_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         return self.target_field.cast_db_type(connection=connection)
 
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, Any]:
+    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
         target_db_parameters = self.target_field.db_parameters(connection)
         return {
             "type": self.db_type(connection),
@@ -1204,5 +1204,5 @@ class ManyToManyField(RelatedField):
         # so return None.
         return None
 
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> dict[str, None]:
+    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
         return {"type": None, "check": None}
