@@ -247,12 +247,10 @@ class BuiltinLookup(Lookup):
         lhs_sql, params = self.process_lhs(compiler, connection)
         rhs_sql, rhs_params = self.process_rhs(compiler, connection)
         params.extend(rhs_params)
-        # rhs_sql should be a string for builtin lookups
-        assert isinstance(rhs_sql, str), f"Expected str, got {type(rhs_sql)}"
         rhs_sql = self.get_rhs_op(connection, rhs_sql)
         return f"{lhs_sql} {rhs_sql}", params
 
-    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
+    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str | list[str]) -> str:
         assert self.lookup_name is not None, (
             "lookup_name must be set on Lookup subclass"
         )
@@ -542,7 +540,7 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
             return (placeholder, sqls_params)
         return super().process_rhs(compiler, connection)
 
-    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
+    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str | list[str]) -> str:
         return f"IN {rhs}"
 
     def as_sql(
@@ -588,7 +586,7 @@ class PatternLookup(BuiltinLookup):
     prepare_rhs: bool = False
     bilateral_transforms: list[Any]
 
-    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
+    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str | list[str]) -> str:
         # Assume we are in startswith. We need to produce SQL like:
         #     col LIKE %s, ['thevalue%']
         # For python values we can (and should) do that directly in Python,
@@ -659,7 +657,9 @@ class IEndsWith(EndsWith):
 class Range(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
     lookup_name: str = "range"
 
-    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str) -> str:
+    def get_rhs_op(self, connection: BaseDatabaseWrapper, rhs: str | list[str]) -> str:
+        # Range lookup always receives a list of two elements from process_rhs
+        assert isinstance(rhs, list), f"Range lookup expects list, got {type(rhs)}"
         return f"BETWEEN {rhs[0]} AND {rhs[1]}"
 
 
