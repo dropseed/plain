@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.16.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.16.0) (2025-12-04)
+
+### What's changed
+
+- Internal refactoring of `ExpiringSigner` to use composition instead of inheritance for better type safety ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.15.0) (2025-11-24)
 
 ### What's changed
