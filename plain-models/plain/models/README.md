@@ -503,47 +503,51 @@ users = User.query.filter(Q(is_admin=True) | Q(is_staff=True))
 ```mermaid
 graph TB
     subgraph "User API"
-        Model["Model<br/><small>Define fields & relationships</small>"]
-        QS["QuerySet<br/><small>.filter() .get() .create()</small>"]
+        Model["Model"]
+        QS["QuerySet"]
         Expr["Expressions<br/><small>F() Q() Value()</small>"]
     end
 
-    subgraph "Query Building"
-        Query["Query<br/><small>Logical query structure</small>"]
-        Where["WhereNode<br/><small>Filter tree</small>"]
-        Join["Join<br/><small>Table relationships</small>"]
+    subgraph "Query Layer"
+        Query["Query"]
+        Where["WhereNode"]
+        Join["Join"]
     end
 
-    subgraph "SQL Generation"
-        Compiler["SQLCompiler<br/><small>Renders Query → SQL</small>"]
-        Ops["DatabaseOperations<br/><small>Vendor-specific SQL</small>"]
+    subgraph "Compilation"
+        Compiler["SQLCompiler"]
+        Ops["DatabaseOperations"]
     end
 
-    subgraph "Database Backends"
-        PG["PostgreSQL"]
-        MySQL["MySQL"]
-        SQLite["SQLite"]
+    subgraph "Database"
+        DB[(Database)]
     end
 
-    Model --> QS
-    QS --> Query
-    Expr --> Query
-    Query --> Where
-    Query --> Join
-    Query --> Compiler
-    Compiler --> Ops
-    Ops --> PG
-    Ops --> MySQL
-    Ops --> SQLite
+    Model -- ".query" --> QS
+    QS -- "owns" --> Query
+    Expr -- "used by" --> Query
+    Query -- "contains" --> Where
+    Query -- "contains" --> Join
+    Query -- "get_compiler()" --> Compiler
+    Compiler -- "uses" --> Ops
+    Compiler -- "execute_sql()" --> DB
 ```
+
+**Query execution flow:**
+
+1. **Model.query** returns a [`QuerySet`](./query.py#QuerySet) bound to the model
+2. **QuerySet** methods like `.filter()` modify the internal [`Query`](./sql/query.py#Query) object
+3. When results are needed, **Query.get_compiler()** creates a [`SQLCompiler`](./sql/compiler.py#SQLCompiler)
+4. **SQLCompiler.as_sql()** renders the Query to SQL, using [`DatabaseOperations`](./backends/base/operations.py#BaseDatabaseOperations) for vendor-specific syntax
+5. **SQLCompiler.execute_sql()** runs the SQL and returns results
 
 **Key components:**
 
-- **Model** - Defines your data structure with fields and relationships
-- **QuerySet** - The chainable API for building queries (`.filter()`, `.exclude()`, `.order_by()`)
-- **Query** - Internal representation of a query's logical structure
-- **SQLCompiler** - Transforms Query objects into database-specific SQL
-- **DatabaseOperations** - Handles vendor-specific SQL syntax differences
+- [`Model`](./base.py#Model) - Defines fields, relationships, and provides the `query` attribute
+- [`QuerySet`](./query.py#QuerySet) - Chainable API (`.filter()`, `.exclude()`, `.order_by()`) that builds a Query
+- [`Query`](./sql/query.py#Query) - Internal representation of a query's logical structure (tables, joins, filters)
+- [`SQLCompiler`](./sql/compiler.py#SQLCompiler) - Transforms a Query into executable SQL
+- [`DatabaseOperations`](./backends/base/operations.py#BaseDatabaseOperations) - Vendor-specific SQL syntax (PostgreSQL, MySQL, SQLite)
 
 ## Installation
 
