@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.10.1](https://github.com/dropseed/plain/releases/plain-vendor@0.10.1) (2025-12-05)
+
+### What's changed
+
+- Fixed sourcemap handling to properly support boolean `True` values in addition to custom filename strings ([76da0af](https://github.com/dropseed/plain/commit/76da0af67a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.0](https://github.com/dropseed/plain/releases/plain-vendor@0.10.0) (2025-11-12)
 
 ### What's changed

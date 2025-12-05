@@ -1,6 +1,6 @@
 [project]
 name = "plain.vendor"
-version = "0.10.0"
+version = "0.10.1"
 description = "Download CDN scripts and styles as vendored dependencies."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
