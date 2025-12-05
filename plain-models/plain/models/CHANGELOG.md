@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.65.1](https://github.com/dropseed/plain/releases/plain-models@0.65.1) (2025-12-04)
+
+### What's changed
+
+- Fixed type annotations for `get_rhs_op` method in lookup classes to accept `str | list[str]` parameter, resolving type checker errors when using `Range` and other lookups that return list-based RHS values ([7030cd0](https://github.com/dropseed/plain/commit/7030cd0ee0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.65.0](https://github.com/dropseed/plain/releases/plain-models@0.65.0) (2025-12-04)
 
 ### What's changed
