@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.39.0](https://github.com/dropseed/plain/releases/plain-oauth@0.39.0) (2025-12-04)
+
+### What's changed
+
+- Internal type improvements for accessing `OAUTH_LOGIN_PROVIDERS` setting ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.38.0](https://github.com/dropseed/plain/releases/plain-oauth@0.38.0) (2025-11-24)
 
 ### What's changed
