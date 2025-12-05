@@ -1,5 +1,23 @@
 # plain-models changelog
 
+## [0.66.0](https://github.com/dropseed/plain/releases/plain-models@0.66.0) (2025-12-05)
+
+### What's changed
+
+- Removed `union()`, `intersection()`, and `difference()` combinator methods from QuerySet - use raw SQL for set operations instead ([0bae6abd](https://github.com/dropseed/plain/commit/0bae6abd94))
+- Removed `dates()` and `datetimes()` methods from QuerySet ([62ba81a6](https://github.com/dropseed/plain/commit/62ba81a627))
+- Removed `in_bulk()` method from QuerySet ([62ba81a6](https://github.com/dropseed/plain/commit/62ba81a627))
+- Removed `contains()` method from QuerySet ([62ba81a6](https://github.com/dropseed/plain/commit/62ba81a627))
+- Internal cleanup: removed unused database backend feature flags and operations (`autoinc_sql`, `allows_group_by_selected_pks_on_model`, `connection_persists_old_columns`, `implied_column_null`, `for_update_after_from`, `select_for_update_of_column`, `modify_insert_params`) ([defe5015](https://github.com/dropseed/plain/commit/defe5015e6), [7e62b635](https://github.com/dropseed/plain/commit/7e62b635ba), [30073da1](https://github.com/dropseed/plain/commit/30073da128))
+
+### Upgrade instructions
+
+- Replace any usage of `queryset.union(other_qs)`, `queryset.intersection(other_qs)`, or `queryset.difference(other_qs)` with raw SQL queries using `Model.query.raw()` or database cursors
+- Replace `queryset.dates(field, kind)` with equivalent annotate/values_list queries using `Trunc` and `DateField`
+- Replace `queryset.datetimes(field, kind)` with equivalent annotate/values_list queries using `Trunc` and `DateTimeField`
+- Replace `queryset.in_bulk(id_list)` with a dictionary comprehension like `{obj.id: obj for obj in queryset.filter(id__in=id_list)}`
+- Replace `queryset.contains(obj)` with `queryset.filter(id=obj.id).exists()`
+
 ## [0.65.1](https://github.com/dropseed/plain/releases/plain-models@0.65.1) (2025-12-04)
 
 ### What's changed
