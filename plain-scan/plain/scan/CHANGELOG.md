@@ -1,5 +1,15 @@
 # plain-scan changelog
 
+## [0.5.0](https://github.com/dropseed/plain/releases/plain-scan@0.5.0) (2025-12-04)
+
+### What's changed
+
+- Internal typing improvements to URL handling in redirects audit ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.4.0](https://github.com/dropseed/plain/releases/plain-scan@0.4.0) (2025-11-12)
 
 ### What's changed
