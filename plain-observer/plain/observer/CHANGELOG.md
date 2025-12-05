@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-observer@0.22.0) (2025-12-04)
+
+### What's changed
+
+- Improved type annotations in OTel sampler to use proper `Attributes` type from OpenTelemetry ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea05b26dfc7e32c50f2a5a5bc7e098ceb))
+- Added explicit foreign key ID field annotations for `Log` model to improve type safety ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea05b26dfc7e32c50f2a5a5bc7e098ceb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-observer@0.21.0) (2025-11-24)
 
 ### What's changed
