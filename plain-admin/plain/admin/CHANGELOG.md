@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.57.1](https://github.com/dropseed/plain/releases/plain-admin@0.57.1) (2025-12-05)
+
+### What's changed
+
+- Select dropdowns now hide the browser's default arrow for a cleaner appearance ([709b8d2](https://github.com/dropseed/plain/commit/709b8d2d27))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.57.0](https://github.com/dropseed/plain/releases/plain-admin@0.57.0) (2025-12-04)
 
 ### What's changed
