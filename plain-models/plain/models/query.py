@@ -89,6 +89,9 @@ class ModelIterable(BaseIterable):
             compiler.klass_info,
             compiler.annotation_col_map,
         )
+        # These are set by execute_sql() above
+        assert select is not None
+        assert klass_info is not None
         model_cls = klass_info["model"]
         select_fields = klass_info["select_fields"]
         model_fields_start, model_fields_end = select_fields[0], select_fields[-1] + 1
@@ -137,8 +140,11 @@ class RawModelIterable(BaseIterable):
 
     def __iter__(self) -> Iterator[Model]:
         # Cache some things for performance reasons outside the loop.
+        # RawQuery is not a Query subclass, so we directly get SQLCompiler
+        from plain.models.sql.query import Query as SqlQuery
+
         query = self.queryset.sql_query
-        compiler = db_connection.ops.compiler("SQLCompiler")(query, db_connection)
+        compiler = db_connection.ops.compilers[SqlQuery](query, db_connection, True)
         query_iterator = iter(query)
 
         try:
@@ -229,10 +235,12 @@ class ValuesListIterable(BaseIterable):
                         chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
                     ),
                 )
-        return compiler.results_iter(
-            tuple_expected=True,
-            chunked_fetch=self.chunked_fetch,
-            chunk_size=self.chunk_size,
+        return iter(
+            compiler.results_iter(
+                tuple_expected=True,
+                chunked_fetch=self.chunked_fetch,
+                chunk_size=self.chunk_size,
+            )
         )
 
 
@@ -1100,13 +1108,13 @@ class QuerySet(Generic[T]):
     def raw(
         self,
         raw_query: str,
-        params: tuple[Any, ...] = (),
+        params: Sequence[Any] = (),
         translations: dict[str, str] | None = None,
     ) -> RawQuerySet:
         qs = RawQuerySet(
             raw_query,
             model=self.model,
-            params=params,
+            params=tuple(params),
             translations=translations,
         )
         qs._prefetch_related_lookups = self._prefetch_related_lookups[:]
@@ -1506,7 +1514,8 @@ class QuerySet(Generic[T]):
             unique_fields=unique_fields,
         )
         query.insert_values(fields, objs, raw=raw)
-        return query.get_compiler().execute_sql(returning_fields)
+        # InsertQuery returns SQLInsertCompiler which has different execute_sql signature
+        return query.get_compiler().execute_sql(returning_fields)  # type: ignore[arg-type]
 
     def _batched_insert(
         self,

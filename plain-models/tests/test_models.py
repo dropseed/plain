@@ -159,3 +159,39 @@ def test_meta_related_objects_includes_reverse_fk(db):
     assert isinstance(parent_rel, ForeignKeyRel), (
         "Reverse FK should be ForeignKeyRel (one_to_many from parent's perspective)"
     )
+
+
+def test_raw_query(db):
+    """Test that raw SQL queries work correctly."""
+    # Create some test data
+    Car.query.create(make="Toyota", model="Camry")
+    Car.query.create(make="Honda", model="Civic")
+    Car.query.create(make="Ford", model="F-150")
+
+    # Test raw query returns model instances
+    cars = list(Car.query.raw("SELECT * FROM examples_car ORDER BY make"))
+    assert len(cars) == 3
+    assert all(isinstance(c, Car) for c in cars)
+
+    # Verify the data is correct
+    makes = [c.make for c in cars]
+    assert makes == ["Ford", "Honda", "Toyota"]
+
+
+def test_raw_query_with_params(db):
+    """Test raw queries with parameters."""
+    Car.query.create(make="Toyota", model="Camry")
+    Car.query.create(make="Toyota", model="Corolla")
+    Car.query.create(make="Honda", model="Civic")
+
+    # Test with tuple params
+    cars = list(
+        Car.query.raw("SELECT * FROM examples_car WHERE make = %s", ("Toyota",))
+    )
+    assert len(cars) == 2
+    assert all(c.make == "Toyota" for c in cars)
+
+    # Test with list params (user-friendly - converted to tuple internally)
+    cars = list(Car.query.raw("SELECT * FROM examples_car WHERE make = %s", ["Honda"]))
+    assert len(cars) == 1
+    assert cars[0].make == "Honda"

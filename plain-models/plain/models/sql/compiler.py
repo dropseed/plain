@@ -43,6 +43,10 @@ if TYPE_CHECKING:
     from plain.models.expressions import BaseExpression
     from plain.models.sql.subqueries import InsertQuery
 
+# Type aliases for SQL compilation results
+SqlParams = tuple[Any, ...]
+SqlWithParams = tuple[str, SqlParams]
+
 
 class SQLCompilable(Protocol):
     """Protocol for objects that can be compiled to SQL."""
@@ -85,7 +89,7 @@ class SQLCompiler:
         # these are set as a side-effect of executing the query. Note that we calculate
         # separately a list of extra select columns needed for grammatical correctness
         # of the query, but these columns are not included in self.select.
-        self.select: list[tuple[Any, tuple[str, tuple], str | None]] | None = None
+        self.select: list[tuple[Any, SqlWithParams, str | None]] | None = None
         self.annotation_col_map: dict[str, int] | None = None
         self.klass_info: dict[str, Any] | None = None
         self._meta_ordering: list[str] | None = None
@@ -108,7 +112,7 @@ class SQLCompiler:
 
     def pre_sql_setup(
         self, with_col_aliases: bool = False
-    ) -> tuple[list[Any], list[Any], list[tuple[str, tuple]]] | None:
+    ) -> tuple[list[Any], list[Any], list[SqlWithParams]] | None:
         """
         Do any necessary class setup immediately prior to producing SQL. This
         is for things that can't necessarily be done in __init__ because we
@@ -127,7 +131,7 @@ class SQLCompiler:
 
     def get_group_by(
         self, select: list[Any], order_by: list[Any]
-    ) -> list[tuple[str, tuple]]:
+    ) -> list[SqlWithParams]:
         """
         Return a list of 2-tuples of form (sql, params).
 
@@ -261,7 +265,7 @@ class SQLCompiler:
     def get_select(
         self, with_col_aliases: bool = False
     ) -> tuple[
-        list[tuple[Any, tuple[str, tuple], str | None]],
+        list[tuple[Any, SqlWithParams, str | None]],
         dict[str, Any] | None,
         dict[str, int],
     ]:
@@ -493,7 +497,7 @@ class SQLCompiler:
 
     def get_extra_select(
         self, order_by: list[Any], select: list[Any]
-    ) -> list[tuple[Any, tuple[str, tuple], None]]:
+    ) -> list[tuple[Any, SqlWithParams, None]]:
         extra_select = []
         if self.query.distinct and not self.query.distinct_fields:
             select_sql = [t[1] for t in select]
@@ -525,7 +529,7 @@ class SQLCompiler:
         self.quote_cache[name] = r
         return r
 
-    def compile(self, node: SQLCompilable) -> tuple[str, tuple]:
+    def compile(self, node: SQLCompilable) -> SqlWithParams:
         vendor_impl = getattr(node, "as_" + self.connection.vendor, None)
         if vendor_impl:
             sql, params = vendor_impl(self, self.connection)
@@ -533,7 +537,7 @@ class SQLCompiler:
             sql, params = node.as_sql(self, self.connection)
         return sql, tuple(params)
 
-    def get_qualify_sql(self) -> tuple[list[str], list]:
+    def get_qualify_sql(self) -> tuple[list[str], list[Any]]:
         where_parts = []
         if self.where:
             where_parts.append(self.where)
@@ -637,7 +641,7 @@ class SQLCompiler:
 
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
-    ) -> tuple[str, tuple] | list[tuple[str, tuple]]:
+    ) -> SqlWithParams:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.
@@ -1359,7 +1363,9 @@ class SQLCompiler:
             )
         return result
 
-    def get_converters(self, expressions: list[Any]) -> dict[int, tuple[list, Any]]:
+    def get_converters(
+        self, expressions: Iterable[Any]
+    ) -> dict[int, tuple[list[Any], Any]]:
         converters = {}
         for i, expression in enumerate(expressions):
             if expression:
@@ -1388,7 +1394,7 @@ class SQLCompiler:
         tuple_expected: bool = False,
         chunked_fetch: bool = False,
         chunk_size: int = GET_ITERATOR_CHUNK_SIZE,
-    ) -> Iterable:
+    ) -> Iterable[Any]:
         """Return an iterator over the results from executing this query."""
         if results is None:
             results = self.execute_sql(
@@ -1432,7 +1438,7 @@ class SQLCompiler:
         result_type = result_type or NO_RESULTS
         try:
             as_sql_result = self.as_sql()
-            # SQLCompiler.as_sql returns tuple[str, tuple], subclasses may differ
+            # SQLCompiler.as_sql returns SqlWithParams, subclasses may differ
             assert isinstance(as_sql_result, tuple)
             assert isinstance(as_sql_result[0], str)
             sql, params = as_sql_result
@@ -1486,7 +1492,7 @@ class SQLCompiler:
 
     def as_subquery_condition(
         self, alias: str, columns: list[str], compiler: SQLCompiler
-    ) -> tuple[str, tuple]:
+    ) -> SqlWithParams:
         qn = compiler.quote_name_unless_alias
         qn2 = self.connection.ops.quote_name
 
@@ -1617,9 +1623,9 @@ class SQLInsertCompiler(SQLCompiler):
 
         return placeholder_rows, param_rows
 
-    def as_sql(
+    def as_sql(  # type: ignore[override]  # Returns list for internal iteration in execute_sql
         self, with_limits: bool = True, with_col_aliases: bool = False
-    ) -> list[tuple[str, tuple]]:
+    ) -> list[SqlWithParams]:
         # We don't need quote_name_unless_alias() here, since these are all
         # going to be column names (so we can avoid the extra overhead).
         qn = self.connection.ops.quote_name
@@ -1781,7 +1787,7 @@ class SQLDeleteCompiler(SQLCompiler):
             )
         )
 
-    def _as_sql(self, query: Query) -> tuple[str, tuple]:
+    def _as_sql(self, query: Query) -> SqlWithParams:
         delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"
         try:
             where, params = self.compile(query.where)
@@ -1791,7 +1797,7 @@ class SQLDeleteCompiler(SQLCompiler):
 
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
-    ) -> tuple[str, tuple]:
+    ) -> SqlWithParams:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.
@@ -1817,7 +1823,7 @@ class SQLDeleteCompiler(SQLCompiler):
 class SQLUpdateCompiler(SQLCompiler):
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
-    ) -> tuple[str, tuple]:
+    ) -> SqlWithParams:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.
@@ -1907,7 +1913,7 @@ class SQLUpdateCompiler(SQLCompiler):
 
     def pre_sql_setup(
         self, with_col_aliases: bool = False
-    ) -> tuple[list[Any], list[Any], list[tuple[str, tuple]]] | None:
+    ) -> tuple[list[Any], list[Any], list[SqlWithParams]] | None:
         """
         If the update depends on results from other tables, munge the "where"
         conditions to match the format required for (portable) SQL updates.
@@ -1966,7 +1972,7 @@ class SQLUpdateCompiler(SQLCompiler):
 class SQLAggregateCompiler(SQLCompiler):
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
-    ) -> tuple[str, tuple]:
+    ) -> SqlWithParams:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.

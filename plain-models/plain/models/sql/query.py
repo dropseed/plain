@@ -66,8 +66,7 @@ if TYPE_CHECKING:
     from plain.models.fields.related import RelatedField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.meta import Meta
-    from plain.models.sql.compiler import SQLCompiler
-
+    from plain.models.sql.compiler import SQLCompiler, SqlWithParams
 
 __all__ = ["Query", "RawQuery"]
 
@@ -220,8 +219,6 @@ class Query(BaseExpression):
     empty_result_set_value = None
     subq_aliases = frozenset([alias_prefix])
 
-    compiler = "SQLCompiler"
-
     base_table_class = BaseTable
     join_class = Join
 
@@ -333,7 +330,7 @@ class Query(BaseExpression):
         sql, params = self.sql_with_params()
         return sql % params
 
-    def sql_with_params(self) -> tuple[str, tuple[Any, ...]]:
+    def sql_with_params(self) -> SqlWithParams:
         """
         Return the query as an SQL string and the parameters that will be
         substituted into the query.
@@ -346,10 +343,9 @@ class Query(BaseExpression):
         memo[id(self)] = result
         return result
 
-    def get_compiler(self, *, elide_empty: bool = True) -> Any:
-        return db_connection.ops.compiler(self.compiler)(
-            self, db_connection, elide_empty
-        )
+    def get_compiler(self, *, elide_empty: bool = True) -> SQLCompiler:
+        """Return a compiler instance for this query."""
+        return db_connection.ops.get_compiler_for(self, elide_empty)
 
     def clone(self) -> Self:
         """
@@ -1183,7 +1179,7 @@ class Query(BaseExpression):
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> SqlWithParams:
         # Some backends (e.g. Oracle) raise an error when a subquery contains
         # unnecessary ORDER BY clause.
         if (

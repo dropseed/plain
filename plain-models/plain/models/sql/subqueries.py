@@ -20,8 +20,6 @@ __all__ = ["DeleteQuery", "UpdateQuery", "InsertQuery", "AggregateQuery"]
 class DeleteQuery(Query):
     """A DELETE SQL query."""
 
-    compiler = "SQLDeleteCompiler"
-
     def do_query(self, table: str, where: Any) -> int:
         self.alias_map = {table: self.alias_map[table]}
         self.where = where
@@ -55,8 +53,6 @@ class DeleteQuery(Query):
 
 class UpdateQuery(Query):
     """An UPDATE SQL query."""
-
-    compiler = "SQLUpdateCompiler"
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -153,7 +149,17 @@ class UpdateQuery(Query):
 
 
 class InsertQuery(Query):
-    compiler = "SQLInsertCompiler"
+    def __str__(self) -> str:
+        raise NotImplementedError(
+            "InsertQuery does not support __str__(). "
+            "Use get_compiler().as_sql() which returns a list of SQL statements."
+        )
+
+    def sql_with_params(self) -> Any:
+        raise NotImplementedError(
+            "InsertQuery does not support sql_with_params(). "
+            "Use get_compiler().as_sql() which returns a list of SQL statements."
+        )
 
     def __init__(
         self,
@@ -183,8 +189,6 @@ class AggregateQuery(Query):
     Take another query as a parameter to the FROM clause and only select the
     elements in the provided list.
     """
-
-    compiler = "SQLAggregateCompiler"
 
     def __init__(self, model: Any, inner_query: Any) -> None:
         self.inner_query = inner_query

@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import uuid
 from collections.abc import Iterable
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from plain.models.backends.base.operations import BaseDatabaseOperations
@@ -18,13 +19,32 @@ if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.backends.mysql.base import MySQLDatabaseWrapper
     from plain.models.fields import Field
+    from plain.models.sql.compiler import SQLCompiler
+    from plain.models.sql.query import Query
 
 
 class DatabaseOperations(BaseDatabaseOperations):
     # Type checker hint: connection is always MySQLDatabaseWrapper in this class
     connection: MySQLDatabaseWrapper
 
-    compiler_module = "plain.models.backends.mysql.compiler"
+    @cached_property
+    def compilers(self) -> dict[type[Query], type[SQLCompiler]]:
+        from plain.models.backends.mysql import compiler as mysql_compiler
+        from plain.models.sql.query import Query
+        from plain.models.sql.subqueries import (
+            AggregateQuery,
+            DeleteQuery,
+            InsertQuery,
+            UpdateQuery,
+        )
+
+        return {
+            Query: mysql_compiler.SQLCompiler,
+            DeleteQuery: mysql_compiler.SQLDeleteCompiler,
+            UpdateQuery: mysql_compiler.SQLUpdateCompiler,
+            InsertQuery: mysql_compiler.SQLInsertCompiler,
+            AggregateQuery: mysql_compiler.SQLAggregateCompiler,
+        }
 
     # MySQL stores positive fields as UNSIGNED ints.
     integer_field_ranges = {

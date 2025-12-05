@@ -6,7 +6,7 @@ import ipaddress
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
-from importlib import import_module
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 import sqlparse
@@ -19,10 +19,10 @@ from plain.utils import timezone
 from plain.utils.encoding import force_str
 
 if TYPE_CHECKING:
-    from types import ModuleType
-
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.fields import Field
+    from plain.models.sql.compiler import SQLCompiler
+    from plain.models.sql.query import Query
 
 
 class BaseDatabaseOperations(ABC):
@@ -30,8 +30,6 @@ class BaseDatabaseOperations(ABC):
     Encapsulate backend-specific differences, such as the way a backend
     performs ordering or calculates the ID of a recently-inserted row.
     """
-
-    compiler_module: str = "plain.models.sql.compiler"
 
     # Integer field safe ranges by `internal_type` as documented
     # in docs/ref/models/fields.txt.
@@ -63,7 +61,6 @@ class BaseDatabaseOperations(ABC):
 
     def __init__(self, connection: BaseDatabaseWrapper):
         self.connection = connection
-        self._cache: ModuleType | None = None
 
     def bulk_batch_size(self, fields: list[Field], objs: list[Any]) -> int:
         """
@@ -396,15 +393,44 @@ class BaseDatabaseOperations(ABC):
         """
         ...
 
-    def compiler(self, compiler_name: str) -> type[Any]:
+    @cached_property
+    def compilers(self) -> dict[type[Query], type[SQLCompiler]]:
         """
-        Return the SQLCompiler class corresponding to the given name,
-        in the namespace corresponding to the `compiler_module` attribute
-        on this backend.
+        Return a mapping of Query types to their SQLCompiler implementations.
+        Subclasses can override this to provide custom compiler implementations.
         """
-        if self._cache is None:
-            self._cache = import_module(self.compiler_module)
-        return getattr(self._cache, compiler_name)
+        from plain.models.sql.compiler import (
+            SQLAggregateCompiler,
+            SQLCompiler,
+            SQLDeleteCompiler,
+            SQLInsertCompiler,
+            SQLUpdateCompiler,
+        )
+        from plain.models.sql.query import Query
+        from plain.models.sql.subqueries import (
+            AggregateQuery,
+            DeleteQuery,
+            InsertQuery,
+            UpdateQuery,
+        )
+
+        return {
+            Query: SQLCompiler,
+            DeleteQuery: SQLDeleteCompiler,
+            UpdateQuery: SQLUpdateCompiler,
+            InsertQuery: SQLInsertCompiler,
+            AggregateQuery: SQLAggregateCompiler,
+        }
+
+    def get_compiler_for(self, query: Query, elide_empty: bool = True) -> SQLCompiler:
+        """
+        Return a compiler instance for the given query.
+        Walks the query's MRO to find the appropriate compiler class.
+        """
+        for query_cls in type(query).__mro__:
+            if query_cls in self.compilers:
+                return self.compilers[query_cls](query, self.connection, elide_empty)
+        raise TypeError(f"No compiler registered for {type(query)}")
 
     @abstractmethod
     def quote_name(self, name: str) -> str:

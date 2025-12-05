@@ -515,8 +515,8 @@ graph TB
     end
 
     subgraph "Compilation"
-        Compiler["SQLCompiler"]
         Ops["DatabaseOperations"]
+        Compiler["SQLCompiler"]
     end
 
     subgraph "Database"
@@ -528,8 +528,8 @@ graph TB
     Expr -- "used by" --> Query
     Query -- "contains" --> Where
     Query -- "contains" --> Join
-    Query -- "get_compiler()" --> Compiler
-    Compiler -- "uses" --> Ops
+    Query -- "get_compiler()" --> Ops
+    Ops -- "creates" --> Compiler
     Compiler -- "execute_sql()" --> DB
 ```
 
@@ -537,8 +537,8 @@ graph TB
 
 1. **Model.query** returns a [`QuerySet`](./query.py#QuerySet) bound to the model
 2. **QuerySet** methods like `.filter()` modify the internal [`Query`](./sql/query.py#Query) object
-3. When results are needed, **Query.get_compiler()** creates a [`SQLCompiler`](./sql/compiler.py#SQLCompiler)
-4. **SQLCompiler.as_sql()** renders the Query to SQL, using [`DatabaseOperations`](./backends/base/operations.py#BaseDatabaseOperations) for vendor-specific syntax
+3. When results are needed, **Query.get_compiler()** asks [`DatabaseOperations`](./backends/base/operations.py#BaseDatabaseOperations) to create the appropriate [`SQLCompiler`](./sql/compiler.py#SQLCompiler)
+4. **SQLCompiler.as_sql()** renders the Query to SQL
 5. **SQLCompiler.execute_sql()** runs the SQL and returns results
 
 **Key components:**
