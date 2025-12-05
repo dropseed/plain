@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.17.0) (2025-12-04)
+
+### What's changed
+
+- Internal type annotation improvements ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.16.0) (2025-11-24)
 
 ### What's changed
