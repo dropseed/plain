@@ -1,5 +1,16 @@
 # plain-toolbar changelog
 
+## [0.8.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.8.1) (2025-12-05)
+
+### What's changed
+
+- Toolbar tabs now display in registration order instead of being sorted alphabetically ([ef81fb8](https://github.com/dropseed/plain/commit/ef81fb8ff0b7ab09760d4b63e904e72ee2d4b97d))
+- Toolbar expand and close button icons are now more subtle with improved sizing ([ab038bd](https://github.com/dropseed/plain/commit/ab038bddef6b8f5108efd1c6315f3537898b20b8))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.8.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.8.0) (2025-12-04)
 
 ### What's changed

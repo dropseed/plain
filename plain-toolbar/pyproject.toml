@@ -1,6 +1,6 @@
 [project]
 name = "plain.toolbar"
-version = "0.8.0"
+version = "0.8.1"
 description = "Debug toolbar for Plain applications"
 authors = [
     {name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"},
