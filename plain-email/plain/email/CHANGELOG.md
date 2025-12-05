@@ -1,5 +1,15 @@
 # plain-email changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-email@0.13.0) (2025-12-04)
+
+### What's changed
+
+- Internal typing improvements for better type checker compatibility ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea05b26dfc7e32c50f2a5a5bc7e098ceb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-email@0.12.0) (2025-11-12)
 
 ### What's changed
