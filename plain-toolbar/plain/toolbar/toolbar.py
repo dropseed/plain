@@ -47,8 +47,7 @@ class Toolbar:
 
     def get_items(self) -> list[ToolbarItem]:
         items = [item(self.context) for item in registry.get_items()]
-        enabled = [item for item in items if item.is_enabled()]
-        return sorted(enabled, key=lambda item: item.name)
+        return [item for item in items if item.is_enabled()]
 
 
 class ToolbarItem:
