@@ -298,7 +298,8 @@ class SQLiteDatabaseWrapper(BaseDatabaseWrapper):
         return None
 
     def is_in_memory_db(self) -> bool:
-        return self.creation.is_in_memory_db(self.settings_dict["NAME"])
+        name = self.settings_dict.get("NAME") or ""
+        return self.creation.is_in_memory_db(name)
 
 
 FORMAT_QMARK_REGEX = _lazy_re_compile(r"(?<!%)%s")

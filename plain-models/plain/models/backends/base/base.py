@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from plain.models.backends.base.introspection import BaseDatabaseIntrospection
     from plain.models.backends.base.operations import BaseDatabaseOperations
     from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.connections import DatabaseConfig
 
 RAN_DB_VERSION_CHECK = False
 
@@ -75,14 +76,14 @@ class BaseDatabaseWrapper(ABC):
 
     queries_limit: int = 9000
 
-    def __init__(self, settings_dict: dict[str, Any]):
+    def __init__(self, settings_dict: DatabaseConfig):
         # Connection related attributes.
         # The underlying database connection (from the database library, not a wrapper).
         self.connection: Any = None
         # `settings_dict` should be a dictionary containing keys such as
         # NAME, USER, etc. It's called `settings_dict` instead of `settings`
         # to disambiguate it from Plain settings modules.
-        self.settings_dict: dict[str, Any] = settings_dict
+        self.settings_dict: DatabaseConfig = settings_dict
         # Query logging in debug mode or when explicitly enabled.
         self.queries_log: deque[dict[str, Any]] = deque(maxlen=self.queries_limit)
         self.force_debug_cursor: bool = False

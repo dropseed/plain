@@ -3,10 +3,11 @@ from __future__ import annotations
 import os
 import subprocess
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.connections import DatabaseConfig
 
 
 class BaseDatabaseClient(ABC):
@@ -23,7 +24,7 @@ class BaseDatabaseClient(ABC):
     @classmethod
     @abstractmethod
     def settings_to_cmd_args_env(
-        cls, settings_dict: dict[str, Any], parameters: list[str]
+        cls, settings_dict: DatabaseConfig, parameters: list[str]
     ) -> tuple[list[str], dict[str, str] | None]: ...
 
     def runshell(self, parameters: list[str]) -> None:

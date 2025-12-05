@@ -194,37 +194,37 @@ class PostgreSQLDatabaseWrapper(BaseDatabaseWrapper):
 
     def get_connection_params(self) -> dict[str, Any]:
         settings_dict = self.settings_dict
+        options = settings_dict.get("OPTIONS", {})
         # None may be used to connect to the default 'postgres' db
-        if settings_dict["NAME"] == "" and not settings_dict.get("OPTIONS", {}).get(
-            "service"
-        ):
+        if settings_dict.get("NAME") == "" and not options.get("service"):
             raise ImproperlyConfigured(
                 "settings.DATABASE is improperly configured. "
                 "Please supply the NAME or OPTIONS['service'] value."
             )
-        if len(settings_dict["NAME"] or "") > self.ops.max_name_length():
+        db_name = settings_dict.get("NAME")
+        if len(db_name or "") > self.ops.max_name_length():
             raise ImproperlyConfigured(
                 "The database name '%s' (%d characters) is longer than "  # noqa: UP031
                 "PostgreSQL's limit of %d characters. Supply a shorter NAME "
                 "in settings.DATABASE."
                 % (
-                    settings_dict["NAME"],
-                    len(settings_dict["NAME"]),
+                    db_name,
+                    len(db_name or ""),
                     self.ops.max_name_length(),
                 )
             )
         conn_params: dict[str, Any] = {"client_encoding": "UTF8"}
-        if settings_dict["NAME"]:
+        if db_name:
             conn_params = {
-                "dbname": settings_dict["NAME"],
-                **settings_dict["OPTIONS"],
+                "dbname": db_name,
+                **options,
             }
-        elif settings_dict["NAME"] is None:
+        elif db_name is None:
             # Connect to the default 'postgres' db.
-            settings_dict.get("OPTIONS", {}).pop("service", None)
-            conn_params = {"dbname": "postgres", **settings_dict["OPTIONS"]}
+            options.pop("service", None)
+            conn_params = {"dbname": "postgres", **options}
         else:
-            conn_params = {**settings_dict["OPTIONS"]}
+            conn_params = {**options}
 
         conn_params.pop("assume_role", None)
         conn_params.pop("isolation_level", None)
@@ -249,7 +249,7 @@ class PostgreSQLDatabaseWrapper(BaseDatabaseWrapper):
         #   default when no value is explicitly specified in options.
         # - before calling _set_autocommit() because if autocommit is on, that
         #   will set connection.isolation_level to ISOLATION_LEVEL_AUTOCOMMIT.
-        options = self.settings_dict["OPTIONS"]
+        options = self.settings_dict.get("OPTIONS", {})
         set_isolation_level = False
         try:
             isolation_level_value = options["isolation_level"]

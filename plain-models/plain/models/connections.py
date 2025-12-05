@@ -17,12 +17,12 @@ class DatabaseConfig(TypedDict, total=False):
     DISABLE_SERVER_SIDE_CURSORS: bool
     ENGINE: str
     HOST: str
-    NAME: str
-    OPTIONS: dict[str, Any] | None
+    NAME: str | None
+    OPTIONS: dict[str, Any]
     PASSWORD: str
     PORT: str | int
     TEST: dict[str, Any]
-    TIME_ZONE: str
+    TIME_ZONE: str | None
     USER: str
 
 

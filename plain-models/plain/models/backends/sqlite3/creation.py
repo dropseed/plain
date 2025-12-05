@@ -59,7 +59,7 @@ class DatabaseCreation(BaseDatabaseCreation):
             # Remove the SQLite database file
             os.remove(test_database_name)
 
-    def test_db_signature(self, prefix: str = "") -> tuple[str, ...]:
+    def test_db_signature(self, prefix: str = "") -> tuple[str | int, ...]:
         """
         Return a tuple that uniquely identifies a test database.
 
@@ -68,7 +68,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         TEST NAME. See https://www.sqlite.org/inmemorydb.html
         """
         test_database_name = self._get_test_db_name(prefix)
-        sig = [self.connection.settings_dict["NAME"]]
+        sig: list[str | int] = [self.connection.settings_dict.get("NAME") or ""]
         if self.is_in_memory_db(test_database_name):
             sig.append(":memory:")
         else:

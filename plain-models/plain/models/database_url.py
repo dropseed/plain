@@ -139,7 +139,7 @@ def build_database_url(config: DatabaseConfig) -> str:
             f"No scheme known for engine '{engine}'. We support: {', '.join(sorted(SCHEMES.values()))}"
         )
 
-    options = config.get("OPTIONS") or {}
+    options = config.get("OPTIONS", {})
     query_parts: list[tuple[str, Any]] = []
     for key, value in options.items():
         if scheme == "mysql" and key == "ssl" and isinstance(value, dict):
@@ -153,7 +153,7 @@ def build_database_url(config: DatabaseConfig) -> str:
     query = urlparse.urlencode(query_parts)
 
     if scheme == "sqlite":
-        name = config.get("NAME", "")
+        name = config.get("NAME") or ""
         if name == ":memory:":
             url = "sqlite://:memory:"
         else:

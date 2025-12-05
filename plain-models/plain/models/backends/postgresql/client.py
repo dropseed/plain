@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import signal
-from typing import Any
+from typing import TYPE_CHECKING
 
 from plain.models.backends.base.client import BaseDatabaseClient
+
+if TYPE_CHECKING:
+    from plain.models.connections import DatabaseConfig
 
 
 class DatabaseClient(BaseDatabaseClient):
@@ -11,7 +14,7 @@ class DatabaseClient(BaseDatabaseClient):
 
     @classmethod
     def settings_to_cmd_args_env(
-        cls, settings_dict: dict[str, Any], parameters: list[str]
+        cls, settings_dict: DatabaseConfig, parameters: list[str]
     ) -> tuple[list[str], dict[str, str] | None]:
         args = [cls.executable_name]
         options = settings_dict.get("OPTIONS", {})

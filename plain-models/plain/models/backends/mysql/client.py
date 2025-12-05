@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import signal
-from typing import Any
+from typing import TYPE_CHECKING
 
 from plain.models.backends.base.client import BaseDatabaseClient
+
+if TYPE_CHECKING:
+    from plain.models.connections import DatabaseConfig
 
 
 class DatabaseClient(BaseDatabaseClient):
@@ -11,26 +14,27 @@ class DatabaseClient(BaseDatabaseClient):
 
     @classmethod
     def settings_to_cmd_args_env(
-        cls, settings_dict: dict[str, Any], parameters: list[str]
+        cls, settings_dict: DatabaseConfig, parameters: list[str]
     ) -> tuple[list[str], dict[str, str] | None]:
         args = [cls.executable_name]
         env = None
-        database = settings_dict["OPTIONS"].get(
+        options = settings_dict.get("OPTIONS", {})
+        database = options.get(
             "database",
-            settings_dict["OPTIONS"].get("db", settings_dict["NAME"]),
+            options.get("db", settings_dict.get("NAME")),
         )
-        user = settings_dict["OPTIONS"].get("user", settings_dict["USER"])
-        password = settings_dict["OPTIONS"].get(
+        user = options.get("user", settings_dict.get("USER"))
+        password = options.get(
             "password",
-            settings_dict["OPTIONS"].get("passwd", settings_dict["PASSWORD"]),
+            options.get("passwd", settings_dict.get("PASSWORD")),
         )
-        host = settings_dict["OPTIONS"].get("host", settings_dict["HOST"])
-        port = settings_dict["OPTIONS"].get("port", settings_dict["PORT"])
-        server_ca = settings_dict["OPTIONS"].get("ssl", {}).get("ca")
-        client_cert = settings_dict["OPTIONS"].get("ssl", {}).get("cert")
-        client_key = settings_dict["OPTIONS"].get("ssl", {}).get("key")
-        defaults_file = settings_dict["OPTIONS"].get("read_default_file")
-        charset = settings_dict["OPTIONS"].get("charset")
+        host = options.get("host", settings_dict.get("HOST"))
+        port = options.get("port", settings_dict.get("PORT"))
+        server_ca = options.get("ssl", {}).get("ca")
+        client_cert = options.get("ssl", {}).get("cert")
+        client_key = options.get("ssl", {}).get("key")
+        defaults_file = options.get("read_default_file")
+        charset = options.get("charset")
         # Seems to be no good way to set sql_mode with CLI.
 
         if defaults_file:

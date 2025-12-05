@@ -223,7 +223,7 @@ class MySQLDatabaseWrapper(BaseDatabaseWrapper):
         # "UPDATE", not the number of changed rows.
         kwargs["client_flag"] = CLIENT.FOUND_ROWS
         # Validate the transaction isolation level, if specified.
-        options = settings_dict["OPTIONS"].copy()
+        options = settings_dict.get("OPTIONS", {}).copy()
         isolation_level = options.pop("isolation_level", "read committed")
         if isolation_level:
             isolation_level = isolation_level.lower()

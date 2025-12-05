@@ -146,7 +146,9 @@ class BaseDatabaseCreation:
             return f"{prefix}_{base_name}"
         if self.connection.settings_dict["TEST"]["NAME"]:
             return self.connection.settings_dict["TEST"]["NAME"]
-        return TEST_DATABASE_PREFIX + self.connection.settings_dict["NAME"]
+        name = self.connection.settings_dict["NAME"]
+        assert name is not None, "DATABASE NAME must be set"
+        return TEST_DATABASE_PREFIX + name
 
     def _execute_create_test_db(self, cursor: Any, parameters: dict[str, str]) -> None:
         cursor.execute("CREATE DATABASE {dbname} {suffix}".format(**parameters))
@@ -201,6 +203,7 @@ class BaseDatabaseCreation:
         self.connection.close()
 
         test_database_name = self.connection.settings_dict["NAME"]
+        assert test_database_name is not None, "Test database NAME must be set"
 
         if verbosity >= 1:
             self.log(f"Destroying test database '{test_database_name}'...")
@@ -230,7 +233,7 @@ class BaseDatabaseCreation:
         """
         return ""
 
-    def test_db_signature(self, prefix: str = "") -> tuple[str, ...]:
+    def test_db_signature(self, prefix: str = "") -> tuple[str | int, ...]:
         """
         Return a tuple with elements of self.connection.settings_dict (a
         DATABASE setting value) that uniquely identify a database
@@ -238,8 +241,8 @@ class BaseDatabaseCreation:
         """
         settings_dict = self.connection.settings_dict
         return (
-            settings_dict["HOST"],
-            settings_dict["PORT"],
-            settings_dict["ENGINE"],
+            settings_dict.get("HOST") or "",
+            settings_dict.get("PORT") or "",
+            settings_dict.get("ENGINE") or "",
             self._get_test_db_name(prefix),
         )
