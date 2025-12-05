@@ -1,5 +1,20 @@
 # plain-toolbar changelog
 
+## [0.8.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.8.0) (2025-12-04)
+
+### What's changed
+
+- Exception toolbar now displays rich traceback frames with expandable source code context instead of raw traceback text ([9c4415e](https://github.com/dropseed/plain/commit/9c4415ed6266a36014f1fea75033f3bba4a23b7c))
+- Frames are categorized by source (app, plain, plainx, python, third-party) with color-coded badges ([9c4415e](https://github.com/dropseed/plain/commit/9c4415ed6266a36014f1fea75033f3bba4a23b7c))
+- App frames are expanded by default while framework/library frames are collapsed ([9c4415e](https://github.com/dropseed/plain/commit/9c4415ed6266a36014f1fea75033f3bba4a23b7c))
+- Local variables are displayed for each frame when `DEBUG=True` ([9c4415e](https://github.com/dropseed/plain/commit/9c4415ed6266a36014f1fea75033f3bba4a23b7c))
+- Frame filenames link directly to VS Code at the exact line number ([9c4415e](https://github.com/dropseed/plain/commit/9c4415ed6266a36014f1fea75033f3bba4a23b7c))
+- Toggle between rich frame view and raw traceback text with the "View raw" button ([9c4415e](https://github.com/dropseed/plain/commit/9c4415ed6266a36014f1fea75033f3bba4a23b7c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.7.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.7.1) (2025-10-31)
 
 ### What's changed
