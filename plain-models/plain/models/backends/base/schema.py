@@ -266,14 +266,6 @@ class BaseDatabaseSchemaEditor(ABC):
                     )
             # Add the SQL to our big list.
             column_sqls.append(f"{self.quote_name(field.column)} {definition}")
-            # Autoincrement SQL (for backends with post table definition
-            # variant).
-            if field.get_internal_type() in ("PrimaryKeyField",):
-                autoinc_sql = self.connection.ops.autoinc_sql(
-                    model.model_options.db_table, field.column
-                )
-                if autoinc_sql:
-                    self.deferred_sql.extend(autoinc_sql)
         constraints = [
             constraint.constraint_sql(model, self)
             for constraint in model.model_options.constraints

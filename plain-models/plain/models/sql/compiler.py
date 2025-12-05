@@ -245,9 +245,7 @@ class SQLCompiler:
                 if (
                     hasattr(expr, "target")
                     and expr.target.primary_key
-                    and self.connection.features.allows_group_by_selected_pks_on_model(
-                        expr.target.model
-                    )
+                    and self.connection.features.allows_group_by_selected_pks
                 )
             }
             aliases = {expr.alias for expr in pks}

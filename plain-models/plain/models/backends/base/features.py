@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
@@ -187,8 +187,3 @@ class BaseDatabaseFeatures:
             (count,) = cursor.fetchone()
             cursor.execute("DROP TABLE ROLLBACK_TEST")
         return count == 0
-
-    def allows_group_by_selected_pks_on_model(self, model: Any) -> bool:
-        if not self.allows_group_by_selected_pks:
-            return False
-        return True

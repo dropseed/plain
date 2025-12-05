@@ -65,15 +65,6 @@ class BaseDatabaseOperations(ABC):
         self.connection = connection
         self._cache: ModuleType | None = None
 
-    def autoinc_sql(self, table: str, column: str) -> str | None:
-        """
-        Return any SQL needed to support auto-incrementing primary keys, or
-        None if no SQL is necessary.
-
-        This SQL is executed when a table is created.
-        """
-        return None
-
     def bulk_batch_size(self, fields: list[Field], objs: list[Any]) -> int:
         """
         Return the maximum allowed batch size for the backend. The fields
