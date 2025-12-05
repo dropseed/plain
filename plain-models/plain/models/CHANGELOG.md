@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.65.0](https://github.com/dropseed/plain/releases/plain-models@0.65.0) (2025-12-04)
+
+### What's changed
+
+- Improved type annotations for `ReverseForeignKey` and `ReverseManyToMany` descriptors - they are now proper generic descriptor classes with `__get__` overloads, providing better type inference when accessed on class vs instance ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea0))
+- Internal type annotation improvements across aggregates, expressions, database backends, and SQL compiler modules ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.64.0](https://github.com/dropseed/plain/releases/plain-models@0.64.0) (2025-11-24)
 
 ### What's changed
