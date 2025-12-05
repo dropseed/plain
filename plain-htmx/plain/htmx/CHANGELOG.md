@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-htmx@0.14.0) (2025-12-04)
+
+### What's changed
+
+- Improved type annotations for template extension context handling ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.0](https://github.com/dropseed/plain/releases/plain-htmx@0.13.0) (2025-11-24)
 
 ### What's changed
