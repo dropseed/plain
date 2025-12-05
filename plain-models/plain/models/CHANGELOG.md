@@ -1,5 +1,17 @@
 # plain-models changelog
 
+## [0.67.0](https://github.com/dropseed/plain/releases/plain-models@0.67.0) (2025-12-05)
+
+### What's changed
+
+- Simplified Query/Compiler architecture by moving compiler selection from Query classes to DatabaseOperations ([1d1ae5a6](https://github.com/dropseed/plain/commit/1d1ae5a61f))
+- The `raw()` method now accepts any `Sequence` for params (e.g., lists) instead of requiring tuples ([1d1ae5a6](https://github.com/dropseed/plain/commit/1d1ae5a61f))
+- Internal type annotation improvements across database backends and SQL compiler modules ([bc02184d](https://github.com/dropseed/plain/commit/bc02184de7), [e068dcf2](https://github.com/dropseed/plain/commit/e068dcf201), [33fa09d6](https://github.com/dropseed/plain/commit/33fa09d66f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.66.0](https://github.com/dropseed/plain/releases/plain-models@0.66.0) (2025-12-05)
 
 ### What's changed
