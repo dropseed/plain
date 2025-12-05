@@ -117,14 +117,6 @@ class BaseDatabaseFeatures:
     # Place FOR UPDATE right after FROM clause. Used on MSSQL.
     for_update_after_from = False
 
-    # Combinatorial flags
-    supports_select_union = True
-    supports_select_intersection = True
-    supports_select_difference = True
-    supports_slicing_ordering_in_compound = False
-    supports_parentheses_in_compound = True
-    requires_compound_order_by_subquery = False
-
     # Does the database support SQL 2003 FILTER (WHERE ...) in aggregate
     # expressions?
     supports_aggregate_filter_clause = False

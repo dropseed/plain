@@ -14,6 +14,8 @@
 - [Custom QuerySets](#custom-querysets)
 - [Forms](#forms)
 - [Sharing fields across models](#sharing-fields-across-models)
+- [Raw SQL](#raw-sql)
+- [Architecture](#architecture)
 - [Installation](#installation)
 
 ## Overview
@@ -420,6 +422,128 @@ class Note(TimestampedMixin, models.Model):
     content = models.TextField(max_length=1024)
     liked = models.BooleanField(default=False)
 ```
+
+## Raw SQL
+
+For complex queries that can't be expressed with the ORM, you can use raw SQL.
+
+### Raw QuerySet
+
+Use `Model.query.raw()` to execute raw SQL and get model instances back:
+
+```python
+# Execute raw SQL, returns User instances
+users = User.query.raw("""
+    SELECT * FROM users
+    WHERE created_at > %s
+    ORDER BY created_at DESC
+""", [some_date])
+
+for user in users:
+    print(user.email)  # Full model instance with all fields
+```
+
+Raw querysets support `prefetch_related()` for loading related objects:
+
+```python
+users = User.query.raw("SELECT * FROM users WHERE is_admin = %s", [True])
+users = users.prefetch_related("posts")
+```
+
+### Database cursor
+
+For queries that don't map to a model, use the database cursor directly:
+
+```python
+from plain.models import db_connection
+
+with db_connection.cursor() as cursor:
+    cursor.execute("SELECT COUNT(*) FROM users WHERE is_admin = %s", [True])
+    count = cursor.fetchone()[0]
+```
+
+### SQL operations (UNION, etc.)
+
+For SQL set operations like UNION, INTERSECT, or EXCEPT, use raw SQL:
+
+```python
+# UNION - combine results from multiple queries
+users = User.query.raw("""
+    SELECT * FROM users WHERE is_admin = %s
+    UNION
+    SELECT * FROM users WHERE is_staff = %s
+""", [True, True])
+
+# INTERSECT - users matching both conditions
+users = User.query.raw("""
+    SELECT * FROM users WHERE is_admin = %s
+    INTERSECT
+    SELECT * FROM users WHERE is_staff = %s
+""", [True, True])
+
+# EXCEPT - admins who are not staff
+users = User.query.raw("""
+    SELECT * FROM users WHERE is_admin = %s
+    EXCEPT
+    SELECT * FROM users WHERE is_staff = %s
+""", [True, True])
+```
+
+For simple cases, use Q objects instead of UNION:
+
+```python
+from plain.models import Q
+
+# Equivalent to UNION (on same model)
+users = User.query.filter(Q(is_admin=True) | Q(is_staff=True))
+```
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph "User API"
+        Model["Model<br/><small>Define fields & relationships</small>"]
+        QS["QuerySet<br/><small>.filter() .get() .create()</small>"]
+        Expr["Expressions<br/><small>F() Q() Value()</small>"]
+    end
+
+    subgraph "Query Building"
+        Query["Query<br/><small>Logical query structure</small>"]
+        Where["WhereNode<br/><small>Filter tree</small>"]
+        Join["Join<br/><small>Table relationships</small>"]
+    end
+
+    subgraph "SQL Generation"
+        Compiler["SQLCompiler<br/><small>Renders Query → SQL</small>"]
+        Ops["DatabaseOperations<br/><small>Vendor-specific SQL</small>"]
+    end
+
+    subgraph "Database Backends"
+        PG["PostgreSQL"]
+        MySQL["MySQL"]
+        SQLite["SQLite"]
+    end
+
+    Model --> QS
+    QS --> Query
+    Expr --> Query
+    Query --> Where
+    Query --> Join
+    Query --> Compiler
+    Compiler --> Ops
+    Ops --> PG
+    Ops --> MySQL
+    Ops --> SQLite
+```
+
+**Key components:**
+
+- **Model** - Defines your data structure with fields and relationships
+- **QuerySet** - The chainable API for building queries (`.filter()`, `.exclude()`, `.order_by()`)
+- **Query** - Internal representation of a query's logical structure
+- **SQLCompiler** - Transforms Query objects into database-specific SQL
+- **DatabaseOperations** - Handles vendor-specific SQL syntax differences
 
 ## Installation
 

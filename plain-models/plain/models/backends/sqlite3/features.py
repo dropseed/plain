@@ -29,13 +29,10 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     can_alter_table_rename_column = Database.sqlite_version_info >= (3, 25, 0)
     # Is "ALTER TABLE ... DROP COLUMN" supported?
     can_alter_table_drop_column = Database.sqlite_version_info >= (3, 35, 5)
-    supports_parentheses_in_compound = False
     can_defer_constraint_checks = True
     supports_over_clause = Database.sqlite_version_info >= (3, 25, 0)
     supports_aggregate_filter_clause = Database.sqlite_version_info >= (3, 30, 1)
     supports_order_by_nulls_modifier = Database.sqlite_version_info >= (3, 30, 0)
-    # NULLS LAST/FIRST emulation on < 3.30 requires subquery wrapping.
-    requires_compound_order_by_subquery = Database.sqlite_version_info < (3, 30)
     order_by_nulls_first = True
     supports_json_field_contains = False
     supports_update_conflicts = Database.sqlite_version_info >= (3, 24, 0)

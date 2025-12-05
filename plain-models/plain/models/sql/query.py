@@ -267,11 +267,6 @@ class Query(BaseExpression):
     annotation_select_mask = None
     _annotation_select_cache = None
 
-    # Set combination attributes.
-    combinator = None
-    combinator_all = False
-    combined_queries = ()
-
     # These are for extensions. The contents are more or less appended verbatim
     # to the appropriate clause.
     extra_select_mask = None
@@ -375,10 +370,6 @@ class Query(BaseExpression):
         obj.annotations = self.annotations.copy()
         if self.annotation_select_mask is not None:
             obj.annotation_select_mask = self.annotation_select_mask.copy()
-        if self.combined_queries:
-            obj.combined_queries = tuple(
-                [query.clone() for query in self.combined_queries]
-            )
         # _annotation_select_cache cannot be copied, as doing so breaks the
         # (necessary) state in which both annotations and
         # _annotation_select_cache point to the same underlying objects.
@@ -474,7 +465,6 @@ class Query(BaseExpression):
             or has_existing_aggregation
             or qualify
             or self.distinct
-            or self.combinator
         ):
             from plain.models.sql.subqueries import AggregateQuery
 
@@ -608,11 +598,6 @@ class Query(BaseExpression):
                 # SELECT clause which is about to be cleared.
                 q.set_group_by(allow_aliases=False)
             q.clear_select_clause()
-        if q.combined_queries and q.combinator == "union":
-            q.combined_queries = tuple(
-                combined_query.exists(limit=False)
-                for combined_query in q.combined_queries
-            )
         q.clear_ordering(force=True)
         if limit:
             q.set_limits(high=1)
@@ -1158,16 +1143,6 @@ class Query(BaseExpression):
         clone.bump_prefix(query)
         clone.subquery = True
         clone.where.resolve_expression(query, allow_joins, reuse, summarize, for_save)
-        # Resolve combined queries.
-        if clone.combinator:
-            clone.combined_queries = tuple(
-                [
-                    combined_query.resolve_expression(
-                        query, allow_joins, reuse, summarize, for_save
-                    )
-                    for combined_query in clone.combined_queries
-                ]
-            )
         for key, value in clone.annotations.items():
             resolved = value.resolve_expression(
                 query, allow_joins, reuse, summarize, for_save
@@ -1216,8 +1191,6 @@ class Query(BaseExpression):
             and not db_connection.features.ignores_unnecessary_order_by_in_subqueries
         ):
             self.clear_ordering(force=False)
-            for query in self.combined_queries:
-                query.clear_ordering(force=False)
         sql, params = self.get_compiler().as_sql()
         if self.subquery:
             sql = f"({sql})"
@@ -2158,8 +2131,6 @@ class Query(BaseExpression):
 
     def set_empty(self) -> None:
         self.where.add(NothingNode(), AND)
-        for query in self.combined_queries:
-            query.set_empty()
 
     def is_empty(self) -> bool:
         return any(isinstance(c, NothingNode) for c in self.where.children)

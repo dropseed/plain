@@ -9,7 +9,7 @@ from itertools import chain
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import DatabaseError, NotSupportedError
+from plain.models.db import NotSupportedError
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.expressions import (
     F,
@@ -398,12 +398,6 @@ class SQLCompiler:
                     ) or self.connection.features.supports_order_by_nulls_modifier:
                         field = field.copy()
                         field.expression = select_ref
-                    # Alias collisions are not possible when dealing with
-                    # combined queries so fallback to it if emulation of NULLS
-                    # handling is required.
-                    elif self.query.combinator:
-                        field = field.copy()
-                        field.expression = Ref(select_ref.refs, select_ref.source)
                 yield field, select_ref is not None
                 continue
             if field == "?":  # random
@@ -426,15 +420,10 @@ class SQLCompiler:
             if col in self.query.annotations:
                 # References to an expression which is masked out of the SELECT
                 # clause.
-                if self.query.combinator and self.select:
-                    # Don't use the resolved annotation because other
-                    # combinated queries might define it differently.
-                    expr = F(col)
-                else:
-                    expr = self.query.annotations[col]
-                    if isinstance(expr, Value):
-                        # output_field must be resolved for constants.
-                        expr = Cast(expr, expr.output_field)
+                expr = self.query.annotations[col]
+                if isinstance(expr, Value):
+                    # output_field must be resolved for constants.
+                    expr = Cast(expr, expr.output_field)
                 yield OrderBy(expr, descending=descending), False
                 continue
 
@@ -466,22 +455,17 @@ class SQLCompiler:
                         False,
                     )
             else:
-                if self.query.combinator and self.select:
-                    # Don't use the first model's field because other
-                    # combinated queries might define it differently.
-                    yield OrderBy(F(col), descending=descending), False
-                else:
-                    # 'col' is of the form 'field' or 'field1__field2' or
-                    # '-field1__field2__field', etc.
-                    assert self.query.model is not None, (
-                        "Ordering by fields requires a model"
-                    )
-                    meta = self.query.model._model_meta
-                    yield from self.find_ordering_name(
-                        field,
-                        meta,
-                        default_order=default_order,
-                    )
+                # 'col' is of the form 'field' or 'field1__field2' or
+                # '-field1__field2__field', etc.
+                assert self.query.model is not None, (
+                    "Ordering by fields requires a model"
+                )
+                meta = self.query.model._model_meta
+                yield from self.find_ordering_name(
+                    field,
+                    meta,
+                    default_order=default_order,
+                )
 
     def get_order_by(self) -> list[tuple[Any, tuple[str, tuple, bool]]]:
         """
@@ -496,41 +480,6 @@ class SQLCompiler:
         seen = set()
         for expr, is_ref in self._order_by_pairs():
             resolved = expr.resolve_expression(self.query, allow_joins=True, reuse=None)
-            if not is_ref and self.query.combinator and self.select:
-                src = resolved.expression
-                expr_src = expr.expression
-                for sel_expr, _, col_alias in self.select:
-                    if src == sel_expr:
-                        # When values() is used the exact alias must be used to
-                        # reference annotations.
-                        if (
-                            self.query.has_select_fields
-                            and col_alias in self.query.annotation_select
-                            and not (
-                                isinstance(expr_src, F) and col_alias == expr_src.name
-                            )
-                        ):
-                            continue
-                        resolved.set_source_expressions(
-                            [Ref(col_alias if col_alias else src.target.column, src)]
-                        )
-                        break
-                else:
-                    # Add column used in ORDER BY clause to the selected
-                    # columns and to each combined query.
-                    order_by_idx = len(self.query.select) + 1
-                    col_alias = f"__orderbycol{order_by_idx}"
-                    for q in self.query.combined_queries:
-                        # If fields were explicitly selected through values()
-                        # combined queries cannot be augmented.
-                        if q.has_select_fields:
-                            raise DatabaseError(
-                                "ORDER BY term does not match any column in "
-                                "the result set."
-                            )
-                        q.add_annotation(expr_src, col_alias)
-                    self.query.add_select_col(resolved, col_alias)
-                    resolved.set_source_expressions([Ref(col_alias, src)])
             sql, params = self.compile(resolved)
             # Don't add the same column twice, but the order direction is
             # not taken into account so we strip it. When this entire method
@@ -585,86 +534,6 @@ class SQLCompiler:
         else:
             sql, params = node.as_sql(self, self.connection)
         return sql, tuple(params)
-
-    def get_combinator_sql(self, combinator: str, all: bool) -> tuple[list[str], list]:
-        features = self.connection.features
-        compilers = [
-            query.get_compiler(elide_empty=self.elide_empty)
-            for query in self.query.combined_queries
-        ]
-        if not features.supports_slicing_ordering_in_compound:
-            for compiler in compilers:
-                if compiler.query.is_sliced:
-                    raise DatabaseError(
-                        "LIMIT/OFFSET not allowed in subqueries of compound statements."
-                    )
-                if compiler.get_order_by():
-                    raise DatabaseError(
-                        "ORDER BY not allowed in subqueries of compound statements."
-                    )
-        elif self.query.is_sliced and combinator == "union":
-            for compiler in compilers:
-                # A sliced union cannot have its parts elided as some of them
-                # might be sliced as well and in the event where only a single
-                # part produces a non-empty resultset it might be impossible to
-                # generate valid SQL.
-                compiler.elide_empty = False
-        parts = ()
-        for compiler in compilers:
-            try:
-                # If the columns list is limited, then all combined queries
-                # must have the same columns list. Set the selects defined on
-                # the query on all combined queries, if not already set.
-                if not compiler.query.values_select and self.query.values_select:
-                    compiler.query = compiler.query.clone()
-                    compiler.query.set_values(
-                        (
-                            *self.query.extra_select,
-                            *self.query.values_select,
-                            *self.query.annotation_select,
-                        )
-                    )
-                part_sql, part_args = compiler.as_sql(with_col_aliases=True)
-                if compiler.query.combinator:
-                    # Wrap in a subquery if wrapping in parentheses isn't
-                    # supported.
-                    if not features.supports_parentheses_in_compound:
-                        part_sql = f"SELECT * FROM ({part_sql})"
-                    # Add parentheses when combining with compound query if not
-                    # already added for all compound queries.
-                    elif (
-                        self.query.subquery
-                        or not features.supports_slicing_ordering_in_compound
-                    ):
-                        part_sql = f"({part_sql})"
-                elif (
-                    self.query.subquery
-                    and features.supports_slicing_ordering_in_compound
-                ):
-                    part_sql = f"({part_sql})"
-                parts += ((part_sql, part_args),)
-            except EmptyResultSet:
-                # Omit the empty queryset with UNION and with DIFFERENCE if the
-                # first queryset is nonempty.
-                if combinator == "union" or (combinator == "difference" and parts):
-                    continue
-                raise
-        if not parts:
-            raise EmptyResultSet
-        combinator_sql = self.connection.ops.set_operators[combinator]
-        if all and combinator == "union":
-            combinator_sql += " ALL"
-        braces = "{}"
-        if not self.query.subquery and features.supports_slicing_ordering_in_compound:
-            braces = "({})"
-        sql_parts, args_parts = zip(
-            *((braces.format(sql), args) for sql, args in parts)
-        )
-        result = [f" {combinator_sql} ".join(sql_parts)]
-        params = []
-        for part in args_parts:
-            params.extend(part)
-        return result, params
 
     def get_qualify_sql(self) -> tuple[list[str], list]:
         where_parts = []
@@ -780,27 +649,15 @@ class SQLCompiler:
         """
         refcounts_before = self.query.alias_refcount.copy()
         try:
-            combinator = self.query.combinator
-            result = self.pre_sql_setup(
-                with_col_aliases=with_col_aliases or bool(combinator),
-            )
+            result = self.pre_sql_setup(with_col_aliases=with_col_aliases)
             assert result is not None  # SQLCompiler.pre_sql_setup always returns tuple
             extra_select, order_by, group_by = result
             assert self.select is not None  # Set by pre_sql_setup()
             for_update_part = None
             # Is a LIMIT/OFFSET clause needed?
             with_limit_offset = with_limits and self.query.is_sliced
-            combinator = self.query.combinator
             features = self.connection.features
-            if combinator:
-                if not getattr(features, f"supports_select_{combinator}"):
-                    raise NotSupportedError(
-                        f"{combinator} is not supported on this database backend."
-                    )
-                result, params = self.get_combinator_sql(
-                    combinator, self.query.combinator_all
-                )
-            elif self.qualify:
+            if self.qualify:
                 result, params = self.get_qualify_sql()
                 order_by = None
             else:
@@ -940,11 +797,7 @@ class SQLCompiler:
                 for _, (o_sql, o_params, _) in order_by:
                     ordering.append(o_sql)
                     params.extend(o_params)
-                order_by_sql = "ORDER BY {}".format(", ".join(ordering))
-                if combinator and features.requires_compound_order_by_subquery:
-                    result = ["SELECT * FROM (", *result, ")", order_by_sql]
-                else:
-                    result.append(order_by_sql)
+                result.append("ORDER BY {}".format(", ".join(ordering)))
 
             if with_limit_offset:
                 result.append(

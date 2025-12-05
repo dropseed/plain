@@ -21,7 +21,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_comments = True
     supports_comments_inline = True
     supports_temporal_subtraction = True
-    supports_slicing_ordering_in_compound = True
     supports_update_conflicts = True
 
     # Neither MySQL nor MariaDB support partial indexes.
@@ -178,15 +177,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             and self._mysql_storage_engine != "MyISAM"
             and self.connection.mysql_version >= (8, 0, 13)
         )
-
-    @cached_property
-    def supports_select_intersection(self) -> bool:
-        is_mariadb = self.connection.mysql_is_mariadb
-        return is_mariadb or self.connection.mysql_version >= (8, 0, 31)
-
-    supports_select_difference = property(
-        operator.attrgetter("supports_select_intersection")
-    )
 
     @cached_property
     def can_rename_index(self) -> bool:

@@ -30,7 +30,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     can_rollback_ddl = True
     supports_combined_alters = True
     supports_temporal_subtraction = True
-    supports_slicing_ordering_in_compound = True
 
     requires_casted_case_in_updates = True
     supports_over_clause = True

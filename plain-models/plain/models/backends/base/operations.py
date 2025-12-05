@@ -44,11 +44,6 @@ class BaseDatabaseOperations(ABC):
         "PositiveIntegerField": (0, 2147483647),
         "PrimaryKeyField": (-9223372036854775808, 9223372036854775807),
     }
-    set_operators: dict[str, str] = {
-        "union": "UNION",
-        "intersection": "INTERSECT",
-        "difference": "EXCEPT",
-    }
     # Mapping of Field.get_internal_type() (typically the model field's class
     # name) to the data type to use for the Cast() function, if different from
     # DatabaseWrapper.data_types.

@@ -459,7 +459,6 @@ class QuerySet(Generic[T]):
         return cls
 
     def __and__(self, other: QuerySet[T]) -> QuerySet[T]:
-        self._check_operator_queryset(other, "&")
         self._merge_sanity_check(other)
         if isinstance(other, EmptyQuerySet):
             return other
@@ -471,7 +470,6 @@ class QuerySet(Generic[T]):
         return combined
 
     def __or__(self, other: QuerySet[T]) -> QuerySet[T]:
-        self._check_operator_queryset(other, "|")
         self._merge_sanity_check(other)
         if isinstance(self, EmptyQuerySet):
             return other
@@ -492,7 +490,6 @@ class QuerySet(Generic[T]):
         return combined
 
     def __xor__(self, other: QuerySet[T]) -> QuerySet[T]:
-        self._check_operator_queryset(other, "^")
         self._merge_sanity_check(other)
         if isinstance(self, EmptyQuerySet):
             return other
@@ -593,14 +590,7 @@ class QuerySet(Generic[T]):
         Perform the query and return a single object matching the given
         keyword arguments.
         """
-        if self.sql_query.combinator and (args or kwargs):
-            raise NotSupportedError(
-                f"Calling QuerySet.get(...) with filters after {self.sql_query.combinator}() is not "
-                "supported."
-            )
-        clone = (
-            self._chain() if self.sql_query.combinator else self.filter(*args, **kwargs)
-        )
+        clone = self.filter(*args, **kwargs)
         if self.sql_query.can_filter() and not self.sql_query.distinct_fields:
             clone = clone.order_by()
         limit = None
@@ -1031,7 +1021,6 @@ class QuerySet(Generic[T]):
 
     def delete(self) -> tuple[int, dict[str, int]]:
         """Delete the records in the current QuerySet."""
-        self._not_support_combined_queries("delete")
         if self.sql_query.is_sliced:
             raise TypeError("Cannot use 'limit' or 'offset' with delete().")
         if self.sql_query.distinct or self.sql_query.distinct_fields:
@@ -1079,7 +1068,6 @@ class QuerySet(Generic[T]):
         Update all elements in the current QuerySet, setting all the given
         fields to the appropriate values.
         """
-        self._not_support_combined_queries("update")
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
         self._for_write = True
@@ -1142,7 +1130,6 @@ class QuerySet(Generic[T]):
         Return True if the QuerySet contains the provided obj,
         False otherwise.
         """
-        self._not_support_combined_queries("contains")
         if self._fields is not None:
             raise TypeError(
                 "Cannot call QuerySet.contains() after .values() or .values_list()."
@@ -1314,7 +1301,6 @@ class QuerySet(Generic[T]):
         Return a new QuerySet instance with the args ANDed to the existing
         set.
         """
-        self._not_support_combined_queries("filter")
         return self._filter_or_exclude(False, args, kwargs)
 
     def exclude(self, *args: Any, **kwargs: Any) -> Self:
@@ -1322,7 +1308,6 @@ class QuerySet(Generic[T]):
         Return a new QuerySet instance with NOT (args) ANDed to the existing
         set.
         """
-        self._not_support_combined_queries("exclude")
         return self._filter_or_exclude(True, args, kwargs)
 
     def _filter_or_exclude(
@@ -1363,47 +1348,6 @@ class QuerySet(Generic[T]):
         else:
             return self._filter_or_exclude(False, args=(), kwargs=filter_obj)
 
-    def _combinator_query(
-        self, combinator: str, *other_qs: QuerySet[T], all: bool = False
-    ) -> QuerySet[T]:
-        # Clone the query to inherit the select list and everything
-        clone = self._chain()
-        # Clear limits and ordering so they can be reapplied
-        clone.sql_query.clear_ordering(force=True)
-        clone.sql_query.clear_limits()
-        clone.sql_query.combined_queries = (self.sql_query,) + tuple(
-            qs.sql_query for qs in other_qs
-        )
-        clone.sql_query.combinator = combinator
-        clone.sql_query.combinator_all = all
-        return clone
-
-    def union(self, *other_qs: QuerySet[T], all: bool = False) -> QuerySet[T]:
-        # If the query is an EmptyQuerySet, combine all nonempty querysets.
-        if isinstance(self, EmptyQuerySet):
-            qs = [q for q in other_qs if not isinstance(q, EmptyQuerySet)]
-            if not qs:
-                return self
-            if len(qs) == 1:
-                return qs[0]
-            return qs[0]._combinator_query("union", *qs[1:], all=all)
-        return self._combinator_query("union", *other_qs, all=all)
-
-    def intersection(self, *other_qs: QuerySet[T]) -> QuerySet[T]:
-        # If any query is an EmptyQuerySet, return it.
-        if isinstance(self, EmptyQuerySet):
-            return self
-        for other in other_qs:
-            if isinstance(other, EmptyQuerySet):
-                return other
-        return self._combinator_query("intersection", *other_qs)
-
-    def difference(self, *other_qs: QuerySet[T]) -> QuerySet[T]:
-        # If the query is an EmptyQuerySet, return it.
-        if isinstance(self, EmptyQuerySet):
-            return self
-        return self._combinator_query("difference", *other_qs)
-
     def select_for_update(
         self,
         nowait: bool = False,
@@ -1435,7 +1379,6 @@ class QuerySet(Generic[T]):
 
         If select_related(None) is called, clear the list.
         """
-        self._not_support_combined_queries("select_related")
         if self._fields is not None:
             raise TypeError(
                 "Cannot call select_related() after .values() or .values_list()"
@@ -1459,7 +1402,6 @@ class QuerySet(Generic[T]):
         When prefetch_related() is called more than once, append to the list of
         prefetch lookups. If prefetch_related(None) is called, clear the list.
         """
-        self._not_support_combined_queries("prefetch_related")
         clone = self._chain()
         if lookups == (None,):
             clone._prefetch_related_lookups = ()
@@ -1484,14 +1426,12 @@ class QuerySet(Generic[T]):
         Return a query set in which the returned objects have been annotated
         with extra data or aggregations.
         """
-        self._not_support_combined_queries("annotate")
         return self._annotate(args, kwargs, select=True)
 
     def alias(self, *args: Any, **kwargs: Any) -> Self:
         """
         Return a query set with added aliases for extra data or aggregations.
         """
-        self._not_support_combined_queries("alias")
         return self._annotate(args, kwargs, select=False)
 
     def _annotate(
@@ -1562,7 +1502,6 @@ class QuerySet(Generic[T]):
         """
         Return a new QuerySet instance that will select only distinct results.
         """
-        self._not_support_combined_queries("distinct")
         if self.sql_query.is_sliced:
             raise TypeError(
                 "Cannot create distinct fields once a slice has been taken."
@@ -1581,7 +1520,6 @@ class QuerySet(Generic[T]):
         select_params: list[Any] | None = None,
     ) -> QuerySet[T]:
         """Add extra SQL fragments to the query."""
-        self._not_support_combined_queries("extra")
         if self.sql_query.is_sliced:
             raise TypeError("Cannot change a query once a slice has been taken.")
         clone = self._chain()
@@ -1610,7 +1548,6 @@ class QuerySet(Generic[T]):
         The only exception to this is if None is passed in as the only
         parameter, in which case removal all deferrals.
         """
-        self._not_support_combined_queries("defer")
         if self._fields is not None:
             raise TypeError("Cannot call defer() after .values() or .values_list()")
         clone = self._chain()
@@ -1626,7 +1563,6 @@ class QuerySet(Generic[T]):
         method and that are not already specified as deferred are loaded
         immediately when the queryset is evaluated.
         """
-        self._not_support_combined_queries("only")
         if self._fields is not None:
             raise TypeError("Cannot call only() after .values() or .values_list()")
         if fields == (None,):
@@ -1828,16 +1764,6 @@ class QuerySet(Generic[T]):
                     ", ".join(invalid_args),
                 )
             )
-
-    def _not_support_combined_queries(self, operation_name: str) -> None:
-        if self.sql_query.combinator:
-            raise NotSupportedError(
-                f"Calling QuerySet.{operation_name}() after {self.sql_query.combinator}() is not supported."
-            )
-
-    def _check_operator_queryset(self, other: QuerySet[T], operator_: str) -> None:
-        if self.sql_query.combinator or other.sql_query.combinator:
-            raise TypeError(f"Cannot use {operator_} operator with combined queryset.")
 
 
 class InstanceCheckMeta(type):
