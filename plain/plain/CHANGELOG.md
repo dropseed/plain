@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.93.0](https://github.com/dropseed/plain/releases/plain@0.93.0) (2025-12-04)
+
+### What's changed
+
+- Improved type annotations across forms, HTTP handling, logging, and other core modules for better IDE support and type checking ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea0))
+- Internal refactor of `TimestampSigner` to use composition instead of inheritance from `Signer`, maintaining the same public API ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.92.0](https://github.com/dropseed/plain/releases/plain@0.92.0) (2025-12-01)
 
 ### What's changed
