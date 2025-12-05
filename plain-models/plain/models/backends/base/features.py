@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 class BaseDatabaseFeatures:
     # An optional tuple indicating the minimum supported database version.
-    minimum_database_version = None
+    minimum_database_version: tuple[int, ...] | None = None
     allows_group_by_selected_pks = False
     allows_group_by_select_index = True
     empty_fetchmany_value = []
