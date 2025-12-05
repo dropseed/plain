@@ -36,7 +36,7 @@ class SafeString(str, SafeData):
 
     __slots__ = ()
 
-    def __add__(self, rhs: str) -> SafeString | str:
+    def __add__(self, rhs: str) -> SafeString | str:  # type: ignore[override]
         """
         Concatenating a safe string with another safe bytestring or
         safe string is safe. Otherwise, the result is no longer safe.

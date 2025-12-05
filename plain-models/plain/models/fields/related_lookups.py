@@ -14,8 +14,6 @@ from plain.models.lookups import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
@@ -113,7 +111,7 @@ class RelatedIn(In):
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, Sequence[Any]]:
+    ) -> tuple[str, list[Any]]:
         if isinstance(self.lhs, MultiColSource):
             # For multicolumn lookups we need to build a multicolumn where clause.
             # This clause is either a SubqueryConstraint (for values that need
@@ -181,7 +179,7 @@ class RelatedLookupMixin(Lookup):
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, Sequence[Any]]:
+    ) -> tuple[str, list[Any]]:
         if isinstance(self.lhs, MultiColSource):
             assert self.rhs_is_direct_value()
             self.rhs = get_normalized_value(self.rhs, self.lhs)
@@ -195,8 +193,10 @@ class RelatedLookupMixin(Lookup):
                 root_constraint.add(
                     lookup_class(target.get_col(self.lhs.alias, source), val), AND
                 )
-            return root_constraint.as_sql(compiler, connection)
-        return super().as_sql(compiler, connection)
+            sql, params = root_constraint.as_sql(compiler, connection)
+            return sql, list(params)
+        sql, params = super().as_sql(compiler, connection)
+        return sql, list(params)
 
 
 class RelatedExact(RelatedLookupMixin, Exact):

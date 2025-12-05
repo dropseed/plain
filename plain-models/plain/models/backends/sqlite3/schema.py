@@ -573,5 +573,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         else:
             self._remake_table(model)
 
-    def _collate_sql(self, collation: str) -> str:
-        return "COLLATE " + collation
+    def _collate_sql(
+        self,
+        collation: str | None,
+        old_collation: str | None = None,
+        table_name: str | None = None,
+    ) -> str:
+        return "COLLATE " + collation if collation else ""

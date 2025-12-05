@@ -28,10 +28,15 @@ class Cast(Func):
         self,
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
         extra_context["db_type"] = self.output_field.cast_db_type(connection)
-        return super().as_sql(compiler, connection, **extra_context)
+        return super().as_sql(
+            compiler, connection, function, template, arg_joiner, **extra_context
+        )
 
     def as_sqlite(
         self,
@@ -129,10 +134,15 @@ class Collate(Func):
         self,
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
         extra_context.setdefault("collation", connection.ops.quote_name(self.collation))
-        return super().as_sql(compiler, connection, **extra_context)
+        return super().as_sql(
+            compiler, connection, function, template, arg_joiner, **extra_context
+        )
 
 
 class Greatest(Func):
@@ -178,13 +188,18 @@ class JSONObject(Func):
         self,
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
         if not connection.features.has_json_object_function:
             raise NotSupportedError(
                 "JSONObject() is not supported on this database backend."
             )
-        return super().as_sql(compiler, connection, **extra_context)
+        return super().as_sql(
+            compiler, connection, function, template, arg_joiner, **extra_context
+        )
 
     def as_postgresql(
         self,

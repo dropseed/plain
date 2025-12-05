@@ -211,7 +211,7 @@ class OAuthProvider(ABC):
 
 
 def get_oauth_provider_instance(*, provider_key: str) -> OAuthProvider:
-    OAUTH_LOGIN_PROVIDERS = getattr(settings, "OAUTH_LOGIN_PROVIDERS", {})
+    OAUTH_LOGIN_PROVIDERS = settings.OAUTH_LOGIN_PROVIDERS
     provider_class_path = OAUTH_LOGIN_PROVIDERS[provider_key]["class"]
     provider_class = import_string(provider_class_path)
     provider_kwargs = OAUTH_LOGIN_PROVIDERS[provider_key].get("kwargs", {})
@@ -219,4 +219,4 @@ def get_oauth_provider_instance(*, provider_key: str) -> OAuthProvider:
 
 
 def get_provider_keys() -> list[str]:
-    return list(getattr(settings, "OAUTH_LOGIN_PROVIDERS", {}).keys())
+    return list(settings.OAUTH_LOGIN_PROVIDERS.keys())

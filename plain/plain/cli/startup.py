@@ -29,12 +29,13 @@ if shell_import := plain.runtime.settings.SHELL_IMPORT:
     print_bold(f"Importing {shell_import}")
     module = import_module(shell_import)
 
-    with open(module.__file__) as f:
-        contents = f.read()
-        for line in contents.splitlines():
-            print_dim(f"{line}")
+    if module.__file__:
+        with open(module.__file__) as f:
+            contents = f.read()
+            for line in contents.splitlines():
+                print_dim(f"{line}")
 
-    print()
+        print()
 
     # Emulate `from module import *`
     names = getattr(

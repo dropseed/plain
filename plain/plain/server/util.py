@@ -159,6 +159,8 @@ def write_chunk(sock: socket.socket, data: str | bytes) -> None:
 def write(sock: socket.socket, data: str | bytes, chunked: bool = False) -> None:
     if chunked:
         return write_chunk(sock, data)
+    if isinstance(data, str):
+        data = data.encode("utf-8")
     sock.sendall(data)
 
 
@@ -290,9 +292,11 @@ def split_request_uri(uri: str) -> urllib.parse.SplitResult:
 
 # From six.reraise
 def reraise(
-    tp: type[BaseException], value: BaseException | None, tb: Any = None
+    tp: type[BaseException] | None, value: BaseException | None, tb: Any = None
 ) -> None:
     try:
+        if tp is None:
+            return
         if value is None:
             value = tp()
         if value.__traceback__ is not tb:

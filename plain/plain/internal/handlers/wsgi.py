@@ -48,12 +48,12 @@ class LimitedStream(IOBase):
         self._pos += len(data)
         return data
 
-    def readline(self, size: int = -1, /) -> bytes:
+    def readline(self, size: int | None = -1, /) -> bytes:
         _pos = self._pos
         limit = self.limit
         if _pos >= limit:
             return b""
-        if size == -1 or size is None:
+        if size is None or size == -1:
             size = limit - _pos
         else:
             size = min(size, limit - _pos)
@@ -100,7 +100,7 @@ class WSGIRequest(Request):
                 self.encoding = self.content_params["charset"]
 
         try:
-            content_length = int(environ.get("CONTENT_LENGTH"))
+            content_length = int(environ.get("CONTENT_LENGTH") or 0)
         except (ValueError, TypeError):
             content_length = 0
         self._stream = LimitedStream(self.environ["wsgi.input"], content_length)
@@ -113,8 +113,8 @@ class WSGIRequest(Request):
                 del state["meta"][attr]
         return state
 
-    def _get_scheme(self) -> str | None:
-        return self.environ.get("wsgi.url_scheme")
+    def _get_scheme(self) -> str:
+        return self.environ.get("wsgi.url_scheme", "http")
 
     @cached_property
     def query_params(self) -> QueryDict:

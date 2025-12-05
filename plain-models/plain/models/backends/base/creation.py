@@ -230,7 +230,7 @@ class BaseDatabaseCreation:
         """
         return ""
 
-    def test_db_signature(self, prefix: str = "") -> tuple[str, str, str, str]:
+    def test_db_signature(self, prefix: str = "") -> tuple[str, ...]:
         """
         Return a tuple with elements of self.connection.settings_dict (a
         DATABASE setting value) that uniquely identify a database

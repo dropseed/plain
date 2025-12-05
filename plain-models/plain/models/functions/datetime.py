@@ -60,7 +60,13 @@ class Extract(TimezoneMixin, Transform):
         super().__init__(expression, **extra)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
+        **extra_context: Any,
     ) -> tuple[str, list[Any]]:
         # lookup_name is guaranteed to be str after __init__ validation
         assert self.lookup_name is not None
@@ -283,7 +289,13 @@ class TruncBase(TimezoneMixin, Transform):
         super().__init__(expression, output_field=output_field, **extra)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
+        **extra_context: Any,
     ) -> tuple[str, list[Any]]:
         # kind is guaranteed to be str in subclasses
         assert self.kind is not None
@@ -434,7 +446,13 @@ class TruncDate(TruncBase):
     output_field = DateField()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
+        **extra_context: Any,
     ) -> tuple[str, list[Any]]:
         # Cast to date rather than truncate to date.
         sql, params = compiler.compile(self.lhs)
@@ -449,7 +467,13 @@ class TruncTime(TruncBase):
     output_field = TimeField()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
+        **extra_context: Any,
     ) -> tuple[str, list[Any]]:
         # Cast to time rather than truncate to time.
         sql, params = compiler.compile(self.lhs)

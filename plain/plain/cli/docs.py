@@ -25,7 +25,7 @@ def docs(module: str, open: bool) -> None:
 
     # Get the README.md file for the module
     spec = importlib.util.find_spec(module)
-    if not spec:
+    if not spec or not spec.origin:
         raise click.UsageError(f"Module {module} not found")
 
     module_path = Path(spec.origin).parent

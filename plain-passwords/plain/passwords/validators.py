@@ -51,16 +51,17 @@ class CommonPasswordValidator:
     def DEFAULT_PASSWORD_LIST_PATH(self) -> Path:
         return Path(__file__).resolve().parent / "common-passwords.txt.gz"
 
-    def __init__(
-        self, password_list_path: Path | cached_property = DEFAULT_PASSWORD_LIST_PATH
-    ) -> None:
-        if password_list_path is CommonPasswordValidator.DEFAULT_PASSWORD_LIST_PATH:
-            password_list_path = self.DEFAULT_PASSWORD_LIST_PATH
+    def __init__(self, password_list_path: Path | None = None) -> None:
+        resolved_path: Path = (
+            password_list_path
+            if password_list_path
+            else self.DEFAULT_PASSWORD_LIST_PATH
+        )
         try:
-            with gzip.open(password_list_path, "rt", encoding="utf-8") as f:
+            with gzip.open(resolved_path, "rt", encoding="utf-8") as f:
                 self.passwords = {x.strip() for x in f}
         except OSError:
-            with open(password_list_path) as f:
+            with open(resolved_path) as f:
                 self.passwords = {x.strip() for x in f}
 
     def __call__(self, password: str) -> None:

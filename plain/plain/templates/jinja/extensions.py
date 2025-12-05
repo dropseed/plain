@@ -4,6 +4,7 @@ from typing import Any
 
 from jinja2 import nodes
 from jinja2.ext import Extension
+from jinja2.runtime import Context
 
 
 class InclusionTagExtension(Extension):
@@ -32,14 +33,14 @@ class InclusionTagExtension(Extension):
         call = self.call_method("_render", args=args, kwargs=kwargs, lineno=lineno)
         return nodes.CallBlock(call, [], [], []).set_lineno(lineno)
 
-    def _render(self, context: dict[str, Any], *args: Any, **kwargs: Any) -> str:
-        context = self.get_context(context, *args, **kwargs)
+    def _render(self, context: Context, *args: Any, **kwargs: Any) -> str:
+        render_context = self.get_context(context, *args, **kwargs)
         template = self.environment.get_template(self.template_name)
-        return template.render(context)
+        return template.render(render_context)
 
     def get_context(
-        self, context: dict[str, Any], *args: Any, **kwargs: Any
-    ) -> dict[str, Any]:
+        self, context: Context, *args: Any, **kwargs: Any
+    ) -> Context | dict[str, Any]:
         raise NotImplementedError(
             "You need to implement the `get_context` method in your subclass."
         )

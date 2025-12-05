@@ -115,7 +115,7 @@ class RelatedField(FieldCacheMixin, Field):
         obj = super().__deepcopy__(memodict)
         obj.remote_field = copy.copy(self.remote_field)
         if hasattr(self.remote_field, "field") and self.remote_field.field is self:
-            obj.remote_field.field = obj
+            obj.remote_field.field = obj  # type: ignore[invalid-assignment]
         return cast(Self, obj)
 
     @cached_property
@@ -233,7 +233,7 @@ class RelatedField(FieldCacheMixin, Field):
 
         return errors
 
-    def db_type(self, connection: BaseDatabaseWrapper) -> None:
+    def db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         # By default related field will not have a column as it relates to
         # columns from another table.
         return None
@@ -660,7 +660,7 @@ class ForeignKeyField(RelatedField):
             "collation": target_db_parameters.get("collation"),
         }
 
-    def get_col(self, alias: str, output_field: Field | None = None) -> Any:
+    def get_col(self, alias: str | None, output_field: Field | None = None) -> Any:
         if output_field is None:
             output_field = self.target_field
             while isinstance(output_field, ForeignKeyField):

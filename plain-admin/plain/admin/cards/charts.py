@@ -42,10 +42,10 @@ class TrendCard(ChartCard):
         end = datetime_range.end.strftime("%b %d, %Y")
         return f"{start} to {end}"
 
-    def get_current_preset(self) -> DatetimeRangeAliases:
+    def get_current_preset(self) -> str:
         if s := super().get_current_preset():
-            return DatetimeRangeAliases.from_value(s)
-        return self.default_preset
+            return s
+        return self.default_preset.value
 
     def get_trend_data(self) -> dict[str, int]:
         if not self.model or not self.datetime_field:

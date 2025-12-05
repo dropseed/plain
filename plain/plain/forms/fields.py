@@ -11,7 +11,7 @@ import json
 import math
 import re
 import uuid
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from decimal import Decimal, DecimalException
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, Self
@@ -222,18 +222,15 @@ class CharField(Field):
         return value
 
 
-class IntegerField(Field):
-    default_error_messages = {
-        "invalid": "Enter a whole number.",
-    }
-    re_decimal = _lazy_re_compile(r"\.0*\s*$")
+class NumericField(Field):
+    """Base class for numeric fields with min/max/step validation."""
 
     def __init__(
         self,
         *,
-        max_value: int | None = None,
-        min_value: int | None = None,
-        step_size: int | None = None,
+        max_value: int | float | Decimal | None = None,
+        min_value: int | float | Decimal | None = None,
+        step_size: int | float | Decimal | None = None,
         required: bool = True,
         initial: Any = None,
         error_messages: dict[str, str] | None = None,
@@ -254,6 +251,13 @@ class IntegerField(Field):
         if step_size is not None:
             self.validators.append(validators_.StepValueValidator(step_size))
 
+
+class IntegerField(NumericField):
+    default_error_messages = {
+        "invalid": "Enter a whole number.",
+    }
+    re_decimal = _lazy_re_compile(r"\.0*\s*$")
+
     def to_python(self, value: Any) -> int | None:
         """
         Validate that int() can be called on the input. Return the result
@@ -270,7 +274,7 @@ class IntegerField(Field):
         return value
 
 
-class FloatField(IntegerField):
+class FloatField(NumericField):
     default_error_messages = {
         "invalid": "Enter a number.",
     }
@@ -280,7 +284,7 @@ class FloatField(IntegerField):
         Validate that float() can be called on the input. Return the result
         of float() or None for empty values.
         """
-        value = super(IntegerField, self).to_python(value)
+        value = super().to_python(value)
         if value in self.empty_values:
             return None
         try:
@@ -297,7 +301,7 @@ class FloatField(IntegerField):
             raise ValidationError(self.error_messages["invalid"], code="invalid")
 
 
-class DecimalField(IntegerField):
+class DecimalField(NumericField):
     default_error_messages = {
         "invalid": "Enter a number.",
     }
@@ -305,8 +309,8 @@ class DecimalField(IntegerField):
     def __init__(
         self,
         *,
-        max_value: int | None = None,
-        min_value: int | None = None,
+        max_value: Decimal | int | None = None,
+        min_value: Decimal | int | None = None,
         max_digits: int | None = None,
         decimal_places: int | None = None,
         required: bool = True,
@@ -650,14 +654,14 @@ class FileField(Field):
             validators=validators,
         )
 
-    def to_python(self, data: Any) -> Any:
-        if data in self.empty_values:
+    def to_python(self, value: Any) -> Any:
+        if value in self.empty_values:
             return None
 
         # UploadedFile objects should have name and size attributes.
         try:
-            file_name = data.name
-            file_size = data.size
+            file_name = value.name
+            file_size = value.size
         except AttributeError:
             raise ValidationError(self.error_messages["invalid"], code="invalid")
 
@@ -671,9 +675,9 @@ class FileField(Field):
         if not self.allow_empty_file and not file_size:
             raise ValidationError(self.error_messages["empty"], code="empty")
 
-        return data
+        return value
 
-    def clean(self, data: Any, initial: Any = None) -> Any:
+    def clean(self, data: Any, initial: Any = None) -> Any:  # type: ignore[override]
         # If the widget got contradictory inputs, we raise a validation error
         if data is FILE_INPUT_CONTRADICTION:
             raise ValidationError(
@@ -694,7 +698,7 @@ class FileField(Field):
             return initial
         return super().clean(data)
 
-    def bound_data(self, _: Any, initial: Any) -> Any:
+    def bound_data(self, data: Any, initial: Any) -> Any:
         return initial
 
     def has_changed(self, initial: Any, data: Any) -> bool:
@@ -713,12 +717,12 @@ class ImageField(FileField):
         "invalid_image": "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
     }
 
-    def to_python(self, data: Any) -> Any:
+    def to_python(self, value: Any) -> Any:
         """
         Check that the file-upload field data contains a valid image (GIF, JPG,
         PNG, etc. -- whatever Pillow supports).
         """
-        f = super().to_python(data)
+        f = super().to_python(value)
         if f is None:
             return None
 
@@ -726,13 +730,13 @@ class ImageField(FileField):
 
         # We need to get a file object for Pillow. We might have a path or we might
         # have to read the data into memory.
-        if hasattr(data, "temporary_file_path"):
-            file = data.temporary_file_path()
+        if hasattr(value, "temporary_file_path"):
+            file = value.temporary_file_path()
         else:
-            if hasattr(data, "read"):
-                file = BytesIO(data.read())
+            if hasattr(value, "read"):
+                file = BytesIO(value.read())
             else:
-                file = BytesIO(data["content"])
+                file = BytesIO(value["content"])
 
         try:
             # load() could spot a truncated JPEG, but it loads the entire
@@ -878,7 +882,7 @@ class NullBooleanField(BooleanField):
     to None.
     """
 
-    def to_python(self, value: Any) -> bool | None:
+    def to_python(self, value: Any) -> bool | None:  # type: ignore[override]
         """
         Explicitly check for the string 'True' and 'False', which is what a
         hidden field will submit for True and False, for 'true' and 'false',
@@ -939,7 +943,7 @@ class ChoiceField(Field):
         result._choices = copy.deepcopy(self._choices, memo)
         return result
 
-    def _get_choices(self) -> CallableChoiceIterator | list[Any]:
+    def _get_choices(self) -> Iterable[Any]:
         return self._choices
 
     def _set_choices(self, value: Any) -> None:
@@ -1035,7 +1039,7 @@ class MultipleChoiceField(ChoiceField):
         "invalid_list": "Enter a list of values.",
     }
 
-    def to_python(self, value: Any) -> list[str]:
+    def to_python(self, value: Any) -> list[str]:  # type: ignore[override]
         if not value:
             return []
         elif not isinstance(value, list | tuple):
@@ -1082,7 +1086,7 @@ class UUIDField(CharField):
             return str(value)
         return value
 
-    def to_python(self, value: Any) -> uuid.UUID | None:
+    def to_python(self, value: Any) -> uuid.UUID | None:  # type: ignore[override]
         value = super().to_python(value)
         if value in self.empty_values:
             return None

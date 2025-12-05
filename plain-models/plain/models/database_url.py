@@ -123,7 +123,7 @@ def parse_database_url(
     return parsed_config
 
 
-def build_database_url(config: dict) -> str:
+def build_database_url(config: DatabaseConfig) -> str:
     """Build a database URL from a configuration dictionary."""
     engine = config.get("ENGINE")
     if not engine:

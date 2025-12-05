@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import datetime
 import decimal
+import ipaddress
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
@@ -243,7 +244,7 @@ class BaseDatabaseOperations(ABC):
         """
         return "%s"
 
-    def force_no_ordering(self) -> list[str]:
+    def force_no_ordering(self) -> list[tuple[Any, tuple[str, tuple[Any, ...], bool]]]:
         """
         Return a list used in the "ORDER BY" clause to force no ordering at
         all. Return an empty list to include nothing in the ordering.
@@ -293,8 +294,8 @@ class BaseDatabaseOperations(ABC):
         self,
         cursor: CursorWrapper,
         sql: str,
-        params: list[Any] | tuple[Any, ...] | dict[str, Any] | None,
-    ) -> str:
+        params: Any,
+    ) -> str | None:
         """
         Return a string of the query last executed by the given cursor, with
         placeholders replaced with actual values.
@@ -384,7 +385,7 @@ class BaseDatabaseOperations(ABC):
 
     def return_insert_columns(
         self, fields: list[Field]
-    ) -> tuple[str, list[Any]] | None:
+    ) -> tuple[str, Sequence[Any]] | None:
         """
         For backends that support returning columns as part of an insert query,
         return the SQL and params to append to the INSERT query. The returned
@@ -561,7 +562,9 @@ class BaseDatabaseOperations(ABC):
         """
         return utils.format_number(value, max_digits, decimal_places)
 
-    def adapt_ipaddressfield_value(self, value: str | None) -> str | None:
+    def adapt_ipaddressfield_value(
+        self, value: str | None
+    ) -> str | ipaddress.IPv4Address | ipaddress.IPv6Address | None:
         """
         Transform a string representation of an IP address into the expected
         type for the backend driver.
@@ -570,7 +573,7 @@ class BaseDatabaseOperations(ABC):
 
     def adapt_json_value(
         self, value: Any, encoder: type[json.JSONEncoder] | None
-    ) -> str:
+    ) -> Any:
         return json.dumps(value, cls=encoder)
 
     def year_lookup_bounds_for_date_field(

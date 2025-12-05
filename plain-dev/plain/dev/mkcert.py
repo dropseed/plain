@@ -11,7 +11,7 @@ import click
 
 class MkcertManager:
     def __init__(self) -> None:
-        self.mkcert_bin = None
+        self.mkcert_bin: str | Path | None = None
 
     def setup_mkcert(self, install_path: Path) -> None:
         """Set up mkcert by checking if it's installed or downloading the binary and installing the local CA."""
@@ -62,6 +62,8 @@ class MkcertManager:
 
     def is_mkcert_ca_installed(self) -> bool:
         """Check if mkcert local CA is already installed using mkcert -check."""
+        if not self.mkcert_bin:
+            return False
         try:
             result = subprocess.run([self.mkcert_bin, "-check"], capture_output=True)
             output = result.stdout.decode() + result.stderr.decode()
@@ -85,6 +87,9 @@ class MkcertManager:
                 return cert_path, key_path
 
         storage_path.mkdir(parents=True, exist_ok=True)
+
+        if not self.mkcert_bin:
+            raise RuntimeError("mkcert is not set up. Call setup_mkcert first.")
 
         click.secho(f"Generating SSL certificates for {domain}...", bold=True)
         subprocess.run(

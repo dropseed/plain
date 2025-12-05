@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime
 import decimal
 import warnings
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from itertools import chain, tee
 from sqlite3 import dbapi2 as Database
 from typing import Any
@@ -317,20 +317,22 @@ class SQLiteCursorWrapper(Database.Cursor):
     In both cases, if you want to use a literal "%s", you'll need to use "%%s".
     """
 
-    def execute(
-        self, query: str, params: Iterable[Any] | Mapping[str, Any] | None = None
+    def execute(  # type: ignore[override]
+        self, query: str, params: Sequence[Any] | Mapping[str, Any] = ()
     ) -> Any:
-        if params is None:
+        if not params:
+            # Still need convert_query for %% → % conversion
+            query = self.convert_query(query)
             return super().execute(query)
         # Extract names if params is a mapping, i.e. "pyformat" style is used.
         param_names = list(params) if isinstance(params, Mapping) else None
         query = self.convert_query(query, param_names=param_names)
         return super().execute(query, params)
 
-    def executemany(
+    def executemany(  # type: ignore[override]
         self,
         query: str,
-        param_list: Iterable[Iterable[Any] | Mapping[str, Any]],
+        param_list: Iterable[Sequence[Any] | Mapping[str, Any]],
     ) -> Any:
         # Extract names if params is a mapping, i.e. "pyformat" style is used.
         # Peek carefully as a generator can be passed instead of a list/tuple.

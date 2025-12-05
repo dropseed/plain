@@ -15,22 +15,53 @@ from plain.signing import (
 )
 
 
-class ExpiringSigner(Signer):
-    """A signer with an embedded expiration (vs max age unsign)"""
+class ExpiringSigner:
+    """A signer with an embedded expiration (vs max age unsign).
+
+    Uses composition rather than inheritance since the interface
+    intentionally differs from Signer (requires expires_in parameter).
+    """
+
+    def __init__(
+        self,
+        *,
+        key: str | None = None,
+        sep: str = ":",
+        salt: str | None = None,
+        algorithm: str = "sha256",
+        fallback_keys: list[str] | None = None,
+    ) -> None:
+        # Compute default salt here to preserve backwards compatibility.
+        # When ExpiringSigner inherited from Signer, the default salt was
+        # "plain.loginlink.signing.ExpiringSigner". Now that we use composition,
+        # we must set it explicitly rather than letting Signer compute its own.
+        if salt is None:
+            salt = f"{self.__class__.__module__}.{self.__class__.__name__}"
+        self._signer = Signer(
+            key=key,
+            sep=sep,
+            salt=salt,
+            algorithm=algorithm,
+            fallback_keys=fallback_keys,
+        )
+
+    @property
+    def sep(self) -> str:
+        return self._signer.sep
 
     def sign(self, value: str, expires_in: int) -> str:
         timestamp = b62_encode(int(time.time() + expires_in))
         value = f"{value}{self.sep}{timestamp}"
-        return super().sign(value)
+        return self._signer.sign(value)
 
-    def unsign(self, value: str) -> str:
+    def unsign(self, signed_value: str) -> str:
         """
         Retrieve original value and check the expiration hasn't passed.
         """
-        result = super().unsign(value)
+        result = self._signer.unsign(signed_value)
         value, timestamp = result.rsplit(self.sep, 1)
-        timestamp = b62_decode(timestamp)
-        if timestamp < time.time():
+        ts = b62_decode(timestamp)
+        if ts < time.time():
             raise SignatureExpired("Signature expired")
         return value
 

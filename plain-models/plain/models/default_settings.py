@@ -1,9 +1,10 @@
 from os import environ
 
 from . import database_url
+from .connections import DatabaseConfig
 
 # Make DATABASE a required setting
-DATABASE: dict
+DATABASE: DatabaseConfig
 
 # Automatically configure DATABASE if a DATABASE_URL was given in the environment
 if "DATABASE_URL" in environ:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import copy
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from typing import Any, TypeVar
@@ -105,7 +106,7 @@ class MultiValueDict(dict[str, list[Any]]):
     def __copy__(self) -> MultiValueDict:
         return self.__class__([(k, v[:]) for k, v in self.lists()])
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> MultiValueDict:
+    def __deepcopy__(self, memo: builtins.dict[int, Any]) -> MultiValueDict:
         result = self.__class__()
         memo[id(self)] = result
         for key, value in dict.items(self):
@@ -114,10 +115,10 @@ class MultiValueDict(dict[str, list[Any]]):
             )
         return result
 
-    def __getstate__(self) -> dict[str, Any]:
+    def __getstate__(self) -> builtins.dict[str, Any]:
         return {**self.__dict__, "_data": {k: self._getlist(k) for k in self}}
 
-    def __setstate__(self, obj_dict: dict[str, Any]) -> None:
+    def __setstate__(self, obj_dict: builtins.dict[str, Any]) -> None:
         data = obj_dict.pop("_data", {})
         for k, v in data.items():
             self.setlist(k, v)
@@ -188,7 +189,7 @@ class MultiValueDict(dict[str, list[Any]]):
         """Append an item to the internal list associated with key."""
         self.setlistdefault(key).append(value)
 
-    def items(self) -> Iterator[tuple[str, Any]]:
+    def items(self) -> Iterator[tuple[str, Any]]:  # type: ignore[override]
         """
         Yield (key, value) pairs, where value is the last item in the list
         associated with the key.
@@ -200,7 +201,7 @@ class MultiValueDict(dict[str, list[Any]]):
         """Yield (key, list) pairs."""
         return iter(super().items())
 
-    def values(self) -> Iterator[Any]:
+    def values(self) -> Iterator[Any]:  # type: ignore[override]
         """Yield the last value on every key list."""
         for key in self:
             yield self[key]
@@ -226,7 +227,7 @@ class MultiValueDict(dict[str, list[Any]]):
         for key, value in kwargs.items():
             self.setlistdefault(key).append(value)
 
-    def dict(self) -> dict[str, Any]:
+    def dict(self) -> builtins.dict[str, Any]:
         """Return current object as a dict with singular values."""
         return {key: self[key] for key in self}
 

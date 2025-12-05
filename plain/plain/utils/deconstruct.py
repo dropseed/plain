@@ -20,8 +20,8 @@ def deconstructible(
     def decorator(klass: type[T]) -> type[T]:
         def __new__(cls: type[T], *args: Any, **kwargs: Any) -> T:
             # We capture the arguments to make returning them trivial
-            obj = super(klass, cls).__new__(cls)
-            obj._constructor_args = (args, kwargs)
+            obj = super(klass, cls).__new__(cls)  # type: ignore[misc]
+            obj._constructor_args = (args, kwargs)  # type: ignore[attr-defined]
             return obj
 
         def deconstruct(obj: Any) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
@@ -52,8 +52,8 @@ def deconstructible(
                 obj._constructor_args[1],
             )
 
-        klass.__new__ = staticmethod(__new__)
-        klass.deconstruct = deconstruct
+        setattr(klass, "__new__", staticmethod(__new__))
+        setattr(klass, "deconstruct", deconstruct)
 
         return klass
 

@@ -61,9 +61,9 @@ class CLIRegistryGroup(click.Group):
     def list_commands(self, ctx: Context) -> list[str]:
         return sorted(cli_registry.get_commands().keys())
 
-    def get_command(self, ctx: Context, name: str) -> Command | None:
+    def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         commands = cli_registry.get_commands()
-        return commands.get(name)
+        return commands.get(cmd_name)
 
 
 class PlainCommandCollection(click.CommandCollection):

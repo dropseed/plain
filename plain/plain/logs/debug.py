@@ -43,5 +43,5 @@ class DebugMode:
         """Restore original logging level."""
         with self._lock:
             self._ref_count = max(0, self._ref_count - 1)
-            if self._ref_count == 0:
+            if self._ref_count == 0 and self.original_level is not None:
                 self.logger.setLevel(self.original_level)

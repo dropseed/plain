@@ -1145,22 +1145,33 @@ class Query(BaseExpression):
             self.set_annotation_mask(set(self.annotation_select).difference({alias}))
         self.annotations[alias] = annotation
 
-    def resolve_expression(self, query: Query, *args: Any, **kwargs: Any) -> Self:
+    def resolve_expression(
+        self,
+        query: Any = None,
+        allow_joins: bool = True,
+        reuse: Any = None,
+        summarize: bool = False,
+        for_save: bool = False,
+    ) -> Self:
         clone = self.clone()
         # Subqueries need to use a different set of aliases than the outer query.
         clone.bump_prefix(query)
         clone.subquery = True
-        clone.where.resolve_expression(query, *args, **kwargs)
+        clone.where.resolve_expression(query, allow_joins, reuse, summarize, for_save)
         # Resolve combined queries.
         if clone.combinator:
             clone.combined_queries = tuple(
                 [
-                    combined_query.resolve_expression(query, *args, **kwargs)
+                    combined_query.resolve_expression(
+                        query, allow_joins, reuse, summarize, for_save
+                    )
                     for combined_query in clone.combined_queries
                 ]
             )
         for key, value in clone.annotations.items():
-            resolved = value.resolve_expression(query, *args, **kwargs)
+            resolved = value.resolve_expression(
+                query, allow_joins, reuse, summarize, for_save
+            )
             if hasattr(resolved, "external_aliases"):
                 resolved.external_aliases.update(clone.external_aliases)
             clone.annotations[key] = resolved
@@ -1182,9 +1193,9 @@ class Query(BaseExpression):
             if col.alias in self.external_aliases
         ]
 
-    def get_group_by_cols(
+    def get_group_by_cols(  # type: ignore[override]
         self, wrapper: BaseExpression | None = None
-    ) -> list[Col] | list[BaseExpression]:
+    ) -> list[BaseExpression]:
         # If wrapper is referenced by an alias for an explicit GROUP BY through
         # values() a reference to this expression and not the self must be
         # returned to ensure external column references are not grouped against
@@ -1192,7 +1203,8 @@ class Query(BaseExpression):
         external_cols = self.get_external_cols()
         if any(col.possibly_multivalued for col in external_cols):
             return [wrapper or self]
-        return external_cols
+        # Cast needed because list is invariant: list[Col] is not list[BaseExpression]
+        return cast(list[BaseExpression], external_cols)
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper

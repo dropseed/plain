@@ -86,7 +86,7 @@ class AddField(FieldOperation):
         self.preserve_default = preserve_default
         super().__init__(model_name, name, field)
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "model_name": self.model_name,
             "name": self.name,
@@ -94,7 +94,7 @@ class AddField(FieldOperation):
         }
         if self.preserve_default is not True:
             kwargs["preserve_default"] = self.preserve_default
-        return (self.__class__.__name__, [], kwargs)
+        return (self.__class__.__name__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: Any) -> None:
         state.add_field(
@@ -167,12 +167,12 @@ class AddField(FieldOperation):
 class RemoveField(FieldOperation):
     """Remove a field from a model."""
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "model_name": self.model_name,
             "name": self.name,
         }
-        return (self.__class__.__name__, [], kwargs)
+        return (self.__class__.__name__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: Any) -> None:
         state.remove_field(package_label, self.model_name_lower, self.name)
@@ -224,7 +224,7 @@ class AlterField(FieldOperation):
         self.preserve_default = preserve_default
         super().__init__(model_name, name, field)
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "model_name": self.model_name,
             "name": self.name,
@@ -232,7 +232,7 @@ class AlterField(FieldOperation):
         }
         if self.preserve_default is not True:
             kwargs["preserve_default"] = self.preserve_default
-        return (self.__class__.__name__, [], kwargs)
+        return (self.__class__.__name__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: Any) -> None:
         state.alter_field(
@@ -311,13 +311,13 @@ class RenameField(FieldOperation):
     def new_name_lower(self) -> str:
         return self.new_name.lower()
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "model_name": self.model_name,
             "old_name": self.old_name,
             "new_name": self.new_name,
         }
-        return (self.__class__.__name__, [], kwargs)
+        return (self.__class__.__name__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: Any) -> None:
         state.rename_field(

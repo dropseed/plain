@@ -59,7 +59,7 @@ class DatabaseCreation(BaseDatabaseCreation):
             # Remove the SQLite database file
             os.remove(test_database_name)
 
-    def test_db_signature(self, prefix: str = "") -> tuple[str, str]:
+    def test_db_signature(self, prefix: str = "") -> tuple[str, ...]:
         """
         Return a tuple that uniquely identifies a test database.
 

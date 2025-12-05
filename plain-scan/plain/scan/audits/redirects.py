@@ -226,7 +226,8 @@ class RedirectsAudit(Audit):
             )
 
         original_parsed = urlparse(original_url)
-        final_parsed = urlparse(response.url)
+        final_url = str(response.url) if response.url else original_url
+        final_parsed = urlparse(final_url)
 
         # Check if everything is the same except trailing slash
         if (

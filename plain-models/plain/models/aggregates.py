@@ -19,6 +19,8 @@ from plain.models.functions.mixins import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.expressions import Expression
     from plain.models.query_utils import Q
@@ -73,11 +75,12 @@ class Aggregate(Func):
             return source_expressions + [self.filter]
         return source_expressions
 
-    def set_source_expressions(self, exprs: list[Expression]) -> None:
-        self.filter = self.filter and exprs.pop()
-        super().set_source_expressions(exprs)
+    def set_source_expressions(self, exprs: Sequence[Any]) -> None:
+        exprs_list = list(exprs)
+        self.filter = self.filter and exprs_list.pop()
+        super().set_source_expressions(exprs_list)
 
-    def resolve_expression(
+    def resolve_expression(  # type: ignore[override]
         self,
         query: Any = None,
         allow_joins: bool = True,
@@ -133,6 +136,9 @@ class Aggregate(Func):
         self,
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
         extra_context["distinct"] = "DISTINCT " if self.distinct else ""
@@ -143,13 +149,15 @@ class Aggregate(Func):
                 except FullResultSet:
                     pass
                 else:
-                    template = self.filter_template % extra_context.get(
-                        "template", self.template
+                    filter_template = self.filter_template % extra_context.get(
+                        "template", template or self.template
                     )
                     sql, params = super().as_sql(
                         compiler,
                         connection,
-                        template=template,
+                        function=function,
+                        template=filter_template,
+                        arg_joiner=arg_joiner,
                         filter=filter_sql,
                         **extra_context,
                     )
@@ -161,9 +169,21 @@ class Aggregate(Func):
                 condition = When(self.filter, then=source_expressions[0])
                 copy.set_source_expressions([Case(condition)] + source_expressions[1:])
                 return super(Aggregate, copy).as_sql(
-                    compiler, connection, **extra_context
+                    compiler,
+                    connection,
+                    function=function,
+                    template=template,
+                    arg_joiner=arg_joiner,
+                    **extra_context,
                 )
-        return super().as_sql(compiler, connection, **extra_context)
+        return super().as_sql(
+            compiler,
+            connection,
+            function=function,
+            template=template,
+            arg_joiner=arg_joiner,
+            **extra_context,
+        )
 
     def _get_repr_options(self) -> dict[str, Any]:
         options = super()._get_repr_options()

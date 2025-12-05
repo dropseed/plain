@@ -100,7 +100,7 @@ def parse_time(value: str) -> datetime.time | None:
             kw = match.groupdict()
             kw["microsecond"] = kw["microsecond"] and kw["microsecond"].ljust(6, "0")
             kw = {k: int(v) for k, v in kw.items() if v is not None}
-            return datetime.time(**kw)
+            return datetime.time(**kw)  # type: ignore[arg-type]
 
 
 def parse_datetime(value: str) -> datetime.datetime | None:

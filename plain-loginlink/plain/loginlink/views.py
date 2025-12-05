@@ -31,7 +31,7 @@ class LoginLinkFormView(AuthView, FormView):
 
         return super().get()
 
-    def form_valid(self, form: LoginLinkForm) -> Response:
+    def form_valid(self, form: LoginLinkForm) -> Response:  # type: ignore[override]
         form.maybe_send_link(self.request)
         return super().form_valid(form)
 

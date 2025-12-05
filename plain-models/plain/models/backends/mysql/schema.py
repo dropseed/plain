@@ -239,8 +239,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         old_field: Field,
         new_field: Field,
         new_type: str,
-        old_collation: str,
-        new_collation: str,
+        old_collation: str | None,
+        new_collation: str | None,
     ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         new_type = self._set_field_new_type_null_status(old_field, new_type)
         return super()._alter_column_type_sql(
@@ -269,7 +269,11 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         return super()._rename_field_sql(table, old_field, new_field, new_type)
 
     def _alter_column_comment_sql(
-        self, model: type[Model], new_field: Field, new_type: str, new_db_comment: str
+        self,
+        model: type[Model],
+        new_field: Field,
+        new_type: str,
+        new_db_comment: str | None,
     ) -> tuple[str, list[Any]]:
         # Comment is alter when altering the column type.
         return "", []

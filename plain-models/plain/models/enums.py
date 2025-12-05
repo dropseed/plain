@@ -40,21 +40,21 @@ class ChoicesMeta(enum.EnumMeta):
             member._label_ = label
         return enum.unique(cls)
 
-    def __contains__(cls, member: object) -> bool:
+    def __contains__(cls, member: object) -> bool:  # type: ignore[override]
         if not isinstance(member, enum.Enum):
             # Allow non-enums to match against member values.
-            return any(x.value == member for x in cls)
+            return any(x.value == member for x in cls)  # type: ignore[attr-defined]
         return super().__contains__(member)
 
     @property
     def names(cls) -> list[str]:
         empty = ["__empty__"] if hasattr(cls, "__empty__") else []
-        return empty + [member.name for member in cls]
+        return empty + [member.name for member in cls]  # type: ignore[attr-defined]
 
     @property
     def choices(cls) -> list[tuple[Any, str]]:
         empty = [(None, cls.__empty__)] if hasattr(cls, "__empty__") else []
-        return empty + [(member.value, member.label) for member in cls]
+        return empty + [(member.value, member.label) for member in cls]  # type: ignore[attr-defined]
 
     @property
     def labels(cls) -> list[str]:
@@ -96,6 +96,7 @@ class IntegerChoices(int, Choices):
 class TextChoices(str, Choices):
     """Class for creating enumerated string choices."""
 
+    @staticmethod
     def _generate_next_value_(
         name: str, start: int, count: int, last_values: list[str]
     ) -> str:

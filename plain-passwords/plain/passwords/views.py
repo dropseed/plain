@@ -53,7 +53,7 @@ class PasswordForgotView(FormView):
         url = reverse(self.reset_confirm_url_name) + f"?token={token}"
         return self.request.build_absolute_uri(url)
 
-    def form_valid(self, form: PasswordResetForm) -> Response:
+    def form_valid(self, form: PasswordResetForm) -> Response:  # type: ignore[override]
         form.save(
             generate_reset_url=self.generate_password_reset_url,
         )
@@ -133,7 +133,7 @@ class PasswordResetView(AuthView, FormView):
         kwargs["user"] = self.get_user()
         return kwargs
 
-    def form_valid(self, form: PasswordSetForm) -> Response:
+    def form_valid(self, form: PasswordSetForm) -> Response:  # type: ignore[override]
         form.save()
         del self.session[self._reset_token_session_key]
         # If you wanted, you could log in the user here so they don't have to
@@ -151,7 +151,7 @@ class PasswordChangeView(AuthView, FormView):
         kwargs["user"] = self.user
         return kwargs
 
-    def form_valid(self, form: PasswordChangeForm) -> Response:
+    def form_valid(self, form: PasswordChangeForm) -> Response:  # type: ignore[override]
         form.save()
         # Updating the password logs out all other sessions for the user
         # except the current one.
@@ -170,7 +170,7 @@ class PasswordLoginView(AuthView, FormView):
 
         return super().get()
 
-    def form_valid(self, form: PasswordLoginForm) -> Response:
+    def form_valid(self, form: PasswordLoginForm) -> Response:  # type: ignore[override]
         # Log the user in and redirect
         auth_login(self.request, form.get_user())
 

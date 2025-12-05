@@ -7,6 +7,7 @@ from jinja2 import meta, nodes
 from jinja2.ext import Extension
 from jinja2.nodes import CallBlock, Node
 from jinja2.parser import Parser
+from jinja2.runtime import Context
 
 from plain.runtime import settings
 from plain.templates import register_template_extension
@@ -19,7 +20,7 @@ class HTMXJSExtension(InclusionTagExtension):
     template_name = "htmx/js.html"
 
     def get_context(
-        self, context: dict[str, Any], *args: Any, **kwargs: Any
+        self, context: Context, *args: Any, **kwargs: Any
     ) -> dict[str, Any]:
         request = context.get("request")
         return {

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain.htmx.views import HTMXView
 from plain.http import Response, ResponseRedirect
-from plain.models import Model
+from plain.models import Model, QuerySet
 from plain.paginator import Paginator
 from plain.views import (
     CreateView,
@@ -104,7 +104,7 @@ class AdminListView(HTMXView, AdminView):
     def perform_action(self, action: str, target_ids: list) -> Response | None:
         raise NotImplementedError
 
-    def get_objects(self) -> list:
+    def get_objects(self) -> list[Any] | QuerySet[Any]:
         return []
 
     def get_fields(self) -> list:

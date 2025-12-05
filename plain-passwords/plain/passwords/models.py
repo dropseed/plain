@@ -24,13 +24,13 @@ class PasswordField(models.CharField):
         )
         super().__init__(*args, **kwargs)
 
-    def deconstruct(self) -> tuple[str | None, str, tuple[Any, ...], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if kwargs.get("max_length") == 128:
             del kwargs["max_length"]
-        return name, path, tuple(args), kwargs
+        return name, path, args, kwargs
 
-    def pre_save(self, model_instance: models.Model, add: bool) -> str:
+    def pre_save(self, model_instance: models.Model, add: bool) -> str | None:
         value = super().pre_save(model_instance, add)
 
         if value and not self._is_hashed(value):

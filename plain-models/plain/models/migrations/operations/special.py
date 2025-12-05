@@ -28,13 +28,13 @@ class SeparateDatabaseAndState(Operation):
         self.database_operations = database_operations or []
         self.state_operations = state_operations or []
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, list[Operation]]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, list[Operation]]]:
         kwargs: dict[str, list[Operation]] = {}
         if self.database_operations:
             kwargs["database_operations"] = self.database_operations
         if self.state_operations:
             kwargs["state_operations"] = self.state_operations
-        return (self.__class__.__qualname__, [], kwargs)
+        return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         for state_operation in self.state_operations:
@@ -81,13 +81,13 @@ class RunSQL(Operation):
         self.state_operations = state_operations or []
         self.elidable = elidable
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "sql": self.sql,
         }
         if self.state_operations:
             kwargs["state_operations"] = self.state_operations
-        return (self.__class__.__qualname__, [], kwargs)
+        return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         for state_operation in self.state_operations:
@@ -153,13 +153,13 @@ class RunPython(Operation):
         self.code = code
         self.elidable = elidable
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "code": self.code,
         }
         if self.atomic is not None:
             kwargs["atomic"] = self.atomic
-        return (self.__class__.__qualname__, [], kwargs)
+        return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: Any) -> None:
         # RunPython objects have no state effect. To add some, combine this

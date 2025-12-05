@@ -11,7 +11,7 @@ from __future__ import annotations
 import functools
 import inspect
 import logging
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from typing import TYPE_CHECKING, Any, NamedTuple, Self
 
 from plain.models.constants import LOOKUP_SEP
@@ -235,7 +235,9 @@ class RegisterLookupMixin:
             return None
         return found
 
-    def get_transform(self, lookup_name: str) -> type[Transform] | None:
+    def get_transform(
+        self, lookup_name: str
+    ) -> type[Transform] | Callable[..., Any] | None:
         from plain.models.lookups import Transform
 
         found = self._get_lookup(lookup_name)

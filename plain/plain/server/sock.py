@@ -136,7 +136,7 @@ class UnixSocket(BaseSocket):
 
     def __init__(
         self,
-        addr: tuple[str, int] | str,
+        addr: str,
         conf: Config,
         log: Logger,
         fd: int | None = None,
@@ -225,11 +225,13 @@ def close_sockets(listeners: list[BaseSocket], unlink: bool = True) -> None:
         sock_name = sock.getsockname()
         sock.close()
         if unlink and _sock_type(sock_name) is UnixSocket:
+            assert isinstance(sock_name, str)
             os.unlink(sock_name)
 
 
 def ssl_context(conf: Config) -> ssl.SSLContext:
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    assert conf.certfile is not None
     context.load_cert_chain(certfile=conf.certfile, keyfile=conf.keyfile)
     return context
 

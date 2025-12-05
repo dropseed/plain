@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from types import NoneType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from plain.models.backends.utils import names_digest, split_identifier
 from plain.models.expressions import Col, ExpressionList, F, Func, OrderBy
@@ -246,7 +246,7 @@ class IndexExpression(Func):
         reuse: Any = None,
         summarize: bool = False,
         for_save: bool = False,
-    ) -> Expression:
+    ) -> Self:
         expressions = list(self.flatten())
         # Split expressions and wrappers.
         index_expressions, wrappers = partition(
@@ -304,8 +304,10 @@ class IndexExpression(Func):
         else:
             # Use the root expression, if there are no wrappers.
             self.set_source_expressions([root_expression])
-        return super().resolve_expression(
-            query, allow_joins, reuse, summarize, for_save
+        # Cast needed because super() returns parent's Self type, not subclass's Self
+        return cast(
+            Self,
+            super().resolve_expression(query, allow_joins, reuse, summarize, for_save),
         )
 
     def as_sqlite(

@@ -1,13 +1,37 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Generator
-from typing import TYPE_CHECKING, Any, NamedTuple
+from collections.abc import Generator, Sequence
+from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, runtime_checkable
 
 from plain.models.backends.utils import CursorWrapper
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
+
+
+# Protocols for structural typing - allows backends to extend with extra fields
+@runtime_checkable
+class TableInfoProtocol(Protocol):
+    """Protocol for TableInfo - backends can add extra fields."""
+
+    name: str
+    type: str
+
+
+@runtime_checkable
+class FieldInfoProtocol(Protocol):
+    """Protocol for FieldInfo - backends can add extra fields."""
+
+    name: str
+    type_code: Any
+    display_size: int | None
+    internal_size: int | None
+    precision: int | None
+    scale: int | None
+    null_ok: bool | None
+    default: Any
+    collation: str | None
 
 
 class TableInfo(NamedTuple):
@@ -80,7 +104,7 @@ class BaseDatabaseIntrospection(ABC):
         return get_names(cursor)
 
     @abstractmethod
-    def get_table_list(self, cursor: CursorWrapper) -> list[TableInfo]:
+    def get_table_list(self, cursor: CursorWrapper) -> Sequence[TableInfoProtocol]:
         """
         Return an unsorted list of TableInfo named tuples of all tables and
         views that exist in the database.
@@ -90,7 +114,7 @@ class BaseDatabaseIntrospection(ABC):
     @abstractmethod
     def get_table_description(
         self, cursor: CursorWrapper, table_name: str
-    ) -> list[FieldInfo]:
+    ) -> Sequence[FieldInfoProtocol]:
         """
         Return a description of the table with the DB-API cursor.description
         interface.

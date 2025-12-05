@@ -28,7 +28,7 @@ class BaseEmailBackend(ABC):
     def __init__(self, fail_silently: bool = False, **kwargs: Any) -> None:
         self.fail_silently = fail_silently
 
-    def open(self) -> None:
+    def open(self) -> bool | None:
         """
         Open a network connection.
 

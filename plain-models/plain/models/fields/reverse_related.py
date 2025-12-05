@@ -69,7 +69,7 @@ class ForeignObjectRel(FieldCacheMixin):
         limit_choices_to: dict[str, Any] | Q | None = None,
         on_delete: OnDeleteCallback | None = None,
     ):
-        self.field = field
+        self.field = field  # type: ignore[invalid-assignment]
         # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
         # (see related.py:250 where field.remote_field.model is overwritten)
         self.model = to  # type: ignore[assignment]
@@ -200,7 +200,7 @@ class ForeignObjectRel(FieldCacheMixin):
     def path_infos(self) -> list[PathInfo]:
         return self.get_path_info()
 
-    def get_cache_name(self) -> str | None:
+    def get_cache_name(self) -> str:
         """
         Return the name of the cache key to use for storing an instance of the
         forward model on the reverse model.

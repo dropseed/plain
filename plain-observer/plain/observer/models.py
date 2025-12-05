@@ -240,7 +240,7 @@ class Trace(models.Model):
         """Get chronological list of spans and logs for unified timeline display."""
         events: list[dict[str, Any]] = []
 
-        for span in self.spans.query.all().annotate_spans():
+        for span in self.spans.query.all().annotate_spans():  # type: ignore[attr-defined]
             events.append(
                 {
                     "type": "span",
@@ -514,12 +514,14 @@ class Span(models.Model):
 @models.register_model
 class Log(models.Model):
     trace: Trace = types.ForeignKeyField(Trace, on_delete=models.CASCADE)
+    trace_id: int
     span: Span | None = types.ForeignKeyField(
         Span,
         on_delete=models.SET_NULL,
         allow_null=True,
         required=False,
     )
+    span_id: int | None
 
     timestamp: datetime = types.DateTimeField()
     level: str = types.CharField(max_length=20)

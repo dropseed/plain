@@ -23,9 +23,13 @@ class EmailBackend(BaseEmailBackend):
     def write_message(self, message: EmailMessage) -> None:
         msg = message.message()
         msg_data = msg.as_bytes()
-        charset = (
-            msg.get_charset().get_output_charset() if msg.get_charset() else "utf-8"
-        )
+        msg_charset = msg.get_charset()
+        if msg_charset is None:
+            charset = "utf-8"
+        elif isinstance(msg_charset, str):
+            charset = msg_charset
+        else:
+            charset = msg_charset.get_output_charset() or "utf-8"
         msg_data = msg_data.decode(charset)
         self.stream.write(f"{msg_data}\n")
         self.stream.write("-" * 79)

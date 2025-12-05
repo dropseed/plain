@@ -1,9 +1,13 @@
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from plain.urls import path, reverse_lazy
 
+if TYPE_CHECKING:
+    from .viewsets import AdminViewset
+
 T = TypeVar("T")
+VS = TypeVar("VS", bound="AdminViewset")
 
 
 class NavSection:
@@ -43,9 +47,9 @@ class AdminViewRegistry:
             return inner
 
     def register_viewset(
-        self, viewset: type[T] | None = None
-    ) -> type[T] | Callable[[type[T]], type[T]]:
-        def inner(viewset: type[T]) -> type[T]:
+        self, viewset: type[VS] | None = None
+    ) -> type[VS] | Callable[[type[VS]], type[VS]]:
+        def inner(viewset: type[VS]) -> type[VS]:
             for view in viewset.get_views():
                 self.register_view(view)
             return viewset

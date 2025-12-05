@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import psycopg as Database
 from psycopg import IsolationLevel, adapt, adapters, sql
-from psycopg.abc import PyFormat
+from psycopg.abc import Buffer, PyFormat
 from psycopg.postgres import types as pg_types
 from psycopg.pq import Format
 from psycopg.types.datetime import TimestamptzLoader
@@ -53,7 +53,7 @@ class BaseTzLoader(TimestamptzLoader):
 
     timezone: datetime.tzinfo | None = None
 
-    def load(self, data: bytes) -> datetime.datetime:
+    def load(self, data: Buffer) -> datetime.datetime:
         res = super().load(data)
         return res.replace(tzinfo=self.timezone)
 

@@ -463,7 +463,7 @@ class BaseExpression:
     def get_group_by_cols(self) -> list[BaseExpression]:
         if not self.contains_aggregate:
             return [self]
-        cols = []
+        cols: list[BaseExpression] = []
         for source in self.get_source_expressions():
             cols.extend(source.get_group_by_cols())
         return cols
@@ -881,13 +881,14 @@ class TemporalSubtraction(CombinedExpression):
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, Sequence[Any]]:
+    ) -> tuple[str, list[Any]]:
         connection.ops.check_expression_support(self)
         lhs = compiler.compile(self.lhs)
         rhs = compiler.compile(self.rhs)
-        return connection.ops.subtract_temporals(
+        sql, params = connection.ops.subtract_temporals(
             self.lhs.output_field.get_internal_type(), lhs, rhs
         )
+        return sql, list(params)
 
 
 @deconstructible(path="plain.models.F")
@@ -1195,7 +1196,7 @@ class RawSQL(Expression):
     ) -> tuple[str, Sequence[Any]]:
         return f"({self.sql})", self.params
 
-    def get_group_by_cols(self) -> list[RawSQL]:
+    def get_group_by_cols(self) -> list[BaseExpression]:
         return [self]
 
 
@@ -1234,14 +1235,14 @@ class Col(Expression):
         sql = ".".join(map(compiler.quote_name_unless_alias, identifiers))
         return sql, []
 
-    def relabeled_clone(self, relabels: dict[str, str]) -> Col:
+    def relabeled_clone(self, change_map: dict[str, str]) -> Self:
         if self.alias is None:
             return self
         return self.__class__(
-            relabels.get(self.alias, self.alias), self.target, self.output_field
+            change_map.get(self.alias, self.alias), self.target, self.output_field
         )
 
-    def get_group_by_cols(self) -> list[Col]:
+    def get_group_by_cols(self) -> list[BaseExpression]:
         return [self]
 
     def get_db_converters(
@@ -1288,7 +1289,7 @@ class Ref(Expression):
     def get_refs(self) -> set[str]:
         return {self.refs}
 
-    def relabeled_clone(self, relabels: dict[str, str]) -> Ref:
+    def relabeled_clone(self, change_map: dict[str, str]) -> Self:
         return self
 
     def as_sql(
@@ -1296,7 +1297,7 @@ class Ref(Expression):
     ) -> tuple[str, list[Any]]:
         return connection.ops.quote_name(self.refs), []
 
-    def get_group_by_cols(self) -> list[Ref]:
+    def get_group_by_cols(self) -> list[BaseExpression]:
         return [self]
 
 
@@ -1343,11 +1344,11 @@ class OrderByList(Func):
         )
         super().__init__(*expressions_tuple, **extra)
 
-    def as_sql(self, *args: Any, **kwargs: Any) -> tuple[str, tuple[Any, ...]]:
+    def as_sql(self, *args: Any, **kwargs: Any) -> tuple[str, list[Any]]:
         if not self.source_expressions:
-            return "", cast(tuple[Any, ...], ())
+            return "", []
         sql, params = super().as_sql(*args, **kwargs)
-        return sql, tuple(params)
+        return sql, list(params)
 
     def get_group_by_cols(self) -> list[Any]:
         group_by_cols = []
@@ -1833,10 +1834,10 @@ class OrderBy(Expression):
             self.nulls_last = None
         return self
 
-    def asc(self) -> None:
+    def asc(self) -> None:  # type: ignore[override]
         self.descending = False
 
-    def desc(self) -> None:
+    def desc(self) -> None:  # type: ignore[override]
         self.descending = True
 
 
@@ -1936,7 +1937,10 @@ class Window(SQLiteNumericMixin, Expression):
         )
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
     ) -> tuple[str, Sequence[Any]]:
         if isinstance(self.output_field, fields.DecimalField):
             # Casting to numeric must be outside of the window expression.
@@ -1944,8 +1948,8 @@ class Window(SQLiteNumericMixin, Expression):
             source_expressions = copy.get_source_expressions()
             source_expressions[0].output_field = fields.FloatField()
             copy.set_source_expressions(source_expressions)
-            return super(Window, copy).as_sqlite(compiler, connection)
-        return self.as_sql(compiler, connection)
+            return super(Window, copy).as_sqlite(compiler, connection, **extra_context)
+        return self.as_sql(compiler, connection, **extra_context)
 
     def __str__(self) -> str:
         return "{} OVER ({}{}{})".format(

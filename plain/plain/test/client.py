@@ -144,11 +144,11 @@ class FakePayload(IOBase):
         self.__len -= len(content)
         return content
 
-    def readline(self, size: int = -1, /) -> bytes:
+    def readline(self, size: int | None = -1, /) -> bytes:
         if not self.read_started:
             self.__content.seek(0)
             self.read_started = True
-        if size == -1 or size is None:
+        if size is None or size == -1:
             size = self.__len
         assert self.__len >= size, (
             "Cannot read more than the available bytes from the HTTP incoming data."

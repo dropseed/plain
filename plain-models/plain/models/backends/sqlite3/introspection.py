@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from typing import Any, NamedTuple
 
 import sqlparse
@@ -103,7 +103,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
 
     def get_table_description(
         self, cursor: CursorWrapper, table_name: str
-    ) -> list[FieldInfo]:
+    ) -> Sequence[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface.

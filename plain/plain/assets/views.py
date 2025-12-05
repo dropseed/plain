@@ -35,11 +35,14 @@ class AssetView(View):
         # Allow a path to be passed in AssetView.as_view(path="...")
         self.asset_path = asset_path
 
-    def get_url_path(self) -> str:
+    def get_url_path(self) -> str | None:
         return self.asset_path or self.url_kwargs["path"]
 
     def get(self) -> Response | FileResponse | StreamingResponse:
         url_path = self.get_url_path()
+
+        if not url_path:
+            raise Http404("Asset path not found")
 
         # Make a trailing slash work, but we don't expect it
         url_path = url_path.rstrip("/")
@@ -122,7 +125,7 @@ class AssetView(View):
         try:
             mtime = os.path.getmtime(path)
         except OSError:
-            mtime = None
+            mtime = 0.0
 
         timestamp = int(mtime)
         size = self.get_size(path)
@@ -277,7 +280,7 @@ class AssetView(View):
                 status_code=416, headers=[("Content-Range", f"bytes */{file_size}")]
             )
 
-        end = min(end, file_size - 1)
+        end = int(min(end, file_size - 1))
 
         with open(path, "rb") as f:
             f.seek(start)

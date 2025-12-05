@@ -60,5 +60,5 @@ class TemplateView(View):
     def render_template(self) -> str:
         return self.get_template().render(self.get_template_context())
 
-    def get(self) -> Response:
+    def get(self) -> Response | Any:
         return Response(self.render_template())

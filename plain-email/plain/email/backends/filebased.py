@@ -16,17 +16,16 @@ if TYPE_CHECKING:
 
 
 class EmailBackend(ConsoleEmailBackend):
+    file_path: str  # Set during __init__, validated to be non-None
+
     def __init__(self, *args: Any, file_path: str | None = None, **kwargs: Any) -> None:
-        self._fname = None
-        if file_path is not None:
-            self.file_path = file_path
-        else:
-            self.file_path = getattr(settings, "EMAIL_FILE_PATH", None)
-        if not self.file_path:
+        self._fname: str | None = None
+        _file_path: str | None = file_path or getattr(settings, "EMAIL_FILE_PATH", None)
+        if not _file_path:
             raise ImproperlyConfigured(
                 "EMAIL_FILE_PATH must be set for the filebased email backend"
             )
-        self.file_path = os.path.abspath(self.file_path)
+        self.file_path = os.path.abspath(_file_path)
         try:
             os.makedirs(self.file_path, exist_ok=True)
         except FileExistsError:

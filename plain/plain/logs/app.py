@@ -36,7 +36,7 @@ class AppLogger(logging.Logger):
         return self.debug_mode
 
     # Override logging methods with explicit parameters for IDE support
-    def debug(
+    def debug(  # type: ignore[override]
         self,
         msg: object,
         *args: object,
@@ -58,7 +58,7 @@ class AppLogger(logging.Logger):
                 context=context,
             )
 
-    def info(
+    def info(  # type: ignore[override]
         self,
         msg: object,
         *args: object,
@@ -80,7 +80,7 @@ class AppLogger(logging.Logger):
                 context=context,
             )
 
-    def warning(
+    def warning(  # type: ignore[override]
         self,
         msg: object,
         *args: object,
@@ -102,7 +102,7 @@ class AppLogger(logging.Logger):
                 context=context,
             )
 
-    def error(
+    def error(  # type: ignore[override]
         self,
         msg: object,
         *args: object,
@@ -124,7 +124,7 @@ class AppLogger(logging.Logger):
                 context=context,
             )
 
-    def critical(
+    def critical(  # type: ignore[override]
         self,
         msg: object,
         *args: object,
@@ -146,7 +146,7 @@ class AppLogger(logging.Logger):
                 context=context,
             )
 
-    def _log(
+    def _log(  # type: ignore[override]
         self,
         level: int,
         msg: object,

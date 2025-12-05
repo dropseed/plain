@@ -81,7 +81,7 @@ class CreateModel(ModelOperation):
             ),
         )
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "name": self.name,
             "fields": self.fields,
@@ -90,7 +90,7 @@ class CreateModel(ModelOperation):
             kwargs["options"] = self.options
         if self.bases and self.bases != (models.Model,):
             kwargs["bases"] = self.bases
-        return (self.__class__.__qualname__, [], kwargs)
+        return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.add_model(
@@ -242,11 +242,11 @@ class CreateModel(ModelOperation):
 class DeleteModel(ModelOperation):
     """Drop a model's table."""
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "name": self.name,
         }
-        return (self.__class__.__qualname__, [], kwargs)
+        return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.remove_model(package_label, self.name_lower)
@@ -291,12 +291,12 @@ class RenameModel(ModelOperation):
     def new_name_lower(self) -> str:
         return self.new_name.lower()
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "old_name": self.old_name,
             "new_name": self.new_name,
         }
-        return (self.__class__.__qualname__, [], kwargs)
+        return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.rename_model(package_label, self.old_name, self.new_name)
@@ -390,12 +390,12 @@ class AlterModelTable(ModelOptionOperation):
         self.table = table
         super().__init__(name)
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "name": self.name,
             "table": self.table,
         }
-        return (self.__class__.__qualname__, [], kwargs)
+        return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.alter_model_options(
@@ -434,12 +434,12 @@ class AlterModelTableComment(ModelOptionOperation):
         self.table_comment = table_comment
         super().__init__(name)
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "name": self.name,
             "table_comment": self.table_comment,
         }
-        return (self.__class__.__qualname__, [], kwargs)
+        return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.alter_model_options(
@@ -486,12 +486,12 @@ class AlterModelOptions(ModelOptionOperation):
         self.options = options
         super().__init__(name)
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "name": self.name,
             "options": self.options,
         }
-        return (self.__class__.__qualname__, [], kwargs)
+        return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         state.alter_model_options(
@@ -553,14 +553,14 @@ class AddIndex(IndexOperation):
         if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.add_index(model, self.index)
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "model_name": self.model_name,
             "index": self.index,
         }
         return (
             self.__class__.__qualname__,
-            [],
+            (),
             kwargs,
         )
 
@@ -605,14 +605,14 @@ class RemoveIndex(IndexOperation):
             index = from_model_state.get_index_by_name(self.name)
             schema_editor.remove_index(model, index)
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "model_name": self.model_name,
             "name": self.name,
         }
         return (
             self.__class__.__qualname__,
-            [],
+            (),
             kwargs,
         )
 
@@ -657,7 +657,7 @@ class RenameIndex(IndexOperation):
     def new_name_lower(self) -> str:
         return self.new_name.lower()
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
             "model_name": self.model_name,
             "new_name": self.new_name,
@@ -666,7 +666,7 @@ class RenameIndex(IndexOperation):
             kwargs["old_name"] = self.old_name
         if self.old_fields:
             kwargs["old_fields"] = self.old_fields
-        return (self.__class__.__qualname__, [], kwargs)
+        return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         if self.old_fields:
@@ -793,10 +793,10 @@ class AddConstraint(IndexOperation):
         if self.allow_migrate_model(schema_editor.connection, model):
             schema_editor.add_constraint(model, self.constraint)
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         return (
             self.__class__.__name__,
-            [],
+            (),
             {
                 "model_name": self.model_name,
                 "constraint": self.constraint,
@@ -834,10 +834,10 @@ class RemoveConstraint(IndexOperation):
             constraint = from_model_state.get_constraint_by_name(self.name)
             schema_editor.remove_constraint(model, constraint)
 
-    def deconstruct(self) -> tuple[str, list[Any], dict[str, Any]]:
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         return (
             self.__class__.__name__,
-            [],
+            (),
             {
                 "model_name": self.model_name,
                 "name": self.name,

@@ -4,9 +4,9 @@ import ipaddress
 import json
 from collections.abc import Callable, Iterable
 from functools import lru_cache, partial
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, LiteralString, cast
 
-from psycopg import ClientCursor, errors
+from psycopg import ClientCursor, errors, sql
 from psycopg.types import numeric
 from psycopg.types.json import Jsonb
 
@@ -234,8 +234,10 @@ class DatabaseOperations(BaseDatabaseOperations):
             return name  # Quoting once is enough.
         return f'"{name}"'
 
-    def compose_sql(self, sql: str, params: Any) -> str:
-        return ClientCursor(self.connection.connection).mogrify(sql, params)
+    def compose_sql(self, query: str, params: Any) -> str:
+        return ClientCursor(self.connection.connection).mogrify(
+            sql.SQL(cast(LiteralString, query)), params
+        )
 
     def set_time_zone_sql(self) -> str:
         return "SELECT set_config('TimeZone', %s, false)"

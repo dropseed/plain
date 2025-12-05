@@ -201,13 +201,15 @@ class DatabaseOperations(BaseDatabaseOperations):
     def format_for_duration_arithmetic(self, sql: str) -> str:
         return f"INTERVAL {sql} MICROSECOND"
 
-    def force_no_ordering(self) -> list[tuple[None, tuple[str, list[Any], bool]]]:
+    def force_no_ordering(
+        self,
+    ) -> list[tuple[Any, tuple[str, tuple[Any, ...], bool]]]:
         """
         "ORDER BY NULL" prevents MySQL from implicitly ordering by grouped
         columns. If no ordering would otherwise be applied, we don't want any
         implicit sorting going on.
         """
-        return [(None, ("NULL", [], False))]
+        return [(None, ("NULL", (), False))]
 
     def adapt_decimalfield_value(
         self,

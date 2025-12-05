@@ -354,7 +354,7 @@ class ResponseBase:
     def writable(self) -> bool:
         return False
 
-    def writelines(self, lines: list[bytes]) -> None:
+    def writelines(self, lines: list[bytes | str]) -> None:
         raise OSError(f"This {self.__class__.__name__} instance is not writable")
 
 

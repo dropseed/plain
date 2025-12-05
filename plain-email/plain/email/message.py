@@ -181,7 +181,7 @@ class SafeMIMEText(MIMEMixin, MIMEText):
         name, val = forbid_multi_line_headers(name, val, self.encoding)
         MIMEText.__setitem__(self, name, val)
 
-    def set_payload(
+    def set_payload(  # type: ignore[override]
         self, payload: str, charset: str | Charset.Charset | None = None
     ) -> None:
         if charset == "utf-8" and not isinstance(charset, Charset.Charset):
@@ -349,11 +349,10 @@ class EmailMessage:
         elif content is None:
             raise ValueError("content must be provided.")
         else:
-            mimetype = (
-                mimetype
-                or mimetypes.guess_type(filename)[0]
-                or DEFAULT_ATTACHMENT_MIME_TYPE
-            )
+            if filename is not None and mimetype is None:
+                mimetype = mimetypes.guess_type(filename)[0]
+            if mimetype is None:
+                mimetype = DEFAULT_ATTACHMENT_MIME_TYPE
             basetype, subtype = mimetype.split("/", 1)
 
             if basetype == "text":
@@ -434,6 +433,7 @@ class EmailMessage:
         else:
             # Encode non-text attachments with base64.
             attachment = MIMEBase(basetype, subtype)
+            assert isinstance(content, bytes), "Non-text attachments must be bytes"
             attachment.set_payload(content)
             Encoders.encode_base64(attachment)
         return attachment

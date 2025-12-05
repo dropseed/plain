@@ -16,7 +16,7 @@ from collections.abc import Callable, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from json import JSONDecoder, JSONEncoder
-from typing import Any, Literal, TypeVar, overload
+from typing import Any, Generic, Literal, TypeVar, overload
 from uuid import UUID
 
 # Import manager types from runtime (will be Generic[T] there)
@@ -704,16 +704,25 @@ def ManyToManyField(
 ) -> ManyToManyManager[_T]: ...
 
 # Reverse relation descriptors
-def ReverseForeignKey(
-    *,
-    to: type[_T] | str,
-    field: str,
-) -> ReverseForeignKeyManager[_T]: ...
-def ReverseManyToMany(
-    *,
-    to: type[_T] | str,
-    field: str,
-) -> ManyToManyManager[_T]: ...
+class ReverseForeignKey(Generic[_T]):
+    def __init__(self, *, to: type[_T] | str, field: str) -> None: ...
+    @overload
+    def __get__(self, instance: None, owner: type) -> ReverseForeignKey[_T]: ...
+    @overload
+    def __get__(self, instance: Model, owner: type) -> ReverseForeignKeyManager[_T]: ...
+    def __get__(
+        self, instance: Model | None, owner: type
+    ) -> ReverseForeignKey[_T] | ReverseForeignKeyManager[_T]: ...
+
+class ReverseManyToMany(Generic[_T]):
+    def __init__(self, *, to: type[_T] | str, field: str) -> None: ...
+    @overload
+    def __get__(self, instance: None, owner: type) -> ReverseManyToMany[_T]: ...
+    @overload
+    def __get__(self, instance: Model, owner: type) -> ManyToManyManager[_T]: ...
+    def __get__(
+        self, instance: Model | None, owner: type
+    ) -> ReverseManyToMany[_T] | ManyToManyManager[_T]: ...
 
 # Export all types (should match types.py)
 __all__ = [

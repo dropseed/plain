@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 import sqlparse
@@ -107,7 +108,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             return "JSONField"
         return field_type
 
-    def get_table_list(self, cursor: CursorWrapper) -> list[TableInfo]:
+    def get_table_list(self, cursor: CursorWrapper) -> Sequence[TableInfo]:
         """Return a list of table and view names in the current database."""
         cursor.execute(
             """
@@ -126,7 +127,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
 
     def get_table_description(
         self, cursor: CursorWrapper, table_name: str
-    ) -> list[FieldInfo]:
+    ) -> Sequence[FieldInfo]:
         """
         Return a description of the table with the DB-API cursor.description
         interface."

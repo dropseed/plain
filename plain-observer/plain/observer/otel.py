@@ -4,7 +4,7 @@ import logging
 import re
 import threading
 from collections import defaultdict
-from collections.abc import MutableMapping, Sequence
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 import opentelemetry.context as context_api
@@ -19,6 +19,7 @@ from opentelemetry.trace import (
     format_span_id,
     format_trace_id,
 )
+from opentelemetry.util.types import Attributes
 
 from plain.logs import app_logger
 from plain.models.otel import suppress_db_tracing
@@ -90,13 +91,14 @@ class ObserverSampler(sampling.Sampler):
         trace_id: int,
         name: str,
         kind: SpanKind | None = None,
-        attributes: MutableMapping[str, Any] | None = None,
+        attributes: Attributes = None,
         links: Sequence[Link] | None = None,
         trace_state: TraceState | None = None,
     ) -> sampling.SamplingResult:
         # First, drop if the URL should be ignored.
         if attributes:
-            if url_path := attributes.get(url_attributes.URL_PATH, ""):
+            url_path = attributes.get(url_attributes.URL_PATH, "")
+            if isinstance(url_path, str) and url_path:
                 for pattern in self._ignore_url_paths:
                     if pattern.match(url_path):
                         return sampling.SamplingResult(
@@ -158,7 +160,7 @@ class ObserverCombinedSampler(sampling.Sampler):
         trace_id: int,
         name: str,
         kind: SpanKind | None = None,
-        attributes: MutableMapping[str, Any] | None = None,
+        attributes: Attributes = None,
         links: Sequence[Link] | None = None,
         trace_state: TraceState | None = None,
     ) -> sampling.SamplingResult:

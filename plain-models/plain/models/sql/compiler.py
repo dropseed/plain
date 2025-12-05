@@ -61,8 +61,8 @@ class PositionRef(Ref):
 
     def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple]:
-        return str(self.ordinal), ()
+    ) -> tuple[str, list[Any]]:
+        return str(self.ordinal), []
 
 
 class SQLCompiler:
@@ -108,7 +108,7 @@ class SQLCompiler:
 
     def pre_sql_setup(
         self, with_col_aliases: bool = False
-    ) -> tuple[list[Any], list[Any], list[tuple[str, tuple]]]:
+    ) -> tuple[list[Any], list[Any], list[tuple[str, tuple]]] | None:
         """
         Do any necessary class setup immediately prior to producing SQL. This
         is for things that can't necessarily be done in __init__ because we
@@ -770,7 +770,7 @@ class SQLCompiler:
 
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
-    ) -> tuple[str, tuple]:
+    ) -> tuple[str, tuple] | list[tuple[str, tuple]]:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.
@@ -781,9 +781,11 @@ class SQLCompiler:
         refcounts_before = self.query.alias_refcount.copy()
         try:
             combinator = self.query.combinator
-            extra_select, order_by, group_by = self.pre_sql_setup(
+            result = self.pre_sql_setup(
                 with_col_aliases=with_col_aliases or bool(combinator),
             )
+            assert result is not None  # SQLCompiler.pre_sql_setup always returns tuple
+            extra_select, order_by, group_by = result
             assert self.select is not None  # Set by pre_sql_setup()
             for_update_part = None
             # Is a LIMIT/OFFSET clause needed?
@@ -1584,7 +1586,11 @@ class SQLCompiler:
         """
         result_type = result_type or NO_RESULTS
         try:
-            sql, params = self.as_sql()
+            as_sql_result = self.as_sql()
+            # SQLCompiler.as_sql returns tuple[str, tuple], subclasses may differ
+            assert isinstance(as_sql_result, tuple)
+            assert isinstance(as_sql_result[0], str)
+            sql, params = as_sql_result
             if not sql:
                 raise EmptyResultSet
         except EmptyResultSet:
@@ -1773,7 +1779,9 @@ class SQLInsertCompiler(SQLCompiler):
 
         return placeholder_rows, param_rows
 
-    def as_sql(self) -> list[tuple[str, tuple]]:
+    def as_sql(
+        self, with_limits: bool = True, with_col_aliases: bool = False
+    ) -> list[tuple[str, tuple]]:
         # We don't need quote_name_unless_alias() here, since these are all
         # going to be column names (so we can avoid the extra overhead).
         qn = self.connection.ops.quote_name
@@ -1860,7 +1868,9 @@ class SQLInsertCompiler(SQLCompiler):
                 for p, vals in zip(placeholder_rows, param_rows)
             ]
 
-    def execute_sql(self, returning_fields: list | None = None) -> list:
+    def execute_sql(  # type: ignore[override]
+        self, returning_fields: list | None = None
+    ) -> list:
         assert not (
             returning_fields
             and len(self.query.objs) != 1
@@ -1941,7 +1951,9 @@ class SQLDeleteCompiler(SQLCompiler):
             return delete, ()
         return f"{delete} WHERE {where}", tuple(params)
 
-    def as_sql(self) -> tuple[str, tuple]:
+    def as_sql(
+        self, with_limits: bool = True, with_col_aliases: bool = False
+    ) -> tuple[str, tuple]:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.
@@ -1965,7 +1977,9 @@ class SQLDeleteCompiler(SQLCompiler):
 
 
 class SQLUpdateCompiler(SQLCompiler):
-    def as_sql(self) -> tuple[str, tuple]:
+    def as_sql(
+        self, with_limits: bool = True, with_col_aliases: bool = False
+    ) -> tuple[str, tuple]:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.
@@ -2029,7 +2043,7 @@ class SQLUpdateCompiler(SQLCompiler):
             result.append(f"WHERE {where}")
         return " ".join(result), tuple(update_params + list(params))
 
-    def execute_sql(self, result_type: str) -> int:
+    def execute_sql(self, result_type: str) -> int:  # type: ignore[override]
         """
         Execute the specified update. Return the number of rows affected by
         the primary update query. The "primary update query" is the first
@@ -2053,7 +2067,9 @@ class SQLUpdateCompiler(SQLCompiler):
                 is_empty = False
         return rows
 
-    def pre_sql_setup(self) -> None:
+    def pre_sql_setup(
+        self, with_col_aliases: bool = False
+    ) -> tuple[list[Any], list[Any], list[tuple[str, tuple]]] | None:
         """
         If the update depends on results from other tables, munge the "where"
         conditions to match the format required for (portable) SQL updates.
@@ -2110,7 +2126,9 @@ class SQLUpdateCompiler(SQLCompiler):
 
 
 class SQLAggregateCompiler(SQLCompiler):
-    def as_sql(self) -> tuple[str, tuple]:
+    def as_sql(
+        self, with_limits: bool = True, with_col_aliases: bool = False
+    ) -> tuple[str, tuple]:
         """
         Create the SQL for this query. Return the SQL string and list of
         parameters.

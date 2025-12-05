@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from plain import exceptions, preflight
@@ -140,11 +141,14 @@ class JSONField(Field):
             return value
         return self.get_db_prep_value(value, connection)
 
-    def get_transform(self, name: str) -> KeyTransformFactory | type[Transform]:
-        transform = super().get_transform(name)
+    def get_transform(
+        self, lookup_name: str
+    ) -> type[Transform] | Callable[..., Any] | None:
+        # Always returns a transform (never None in practice)
+        transform = super().get_transform(lookup_name)
         if transform:
             return transform
-        return KeyTransformFactory(name)
+        return KeyTransformFactory(lookup_name)
 
     def validate(self, value: Any, model_instance: Any) -> None:
         super().validate(value, model_instance)
@@ -311,20 +315,23 @@ class CaseInsensitiveMixin(Lookup):
     """
 
     def process_lhs(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper, lhs: Any = None
     ) -> tuple[str, list[Any]]:
-        lhs, lhs_params = super().process_lhs(compiler, connection)
+        lhs_sql, lhs_params = super().process_lhs(compiler, connection, lhs)
         if connection.vendor == "mysql":
-            return f"LOWER({lhs})", lhs_params
-        return lhs, lhs_params
+            return f"LOWER({lhs_sql})", lhs_params
+        return lhs_sql, lhs_params
 
     def process_rhs(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, list[Any]]:
+    ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
         rhs, rhs_params = super().process_rhs(compiler, connection)
-        if connection.vendor == "mysql":
-            return f"LOWER({rhs})", rhs_params
-        return rhs, rhs_params
+        if isinstance(rhs, str):
+            if connection.vendor == "mysql":
+                return f"LOWER({rhs})", rhs_params
+            return rhs, rhs_params
+        else:
+            return rhs, rhs_params
 
 
 class JSONExact(lookups.Exact):
@@ -332,15 +339,18 @@ class JSONExact(lookups.Exact):
 
     def process_rhs(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, list[Any]]:
+    ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
         rhs, rhs_params = super().process_rhs(compiler, connection)
-        # Treat None lookup values as null.
-        if rhs == "%s" and rhs_params == [None]:
-            rhs_params = ["null"]
-        if connection.vendor == "mysql":
-            func = ["JSON_EXTRACT(%s, '$')"] * len(rhs_params)
-            rhs %= tuple(func)
-        return rhs, rhs_params
+        if isinstance(rhs, str):
+            # Treat None lookup values as null.
+            if rhs == "%s" and rhs_params == [None]:
+                rhs_params = ["null"]
+            if connection.vendor == "mysql":
+                func = ["JSON_EXTRACT(%s, '$')"] * len(rhs_params)
+                rhs = rhs % tuple(func)
+            return rhs, rhs_params
+        else:
+            return rhs, rhs_params
 
 
 class JSONIContains(CaseInsensitiveMixin, lookups.IContains):
@@ -396,8 +406,11 @@ class KeyTransform(Transform):
         return f"({lhs} {self.postgres_operator} %s)", tuple(params) + (lookup,)
 
     def as_sqlite(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
+        self,
+        compiler: SQLCompiler,
+        connection: BaseDatabaseWrapper,
+        **extra_context: Any,
+    ) -> tuple[str, Sequence[Any]]:
         # as_sqlite is only called for SQLite connections
         assert is_sqlite_connection(connection)
         lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
@@ -487,7 +500,7 @@ class KeyTransformIn(lookups.In):
         connection: BaseDatabaseWrapper,
         sql: str,
         param: Any,
-    ) -> tuple[str, tuple[Any, ...]]:
+    ) -> tuple[str, list[Any]]:
         sql, params = super().resolve_expression_parameter(
             compiler,
             connection,
@@ -508,26 +521,29 @@ class KeyTransformIn(lookups.In):
             # Type guard narrows connection to MySQLDatabaseWrapper
             if connection.mysql_is_mariadb:
                 sql = f"JSON_UNQUOTE({sql})"
-        return sql, tuple(params)
+        return sql, list(params)
 
 
 class KeyTransformExact(JSONExact):
     def process_rhs(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, list[Any]]:
+    ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
         if isinstance(self.rhs, KeyTransform):
             return super(lookups.Exact, self).process_rhs(compiler, connection)
         rhs, rhs_params = super().process_rhs(compiler, connection)
-        if is_sqlite_connection(connection):
-            # Type guard narrows connection to SQLiteDatabaseWrapper
-            func = []
-            for value in rhs_params:
-                if value in connection.ops.jsonfield_datatype_values:
-                    func.append("%s")
-                else:
-                    func.append("JSON_EXTRACT(%s, '$')")
-            rhs %= tuple(func)
-        return rhs, rhs_params
+        if isinstance(rhs, str):
+            if is_sqlite_connection(connection):
+                # Type guard narrows connection to SQLiteDatabaseWrapper
+                func = []
+                for value in rhs_params:
+                    if value in connection.ops.jsonfield_datatype_values:
+                        func.append("%s")
+                    else:
+                        func.append("JSON_EXTRACT(%s, '$')")
+                rhs = rhs % tuple(func)
+            return rhs, rhs_params
+        else:
+            return rhs, rhs_params
 
 
 class KeyTransformIExact(
@@ -575,11 +591,14 @@ class KeyTransformIRegex(
 class KeyTransformNumericLookupMixin(Lookup):
     def process_rhs(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, list[Any]]:
+    ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
         rhs, rhs_params = super().process_rhs(compiler, connection)
-        if not connection.features.has_native_json_field:
-            rhs_params = [json.loads(value) for value in rhs_params]
-        return rhs, rhs_params
+        if isinstance(rhs, str):
+            if not connection.features.has_native_json_field:
+                rhs_params = [json.loads(value) for value in rhs_params]
+            return rhs, rhs_params
+        else:
+            return rhs, rhs_params
 
 
 class KeyTransformLt(KeyTransformNumericLookupMixin, lookups.LessThan):

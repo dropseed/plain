@@ -18,6 +18,8 @@ def cry(message: str, stderr: Any = sys.__stderr__) -> None:
 
 
 class LF2CRLF_FileWrapper:
+    _send: Any  # Can be lambda or socket.sendall
+
     def __init__(self, connection: socket.socket) -> None:
         self.connection = connection
         self.stream = fh = connection.makefile("rw")

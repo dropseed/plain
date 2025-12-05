@@ -67,7 +67,7 @@ class WSGIErrorsWrapper(io.RawIOBase):
             if hasattr(h, "stream"):
                 self.streams.append(h.stream)
 
-    def write(self, data: str | bytes) -> None:
+    def write(self, data: str | bytes) -> None:  # type: ignore[override]
         for stream in self.streams:
             try:
                 stream.write(data)

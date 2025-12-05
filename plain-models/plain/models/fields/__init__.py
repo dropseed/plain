@@ -37,6 +37,7 @@ from ..registry import models_registry
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
+    from plain.models.expressions import Col
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.sql.compiler import SQLCompiler
 
@@ -405,7 +406,7 @@ class Field(RegisterLookupMixin, Generic[T]):
                 )
         return errors
 
-    def get_col(self, alias: str | None, output_field: Field | None = None) -> Any:
+    def get_col(self, alias: str | None, output_field: Field | None = None) -> Col:
         if alias == self.model.model_options.db_table and (
             output_field is None or output_field == self
         ):
@@ -415,7 +416,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         return Col(alias, self, output_field)
 
     @cached_property
-    def cached_col(self) -> Any:
+    def cached_col(self) -> Col:
         from plain.models.expressions import Col
 
         return Col(self.model.model_options.db_table, self)
@@ -512,7 +513,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         Will not preserve any class attachments/attribute names.
         """
         name, path, args, kwargs = self.deconstruct()
-        return cast(Self, self.__class__(*args, **kwargs))
+        return self.__class__(*args, **kwargs)
 
     def __eq__(self, other: object) -> bool:
         # Needed for @total_ordering
@@ -606,7 +607,7 @@ class Field(RegisterLookupMixin, Generic[T]):
             self.name,
         )
 
-    def get_id_value_on_save(self, instance: Any) -> Any:
+    def get_id_value_on_save(self, instance: Model) -> T | None:
         """
         Hook to generate new primary key values on save. This method is called when
         saving instances with no primary key value set. If this method returns
@@ -617,7 +618,7 @@ class Field(RegisterLookupMixin, Generic[T]):
             return self.get_default()
         return None
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> T | None:
         """
         Convert the input value into the expected Python data type, raising
         plain.exceptions.ValidationError if the data can't be converted.
@@ -657,7 +658,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         if errors:
             raise exceptions.ValidationError(errors)
 
-    def validate(self, value: Any, model_instance: Any) -> None:
+    def validate(self, value: Any, model_instance: Model) -> None:
         """
         Validate value and raise ValidationError if necessary. Subclasses
         should override this to provide validation logic.
@@ -689,7 +690,7 @@ class Field(RegisterLookupMixin, Generic[T]):
                 self.error_messages["required"], code="required"
             )
 
-    def clean(self, value: Any, model_instance: Any) -> Any:
+    def clean(self, value: Any, model_instance: Model) -> T | None:
         """
         Convert the value's type and run validation. Validation errors
         from to_python() and validate() are propagated. Return the correct
@@ -816,12 +817,12 @@ class Field(RegisterLookupMixin, Generic[T]):
 
     # Descriptor protocol implementation
     @overload
-    def __get__(self, instance: None, owner: type) -> Self: ...
+    def __get__(self, instance: None, owner: type[Model]) -> Self: ...
 
     @overload
-    def __get__(self, instance: Any, owner: type) -> T: ...
+    def __get__(self, instance: Model, owner: type[Model]) -> T: ...
 
-    def __get__(self, instance: Any | None, owner: type) -> Self | T:
+    def __get__(self, instance: Model | None, owner: type[Model]) -> Self | T:
         """
         Descriptor __get__ for attribute access.
 
@@ -847,9 +848,9 @@ class Field(RegisterLookupMixin, Generic[T]):
             # Deferred field - load it from the database
             instance.refresh_from_db(fields=[field_name])
 
-        return data.get(field_name)
+        return cast(T, data.get(field_name))
 
-    def __set__(self, instance: Any, value: Any) -> None:
+    def __set__(self, instance: Model, value: Any) -> None:
         """
         Descriptor __set__ for attribute assignment.
 
@@ -871,7 +872,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         # Store in instance dict
         instance.__dict__[self.attname] = value
 
-    def __delete__(self, instance: Any) -> None:
+    def __delete__(self, instance: Model) -> None:
         """
         Descriptor __delete__ for attribute deletion.
 
@@ -896,7 +897,7 @@ class Field(RegisterLookupMixin, Generic[T]):
     def get_internal_type(self) -> str:
         return self.__class__.__name__
 
-    def pre_save(self, model_instance: Any, add: bool) -> Any:
+    def pre_save(self, model_instance: Model, add: bool) -> T | None:
         """Return field's value just before saving."""
         return getattr(model_instance, self.attname)
 
@@ -928,7 +929,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         """Return a boolean of whether this field has a default value."""
         return self.default is not NOT_PROVIDED
 
-    def get_default(self) -> Any:
+    def get_default(self) -> T | None:
         """Return the default value for this field."""
         return self._get_default()
 
@@ -990,7 +991,7 @@ class Field(RegisterLookupMixin, Generic[T]):
             (choice_func(x), str(x)) for x in qs
         ]
 
-    def value_to_string(self, obj: Any) -> str:
+    def value_to_string(self, obj: Model) -> str:
         """
         Return a string value of this field from the passed obj.
         This is used by the serialization framework.
@@ -1011,11 +1012,11 @@ class Field(RegisterLookupMixin, Generic[T]):
 
     flatchoices = property(_get_flatchoices)
 
-    def save_form_data(self, instance: Any, data: Any) -> None:
+    def save_form_data(self, instance: Model, data: Any) -> None:
         assert self.name is not None
         setattr(instance, self.name, data)
 
-    def value_from_object(self, obj: Any) -> Any:
+    def value_from_object(self, obj: Model) -> T | None:
         """Return the value of this field in the given model instance."""
         return getattr(obj, self.attname)
 
@@ -1031,7 +1032,7 @@ class BooleanField(Field[bool]):
     def get_internal_type(self) -> str:
         return "BooleanField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> bool | None:
         if self.allow_null and value in self.empty_values:
             return None
         if value in (True, False):
@@ -1136,7 +1137,7 @@ class CharField(Field[str]):
     def get_internal_type(self) -> str:
         return "CharField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> str | None:
         if isinstance(value, str) or value is None:
             return value
         return str(value)
@@ -1289,7 +1290,7 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
     def get_internal_type(self) -> str:
         return "DateField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> datetime.date | None:
         if value is None:
             return value
         if isinstance(value, datetime.datetime):
@@ -1319,7 +1320,7 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
             params={"value": value},
         )
 
-    def pre_save(self, model_instance: Any, add: bool) -> Any:
+    def pre_save(self, model_instance: Model, add: bool) -> datetime.date | None:
         if self.auto_now or (self.auto_now_add and add):
             value = datetime.date.today()
             setattr(model_instance, self.attname, value)
@@ -1339,7 +1340,7 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
             value = self.get_prep_value(value)
         return connection.ops.adapt_datefield_value(value)
 
-    def value_to_string(self, obj: Any) -> str:
+    def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
 
@@ -1372,7 +1373,7 @@ class DateTimeField(DateField):
     def get_internal_type(self) -> str:
         return "DateTimeField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> datetime.datetime | None:
         if value is None:
             return value
         if isinstance(value, datetime.datetime):
@@ -1422,13 +1423,13 @@ class DateTimeField(DateField):
             params={"value": value},
         )
 
-    def pre_save(self, model_instance: Any, add: bool) -> Any:
+    def pre_save(self, model_instance: Model, add: bool) -> datetime.datetime | None:
         if self.auto_now or (self.auto_now_add and add):
             value = timezone.now()
             setattr(model_instance, self.attname, value)
             return value
         else:
-            return super().pre_save(model_instance, add)
+            return getattr(model_instance, self.attname)
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
@@ -1458,7 +1459,7 @@ class DateTimeField(DateField):
             value = self.get_prep_value(value)
         return connection.ops.adapt_datetimefield_value(value)
 
-    def value_to_string(self, obj: Any) -> str:
+    def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
 
@@ -1494,11 +1495,7 @@ class DecimalField(Field[decimal.Decimal]):
         return errors
 
     def _check_decimal_places(self) -> list[PreflightResult]:
-        try:
-            decimal_places = int(self.decimal_places)
-            if decimal_places < 0:
-                raise ValueError()
-        except TypeError:
+        if self.decimal_places is None:
             return [
                 PreflightResult(
                     fix="DecimalFields must define a 'decimal_places' attribute.",
@@ -1506,6 +1503,10 @@ class DecimalField(Field[decimal.Decimal]):
                     id="fields.decimalfield_missing_decimal_places",
                 )
             ]
+        try:
+            decimal_places = int(self.decimal_places)
+            if decimal_places < 0:
+                raise ValueError()
         except ValueError:
             return [
                 PreflightResult(
@@ -1518,11 +1519,7 @@ class DecimalField(Field[decimal.Decimal]):
             return []
 
     def _check_max_digits(self) -> list[PreflightResult]:
-        try:
-            max_digits = int(self.max_digits)
-            if max_digits <= 0:
-                raise ValueError()
-        except TypeError:
+        if self.max_digits is None:
             return [
                 PreflightResult(
                     fix="DecimalFields must define a 'max_digits' attribute.",
@@ -1530,6 +1527,10 @@ class DecimalField(Field[decimal.Decimal]):
                     id="fields.decimalfield_missing_max_digits",
                 )
             ]
+        try:
+            max_digits = int(self.max_digits)
+            if max_digits <= 0:
+                raise ValueError()
         except ValueError:
             return [
                 PreflightResult(
@@ -1542,7 +1543,9 @@ class DecimalField(Field[decimal.Decimal]):
             return []
 
     def _check_decimal_places_and_max_digits(self) -> list[PreflightResult]:
-        if int(self.decimal_places) > int(self.max_digits):
+        if self.decimal_places is None or self.max_digits is None:
+            return []
+        if self.decimal_places > self.max_digits:
             return [
                 PreflightResult(
                     fix="'max_digits' must be greater or equal to 'decimal_places'.",
@@ -1573,7 +1576,7 @@ class DecimalField(Field[decimal.Decimal]):
     def get_internal_type(self) -> str:
         return "DecimalField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> decimal.Decimal | None:
         if value is None:
             return value
         try:
@@ -1628,7 +1631,7 @@ class DurationField(Field[datetime.timedelta]):
     def get_internal_type(self) -> str:
         return "DurationField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> datetime.timedelta | None:
         if value is None:
             return value
         if isinstance(value, datetime.timedelta):
@@ -1664,7 +1667,7 @@ class DurationField(Field[datetime.timedelta]):
             converters.append(connection.ops.convert_durationfield_value)
         return converters + super().get_db_converters(connection)
 
-    def value_to_string(self, obj: Any) -> str:
+    def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
         return "" if val is None else duration_string(val)
 
@@ -1706,7 +1709,7 @@ class FloatField(Field[float]):
     def get_internal_type(self) -> str:
         return "FloatField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> float | None:
         if value is None:
             return value
         try:
@@ -1799,7 +1802,7 @@ class IntegerField(Field[int]):
     def get_internal_type(self) -> str:
         return "IntegerField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> int | None:
         if value is None:
             return value
         try:
@@ -1881,7 +1884,7 @@ class GenericIPAddressField(Field[str]):
     def get_internal_type(self) -> str:
         return "GenericIPAddressField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> str | None:
         if value is None:
             return None
         if not isinstance(value, str):
@@ -2010,7 +2013,7 @@ class TextField(Field[str]):
     def get_internal_type(self) -> str:
         return "TextField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> str | None:
         if isinstance(value, str) or value is None:
             return value
         return str(value)
@@ -2077,7 +2080,7 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
     def get_internal_type(self) -> str:
         return "TimeField"
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> datetime.time | None:
         if value is None:
             return None
         if isinstance(value, datetime.time):
@@ -2105,7 +2108,7 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
             params={"value": value},
         )
 
-    def pre_save(self, model_instance: Any, add: bool) -> Any:
+    def pre_save(self, model_instance: Model, add: bool) -> datetime.time | None:
         if self.auto_now or (self.auto_now_add and add):
             value = datetime.datetime.now().time()
             setattr(model_instance, self.attname, value)
@@ -2125,7 +2128,7 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
             value = self.get_prep_value(value)
         return connection.ops.adapt_timefield_value(value)
 
-    def value_to_string(self, obj: Any) -> str:
+    def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
 
@@ -2177,7 +2180,7 @@ class BinaryField(Field[bytes | memoryview]):
     ) -> Any:
         return connection.ops.binary_placeholder_sql(value)
 
-    def get_default(self) -> Any:
+    def get_default(self) -> bytes | memoryview | None:
         if self.has_default() and not callable(self.default):
             return self.default
         default = super().get_default()
@@ -2193,11 +2196,14 @@ class BinaryField(Field[bytes | memoryview]):
             return connection.Database.Binary(value)
         return value
 
-    def value_to_string(self, obj: Any) -> str:
+    def value_to_string(self, obj: Model) -> str:
         """Binary data is serialized as base64"""
-        return b64encode(self.value_from_object(obj)).decode("ascii")
+        val = self.value_from_object(obj)
+        if val is None:
+            return ""
+        return b64encode(val).decode("ascii")
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> bytes | memoryview | None:
         # If it's a string, it should be base64-encoded data
         if isinstance(value, str):
             return memoryview(b64decode(value.encode("ascii")))
@@ -2229,17 +2235,19 @@ class UUIDField(Field[uuid.UUID]):
 
     def get_db_prep_value(
         self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
-    ) -> Any:
+    ) -> str | uuid.UUID | None:
         if value is None:
             return None
         if not isinstance(value, uuid.UUID):
             value = self.to_python(value)
+            if value is None:
+                return None
 
         if connection.features.has_native_uuid_field:
             return value
         return value.hex
 
-    def to_python(self, value: Any) -> Any:
+    def to_python(self, value: Any) -> uuid.UUID | None:
         if value is not None and not isinstance(value, uuid.UUID):
             input_form = "int" if isinstance(value, int) else "hex"
             try:
@@ -2281,7 +2289,7 @@ class PrimaryKeyField(BigIntegerField):
             cast(dict[str, Any], {}),
         )
 
-    def validate(self, value: Any, model_instance: Any) -> None:
+    def validate(self, value: Any, model_instance: Model) -> None:
         pass
 
     def get_db_prep_value(

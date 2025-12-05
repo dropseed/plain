@@ -60,6 +60,7 @@ class Settings:
             )
 
         # Keep a reference to the settings.py module path
+        assert mod.__file__ is not None
         self.path = Path(mod.__file__).resolve()
 
         # Load default settings from installed packages
@@ -103,7 +104,7 @@ class Settings:
                 )
 
     def _load_default_settings(self, settings_module: types.ModuleType) -> None:
-        for entry in getattr(settings_module, "INSTALLED_PACKAGES", []):
+        for entry in settings_module.INSTALLED_PACKAGES:
             if isinstance(entry, PackageConfig):
                 app_settings = entry.module.default_settings
             elif find_spec(f"{entry}.default_settings"):

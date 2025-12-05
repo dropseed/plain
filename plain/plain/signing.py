@@ -260,13 +260,46 @@ class Signer:
         return serializer().loads(data)
 
 
-class TimestampSigner(Signer):
+class TimestampSigner:
+    """A signer that includes a timestamp for max_age validation.
+
+    Uses composition rather than inheritance since the interface
+    intentionally differs from Signer (unsign accepts max_age parameter).
+    """
+
+    def __init__(
+        self,
+        *,
+        key: str | None = None,
+        sep: str = ":",
+        salt: str | None = None,
+        algorithm: str = "sha256",
+        fallback_keys: list[str] | None = None,
+    ) -> None:
+        # Compute default salt here to preserve backwards compatibility.
+        # When TimestampSigner inherited from Signer, the default salt was
+        # "plain.signing.TimestampSigner". Now that we use composition,
+        # we must set it explicitly rather than letting Signer compute its own.
+        if salt is None:
+            salt = f"{self.__class__.__module__}.{self.__class__.__name__}"
+        self._signer = Signer(
+            key=key,
+            sep=sep,
+            salt=salt,
+            algorithm=algorithm,
+            fallback_keys=fallback_keys,
+        )
+
+    @property
+    def sep(self) -> str:
+        return self._signer.sep
+
     def timestamp(self) -> str:
         return b62_encode(int(time.time()))
 
     def sign(self, value: str) -> str:
         value = f"{value}{self.sep}{self.timestamp()}"
-        return super().sign(value)
+        return self._signer.sign(value)
 
     def unsign(
         self, value: str, max_age: int | float | datetime.timedelta | None = None
@@ -275,14 +308,58 @@ class TimestampSigner(Signer):
         Retrieve original value and check it wasn't signed more
         than max_age seconds ago.
         """
-        result = super().unsign(value)
+        result = self._signer.unsign(value)
         value, timestamp = result.rsplit(self.sep, 1)
-        timestamp = b62_decode(timestamp)
+        ts = b62_decode(timestamp)
         if max_age is not None:
             if isinstance(max_age, datetime.timedelta):
                 max_age = max_age.total_seconds()
             # Check timestamp is not older than max_age
-            age = time.time() - timestamp
+            age = time.time() - ts
             if age > max_age:
                 raise SignatureExpired(f"Signature age {age} > {max_age} seconds")
         return value
+
+    def sign_object(
+        self,
+        obj: Any,
+        serializer: type[JSONSerializer] = JSONSerializer,
+        compress: bool = False,
+    ) -> str:
+        """
+        Return URL-safe, hmac signed base64 compressed JSON string.
+
+        If compress is True (not the default), check if compressing using zlib
+        can save some space. Prepend a '.' to signify compression. This is
+        included in the signature, to protect against zip bombs.
+
+        The serializer is expected to return a bytestring.
+        """
+        data = serializer().dumps(obj)
+        is_compressed = False
+
+        if compress:
+            compressed = zlib.compress(data)
+            if len(compressed) < (len(data) - 1):
+                data = compressed
+                is_compressed = True
+        base64d = b64_encode(data).decode()
+        if is_compressed:
+            base64d = "." + base64d
+        return self.sign(base64d)
+
+    def unsign_object(
+        self,
+        signed_obj: str,
+        serializer: type[JSONSerializer] = JSONSerializer,
+        max_age: int | float | datetime.timedelta | None = None,
+    ) -> Any:
+        """Unsign and decode an object, optionally checking max_age."""
+        base64d = self.unsign(signed_obj, max_age=max_age).encode()
+        decompress = base64d[:1] == b"."
+        if decompress:
+            base64d = base64d[1:]
+        data = b64_decode(base64d)
+        if decompress:
+            data = zlib.decompress(data)
+        return serializer().loads(data)

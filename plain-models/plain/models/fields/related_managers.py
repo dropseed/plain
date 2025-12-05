@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.fields.related import ForeignKeyField, ManyToManyField
 
+import builtins
+
 from plain.models import transaction
 from plain.models.db import NotSupportedError, db_connection
 from plain.models.expressions import Window
@@ -52,7 +54,7 @@ def _filter_prefetch_queryset(
     return queryset.filter(predicate)
 
 
-class BaseRelatedManager(ABC):
+class BaseRelatedManager(ABC, Generic[T]):
     """
     Base class for all related object managers.
 
@@ -60,17 +62,17 @@ class BaseRelatedManager(ABC):
     """
 
     @property
-    def query(self) -> QuerySet:
+    def query(self) -> QuerySet[T]:
         """Access the QuerySet for this relationship."""
         return self.get_queryset()
 
     @abstractmethod
-    def get_queryset(self) -> QuerySet:
+    def get_queryset(self) -> QuerySet[T]:
         """Return the QuerySet for this relationship."""
         ...
 
 
-class ReverseForeignKeyManager(BaseRelatedManager, Generic[T]):
+class ReverseForeignKeyManager(BaseRelatedManager[T]):
     """
     Manager for the reverse side of a foreign key relation.
 
@@ -88,7 +90,7 @@ class ReverseForeignKeyManager(BaseRelatedManager, Generic[T]):
         self, instance: Model, field: ForeignKeyField, related_model: type[Model]
     ):
         assert field.name is not None, "Field must have a name"
-        self.model = related_model
+        self.model = cast(type[T], related_model)
         self.instance = instance
         self.field = field
         self.core_filters = {self.field.name: instance}
@@ -145,7 +147,7 @@ class ReverseForeignKeyManager(BaseRelatedManager, Generic[T]):
         except (AttributeError, KeyError):
             pass  # nothing to clear from cache
 
-    def get_queryset(self) -> QuerySet:
+    def get_queryset(self) -> QuerySet[T]:
         # Even if this relation is not to primary key, we require still primary key value.
         # The wish is that the instance has been already saved to DB,
         # although having a primary key value isn't a guarantee of that.
@@ -219,17 +221,17 @@ class ReverseForeignKeyManager(BaseRelatedManager, Generic[T]):
     def create(self, **kwargs: Any) -> T:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return self.model.query.create(**kwargs)
+        return cast(T, self.model.query.create(**kwargs))
 
     def get_or_create(self, **kwargs: Any) -> tuple[T, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return self.model.query.get_or_create(**kwargs)
+        return cast(tuple[T, bool], self.model.query.get_or_create(**kwargs))
 
     def update_or_create(self, **kwargs: Any) -> tuple[T, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return self.model.query.update_or_create(**kwargs)
+        return cast(tuple[T, bool], self.model.query.update_or_create(**kwargs))
 
     def remove(self, *objs: T, bulk: bool = True) -> None:
         # remove() is only provided if the ForeignKeyField can have a value of null
@@ -304,7 +306,7 @@ class ReverseForeignKeyManager(BaseRelatedManager, Generic[T]):
             self.add(*objs, bulk=bulk)
 
 
-class ManyToManyManager(BaseRelatedManager, Generic[T]):
+class ManyToManyManager(BaseRelatedManager[T]):
     """
     Manager for both forward and reverse sides of a many-to-many relation.
 
@@ -340,7 +342,7 @@ class ManyToManyManager(BaseRelatedManager, Generic[T]):
         # Set direction-specific attributes
         if is_reverse:
             # Reverse: accessing from the target model back to the source
-            self.model = related_model
+            self.model = cast(type[T], related_model)
             self.query_field_name = field.name
             self.prefetch_cache_name = field.related_query_name()
             self.source_field_name = field.m2m_reverse_field_name()
@@ -348,7 +350,7 @@ class ManyToManyManager(BaseRelatedManager, Generic[T]):
             self.symmetrical = False  # Reverse relations are never symmetrical
         else:
             # Forward: accessing from the source model to the target
-            self.model = related_model
+            self.model = cast(type[T], related_model)
             self.query_field_name = field.related_query_name()
             self.prefetch_cache_name = field.name
             self.source_field_name = field.m2m_field_name()
@@ -400,7 +402,7 @@ class ManyToManyManager(BaseRelatedManager, Generic[T]):
         except (AttributeError, KeyError):
             pass  # nothing to clear from cache
 
-    def get_queryset(self) -> QuerySet:
+    def get_queryset(self) -> QuerySet[T]:
         try:
             return self.instance._prefetched_objects_cache[self.prefetch_cache_name]
         except (AttributeError, KeyError):
@@ -500,7 +502,7 @@ class ManyToManyManager(BaseRelatedManager, Generic[T]):
     ) -> T:
         new_obj = self.model.query.create(**kwargs)
         self.add(new_obj, through_defaults=through_defaults)
-        return new_obj
+        return cast(T, new_obj)
 
     def get_or_create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
@@ -510,7 +512,7 @@ class ManyToManyManager(BaseRelatedManager, Generic[T]):
         # from get() then the relationship already exists.
         if created:
             self.add(obj, through_defaults=through_defaults)
-        return obj, created
+        return cast(T, obj), created
 
     def update_or_create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
@@ -520,16 +522,16 @@ class ManyToManyManager(BaseRelatedManager, Generic[T]):
         # from get() then the relationship already exists.
         if created:
             self.add(obj, through_defaults=through_defaults)
-        return obj, created
+        return cast(T, obj), created
 
-    def _get_target_ids(self, target_field_name: str, objs: Any) -> set[Any]:
+    def _get_target_ids(self, target_field_name: str, objs: Any) -> builtins.set[Any]:
         """Return the set of ids of `objs` that the target field references."""
         from typing import cast
 
         from plain.models import Model
         from plain.models.fields.related import ForeignKeyField
 
-        target_ids = set()
+        target_ids: set[Any] = set()
         target_field = cast(
             ForeignKeyField,
             self.through._model_meta.get_forward_field(target_field_name),
@@ -551,8 +553,11 @@ class ManyToManyManager(BaseRelatedManager, Generic[T]):
         return target_ids
 
     def _get_missing_target_ids(
-        self, source_field_name: str, target_field_name: str, target_ids: set[Any]
-    ) -> set[Any]:
+        self,
+        source_field_name: str,
+        target_field_name: str,
+        target_ids: builtins.set[Any],
+    ) -> builtins.set[Any]:
         """Return the subset of ids of `objs` that aren't already assigned to this relationship."""
         vals = self.through.query.values_list(target_field_name, flat=True).filter(
             **{

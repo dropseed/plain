@@ -3,7 +3,7 @@ from plain.views import View
 
 class AdminViewset:
     @classmethod
-    def get_views(cls) -> list[View]:
+    def get_views(cls) -> list[type[View]]:
         """Views are defined as inner classes on the viewset class."""
 
         # Primary views that we can interlink automatically
