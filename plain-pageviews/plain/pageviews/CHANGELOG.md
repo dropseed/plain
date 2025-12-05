@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.30.0) (2025-12-04)
+
+### What's changed
+
+- Fixed type annotation for template extension context parameter ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea05b26dfc7e32c50f2a5a5bc7e098ceb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.29.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.29.0) (2025-11-24)
 
 ### What's changed
