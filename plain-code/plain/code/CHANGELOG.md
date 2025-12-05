@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-code@0.14.0) (2025-12-05)
+
+### What's changed
+
+- Updated the minimum ty type checker version to 0.0.1a31 for improved type checking capabilities ([17a2e6d](https://github.com/dropseed/plain/commit/17a2e6d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.0](https://github.com/dropseed/plain/releases/plain-code@0.13.0) (2025-12-01)
 
 ### What's changed
