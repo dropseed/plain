@@ -35,7 +35,7 @@ dev = [
     "plain-tunnel",
     "plain-vendor",
     # Type checking and better dev experience
-    "ty>=0.0.1a21",
+    "ty>=0.0.1a32",
     "psycopg[binary]>=3.2.12",
     "mysqlclient>=2.2.7",
 ]

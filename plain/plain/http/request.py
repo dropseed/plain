@@ -68,6 +68,7 @@ class Request:
     meta: dict[str, Any]
     path: str
     path_info: str
+    unique_id: str
     upload_handlers: list[FileUploadHandler]
 
     def __init__(self):

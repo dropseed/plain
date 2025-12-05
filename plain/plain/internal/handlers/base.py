@@ -74,9 +74,9 @@ class BaseHandler:
             "load_middleware() must be called before get_response()"
         )
 
-        span_attributes = {
+        span_attributes: dict[str, str] = {
             "plain.request.id": request.unique_id,
-            http_attributes.HTTP_REQUEST_METHOD: request.method,
+            http_attributes.HTTP_REQUEST_METHOD: request.method or "",
             url_attributes.URL_PATH: request.path_info,
             url_attributes.URL_SCHEME: request.scheme,
         }
