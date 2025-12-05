@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.57.0](https://github.com/dropseed/plain/releases/plain-admin@0.57.0) (2025-12-04)
+
+### What's changed
+
+- Internal type annotation improvements for better IDE support and type checking ([ac1eeb0](https://github.com/dropseed/plain/commit/ac1eeb0ea0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.56.0](https://github.com/dropseed/plain/releases/plain-admin@0.56.0) (2025-11-24)
 
 ### What's changed
