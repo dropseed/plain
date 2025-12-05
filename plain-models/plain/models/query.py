@@ -33,21 +33,19 @@ from plain.models.exceptions import (
 )
 from plain.models.expressions import Case, F, ResolvableExpression, Value, When
 from plain.models.fields import (
-    DateField,
-    DateTimeField,
     Field,
     PrimaryKeyField,
 )
-from plain.models.functions import Cast, Trunc
+from plain.models.functions import Cast
 from plain.models.query_utils import FilteredRelation, Q
 from plain.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE
 from plain.models.utils import resolve_callables
-from plain.utils import timezone
 from plain.utils.functional import partition
 
-if TYPE_CHECKING:
-    from datetime import tzinfo
+# Re-exports for public API
+__all__ = ["F", "Q", "QuerySet", "RawQuerySet", "Prefetch", "FilteredRelation"]
 
+if TYPE_CHECKING:
     from plain.models import Model
 
 # Type variable for QuerySet generic
@@ -976,49 +974,6 @@ class QuerySet(Generic[T]):
             return obj
         return None
 
-    def in_bulk(
-        self, id_list: list[Any] | None = None, *, field_name: str = "id"
-    ) -> dict[Any, T]:
-        """
-        Return a dictionary mapping each of the given IDs to the object with
-        that ID. If `id_list` isn't provided, evaluate the entire QuerySet.
-        """
-        if self.sql_query.is_sliced:
-            raise TypeError("Cannot use 'limit' or 'offset' with in_bulk().")
-        meta = self.model._model_meta
-        unique_fields = [
-            constraint.fields[0]
-            for constraint in self.model.model_options.total_unique_constraints
-            if len(constraint.fields) == 1
-        ]
-        if (
-            field_name != "id"
-            and not meta.get_forward_field(field_name).primary_key
-            and field_name not in unique_fields
-            and self.sql_query.distinct_fields != (field_name,)
-        ):
-            raise ValueError(
-                f"in_bulk()'s field_name must be a unique field but {field_name!r} isn't."
-            )
-        if id_list is not None:
-            if not id_list:
-                return {}
-            filter_key = f"{field_name}__in"
-            batch_size = db_connection.features.max_query_params
-            id_list_tuple = tuple(id_list)
-            # If the database has a limit on the number of query parameters
-            # (e.g. SQLite), retrieve objects in batches if necessary.
-            if batch_size and batch_size < len(id_list_tuple):
-                qs: tuple[T, ...] = ()
-                for offset in range(0, len(id_list_tuple), batch_size):
-                    batch = id_list_tuple[offset : offset + batch_size]
-                    qs += tuple(self.filter(**{filter_key: batch}))
-            else:
-                qs = self.filter(**{filter_key: id_list_tuple})
-        else:
-            qs = self._chain()
-        return {getattr(obj, field_name): obj for obj in qs}
-
     def delete(self) -> tuple[int, dict[str, int]]:
         """Delete the records in the current QuerySet."""
         if self.sql_query.is_sliced:
@@ -1125,26 +1080,6 @@ class QuerySet(Generic[T]):
             return self.sql_query.has_results()
         return bool(self._result_cache)
 
-    def contains(self, obj: T) -> bool:
-        """
-        Return True if the QuerySet contains the provided obj,
-        False otherwise.
-        """
-        if self._fields is not None:
-            raise TypeError(
-                "Cannot call QuerySet.contains() after .values() or .values_list()."
-            )
-        try:
-            if obj.__class__ != self.model:
-                return False
-        except AttributeError:
-            raise TypeError("'obj' must be a model instance.")
-        if obj.id is None:
-            raise ValueError("QuerySet.contains() cannot be used on unsaved objects.")
-        if self._result_cache is not None:
-            return obj in self._result_cache
-        return self.filter(id=obj.id).exists()
-
     def _prefetch_related_objects(self) -> None:
         # This method can only be called once the result cache has been filled.
         assert self._result_cache is not None
@@ -1220,64 +1155,6 @@ class QuerySet(Generic[T]):
         clone = self._values(*_fields, **expressions)
         clone._iterable_class = FlatValuesListIterable if flat else ValuesListIterable
         return clone
-
-    def dates(self, field_name: str, kind: str, order: str = "ASC") -> QuerySet[Any]:
-        """
-        Return a list of date objects representing all available dates for
-        the given field_name, scoped to 'kind'.
-        """
-        if kind not in ("year", "month", "week", "day"):
-            raise ValueError("'kind' must be one of 'year', 'month', 'week', or 'day'.")
-        if order not in ("ASC", "DESC"):
-            raise ValueError("'order' must be either 'ASC' or 'DESC'.")
-        return (
-            self.annotate(
-                datefield=Trunc(field_name, kind, output_field=DateField()),
-                plain_field=F(field_name),
-            )
-            .values_list("datefield", flat=True)
-            .distinct()
-            .filter(plain_field__isnull=False)
-            .order_by(("-" if order == "DESC" else "") + "datefield")
-        )
-
-    def datetimes(
-        self,
-        field_name: str,
-        kind: str,
-        order: str = "ASC",
-        tzinfo: tzinfo | None = None,
-    ) -> QuerySet[Any]:
-        """
-        Return a list of datetime objects representing all available
-        datetimes for the given field_name, scoped to 'kind'.
-        """
-        if kind not in ("year", "month", "week", "day", "hour", "minute", "second"):
-            raise ValueError(
-                "'kind' must be one of 'year', 'month', 'week', 'day', "
-                "'hour', 'minute', or 'second'."
-            )
-        if order not in ("ASC", "DESC"):
-            raise ValueError("'order' must be either 'ASC' or 'DESC'.")
-
-        if tzinfo is None:
-            tzinfo = timezone.get_current_timezone()
-
-        return (
-            self.annotate(
-                datetimefield=Trunc(
-                    field_name,
-                    kind,
-                    output_field=DateTimeField(),
-                    tzinfo=tzinfo,
-                ),
-                plain_field=F(field_name),
-            )
-            .values_list("datetimefield", flat=True)
-            .distinct()
-            .filter(plain_field__isnull=False)
-            .order_by(("-" if order == "DESC" else "") + "datetimefield")
-        )
 
     def none(self) -> QuerySet[T]:
         """Return an empty QuerySet."""
