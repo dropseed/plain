@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.49.0](https://github.com/dropseed/plain/releases/plain-dev@0.49.0) (2025-12-04)
+
+### What's changed
+
+- Improved type annotations in `mkcert.py` and `pdb.py` for better type checker compatibility ([ac1eeb0ea0](https://github.com/dropseed/plain/commit/ac1eeb0ea0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.48.0](https://github.com/dropseed/plain/releases/plain-dev@0.48.0) (2025-12-01)
 
 ### What's changed
