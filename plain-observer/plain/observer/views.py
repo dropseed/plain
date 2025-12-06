@@ -5,7 +5,7 @@ from typing import Any
 from plain import models
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
-from plain.http import JsonResponse, Response, ResponseBase
+from plain.http import Response, ResponseBase
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.views import DetailView, ListView
@@ -61,7 +61,7 @@ class ObserverTracesView(AuthView, HTMXView, ListView):
 
     def htmx_delete_traces(self) -> Response:
         """Clear all traces via HTMX DELETE."""
-        Trace.query.filter(share_id="").delete()
+        Trace.query.all().delete()
         response = Response(status_code=204)
         response.headers["HX-Refresh"] = "true"
         return response
@@ -126,37 +126,3 @@ class ObserverTraceDetailView(AuthView, HTMXView, DetailView):
         response = Response(status_code=204)
         response.headers["HX-Redirect"] = reverse("observer:traces")
         return response
-
-    def htmx_post_share(self) -> Response:
-        self.object.generate_share_id()
-        return super().get()
-
-    def htmx_delete_share(self) -> Response:
-        self.object.remove_share_id()
-        return super().get()
-
-
-class ObserverTraceSharedView(DetailView):
-    """Public view for shared trace data."""
-
-    template_name = "observer/trace_share.html"
-    context_object_name = "trace"
-
-    def get_object(self) -> Trace | None:
-        return Trace.query.get_or_none(share_id=self.url_kwargs["share_id"])
-
-    def get_template_context(self) -> dict[str, Any]:
-        context = super().get_template_context()
-        context["is_share_view"] = True
-        return context
-
-    def get(self) -> Response:
-        """Return trace data as HTML or JSON based on content negotiation."""
-        preferred = self.request.get_preferred_type("text/html", "application/json")
-        if (
-            preferred == "application/json"
-            or self.request.query_params.get("format") == "json"
-        ):
-            return JsonResponse(self.object.as_dict())
-
-        return super().get()

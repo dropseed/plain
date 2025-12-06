@@ -104,16 +104,6 @@
                                 </div>
                                 <div class="mt-1 space-y-1">
                                     {% if trace_item.summary %}<div class="text-xs text-white/60">{{ trace_item.summary }}</div>{% endif %}
-                                    {% if trace_item.share_id %}
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="text-emerald-500 flex-shrink-0" title="Has active share link">
-                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-                                                <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/>
-                                            </svg>
-                                        </div>
-                                        <div class="text-xs text-white/30 font-mono truncate">{{ trace_item.trace_id }}</div>
-                                    </div>
-                                    {% endif %}
                                     <div class="flex items-center justify-between gap-3 text-xs text-white/50">
                                         {% if trace_item.user_id or trace_item.session_id or trace_item.app_version %}
                                         <div class="flex items-center gap-3">

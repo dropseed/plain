@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import secrets
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
@@ -35,7 +34,6 @@ from plain import models
 from plain.models import types
 from plain.runtime import settings
 from plain.urls import reverse
-from plain.utils import timezone
 
 
 @models.register_model
@@ -53,12 +51,6 @@ class Trace(models.Model):
     user_id: str = types.CharField(max_length=255, default="", required=False)
     app_name: str = types.CharField(max_length=255, default="", required=False)
     app_version: str = types.CharField(max_length=255, default="", required=False)
-
-    # Shareable URL fields
-    share_id: str = types.CharField(max_length=32, default="", required=False)
-    share_created_at: datetime | None = types.DateTimeField(
-        allow_null=True, required=False
-    )
 
     # Explicit reverse relations
     spans: types.ReverseForeignKey[Span] = types.ReverseForeignKey(
@@ -82,7 +74,6 @@ class Trace(models.Model):
             models.Index(fields=["trace_id"]),
             models.Index(fields=["start_time"]),
             models.Index(fields=["request_id"]),
-            models.Index(fields=["share_id"]),
             models.Index(fields=["session_id"]),
         ],
     )
@@ -93,19 +84,6 @@ class Trace(models.Model):
     def get_absolute_url(self) -> str:
         """Return the canonical URL for this trace."""
         return reverse("observer:trace_detail", trace_id=self.trace_id)
-
-    def generate_share_id(self) -> str:
-        """Generate a unique share ID for this trace."""
-        self.share_id = secrets.token_urlsafe(24)
-        self.share_created_at = timezone.now()
-        self.save(update_fields=["share_id", "share_created_at"])
-        return self.share_id
-
-    def remove_share_id(self) -> None:
-        """Remove the share ID from this trace."""
-        self.share_id = ""
-        self.share_created_at = None
-        self.save(update_fields=["share_id", "share_created_at"])
 
     def duration_ms(self) -> float:
         return (self.end_time - self.start_time).total_seconds() * 1000

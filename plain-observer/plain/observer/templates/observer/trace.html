@@ -1,29 +1,5 @@
 <header class="mb-2">
     {% htmxfragment "header" %}
-    {% if trace.share_id and not is_share_view|default(False) %}
-    <div class="mb-2">
-        <div class="flex items-center gap-2 bg-emerald-900/20 border border-emerald-700/50 rounded px-2 py-1">
-            <span class="text-xs text-emerald-400 font-mono flex-1 truncate" id="share-url-{{ trace.id }}">
-                {{ request.host }}{{ url('observer:trace_shared', trace.share_id) }}
-            </span>
-            <button
-                data-copy-share-url
-                data-trace-id="{{ trace.id }}"
-                data-share-url="{{ request.build_absolute_uri(url('observer:trace_shared', trace.share_id)) }}"
-                class="px-2 py-0.5 text-xs bg-emerald-700 text-emerald-100 hover:bg-emerald-600 rounded transition-colors flex-shrink-0"
-                title="Copy shareable URL">
-                Copy
-            </button>
-            <button
-                hx-delete="{{ trace.get_absolute_url() }}"
-                plain-hx-action="share"
-                class="px-2 py-0.5 text-xs bg-red-600 text-red-100 hover:bg-red-700 rounded transition-colors flex-shrink-0"
-                title="Remove shareable URL">
-                Remove
-            </button>
-        </div>
-    </div>
-    {% endif %}
     <div class="flex items-start justify-between">
         <h2 class="text-lg font-semibold text-white flex-1 min-w-0">{{ trace.root_span_name }}</h2>
         <div class="relative group">
@@ -33,20 +9,7 @@
                 </svg>
             </div>
             <div class="absolute right-0 mt-3 w-64 bg-stone-900 rounded-lg shadow-lg border border-stone-700 py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                {% if not is_share_view|default(False) and not trace.share_id %}
                 <div class="py-1">
-                    <button
-                        hx-post="{{ trace.get_absolute_url() }}"
-                        plain-hx-action="share"
-                        class="cursor-pointer w-full text-left px-4 py-3 text-sm text-stone-200 hover:bg-stone-800 transition-colors flex items-center gap-3">
-                        <svg class="w-4 h-4 text-stone-400" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/>
-                        </svg>
-                        Generate Share URL
-                    </button>
-                </div>
-                {% endif %}
-            <div class="py-1">
                 <a
                     href="{{ trace.get_absolute_url() }}?format=json"
                     target="_blank"
@@ -56,7 +19,6 @@
                     </svg>
                     View as JSON
                 </a>
-                {% if not is_share_view|default(False) %}
                 <a
                     href="{{ trace.get_absolute_url() }}?logs=true"
                     target="_blank"
@@ -77,7 +39,6 @@
                     </svg>
                     Delete Trace
                 </button>
-                {% endif %}
             </div>
         </div>
     </div>
