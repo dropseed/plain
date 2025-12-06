@@ -6,6 +6,9 @@
   htmx.config.inlineScriptNonce = nonce;
   htmx.config.inlineStyleNonce = nonce;
 
+  // Enable native browser form validation feedback
+  htmx.config.reportValidityOfForms = true;
+
   htmx.defineExtension("plain-views", {
     init() {
       // Set or append this extension to the body hx-ext automatically
