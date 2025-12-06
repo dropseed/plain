@@ -116,27 +116,21 @@ class ReverseForeignKeyManager(BaseRelatedManager[T]):
             val = getattr(self.instance, field.attname)
             if val is None:
                 return queryset.none()
-        from plain.models.fields.related import ForeignKeyField
 
-        if isinstance(self.field, ForeignKeyField):
-            # Guard against field-like objects such as GenericRelation
-            # that abuse create_reverse_many_to_one_manager() with reverse
-            # one-to-many relationships instead and break known related
-            # objects assignment.
-            try:
-                target_field = self.field.target_field
-            except FieldError:
-                # The relationship has multiple target fields. Use a tuple
-                # for related object id.
-                rel_obj_id = tuple(
-                    [
-                        getattr(self.instance, target_field.attname)
-                        for target_field in self.field.path_infos[-1].target_fields
-                    ]
-                )
-            else:
-                rel_obj_id = getattr(self.instance, target_field.attname)
-            queryset._known_related_objects = {self.field: {rel_obj_id: self.instance}}
+        try:
+            target_field = self.field.target_field
+        except FieldError:
+            # The relationship has multiple target fields. Use a tuple
+            # for related object id.
+            rel_obj_id = tuple(
+                [
+                    getattr(self.instance, target_field.attname)
+                    for target_field in self.field.path_infos[-1].target_fields
+                ]
+            )
+        else:
+            rel_obj_id = getattr(self.instance, target_field.attname)
+        queryset._known_related_objects = {self.field: {rel_obj_id: self.instance}}
         return queryset
 
     def _remove_prefetched_objects(self) -> None:

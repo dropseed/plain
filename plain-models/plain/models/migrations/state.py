@@ -50,10 +50,8 @@ def _get_related_models(m: type[models.Model]) -> list[type[models.Model]]:
 
     related_fields_models = set()
     for f in m._model_meta.get_fields(include_reverse=True):
-        if (
-            isinstance(f, RelatedField | ForeignObjectRel)
-            and f.related_model is not None
-            and not isinstance(f.related_model, str)
+        if isinstance(f, RelatedField | ForeignObjectRel) and not isinstance(
+            f.related_model, str
         ):
             related_fields_models.add(f.model)
             related_models.append(f.related_model)

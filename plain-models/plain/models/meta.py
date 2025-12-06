@@ -196,12 +196,7 @@ class Meta:
         """
 
         # For legacy reasons, the fields property should only contain forward
-        # fields that are not private or with a m2m cardinality. Therefore we
-        # pass these three filters as filters to the generator.
-        # The third lambda is a longwinded way of checking f.related_model - we don't
-        # use that property directly because related_model is a cached property,
-        # and all the models may not have been loaded yet; we don't want to cache
-        # the string reference to the related_model.
+        # fields that are not private or with a m2m cardinality.
         def is_not_an_m2m_field(f: Any) -> bool:
             from plain.models.fields.related import ManyToManyField
 
@@ -216,19 +211,12 @@ class Meta:
                 return True
             return isinstance(f, ForeignKeyField | ManyToManyField)
 
-        def is_not_a_generic_foreign_key(f: Any) -> bool:
-            from plain.models.fields.related import ForeignKeyField
-
-            return not (isinstance(f, ForeignKeyField) and not f.remote_field.model)
-
         return make_immutable_fields_list(
             "fields",
             (
                 f
                 for f in self._get_fields(reverse=False)
-                if is_not_an_m2m_field(f)
-                and is_not_a_generic_relation(f)
-                and is_not_a_generic_foreign_key(f)
+                if is_not_an_m2m_field(f) and is_not_a_generic_relation(f)
             ),
         )
 
@@ -412,7 +400,7 @@ class Meta:
             fields_with_relations = (
                 f
                 for f in meta._get_fields(reverse=False)
-                if isinstance(f, RelatedField) and f.related_model is not None
+                if isinstance(f, RelatedField)
             )
             for f in fields_with_relations:
                 if not isinstance(f.remote_field.model, str):

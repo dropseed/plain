@@ -1687,8 +1687,6 @@ class Query(BaseExpression):
         allow_many: bool = True,
         fail_on_missing: bool = False,
     ) -> tuple[list[Any], Field | ForeignObjectRel, tuple[Field, ...], list[str]]:
-        from plain.models.fields.related import RelatedField
-
         """
         Walk the list of names and turns them into PathInfo tuples. A single
         name in 'names' can generate multiple PathInfos (m2m, for example).
@@ -1729,18 +1727,7 @@ class Query(BaseExpression):
                         path.extend(filtered_relation_path[:-1])
                     else:
                         field = meta.get_field(filtered_relation.relation_name)
-            if field is not None:
-                # Fields that contain one-to-many relations with a generic
-                # model (like a GenericForeignKey) cannot generate reverse
-                # relations and therefore cannot be used for reverse querying.
-                if isinstance(field, RelatedField) and not field.related_model:
-                    raise FieldError(
-                        f"Field {name!r} does not generate an automatic reverse "
-                        "relation and therefore cannot be used for reverse "
-                        "querying. If it is a GenericForeignKey, consider "
-                        "adding a GenericRelation."
-                    )
-            else:
+            if field is None:
                 # We didn't find the current field, so move position back
                 # one step.
                 pos -= 1

@@ -1076,7 +1076,7 @@ class Model(metaclass=ModelBase):
         related_field_accessors = (
             f.get_attname()
             for f in cls._model_meta._get_fields(reverse=False)
-            if isinstance(f, RelatedField) and f.related_model is not None
+            if isinstance(f, RelatedField)
         )
         for accessor in related_field_accessors:
             if accessor in property_names:
