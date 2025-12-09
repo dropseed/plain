@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import datetime
+import json
 import os
+import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -9,6 +11,35 @@ from plain.runtime import PLAIN_TEMP_PATH
 
 from .. import db_connection as _db_connection
 from .clients import PostgresBackupClient, SQLiteBackupClient
+
+
+def get_git_branch() -> str | None:
+    """Get current git branch, or None if not in a git repo."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def get_git_commit() -> str | None:
+    """Get current git commit (short hash), or None if not in a git repo."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
@@ -67,7 +98,7 @@ class DatabaseBackup:
     def exists(self) -> bool:
         return self.path.exists()
 
-    def create(self, **create_kwargs: Any) -> Path:
+    def create(self, *, source: str = "manual", **create_kwargs: Any) -> Path:
         self.path.mkdir(parents=True, exist_ok=True)
 
         backup_path = self.path / "default.backup"
@@ -81,6 +112,17 @@ class DatabaseBackup:
             SQLiteBackupClient(db_connection).create_backup(backup_path)
         else:
             raise Exception("Unsupported database vendor")
+
+        # Write metadata
+        metadata = {
+            "created_at": datetime.datetime.now(datetime.UTC).isoformat(),
+            "source": source,
+            "git_branch": get_git_branch(),
+            "git_commit": get_git_commit(),
+        }
+        metadata_path = self.path / "metadata.json"
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=2)
 
         return self.path
 
@@ -97,9 +139,27 @@ class DatabaseBackup:
         else:
             raise Exception("Unsupported database vendor")
 
+    @property
+    def metadata(self) -> dict[str, Any]:
+        """Read metadata from metadata.json, with fallback for old backups."""
+        metadata_path = self.path / "metadata.json"
+        if metadata_path.exists():
+            with open(metadata_path) as f:
+                return json.load(f)
+
+        return {
+            "created_at": None,
+            "source": None,
+            "git_branch": None,
+            "git_commit": None,
+        }
+
     def delete(self) -> None:
         backup_file = self.path / "default.backup"
         backup_file.unlink()
+        metadata_file = self.path / "metadata.json"
+        if metadata_file.exists():
+            metadata_file.unlink()
         self.path.rmdir()
 
     def updated_at(self) -> datetime.datetime:

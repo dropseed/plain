@@ -529,7 +529,7 @@ def apply(
                             )
 
         if backup or (backup is None and settings.DEBUG):
-            backup_name = f"migrate_{time.strftime('%Y%m%d_%H%M%S')}"
+            backup_name = time.strftime("%Y%m%d_%H%M%S")
             if not quiet:
                 click.secho("Creating backup: ", bold=True, nl=False)
                 click.secho(f"{backup_name}", dim=True, nl=False)
@@ -538,6 +538,7 @@ def apply(
             backups_handler = DatabaseBackups()
             backups_handler.create(
                 backup_name,
+                source="migrate",
                 pg_dump=os.environ.get("PG_DUMP", "pg_dump"),
             )
 

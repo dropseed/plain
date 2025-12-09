@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from .core import DatabaseBackups
+from .core import DatabaseBackups, get_git_branch
 
 
 @click.group("backups")
@@ -16,21 +16,58 @@ def cli() -> None:
 
 
 @cli.command("list")
-def list_backups() -> None:
+@click.option(
+    "--branch",
+    "branch",
+    is_flag=False,
+    flag_value="__current__",
+    default=None,
+    help="Filter by branch (defaults to current branch if flag used without value)",
+)
+def list_backups(branch: str | None) -> None:
     """List database backups"""
     backups_handler = DatabaseBackups()
     backups = backups_handler.find_backups()
+
+    # Resolve branch filter
+    if branch == "__current__":
+        branch = get_git_branch()
+
+    # Filter by branch if specified
+    if branch:
+        backups = [b for b in backups if b.metadata.get("git_branch") == branch]
+
     if not backups:
-        click.secho("No backups found", fg="yellow")
+        if branch:
+            click.secho(f"No backups found for branch '{branch}'", fg="yellow")
+        else:
+            click.secho("No backups found", fg="yellow")
         return
 
+    # Calculate column widths
+    name_width = max(len(b.name) for b in backups)
+    source_width = max(len(b.metadata.get("source") or "-") for b in backups)
+
+    # Print header
+    click.secho(
+        f"{'NAME':<{name_width}}  {'SOURCE':<{source_width}}  {'SIZE':<10}  BRANCH",
+        dim=True,
+    )
+
+    # Print rows
     for backup in backups:
         backup_file = backup.path / "default.backup"
-        size = os.path.getsize(backup_file)
-        click.secho(backup.name, bold=True, nl=False)
-        click.secho(
-            f" ({size / 1024 / 1024:.2f} MB, {backup.updated_at().strftime('%Y-%m-%d %H:%M:%S')})",
-            dim=True,
+        if backup_file.exists():
+            size = os.path.getsize(backup_file)
+            size_str = f"{size / 1024 / 1024:.2f} MB"
+        else:
+            size_str = "-"
+        metadata = backup.metadata
+        source = metadata.get("source") or "-"
+        git_branch = metadata.get("git_branch") or "-"
+
+        click.echo(
+            f"{backup.name:<{name_width}}  {source:<{source_width}}  {size_str:<10}  {git_branch}"
         )
 
 
@@ -42,11 +79,12 @@ def create_backup(backup_name: str, pg_dump: str) -> None:
     backups_handler = DatabaseBackups()
 
     if not backup_name:
-        backup_name = f"backup_{time.strftime('%Y%m%d_%H%M%S')}"
+        backup_name = time.strftime("%Y%m%d_%H%M%S")
 
     try:
         backup_dir = backups_handler.create(
             backup_name,
+            source="manual",
             pg_dump=pg_dump,
         )
     except Exception as e:
