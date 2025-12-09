@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.15.0](https://github.com/dropseed/plain/releases/plain-htmx@0.15.0) (2025-12-09)
+
+### What's changed
+
+- Native browser form validation is now enabled by default via `htmx.config.reportValidityOfForms`, so forms with HTML5 validation attributes will show validation feedback before submitting ([b9e2476](https://github.com/dropseed/plain/commit/b9e2476))
+
+### Upgrade instructions
+
+- Test your usage of HTMX forms where client validation is concerned
+
 ## [0.14.0](https://github.com/dropseed/plain/releases/plain-htmx@0.14.0) (2025-12-04)
 
 ### What's changed
