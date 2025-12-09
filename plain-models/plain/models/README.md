@@ -233,6 +233,21 @@ for car in feature.cars.all():
 
 Reverse relations are optional - if you don't declare them, the automatic `{model}_set` accessor still works. You can also use both approaches in the same codebase.
 
+### Custom QuerySet typing
+
+To get type checking for custom QuerySet methods on reverse relations, specify the QuerySet type as a second parameter:
+
+```python
+# Basic usage
+books: types.ReverseForeignKey[Book] = types.ReverseForeignKey(to="Book", field="author")
+
+# With custom QuerySet for proper method recognition
+books: types.ReverseForeignKey[Book, BookQuerySet] = types.ReverseForeignKey(to="Book", field="author")
+
+# Now type checkers recognize custom methods like .published()
+author.books.query.published()
+```
+
 ## Typing
 
 For better IDE support and type checking, use `plain.models.types` with type annotations:

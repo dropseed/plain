@@ -29,6 +29,8 @@ from plain.models.utils import resolve_callables
 
 # TypeVar for generic manager support
 T = TypeVar("T", bound="Model")
+# TypeVar for custom QuerySet types (defaults to QuerySet[Any] when not specified)
+QS = TypeVar("QS", bound="QuerySet[Any]", default="QuerySet[Any]")
 
 
 def _filter_prefetch_queryset(
@@ -54,7 +56,7 @@ def _filter_prefetch_queryset(
     return queryset.filter(predicate)
 
 
-class BaseRelatedManager(ABC, Generic[T]):
+class BaseRelatedManager(ABC, Generic[T, QS]):
     """
     Base class for all related object managers.
 
@@ -62,17 +64,17 @@ class BaseRelatedManager(ABC, Generic[T]):
     """
 
     @property
-    def query(self) -> QuerySet[T]:
+    def query(self) -> QS:
         """Access the QuerySet for this relationship."""
         return self.get_queryset()
 
     @abstractmethod
-    def get_queryset(self) -> QuerySet[T]:
+    def get_queryset(self) -> QS:
         """Return the QuerySet for this relationship."""
         ...
 
 
-class ReverseForeignKeyManager(BaseRelatedManager[T]):
+class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
     """
     Manager for the reverse side of a foreign key relation.
 
@@ -141,7 +143,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T]):
         except (AttributeError, KeyError):
             pass  # nothing to clear from cache
 
-    def get_queryset(self) -> QuerySet[T]:
+    def get_queryset(self) -> QS:
         # Even if this relation is not to primary key, we require still primary key value.
         # The wish is that the instance has been already saved to DB,
         # although having a primary key value isn't a guarantee of that.
@@ -156,7 +158,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T]):
             ]
         except (AttributeError, KeyError):
             queryset = self.model.query
-            return self._apply_rel_filters(queryset)
+            return cast(QS, self._apply_rel_filters(queryset))
 
     def get_prefetch_queryset(
         self, instances: Iterable[Model], queryset: QuerySet | None = None
@@ -300,7 +302,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T]):
             self.add(*objs, bulk=bulk)
 
 
-class ManyToManyManager(BaseRelatedManager[T]):
+class ManyToManyManager(BaseRelatedManager[T, QS]):
     """
     Manager for both forward and reverse sides of a many-to-many relation.
 
@@ -396,12 +398,12 @@ class ManyToManyManager(BaseRelatedManager[T]):
         except (AttributeError, KeyError):
             pass  # nothing to clear from cache
 
-    def get_queryset(self) -> QuerySet[T]:
+    def get_queryset(self) -> QS:
         try:
             return self.instance._prefetched_objects_cache[self.prefetch_cache_name]
         except (AttributeError, KeyError):
             queryset = self.model.query
-            return self._apply_rel_filters(queryset)
+            return cast(QS, self._apply_rel_filters(queryset))
 
     def get_prefetch_queryset(
         self, instances: Iterable[Model], queryset: QuerySet | None = None

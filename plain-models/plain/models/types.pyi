@@ -19,15 +19,18 @@ from json import JSONDecoder, JSONEncoder
 from typing import Any, Generic, Literal, TypeVar, overload
 from uuid import UUID
 
-# Import manager types from runtime (will be Generic[T] there)
+# Import manager types from runtime (will be Generic[T, QS] there)
 from plain.models.base import Model
 from plain.models.fields.related_managers import (
     ManyToManyManager,
     ReverseForeignKeyManager,
 )
+from plain.models.query import QuerySet
 
 # TypeVar for generic ForeignKey/ManyToManyField support
 _T = TypeVar("_T", bound=Model)
+# TypeVar for custom QuerySet types (defaults to QuerySet[Any] when not specified)
+_QS = TypeVar("_QS", bound=QuerySet[Any], default=QuerySet[Any])
 
 # String fields
 @overload
@@ -704,25 +707,47 @@ def ManyToManyField(
 ) -> ManyToManyManager[_T]: ...
 
 # Reverse relation descriptors
-class ReverseForeignKey(Generic[_T]):
-    def __init__(self, *, to: type[_T] | str, field: str) -> None: ...
-    @overload
-    def __get__(self, instance: None, owner: type) -> ReverseForeignKey[_T]: ...
-    @overload
-    def __get__(self, instance: Model, owner: type) -> ReverseForeignKeyManager[_T]: ...
-    def __get__(
-        self, instance: Model | None, owner: type
-    ) -> ReverseForeignKey[_T] | ReverseForeignKeyManager[_T]: ...
+class ReverseForeignKey(Generic[_T, _QS]):
+    """
+    Descriptor for the reverse side of a ForeignKeyField.
 
-class ReverseManyToMany(Generic[_T]):
+    Type parameters:
+        _T: The related model type
+        _QS: The QuerySet type (use the model's custom QuerySet for proper method typing)
+
+    Example:
+        # With custom QuerySet for proper typing of custom methods like .enabled()
+        repos: ReverseForeignKey[Repo, RepoQuerySet] = ReverseForeignKey(to="Repo", field="organization")
+
+        # Usage: org.repos.query.enabled()  # .enabled() is now recognized
+    """
     def __init__(self, *, to: type[_T] | str, field: str) -> None: ...
     @overload
-    def __get__(self, instance: None, owner: type) -> ReverseManyToMany[_T]: ...
+    def __get__(self, instance: None, owner: type) -> ReverseForeignKey[_T, _QS]: ...
     @overload
-    def __get__(self, instance: Model, owner: type) -> ManyToManyManager[_T]: ...
+    def __get__(
+        self, instance: Model, owner: type
+    ) -> ReverseForeignKeyManager[_T, _QS]: ...
     def __get__(
         self, instance: Model | None, owner: type
-    ) -> ReverseManyToMany[_T] | ManyToManyManager[_T]: ...
+    ) -> ReverseForeignKey[_T, _QS] | ReverseForeignKeyManager[_T, _QS]: ...
+
+class ReverseManyToMany(Generic[_T, _QS]):
+    """
+    Descriptor for the reverse side of a ManyToManyField.
+
+    Type parameters:
+        _T: The related model type
+        _QS: The QuerySet type (use the model's custom QuerySet for proper method typing)
+    """
+    def __init__(self, *, to: type[_T] | str, field: str) -> None: ...
+    @overload
+    def __get__(self, instance: None, owner: type) -> ReverseManyToMany[_T, _QS]: ...
+    @overload
+    def __get__(self, instance: Model, owner: type) -> ManyToManyManager[_T, _QS]: ...
+    def __get__(
+        self, instance: Model | None, owner: type
+    ) -> ReverseManyToMany[_T, _QS] | ManyToManyManager[_T, _QS]: ...
 
 # Export all types (should match types.py)
 __all__ = [

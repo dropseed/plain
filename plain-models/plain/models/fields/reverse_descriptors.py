@@ -13,11 +13,15 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 if TYPE_CHECKING:
     from plain.models import Model
+    from plain.models.fields.related_managers import BaseRelatedManager
+    from plain.models.query import QuerySet
 
 T = TypeVar("T", bound="Model")
+# Default to QuerySet[Any] so users can omit the second type parameter
+QS = TypeVar("QS", bound="QuerySet[Any]", default="QuerySet[Any]")
 
 
-class BaseReverseDescriptor(Generic[T], ABC):
+class BaseReverseDescriptor(Generic[T, QS], ABC):
     """
     Base class for reverse relation descriptors.
 
@@ -73,7 +77,7 @@ class BaseReverseDescriptor(Generic[T], ABC):
 
     def __get__(
         self, instance: Model | None, owner: type[Model]
-    ) -> BaseReverseDescriptor[T] | Any:
+    ) -> BaseReverseDescriptor[T, QS] | BaseRelatedManager[T, QS]:
         """
         Get the related manager when accessed on an instance.
 
@@ -125,7 +129,7 @@ class BaseReverseDescriptor(Generic[T], ABC):
         ...
 
 
-class ReverseForeignKey(BaseReverseDescriptor[T]):
+class ReverseForeignKey(BaseReverseDescriptor[T, QS]):
     """
     Descriptor for the reverse side of a ForeignKeyField relation.
 
@@ -134,7 +138,11 @@ class ReverseForeignKey(BaseReverseDescriptor[T]):
 
     Example:
         class Parent(Model):
-            children: ReverseForeignKey[Child] = ReverseForeignKey(to="Child", field="parent")
+            # Basic usage (uses default QuerySet[Child])
+            children: ReverseForeignKey[Child, QuerySet[Child]] = ReverseForeignKey(to="Child", field="parent")
+
+            # With custom QuerySet
+            children: ReverseForeignKey[Child, ChildQuerySet] = ReverseForeignKey(to="Child", field="parent")
 
         class Child(Model):
             parent: Parent = ForeignKeyField(Parent, on_delete=models.CASCADE)
@@ -172,7 +180,7 @@ class ReverseForeignKey(BaseReverseDescriptor[T]):
         )
 
 
-class ReverseManyToMany(BaseReverseDescriptor[T]):
+class ReverseManyToMany(BaseReverseDescriptor[T, QS]):
     """
     Descriptor for the reverse side of a ManyToManyField relation.
 
@@ -181,7 +189,11 @@ class ReverseManyToMany(BaseReverseDescriptor[T]):
 
     Example:
         class Feature(Model):
-            cars: ReverseManyToMany[Car] = ReverseManyToMany(to="Car", field="features")
+            # Basic usage (uses default QuerySet[Car])
+            cars: ReverseManyToMany[Car, QuerySet[Car]] = ReverseManyToMany(to="Car", field="features")
+
+            # With custom QuerySet
+            cars: ReverseManyToMany[Car, CarQuerySet] = ReverseManyToMany(to="Car", field="features")
 
         class Car(Model):
             features: ManyToManyField[Feature] = ManyToManyField(Feature, through=CarFeature)
