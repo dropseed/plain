@@ -1,5 +1,18 @@
 # plain-models changelog
 
+## [0.68.0](https://github.com/dropseed/plain/releases/plain-models@0.68.0) (2025-12-09)
+
+### What's changed
+
+- Database backups now store git metadata (branch and commit) and the `plain db backups list` command displays this information along with source and size in a table format ([287fa89f](https://github.com/dropseed/plain/commit/287fa89fb1))
+- Added `--branch` option to `plain db backups list` to filter backups by git branch ([287fa89f](https://github.com/dropseed/plain/commit/287fa89fb1))
+- `ReverseForeignKey` and `ReverseManyToMany` now support an optional second type parameter for custom QuerySet types, enabling type checkers to recognize custom QuerySet methods on reverse relations ([487c6195](https://github.com/dropseed/plain/commit/487c6195bf))
+- Internal cleanup: removed legacy generic foreign key related code ([c9ca1b67](https://github.com/dropseed/plain/commit/c9ca1b670a))
+
+### Upgrade instructions
+
+- To get type checking for custom QuerySet methods on reverse relations, you can optionally add a second type parameter: `books: types.ReverseForeignKey[Book, BookQuerySet] = types.ReverseForeignKey(to="Book", field="author")`. This is optional and existing code without the second parameter continues to work.
+
 ## [0.67.0](https://github.com/dropseed/plain/releases/plain-models@0.67.0) (2025-12-05)
 
 ### What's changed
