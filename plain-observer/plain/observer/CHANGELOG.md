@@ -1,5 +1,17 @@
 # plain-observer changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-observer@0.23.0) (2025-12-09)
+
+### What's changed
+
+- The trace sharing feature has been removed, including the share URL generation and public shared trace view ([5fba11a](https://github.com/dropseed/plain/commit/5fba11a7748ba2f6309c167be44501a79141e7a4))
+- Added a "Copy JSON" button to the trace detail view that fetches and copies the trace data as formatted JSON to the clipboard ([44a9d62](https://github.com/dropseed/plain/commit/44a9d62ad7c9a1ea7d4b9e1b6ca56316dd9d7375))
+- The "Clear Traces" action now deletes all traces instead of only unshared ones ([5fba11a](https://github.com/dropseed/plain/commit/5fba11a7748ba2f6309c167be44501a79141e7a4))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-observer@0.22.0) (2025-12-04)
 
 ### What's changed

@@ -407,7 +407,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.93.0"
+version = "0.93.1"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -626,7 +626,7 @@ dev = [
 
 [[package]]
 name = "plain-htmx"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "plain-htmx" }
 dependencies = [
     { name = "plain" },
@@ -683,7 +683,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.67.0"
+version = "0.68.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -733,7 +733,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-observer"
-version = "0.22.0"
+version = "0.23.0"
 source = { editable = "plain-observer" }
 dependencies = [
     { name = "opentelemetry-sdk" },
