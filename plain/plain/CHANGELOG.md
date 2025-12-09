@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.93.1](https://github.com/dropseed/plain/releases/plain@0.93.1) (2025-12-09)
+
+### What's changed
+
+- Added type annotation for `request.unique_id` attribute to improve IDE support and type checking ([23af501](https://github.com/dropseed/plain/commit/23af501d09))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.93.0](https://github.com/dropseed/plain/releases/plain@0.93.0) (2025-12-04)
 
 ### What's changed
