@@ -9,6 +9,7 @@ from plain.exceptions import (
     PermissionDenied,
     SuspiciousOperation,
 )
+from plain.forms.exceptions import FormFieldMissingError
 from plain.http import Http404, ResponseServerError
 from plain.http.multipartparser import MultiPartParserError
 from plain.runtime import settings
@@ -100,6 +101,17 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
         )
         response = get_exception_response(
             request=request, status_code=400, exception=None
+        )
+
+    elif isinstance(exc, FormFieldMissingError):
+        response = get_exception_response(
+            request=request, status_code=400, exception=None
+        )
+        request_logger.warning(
+            "Bad request (missing form field '%s'): %s",
+            exc.field_name,
+            request.path,
+            extra={"status_code": 400, "request": request},
         )
 
     else:
