@@ -23,7 +23,7 @@
         <div
             data-category="{{ frame.category }}"
             data-expanded="{{ 'true' if frame.category == 'app' else 'false' }}"
-            class="group rounded overflow-hidden border border-white/10 bg-white/5 data-[category=app]:bg-stone-500/10"
+            class="group rounded overflow-hidden border border-white/10 bg-white/5 data-[category=app]:bg-amber-500/10"
         >
             <button
                 data-toggle-frame
@@ -34,11 +34,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                     <span data-category="{{ frame.category }}" class="px-1.5 py-0.5 rounded text-[10px] font-medium
-                        data-[category=app]:bg-stone-500/30 data-[category=app]:text-stone-200
+                        data-[category=app]:bg-amber-500/30 data-[category=app]:text-amber-300
                         data-[category=plain]:bg-emerald-500/30 data-[category=plain]:text-emerald-300
                         data-[category=plainx]:bg-violet-500/30 data-[category=plainx]:text-violet-300
                         data-[category=python]:bg-sky-500/30 data-[category=python]:text-sky-300
-                        data-[category=third-party]:bg-neutral-500/30 data-[category=third-party]:text-neutral-300"
+                        data-[category=third-party]:bg-zinc-600/30 data-[category=third-party]:text-zinc-400"
                     >{{ frame.category }}</span>
                     <a href="vscode://file/{{ frame.filename }}:{{ frame.lineno }}" data-vscode-link class="font-mono hover:underline text-stone-500">{{ frame.filename }}</a>
                 </div>
