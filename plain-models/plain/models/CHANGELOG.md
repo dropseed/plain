@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.69.0](https://github.com/dropseed/plain/releases/plain-models@0.69.0) (2025-12-12)
+
+### What's changed
+
+- The `queryset.all()` method now preserves the prefetch cache, fixing an issue where accessing prefetched related objects through `.all()` would trigger additional database queries instead of using the cached results ([8b899a8](https://github.com/dropseed/plain/commit/8b899a807a))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.68.0](https://github.com/dropseed/plain/releases/plain-models@0.68.0) (2025-12-09)
 
 ### What's changed
