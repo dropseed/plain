@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.8.2](https://github.com/dropseed/plain/releases/plain-toolbar@0.8.2) (2025-12-12)
+
+### What's changed
+
+- Exception traceback frame badges now use more distinct colors to improve visual differentiation between app, plain, plainx, python, and third-party frames ([3911c11](https://github.com/dropseed/plain/commit/3911c1114d842aed4f48782a767c589d71f219af))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.8.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.8.1) (2025-12-05)
 
 ### What's changed
