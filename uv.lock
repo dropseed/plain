@@ -407,7 +407,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.93.1"
+version = "0.94.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -518,7 +518,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-code"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "plain-code" }
 dependencies = [
     { name = "plain" },
@@ -683,7 +683,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.68.0"
+version = "0.69.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -930,7 +930,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-toolbar"
-version = "0.8.1"
+version = "0.8.2"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },

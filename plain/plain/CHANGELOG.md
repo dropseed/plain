@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.94.0](https://github.com/dropseed/plain/releases/plain@0.94.0) (2025-12-12)
+
+### What's changed
+
+- `FormFieldMissingError` exceptions are now automatically converted to HTTP 400 Bad Request responses with a warning log instead of causing a 500 error ([b38f6e5](https://github.com/dropseed/plain/commit/b38f6e50db))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.93.1](https://github.com/dropseed/plain/releases/plain@0.93.1) (2025-12-09)
 
 ### What's changed
