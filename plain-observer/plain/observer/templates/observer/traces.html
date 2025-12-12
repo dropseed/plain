@@ -7,7 +7,7 @@
     {% tailwind_css %}
     {% htmx_js %}
     <link rel="stylesheet" href="{{ asset('observer/observer.css') }}">
-    <script src="{{ asset('observer/observer.js') }}" defer></script>
+    <script src="{{ asset('observer/observer.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script nonce="{{ request.csp_nonce }}">
         if (window.self !== window.top) {
             document.addEventListener('DOMContentLoaded', function() {
