@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.23.1](https://github.com/dropseed/plain/releases/plain-observer@0.23.1) (2025-12-12)
+
+### What's changed
+
+- Added CSP nonce support to the observer.js script tag in trace templates for improved Content Security Policy compatibility ([2961042](https://github.com/dropseed/plain/commit/2961042e1cb50e851499a9fef989664934d530fd))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-observer@0.23.0) (2025-12-09)
 
 ### What's changed
