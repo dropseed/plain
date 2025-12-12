@@ -199,6 +199,28 @@ class TestPrefetchRelated:
         with pytest.raises((AttributeError, ValueError)):
             list(DeleteParent.query.prefetch_related("nonexistent_relation").all())
 
+    def test_prefetch_related_queryset_all_preserves_cache(self, db):
+        """Test that queryset.all() preserves prefetch cache"""
+        parent = DeleteParent.query.create(name="Test Parent")
+        ChildCascade.query.create(parent=parent)
+        ChildCascade.query.create(parent=parent)
+
+        parents = list(DeleteParent.query.prefetch_related("childcascade_set").all())
+        parent_from_query = parents[0]
+
+        # .query returns the prefetched queryset with _result_cache populated
+        prefetched_qs = parent_from_query.childcascade_set.query
+        assert prefetched_qs._result_cache is not None, "Prefetch should populate cache"
+
+        # .all() should preserve the cache
+        all_qs = prefetched_qs.all()
+        assert all_qs._result_cache is not None, "all() should preserve prefetch cache"
+        assert len(all_qs._result_cache) == 2
+
+        # .filter() should NOT preserve the cache (query is modified)
+        filtered_qs = prefetched_qs.filter(id__gt=0)
+        assert filtered_qs._result_cache is None, "filter() should clear cache"
+
 
 class TestCustomQuerySetInheritance:
     """Test that custom QuerySets are properly inherited in related descriptors"""

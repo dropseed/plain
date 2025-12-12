@@ -1179,7 +1179,12 @@ class QuerySet(Generic[T]):
         Return a new QuerySet that is a copy of the current one. This allows a
         QuerySet to proxy for a model queryset in some cases.
         """
-        return self._chain()
+        obj = self._chain()
+        # Preserve cache since all() doesn't modify the query.
+        # This is important for prefetch_related() to work correctly.
+        obj._result_cache = self._result_cache
+        obj._prefetch_done = self._prefetch_done
+        return obj
 
     def filter(self, *args: Any, **kwargs: Any) -> Self:
         """
