@@ -152,13 +152,10 @@ url = doc.file.download_url(expires_in=300)  # 5 minutes
 Configure your S3 connection credentials in settings. Bucket and path configuration is per-field (see Overview above).
 
 ```python
-# Required - connection credentials
 S3_ACCESS_KEY_ID = "..."
 S3_SECRET_ACCESS_KEY = "..."
-
-# Optional
-S3_REGION = "us-east-1"
 S3_ENDPOINT_URL = "https://..."  # For R2, MinIO, etc.
+S3_REGION = "auto"  # Default; set to actual region for AWS (e.g., "us-east-1")
 ```
 
 **Cloudflare R2 example:**
@@ -167,6 +164,7 @@ S3_ENDPOINT_URL = "https://..."  # For R2, MinIO, etc.
 S3_ACCESS_KEY_ID = "..."
 S3_SECRET_ACCESS_KEY = "..."
 S3_ENDPOINT_URL = "https://ACCOUNT_ID.r2.cloudflarestorage.com"
+# S3_REGION defaults to "auto", which works for R2
 ```
 
 ## Installation
