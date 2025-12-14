@@ -64,25 +64,29 @@ doc.file.download_url() # presigned S3 URL
 
 For large files, upload directly from the browser to S3 to avoid tying up your server.
 
-**1. Create a presigned upload view:**
+**1. Create views for presigned uploads:**
 
 ```python
-# app/api/views.py
-from plain.api.views import APIView
+# app/documents/views.py
+import json
+
+from plain.views import View
 from plain.s3.models import S3File
 
-from app.documents.models import Document
+from .models import Document
 
 
-class PresignUploadView(APIView):
+class PresignUploadView(View):
     def post(self):
+        data = json.loads(self.request.body)
+
         # Get the field configuration
         file_field = Document._meta.get_field("file")
 
         # Create presigned upload using field's bucket/prefix/acl
         return file_field.create_presigned_upload(
-            filename=self.data["filename"],
-            byte_size=self.data["byte_size"],
+            filename=data["filename"],
+            byte_size=data["byte_size"],
         )
         # Returns: {
         #     "file_id": "uuid...",
@@ -91,36 +95,22 @@ class PresignUploadView(APIView):
         # }
 
 
-class DocumentView(APIView):
+class DocumentCreateView(View):
     def post(self):
-        file = S3File.query.get(uuid=self.data["file_id"])
+        data = json.loads(self.request.body)
+        file = S3File.query.get(uuid=data["file_id"])
         doc = Document.query.create(
-            title=self.data["title"],
+            title=data["title"],
             file=file,
         )
         return {"id": str(doc.id)}
-```
-
-```python
-# app/api/urls.py
-from plain.urls import Router, path
-
-from . import views
-
-
-class APIRouter(Router):
-    namespace = "api"
-    urls = [
-        path("uploads/presign/", views.PresignUploadView),
-        path("documents/", views.DocumentView),
-    ]
 ```
 
 **2. Upload from the browser:**
 
 ```javascript
 // Get presigned URL
-const presign = await fetch('/api/uploads/presign/', {
+const presign = await fetch('/documents/presign/', {
   method: 'POST',
   body: JSON.stringify({
     filename: file.name,
@@ -136,7 +126,7 @@ formData.append('file', file);
 await fetch(presign.upload_url, { method: 'POST', body: formData });
 
 // Now attach to your record
-await fetch('/api/documents/', {
+await fetch('/documents/', {
   method: 'POST',
   body: JSON.stringify({
     title: 'My Document',
