@@ -6,7 +6,6 @@ from uuid import UUID, uuid4
 
 from plain import models
 from plain.models import types
-from plain.runtime import settings
 
 from . import storage
 
@@ -25,6 +24,7 @@ class S3File(models.Model):
     uuid: UUID = types.UUIDField(default=uuid4)
 
     # S3 storage location
+    bucket: str = types.CharField(max_length=255)
     key: str = types.CharField(max_length=500)
 
     # File metadata
@@ -41,7 +41,7 @@ class S3File(models.Model):
     model_options = models.Options(
         indexes=[
             models.Index(fields=["uuid"]),
-            models.Index(fields=["key"]),
+            models.Index(fields=["bucket", "key"]),
             models.Index(fields=["created_at"]),
         ],
         constraints=[
@@ -53,20 +53,23 @@ class S3File(models.Model):
         return self.filename
 
     @classmethod
-    def generate_key(cls, filename: str) -> str:
+    def generate_key(cls, filename: str, *, key_prefix: str = "") -> str:
         """Generate a unique S3 key for a new file."""
         ext = ""
         if "." in filename:
             ext = "." + filename.rsplit(".", 1)[-1].lower()
-        return f"{settings.S3_UPLOAD_KEY_PREFIX}{uuid4()}{ext}"
+        return f"{key_prefix}{uuid4()}{ext}"
 
     @classmethod
     def create_presigned_upload(
         cls,
         *,
+        bucket: str,
         filename: str,
-        content_type: str | None = None,
         byte_size: int,
+        content_type: str | None = None,
+        key_prefix: str = "",
+        acl: str = "",
     ) -> dict:
         """
         Create a new S3File record and return presigned upload data.
@@ -76,7 +79,7 @@ class S3File(models.Model):
 
         Returns:
             {
-                "file_id": UUID,
+                "file_id": str (UUID),
                 "key": str,
                 "upload_url": str,
                 "upload_fields": dict,
@@ -86,10 +89,11 @@ class S3File(models.Model):
             content_type, _ = mimetypes.guess_type(filename)
             content_type = content_type or "application/octet-stream"
 
-        key = cls.generate_key(filename)
+        key = cls.generate_key(filename, key_prefix=key_prefix)
 
         # Create the file record
         file = cls.query.create(
+            bucket=bucket,
             key=key,
             filename=filename,
             content_type=content_type,
@@ -97,7 +101,9 @@ class S3File(models.Model):
         )
 
         # Generate presigned upload URL
-        presign = storage.generate_presigned_upload_url(key, content_type)
+        presign = storage.generate_presigned_upload_url(
+            bucket, key, content_type, acl=acl
+        )
 
         return {
             "file_id": str(file.uuid),
@@ -108,19 +114,23 @@ class S3File(models.Model):
 
     def download_url(self, *, expires_in: int | None = None) -> str:
         """Generate a presigned URL for downloading this file."""
+        kwargs = {}
+        if expires_in is not None:
+            kwargs["expires_in"] = expires_in
         return storage.generate_presigned_download_url(
+            self.bucket,
             self.key,
-            expires_in=expires_in,
             filename=self.filename,
+            **kwargs,
         )
 
     def exists_in_storage(self) -> bool:
         """Check if the file actually exists in S3."""
-        return storage.head_object(self.key) is not None
+        return storage.head_object(self.bucket, self.key) is not None
 
     def delete(self) -> None:
         """Delete the file from S3 and the database record."""
-        storage.delete_object(self.key)
+        storage.delete_object(self.bucket, self.key)
         super().delete()
 
     @property

@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 _client: S3Client | None = None
 
+DEFAULT_PRESIGNED_URL_EXPIRATION = 3600  # 1 hour
+
 
 def get_client() -> S3Client:
     """Get or create the S3 client singleton."""
@@ -30,36 +32,33 @@ def get_client() -> S3Client:
 
 
 def generate_presigned_upload_url(
+    bucket: str,
     key: str,
     content_type: str,
     *,
-    expires_in: int | None = None,
+    acl: str = "",
+    expires_in: int = DEFAULT_PRESIGNED_URL_EXPIRATION,
 ) -> dict:
     """
     Generate a presigned URL for uploading a file directly to S3.
 
-    Returns a dict with 'url' and 'fields' for form-based uploads,
-    or just 'url' for PUT-based uploads.
+    Returns a dict with 'url' and 'fields' for form-based uploads.
     """
-    if expires_in is None:
-        expires_in = settings.S3_PRESIGNED_URL_EXPIRATION
-
     client = get_client()
 
-    # Use presigned POST for browser uploads (more flexible)
-    conditions = [
+    conditions: list = [
         {"Content-Type": content_type},
     ]
     fields = {
         "Content-Type": content_type,
     }
 
-    if settings.S3_DEFAULT_ACL:
-        conditions.append({"acl": settings.S3_DEFAULT_ACL})
-        fields["acl"] = settings.S3_DEFAULT_ACL
+    if acl:
+        conditions.append({"acl": acl})
+        fields["acl"] = acl
 
     response = client.generate_presigned_post(
-        Bucket=settings.S3_BUCKET,
+        Bucket=bucket,
         Key=key,
         Fields=fields,
         Conditions=conditions,
@@ -69,19 +68,17 @@ def generate_presigned_upload_url(
 
 
 def generate_presigned_download_url(
+    bucket: str,
     key: str,
     *,
-    expires_in: int | None = None,
+    expires_in: int = DEFAULT_PRESIGNED_URL_EXPIRATION,
     filename: str | None = None,
 ) -> str:
     """Generate a presigned URL for downloading a file from S3."""
-    if expires_in is None:
-        expires_in = settings.S3_PRESIGNED_URL_EXPIRATION
-
     client = get_client()
 
     params = {
-        "Bucket": settings.S3_BUCKET,
+        "Bucket": bucket,
         "Key": key,
     }
 
@@ -95,13 +92,13 @@ def generate_presigned_download_url(
     )
 
 
-def delete_object(key: str) -> None:
+def delete_object(bucket: str, key: str) -> None:
     """Delete an object from S3."""
     client = get_client()
-    client.delete_object(Bucket=settings.S3_BUCKET, Key=key)
+    client.delete_object(Bucket=bucket, Key=key)
 
 
-def head_object(key: str) -> dict | None:
+def head_object(bucket: str, key: str) -> dict | None:
     """
     Get object metadata from S3.
 
@@ -109,7 +106,7 @@ def head_object(key: str) -> dict | None:
     """
     client = get_client()
     try:
-        return client.head_object(Bucket=settings.S3_BUCKET, Key=key)
+        return client.head_object(Bucket=bucket, Key=key)
     except client.exceptions.ClientError as e:
         if e.response["Error"]["Code"] == "404":
             return None

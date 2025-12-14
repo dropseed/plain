@@ -12,7 +12,7 @@ Store files in S3, Cloudflare R2, MinIO, or any S3-compatible storage service. D
 
 ## Overview
 
-Add file uploads to your models with `S3FileField`:
+Add file uploads to your models with `S3FileField`. Each field specifies which bucket to use:
 
 ```python
 from plain import models
@@ -24,7 +24,28 @@ from plain.s3.models import S3File
 @models.register_model
 class Document(models.Model):
     title: str = types.CharField(max_length=200)
-    file: S3File | None = S3FileField()
+    file: S3File | None = S3FileField(bucket="my-bucket")
+```
+
+Configure per-field storage options:
+
+```python
+@models.register_model
+class User(models.Model):
+    name: str = types.CharField(max_length=100)
+
+    # Public avatars with custom path prefix
+    avatar: S3File | None = S3FileField(
+        bucket="public-assets",
+        key_prefix="avatars/",
+        acl="public-read",
+    )
+
+    # Private documents in a different bucket
+    id_document: S3File | None = S3FileField(
+        bucket="private-docs",
+        key_prefix="id-verification/",
+    )
 ```
 
 Access file properties and generate download URLs:
@@ -47,14 +68,18 @@ For large files, upload directly from the browser to S3 to avoid tying up your s
 
 ```python
 from plain.api import api
-from plain.s3.models import S3File
+
+from app.documents.models import Document
 
 
 @api.route("/uploads/presign", method="POST")
 def create_presign(request):
-    data = S3File.create_presigned_upload(
+    # Get the field configuration
+    file_field = Document._meta.get_field("file")
+
+    # Create presigned upload using field's bucket/prefix/acl
+    data = file_field.create_presigned_upload(
         filename=request.data["filename"],
-        content_type=request.data["content_type"],
         byte_size=request.data["byte_size"],
     )
     return data
@@ -73,7 +98,6 @@ const presign = await fetch('/uploads/presign', {
   method: 'POST',
   body: JSON.stringify({
     filename: file.name,
-    content_type: file.type,
     byte_size: file.size,
   }),
 }).then(r => r.json());
@@ -98,6 +122,9 @@ await fetch('/documents', {
 **3. Link the file to your record:**
 
 ```python
+from plain.s3.models import S3File
+
+
 @api.route("/documents", method="POST")
 def create_document(request):
     file = S3File.query.get(uuid=request.data["file_id"])
@@ -122,26 +149,21 @@ url = doc.file.download_url(expires_in=300)  # 5 minutes
 
 ## Settings
 
-Configure your S3 connection in settings:
+Configure your S3 connection credentials in settings. Bucket and path configuration is per-field (see Overview above).
 
 ```python
-# Required
-S3_BUCKET = "my-bucket"
+# Required - connection credentials
 S3_ACCESS_KEY_ID = "..."
 S3_SECRET_ACCESS_KEY = "..."
 
 # Optional
 S3_REGION = "us-east-1"
 S3_ENDPOINT_URL = "https://..."  # For R2, MinIO, etc.
-S3_DEFAULT_ACL = "private"  # or "public-read"
-S3_PRESIGNED_URL_EXPIRATION = 3600  # seconds
-S3_UPLOAD_KEY_PREFIX = "uploads/"
 ```
 
 **Cloudflare R2 example:**
 
 ```python
-S3_BUCKET = "my-bucket"
 S3_ACCESS_KEY_ID = "..."
 S3_SECRET_ACCESS_KEY = "..."
 S3_ENDPOINT_URL = "https://ACCOUNT_ID.r2.cloudflarestorage.com"
@@ -158,7 +180,7 @@ INSTALLED_PACKAGES = [
 ]
 ```
 
-2. Configure your S3 settings (see above).
+2. Configure your S3 connection credentials (see Settings above).
 
 3. Run migrations:
 
@@ -166,4 +188,4 @@ INSTALLED_PACKAGES = [
 plain migrate
 ```
 
-4. Add `S3FileField` to your models where needed.
+4. Add `S3FileField` to your models, specifying the bucket for each field.

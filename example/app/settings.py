@@ -58,7 +58,6 @@ MIDDLEWARE = [
 AUTH_LOGIN_URL = "login"
 AUTH_USER_MODEL = "users.User"
 
-# S3 settings (configure for your storage provider)
-S3_BUCKET = ""
+# S3 connection settings (configure for your storage provider)
 S3_ACCESS_KEY_ID = ""
 S3_SECRET_ACCESS_KEY = ""
