@@ -100,18 +100,17 @@ class S3FileField(ForeignKeyField):
             acl=self.acl,
         )
 
-    def formfield(self, **kwargs):
+    def formfield(self, **kwargs: Any) -> Any:
         """Return an S3FileField form field for use in ModelForms."""
         from .forms import S3FileField as S3FileFormField
 
-        defaults = {
-            "bucket": self.bucket,
-            "key_prefix": self.key_prefix,
-            "acl": self.acl,
-            "required": not self.allow_null,
-        }
-        defaults.update(kwargs)
-        return S3FileFormField(**defaults)
+        return S3FileFormField(
+            bucket=self.bucket,
+            key_prefix=self.key_prefix,
+            acl=self.acl,
+            required=kwargs.pop("required", not self.allow_null),
+            **kwargs,
+        )
 
     def deconstruct(self) -> tuple:
         """Support migrations by including S3 configuration."""

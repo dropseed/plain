@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from plain.forms.fields import FileField
 
 
@@ -28,7 +30,7 @@ class S3FileField(FileField):
         self.acl = acl
         super().__init__(**kwargs)
 
-    def clean(self, data, initial=None):
+    def clean(self, data: Any, initial: Any = None) -> Any:  # type: ignore[override]
         file = super().clean(data, initial)
 
         if file is None or file is False:

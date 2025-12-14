@@ -220,11 +220,11 @@ class S3File(models.Model):
                 return False
             raise
 
-    def delete(self) -> None:
+    def delete(self) -> tuple[int, dict[str, int]]:
         """Delete the file from S3 and the database record."""
         client = _get_client()
         client.delete_object(Bucket=self.bucket, Key=self.key)
-        super().delete()
+        return super().delete()
 
     @property
     def extension(self) -> str:
