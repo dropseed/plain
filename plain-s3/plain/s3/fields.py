@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from plain import models
 from plain.models.fields.related import ForeignKeyField
-
-if TYPE_CHECKING:
-    pass
 
 
 class S3FileField(ForeignKeyField):

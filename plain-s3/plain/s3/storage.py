@@ -1,21 +1,16 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import boto3
 
 from plain.runtime import settings
 
-if TYPE_CHECKING:
-    from mypy_boto3_s3 import S3Client
 
-
-_client: S3Client | None = None
+_client = None
 
 DEFAULT_PRESIGNED_URL_EXPIRATION = 3600  # 1 hour
 
 
-def get_client() -> S3Client:
+def get_client():
     """Get or create the S3 client singleton."""
     global _client
     if _client is None:

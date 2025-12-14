@@ -64,37 +64,63 @@ doc.file.download_url() # presigned S3 URL
 
 For large files, upload directly from the browser to S3 to avoid tying up your server.
 
-**1. Create a presigned upload from your backend:**
+**1. Create a presigned upload view:**
 
 ```python
-from plain.api import api
+# app/api/views.py
+from plain.api.views import APIView
+from plain.s3.models import S3File
 
 from app.documents.models import Document
 
 
-@api.route("/uploads/presign", method="POST")
-def create_presign(request):
-    # Get the field configuration
-    file_field = Document._meta.get_field("file")
+class PresignUploadView(APIView):
+    def post(self):
+        # Get the field configuration
+        file_field = Document._meta.get_field("file")
 
-    # Create presigned upload using field's bucket/prefix/acl
-    data = file_field.create_presigned_upload(
-        filename=request.data["filename"],
-        byte_size=request.data["byte_size"],
-    )
-    return data
-    # Returns: {
-    #     "file_id": "uuid...",
-    #     "upload_url": "https://bucket.s3...",
-    #     "upload_fields": {"key": "...", "policy": "...", ...},
-    # }
+        # Create presigned upload using field's bucket/prefix/acl
+        return file_field.create_presigned_upload(
+            filename=self.data["filename"],
+            byte_size=self.data["byte_size"],
+        )
+        # Returns: {
+        #     "file_id": "uuid...",
+        #     "upload_url": "https://bucket.s3...",
+        #     "upload_fields": {"key": "...", "policy": "...", ...},
+        # }
+
+
+class DocumentView(APIView):
+    def post(self):
+        file = S3File.query.get(uuid=self.data["file_id"])
+        doc = Document.query.create(
+            title=self.data["title"],
+            file=file,
+        )
+        return {"id": str(doc.id)}
+```
+
+```python
+# app/api/urls.py
+from plain.urls import Router, path
+
+from . import views
+
+
+class APIRouter(Router):
+    namespace = "api"
+    urls = [
+        path("uploads/presign/", views.PresignUploadView),
+        path("documents/", views.DocumentView),
+    ]
 ```
 
 **2. Upload from the browser:**
 
 ```javascript
 // Get presigned URL
-const presign = await fetch('/uploads/presign', {
+const presign = await fetch('/api/uploads/presign/', {
   method: 'POST',
   body: JSON.stringify({
     filename: file.name,
@@ -110,29 +136,13 @@ formData.append('file', file);
 await fetch(presign.upload_url, { method: 'POST', body: formData });
 
 // Now attach to your record
-await fetch('/documents', {
+await fetch('/api/documents/', {
   method: 'POST',
   body: JSON.stringify({
     title: 'My Document',
     file_id: presign.file_id,
   }),
 });
-```
-
-**3. Link the file to your record:**
-
-```python
-from plain.s3.models import S3File
-
-
-@api.route("/documents", method="POST")
-def create_document(request):
-    file = S3File.query.get(uuid=request.data["file_id"])
-    doc = Document.query.create(
-        title=request.data["title"],
-        file=file,
-    )
-    return {"id": str(doc.id)}
 ```
 
 ## Downloading files
