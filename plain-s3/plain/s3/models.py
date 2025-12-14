@@ -4,10 +4,30 @@ import mimetypes
 from datetime import datetime
 from uuid import UUID, uuid4
 
+import boto3
+
 from plain import models
 from plain.models import types
+from plain.runtime import settings
 
-from . import storage
+
+_client = None
+_DEFAULT_PRESIGNED_EXPIRATION = 3600  # 1 hour
+
+
+def _get_client():
+    """Get or create the S3 client singleton."""
+    global _client
+    if _client is None:
+        kwargs = {
+            "aws_access_key_id": settings.S3_ACCESS_KEY_ID,
+            "aws_secret_access_key": settings.S3_SECRET_ACCESS_KEY,
+            "region_name": settings.S3_REGION,
+        }
+        if settings.S3_ENDPOINT_URL:
+            kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
+        _client = boto3.client("s3", **kwargs)
+    return _client
 
 
 @models.register_model
@@ -53,7 +73,7 @@ class S3File(models.Model):
         return self.filename
 
     @classmethod
-    def generate_key(cls, filename: str, *, key_prefix: str = "") -> str:
+    def _generate_key(cls, filename: str, *, key_prefix: str = "") -> str:
         """Generate a unique S3 key for a new file."""
         ext = ""
         if "." in filename:
@@ -87,12 +107,21 @@ class S3File(models.Model):
             content_type, _ = mimetypes.guess_type(filename)
             content_type = content_type or "application/octet-stream"
 
-        key = cls.generate_key(filename, key_prefix=key_prefix)
+        key = cls._generate_key(filename, key_prefix=key_prefix)
         body = file.read()
         byte_size = len(body)
 
         # Upload to S3
-        storage.upload_object(bucket, key, body, content_type, acl=acl)
+        client = _get_client()
+        put_kwargs = {
+            "Bucket": bucket,
+            "Key": key,
+            "Body": body,
+            "ContentType": content_type,
+        }
+        if acl:
+            put_kwargs["ACL"] = acl
+        client.put_object(**put_kwargs)
 
         # Create the database record
         return cls.query.create(
@@ -118,7 +147,7 @@ class S3File(models.Model):
         Create a new S3File record and return presigned upload data.
 
         The file record is created immediately but the file isn't uploaded yet.
-        After the client uploads directly to S3, call verify_upload() to confirm.
+        After the client uploads directly to S3, the file will be available.
 
         Returns:
             {
@@ -132,7 +161,7 @@ class S3File(models.Model):
             content_type, _ = mimetypes.guess_type(filename)
             content_type = content_type or "application/octet-stream"
 
-        key = cls.generate_key(filename, key_prefix=key_prefix)
+        key = cls._generate_key(filename, key_prefix=key_prefix)
 
         # Create the file record
         file = cls.query.create(
@@ -144,8 +173,19 @@ class S3File(models.Model):
         )
 
         # Generate presigned upload URL
-        presign = storage.generate_presigned_upload_url(
-            bucket, key, content_type, acl=acl
+        client = _get_client()
+        conditions: list = [{"Content-Type": content_type}]
+        fields = {"Content-Type": content_type}
+        if acl:
+            conditions.append({"acl": acl})
+            fields["acl"] = acl
+
+        presign = client.generate_presigned_post(
+            Bucket=bucket,
+            Key=key,
+            Fields=fields,
+            Conditions=conditions,
+            ExpiresIn=_DEFAULT_PRESIGNED_EXPIRATION,
         )
 
         return {
@@ -155,25 +195,35 @@ class S3File(models.Model):
             "upload_fields": presign["fields"],
         }
 
-    def download_url(self, *, expires_in: int | None = None) -> str:
+    def download_url(self, *, expires_in: int = _DEFAULT_PRESIGNED_EXPIRATION) -> str:
         """Generate a presigned URL for downloading this file."""
-        kwargs = {}
-        if expires_in is not None:
-            kwargs["expires_in"] = expires_in
-        return storage.generate_presigned_download_url(
-            self.bucket,
-            self.key,
-            filename=self.filename,
-            **kwargs,
+        client = _get_client()
+        params = {
+            "Bucket": self.bucket,
+            "Key": self.key,
+            "ResponseContentDisposition": f'attachment; filename="{self.filename}"',
+        }
+        return client.generate_presigned_url(
+            "get_object",
+            Params=params,
+            ExpiresIn=expires_in,
         )
 
     def exists_in_storage(self) -> bool:
         """Check if the file actually exists in S3."""
-        return storage.head_object(self.bucket, self.key) is not None
+        client = _get_client()
+        try:
+            client.head_object(Bucket=self.bucket, Key=self.key)
+            return True
+        except client.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "404":
+                return False
+            raise
 
     def delete(self) -> None:
         """Delete the file from S3 and the database record."""
-        storage.delete_object(self.bucket, self.key)
+        client = _get_client()
+        client.delete_object(Bucket=self.bucket, Key=self.key)
         super().delete()
 
     @property
