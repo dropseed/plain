@@ -2,10 +2,11 @@
 
 **S3-compatible file storage for Plain models.**
 
-Store files in S3, Cloudflare R2, MinIO, or any S3-compatible storage service. Designed for direct browser uploads using presigned URLs.
+Store files in S3, Cloudflare R2, MinIO, or any S3-compatible storage service.
 
 - [Overview](#overview)
-- [Direct uploads](#direct-uploads)
+- [Uploading files](#uploading-files)
+- [Presigned uploads](#presigned-uploads)
 - [Downloading files](#downloading-files)
 - [Settings](#settings)
 - [Installation](#installation)
@@ -60,11 +61,73 @@ doc.file.size_display   # "1.0 MB"
 doc.file.download_url() # presigned S3 URL
 ```
 
-## Direct uploads
+## Uploading files
 
-For large files, upload directly from the browser to S3 to avoid tying up your server.
+### Using a form
 
-**1. Create views for presigned uploads:**
+Use `S3FileField` in your form to handle file uploads:
+
+```python
+# app/documents/forms.py
+from plain import forms
+from plain.s3.forms import S3FileField
+
+
+class DocumentForm(forms.Form):
+    title = forms.CharField()
+    file = S3FileField(bucket="my-bucket")
+```
+
+```python
+# app/documents/views.py
+from plain.views import FormView
+
+from .forms import DocumentForm
+from .models import Document
+
+
+class DocumentCreateView(FormView):
+    form_class = DocumentForm
+    template_name = "documents/create.html"
+
+    def form_valid(self, form):
+        doc = Document.query.create(
+            title=form.cleaned_data["title"],
+            file=form.cleaned_data["file"],  # S3File instance
+        )
+        return redirect("documents:detail", doc.id)
+```
+
+### Direct upload in a view
+
+Upload files directly using the model field's `upload` method:
+
+```python
+from plain.views import View
+
+from .models import Document
+
+
+class DocumentUploadView(View):
+    def post(self):
+        uploaded_file = self.request.files["file"]
+
+        # Get the field and use its configuration
+        file_field = Document._meta.get_field("file")
+        s3_file = file_field.upload(uploaded_file)
+
+        doc = Document.query.create(
+            title=self.request.POST["title"],
+            file=s3_file,
+        )
+        return {"id": doc.id}
+```
+
+## Presigned uploads
+
+For large files, upload directly from the browser to S3 to avoid server load.
+
+**1. Create a view that returns presigned upload data:**
 
 ```python
 # app/documents/views.py
@@ -80,10 +143,7 @@ class PresignUploadView(View):
     def post(self):
         data = json.loads(self.request.body)
 
-        # Get the field configuration
         file_field = Document._meta.get_field("file")
-
-        # Create presigned upload using field's bucket/prefix/acl
         return file_field.create_presigned_upload(
             filename=data["filename"],
             byte_size=data["byte_size"],

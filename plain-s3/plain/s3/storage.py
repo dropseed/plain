@@ -86,6 +86,27 @@ def generate_presigned_download_url(
     )
 
 
+def upload_object(
+    bucket: str,
+    key: str,
+    body: bytes,
+    content_type: str,
+    *,
+    acl: str = "",
+) -> None:
+    """Upload file content to S3."""
+    client = get_client()
+    kwargs = {
+        "Bucket": bucket,
+        "Key": key,
+        "Body": body,
+        "ContentType": content_type,
+    }
+    if acl:
+        kwargs["ACL"] = acl
+    client.put_object(**kwargs)
+
+
 def delete_object(bucket: str, key: str) -> None:
     """Delete an object from S3."""
     client = get_client()

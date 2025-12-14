@@ -61,6 +61,49 @@ class S3File(models.Model):
         return f"{key_prefix}{uuid4()}{ext}"
 
     @classmethod
+    def upload(
+        cls,
+        *,
+        bucket: str,
+        file,
+        key_prefix: str = "",
+        acl: str = "",
+    ) -> "S3File":
+        """
+        Upload a file to S3 and create the S3File record.
+
+        Args:
+            bucket: S3 bucket name
+            file: An uploaded file object with name, size, content_type, and read() method
+            key_prefix: Optional prefix for the S3 key
+            acl: Optional ACL (e.g., "public-read")
+
+        Returns:
+            The created S3File instance
+        """
+        filename = file.name
+        content_type = getattr(file, "content_type", None)
+        if content_type is None:
+            content_type, _ = mimetypes.guess_type(filename)
+            content_type = content_type or "application/octet-stream"
+
+        key = cls.generate_key(filename, key_prefix=key_prefix)
+        body = file.read()
+        byte_size = len(body)
+
+        # Upload to S3
+        storage.upload_object(bucket, key, body, content_type, acl=acl)
+
+        # Create the database record
+        return cls.query.create(
+            bucket=bucket,
+            key=key,
+            filename=filename,
+            content_type=content_type,
+            byte_size=byte_size,
+        )
+
+    @classmethod
     def create_presigned_upload(
         cls,
         *,

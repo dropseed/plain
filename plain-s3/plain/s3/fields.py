@@ -52,6 +52,25 @@ class S3FileField(ForeignKeyField):
 
         super().__init__(S3File, on_delete=on_delete, **kwargs)
 
+    def upload(self, file):
+        """
+        Upload a file using this field's configuration.
+
+        Args:
+            file: An uploaded file object with name, size, content_type, and read() method
+
+        Returns:
+            The created S3File instance
+        """
+        from .models import S3File
+
+        return S3File.upload(
+            bucket=self.bucket,
+            file=file,
+            key_prefix=self.key_prefix,
+            acl=self.acl,
+        )
+
     def create_presigned_upload(
         self,
         *,
