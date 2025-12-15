@@ -30,7 +30,7 @@
                             <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse" title="Recording"></div>
                             {% endif %}
                             <select
-                                hx-put="."
+                                hx-put="{{ url('observer:traces') }}"
                                 hx-trigger="change"
                                 hx-swap="morph:innerHTML"
                                 hx-target="#main-content"
@@ -63,7 +63,7 @@
                                             <span class="hidden htmx-request:inline">Refreshing...</span>
                                         </button>
                                         <button
-                                            hx-delete="."
+                                            hx-delete="{{ url('observer:traces') }}"
                                             plain-hx-action="traces"
                                             hx-swap="morph:innerHTML"
                                             hx-target="#main-content"
@@ -190,7 +190,7 @@
                         <div class="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2">
                             {% if observer.is_summarizing() %}
                             <button
-                                hx-put="."
+                                hx-put="{{ url('observer:traces') }}"
                                 plain-hx-action="mode"
                                 hx-vals='{"mode": "persist"}'
                                 hx-swap="morph:innerHTML"
@@ -215,7 +215,7 @@
                                 <span class="hidden htmx-request:inline">Checking...</span>
                             </button>
                             <button
-                                hx-put="."
+                                hx-put="{{ url('observer:traces') }}"
                                 plain-hx-action="mode"
                                 hx-vals='{"mode": "summary"}'
                                 hx-swap="morph:innerHTML"
@@ -230,7 +230,7 @@
                             {% endif %}
 
                             <button
-                                hx-put="."
+                                hx-put="{{ url('observer:traces') }}"
                                 plain-hx-action="mode"
                                 hx-vals='{"mode": "disable"}'
                                 hx-swap="morph:innerHTML"
@@ -289,7 +289,7 @@
 
                         <div class="flex flex-col sm:flex-row items-center sm:items-start gap-2">
                             <button
-                                hx-put="."
+                                hx-put="{{ url('observer:traces') }}"
                                 plain-hx-action="mode"
                                 hx-vals='{"mode": "summary"}'
                                 hx-swap="morph:innerHTML"
@@ -302,7 +302,7 @@
                                 <span>Enable Summary</span>
                             </button>
                             <button
-                                hx-put="."
+                                hx-put="{{ url('observer:traces') }}"
                                 plain-hx-action="mode"
                                 hx-vals='{"mode": "persist"}'
                                 hx-swap="morph:innerHTML"
