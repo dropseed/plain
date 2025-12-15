@@ -45,6 +45,7 @@ FULLY_TYPED_PATHS = [
     "plain-passwords",
     "plain-pytest",
     "plain-redirection",
+    "plain-s3",
     "plain-sessions",
     "plain-observer",
     "plain-support",

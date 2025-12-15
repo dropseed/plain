@@ -5,6 +5,8 @@ from typing import Any
 from plain import models
 from plain.models.fields.related import ForeignKeyField
 
+from .models import PresignedUpload
+
 
 class S3FileField(ForeignKeyField):
     """
@@ -12,7 +14,8 @@ class S3FileField(ForeignKeyField):
 
     Usage:
         class Document(models.Model):
-            file: S3File | None = S3FileField(bucket="my-bucket")
+            # Uses S3_BUCKET setting:
+            file: S3File | None = S3FileField()
 
             # With optional configuration:
             avatar: S3File | None = S3FileField(
@@ -21,15 +24,13 @@ class S3FileField(ForeignKeyField):
                 acl="public-read",
             )
 
-    The bucket is required. key_prefix and acl are optional.
-
     By default, the field is optional (allow_null=True) and uses SET_NULL
     on delete to avoid cascading deletes of your records when files are removed.
     """
 
     def __init__(
         self,
-        bucket: str,
+        bucket: str = "",
         *,
         key_prefix: str = "",
         acl: str = "",
@@ -52,15 +53,11 @@ class S3FileField(ForeignKeyField):
 
         super().__init__(S3File, on_delete=on_delete, **kwargs)
 
-    def upload(self, file):
+    def upload(self, file: Any) -> Any:
         """
         Upload a file using this field's configuration.
 
-        Args:
-            file: An uploaded file object with name, size, content_type, and read() method
-
-        Returns:
-            The created S3File instance
+        Returns the created S3File instance.
         """
         from .models import S3File
 
@@ -77,18 +74,8 @@ class S3FileField(ForeignKeyField):
         filename: str,
         byte_size: int,
         content_type: str | None = None,
-    ) -> dict:
-        """
-        Create a presigned upload using this field's configuration.
-
-        Returns:
-            {
-                "file_id": str (UUID),
-                "key": str,
-                "upload_url": str,
-                "upload_fields": dict,
-            }
-        """
+    ) -> PresignedUpload:
+        """Create a presigned upload using this field's configuration."""
         from .models import S3File
 
         return S3File.create_presigned_upload(
@@ -116,7 +103,8 @@ class S3FileField(ForeignKeyField):
         """Support migrations by including S3 configuration."""
         name, path, args, kwargs = super().deconstruct()
         # Add our custom attributes
-        kwargs["bucket"] = self.bucket
+        if self.bucket:
+            kwargs["bucket"] = self.bucket
         if self.key_prefix:
             kwargs["key_prefix"] = self.key_prefix
         if self.acl:

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import mimetypes
 from datetime import datetime
-from uuid import UUID, uuid4
+from typing import TYPE_CHECKING, Any, TypedDict
+from uuid import uuid4
 
 import boto3
 
@@ -10,24 +11,15 @@ from plain import models
 from plain.models import types
 from plain.runtime import settings
 
+if TYPE_CHECKING:
+    from types_boto3_s3 import S3Client
 
-_client = None
-_DEFAULT_PRESIGNED_EXPIRATION = 3600  # 1 hour
 
+class PresignedUpload(TypedDict):
+    """Return type for create_presigned_upload."""
 
-def _get_client():
-    """Get or create the S3 client singleton."""
-    global _client
-    if _client is None:
-        kwargs = {
-            "aws_access_key_id": settings.S3_ACCESS_KEY_ID,
-            "aws_secret_access_key": settings.S3_SECRET_ACCESS_KEY,
-            "region_name": settings.S3_REGION,
-        }
-        if settings.S3_ENDPOINT_URL:
-            kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
-        _client = boto3.client("s3", **kwargs)
-    return _client
+    key: str
+    upload_url: str
 
 
 @models.register_model
@@ -41,8 +33,6 @@ class S3File(models.Model):
 
     query: models.QuerySet[S3File] = models.QuerySet()
 
-    uuid: UUID = types.UUIDField(default=uuid4)
-
     # S3 storage location
     bucket: str = types.CharField(max_length=255)
     key: str = types.CharField(max_length=500)
@@ -51,26 +41,32 @@ class S3File(models.Model):
     filename: str = types.CharField(max_length=255)
     content_type: str = types.CharField(max_length=100)
     byte_size: int = types.PositiveBigIntegerField()
-    checksum: str = types.CharField(max_length=64, required=False)
-
-    # Extensible metadata (dimensions, duration, etc.)
-    metadata: dict = types.JSONField(default=dict)
 
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 
     model_options = models.Options(
         indexes=[
-            models.Index(fields=["uuid"]),
-            models.Index(fields=["bucket", "key"]),
             models.Index(fields=["created_at"]),
         ],
         constraints=[
-            models.UniqueConstraint(fields=["uuid"], name="plains3_s3file_unique_uuid"),
+            models.UniqueConstraint(fields=["key"], name="plains3_s3file_unique_key"),
         ],
     )
 
     def __str__(self) -> str:
         return self.filename
+
+    @classmethod
+    def get_s3_client(cls) -> S3Client:
+        """Create an S3 client using settings."""
+        kwargs: dict[str, Any] = {
+            "aws_access_key_id": settings.S3_ACCESS_KEY_ID,
+            "aws_secret_access_key": settings.S3_SECRET_ACCESS_KEY,
+            "region_name": settings.S3_REGION,
+        }
+        if settings.S3_ENDPOINT_URL:
+            kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
+        return boto3.client("s3", **kwargs)
 
     @classmethod
     def _generate_key(cls, filename: str, *, key_prefix: str = "") -> str:
@@ -84,23 +80,15 @@ class S3File(models.Model):
     def upload(
         cls,
         *,
-        bucket: str,
-        file,
+        file: Any,
+        bucket: str = "",
         key_prefix: str = "",
         acl: str = "",
-    ) -> "S3File":
+    ) -> S3File:
         """
         Upload a file to S3 and create the S3File record.
-
-        Args:
-            bucket: S3 bucket name
-            file: An uploaded file object with name, size, content_type, and read() method
-            key_prefix: Optional prefix for the S3 key
-            acl: Optional ACL (e.g., "public-read")
-
-        Returns:
-            The created S3File instance
         """
+        bucket = bucket or settings.S3_BUCKET
         filename = file.name
         content_type = getattr(file, "content_type", None)
         if content_type is None:
@@ -112,7 +100,7 @@ class S3File(models.Model):
         byte_size = len(body)
 
         # Upload to S3
-        client = _get_client()
+        client = cls.get_s3_client()
         put_kwargs = {
             "Bucket": bucket,
             "Key": key,
@@ -136,27 +124,21 @@ class S3File(models.Model):
     def create_presigned_upload(
         cls,
         *,
-        bucket: str,
         filename: str,
         byte_size: int,
+        bucket: str = "",
         content_type: str | None = None,
         key_prefix: str = "",
         acl: str = "",
-    ) -> dict:
+    ) -> PresignedUpload:
         """
         Create a new S3File record and return presigned upload data.
 
         The file record is created immediately but the file isn't uploaded yet.
         After the client uploads directly to S3, the file will be available.
-
-        Returns:
-            {
-                "file_id": str (UUID),
-                "key": str,
-                "upload_url": str,
-                "upload_fields": dict,
-            }
         """
+        bucket = bucket or settings.S3_BUCKET
+
         if content_type is None:
             content_type, _ = mimetypes.guess_type(filename)
             content_type = content_type or "application/octet-stream"
@@ -164,7 +146,7 @@ class S3File(models.Model):
         key = cls._generate_key(filename, key_prefix=key_prefix)
 
         # Create the file record
-        file = cls.query.create(
+        cls.query.create(
             bucket=bucket,
             key=key,
             filename=filename,
@@ -172,36 +154,41 @@ class S3File(models.Model):
             byte_size=byte_size,
         )
 
-        # Generate presigned upload URL
-        client = _get_client()
-        conditions: list = [{"Content-Type": content_type}]
-        fields = {"Content-Type": content_type}
-        if acl:
-            conditions.append({"acl": acl})
-            fields["acl"] = acl
+        client = cls.get_s3_client()
 
-        presign = client.generate_presigned_post(
-            Bucket=bucket,
-            Key=key,
-            Fields=fields,
-            Conditions=conditions,
-            ExpiresIn=_DEFAULT_PRESIGNED_EXPIRATION,
+        params: dict[str, Any] = {
+            "Bucket": bucket,
+            "Key": key,
+            "ContentType": content_type,
+        }
+        if acl:
+            params["ACL"] = acl
+
+        upload_url = client.generate_presigned_url(
+            "put_object",
+            Params=params,
+            ExpiresIn=3600,
         )
 
-        return {
-            "file_id": str(file.uuid),
-            "key": key,
-            "upload_url": presign["url"],
-            "upload_fields": presign["fields"],
-        }
+        return PresignedUpload(
+            key=key,
+            upload_url=upload_url,
+        )
 
-    def download_url(self, *, expires_in: int = _DEFAULT_PRESIGNED_EXPIRATION) -> str:
-        """Generate a presigned URL for downloading this file."""
-        client = _get_client()
+    def presigned_download_url(
+        self, *, expires_in: int = 3600, inline: bool = False
+    ) -> str:
+        """Generate a presigned URL for downloading this file.
+
+        Use inline=True to display in browser (for images, PDFs, etc.)
+        instead of triggering a download.
+        """
+        client = self.get_s3_client()
+        disposition = "inline" if inline else "attachment"
         params = {
             "Bucket": self.bucket,
             "Key": self.key,
-            "ResponseContentDisposition": f'attachment; filename="{self.filename}"',
+            "ResponseContentDisposition": f'{disposition}; filename="{self.filename}"',
         }
         return client.generate_presigned_url(
             "get_object",
@@ -211,7 +198,7 @@ class S3File(models.Model):
 
     def exists_in_storage(self) -> bool:
         """Check if the file actually exists in S3."""
-        client = _get_client()
+        client = self.get_s3_client()
         try:
             client.head_object(Bucket=self.bucket, Key=self.key)
             return True
@@ -222,7 +209,7 @@ class S3File(models.Model):
 
     def delete(self) -> tuple[int, dict[str, int]]:
         """Delete the file from S3 and the database record."""
-        client = _get_client()
+        client = self.get_s3_client()
         client.delete_object(Bucket=self.bucket, Key=self.key)
         return super().delete()
 
@@ -232,22 +219,6 @@ class S3File(models.Model):
         if "." in self.filename:
             return self.filename.rsplit(".", 1)[-1].lower()
         return ""
-
-    def is_image(self) -> bool:
-        """Check if this file is an image based on content type."""
-        return self.content_type.startswith("image/")
-
-    def is_video(self) -> bool:
-        """Check if this file is a video based on content type."""
-        return self.content_type.startswith("video/")
-
-    def is_audio(self) -> bool:
-        """Check if this file is audio based on content type."""
-        return self.content_type.startswith("audio/")
-
-    def is_pdf(self) -> bool:
-        """Check if this file is a PDF."""
-        return self.content_type == "application/pdf"
 
     @property
     def size_display(self) -> str:

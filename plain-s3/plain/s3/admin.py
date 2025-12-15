@@ -24,7 +24,6 @@ class S3FileViewset(AdminViewset):
             "created_at",
         ]
         search_fields = [
-            "uuid",
             "filename",
             "key",
         ]

@@ -14,7 +14,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0.0",
+    "plain.pytest<1.0.0",
+    "types-boto3[s3]>=1.35.0",
 ]
 
 [tool.hatch.build.targets.wheel]

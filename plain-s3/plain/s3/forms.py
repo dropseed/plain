@@ -12,18 +12,18 @@ class S3FileField(FileField):
     Usage in a form:
         class DocumentForm(Form):
             title = fields.CharField()
-            file = S3FileField(bucket="my-bucket")
+            file = S3FileField()  # Uses S3_BUCKET setting
 
     The cleaned value is an S3File instance (or None if no file uploaded).
     """
 
     def __init__(
         self,
-        bucket: str,
+        bucket: str = "",
         *,
         key_prefix: str = "",
         acl: str = "",
-        **kwargs,
+        **kwargs: Any,
     ):
         self.bucket = bucket
         self.key_prefix = key_prefix

@@ -2,7 +2,7 @@
 
 **S3-compatible file storage for Plain models.**
 
-Store files in S3, Cloudflare R2, MinIO, or any S3-compatible storage service.
+Store files in S3, Cloudflare R2, DigitalOcean Spaces, MinIO, or any S3-compatible storage.
 
 - [Overview](#overview)
 - [Uploading files](#uploading-files)
@@ -13,7 +13,7 @@ Store files in S3, Cloudflare R2, MinIO, or any S3-compatible storage service.
 
 ## Overview
 
-Add file uploads to your models with `S3FileField`. Each field specifies which bucket to use:
+Add file uploads to your models with `S3FileField`:
 
 ```python
 from plain import models
@@ -25,10 +25,10 @@ from plain.s3.models import S3File
 @models.register_model
 class Document(models.Model):
     title: str = types.CharField(max_length=200)
-    file: S3File | None = S3FileField(bucket="my-bucket")
+    file: S3File | None = S3FileField()  # Uses S3_BUCKET setting
 ```
 
-Configure per-field storage options:
+Override the bucket or add path prefixes per-field:
 
 ```python
 @models.register_model
@@ -37,7 +37,6 @@ class User(models.Model):
 
     # Public avatars with custom path prefix
     avatar: S3File | None = S3FileField(
-        bucket="public-assets",
         key_prefix="avatars/",
         acl="public-read",
     )
@@ -54,11 +53,11 @@ Access file properties and generate download URLs:
 ```python
 doc = Document.query.get(id=some_id)
 
-doc.file.filename       # "report.pdf"
-doc.file.content_type   # "application/pdf"
-doc.file.byte_size      # 1048576
-doc.file.size_display   # "1.0 MB"
-doc.file.download_url() # presigned S3 URL
+doc.file.filename              # "report.pdf"
+doc.file.content_type          # "application/pdf"
+doc.file.byte_size             # 1048576
+doc.file.size_display          # "1.0 MB"
+doc.file.presigned_download_url()  # Presigned S3 URL
 ```
 
 ## Uploading files
@@ -75,7 +74,7 @@ from plain.s3.forms import S3FileField
 
 class DocumentForm(forms.Form):
     title = forms.CharField()
-    file = S3FileField(bucket="my-bucket")
+    file = S3FileField()  # Uses S3_BUCKET setting
 ```
 
 ```python
@@ -123,6 +122,15 @@ class DocumentUploadView(View):
         return {"id": doc.id}
 ```
 
+Or upload directly via `S3File.upload()`:
+
+```python
+from plain.s3.models import S3File
+
+
+s3_file = S3File.upload(file=uploaded_file)
+```
+
 ## Presigned uploads
 
 For large files, upload directly from the browser to S3 to avoid server load.
@@ -149,16 +157,15 @@ class PresignUploadView(View):
             byte_size=data["byte_size"],
         )
         # Returns: {
-        #     "file_id": "uuid...",
+        #     "key": "abc123.pdf",
         #     "upload_url": "https://bucket.s3...",
-        #     "upload_fields": {"key": "...", "policy": "...", ...},
         # }
 
 
 class DocumentCreateView(View):
     def post(self):
         data = json.loads(self.request.body)
-        file = S3File.query.get(uuid=data["file_id"])
+        file = S3File.query.get(key=data["key"])
         doc = Document.query.create(
             title=data["title"],
             file=file,
@@ -179,18 +186,18 @@ const presign = await fetch('/documents/presign/', {
 }).then(r => r.json());
 
 // Upload directly to S3
-const formData = new FormData();
-Object.entries(presign.upload_fields).forEach(([k, v]) => formData.append(k, v));
-formData.append('file', file);
-
-await fetch(presign.upload_url, { method: 'POST', body: formData });
+await fetch(presign.upload_url, {
+  method: 'PUT',
+  body: file,
+  headers: { 'Content-Type': file.type },
+});
 
 // Now attach to your record
 await fetch('/documents/', {
   method: 'POST',
   body: JSON.stringify({
     title: 'My Document',
-    file_id: presign.file_id,
+    key: presign.key,
   }),
 });
 ```
@@ -200,31 +207,46 @@ await fetch('/documents/', {
 Generate presigned download URLs:
 
 ```python
-# Default expiration (1 hour)
-url = doc.file.download_url()
+# Default expiration (1 hour), triggers download
+url = doc.file.presigned_download_url()
 
-# Custom expiration
-url = doc.file.download_url(expires_in=300)  # 5 minutes
+# Custom expiration (5 minutes)
+url = doc.file.presigned_download_url(expires_in=300)
+
+# Display in browser instead of downloading (for images, PDFs, etc.)
+url = doc.file.presigned_download_url(inline=True)
 ```
 
 ## Settings
 
-Configure your S3 connection credentials in settings. Bucket and path configuration is per-field (see Overview above).
+Configure your S3 connection in settings:
 
 ```python
 S3_ACCESS_KEY_ID = "..."
 S3_SECRET_ACCESS_KEY = "..."
-S3_ENDPOINT_URL = "https://..."  # For R2, MinIO, etc.
-S3_REGION = "auto"  # Default; set to actual region for AWS (e.g., "us-east-1")
+S3_BUCKET = "my-bucket"
+S3_REGION = "us-east-1"
+S3_ENDPOINT_URL = ""  # For R2, MinIO, DigitalOcean Spaces, etc.
 ```
 
-**Cloudflare R2 example:**
+### Cloudflare R2
 
 ```python
 S3_ACCESS_KEY_ID = "..."
 S3_SECRET_ACCESS_KEY = "..."
+S3_BUCKET = "my-bucket"
+S3_REGION = "auto"
 S3_ENDPOINT_URL = "https://ACCOUNT_ID.r2.cloudflarestorage.com"
-# S3_REGION defaults to "auto", which works for R2
+```
+
+### DigitalOcean Spaces
+
+```python
+S3_ACCESS_KEY_ID = "..."
+S3_SECRET_ACCESS_KEY = "..."
+S3_BUCKET = "my-bucket"
+S3_REGION = "nyc3"  # Your Spaces region
+S3_ENDPOINT_URL = "https://nyc3.digitaloceanspaces.com"
 ```
 
 ## Installation
@@ -238,7 +260,7 @@ INSTALLED_PACKAGES = [
 ]
 ```
 
-2. Configure your S3 connection credentials (see Settings above).
+2. Configure your S3 settings (see Settings above).
 
 3. Run migrations:
 
@@ -246,4 +268,4 @@ INSTALLED_PACKAGES = [
 plain migrate
 ```
 
-4. Add `S3FileField` to your models, specifying the bucket for each field.
+4. Add `S3FileField` to your models.
