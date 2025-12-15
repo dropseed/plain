@@ -22,6 +22,7 @@ plain-auth
 plain-api
 plain-elements
 plain-htmx
+plain-s3
 EOF
 )"
 

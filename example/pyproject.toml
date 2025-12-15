@@ -33,6 +33,7 @@ dependencies = [
     "plain-tunnel",
     "plain-vendor",
     "plain-observer",
+    "plain-s3",
 ]
 
 [tool.plain.tailwind]
