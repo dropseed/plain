@@ -156,10 +156,7 @@ class Meta:
     def add_field(self, field: Field) -> None:
         from plain.models.fields.related import ManyToManyField, RelatedField
 
-        # Insert the given field in the order in which it was created, using
-        # the "creation_counter" attribute of the field.
-        # Move many-to-many related fields from self.fields into
-        # self.many_to_many.
+        # Insert the field in sorted order: primary key first, then alphabetically.
         if isinstance(field, ManyToManyField):
             bisect.insort(self.local_many_to_many, field)
         else:

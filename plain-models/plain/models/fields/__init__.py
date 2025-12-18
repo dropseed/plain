@@ -160,11 +160,6 @@ class Field(RegisterLookupMixin, Generic[T]):
     empty_strings_allowed = True
     empty_values = list(validators.EMPTY_VALUES)
 
-    # These track each time a Field instance is created. Used to retain order.
-    # The auto_creation_counter is used for fields that Plain implicitly
-    # creates, creation_counter is used for all user-specified fields.
-    creation_counter: int = 0
-    auto_creation_counter: int = -1
     default_validators = []  # Default set of validators
     default_error_messages = {
         "invalid_choice": "Value %(value)r is not a valid choice.",
@@ -222,10 +217,6 @@ class Field(RegisterLookupMixin, Generic[T]):
 
         self.primary_key = False
         self.auto_created = False
-
-        # Adjust the appropriate creation counter, and save our local copy.
-        self.creation_counter = Field.creation_counter
-        Field.creation_counter += 1
 
         self._validators = list(validators)  # Store for deconstruction later
 
@@ -538,48 +529,27 @@ class Field(RegisterLookupMixin, Generic[T]):
     def __eq__(self, other: object) -> bool:
         # Needed for @total_ordering
         if isinstance(other, Field):
-            return self.creation_counter == other.creation_counter and getattr(
-                self, "model", None
-            ) == getattr(other, "model", None)
+            return getattr(self, "model", None) == getattr(
+                other, "model", None
+            ) and getattr(self, "name", None) == getattr(other, "name", None)
         return NotImplemented
 
     def __lt__(self, other: object) -> bool:
-        # This is needed because bisect does not take a comparison function.
-        # Order by creation_counter first for backward compatibility.
+        # Order primary key fields first, then alphabetically by name.
         if not isinstance(other, Field):
             return NotImplemented
 
-        # Type narrowing: other is now known to be a Field
-        other_field: Field[Any] = other
+        # Primary key fields come first
+        if self.primary_key != other.primary_key:
+            return self.primary_key  # True < False, so pk comes first
 
-        if (
-            self.creation_counter != other_field.creation_counter
-            or not hasattr(self, "model")
-            and not hasattr(other_field, "model")
-        ):
-            return self.creation_counter < other_field.creation_counter
-        elif hasattr(self, "model") != hasattr(other_field, "model"):
-            return not hasattr(self, "model")  # Order no-model fields first
-        else:
-            # creation_counter's are equal, compare only models.
-            # Use getattr with defaults to satisfy type checker
-            self_pkg = getattr(getattr(self, "model", None), "model_options", None)
-            other_pkg = getattr(
-                getattr(other_field, "model", None), "model_options", None
-            )
-            if self_pkg is not None and other_pkg is not None:
-                return (
-                    self_pkg.package_label,
-                    self_pkg.model_name,
-                ) < (
-                    other_pkg.package_label,
-                    other_pkg.model_name,
-                )
-            # Fallback if model_options not available
-            return self.creation_counter < other_field.creation_counter
+        # Then sort alphabetically by name
+        self_name = getattr(self, "name", "") or ""
+        other_name = getattr(other, "name", "") or ""
+        return self_name < other_name
 
     def __hash__(self) -> int:
-        return hash(self.creation_counter)
+        return id(self)
 
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         # We don't have to deepcopy very much here, since most things are not
@@ -2288,11 +2258,6 @@ class PrimaryKeyField(BigIntegerField):
         super().__init__(required=False)
         self.primary_key = True
         self.auto_created = True
-        # Adjust creation counter for auto-created fields
-        # We need to undo the counter increment from Field.__init__ and use the auto counter
-        Field.creation_counter -= 1  # Undo the increment
-        self.creation_counter = Field.auto_creation_counter
-        Field.auto_creation_counter -= 1
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         errors = super().preflight(**kwargs)
