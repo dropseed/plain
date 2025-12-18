@@ -69,7 +69,7 @@ class ForeignObjectRel(FieldCacheMixin):
         limit_choices_to: dict[str, Any] | Q | None = None,
         on_delete: OnDeleteCallback | None = None,
     ):
-        self.field = field  # type: ignore[invalid-assignment]
+        self.field = field  # type: ignore[misc]
         # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
         # (see related.py:250 where field.remote_field.model is overwritten)
         self.model = to  # type: ignore[assignment]

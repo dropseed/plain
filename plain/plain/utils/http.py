@@ -22,7 +22,7 @@ def urlencode(
     if isinstance(query, MultiValueDict):
         query = query.lists()
     elif hasattr(query, "items"):
-        query = query.items()  # type: ignore[assignment]
+        query = query.items()  # type: ignore[union-attr]
     query_params = []
     for key, value in query:
         if value is None:

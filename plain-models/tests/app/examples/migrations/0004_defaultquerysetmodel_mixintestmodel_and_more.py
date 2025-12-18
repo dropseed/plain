@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
             options={
                 "ordering": ["-created_at"],
             },
-            bases=(app.examples.models.TimestampMixin, models.Model),  # type: ignore[attr-defined]
+            bases=(app.examples.models.TimestampMixin, models.Model),
         ),
         migrations.CreateModel(
             name="CustomQuerySetModel",
@@ -59,7 +59,7 @@ class Migration(migrations.Migration):
             model_name="childsetdefault",
             name="parent",
             field=models.ForeignKeyField(
-                default=app.examples.models.ChildSetDefault.default_parent_id,  # type: ignore[attr-defined]
+                default=app.examples.models.ChildSetDefault.default_parent_id,
                 on_delete=plain.models.deletion.SET_DEFAULT,
                 to="examples.deleteparent",
             ),

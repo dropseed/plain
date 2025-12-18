@@ -38,7 +38,7 @@ class DeclarativeFieldsMetaclass(type):
             if isinstance(value, Field)
         }
 
-        new_class = super().__new__(mcs, name, bases, attrs)  # type: ignore[misc]
+        new_class = super().__new__(mcs, name, bases, attrs)
 
         # Walk through the MRO.
         declared_fields: dict[str, Field] = {}

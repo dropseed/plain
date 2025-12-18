@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 def cry(message: str, stderr: Any = sys.__stderr__) -> None:
     log.critical(message)
     print(message, file=stderr)
-    stderr.flush()  # type: ignore[possibly-unbound]
+    stderr.flush()
 
 
 class LF2CRLF_FileWrapper:

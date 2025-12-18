@@ -13,7 +13,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
-logging.Logger.manager.emittedNoHandlerWarning = True  # type: ignore[attr-defined]
+logging.Logger.manager.emittedNoHandlerWarning = True
 import os  # noqa: E402
 import sys  # noqa: E402
 import threading  # noqa: E402

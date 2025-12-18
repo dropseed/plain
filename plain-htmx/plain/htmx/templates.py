@@ -26,7 +26,7 @@ class HTMXJSExtension(InclusionTagExtension):
         return {
             "DEBUG": settings.DEBUG,
             "extensions": kwargs.get("extensions", []),
-            "csp_nonce": request.csp_nonce if request else None,  # type: ignore[attr-defined]
+            "csp_nonce": request.csp_nonce if request else None,
         }
 
 
@@ -167,5 +167,5 @@ def find_template_fragment(
         )
 
     # Create a new template from the node
-    template_node = nodes.Template(callblock_node.body)  # type: ignore[attr-defined]
-    return template.environment.from_string(template_node)  # type: ignore[arg-type]
+    template_node = nodes.Template(callblock_node.body)
+    return template.environment.from_string(template_node)

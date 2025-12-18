@@ -145,23 +145,23 @@ class Dependency:
 
         # Force [tool.plain.vendor.dependencies.{name}] to be an inline table
         # name = { url = "https://example.com", installed = "1.0.0" }
-        dependencies[self.name] = tomlkit.inline_table()  # type: ignore
-        dependencies[self.name]["url"] = self.url  # type: ignore
-        dependencies[self.name]["installed"] = self.installed  # type: ignore
+        dependencies[self.name] = tomlkit.inline_table()
+        dependencies[self.name]["url"] = self.url  # type: ignore[index]
+        dependencies[self.name]["installed"] = self.installed  # type: ignore[index]
         if self.filename:
-            dependencies[self.name]["filename"] = self.filename  # type: ignore
+            dependencies[self.name]["filename"] = self.filename  # type: ignore[index]
         if self.sourcemap:
-            dependencies[self.name]["sourcemap"] = self.sourcemap  # type: ignore
+            dependencies[self.name]["sourcemap"] = self.sourcemap  # type: ignore[index]
 
         # Have to give it the right structure in case they don't exist
-        if "tool" not in pyproject:  # type: ignore
-            pyproject["tool"] = tomlkit.table()  # type: ignore
-        if "plain" not in pyproject["tool"]:  # type: ignore
-            pyproject["tool"]["plain"] = tomlkit.table()  # type: ignore
-        if "vendor" not in pyproject["tool"]["plain"]:  # type: ignore
-            pyproject["tool"]["plain"]["vendor"] = tomlkit.table()  # type: ignore
+        if "tool" not in pyproject:
+            pyproject["tool"] = tomlkit.table()
+        if "plain" not in pyproject["tool"]:  # type: ignore[operator]
+            pyproject["tool"]["plain"] = tomlkit.table()  # type: ignore[index]
+        if "vendor" not in pyproject["tool"]["plain"]:  # type: ignore[operator, index]
+            pyproject["tool"]["plain"]["vendor"] = tomlkit.table()  # type: ignore[index]
 
-        pyproject["tool"]["plain"]["vendor"]["dependencies"] = dependencies  # type: ignore
+        pyproject["tool"]["plain"]["vendor"]["dependencies"] = dependencies  # type: ignore[index]
 
         with open("pyproject.toml", "w") as f:
             f.write(tomlkit.dumps(pyproject))
@@ -175,7 +175,8 @@ class Dependency:
             filename = self.filename
         else:
             # Otherwise, use the filename from the URL
-            filename = response.url.split("/")[-1]  # type: ignore
+            assert response.url is not None
+            filename = response.url.split("/")[-1]
             # Remove any query string or fragment
             filename = filename.split("?")[0].split("#")[0]
 
@@ -193,8 +194,9 @@ class Dependency:
                 # Use a specific filename from config
                 sourcemap_filename = str(self.sourcemap)
 
+            assert response.url is not None
             sourcemap_url = "/".join(
-                response.url.split("/")[:-1] + [sourcemap_filename]  # type: ignore
+                response.url.split("/")[:-1] + [sourcemap_filename]
             )
             sourcemap_response = requests.get(sourcemap_url)
             sourcemap_response.raise_for_status()

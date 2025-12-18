@@ -76,7 +76,7 @@ def parse_date(value: str) -> datetime.date | None:
     except ValueError:
         if match := date_re.match(value):
             kw = {k: int(v) for k, v in match.groupdict().items()}
-            return datetime.date(**kw)  # type: ignore[arg-type]
+            return datetime.date(**kw)
     return None
 
 
@@ -128,7 +128,7 @@ def parse_datetime(value: str) -> datetime.datetime | None:
                     offset = -offset
                 tzinfo = get_fixed_timezone(offset)
             kw = {k: int(v) for k, v in kw.items() if v is not None}
-            return datetime.datetime(**kw, tzinfo=tzinfo)  # type: ignore[arg-type]
+            return datetime.datetime(**kw, tzinfo=tzinfo)
     return None
 
 

@@ -259,7 +259,7 @@ class Worker(ABC):
             elif isinstance(exc, InvalidHeaderName | InvalidHeader):
                 mesg = f"{str(exc)}"
                 if not req and hasattr(exc, "req"):
-                    req = exc.req  # type: ignore[attr-defined]  # for access log
+                    req = exc.req  # type: ignore[assignment]  # for access log
             elif isinstance(exc, LimitRequestLine):
                 mesg = f"{str(exc)}"
             elif isinstance(exc, LimitRequestHeaders):

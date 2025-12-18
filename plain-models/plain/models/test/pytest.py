@@ -30,12 +30,12 @@ def _db_disabled() -> Generator[None, None, None]:
 
     # Save original cursor method and replace with disabled version
     setattr(BaseDatabaseWrapper, "_enabled_cursor", BaseDatabaseWrapper.cursor)
-    BaseDatabaseWrapper.cursor = cursor_disabled  # type: ignore[method-assign]
+    BaseDatabaseWrapper.cursor = cursor_disabled  # type: ignore[assignment]
 
     yield
 
     # Restore original cursor method
-    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")  # type: ignore[method-assign]
+    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")
 
 
 @pytest.fixture(scope="session")
@@ -69,7 +69,7 @@ def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
 
     # Set .cursor() back to the original implementation to unblock it
-    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")  # type: ignore[method-assign]
+    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")
 
     if not db_connection.features.supports_transactions:
         pytest.fail("Database does not support transactions")
@@ -105,7 +105,7 @@ def isolated_db(request: Any) -> Generator[None, None, None]:
     if "db" in request.fixturenames:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
     # Set .cursor() back to the original implementation to unblock it
-    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")  # type: ignore[method-assign]
+    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")
 
     verbosity = 1
 

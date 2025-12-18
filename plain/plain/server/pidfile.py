@@ -50,7 +50,8 @@ class Pidfile:
     def rename(self, path: str) -> None:
         self.unlink()
         self.fname = path
-        self.create(self.pid)  # type: ignore[arg-type]
+        assert self.pid is not None
+        self.create(self.pid)
         return None
 
     def unlink(self) -> None:

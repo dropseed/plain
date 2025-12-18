@@ -145,7 +145,7 @@ class Aggregate(Func):
         if self.filter is not None:
             if connection.features.supports_aggregate_filter_clause:
                 try:
-                    filter_sql, filter_params = self.filter.as_sql(compiler, connection)  # type: ignore[possibly-missing-attribute]
+                    filter_sql, filter_params = self.filter.as_sql(compiler, connection)  # type: ignore[union-attr]
                 except FullResultSet:
                     pass
                 else:

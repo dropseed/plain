@@ -18,7 +18,7 @@ from .schemas import ErrorSchema
 try:
     from .models import APIKey
 except ImportError:
-    APIKey = None  # type: ignore[assignment]
+    APIKey = None  # type: ignore[misc, assignment]
 
 logger = logging.getLogger("plain.api")
 

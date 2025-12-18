@@ -644,7 +644,7 @@ class QueryDict(MultiValueDict):
         Return the list of values for the key as strings.
         QueryDict values are always strings.
         """
-        return super().getlist(key, default)  # type: ignore[arg-type,return-value]
+        return super().getlist(key, default)
 
     @overload
     def get(self, key: str) -> str | None: ...

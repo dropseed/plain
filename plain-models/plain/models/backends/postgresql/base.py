@@ -30,7 +30,7 @@ else:
     try:
         from psycopg import Connection as PsycopgConnection
     except ImportError:
-        PsycopgConnection = Any  # type: ignore[misc]
+        PsycopgConnection = Any
 
 from .client import DatabaseClient
 from .creation import DatabaseCreation
@@ -444,4 +444,4 @@ class Cursor(CursorMixin, Database.ClientCursor):
 class CursorDebugWrapper(BaseCursorDebugWrapper):
     def copy(self, statement: Any) -> Any:
         with self.debug_sql(statement):
-            return self.cursor.copy(statement)  # type: ignore[possibly-missing-attribute]
+            return self.cursor.copy(statement)  # type: ignore[union-attr]

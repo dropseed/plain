@@ -20,7 +20,7 @@ from .registry import pages_registry
 class PageViewMixin:
     @cached_property
     def page(self) -> Page:
-        url_name = self.request.resolver_match.url_name  # type: ignore[union-attr]
+        url_name = self.request.resolver_match.url_name  # type: ignore[attr-defined]
 
         try:
             return pages_registry.get_page_from_name(url_name)

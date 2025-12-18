@@ -115,7 +115,7 @@ class RelatedField(FieldCacheMixin, Field):
         obj = super().__deepcopy__(memodict)
         obj.remote_field = copy.copy(self.remote_field)
         if hasattr(self.remote_field, "field") and self.remote_field.field is self:
-            obj.remote_field.field = obj  # type: ignore[invalid-assignment]
+            obj.remote_field.field = obj  # type: ignore[misc]
         return cast(Self, obj)
 
     @cached_property

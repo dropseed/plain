@@ -145,7 +145,7 @@ class ValidationError(Exception):
     @property
     def messages(self) -> list[str]:
         if hasattr(self, "error_dict"):
-            return sum(dict(self).values(), [])  # type: ignore[call-overload]
+            return sum(dict(self).values(), [])  # type: ignore[arg-type]
         return list(self)
 
     def update_error_dict(
@@ -171,7 +171,7 @@ class ValidationError(Exception):
 
     def __str__(self) -> str:
         if hasattr(self, "error_dict"):
-            return repr(dict(self))  # type: ignore[call-overload]
+            return repr(dict(self))  # type: ignore[arg-type]
         return repr(list(self))
 
     def __repr__(self) -> str:

@@ -43,7 +43,7 @@ def response_typed_dict(
                     return_component_name: schema_from_type(return_type),
                 },
             }
-            func.openapi_components = merge_data(  # type: ignore[attr-defined]
+            func.openapi_components = merge_data(
                 getattr(func, "openapi_components", {}),
                 _component_schema,
             )
@@ -56,7 +56,7 @@ def response_typed_dict(
                     }
                 }
             }
-            func.openapi_components = merge_data(  # type: ignore[attr-defined]
+            func.openapi_components = merge_data(
                 getattr(func, "openapi_components", {}),
                 {
                     "responses": {
@@ -68,7 +68,7 @@ def response_typed_dict(
             _schema = {"responses": {str(status_code): response_schema}}
 
         # Add the response schema to the function
-        func.openapi_schema = merge_data(  # type: ignore[attr-defined]
+        func.openapi_schema = merge_data(
             getattr(func, "openapi_schema", {}),
             _schema,
         )
@@ -153,7 +153,7 @@ def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
 
         required_fields = []
 
-        for field_name, field in form_class.base_fields.items():  # type: ignore[attr-defined]
+        for field_name, field in form_class.base_fields.items():
             field_schema = field_mappings[field.__class__].copy()
             # Complex nested dict access - type checker can't verify structure
             _schema["requestBody"]["content"]["application/json"]["schema"][  # type: ignore[index]
@@ -174,7 +174,7 @@ def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
             # The body is required if any field is
             _schema["requestBody"]["required"] = True
 
-        func.openapi_schema = merge_data(  # type: ignore[attr-defined]
+        func.openapi_schema = merge_data(
             getattr(func, "openapi_schema", {}),
             _schema,
         )
@@ -190,7 +190,7 @@ def schema(data: dict[str, Any]) -> Callable[[F], F]:
     """
 
     def decorator(func: F) -> F:
-        func.openapi_schema = merge_data(  # type: ignore[attr-defined]
+        func.openapi_schema = merge_data(
             getattr(func, "openapi_schema", {}),
             data,
         )

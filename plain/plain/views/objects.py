@@ -7,7 +7,7 @@ from plain.exceptions import ImproperlyConfigured
 try:
     from plain.models.exceptions import ObjectDoesNotExist
 except ImportError:
-    ObjectDoesNotExist = None  # type: ignore[assignment]
+    ObjectDoesNotExist = None  # type: ignore[misc, assignment]
 
 from plain.forms import BaseForm, Form
 from plain.http import Http404

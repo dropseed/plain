@@ -112,4 +112,4 @@ class Popen(subprocess.Popen):
         elif start_new_session:
             options.update(start_new_session=True)
 
-        super().__init__(cmd, **options)  # type: ignore[no-matching-overload]
+        super().__init__(cmd, **options)  # type: ignore[call-overload]

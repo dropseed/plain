@@ -1484,7 +1484,7 @@ class QuerySet(Generic[T]):
         elif (
             self.sql_query.default_ordering
             and self.sql_query.model
-            and self.sql_query.model._model_meta.ordering  # type: ignore[possibly-missing-attribute]
+            and self.sql_query.model._model_meta.ordering  # type: ignore[arg-type]
             and
             # A default ordering doesn't affect GROUP BY queries.
             not self.sql_query.group_by
@@ -2185,7 +2185,7 @@ def prefetch_one_level(
                 # No to_attr has been given for this prefetch operation and the
                 # cache_name does not point to a descriptor. Store the value of
                 # the field in the object's field cache.
-                obj._state.fields_cache[cache_name] = val  # type: ignore[assignment]
+                obj._state.fields_cache[cache_name] = val  # type: ignore[index]
         else:
             if as_attr:
                 setattr(obj, to_attr, vals)

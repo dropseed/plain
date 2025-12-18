@@ -144,7 +144,7 @@ class Field:
         try:
             data = self.to_python(data)
             if hasattr(self, "_coerce"):
-                return self._coerce(data) != self._coerce(initial)  # type: ignore[attr-defined]
+                return self._coerce(data) != self._coerce(initial)  # type: ignore[misc]
         except ValidationError:
             return True
         # For purposes of seeing whether something has changed, None is

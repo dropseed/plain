@@ -35,7 +35,7 @@ class ChoicesMeta(enum.EnumMeta):
             # Use dict.__setitem__() to suppress defenses against double
             # assignment in enum's classdict.
             dict.__setitem__(classdict, key, value)
-        cls = super().__new__(metacls, classname, bases, classdict, **kwds)  # type: ignore[invalid-super-argument]
+        cls = super().__new__(metacls, classname, bases, classdict, **kwds)  # type: ignore[misc]
         for member, label in zip(cls.__members__.values(), labels):
             member._label_ = label
         return enum.unique(cls)

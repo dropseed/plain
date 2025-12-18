@@ -93,7 +93,7 @@ class ClientResponse:
         """
         response = object.__getattribute__(self, "_response")
         if hasattr(response, "url"):
-            return response.url  # type: ignore[attr-defined,return-value]
+            return response.url
         # For non-redirect responses, try to get Location header
         if "Location" in response.headers:
             return response.headers["Location"]
@@ -868,12 +868,12 @@ class Client:
             else:
                 request_method = self.get
                 data = QueryDict(url.query)
-                content_type = ""  # type: ignore[assignment]
+                content_type = ""
 
             response = request_method(
                 path,
                 data=data,
-                content_type=content_type,  # type: ignore[arg-type]
+                content_type=content_type,
                 follow=False,
                 headers=headers,
                 **extra,

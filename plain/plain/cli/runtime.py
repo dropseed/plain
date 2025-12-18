@@ -24,7 +24,7 @@ def without_runtime_setup(f: F) -> F:
         def server(**options):
             ...
     """
-    f.without_runtime_setup = True  # type: ignore[attr-defined]  # dynamic attribute for decorator
+    f.without_runtime_setup = True  # dynamic attribute for decorator
     return f
 
 
@@ -41,5 +41,5 @@ def common_command(f: F) -> F:
         def dev(**options):
             ...
     """
-    f.is_common_command = True  # type: ignore[attr-defined]  # dynamic attribute for decorator
+    f.is_common_command = True  # dynamic attribute for decorator
     return f

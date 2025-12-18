@@ -63,7 +63,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         try:
             import sqlite3
 
-            value = sqlite3.adapt(value)  # type: ignore[no-matching-overload]
+            value = sqlite3.adapt(value)  # type: ignore[call-overload]
         except ImportError:
             pass
         except sqlite3.ProgrammingError:

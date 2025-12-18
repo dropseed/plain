@@ -329,7 +329,7 @@ def process_job(job_process_uuid: str) -> None:
 
         job_result = middleware_chain(job_process)
 
-        duration = job_result.ended_at - job_result.started_at  # type: ignore[unsupported-operator]
+        duration = job_result.ended_at - job_result.started_at  # type: ignore[operator]
         duration = duration.total_seconds()
 
         logger.info(

@@ -47,7 +47,7 @@ class RegexValidator:
         else:
             # Class-level regex is already compiled (e.g., in URL Validator subclass)
             # Don't recompile it
-            regex_to_compile = None  # type: ignore[assignment]
+            regex_to_compile = None
 
         if message is not None:
             self.message = message
@@ -80,8 +80,8 @@ class RegexValidator:
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, RegexValidator)
-            and self.regex.pattern == other.regex.pattern  # type: ignore[attr-defined]
-            and self.regex.flags == other.regex.flags  # type: ignore[attr-defined]
+            and self.regex.pattern == other.regex.pattern  # type: ignore[union-attr]
+            and self.regex.flags == other.regex.flags  # type: ignore[union-attr]
             and (self.message == other.message)
             and (self.code == other.code)
             and (self.inverse_match == other.inverse_match)
@@ -578,7 +578,7 @@ class FileExtensionValidator:
 
 def get_available_image_extensions() -> list[str]:
     try:
-        from PIL import Image  # type: ignore[import-untyped]
+        from PIL import Image  # type: ignore[import-not-found]
     except ImportError:
         return []
     else:

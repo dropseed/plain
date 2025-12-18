@@ -275,7 +275,7 @@ class RegisterLookupMixin:
         if lookup_name is None:
             lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
         if "class_lookups" not in cls.__dict__:
-            cls.class_lookups = {}  # type: ignore[attr-defined]
+            cls.class_lookups = {}  # type: ignore[misc]
         cls.class_lookups[lookup_name] = lookup  # type: ignore[attr-defined]
         cls._clear_cached_class_lookups()
         return lookup
@@ -362,7 +362,7 @@ def select_related_descend(
     if (
         restricted
         and select_mask
-        and field.name in requested  # type: ignore[unsupported-operator]
+        and field.name in requested  # type: ignore[operator]
         and field not in select_mask
     ):
         raise FieldError(

@@ -86,6 +86,6 @@ class Card:
     def get_presets(self) -> list[str] | Enum | None:
         if isinstance(self.presets, list):
             # Avoid mutating the class attribute
-            return self.presets.copy()  # type: ignore[return-value]
+            return self.presets.copy()  # type: ignore
         else:
             return self.presets

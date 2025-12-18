@@ -407,7 +407,7 @@ class Query(BaseExpression):
             obj.used_aliases = set()
         obj.filter_is_sticky = False
         if hasattr(obj, "_setup_query"):
-            obj._setup_query()  # type: ignore[call-non-callable]
+            obj._setup_query()  # type: ignore[operator]
         return obj
 
     def relabeled_clone(self, change_map: dict[str, str]) -> Self:
@@ -1164,7 +1164,7 @@ class Query(BaseExpression):
             if col.alias in self.external_aliases
         ]
 
-    def get_group_by_cols(  # type: ignore[override]
+    def get_group_by_cols(
         self, wrapper: BaseExpression | None = None
     ) -> list[BaseExpression]:
         # If wrapper is referenced by an alias for an explicit GROUP BY through
@@ -1425,7 +1425,7 @@ class Query(BaseExpression):
         if isinstance(filter_expr, ResolvableExpression):
             if not getattr(filter_expr, "conditional", False):
                 raise TypeError("Cannot filter against a non-conditional expression.")
-            condition = filter_expr.resolve_expression(  # type: ignore[call-non-callable]
+            condition = filter_expr.resolve_expression(
                 self, allow_joins=allow_joins, summarize=summarize
             )
             if not isinstance(condition, Lookup):

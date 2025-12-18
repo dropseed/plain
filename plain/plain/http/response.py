@@ -415,7 +415,7 @@ class Response(ResponseBase):
             content = b"".join(self.make_bytes(chunk) for chunk in value)
             if hasattr(value, "close") and callable(getattr(value, "close")):
                 try:
-                    value.close()  # type: ignore
+                    value.close()  # type: ignore[union-attr]
                 except Exception:
                     pass
         else:
@@ -548,7 +548,7 @@ class FileResponse(StreamingResponse):
                 getattr(filelike, "getbuffer")
             ):
                 self.headers["Content-Length"] = str(
-                    filelike.getbuffer().nbytes - filelike.tell()  # type: ignore
+                    filelike.getbuffer().nbytes - filelike.tell()  # type: ignore[union-attr]
                 )
             elif os.path.exists(filename):
                 self.headers["Content-Length"] = str(

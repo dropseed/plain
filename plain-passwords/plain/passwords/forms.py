@@ -105,13 +105,13 @@ class PasswordSetForm(forms.Form):
         assert isinstance(password2, str), "new_password2 must be a string"
 
         # Clean it as if it were being put into the model directly
-        self.user._model_meta.get_field("password").clean(password2, self.user)  # type: ignore[possibly-missing-attribute]
+        self.user._model_meta.get_field("password").clean(password2, self.user)  # type: ignore[union-attr]
 
         return password2
 
     def save(self, commit: bool = True) -> Model:
         # User model has password attribute
-        self.user.password = self.cleaned_data["new_password1"]  # type: ignore[attr-defined]
+        self.user.password = self.cleaned_data["new_password1"]  # type: ignore[assignment]
         if commit:
             self.user.save()
         return self.user

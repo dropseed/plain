@@ -162,7 +162,7 @@ class MultiValueDict(dict[str, list[Any]]):
         Return the list of values for the key. If key doesn't exist, return a
         default value.
         """
-        return self._getlist(key, default, force_list=True)  # type: ignore[return-value]
+        return self._getlist(key, default, force_list=True)  # type: ignore
 
     def setlist(self, key: str, list_: list[Any]) -> None:
         super().__setitem__(key, list_)

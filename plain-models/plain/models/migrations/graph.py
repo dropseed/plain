@@ -32,7 +32,7 @@ class Node:
         if isinstance(other, Node):
             return self.key < other.key
         if isinstance(other, tuple):
-            return self.key < other  # type: ignore[operator]
+            return self.key < other
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -357,7 +357,7 @@ class MigrationGraph:
         plan = self._generate_plan(nodes, at_end)
         project_state = ProjectState(real_packages=real_packages)
         for node in plan:
-            project_state = self.nodes[node].mutate_state(project_state, preserve=False)  # type: ignore[possibly-missing-attribute]
+            project_state = self.nodes[node].mutate_state(project_state, preserve=False)  # type: ignore[attr-defined]
         return project_state
 
     def __contains__(self, node: tuple[str, str]) -> bool:

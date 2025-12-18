@@ -26,7 +26,7 @@ class SupportForm(ModelForm):
         self.user = user  # User provided directly by authed request
         self.form_slug = form_slug
         if self.user:
-            self.fields["email"].initial = user.email  # type: ignore[attr-defined]
+            self.fields["email"].initial = user.email  # type: ignore[union-attr]
 
     def find_user(self) -> Model | None:
         # If the user isn't logged in (typical in an iframe, depending on session cookie settings),
