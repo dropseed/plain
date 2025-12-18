@@ -16,6 +16,7 @@ from plain.utils.datastructures import ImmutableList
 if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.fields import Field
+    from plain.models.fields.related import ManyToManyField
     from plain.models.fields.reverse_related import ForeignObjectRel
 
 EMPTY_RELATION_TREE = ()
@@ -57,7 +58,7 @@ class Meta:
     models_registry: Any
     _get_fields_cache: dict[Any, Any]
     local_fields: list[Field]
-    local_many_to_many: list[Field]
+    local_many_to_many: list[ManyToManyField]
 
     def __init__(self, models_registry: Any | None = None):
         """

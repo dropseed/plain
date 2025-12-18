@@ -90,9 +90,9 @@ def lazy(func: Callable[..., Any], *resultclasses: type) -> Callable[..., Any]:
                     "Cannot call lazy() with both bytes and text return types."
                 )
             if cls._delegate_text:
-                cls.__str__ = cls.__text_cast
+                setattr(cls, "__str__", cls.__text_cast)
             elif cls._delegate_bytes:
-                cls.__bytes__ = cls.__bytes_cast
+                setattr(cls, "__bytes__", cls.__bytes_cast)
 
         @classmethod
         def __promise__(cls, method_name: str) -> Callable[..., Any]:

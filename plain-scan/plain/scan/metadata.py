@@ -89,9 +89,16 @@ class ResponseMetadata:
                 )
                 cookies.append(cookie_metadata)
 
+        # response.url and status_code are always set after a successful request
+        # but types-requests stubs don't guarantee this
+        url = response.url
+        status_code = response.status_code
+        if url is None or status_code is None:
+            raise ValueError("Response missing url or status_code")
+
         return cls(
-            url=response.url,
-            status_code=response.status_code,
+            url=url,
+            status_code=status_code,
             headers=dict(response.headers),
             cookies=cookies,
         )

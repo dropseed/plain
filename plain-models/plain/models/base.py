@@ -1288,7 +1288,11 @@ class Model(metaclass=ModelBase):
                         _cls = None
                 except (FieldDoesNotExist, AttributeError):
                     if fld is None or (
-                        fld.get_transform(part) is None and fld.get_lookup(part) is None
+                        not isinstance(fld, Field)
+                        or (
+                            fld.get_transform(part) is None
+                            and fld.get_lookup(part) is None
+                        )
                     ):
                         errors.append(
                             PreflightResult(

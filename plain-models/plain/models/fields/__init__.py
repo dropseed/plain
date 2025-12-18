@@ -1949,7 +1949,8 @@ class PositiveIntegerRelDbTypeMixin(IntegerField):
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         if not hasattr(cls, "integer_field_class"):
-            cls.integer_field_class = next(
+            # Find the first IntegerField parent in the MRO
+            integer_parent = next(
                 (
                     parent
                     for parent in cls.__mro__[1:]
@@ -1957,6 +1958,8 @@ class PositiveIntegerRelDbTypeMixin(IntegerField):
                 ),
                 None,
             )
+            if integer_parent is not None:
+                cls.integer_field_class = integer_parent
 
     def rel_db_type(self: _HasDbType, connection: BaseDatabaseWrapper) -> str | None:
         """

@@ -97,7 +97,7 @@ class Observer:
         if not headers:
             headers = {}
 
-        return cls(cookies=cookies, headers=headers)
+        return cls(cookies=dict(cookies), headers=dict(headers))
 
     def mode(self) -> str | None:
         """Get the current observer mode from header (DEBUG only) or cookie.

@@ -94,7 +94,11 @@ def get_hashers() -> list[BasePasswordHasher]:
 
 @functools.lru_cache
 def get_hashers_by_algorithm() -> dict[str, BasePasswordHasher]:
-    return {hasher.algorithm: hasher for hasher in get_hashers()}
+    return {
+        hasher.algorithm: hasher
+        for hasher in get_hashers()
+        if hasher.algorithm is not None
+    }
 
 
 def get_hasher(algorithm: str | BasePasswordHasher = "default") -> BasePasswordHasher:
