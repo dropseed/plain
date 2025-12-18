@@ -10,7 +10,7 @@ import uuid
 import warnings
 from base64 import b64decode, b64encode
 from collections.abc import Callable, Sequence
-from functools import cached_property, total_ordering
+from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -139,7 +139,6 @@ def return_None() -> None:
 T = TypeVar("T")
 
 
-@total_ordering
 class Field(RegisterLookupMixin, Generic[T]):
     """Base class for all field types"""
 
@@ -525,31 +524,6 @@ class Field(RegisterLookupMixin, Generic[T]):
         """
         name, path, args, kwargs = self.deconstruct()
         return self.__class__(*args, **kwargs)
-
-    def __eq__(self, other: object) -> bool:
-        # Needed for @total_ordering
-        if isinstance(other, Field):
-            return getattr(self, "model", None) == getattr(
-                other, "model", None
-            ) and getattr(self, "name", None) == getattr(other, "name", None)
-        return NotImplemented
-
-    def __lt__(self, other: object) -> bool:
-        # Order primary key fields first, then alphabetically by name.
-        if not isinstance(other, Field):
-            return NotImplemented
-
-        # Primary key fields come first
-        if self.primary_key != other.primary_key:
-            return self.primary_key  # True < False, so pk comes first
-
-        # Then sort alphabetically by name
-        self_name = getattr(self, "name", "") or ""
-        other_name = getattr(other, "name", "") or ""
-        return self_name < other_name
-
-    def __hash__(self) -> int:
-        return id(self)
 
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         # We don't have to deepcopy very much here, since most things are not
