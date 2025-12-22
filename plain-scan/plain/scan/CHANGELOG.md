@@ -1,5 +1,15 @@
 # plain-scan changelog
 
+## [0.5.1](https://github.com/dropseed/plain/releases/plain-scan@0.5.1) (2025-12-22)
+
+### What's changed
+
+- Internal type safety improvements to response metadata handling ([5c0e403](https://github.com/dropseed/plain/commit/5c0e403))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.5.0](https://github.com/dropseed/plain/releases/plain-scan@0.5.0) (2025-12-04)
 
 ### What's changed
