@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.69.1](https://github.com/dropseed/plain/releases/plain-models@0.69.1) (2025-12-22)
+
+### What's changed
+
+- Internal type annotation improvements for better type checker compatibility ([539a706](https://github.com/dropseed/plain/commit/539a706760), [5c0e403](https://github.com/dropseed/plain/commit/5c0e403863))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.69.0](https://github.com/dropseed/plain/releases/plain-models@0.69.0) (2025-12-12)
 
 ### What's changed
