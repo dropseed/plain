@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.16.1](https://github.com/dropseed/plain/releases/plain-pages@0.16.1) (2025-12-22)
+
+### What's changed
+
+- Updated type ignore comments for improved type checker compatibility ([539a706](https://github.com/dropseed/plain/commit/539a706))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-pages@0.16.0) (2025-11-12)
 
 ### What's changed
