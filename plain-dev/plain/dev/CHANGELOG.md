@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.49.1](https://github.com/dropseed/plain/releases/plain-dev@0.49.1) (2025-12-22)
+
+### What's changed
+
+- Updated type ignore comments for improved compatibility with the ty type checker ([539a706760](https://github.com/dropseed/plain/commit/539a706760))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.49.0](https://github.com/dropseed/plain/releases/plain-dev@0.49.0) (2025-12-04)
 
 ### What's changed
