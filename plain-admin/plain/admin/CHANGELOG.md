@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.57.2](https://github.com/dropseed/plain/releases/plain-admin@0.57.2) (2025-12-22)
+
+### What's changed
+
+- Internal type annotation cleanup for improved type checker compatibility ([539a706](https://github.com/dropseed/plain/commit/539a706760))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.57.1](https://github.com/dropseed/plain/releases/plain-admin@0.57.1) (2025-12-05)
 
 ### What's changed
