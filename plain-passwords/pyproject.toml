@@ -1,6 +1,6 @@
 [project]
 name = "plain.passwords"
-version = "0.19.0"
+version = "0.19.1"
 description = "Password authentication for Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
