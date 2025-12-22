@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.15.1](https://github.com/dropseed/plain/releases/plain-htmx@0.15.1) (2025-12-22)
+
+### What's changed
+
+- Internal code cleanup to remove unnecessary type ignore comments ([539a706](https://github.com/dropseed/plain/commit/539a706))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.0](https://github.com/dropseed/plain/releases/plain-htmx@0.15.0) (2025-12-09)
 
 ### What's changed
