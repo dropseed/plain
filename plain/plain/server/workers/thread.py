@@ -115,9 +115,14 @@ class ThreadWorker(base.Worker):
 
     def handle_quit(self, sig: int, frame: FrameType | None) -> None:
         self.alive = False
-        self.tpool.shutdown(False)
+        self.tpool.shutdown(wait=False, cancel_futures=True)
         time.sleep(0.1)
         sys.exit(0)
+
+    def handle_abort(self, sig: int, frame: FrameType | None) -> None:
+        self.alive = False
+        self.tpool.shutdown(wait=False, cancel_futures=True)
+        sys.exit(1)
 
     def _wrap_future(self, fs: futures.Future[tuple[bool, TConn]], conn: TConn) -> None:
         fs.conn = conn  # type: ignore[attr-defined]
