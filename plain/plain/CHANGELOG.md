@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.95.0](https://github.com/dropseed/plain/releases/plain@0.95.0) (2025-12-22)
+
+### What's changed
+
+- Improved thread worker server shutdown behavior with `cancel_futures=True` for faster and cleaner process termination ([72d0620](https://github.com/dropseed/plain/commit/72d0620094))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.94.0](https://github.com/dropseed/plain/releases/plain@0.94.0) (2025-12-12)
 
 ### What's changed
