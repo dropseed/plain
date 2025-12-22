@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.10.2](https://github.com/dropseed/plain/releases/plain-vendor@0.10.2) (2025-12-22)
+
+### What's changed
+
+- Improved type annotations with more specific type ignore comments for better type checker compatibility ([539a706](https://github.com/dropseed/plain/commit/539a706760))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.1](https://github.com/dropseed/plain/releases/plain-vendor@0.10.1) (2025-12-05)
 
 ### What's changed
