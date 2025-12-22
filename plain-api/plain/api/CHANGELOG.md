@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.21.1](https://github.com/dropseed/plain/releases/plain-api@0.21.1) (2025-12-22)
+
+### What's changed
+
+- Internal type annotation improvements in OpenAPI decorators ([539a706](https://github.com/dropseed/plain/commit/539a706760))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-api@0.21.0) (2025-11-21)
 
 ### What's changed
