@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.41.2](https://github.com/dropseed/plain/releases/plain-jobs@0.41.2) (2025-12-22)
+
+### What's changed
+
+- Internal type annotation cleanup ([539a706760](https://github.com/dropseed/plain/commit/539a706760))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.41.1](https://github.com/dropseed/plain/releases/plain-jobs@0.41.1) (2025-11-17)
 
 ### What's changed
