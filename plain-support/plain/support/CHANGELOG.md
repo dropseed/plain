@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.27.1](https://github.com/dropseed/plain/releases/plain-support@0.27.1) (2025-12-22)
+
+### What's changed
+
+- Internal type annotation cleanup ([539a706](https://github.com/dropseed/plain/commit/539a706))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-support@0.27.0) (2025-11-24)
 
 ### What's changed
