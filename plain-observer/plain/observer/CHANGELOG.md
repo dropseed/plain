@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.23.2](https://github.com/dropseed/plain/releases/plain-observer@0.23.2) (2025-12-22)
+
+### What's changed
+
+- Fixed HTMX URL handling in traces template to use explicit named URLs instead of relative paths for improved reliability when observer is mounted at non-root paths ([6096411](https://github.com/dropseed/plain/commit/6096411765299a9ffa5c4af4b93eb15fedb97c82))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.23.1](https://github.com/dropseed/plain/releases/plain-observer@0.23.1) (2025-12-12)
 
 ### What's changed
