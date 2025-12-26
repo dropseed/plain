@@ -15,4 +15,5 @@ The `plain` CLI is the main entrypoint for the framework. If `plain` is not avai
 
 ## Code style
 
+- Add `from __future__ import annotations` at the top of Python files to avoid quoted forward references in type annotations.
 - Imports should be at the top of the file, unless there is a specific reason to import later (e.g. to avoid circular imports).
