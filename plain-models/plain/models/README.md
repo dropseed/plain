@@ -165,17 +165,44 @@ class Product(models.Model):
     tags = models.ManyToManyField("Tag")
 ```
 
-Common field types include:
+**Text fields:**
 
-- [`CharField`](./fields/__init__.py#CharField)
-- [`TextField`](./fields/__init__.py#TextField)
-- [`IntegerField`](./fields/__init__.py#IntegerField)
-- [`DecimalField`](./fields/__init__.py#DecimalField)
-- [`BooleanField`](./fields/__init__.py#BooleanField)
-- [`DateTimeField`](./fields/__init__.py#DateTimeField)
-- [`EmailField`](./fields/__init__.py#EmailField)
-- [`URLField`](./fields/__init__.py#URLField)
-- [`UUIDField`](./fields/__init__.py#UUIDField)
+- [`CharField`](./fields/__init__.py#CharField) - String with max length
+- [`TextField`](./fields/__init__.py#TextField) - Unlimited text
+- [`EmailField`](./fields/__init__.py#EmailField) - Email address (validated)
+- [`URLField`](./fields/__init__.py#URLField) - URL (validated)
+
+**Numeric fields:**
+
+- [`IntegerField`](./fields/__init__.py#IntegerField) - Integer
+- [`BigIntegerField`](./fields/__init__.py#BigIntegerField) - Big (8 byte) integer
+- [`SmallIntegerField`](./fields/__init__.py#SmallIntegerField) - Small integer
+- [`PositiveIntegerField`](./fields/__init__.py#PositiveIntegerField) - Positive integer
+- [`PositiveBigIntegerField`](./fields/__init__.py#PositiveBigIntegerField) - Positive big integer
+- [`PositiveSmallIntegerField`](./fields/__init__.py#PositiveSmallIntegerField) - Positive small integer
+- [`FloatField`](./fields/__init__.py#FloatField) - Floating point number
+- [`DecimalField`](./fields/__init__.py#DecimalField) - Fixed precision decimal
+
+**Date and time fields:**
+
+- [`DateField`](./fields/__init__.py#DateField) - Date (without time)
+- [`DateTimeField`](./fields/__init__.py#DateTimeField) - Date with time
+- [`TimeField`](./fields/__init__.py#TimeField) - Time (without date)
+- [`DurationField`](./fields/__init__.py#DurationField) - Time duration (timedelta)
+- [`TimeZoneField`](./fields/timezones.py#TimeZoneField) - Timezone (stored as string, accessed as ZoneInfo)
+
+**Other fields:**
+
+- [`BooleanField`](./fields/__init__.py#BooleanField) - True/False
+- [`UUIDField`](./fields/__init__.py#UUIDField) - UUID
+- [`BinaryField`](./fields/__init__.py#BinaryField) - Raw binary data
+- [`JSONField`](./fields/json.py#JSONField) - JSON data
+- [`GenericIPAddressField`](./fields/__init__.py#GenericIPAddressField) - IPv4 or IPv6 address
+
+**Relationship fields:**
+
+- [`ForeignKeyField`](./fields/related.py#ForeignKeyField) - Many-to-one relationship
+- [`ManyToManyField`](./fields/related.py#ManyToManyField) - Many-to-many relationship
 
 ## Reverse relationships
 
