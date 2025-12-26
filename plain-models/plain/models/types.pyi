@@ -18,6 +18,7 @@ from decimal import Decimal
 from json import JSONDecoder, JSONEncoder
 from typing import Any, Generic, Literal, TypeVar, overload
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 # Import manager types from runtime (will be Generic[T, QS] there)
 from plain.models.base import Model
@@ -533,6 +534,32 @@ def DurationField(
     error_messages: dict[str, str] | None = None,
     db_comment: str | None = None,
 ) -> timedelta: ...
+@overload
+def TimeZoneField(
+    *,
+    max_length: int | None = None,
+    required: bool = True,
+    allow_null: Literal[True],
+    default: Any = ...,
+    choices: Any = None,
+    db_column: str | None = None,
+    validators: Sequence[Callable[..., Any]] = (),
+    error_messages: dict[str, str] | None = None,
+    db_comment: str | None = None,
+) -> ZoneInfo | None: ...
+@overload
+def TimeZoneField(
+    *,
+    max_length: int | None = None,
+    required: bool = True,
+    allow_null: Literal[False] = False,
+    default: Any = ...,
+    choices: Any = None,
+    db_column: str | None = None,
+    validators: Sequence[Callable[..., Any]] = (),
+    error_messages: dict[str, str] | None = None,
+    db_comment: str | None = None,
+) -> ZoneInfo: ...
 
 # Other fields
 @overload
@@ -777,6 +804,7 @@ __all__ = [
     "SmallIntegerField",
     "TextField",
     "TimeField",
+    "TimeZoneField",
     "URLField",
     "UUIDField",
 ]

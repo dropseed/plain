@@ -33,6 +33,7 @@ from .fields import (
     UUIDField,
 )
 from .fields.json import JSONField
+from .fields.timezones import TimeZoneField
 from .fields.related import (
     ForeignKeyField,
     ManyToManyField,
@@ -82,6 +83,8 @@ __all__ = [
     "UUIDField",
     # From fields.json
     "JSONField",
+    # From fields.timezones
+    "TimeZoneField",
     # From indexes
     "Index",
     # From deletion

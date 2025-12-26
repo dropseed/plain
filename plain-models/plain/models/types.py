@@ -51,6 +51,7 @@ from plain.models.fields.reverse_descriptors import (
     ReverseForeignKey,
     ReverseManyToMany,
 )
+from plain.models.fields.timezones import TimeZoneField
 
 __all__ = [
     "BigIntegerField",
@@ -79,6 +80,7 @@ __all__ = [
     "SmallIntegerField",
     "TextField",
     "TimeField",
+    "TimeZoneField",
     "URLField",
     "UUIDField",
 ]
