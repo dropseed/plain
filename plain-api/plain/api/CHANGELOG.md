@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-api@0.22.0) (2025-12-26)
+
+### What's changed
+
+- Added built-in admin views for managing API keys when `plain-admin` is installed ([960ce39](https://github.com/dropseed/plain/commit/960ce394b9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.21.1](https://github.com/dropseed/plain/releases/plain-api@0.21.1) (2025-12-22)
 
 ### What's changed
