@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.70.0](https://github.com/dropseed/plain/releases/plain-models@0.70.0) (2025-12-26)
+
+### What's changed
+
+- Added `TimeZoneField` for storing timezone information - stores timezone names as strings in the database but provides `zoneinfo.ZoneInfo` objects when accessed, similar to how `DateField` works with `datetime.date` ([b533189](https://github.com/dropseed/plain/commit/b533189576))
+- Documentation improvements listing all available field types in the README ([11837ad](https://github.com/dropseed/plain/commit/11837ad2f2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.69.1](https://github.com/dropseed/plain/releases/plain-models@0.69.1) (2025-12-22)
 
 ### What's changed
