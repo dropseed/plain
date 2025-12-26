@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.58.0](https://github.com/dropseed/plain/releases/plain-admin@0.58.0) (2025-12-26)
+
+### What's changed
+
+- Admin page titles for model views now properly convert CamelCase model names to readable titles (e.g., "URLParser" becomes "URL parser", "ThisThing" becomes "This thing") ([c153390](https://github.com/dropseed/plain/commit/c153390f26))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.57.2](https://github.com/dropseed/plain/releases/plain-admin@0.57.2) (2025-12-22)
 
 ### What's changed
