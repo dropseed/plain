@@ -6,6 +6,7 @@ from plain import models
 from plain.models import Q
 from plain.models.fields.related_managers import BaseRelatedManager
 
+from ..utils import camelcase_to_title
 from .objects import (
     AdminCreateView,
     AdminDeleteView,
@@ -53,7 +54,7 @@ class AdminModelListView(AdminListView):
         if title := super().get_title():
             return title
 
-        return self.model.model_options.model_name.capitalize() + "s"
+        return camelcase_to_title(self.model.model_options.object_name) + "s"
 
     @classmethod
     def get_nav_title(cls) -> str:
@@ -63,7 +64,7 @@ class AdminModelListView(AdminListView):
         if cls.title:
             return cls.title
 
-        return cls.model.model_options.model_name.capitalize() + "s"
+        return camelcase_to_title(cls.model.model_options.object_name) + "s"
 
     @classmethod
     def get_path(cls) -> str:
@@ -155,7 +156,7 @@ class AdminModelDetailView(AdminDetailView):
         if cls.title:
             return cls.title
 
-        return cls.model.model_options.model_name.capitalize()
+        return camelcase_to_title(cls.model.model_options.object_name)
 
     @classmethod
     def get_path(cls) -> str:
@@ -202,7 +203,7 @@ class AdminModelCreateView(AdminCreateView):
         if title := super().get_title():
             return title
 
-        return f"New {self.model.model_options.model_name}"
+        return f"New {camelcase_to_title(self.model.model_options.object_name).lower()}"
 
     @classmethod
     def get_path(cls) -> str:
