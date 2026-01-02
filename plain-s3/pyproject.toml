@@ -1,0 +1,26 @@
+[project]
+name = "plain.s3"
+version = "0.1.0"
+description = "S3-compatible file storage for Plain models."
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.13"
+dependencies = [
+    "plain<1.0.0",
+    "plain.models<1.0.0",
+    "boto3>=1.35.0",
+]
+
+[dependency-groups]
+dev = [
+    "plain.pytest<1.0.0",
+    "types-boto3[s3]>=1.35.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

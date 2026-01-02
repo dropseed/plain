@@ -34,6 +34,7 @@ dev = [
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
+    "plain-s3",
     # Type checking and better dev experience
     "ty>=0.0.7",
     "psycopg[binary]>=3.2.12",
@@ -70,6 +71,7 @@ dev = [
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }
 "plain-vendor" = { workspace = true }
+"plain-s3" = { workspace = true }
 
 [tool.uv.workspace]
 members = [
