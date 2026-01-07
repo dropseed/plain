@@ -4,7 +4,7 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 from plain.models.expressions import Func
-from plain.models.fields import DecimalField, FloatField, IntegerField
+from plain.models.fields import DecimalField, Field, FloatField, IntegerField
 from plain.models.functions import Cast
 
 if TYPE_CHECKING:
@@ -53,14 +53,13 @@ class FixDurationInputMixin(Func):
 
 
 class NumericOutputFieldMixin(Func):
-    def _resolve_output_field(self) -> DecimalField | FloatField:
+    def _resolve_output_field(self) -> DecimalField | FloatField | Field:
         source_fields = self.get_source_fields()
         if any(isinstance(s, DecimalField) for s in source_fields):
             return DecimalField()
         if any(isinstance(s, IntegerField) for s in source_fields):
             return FloatField()
         if source_fields:
-            result = super()._resolve_output_field()
-            if isinstance(result, DecimalField | FloatField):
+            if result := super()._resolve_output_field():
                 return result
         return FloatField()
