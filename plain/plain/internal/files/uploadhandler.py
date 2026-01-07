@@ -86,7 +86,7 @@ class FileUploadHandler(ABC):
 
     chunk_size = 64 * 2**10  # : The default chunk size is 64 KB.
 
-    def __init__(self, request: Request | None = None) -> None:
+    def __init__(self, request: Request) -> None:
         self.file_name = None
         self.content_type = None
         self.content_length = None
@@ -97,8 +97,6 @@ class FileUploadHandler(ABC):
     def handle_raw_input(
         self,
         input_data: Any,
-        environ: dict[str, Any],
-        content_length: int,
         boundary: bytes,
         encoding: str | None = None,
     ) -> None:
@@ -109,13 +107,13 @@ class FileUploadHandler(ABC):
 
             :input_data:
                 An object that supports reading via .read().
-            :environ:
-                ``request.environ``.
-            :content_length:
-                The (integer) value of the Content-Length header from the
-                client.
-            :boundary: The boundary from the Content-Type header. Be sure to
+            :boundary:
+                The boundary from the Content-Type header. Be sure to
                 prepend two '--'.
+            :encoding:
+                The encoding of the request data.
+
+        Note: Access self.request for content_length, environ, or other request data.
         """
         pass
 
@@ -219,8 +217,6 @@ class MemoryFileUploadHandler(FileUploadHandler):
     def handle_raw_input(
         self,
         input_data: Any,
-        environ: dict[str, Any],
-        content_length: int,
         boundary: bytes,
         encoding: str | None = None,
     ) -> None:
@@ -230,7 +226,9 @@ class MemoryFileUploadHandler(FileUploadHandler):
         """
         # Check the content-length header to see if we should
         # If the post is too large, we cannot use the Memory handler.
-        self.activated = content_length <= settings.FILE_UPLOAD_MAX_MEMORY_SIZE
+        self.activated = (
+            self.request.content_length <= settings.FILE_UPLOAD_MAX_MEMORY_SIZE
+        )
 
     def new_file(self, *args: Any, **kwargs: Any) -> None:
         super().new_file(*args, **kwargs)

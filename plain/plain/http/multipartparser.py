@@ -28,7 +28,7 @@ from plain.utils.http import parse_header_parameters
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
-    from plain.internal.files.uploadhandler import FileUploadHandler
+    from plain.http.request import Request
 
 __all__ = ("MultiPartParser", "MultiPartParserError", "InputStreamExhausted")
 
@@ -61,28 +61,15 @@ class MultiPartParser:
 
     boundary_re = _lazy_re_compile(r"[ -~]{0,200}[!-~]")
 
-    def __init__(
-        self,
-        environ: dict[str, Any],
-        input_data: Any,
-        upload_handlers: list[FileUploadHandler],
-        encoding: str | None = None,
-    ):
+    def __init__(self, request: Request):
         """
         Initialize the MultiPartParser object.
 
-        :environ:
-            The WSGI environ dictionary from the request.
-        :input_data:
-            The raw post data, as a file-like object.
-        :upload_handlers:
-            A list of UploadHandler instances that perform operations on the
-            uploaded data.
-        :encoding:
-            The encoding with which to treat the incoming data.
+        :request:
+            The HTTP request object (used for headers and as the input stream).
         """
         # Content-Type should contain multipart and the boundary information.
-        content_type = environ.get("CONTENT_TYPE", "")
+        content_type = request.content_type or ""
         if not content_type.startswith("multipart/"):
             raise MultiPartParserError(f"Invalid Content-Type: {content_type}")
 
@@ -93,37 +80,30 @@ class MultiPartParser:
                 f"Invalid non-ASCII Content-Type in multipart: {force_str(content_type)}"
             )
 
-        # Parse the header to get the boundary to split the parts.
-        _, opts = parse_header_parameters(content_type)
-        boundary = opts.get("boundary")
+        # Get the boundary from parsed content type parameters.
+        content_params = request.content_params or {}
+        boundary = content_params.get("boundary")
         if not boundary or not self.boundary_re.fullmatch(boundary):
             raise MultiPartParserError(
                 f"Invalid boundary in multipart: {force_str(boundary)}"
             )
 
-        # Content-Length should contain the length of the body we are about
-        # to receive.
-        try:
-            content_length = int(environ.get("CONTENT_LENGTH", 0))
-        except (ValueError, TypeError):
-            content_length = 0
-
+        content_length = request.content_length
         if content_length < 0:
             # This means we shouldn't continue...raise an error.
             raise MultiPartParserError(f"Invalid content length: {content_length!r}")
 
         self._boundary = boundary.encode("ascii")
-        self._input_data = input_data
+        self._request = request
 
         # For compatibility with low-level network APIs (with 32-bit integers),
         # the chunk size should be < 2^31, but still divisible by 4.
-        possible_sizes = [x.chunk_size for x in upload_handlers if x.chunk_size]
+        possible_sizes = [x.chunk_size for x in request.upload_handlers if x.chunk_size]
         self._chunk_size = min([2**31 - 4] + possible_sizes)
 
-        self._environ = environ
-        self._encoding = encoding or settings.DEFAULT_CHARSET
+        self._encoding = request.encoding or settings.DEFAULT_CHARSET
         self._content_length = content_length
-        self._upload_handlers = upload_handlers
+        self._upload_handlers = request.upload_handlers
 
     def parse(self) -> tuple[Any, MultiValueDict]:
         # Call the actual parse routine and close all open files in case of
@@ -162,9 +142,7 @@ class MultiPartParser:
         # This allows overriding everything if need be.
         for handler in handlers:
             result = handler.handle_raw_input(
-                self._input_data,
-                self._environ,
-                self._content_length,
+                self._request,
                 self._boundary,
                 encoding,
             )
@@ -177,7 +155,7 @@ class MultiPartParser:
         self._files = MultiValueDict()
 
         # Instantiate the parser and stream:
-        stream = LazyStream(ChunkIter(self._input_data, self._chunk_size))
+        stream = LazyStream(ChunkIter(self._request, self._chunk_size))
 
         # Whether or not to signal a file-completion at the beginning of the loop.
         old_field_name = None
@@ -366,13 +344,13 @@ class MultiPartParser:
         except StopUpload as e:
             self._close_files()
             if not e.connection_reset:
-                exhaust(self._input_data)
+                exhaust(self._request)
         else:
             if not uploaded_file:
                 for handler in handlers:
                     handler.upload_interrupted()
             # Make sure that the request data is all fed
-            exhaust(self._input_data)
+            exhaust(self._request)
 
         # Signal that the upload has completed.
         # any() shortcircuits if a handler's upload_complete() returns a value.

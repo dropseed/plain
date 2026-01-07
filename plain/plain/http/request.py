@@ -8,7 +8,7 @@ from collections.abc import Iterator
 from functools import cached_property
 from io import BytesIO
 from itertools import chain
-from typing import IO, TYPE_CHECKING, Any, TypeVar, overload
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 if TYPE_CHECKING:
@@ -202,6 +202,14 @@ class Request:
         """Return the raw query string from the request URL."""
         return self.environ.get("QUERY_STRING", "")
 
+    @property
+    def content_length(self) -> int:
+        """Return the Content-Length header value, or 0 if not provided."""
+        try:
+            return int(self.environ.get("CONTENT_LENGTH") or 0)
+        except (ValueError, TypeError):
+            return 0
+
     def get_full_path(self, force_append_slash: bool = False) -> str:
         """
         Return the full path for the request, including query string.
@@ -314,8 +322,7 @@ class Request:
             # Limit the maximum request data size that will be handled in-memory.
             if (
                 settings.DATA_UPLOAD_MAX_MEMORY_SIZE is not None
-                and int(self.environ.get("CONTENT_LENGTH") or 0)
-                > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
+                and self.content_length > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
             ):
                 raise RequestDataTooBig(
                     "Request body exceeded settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
@@ -330,15 +337,6 @@ class Request:
             self._stream = BytesIO(self._body)
         return self._body
 
-    def _parse_file_upload(
-        self, environ: dict[str, Any], post_data: IO[bytes]
-    ) -> tuple[Any, MultiValueDict]:
-        """Return a tuple of (data QueryDict, files MultiValueDict)."""
-        parser = MultiPartParser(
-            environ, post_data, self.upload_handlers, self.encoding
-        )
-        return parser.parse()
-
     @cached_property
     def _multipart_data(self) -> tuple[QueryDict, MultiValueDict]:
         """Parse multipart/form-data. Used internally by form_data and files properties.
@@ -346,12 +344,7 @@ class Request:
         Raises MultiPartParserError or TooManyFilesSent for malformed uploads,
         which are handled by response_for_exception() as 400 errors.
         """
-        if hasattr(self, "_body"):
-            # Use already read data
-            data = BytesIO(self._body)
-        else:
-            data = self
-        return self._parse_file_upload(self.environ, data)
+        return MultiPartParser(self).parse()
 
     @cached_property
     def json_data(self) -> dict[str, Any]:
