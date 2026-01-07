@@ -82,9 +82,9 @@ class WSGIRequest(Request):
         self.path = "{}/{}".format(
             script_name.rstrip("/"), path_info.replace("/", "", 1)
         )
-        self.meta = environ
-        self.meta["PATH_INFO"] = path_info
-        self.meta["SCRIPT_NAME"] = script_name
+        self.environ = environ
+        self.environ["PATH_INFO"] = path_info
+        self.environ["SCRIPT_NAME"] = script_name
         self.method = environ["REQUEST_METHOD"].upper()
 
         # Set content_type, content_params, and encoding
@@ -109,8 +109,8 @@ class WSGIRequest(Request):
     def __getstate__(self) -> dict[str, Any]:
         state = super().__getstate__()
         for attr in frozenset(["wsgi.errors", "wsgi.input"]):
-            if attr in state["meta"]:
-                del state["meta"][attr]
+            if attr in state["environ"]:
+                del state["environ"][attr]
         return state
 
     def _get_scheme(self) -> str:

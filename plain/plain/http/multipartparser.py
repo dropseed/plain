@@ -63,7 +63,7 @@ class MultiPartParser:
 
     def __init__(
         self,
-        meta: dict[str, Any],
+        environ: dict[str, Any],
         input_data: Any,
         upload_handlers: list[FileUploadHandler],
         encoding: str | None = None,
@@ -71,8 +71,8 @@ class MultiPartParser:
         """
         Initialize the MultiPartParser object.
 
-        :meta:
-            The standard ``meta`` dictionary in Plain request objects.
+        :environ:
+            The WSGI environ dictionary from the request.
         :input_data:
             The raw post data, as a file-like object.
         :upload_handlers:
@@ -82,7 +82,7 @@ class MultiPartParser:
             The encoding with which to treat the incoming data.
         """
         # Content-Type should contain multipart and the boundary information.
-        content_type = meta.get("CONTENT_TYPE", "")
+        content_type = environ.get("CONTENT_TYPE", "")
         if not content_type.startswith("multipart/"):
             raise MultiPartParserError(f"Invalid Content-Type: {content_type}")
 
@@ -104,7 +104,7 @@ class MultiPartParser:
         # Content-Length should contain the length of the body we are about
         # to receive.
         try:
-            content_length = int(meta.get("CONTENT_LENGTH", 0))
+            content_length = int(environ.get("CONTENT_LENGTH", 0))
         except (ValueError, TypeError):
             content_length = 0
 
@@ -120,7 +120,7 @@ class MultiPartParser:
         possible_sizes = [x.chunk_size for x in upload_handlers if x.chunk_size]
         self._chunk_size = min([2**31 - 4] + possible_sizes)
 
-        self._meta = meta
+        self._environ = environ
         self._encoding = encoding or settings.DEFAULT_CHARSET
         self._content_length = content_length
         self._upload_handlers = upload_handlers
@@ -163,7 +163,7 @@ class MultiPartParser:
         for handler in handlers:
             result = handler.handle_raw_input(
                 self._input_data,
-                self._meta,
+                self._environ,
                 self._content_length,
                 self._boundary,
                 encoding,

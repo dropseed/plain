@@ -97,7 +97,7 @@ class FileUploadHandler(ABC):
     def handle_raw_input(
         self,
         input_data: Any,
-        meta: dict[str, Any],
+        environ: dict[str, Any],
         content_length: int,
         boundary: bytes,
         encoding: str | None = None,
@@ -109,8 +109,8 @@ class FileUploadHandler(ABC):
 
             :input_data:
                 An object that supports reading via .read().
-            :meta:
-                ``request.meta``.
+            :environ:
+                ``request.environ``.
             :content_length:
                 The (integer) value of the Content-Length header from the
                 client.
@@ -219,7 +219,7 @@ class MemoryFileUploadHandler(FileUploadHandler):
     def handle_raw_input(
         self,
         input_data: Any,
-        meta: dict[str, Any],
+        environ: dict[str, Any],
         content_length: int,
         boundary: bytes,
         encoding: str | None = None,

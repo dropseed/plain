@@ -65,7 +65,7 @@ class Request:
     content_params: dict[str, str] | None
     query_params: QueryDict
     cookies: dict[str, str]
-    meta: dict[str, Any]
+    environ: dict[str, Any]
     path: str
     path_info: str
     unique_id: str
@@ -103,7 +103,7 @@ class Request:
 
     @cached_property
     def headers(self) -> RequestHeaders:
-        return RequestHeaders(self.meta)
+        return RequestHeaders(self.environ)
 
     @cached_property
     def csp_nonce(self) -> str:
@@ -157,13 +157,15 @@ class Request:
         property can safely return the host without any validation.
         """
         # We try three options, in order of decreasing preference.
-        if settings.HTTP_X_FORWARDED_HOST and ("HTTP_X_FORWARDED_HOST" in self.meta):
-            host = self.meta["HTTP_X_FORWARDED_HOST"]
-        elif "HTTP_HOST" in self.meta:
-            host = self.meta["HTTP_HOST"]
+        if settings.HTTP_X_FORWARDED_HOST and (
+            xff_host := self.headers.get("X-Forwarded-Host")
+        ):
+            host = xff_host
+        elif http_host := self.headers.get("Host"):
+            host = http_host
         else:
             # Reconstruct the host using the algorithm from PEP 333.
-            host = self.meta["SERVER_NAME"]
+            host = self.environ["SERVER_NAME"]
             server_port = self.port
             if server_port != ("443" if self.is_https() else "80"):
                 host = f"{host}:{server_port}"
@@ -172,10 +174,12 @@ class Request:
     @cached_property
     def port(self) -> str:
         """Return the port number for the request as a string."""
-        if settings.HTTP_X_FORWARDED_PORT and "HTTP_X_FORWARDED_PORT" in self.meta:
-            port = self.meta["HTTP_X_FORWARDED_PORT"]
+        if settings.HTTP_X_FORWARDED_PORT and (
+            xff_port := self.headers.get("X-Forwarded-Port")
+        ):
+            port = xff_port
         else:
-            port = self.meta["SERVER_PORT"]
+            port = self.environ["SERVER_PORT"]
         return str(port)
 
     @cached_property
@@ -191,7 +195,12 @@ class Request:
         if settings.HTTP_X_FORWARDED_FOR:
             if xff := self.headers.get("X-Forwarded-For"):
                 return xff.split(",")[0].strip()
-        return self.meta["REMOTE_ADDR"]
+        return self.environ["REMOTE_ADDR"]
+
+    @property
+    def query_string(self) -> str:
+        """Return the raw query string from the request URL."""
+        return self.environ.get("QUERY_STRING", "")
 
     def get_full_path(self, force_append_slash: bool = False) -> str:
         """
@@ -219,11 +228,10 @@ class Request:
             # the entire path, not a path segment.
             return quote(path, safe="/:@&+$,-_.!~*'()")
 
-        query_string = self.meta.get("QUERY_STRING", "")
         return "{}{}{}".format(
             escape_uri_path(self.path),
             "/" if force_append_slash and not self.path.endswith("/") else "",
-            ("?" + (iri_to_uri(query_string) or "")) if query_string else "",
+            ("?" + (iri_to_uri(self.query_string) or "")) if self.query_string else "",
         )
 
     def build_absolute_uri(self, location: str | None = None) -> str:
@@ -306,7 +314,7 @@ class Request:
             # Limit the maximum request data size that will be handled in-memory.
             if (
                 settings.DATA_UPLOAD_MAX_MEMORY_SIZE is not None
-                and int(self.meta.get("CONTENT_LENGTH") or 0)
+                and int(self.environ.get("CONTENT_LENGTH") or 0)
                 > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
             ):
                 raise RequestDataTooBig(
@@ -323,10 +331,12 @@ class Request:
         return self._body
 
     def _parse_file_upload(
-        self, meta: dict[str, Any], post_data: IO[bytes]
+        self, environ: dict[str, Any], post_data: IO[bytes]
     ) -> tuple[Any, MultiValueDict]:
         """Return a tuple of (data QueryDict, files MultiValueDict)."""
-        parser = MultiPartParser(meta, post_data, self.upload_handlers, self.encoding)
+        parser = MultiPartParser(
+            environ, post_data, self.upload_handlers, self.encoding
+        )
         return parser.parse()
 
     @cached_property
@@ -341,7 +351,7 @@ class Request:
             data = BytesIO(self._body)
         else:
             data = self
-        return self._parse_file_upload(self.meta, data)
+        return self._parse_file_upload(self.environ, data)
 
     @cached_property
     def json_data(self) -> dict[str, Any]:

@@ -89,8 +89,8 @@ class BaseHandler:
             pass
 
         # Add query string if present
-        if query_string := request.meta.get("QUERY_STRING"):
-            span_attributes[url_attributes.URL_QUERY] = query_string
+        if request.query_string:
+            span_attributes[url_attributes.URL_QUERY] = request.query_string
 
         span_context = baggage.set_baggage("http.request.cookies", request.cookies)
         span_context = baggage.set_baggage(

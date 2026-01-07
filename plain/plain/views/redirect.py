@@ -42,9 +42,8 @@ class RedirectView(View):
         else:
             raise ValueError("RedirectView requires either url or url_name to be set")
 
-        args = self.request.meta.get("QUERY_STRING", "")
-        if args and self.preserve_query_params:
-            url = f"{url}?{args}"
+        if self.preserve_query_params and self.request.query_string:
+            url = f"{url}?{self.request.query_string}"
         return url
 
     def get(self) -> ResponseRedirect:
