@@ -59,9 +59,9 @@ HTTPS_PROXY_HEADER: str = ""
 # Whether to use the X-Forwarded-Host, X-Forwarded-Port, and X-Forwarded-For
 # headers when determining the host, port, and client IP for the request.
 # Only enable these when behind a trusted proxy that overwrites these headers.
-USE_X_FORWARDED_HOST = False
-USE_X_FORWARDED_PORT = False
-USE_X_FORWARDED_FOR = False
+HTTP_X_FORWARDED_HOST: bool = False
+HTTP_X_FORWARDED_PORT: bool = False
+HTTP_X_FORWARDED_FOR: bool = False
 
 # A secret key for this particular Plain installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Plain will complain

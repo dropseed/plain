@@ -157,7 +157,7 @@ class Request:
         property can safely return the host without any validation.
         """
         # We try three options, in order of decreasing preference.
-        if settings.USE_X_FORWARDED_HOST and ("HTTP_X_FORWARDED_HOST" in self.meta):
+        if settings.HTTP_X_FORWARDED_HOST and ("HTTP_X_FORWARDED_HOST" in self.meta):
             host = self.meta["HTTP_X_FORWARDED_HOST"]
         elif "HTTP_HOST" in self.meta:
             host = self.meta["HTTP_HOST"]
@@ -172,7 +172,7 @@ class Request:
     @cached_property
     def port(self) -> str:
         """Return the port number for the request as a string."""
-        if settings.USE_X_FORWARDED_PORT and "HTTP_X_FORWARDED_PORT" in self.meta:
+        if settings.HTTP_X_FORWARDED_PORT and "HTTP_X_FORWARDED_PORT" in self.meta:
             port = self.meta["HTTP_X_FORWARDED_PORT"]
         else:
             port = self.meta["SERVER_PORT"]
@@ -182,13 +182,13 @@ class Request:
     def client_ip(self) -> str:
         """Return the client's IP address.
 
-        If USE_X_FORWARDED_FOR is True, checks the X-Forwarded-For header first
+        If HTTP_X_FORWARDED_FOR is True, checks the X-Forwarded-For header first
         (using the first/leftmost IP). Otherwise returns REMOTE_ADDR directly.
 
-        Only enable USE_X_FORWARDED_FOR when behind a trusted proxy that
+        Only enable HTTP_X_FORWARDED_FOR when behind a trusted proxy that
         overwrites the X-Forwarded-For header.
         """
-        if settings.USE_X_FORWARDED_FOR:
+        if settings.HTTP_X_FORWARDED_FOR:
             if xff := self.headers.get("X-Forwarded-For"):
                 return xff.split(",")[0].strip()
         return self.meta["REMOTE_ADDR"]
