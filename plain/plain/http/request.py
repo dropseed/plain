@@ -24,8 +24,6 @@ from plain.http.cookie import unsign_cookie_value
 from plain.http.multipartparser import (
     MultiPartParser,
 )
-from plain.internal.files import uploadhandler
-from plain.internal.files.uploadhandler import FileUploadHandler
 from plain.runtime import settings
 from plain.utils.datastructures import (
     CaseInsensitiveMapping,
@@ -69,17 +67,11 @@ class Request:
     path: str
     path_info: str
     unique_id: str
-    upload_handlers: list[FileUploadHandler]
 
     def __init__(self):
         # A unique ID we can use to trace this request
         self.unique_id = str(uuid.uuid4())
         self.resolver_match = None
-        # Initialize upload handlers from settings
-        self.upload_handlers = [
-            uploadhandler.load_handler(handler, self)
-            for handler in settings.FILE_UPLOAD_HANDLERS
-        ]
 
     def __repr__(self) -> str:
         if self.method is None or not self.get_full_path():

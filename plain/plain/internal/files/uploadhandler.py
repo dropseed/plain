@@ -15,7 +15,6 @@ from plain.internal.files.uploadedfile import (
     UploadedFile,
 )
 from plain.runtime import settings
-from plain.utils.module_loading import import_string
 
 if TYPE_CHECKING:
     from typing import Any
@@ -29,7 +28,6 @@ __all__ = [
     "FileUploadHandler",
     "TemporaryFileUploadHandler",
     "MemoryFileUploadHandler",
-    "load_handler",
     "StopFutureHandlers",
 ]
 
@@ -261,19 +259,3 @@ class MemoryFileUploadHandler(FileUploadHandler):
             charset=self.charset,
             content_type_extra=self.content_type_extra,
         )
-
-
-def load_handler(path: str, *args: Any, **kwargs: Any) -> FileUploadHandler:
-    """
-    Given a path to a handler, return an instance of that handler.
-
-    E.g.::
-        >>> from plain.http import Request
-        >>> request = Request()
-        >>> load_handler(
-        ...     'plain.internal.files.uploadhandler.TemporaryFileUploadHandler',
-        ...     request,
-        ... )
-        <TemporaryFileUploadHandler object at 0x...>
-    """
-    return import_string(path)(*args, **kwargs)

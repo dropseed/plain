@@ -25,10 +25,12 @@ from plain.runtime import settings
 from plain.utils.datastructures import MultiValueDict
 from plain.utils.encoding import force_str
 from plain.utils.http import parse_header_parameters
+from plain.utils.module_loading import import_string
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.http.request import Request
+    from plain.internal.files.uploadhandler import FileUploadHandler
 
 __all__ = ("MultiPartParser", "MultiPartParserError", "InputStreamExhausted")
 
@@ -96,14 +98,18 @@ class MultiPartParser:
         self._boundary = boundary.encode("ascii")
         self._request = request
 
+        # Create upload handlers for this parsing session
+        self._upload_handlers: list[FileUploadHandler] = [
+            import_string(handler)(request) for handler in settings.FILE_UPLOAD_HANDLERS
+        ]
+
         # For compatibility with low-level network APIs (with 32-bit integers),
         # the chunk size should be < 2^31, but still divisible by 4.
-        possible_sizes = [x.chunk_size for x in request.upload_handlers if x.chunk_size]
+        possible_sizes = [x.chunk_size for x in self._upload_handlers if x.chunk_size]
         self._chunk_size = min([2**31 - 4] + possible_sizes)
 
         self._encoding = request.encoding or settings.DEFAULT_CHARSET
         self._content_length = content_length
-        self._upload_handlers = request.upload_handlers
 
     def parse(self) -> tuple[Any, MultiValueDict]:
         # Call the actual parse routine and close all open files in case of
