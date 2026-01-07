@@ -303,10 +303,10 @@ and there won't be an expectation that it "works perfectly for every use case un
 If you're doing local development through a proxy/tunnel like [ngrok](https://ngrok.com/),
 then the callback URL might be automatically built as `http` instead of `https`.
 
-This is the Django setting you're probably looking for:
+This is the setting you're probably looking for:
 
 ```python
-HTTPS_PROXY_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+HTTPS_PROXY_HEADER = "X-Forwarded-Proto: https"
 ```
 
 ## Installation

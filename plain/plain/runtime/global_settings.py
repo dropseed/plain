@@ -49,11 +49,12 @@ HTTPS_REDIRECT_ENABLED = True
 # If your Plain app is behind a proxy that sets a header to specify secure
 # connections, AND that proxy ensures that user-submitted headers with the
 # same name are ignored (so that people can't spoof it), set this value to
-# a tuple of (header_name, header_value). For any requests that come in with
-# that header/value, request.is_https() will return True.
+# a string in the format "Header-Name: value". For any requests that come in
+# with that header/value, request.is_https() will return True.
 # WARNING! Only set this if you fully understand what you're doing. Otherwise,
 # you may be opening yourself up to a security risk.
-HTTPS_PROXY_HEADER = None
+# Example: HTTPS_PROXY_HEADER = "X-Forwarded-Proto: https"
+HTTPS_PROXY_HEADER: str = ""
 
 # Whether to use the X-Forwarded-Host, X-Forwarded-Port, and X-Forwarded-For
 # headers when determining the host, port, and client IP for the request.

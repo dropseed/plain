@@ -278,14 +278,15 @@ class Request:
     @property
     def scheme(self) -> str:
         if settings.HTTPS_PROXY_HEADER:
-            try:
-                header, secure_value = settings.HTTPS_PROXY_HEADER
-            except ValueError:
+            if ":" not in settings.HTTPS_PROXY_HEADER:
                 raise ImproperlyConfigured(
-                    "The HTTPS_PROXY_HEADER setting must be a tuple containing "
-                    "two values."
+                    "The HTTPS_PROXY_HEADER setting must be a string in the format "
+                    "'Header-Name: value' (e.g., 'X-Forwarded-Proto: https')."
                 )
-            header_value = self.meta.get(header)
+            header, secure_value = settings.HTTPS_PROXY_HEADER.split(":", 1)
+            header = header.strip()
+            secure_value = secure_value.strip()
+            header_value = self.headers.get(header)
             if header_value is not None:
                 header_value, *_ = header_value.split(",", 1)
                 return "https" if header_value.strip() == secure_value else "http"
