@@ -157,14 +157,23 @@ class DevProcess(ProcessManager):
                 env=self.plain_env,
                 check=True,
             )
-            print_event("Running migrations...")
-            subprocess.run(
-                [sys.executable, "-m", "plain", "migrate", "--backup"],
+            print_event("Checking migrations...", newline=False)
+            check_result = subprocess.run(
+                [sys.executable, "-m", "plain", "migrate", "--check"],
                 env=self.plain_env,
-                check=True,
+                capture_output=True,
             )
+            if check_result.returncode != 0:
+                click.echo("applying")
+                subprocess.run(
+                    [sys.executable, "-m", "plain", "migrate", "--backup"],
+                    env=self.plain_env,
+                    check=True,
+                )
+                click.echo()
+            else:
+                click.secho("✔ Up to date", fg="green")
 
-        click.echo()
         print_event("Starting app...")
 
         # Manually start the status bar now so it isn't bungled by

@@ -451,15 +451,15 @@ def apply(
 
     # Print some useful info
     if not quiet:
-        if target_package_labels_only:
-            packages = ", ".join(sorted({a for a, n in targets})) or "(none)"
-            click.secho("Packages: ", bold=True, nl=False)
-            click.secho(packages, dim=True)
-            click.echo()  # Add newline after packages
-        else:
+        if not target_package_labels_only:
             click.secho("Target: ", bold=True, nl=False)
             click.secho(f"{targets[0][1]} from {targets[0][0]}", dim=True)
             click.echo()  # Add newline after target
+        elif package_label:
+            # Only show package name when explicitly targeting a single package
+            click.secho("Package: ", bold=True, nl=False)
+            click.secho(package_label, dim=True)
+            click.echo()  # Add newline after package
 
     pre_migrate_state = executor._create_project_state(with_applied_migrations=True)
 
