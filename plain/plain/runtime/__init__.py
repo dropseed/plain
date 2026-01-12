@@ -7,6 +7,7 @@ from typing import Self
 from plain.logs.configure import configure_logging
 from plain.packages import packages_registry
 
+from .secret import Secret
 from .user_settings import Settings
 
 try:
@@ -90,6 +91,7 @@ class SettingsReference(str):
 __all__ = [
     "setup",
     "settings",
+    "Secret",
     "SettingsReference",
     "APP_PATH",
     "__version__",

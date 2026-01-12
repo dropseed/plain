@@ -5,6 +5,7 @@ from .results import PreflightResult
 # Import these to force registration of checks
 import plain.preflight.files  # NOQA isort:skip
 import plain.preflight.security  # NOQA isort:skip
+import plain.preflight.settings  # NOQA isort:skip
 import plain.preflight.urls  # NOQA isort:skip
 
 

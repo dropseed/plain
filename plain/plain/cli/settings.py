@@ -3,58 +3,62 @@ import click
 import plain.runtime
 
 
-@click.command()
+@click.group()
+def settings() -> None:
+    """View and inspect settings"""
+    pass
+
+
+@settings.command()
 @click.argument("setting_name")
-def setting(setting_name: str) -> None:
-    """Print the value of a setting at runtime"""
+def get(setting_name: str) -> None:
+    """Get the value of a specific setting"""
     try:
-        setting = getattr(plain.runtime.settings, setting_name)
-        click.echo(setting)
+        value = getattr(plain.runtime.settings, setting_name)
+        click.echo(value)
     except AttributeError:
         click.secho(f'Setting "{setting_name}" not found', fg="red")
 
 
-# @plain_cli.command()
-# @click.option("--filter", "-f", "name_filter", help="Filter settings by name")
-# @click.option("--overridden", is_flag=True, help="Only show overridden settings")
-# def settings(name_filter, overridden):
-#     """Print Plain settings"""
-#     table = Table(box=box.MINIMAL)
-#     table.add_column("Setting")
-#     table.add_column("Default value")
-#     table.add_column("App value")
-#     table.add_column("Type")
-#     table.add_column("Module")
+@settings.command(name="list")
+def list_settings() -> None:
+    """List all settings with their sources"""
+    if not (items := plain.runtime.settings.get_settings()):
+        click.echo("No settings configured.")
+        return
 
-#     for setting in dir(settings):
-#         if setting.isupper():
-#             if name_filter and name_filter.upper() not in setting:
-#                 continue
+    # Calculate column widths
+    max_name = max(len(name) for name, _ in items)
+    max_source = max(len(defn.env_var_name or defn.source) for _, defn in items)
 
-#             is_overridden = settings.is_overridden(setting)
+    # Print header
+    header = (
+        click.style(f"{'Setting':<{max_name}}", bold=True)
+        + "  "
+        + click.style(f"{'Source':<{max_source}}", bold=True)
+        + "  "
+        + click.style("Value", bold=True)
+    )
+    click.echo(header)
+    click.secho("-" * (max_name + max_source + 10), dim=True)
 
-#             if overridden and not is_overridden:
-#                 continue
+    # Print each setting
+    for name, defn in items:
+        source_info = defn.env_var_name or defn.source
+        value = defn.display_value()
 
-#             default_setting = settings._default_settings.get(setting)
-#             if default_setting:
-#                 default_value = default_setting.value
-#                 annotation = default_setting.annotation
-#                 module = default_setting.module
-#             else:
-#                 default_value = ""
-#                 annotation = ""
-#                 module = ""
+        # Style based on source
+        if defn.source == "env":
+            source_styled = click.style(f"{source_info:<{max_source}}", fg="green")
+        elif defn.source == "explicit":
+            source_styled = click.style(f"{source_info:<{max_source}}", fg="cyan")
+        else:
+            source_styled = click.style(f"{source_info:<{max_source}}", dim=True)
 
-#             table.add_row(
-#                 setting,
-#                 Pretty(default_value) if default_value else "",
-#                 Pretty(getattr(settings, setting))
-#                 if is_overridden
-#                 else Text("<Default>", style="italic dim"),
-#                 Pretty(annotation) if annotation else "",
-#                 str(module.__name__) if module else "",
-#             )
+        # Style secret values
+        if defn.is_secret:
+            value_styled = click.style(value, dim=True)
+        else:
+            value_styled = value
 
-#     console = Console()
-#     console.print(table)
+        click.echo(f"{name:<{max_name}}  {source_styled}  {value_styled}")

@@ -11,9 +11,10 @@ from pathlib import Path
 
 from plain.exceptions import ImproperlyConfigured
 from plain.packages import PackageConfig
+from plain.runtime.secret import Secret
 
 ENVIRONMENT_VARIABLE = "PLAIN_SETTINGS_MODULE"
-ENV_SETTINGS_PREFIX = "PLAIN_"
+DEFAULT_ENV_SETTINGS_PREFIXES = ["PLAIN_"]
 CUSTOM_SETTINGS_PREFIX = "APP_"
 
 
@@ -30,8 +31,9 @@ class Settings:
 
     def __init__(self, settings_module: str | None = None):
         self._settings_module = settings_module
-        self._settings = {}
-        self._errors = []  # Collect configuration errors
+        self._settings: dict[str, SettingDefinition] = {}
+        self._errors: list[str] = []  # Collect configuration errors
+        self._env_prefixes: list[str] = []  # Configured env prefixes
         self.configured = False
 
     def _setup(self) -> None:
@@ -62,6 +64,11 @@ class Settings:
         # Keep a reference to the settings.py module path
         assert mod.__file__ is not None
         self.path = Path(mod.__file__).resolve()
+
+        # Get env prefixes from settings module (must be configured in settings.py, not env)
+        self._env_prefixes = getattr(
+            mod, "ENV_SETTINGS_PREFIXES", DEFAULT_ENV_SETTINGS_PREFIXES
+        )
 
         # Load default settings from installed packages
         self._load_default_settings(mod)
@@ -115,12 +122,19 @@ class Settings:
             self._load_module_settings(app_settings)
 
     def _load_env_settings(self) -> None:
-        env_settings = {
-            k[len(ENV_SETTINGS_PREFIX) :]: v
-            for k, v in os.environ.items()
-            if k.startswith(ENV_SETTINGS_PREFIX) and k.isupper()
-        }
-        for setting, value in env_settings.items():
+        # Collect env settings from all configured prefixes
+        # First prefix wins if same setting appears with multiple prefixes
+        env_settings: dict[
+            str, tuple[str, str]
+        ] = {}  # setting_name -> (value, env_var)
+        for prefix in self._env_prefixes:
+            for key, value in os.environ.items():
+                if key.startswith(prefix) and key.isupper():
+                    setting_name = key[len(prefix) :]
+                    if setting_name and setting_name not in env_settings:
+                        env_settings[setting_name] = (value, key)
+
+        for setting, (value, env_var) in env_settings.items():
             if setting in self._settings:
                 setting_def = self._settings[setting]
                 try:
@@ -128,6 +142,7 @@ class Settings:
                         value, setting_def.annotation, setting
                     )
                     setting_def.set_value(parsed_value, "env")
+                    setting_def.env_var_name = env_var
                 except ImproperlyConfigured as e:
                     self._errors.append(str(e))
 
@@ -215,6 +230,27 @@ class Settings:
             return "<Settings [Unevaluated]>"
         return f'<Settings "{self._settings_module}">'
 
+    def get_settings(
+        self, *, source: str | None = None
+    ) -> list[tuple[str, SettingDefinition]]:
+        """
+        Get settings as a sorted list of (name, definition) tuples.
+
+        Args:
+            source: Filter to settings from a specific source ('default', 'env', 'explicit', 'runtime')
+        """
+        self._setup()
+        result = []
+        for name, defn in sorted(self._settings.items()):
+            if source is not None and defn.source != source:
+                continue
+            result.append((name, defn))
+        return result
+
+    def get_env_settings(self) -> list[tuple[str, SettingDefinition]]:
+        """Get settings that were loaded from environment variables."""
+        return self.get_settings(source="env")
+
 
 def _parse_env_value(
     value: str, annotation: type | None, setting_name: str
@@ -223,6 +259,11 @@ def _parse_env_value(
         raise ImproperlyConfigured(
             f"{setting_name}: Type hint required to set from environment."
         )
+
+    # Unwrap Secret[T] to get the inner type
+    if typing.get_origin(annotation) is Secret:
+        if args := typing.get_args(annotation):
+            annotation = args[0]
 
     if annotation is bool:
         # Special case for bools
@@ -258,6 +299,19 @@ class SettingDefinition:
         self.value = default_value
         self.source = "default"  # 'default', 'env', 'explicit', or 'runtime'
         self.is_set = False  # Indicates if the value was set explicitly
+        self.env_var_name: str | None = None  # Env var name if loaded from env
+        self.is_secret = self._check_if_secret(annotation)
+
+    @staticmethod
+    def _check_if_secret(annotation: type | None) -> bool:
+        """Check if annotation is Secret[T]."""
+        return annotation is not None and typing.get_origin(annotation) is Secret
+
+    def display_value(self) -> str:
+        """Return value for display, masked if secret."""
+        if self.is_secret:
+            return "********"
+        return repr(self.value)
 
     def set_value(self, value: typing.Any, source: str) -> None:
         self.check_type(value)
@@ -280,18 +334,24 @@ class SettingDefinition:
         if isinstance(type_hint, type):
             return isinstance(value, type_hint)
 
+        origin = typing.get_origin(type_hint)
+
+        # Secret[T] - check the inner type (Secret is just a marker)
+        if origin is Secret:
+            args = typing.get_args(type_hint)
+            if args:
+                return SettingDefinition._is_instance_of_type(value, args[0])
+            return True
+
         # Union types
-        if (
-            typing.get_origin(type_hint) is typing.Union
-            or typing.get_origin(type_hint) is types.UnionType
-        ):
+        if origin is typing.Union or origin is types.UnionType:
             return any(
                 SettingDefinition._is_instance_of_type(value, arg)
                 for arg in typing.get_args(type_hint)
             )
 
         # List types
-        if typing.get_origin(type_hint) is list:
+        if origin is list:
             return isinstance(value, list) and all(
                 SettingDefinition._is_instance_of_type(
                     item, typing.get_args(type_hint)[0]
@@ -300,7 +360,7 @@ class SettingDefinition:
             )
 
         # Tuple types
-        if typing.get_origin(type_hint) is tuple:
+        if origin is tuple:
             return isinstance(value, tuple) and all(
                 SettingDefinition._is_instance_of_type(
                     item, typing.get_args(type_hint)[i]

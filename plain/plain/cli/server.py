@@ -111,6 +111,16 @@ def server(
     pidfile: str | None,
 ) -> None:
     """Production-ready WSGI server"""
+    from plain.runtime import settings
+
+    # Show settings loaded from environment
+    if env_settings := settings.get_env_settings():
+        click.secho("Settings from env:", dim=True)
+        for name, defn in env_settings:
+            click.secho(
+                f"  {defn.env_var_name} -> {name}={defn.display_value()}", dim=True
+            )
+
     from plain.server import ServerApplication
     from plain.server.config import Config
 

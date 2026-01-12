@@ -3,6 +3,7 @@ Default Plain settings. Override these with settings in the module pointed to
 by the PLAIN_SETTINGS_MODULE environment variable.
 """
 
+from .secret import Secret
 from .utils import get_app_info_from_pyproject
 
 # MARK: Core Settings
@@ -17,6 +18,12 @@ VERSION: str = version
 INSTALLED_PACKAGES: list[str] = []
 
 URLS_ROUTER: str
+
+# List of environment variable prefixes to check for settings.
+# Settings can be configured via environment variables using these prefixes.
+# Example: ENV_SETTINGS_PREFIXES = ["PLAIN_", "MYAPP_"]
+# Then both PLAIN_DEBUG and MYAPP_DEBUG would set the DEBUG setting.
+ENV_SETTINGS_PREFIXES: list[str] = ["PLAIN_"]
 
 # MARK: HTTP and Security
 
@@ -66,11 +73,11 @@ HTTP_X_FORWARDED_FOR: bool = False
 # A secret key for this particular Plain installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Plain will complain
 # loudly.
-SECRET_KEY: str
+SECRET_KEY: Secret[str]
 
 # List of secret keys used to verify the validity of signatures. This allows
 # secret key rotation.
-SECRET_KEY_FALLBACKS: list[str] = []
+SECRET_KEY_FALLBACKS: Secret[list[str]] = []  # type: ignore[assignment]
 
 # MARK: Internationalization
 
