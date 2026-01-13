@@ -120,7 +120,9 @@ def fields_for_model(
     ignored = []
     meta = model._model_meta
 
-    for f in sorted(chain(meta.concrete_fields, meta.many_to_many)):
+    for f in sorted(
+        chain(meta.concrete_fields, meta.many_to_many), key=lambda f: f.name
+    ):
         if fields is not None and f.name not in fields:
             continue
 

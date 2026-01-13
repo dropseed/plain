@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import bisect
 import copy
 import inspect
 from collections import defaultdict
@@ -131,6 +130,10 @@ class Meta:
                         field = attr_value
                     field.contribute_to_class(model, attr_name)
 
+        # Sort fields: primary key first, then alphabetically by name
+        instance.local_fields.sort(key=lambda f: (not f.primary_key, f.name))
+        instance.local_many_to_many.sort(key=lambda f: f.name)
+
         # Set index names now that fields are contributed
         # Trigger model_options descriptor to ensure it's initialized
         # (accessing it will cache the instance)
@@ -157,14 +160,10 @@ class Meta:
     def add_field(self, field: Field) -> None:
         from plain.models.fields.related import ManyToManyField, RelatedField
 
-        # Insert the given field in the order in which it was created, using
-        # the "creation_counter" attribute of the field.
-        # Move many-to-many related fields from self.fields into
-        # self.many_to_many.
         if isinstance(field, ManyToManyField):
-            bisect.insort(self.local_many_to_many, field)
+            self.local_many_to_many.append(field)
         else:
-            bisect.insort(self.local_fields, field)
+            self.local_fields.append(field)
 
         # If the field being added is a relation to another known field,
         # expire the cache on this field and the forward cache on the field
