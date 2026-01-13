@@ -407,7 +407,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.96.0"
+version = "0.97.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -463,7 +463,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-api"
-version = "0.23.0"
+version = "0.24.0"
 source = { editable = "plain-api" }
 dependencies = [
     { name = "plain" },
@@ -482,7 +482,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-auth"
-version = "0.23.0"
+version = "0.24.0"
 source = { editable = "plain-auth" }
 dependencies = [
     { name = "plain" },
@@ -792,7 +792,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-passwords"
-version = "0.20.0"
+version = "0.21.0"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
