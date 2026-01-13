@@ -1,5 +1,18 @@
 # plain-api changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-api@0.23.0) (2026-01-13)
+
+### What's changed
+
+- HTTP exceptions have been renamed to include the status code in the name (e.g., `Http404` → `NotFoundError404`, `PermissionDenied` → `ForbiddenError403`) ([5a1f020](https://github.com/dropseed/plain/commit/5a1f020f52))
+- Response classes have been renamed to use a `Response` suffix (e.g., `ResponseRedirect` → `RedirectResponse`, `ResponseBadRequest` removed) ([fad5bf2](https://github.com/dropseed/plain/commit/fad5bf28b0))
+
+### Upgrade instructions
+
+- Replace `Http404` with `NotFoundError404` from `plain.exceptions`
+- Replace `PermissionDenied` with `ForbiddenError403` from `plain.exceptions`
+- Replace `ResponseBadRequest(...)` with `Response(..., status_code=400)` from `plain.http`
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-api@0.22.0) (2025-12-26)
 
 ### What's changed
