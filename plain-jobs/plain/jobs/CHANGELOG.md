@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.42.0](https://github.com/dropseed/plain/releases/plain-jobs@0.42.0) (2026-01-13)
+
+### What's changed
+
+- Updated to use `RedirectResponse` instead of `ResponseRedirect` to align with the core response class naming convention ([fad5bf28b0](https://github.com/dropseed/plain/commit/fad5bf28b0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.41.2](https://github.com/dropseed/plain/releases/plain-jobs@0.41.2) (2025-12-22)
 
 ### What's changed
