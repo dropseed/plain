@@ -84,11 +84,25 @@ def _get_skill_destinations() -> list[Path]:
 
 def _install_skills_to(
     dest_skills_dir: Path, skills_by_package: dict[str, list[Path]]
-) -> int:
-    """Install skills to a destination directory. Returns count of installed skills."""
+) -> tuple[int, int]:
+    """Install skills to a destination directory. Returns (installed_count, removed_count)."""
     dest_skills_dir.mkdir(parents=True, exist_ok=True)
 
+    # Collect all source skill names
+    source_skill_names: set[str] = set()
+    for skill_dirs in skills_by_package.values():
+        for skill_dir in skill_dirs:
+            source_skill_names.add(skill_dir.name)
+
     installed_count = 0
+    removed_count = 0
+
+    # Remove orphaned skills (exist in dest but not in source)
+    if dest_skills_dir.exists():
+        for dest_dir in dest_skills_dir.iterdir():
+            if dest_dir.is_dir() and dest_dir.name not in source_skill_names:
+                shutil.rmtree(dest_dir)
+                removed_count += 1
 
     for pkg_name in sorted(skills_by_package.keys()):
         for skill_dir in skills_by_package[pkg_name]:
@@ -110,7 +124,7 @@ def _install_skills_to(
             shutil.copytree(skill_dir, dest_dir)
             installed_count += 1
 
-    return installed_count
+    return installed_count, removed_count
 
 
 @click.command()
@@ -148,6 +162,11 @@ def skills(install: bool) -> None:
 
     # Install to each destination
     for dest in destinations:
-        installed_count = _install_skills_to(dest, skills_by_package)
-        if installed_count > 0:
-            click.echo(f"Installed {installed_count} skill(s) to {dest}/")
+        installed_count, removed_count = _install_skills_to(dest, skills_by_package)
+        if installed_count > 0 or removed_count > 0:
+            parts = []
+            if installed_count > 0:
+                parts.append(f"installed {installed_count}")
+            if removed_count > 0:
+                parts.append(f"removed {removed_count}")
+            click.echo(f"Skills: {', '.join(parts)} in {dest}/")

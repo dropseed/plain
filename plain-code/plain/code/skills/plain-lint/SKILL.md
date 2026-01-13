@@ -1,9 +1,9 @@
 ---
-name: plain-check
-description: Runs code quality checks including ruff, type checking, and biome. Use for linting, formatting, or preflight validation.
+name: plain-lint
+description: Runs linting and formatting checks using ruff, ty, and biome. Use for quick code quality feedback during development.
 ---
 
-# Code Quality
+# Linting and Formatting
 
 ## Check for Issues
 
@@ -25,11 +25,3 @@ Options:
 
 - `--unsafe-fixes` - Apply ruff unsafe fixes
 - `--add-noqa` - Add noqa comments to suppress errors
-
-## Preflight Checks
-
-```
-uv run plain preflight
-```
-
-Validates Plain configuration.
