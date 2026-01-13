@@ -511,6 +511,8 @@ class Field(RegisterLookupMixin, Generic[T]):
             path = path.replace("plain.models.fields.json", "plain.models")
         elif path.startswith("plain.models.fields.proxy"):
             path = path.replace("plain.models.fields.proxy", "plain.models")
+        elif path.startswith("plain.models.fields.timezones"):
+            path = path.replace("plain.models.fields.timezones", "plain.models")
         elif path.startswith("plain.models.fields"):
             path = path.replace("plain.models.fields", "plain.models")
         # Return basic info - other fields should override this.
