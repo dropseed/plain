@@ -1,5 +1,16 @@
 # plain-code changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-code@0.17.0) (2026-01-13)
+
+### What's changed
+
+- Updated the minimum ty type checker version to 0.0.11 for improved Self type inference and unused-ignore-comment detection ([9d83576](https://github.com/dropseed/plain/commit/9d83576))
+- Added a `plain-check` skill for AI agents with instructions for running code quality checks ([b592c32](https://github.com/dropseed/plain/commit/b592c32))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-code@0.16.0) (2025-12-26)
 
 ### What's changed
