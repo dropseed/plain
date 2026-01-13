@@ -1,5 +1,23 @@
 # plain changelog
 
+## [0.97.0](https://github.com/dropseed/plain/releases/plain@0.97.0) (2026-01-13)
+
+### What's changed
+
+- HTTP exceptions (`NotFoundError404`, `ForbiddenError403`, `BadRequestError400`, and `SuspiciousOperationError400` variants) moved from `plain.exceptions` to `plain.http.exceptions` and are now exported from `plain.http` ([b61f909e29](https://github.com/dropseed/plain/commit/b61f909e29))
+
+### Upgrade instructions
+
+- Update imports of HTTP exceptions from `plain.exceptions` to `plain.http`:
+
+    ```python
+    # Before
+    from plain.exceptions import NotFoundError404, ForbiddenError403, BadRequestError400
+
+    # After
+    from plain.http import NotFoundError404, ForbiddenError403, BadRequestError400
+    ```
+
 ## [0.96.0](https://github.com/dropseed/plain/releases/plain@0.96.0) (2026-01-13)
 
 ### What's changed
