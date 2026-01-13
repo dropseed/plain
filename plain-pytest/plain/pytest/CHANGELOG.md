@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-pytest@0.14.0) (2026-01-13)
+
+### What's changed
+
+- Added a `plain-test` skill to help AI coding assistants run and understand tests ([b592c32c](https://github.com/dropseed/plain/commit/b592c32c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.2](https://github.com/dropseed/plain/releases/plain-pytest@0.13.2) (2025-11-17)
 
 ### What's changed
