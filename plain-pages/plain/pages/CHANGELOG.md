@@ -1,5 +1,16 @@
 # plain-pages changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-pages@0.17.0) (2026-01-13)
+
+### What's changed
+
+- Updated to use renamed HTTP exception `NotFoundError404` (previously `Http404`) ([5a1f020](https://github.com/dropseed/plain/commit/5a1f020f52))
+- Updated to use renamed response class `RedirectResponse` (previously `ResponseRedirect`) ([fad5bf2](https://github.com/dropseed/plain/commit/fad5bf28b0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.1](https://github.com/dropseed/plain/releases/plain-pages@0.16.1) (2025-12-22)
 
 ### What's changed
