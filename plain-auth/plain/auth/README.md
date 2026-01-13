@@ -139,7 +139,7 @@ Use the [`AuthViewMixin`](./views.py#AuthViewMixin) to restrict views to logged-
 
 ```python
 from plain.auth.views import AuthViewMixin
-from plain.exceptions import PermissionDenied
+from plain.exceptions import ForbiddenError403
 from plain.views import View
 
 
@@ -156,7 +156,7 @@ class CustomPermissionView(AuthViewMixin, View):
     def check_auth(self):
         super().check_auth()
         if not self.user.is_special:
-            raise PermissionDenied("You're not special!")
+            raise ForbiddenError403("You're not special!")
 ```
 
 The [`AuthViewMixin`](./views.py#AuthViewMixin) provides:

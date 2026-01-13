@@ -311,7 +311,7 @@ class CurrentUserAPIView(BaseAPIView):
 
         user = get_request_user(self.request)
         if not user:
-            raise Http404
+            raise NotFoundError404
 
         return schemas.UserSchema.from_user(user, self.request)
 ```
@@ -348,7 +348,7 @@ class TeamAccountAPIView(BaseAPIView):
                     uuid=self.url_kwargs["uuid"],
                 )
         except TeamAccount.DoesNotExist:
-            raise Http404
+            raise NotFoundError404
 
 
 class TeamAccountForm(ModelForm):

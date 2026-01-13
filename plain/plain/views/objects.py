@@ -10,7 +10,7 @@ except ImportError:
     ObjectDoesNotExist = None  # type: ignore[misc, assignment]
 
 from plain.forms import BaseForm, Form
-from plain.http import Http404
+from plain.http import NotFoundError404
 
 from .forms import FormView
 from .templates import TemplateView
@@ -59,13 +59,13 @@ class DetailView(TemplateView, ABC):
         except Exception as e:
             # If ObjectDoesNotExist is available and this is that exception, raise 404
             if ObjectDoesNotExist and isinstance(e, ObjectDoesNotExist):
-                raise Http404
+                raise NotFoundError404
             # Otherwise, let other exceptions bubble up
             raise
 
         # Also raise 404 if get_object() returns None
         if not obj:
-            raise Http404
+            raise NotFoundError404
 
         return obj
 

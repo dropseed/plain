@@ -4,9 +4,8 @@ from functools import cached_property
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
-from plain.exceptions import PermissionDenied
+from plain.exceptions import ForbiddenError403, NotFoundError404
 from plain.http import (
-    Http404,
     QueryDict,
     ResponseBase,
     ResponseRedirect,
@@ -52,9 +51,9 @@ class AuthView(SessionView):
 
     def check_auth(self) -> None:
         """
-        Raises either LoginRequired or PermissionDenied.
+        Raises either LoginRequired or ForbiddenError403.
         - LoginRequired can specify a login_url and redirect_field_name
-        - PermissionDenied can specify a message
+        - ForbiddenError403 can specify a message
         """
         if not self.login_required and not self.admin_required:
             return None
@@ -70,14 +69,14 @@ class AuthView(SessionView):
                     # Impersonators should be able to view admin pages while impersonating.
                     # There's probably never a case where an impersonator isn't admin, but it can be configured.
                     if not impersonator.is_admin:
-                        raise PermissionDenied(
+                        raise ForbiddenError403(
                             "You do not have permission to access this page."
                         )
                     return
 
             if not self.user.is_admin:
                 # Show a 404 so we don't expose admin urls to non-admin users
-                raise Http404()
+                raise NotFoundError404()
 
     def get_response(self) -> ResponseBase:
         try:
@@ -103,7 +102,7 @@ class AuthView(SessionView):
                     e.redirect_field_name,
                 )
             else:
-                raise PermissionDenied("Login required")
+                raise ForbiddenError403("Login required")
 
         response = super().get_response()
 

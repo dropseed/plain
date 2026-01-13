@@ -676,10 +676,6 @@ class ResponseServerError(Response):
     status_code = 500
 
 
-class Http404(Exception):
-    pass
-
-
 class JsonResponse(Response):
     """
     An HTTP response class that consumes data to be serialized to JSON.

@@ -5,7 +5,7 @@ from typing import Any
 
 from plain.assets.views import AssetView
 from plain.http import (
-    Http404,
+    NotFoundError404,
     Response,
     ResponseRedirect,
 )
@@ -25,7 +25,7 @@ class PageViewMixin:
         try:
             return pages_registry.get_page_from_name(url_name)
         except PageNotFoundError:
-            raise Http404()
+            raise NotFoundError404()
 
 
 class PageView(PageViewMixin, TemplateView):

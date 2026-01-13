@@ -8,7 +8,7 @@ from io import BytesIO
 
 from plain.http import (
     FileResponse,
-    Http404,
+    NotFoundError404,
     Response,
     ResponseNotModified,
     ResponseRedirect,
@@ -42,7 +42,7 @@ class AssetView(View):
         url_path = self.get_url_path()
 
         if not url_path:
-            raise Http404("Asset path not found")
+            raise NotFoundError404("Asset path not found")
 
         # Make a trailing slash work, but we don't expect it
         url_path = url_path.rstrip("/")
@@ -88,7 +88,7 @@ class AssetView(View):
 
         # Make sure we don't try to escape the compiled assests path
         if not os.path.commonpath([compiled_path, asset_path]) == compiled_path:
-            raise Http404("Asset not found")
+            raise NotFoundError404("Asset not found")
 
         return asset_path
 
@@ -101,13 +101,13 @@ class AssetView(View):
 
     def check_asset_path(self, path: str | None) -> None:
         if not path:
-            raise Http404("Asset not found")
+            raise NotFoundError404("Asset not found")
 
         if not os.path.exists(path):
-            raise Http404("Asset not found")
+            raise NotFoundError404("Asset not found")
 
         if os.path.isdir(path):
-            raise Http404("Asset is a directory")
+            raise NotFoundError404("Asset is a directory")
 
     @functools.cache
     def get_last_modified(self, path: str) -> str | None:

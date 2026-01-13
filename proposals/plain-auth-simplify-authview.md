@@ -40,11 +40,11 @@ def check_auth(self) -> None:
     # Check if impersonation is active
     if impersonator := get_request_impersonator(self.request):
         if not impersonator.is_admin:
-            raise PermissionDenied("You do not have permission to access this page.")
+            raise ForbiddenError403("You do not have permission to access this page.")
         return
 
     if not self.user.is_admin:
-        raise Http404()
+        raise NotFoundError404()
 ```
 
 ### 4. plain-observer/plain/observer/views.py
@@ -57,7 +57,7 @@ def check_auth(self) -> None:
         return
     super().check_auth()
     if not self.user.is_admin:
-        raise Http404()
+        raise NotFoundError404()
 ```
 
 ### 5. plain-toolbar/plain/toolbar/toolbar.py

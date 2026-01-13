@@ -9,7 +9,7 @@ from plain.auth import get_user_model
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView
-from plain.exceptions import BadRequest
+from plain.exceptions import BadRequestError400
 from plain.forms import BaseForm
 from plain.http import (
     ResponseRedirect,
@@ -118,13 +118,13 @@ class PasswordResetView(AuthView, FormView):
         session_token = self.session.get(self._reset_token_session_key, "")
         if not session_token:
             # No token in the session, so we can't check the password reset token.
-            raise BadRequest("No password reset token found.")
+            raise BadRequestError400("No password reset token found.")
 
         user = self.check_password_reset_token(session_token)
         if not user:
             # Remove it from the session if it is invalid.
             del self.session[self._reset_token_session_key]
-            raise BadRequest("Password reset token is no longer valid.")
+            raise BadRequestError400("Password reset token is no longer valid.")
 
         return user
 

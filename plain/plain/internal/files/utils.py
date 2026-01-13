@@ -4,7 +4,7 @@ import os
 import pathlib
 from typing import TYPE_CHECKING
 
-from plain.exceptions import SuspiciousFileOperation
+from plain.exceptions import SuspiciousFileOperationError400
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -14,7 +14,9 @@ if TYPE_CHECKING:
 def validate_file_name(name: str, allow_relative_path: bool = False) -> str:
     # Remove potentially dangerous names
     if os.path.basename(name) in {"", ".", ".."}:
-        raise SuspiciousFileOperation(f"Could not derive file name from '{name}'")
+        raise SuspiciousFileOperationError400(
+            f"Could not derive file name from '{name}'"
+        )
 
     if allow_relative_path:
         # Use PurePosixPath() because this branch is checked only in
@@ -22,11 +24,13 @@ def validate_file_name(name: str, allow_relative_path: bool = False) -> str:
         # Unix style (with forward slashes).
         path = pathlib.PurePosixPath(name)
         if path.is_absolute() or ".." in path.parts:
-            raise SuspiciousFileOperation(
+            raise SuspiciousFileOperationError400(
                 f"Detected path traversal attempt in '{name}'"
             )
     elif name != os.path.basename(name):
-        raise SuspiciousFileOperation(f"File name '{name}' includes path elements")
+        raise SuspiciousFileOperationError400(
+            f"File name '{name}' includes path elements"
+        )
 
     return name
 

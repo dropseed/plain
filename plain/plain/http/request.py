@@ -15,10 +15,10 @@ if TYPE_CHECKING:
     from plain.urls import ResolverMatch
 
 from plain.exceptions import (
-    BadRequest,
+    BadRequestError400,
     ImproperlyConfigured,
-    RequestDataTooBig,
-    TooManyFieldsSent,
+    RequestDataTooBigError400,
+    TooManyFieldsSentError400,
 )
 from plain.http.cookie import unsign_cookie_value
 from plain.http.multipartparser import (
@@ -316,7 +316,7 @@ class Request:
                 settings.DATA_UPLOAD_MAX_MEMORY_SIZE is not None
                 and self.content_length > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
             ):
-                raise RequestDataTooBig(
+                raise RequestDataTooBigError400(
                     "Request body exceeded settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
                 )
 
@@ -333,7 +333,7 @@ class Request:
     def _multipart_data(self) -> tuple[QueryDict, MultiValueDict]:
         """Parse multipart/form-data. Used internally by form_data and files properties.
 
-        Raises MultiPartParserError or TooManyFilesSent for malformed uploads,
+        Raises MultiPartParserError or TooManyFilesSentError400 for malformed uploads,
         which are handled by response_for_exception() as 400 errors.
         """
         return MultiPartParser(self).parse()
@@ -344,7 +344,7 @@ class Request:
         Parsed JSON object from request body.
 
         Returns dict for JSON objects.
-        Raises BadRequest (400) if JSON is invalid or not an object.
+        Raises BadRequestError400 if JSON is invalid or not an object.
         Raises ValueError if request content-type is not JSON.
 
         Use this when you expect JSON object data and want type-safe dict access.
@@ -358,10 +358,12 @@ class Request:
         try:
             parsed = json.loads(self.body)
         except json.JSONDecodeError as e:
-            raise BadRequest(f"Invalid JSON in request body: {e}") from e
+            raise BadRequestError400(f"Invalid JSON in request body: {e}") from e
 
         if not isinstance(parsed, dict):
-            raise BadRequest(f"Expected JSON object, got {type(parsed).__name__}")
+            raise BadRequestError400(
+                f"Expected JSON object, got {type(parsed).__name__}"
+            )
         return parsed
 
     @cached_property
@@ -548,7 +550,7 @@ class QueryDict(MultiValueDict):
             # parse_qsl() is True. As that is not used by Plain, assume that
             # the exception was raised by exceeding the value of max_num_fields
             # instead of fragile checks of exception message strings.
-            raise TooManyFieldsSent(
+            raise TooManyFieldsSentError400(
                 "The number of GET/POST parameters exceeded "
                 "settings.DATA_UPLOAD_MAX_NUMBER_FIELDS."
             ) from e

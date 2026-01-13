@@ -1,7 +1,7 @@
-from plain.http import Http404
+from plain.http import NotFoundError404
 
 
-class Resolver404(Http404):
+class Resolver404(NotFoundError404):
     pass
 
 

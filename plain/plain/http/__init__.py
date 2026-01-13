@@ -1,3 +1,5 @@
+from plain.exceptions import NotFoundError404
+
 from .cookie import parse_cookie
 from .middleware import HttpMiddleware
 from .request import (
@@ -10,7 +12,6 @@ from .request import (
 from .response import (
     BadHeaderError,
     FileResponse,
-    Http404,
     JsonResponse,
     Response,
     ResponseBadRequest,
@@ -44,7 +45,7 @@ __all__ = [
     "ResponseNotAllowed",
     "ResponseGone",
     "ResponseServerError",
-    "Http404",
+    "NotFoundError404",
     "BadHeaderError",
     "JsonResponse",
     "FileResponse",

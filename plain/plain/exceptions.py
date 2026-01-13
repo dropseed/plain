@@ -25,26 +25,47 @@ class ImproperlyConfigured(Exception):
     pass
 
 
-# MARK: Security and Suspicious Operations
+# MARK: HTTP Exceptions
+#
+# These exceptions are converted to HTTP responses by the exception handler.
+# The suffix indicates the HTTP status code that will be returned.
 
 
-class SuspiciousOperation(Exception):
-    """The user did something suspicious"""
+class NotFoundError404(Exception):
+    """The requested resource was not found (HTTP 404)"""
+
+    pass
 
 
-class SuspiciousMultipartForm(SuspiciousOperation):
+class ForbiddenError403(Exception):
+    """The user did not have permission to do that (HTTP 403)"""
+
+    pass
+
+
+class BadRequestError400(Exception):
+    """The request is malformed and cannot be processed (HTTP 400)"""
+
+    pass
+
+
+class SuspiciousOperationError400(Exception):
+    """The user did something suspicious (HTTP 400)"""
+
+
+class SuspiciousMultipartFormError400(SuspiciousOperationError400):
     """Suspect MIME request in multipart form data"""
 
     pass
 
 
-class SuspiciousFileOperation(SuspiciousOperation):
+class SuspiciousFileOperationError400(SuspiciousOperationError400):
     """A Suspicious filesystem operation was attempted"""
 
     pass
 
 
-class TooManyFieldsSent(SuspiciousOperation):
+class TooManyFieldsSentError400(SuspiciousOperationError400):
     """
     The number of fields in a GET or POST request exceeded
     settings.DATA_UPLOAD_MAX_NUMBER_FIELDS.
@@ -53,7 +74,7 @@ class TooManyFieldsSent(SuspiciousOperation):
     pass
 
 
-class TooManyFilesSent(SuspiciousOperation):
+class TooManyFilesSentError400(SuspiciousOperationError400):
     """
     The number of fields in a GET or POST request exceeded
     settings.DATA_UPLOAD_MAX_NUMBER_FILES.
@@ -62,26 +83,11 @@ class TooManyFilesSent(SuspiciousOperation):
     pass
 
 
-class RequestDataTooBig(SuspiciousOperation):
+class RequestDataTooBigError400(SuspiciousOperationError400):
     """
     The size of the request (excluding any file uploads) exceeded
     settings.DATA_UPLOAD_MAX_MEMORY_SIZE.
     """
-
-    pass
-
-
-# MARK: HTTP and Request Errors
-
-
-class BadRequest(Exception):
-    """The request is malformed and cannot be processed."""
-
-    pass
-
-
-class PermissionDenied(Exception):
-    """The user did not have permission to do that"""
 
     pass
 

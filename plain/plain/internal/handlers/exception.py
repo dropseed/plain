@@ -5,12 +5,13 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 from plain.exceptions import (
-    BadRequest,
-    PermissionDenied,
-    SuspiciousOperation,
+    BadRequestError400,
+    ForbiddenError403,
+    NotFoundError404,
+    SuspiciousOperationError400,
 )
 from plain.forms.exceptions import FormFieldMissingError
-from plain.http import Http404, ResponseServerError
+from plain.http import ResponseServerError
 from plain.http.multipartparser import MultiPartParserError
 from plain.runtime import settings
 from plain.views.errors import ErrorView
@@ -30,8 +31,8 @@ def convert_exception_to_response(
     """
     Wrap the given get_response callable in exception-to-response conversion.
 
-    All exceptions will be converted. All known 4xx exceptions (Http404,
-    PermissionDenied, MultiPartParserError, SuspiciousOperation) will be
+    All exceptions will be converted. All known 4xx exceptions (NotFoundError404,
+    ForbiddenError403, MultiPartParserError, SuspiciousOperationError400) will be
     converted to the appropriate response, and all other exceptions will be
     converted to 500 responses.
 
@@ -52,12 +53,12 @@ def convert_exception_to_response(
 
 
 def response_for_exception(request: Request, exc: Exception) -> Response:
-    if isinstance(exc, Http404):
+    if isinstance(exc, NotFoundError404):
         response = get_exception_response(
             request=request, status_code=404, exception=None
         )
 
-    elif isinstance(exc, PermissionDenied):
+    elif isinstance(exc, ForbiddenError403):
         response = get_exception_response(
             request=request, status_code=403, exception=exc
         )
@@ -79,7 +80,7 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
             exc_info=exc,
         )
 
-    elif isinstance(exc, BadRequest):
+    elif isinstance(exc, BadRequestError400):
         response = get_exception_response(
             request=request, status_code=400, exception=exc
         )
@@ -90,9 +91,9 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
             extra={"status_code": response.status_code, "request": request},
             exc_info=exc,
         )
-    elif isinstance(exc, SuspiciousOperation):
+    elif isinstance(exc, SuspiciousOperationError400):
         # The request logger receives events for any problematic request
-        # The security logger receives events for all SuspiciousOperations
+        # The security logger receives events for all SuspiciousOperationError400s
         security_logger = logging.getLogger(f"plain.security.{exc.__class__.__name__}")
         security_logger.error(
             str(exc),

@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from plain.exceptions import SuspiciousOperation
+from plain.exceptions import SuspiciousOperationError400
 from plain.http import HttpMiddleware
 from plain.runtime import settings
 
@@ -34,7 +34,7 @@ class CsrfViewMiddleware(HttpMiddleware):
         allowed, reason = self.should_allow_request(request)
 
         if not allowed:
-            raise SuspiciousOperation(reason)
+            raise SuspiciousOperationError400(reason)
 
         return self.get_response(request)
 

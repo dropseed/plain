@@ -3,9 +3,9 @@ import logging
 from functools import cached_property
 from typing import Any
 
-from plain.exceptions import PermissionDenied, ValidationError
+from plain.exceptions import ForbiddenError403, NotFoundError404, ValidationError
 from plain.forms.exceptions import FormFieldMissingError
-from plain.http import Http404, JsonResponse, ResponseBase
+from plain.http import JsonResponse, ResponseBase
 from plain.utils import timezone
 from plain.utils.cache import patch_cache_control
 from plain.views.base import View
@@ -143,7 +143,7 @@ class APIView(View):
                 ),
                 status_code=400,
             )
-        except PermissionDenied:
+        except ForbiddenError403:
             return JsonResponse(
                 ErrorSchema(
                     id="permission_denied",
@@ -152,7 +152,7 @@ class APIView(View):
                 ),
                 status_code=403,
             )
-        except Http404:
+        except NotFoundError404:
             return JsonResponse(
                 ErrorSchema(
                     id="not_found",

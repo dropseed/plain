@@ -15,10 +15,10 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import (
-    RequestDataTooBig,
-    SuspiciousMultipartForm,
-    TooManyFieldsSent,
-    TooManyFilesSent,
+    RequestDataTooBigError400,
+    SuspiciousMultipartFormError400,
+    TooManyFieldsSentError400,
+    TooManyFilesSentError400,
 )
 from plain.internal.files.uploadhandler import SkipFile, StopFutureHandlers, StopUpload
 from plain.runtime import settings
@@ -197,7 +197,7 @@ class MultiPartParser:
                     # 2 accounts for empty raw fields before and after the
                     # last boundary.
                     if settings.DATA_UPLOAD_MAX_NUMBER_FIELDS + 2 < num_post_keys:
-                        raise TooManyFieldsSent(
+                        raise TooManyFieldsSentError400(
                             "The number of GET/POST parameters exceeded "
                             "settings.DATA_UPLOAD_MAX_NUMBER_FIELDS."
                         )
@@ -239,7 +239,7 @@ class MultiPartParser:
                         settings.DATA_UPLOAD_MAX_MEMORY_SIZE is not None
                         and num_bytes_read > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
                     ):
-                        raise RequestDataTooBig(
+                        raise RequestDataTooBigError400(
                             "Request body exceeded "
                             "settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
                         )
@@ -254,7 +254,7 @@ class MultiPartParser:
                         settings.DATA_UPLOAD_MAX_NUMBER_FILES is not None
                         and num_files > settings.DATA_UPLOAD_MAX_NUMBER_FILES
                     ):
-                        raise TooManyFilesSent(
+                        raise TooManyFilesSentError400(
                             "The number of files exceeded "
                             "settings.DATA_UPLOAD_MAX_NUMBER_FILES."
                         )
@@ -523,7 +523,7 @@ class LazyStream:
         )
 
         if number_equal > 40:
-            raise SuspiciousMultipartForm(
+            raise SuspiciousMultipartFormError400(
                 "The multipart parser got stuck, which shouldn't happen with"
                 " normal uploaded files. Check for malicious upload activity;"
                 " if there is none, report this to the Plain developers."
