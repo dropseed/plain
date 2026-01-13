@@ -32,7 +32,7 @@ class Node:
         if isinstance(other, Node):
             return self.key < other.key
         if isinstance(other, tuple):
-            return self.key < other
+            return self.key < cast(tuple[str, str], other)
         return NotImplemented
 
     def __hash__(self) -> int:

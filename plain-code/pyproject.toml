@@ -9,7 +9,7 @@ requires-python = ">=3.13"
 dependencies = [
     "plain<1.0.0",
     "ruff>=0.1.0",
-    "ty>=0.0.7",
+    "ty>=0.0.11",
     "requests>=2.0.0",
     "tomlkit>=0.11.0",
 ]

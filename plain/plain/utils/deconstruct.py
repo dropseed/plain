@@ -21,7 +21,7 @@ def deconstructible(
         def __new__(cls: type[T], *args: Any, **kwargs: Any) -> T:
             # We capture the arguments to make returning them trivial
             obj = super(klass, cls).__new__(cls)  # type: ignore[misc]
-            obj._constructor_args = (args, kwargs)  # type: ignore[attr-defined]
+            obj._constructor_args = (args, kwargs)
             return obj
 
         def deconstruct(obj: Any) -> tuple[str, tuple[Any, ...], dict[str, Any]]:

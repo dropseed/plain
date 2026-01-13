@@ -9,7 +9,7 @@ from collections import defaultdict
 from decimal import Decimal
 from functools import cached_property
 from types import NoneType
-from typing import TYPE_CHECKING, Any, Protocol, Self, cast, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, Self, runtime_checkable
 from uuid import UUID
 
 from plain.models import fields
@@ -1089,7 +1089,7 @@ class Func(SQLiteNumericMixin, Expression):
         clone = super().copy()
         clone.source_expressions = self.source_expressions[:]
         clone.extra = self.extra.copy()
-        return cast(Self, clone)
+        return clone
 
 
 @deconstructible(path="plain.models.Value")
@@ -1616,7 +1616,7 @@ class Case(SQLiteNumericMixin, Expression):
     def copy(self) -> Self:
         c = super().copy()
         c.cases = c.cases[:]
-        return cast(Self, c)
+        return c
 
     def as_sql(
         self,
@@ -1705,7 +1705,7 @@ class Subquery(BaseExpression, Combinable):
     def copy(self) -> Self:
         clone = super().copy()
         clone.query = clone.query.clone()
-        return cast(Self, clone)
+        return clone
 
     @property
     def external_aliases(self) -> dict[str, bool]:

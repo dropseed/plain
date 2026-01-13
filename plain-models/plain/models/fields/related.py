@@ -116,7 +116,7 @@ class RelatedField(FieldCacheMixin, Field):
         obj.remote_field = copy.copy(self.remote_field)
         if hasattr(self.remote_field, "field") and self.remote_field.field is self:
             obj.remote_field.field = obj  # type: ignore[misc]
-        return cast(Self, obj)
+        return obj
 
     @cached_property
     def related_model(self) -> type[Model]:

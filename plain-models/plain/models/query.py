@@ -1444,7 +1444,7 @@ class QuerySet(Generic[T]):
         if fields == (None,):
             clone.sql_query.clear_deferred_loading()
         else:
-            clone.sql_query.add_deferred_loading(frozenset(fields))  # type: ignore[arg-type]
+            clone.sql_query.add_deferred_loading(frozenset(fields))
         return clone
 
     def only(self, *fields: str) -> QuerySet[T]:
