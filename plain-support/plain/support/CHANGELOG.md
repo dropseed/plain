@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-support@0.28.0) (2026-01-13)
+
+### What's changed
+
+- Updated to use `RedirectResponse` instead of `ResponseRedirect` following the framework-wide response class renaming ([fad5bf2](https://github.com/dropseed/plain/commit/fad5bf2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.27.1](https://github.com/dropseed/plain/releases/plain-support@0.27.1) (2025-12-22)
 
 ### What's changed
