@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.59.0](https://github.com/dropseed/plain/releases/plain-admin@0.59.0) (2026-01-13)
+
+### What's changed
+
+- Internal response classes updated to use the new naming convention: `ResponseRedirect` → `RedirectResponse` ([fad5bf2](https://github.com/dropseed/plain/commit/fad5bf28b0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.58.0](https://github.com/dropseed/plain/releases/plain-admin@0.58.0) (2025-12-26)
 
 ### What's changed
