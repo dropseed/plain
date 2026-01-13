@@ -128,13 +128,17 @@ class DevProcess(ProcessManager):
             result = sock.connect_ex(("127.0.0.1", port))
         return result != 0
 
-    def run(self) -> int:
+    def run(self, *, reinstall_ssl: bool = False) -> int:
         self.write_pidfile()
         mkcert_manager = MkcertManager()
-        mkcert_manager.setup_mkcert(install_path=Path.home() / ".plain" / "dev")
+        mkcert_manager.setup_mkcert(
+            install_path=Path.home() / ".plain" / "dev",
+            force_reinstall=reinstall_ssl,
+        )
         self.ssl_cert_path, self.ssl_key_path = mkcert_manager.generate_certs(
             domain=self.hostname,
             storage_path=Path(PLAIN_TEMP_PATH) / "dev" / "certs",
+            force_regenerate=reinstall_ssl,
         )
 
         self.symlink_plain_src()

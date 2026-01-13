@@ -11,80 +11,117 @@ import click
 
 class MkcertManager:
     def __init__(self) -> None:
-        self.mkcert_bin: str | Path | None = None
+        self.mkcert_bin: str | None = None
 
-    def setup_mkcert(self, install_path: Path) -> None:
+    def setup_mkcert(
+        self, install_path: Path, *, force_reinstall: bool = False
+    ) -> None:
         """Set up mkcert by checking if it's installed or downloading the binary and installing the local CA."""
         if mkcert_path := shutil.which("mkcert"):
-            # mkcert is already installed somewhere
             self.mkcert_bin = mkcert_path
-        else:
-            self.mkcert_bin = install_path / "mkcert"
-            install_path.mkdir(parents=True, exist_ok=True)
-            if not self.mkcert_bin.exists():
-                system = platform.system()
-                arch = platform.machine()
+            # Run install if CA files don't exist, or if force reinstall
+            if force_reinstall or not self._ca_files_exist():
+                self.install_ca()
+            return
 
-                # Map platform.machine() to mkcert's expected architecture strings
-                arch_map = {
-                    "x86_64": "amd64",
-                    "amd64": "amd64",
-                    "AMD64": "amd64",
-                    "arm64": "arm64",
-                    "aarch64": "arm64",
-                }
-                arch = arch_map.get(
-                    arch.lower(), "amd64"
-                )  # Default to amd64 if unknown
+        # mkcert not found system-wide, download to install_path
+        install_path.mkdir(parents=True, exist_ok=True)
+        binary_path = install_path / "mkcert"
 
-                if system == "Darwin":
-                    os_name = "darwin"
-                elif system == "Linux":
-                    os_name = "linux"
-                elif system == "Windows":
-                    os_name = "windows"
-                else:
-                    click.secho("Unsupported OS", fg="red")
-                    sys.exit(1)
+        if force_reinstall and binary_path.exists():
+            click.secho("Removing existing mkcert binary...", bold=True)
+            binary_path.unlink()
 
-                mkcert_url = f"https://dl.filippo.io/mkcert/latest?for={os_name}/{arch}"
-                click.secho(f"Downloading mkcert from {mkcert_url}...", bold=True)
-                urllib.request.urlretrieve(mkcert_url, self.mkcert_bin)
-                self.mkcert_bin.chmod(0o755)
-            self.mkcert_bin = str(self.mkcert_bin)  # Convert Path object to string
+        if not binary_path.exists():
+            self._download_mkcert(binary_path)
 
-        if not self.is_mkcert_ca_installed():
-            click.secho(
-                "Installing mkcert local CA. You may be prompted for your password.",
-                bold=True,
-            )
-            subprocess.run([self.mkcert_bin, "-install"], check=True)
+        self.mkcert_bin = str(binary_path)
 
-    def is_mkcert_ca_installed(self) -> bool:
-        """Check if mkcert local CA is already installed using mkcert -check."""
+        # Run install if CA files don't exist, or if force reinstall
+        if force_reinstall or not self._ca_files_exist():
+            self.install_ca()
+
+    def _download_mkcert(self, dest: Path) -> None:
+        """Download the mkcert binary."""
+        system = platform.system()
+        machine = platform.machine().lower()
+
+        # Map platform.machine() to mkcert's expected architecture strings
+        arch_map = {
+            "x86_64": "amd64",
+            "amd64": "amd64",
+            "arm64": "arm64",
+            "aarch64": "arm64",
+        }
+        arch = arch_map.get(machine, "amd64")
+
+        os_map = {
+            "Darwin": "darwin",
+            "Linux": "linux",
+            "Windows": "windows",
+        }
+        os_name = os_map.get(system)
+        if not os_name:
+            click.secho(f"Unsupported OS: {system}", fg="red")
+            sys.exit(1)
+
+        mkcert_url = f"https://dl.filippo.io/mkcert/latest?for={os_name}/{arch}"
+        click.secho(f"Downloading mkcert from {mkcert_url}...", bold=True)
+        urllib.request.urlretrieve(mkcert_url, dest)
+        dest.chmod(0o755)
+
+    def _get_ca_root(self) -> Path | None:
+        """Get the mkcert CAROOT directory."""
         if not self.mkcert_bin:
-            return False
-        try:
-            result = subprocess.run([self.mkcert_bin, "-check"], capture_output=True)
-            output = result.stdout.decode() + result.stderr.decode()
-            if "The local CA is not installed" in output:
-                return False
-            return True
-        except Exception as e:
-            click.secho(f"Error checking mkcert CA installation: {e}", fg="red")
-            return False
+            return None
+        result = subprocess.run(
+            [self.mkcert_bin, "-CAROOT"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip())
+        return None
 
-    def generate_certs(self, domain: str, storage_path: Path) -> tuple[Path, Path]:
+    def _ca_files_exist(self) -> bool:
+        """Check if the CA root files exist."""
+        ca_root = self._get_ca_root()
+        if not ca_root:
+            return False
+        return (ca_root / "rootCA.pem").exists() and (
+            ca_root / "rootCA-key.pem"
+        ).exists()
+
+    def install_ca(self) -> None:
+        """Install the mkcert CA into the system trust store.
+
+        Running `mkcert -install` is idempotent - if already installed,
+        it just prints a message without prompting for a password.
+        """
+        if not self.mkcert_bin:
+            return
+
+        # Don't capture output so user can see messages and respond to password prompts
+        result = subprocess.run([self.mkcert_bin, "-install"])
+
+        if result.returncode != 0:
+            click.secho("Failed to install mkcert CA", fg="red")
+            raise SystemExit(1)
+
+    def generate_certs(
+        self, domain: str, storage_path: Path, *, force_regenerate: bool = False
+    ) -> tuple[Path, Path]:
         cert_path = storage_path / f"{domain}-cert.pem"
         key_path = storage_path / f"{domain}-key.pem"
         timestamp_path = storage_path / f"{domain}.timestamp"
         update_interval = 60 * 24 * 3600  # 60 days in seconds
 
         # Check if the certs exist and if the timestamp is recent enough
-        if cert_path.exists() and key_path.exists() and timestamp_path.exists():
-            last_updated = timestamp_path.stat().st_mtime
-            if time.time() - last_updated < update_interval:
-                return cert_path, key_path
+        if not force_regenerate:
+            if cert_path.exists() and key_path.exists() and timestamp_path.exists():
+                last_updated = timestamp_path.stat().st_mtime
+                if time.time() - last_updated < update_interval:
+                    return cert_path, key_path
 
         storage_path.mkdir(parents=True, exist_ok=True)
 

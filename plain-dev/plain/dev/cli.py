@@ -121,6 +121,12 @@ class DevGroup(click.Group):
     default=False,
     help="Stop the background process",
 )
+@click.option(
+    "--reinstall-ssl",
+    is_flag=True,
+    default=False,
+    help="Reinstall SSL certificates (updates mkcert, reinstalls CA, regenerates certs)",
+)
 def cli(
     ctx: click.Context,
     port: str,
@@ -128,6 +134,7 @@ def cli(
     log_level: str,
     start: bool,
     stop: bool,
+    reinstall_ssl: bool,
 ) -> None:
     """Local development server"""
     if ctx.invoked_subcommand:
@@ -188,7 +195,7 @@ def cli(
         hostname=hostname,
         log_level=log_level if log_level else None,
     )
-    returncode = dev.run()
+    returncode = dev.run(reinstall_ssl=reinstall_ssl)
     if returncode:
         sys.exit(returncode)
 
