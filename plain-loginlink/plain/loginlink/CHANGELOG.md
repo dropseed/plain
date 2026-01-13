@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.17.0) (2026-01-13)
+
+### What's changed
+
+- Internal update to use renamed `RedirectResponse` class (was `ResponseRedirect`) ([fad5bf2](https://github.com/dropseed/plain/commit/fad5bf28b0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.16.0) (2025-12-04)
 
 ### What's changed
