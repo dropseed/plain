@@ -1,5 +1,18 @@
 # plain-auth changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-auth@0.23.0) (2026-01-13)
+
+### What's changed
+
+- HTTP exception classes renamed to include `Error` suffix and status code: `PermissionDenied` → `ForbiddenError403`, `Http404` → `NotFoundError404` ([5a1f020](https://github.com/dropseed/plain/commit/5a1f020f52))
+- Response classes renamed: `ResponseRedirect` → `RedirectResponse` ([fad5bf2](https://github.com/dropseed/plain/commit/fad5bf28b0))
+
+### Upgrade instructions
+
+- Replace `PermissionDenied` with `ForbiddenError403` in any custom auth logic (e.g., `raise PermissionDenied("message")` becomes `raise ForbiddenError403("message")`)
+- Replace `Http404` with `NotFoundError404` if used in auth-related code
+- Replace `ResponseRedirect` with `RedirectResponse` if imported from `plain.http`
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-auth@0.22.0) (2025-11-24)
 
 ### What's changed
