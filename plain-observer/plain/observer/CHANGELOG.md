@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-observer@0.24.0) (2026-01-13)
+
+### What's changed
+
+- Replaced AGENTS.md with a structured SKILL.md file providing a step-by-step performance optimization workflow for AI agents ([b592c32](https://github.com/dropseed/plain/commit/b592c32cb9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.23.2](https://github.com/dropseed/plain/releases/plain-observer@0.23.2) (2025-12-22)
 
 ### What's changed
