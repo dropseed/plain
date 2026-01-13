@@ -1,5 +1,18 @@
 # plain-dev changelog
 
+## [0.50.0](https://github.com/dropseed/plain/releases/plain-dev@0.50.0) (2026-01-13)
+
+### What's changed
+
+- Added `--reinstall-ssl` flag to `plain dev` command that redownloads the mkcert binary, reinstalls the CA into the system trust store, and regenerates domain certificates ([04579b74d7](https://github.com/dropseed/plain/commit/04579b74d7))
+- Fixed mkcert CA detection to check for CA file existence instead of using the non-existent `mkcert -check` command ([04579b74d7](https://github.com/dropseed/plain/commit/04579b74d7))
+- Improved migration output during `plain dev` startup - now shows "✔ Up to date" when no migrations are needed, or "applying" when migrations are being run ([006efae92d](https://github.com/dropseed/plain/commit/006efae92d))
+- Converted package-specific AGENTS.md to skills system - `plain dev` now installs skills to `.claude/agents/` instead of generating `.plain/AGENTS.md` ([b592c32cb9](https://github.com/dropseed/plain/commit/b592c32cb9))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.49.1](https://github.com/dropseed/plain/releases/plain-dev@0.49.1) (2025-12-22)
 
 ### What's changed
