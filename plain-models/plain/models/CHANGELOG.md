@@ -1,5 +1,19 @@
 # plain-models changelog
 
+## [0.71.0](https://github.com/dropseed/plain/releases/plain-models@0.71.0) (2026-01-13)
+
+### What's changed
+
+- `TimeZoneField` choices are no longer serialized in migrations, preventing spurious migration diffs when timezone data differs between machines ([0ede3aae](https://github.com/dropseed/plain/commit/0ede3aae5d))
+- `TimeZoneField` no longer accepts custom choices - the field's purpose is to provide the canonical timezone list ([0ede3aae](https://github.com/dropseed/plain/commit/0ede3aae5d))
+- Simplified `plain migrate` output - package name is only shown when explicitly targeting a specific package ([006efae9](https://github.com/dropseed/plain/commit/006efae92d))
+- Field ordering is now explicit (primary key first, then alphabetically by name) instead of using an internal creation counter ([3ffa44bd](https://github.com/dropseed/plain/commit/3ffa44bdcb))
+
+### Upgrade instructions
+
+- If you have existing migrations that contain `TimeZoneField` with serialized `choices`, you can safely remove the `choices` parameter from those migrations as they are now computed dynamically
+- If you were passing custom `choices` to `TimeZoneField`, this is no longer supported - use a regular `CharField` with choices instead
+
 ## [0.70.0](https://github.com/dropseed/plain/releases/plain-models@0.70.0) (2025-12-26)
 
 ### What's changed
