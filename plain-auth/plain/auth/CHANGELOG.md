@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-auth@0.24.0) (2026-01-13)
+
+### What's changed
+
+- HTTP exceptions moved from `plain.exceptions` to `plain.http.exceptions` (exported via `plain.http`) ([b61f909](https://github.com/dropseed/plain/commit/b61f909e29))
+
+### Upgrade instructions
+
+- Update imports of HTTP exceptions from `plain.exceptions` to `plain.http` (e.g., `from plain.exceptions import ForbiddenError403` becomes `from plain.http import ForbiddenError403`)
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-auth@0.23.0) (2026-01-13)
 
 ### What's changed
