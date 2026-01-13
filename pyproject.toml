@@ -82,5 +82,8 @@ members = [
 [tool.plain.code.biome]
 version = "2.0.6"
 
+[tool.plain.code.annotations]
+exclude = ["example", "scratch", "scripts"]
+
 [tool.ty.environment]
 extra-paths = ["plain-models/tests", "plain/tests", "plain-admin/tests", "example"]

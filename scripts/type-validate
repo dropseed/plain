@@ -71,10 +71,14 @@ def check_type_coverage(path: str) -> tuple[float, int, int, int, int, int]:
         Tuple of (coverage_percentage, fully_typed_functions, total_functions,
                   ignore_comments, cast_calls, assert_statements)
     """
+    # Run from example directory since plain code requires a Plain app context
+    # Use relative path from example to the target
+    relative_path = f"../{path}"
     result = subprocess.run(
-        ["./scripts/type-coverage", path, "--json"],
+        ["uv", "run", "plain", "code", "annotations", relative_path, "--json"],
         capture_output=True,
         text=True,
+        cwd="example",
     )
 
     if result.returncode != 0:
@@ -247,7 +251,7 @@ def main(details: bool = False):
         print(f"{Colors.BOLD}Total diagnostics/errors: {Colors.RED}{total_errors}{Colors.RESET}")
         print()
         print(f"{Colors.DIM}To fix:{Colors.RESET}")
-        print(f"{Colors.DIM}  1. Check coverage: ./scripts/type-coverage <path> --details --missing{Colors.RESET}")
+        print(f"{Colors.DIM}  1. Check coverage: uv run plain code annotations <path> --details{Colors.RESET}")
         print(f"{Colors.DIM}  2. Add missing annotations{Colors.RESET}")
         print(f"{Colors.DIM}  3. Run type check: ./scripts/type-check <path>{Colors.RESET}")
         print(f"{Colors.DIM}  4. Format: ./scripts/fix{Colors.RESET}")

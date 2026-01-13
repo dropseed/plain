@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tomllib
@@ -12,6 +13,7 @@ from plain.cli import register_cli
 from plain.cli.print import print_event
 from plain.cli.runtime import common_command, without_runtime_setup
 
+from .annotations import AnnotationResult, check_annotations
 from .biome import Biome
 
 DEFAULT_RUFF_CONFIG = Path(__file__).parent / "ruff_defaults.toml"
@@ -78,12 +80,14 @@ def update() -> None:
 @click.option("--skip-ruff", is_flag=True, help="Skip Ruff checks")
 @click.option("--skip-ty", is_flag=True, help="Skip ty type checks")
 @click.option("--skip-biome", is_flag=True, help="Skip Biome checks")
+@click.option("--skip-annotations", is_flag=True, help="Skip type annotation checks")
 def check(
     ctx: click.Context,
     path: str,
     skip_ruff: bool,
     skip_ty: bool,
     skip_biome: bool,
+    skip_annotations: bool,
 ) -> None:
     """Check for formatting and linting issues"""
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
@@ -124,6 +128,106 @@ def check(
         print_event("biome check...", newline=False)
         result = biome.invoke("check", path)
         maybe_exit(result.returncode)
+
+    if not skip_annotations and config.get("annotations", {}).get("enabled", True):
+        print_event("annotations...", newline=False)
+        exclude_patterns = config.get("annotations", {}).get("exclude", [])
+        ann_result = check_annotations(path, exclude_patterns or None)
+        if ann_result.missing_count > 0:
+            click.secho(
+                f"{ann_result.missing_count} functions are untyped",
+                fg="red",
+            )
+            click.secho("Run 'plain code annotations --details' for details")
+            maybe_exit(1)
+        else:
+            click.secho("All functions typed!", fg="green")
+
+
+@without_runtime_setup
+@cli.command()
+@click.argument("path", default=".")
+@click.option("--details", is_flag=True, help="List untyped functions")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def annotations(path: str, details: bool, as_json: bool) -> None:
+    """Check type annotation status"""
+    config = get_code_config()
+    exclude_patterns = config.get("annotations", {}).get("exclude", [])
+    result = check_annotations(path, exclude_patterns or None)
+    if as_json:
+        _print_annotations_json(result)
+    else:
+        _print_annotations_report(result, show_details=details)
+
+
+def _print_annotations_report(
+    result: AnnotationResult,
+    show_details: bool = False,
+) -> None:
+    """Print the annotation report with colors."""
+    if result.total_functions == 0:
+        click.echo("No functions found")
+        return
+
+    # Detailed output first (if enabled and there are untyped functions)
+    if show_details and result.missing_count > 0:
+        # Collect all untyped functions with full paths
+        untyped_items: list[tuple[str, str, int, list[str]]] = []
+
+        for stats in result.file_stats:
+            for func in stats.functions:
+                if not func.is_fully_typed:
+                    issues = []
+                    if not func.has_return_type:
+                        issues.append("return type")
+                    missing_params = func.total_params - func.typed_params
+                    if missing_params > 0:
+                        param_word = "param" if missing_params == 1 else "params"
+                        issues.append(f"{missing_params} {param_word}")
+                    untyped_items.append((stats.path, func.name, func.line, issues))
+
+        # Sort by file path, then line number
+        untyped_items.sort(key=lambda x: (x[0], x[2]))
+
+        # Print each untyped function
+        for file_path, func_name, line, issues in untyped_items:
+            location = click.style(f"{file_path}:{line}", fg="cyan")
+            issue_str = click.style(f"({', '.join(issues)})", dim=True)
+            click.echo(f"{location}  {func_name}  {issue_str}")
+
+        click.echo()
+
+    # Summary line
+    pct = result.coverage_percentage
+    color = "green" if result.missing_count == 0 else "red"
+    click.secho(
+        f"{pct:.1f}% typed ({result.fully_typed_functions}/{result.total_functions} functions)",
+        fg=color,
+    )
+
+    # Code smell indicators (only if present)
+    smells = []
+    if result.total_ignores > 0:
+        smells.append(f"{result.total_ignores} ignore")
+    if result.total_casts > 0:
+        smells.append(f"{result.total_casts} cast")
+    if result.total_asserts > 0:
+        smells.append(f"{result.total_asserts} assert")
+    if smells:
+        click.secho(f"{', '.join(smells)}", fg="yellow")
+
+
+def _print_annotations_json(result: AnnotationResult) -> None:
+    """Print the annotation report as JSON."""
+    output = {
+        "overall_coverage": result.coverage_percentage,
+        "total_functions": result.total_functions,
+        "fully_typed_functions": result.fully_typed_functions,
+        "total_ignores": result.total_ignores,
+        "total_casts": result.total_casts,
+        "total_asserts": result.total_asserts,
+    }
+    click.echo(json.dumps(output))
 
 
 @common_command

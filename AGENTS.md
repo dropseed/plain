@@ -40,13 +40,13 @@ Some instructions for writing READMEs:
 
 We are gradually adding type annotations to improve IDE/type checker friendliness. We are using Python 3.13+. Use the following workflow:
 
-1. **Check current coverage**: `./scripts/type-coverage <directory> --details --missing`
+1. **Check current coverage**: `uv run plain code annotations <directory> --details`
 2. **Add annotations**: Focus on function/method signatures (parameters and return types)
 3. **Type check**: `./scripts/type-check <directory>` (uses `uv run ty check`)
 4. **Format**: `./scripts/fix`
 5. **Test**: `./scripts/test <package>`
-6. **Verify improvement**: `./scripts/type-coverage <directory>`
-7. **Add to validation**: Once a directory reaches 100% coverage, add it to `FULLY_TYPED_DIRS` in `scripts/type-validate` to prevent regressions
+6. **Verify improvement**: `uv run plain code annotations <directory>`
+7. **Add to validation**: Once a directory reaches 100% coverage, add it to `FULLY_TYPED_PATHS` in `scripts/type-validate` to prevent regressions
 
 Guidelines:
 
@@ -61,13 +61,13 @@ Example workflow:
 
 ```bash
 # Check coverage
-./scripts/type-coverage plain/plain/assets --details --missing
+uv run plain code annotations plain/plain/assets --details
 
 # After adding annotations...
 ./scripts/type-check plain/plain/assets
 ./scripts/fix
 ./scripts/test plain
-./scripts/type-coverage plain/plain/assets  # Should show 100%
+uv run plain code annotations plain/plain/assets  # Should show 100%
 ```
 
 ## Coding style
