@@ -1,5 +1,17 @@
 # plain-oauth changelog
 
+## [0.40.0](https://github.com/dropseed/plain/releases/plain-oauth@0.40.0) (2026-01-13)
+
+### What's changed
+
+- `OAUTH_LOGIN_PROVIDERS` setting is now marked as secret, preventing it from being exposed in error pages or debug output ([eba56c4](https://github.com/dropseed/plain/commit/eba56c4))
+- Documentation updated to reflect the new `HTTPS_PROXY_HEADER` setting format, which now uses a string like `"X-Forwarded-Proto: https"` instead of a tuple ([7ac2a43](https://github.com/dropseed/plain/commit/7ac2a43))
+- Internal redirect responses now use `RedirectResponse` instead of the deprecated `ResponseRedirect` ([fad5bf2](https://github.com/dropseed/plain/commit/fad5bf2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.39.0](https://github.com/dropseed/plain/releases/plain-oauth@0.39.0) (2025-12-04)
 
 ### What's changed
