@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-api@0.24.0) (2026-01-13)
+
+### What's changed
+
+- HTTP exceptions (`NotFoundError404`, `ForbiddenError403`) are now imported from `plain.http` instead of `plain.exceptions` ([b61f909](https://github.com/dropseed/plain/commit/b61f909e29))
+
+### Upgrade instructions
+
+- Update imports of `NotFoundError404` and `ForbiddenError403` from `plain.exceptions` to `plain.http` (e.g., `from plain.http import NotFoundError404`)
+
 ## [0.23.0](https://github.com/dropseed/plain/releases/plain-api@0.23.0) (2026-01-13)
 
 ### What's changed
