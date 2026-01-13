@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.18.0) (2026-01-13)
+
+### What's changed
+
+- Internal version bump with no user-facing changes
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.17.0) (2025-12-04)
 
 ### What's changed

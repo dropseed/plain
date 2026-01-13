@@ -1,6 +1,6 @@
 [project]
 name = "plain.tailwind"
-version = "0.17.0"
+version = "0.18.0"
 description = "Integrate Tailwind CSS without JavaScript or npm."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
