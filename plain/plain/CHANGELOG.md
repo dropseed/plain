@@ -1,5 +1,59 @@
 # plain changelog
 
+## [0.96.0](https://github.com/dropseed/plain/releases/plain@0.96.0) (2026-01-13)
+
+### What's changed
+
+- Response classes renamed for consistency: `ResponseRedirect` → `RedirectResponse`, `ResponseNotModified` → `NotModifiedResponse`, `ResponseNotAllowed` → `NotAllowedResponse` ([fad5bf28b0](https://github.com/dropseed/plain/commit/fad5bf28b0))
+- Redundant response classes removed: `ResponseNotFound`, `ResponseForbidden`, `ResponseBadRequest`, `ResponseGone`, `ResponseServerError` - use `Response(status_code=X)` instead ([fad5bf28b0](https://github.com/dropseed/plain/commit/fad5bf28b0))
+- HTTP exceptions renamed to include status code suffix: `Http404` → `NotFoundError404`, `PermissionDenied` → `ForbiddenError403`, `BadRequest` → `BadRequestError400`, `SuspiciousOperation` → `SuspiciousOperationError400` ([5a1f020f52](https://github.com/dropseed/plain/commit/5a1f020f52))
+- Added `Secret[T]` type annotation for masking sensitive settings like `SECRET_KEY` in CLI output ([8713dc08b0](https://github.com/dropseed/plain/commit/8713dc08b0))
+- Added `ENV_SETTINGS_PREFIXES` setting to configure which environment variable prefixes are checked for settings (defaults to `["PLAIN_"]`) ([8713dc08b0](https://github.com/dropseed/plain/commit/8713dc08b0))
+- New `plain settings list` and `plain settings get` CLI commands for viewing settings with their sources ([8713dc08b0](https://github.com/dropseed/plain/commit/8713dc08b0))
+- Added preflight check for unused environment variables matching configured prefixes ([8713dc08b0](https://github.com/dropseed/plain/commit/8713dc08b0))
+- Renamed `request.meta` to `request.environ` for clarity ([786b95bef8](https://github.com/dropseed/plain/commit/786b95bef8))
+- Added `request.query_string` and `request.content_length` properties ([786b95bef8](https://github.com/dropseed/plain/commit/786b95bef8), [76dfd477d2](https://github.com/dropseed/plain/commit/76dfd477d2))
+- Renamed X-Forwarded settings: `USE_X_FORWARDED_HOST` → `HTTP_X_FORWARDED_HOST`, `USE_X_FORWARDED_PORT` → `HTTP_X_FORWARDED_PORT`, `USE_X_FORWARDED_FOR` → `HTTP_X_FORWARDED_FOR` ([22f241a55c](https://github.com/dropseed/plain/commit/22f241a55c))
+- Changed `HTTPS_PROXY_HEADER` from a tuple to a string format (e.g., `"X-Forwarded-Proto: https"`) ([7ac2a431b6](https://github.com/dropseed/plain/commit/7ac2a431b6))
+
+### Upgrade instructions
+
+- Replace Response class imports and usages:
+    - `ResponseRedirect` → `RedirectResponse`
+    - `ResponseNotModified` → `NotModifiedResponse`
+    - `ResponseNotAllowed` → `NotAllowedResponse`
+    - `ResponseNotFound` → `Response(status_code=404)`
+    - `ResponseForbidden` → `Response(status_code=403)`
+    - `ResponseBadRequest` → `Response(status_code=400)`
+    - `ResponseGone` → `Response(status_code=410)`
+    - `ResponseServerError` → `Response(status_code=500)`
+- Replace exception imports and usages:
+    - `Http404` → `NotFoundError404`
+    - `PermissionDenied` → `ForbiddenError403`
+    - `BadRequest` → `BadRequestError400`
+    - `SuspiciousOperation` → `SuspiciousOperationError400`
+    - `SuspiciousMultipartForm` → `SuspiciousMultipartFormError400`
+    - `SuspiciousFileOperation` → `SuspiciousFileOperationError400`
+    - `TooManyFieldsSent` → `TooManyFieldsSentError400`
+    - `TooManyFilesSent` → `TooManyFilesSentError400`
+    - `RequestDataTooBig` → `RequestDataTooBigError400`
+- Replace `request.meta` with `request.environ`
+- Rename X-Forwarded settings in your configuration:
+    - `USE_X_FORWARDED_HOST` → `HTTP_X_FORWARDED_HOST`
+    - `USE_X_FORWARDED_PORT` → `HTTP_X_FORWARDED_PORT`
+    - `USE_X_FORWARDED_FOR` → `HTTP_X_FORWARDED_FOR`
+- Update `HTTPS_PROXY_HEADER` from tuple format to string format:
+
+    ```python
+    # Before
+    HTTPS_PROXY_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+    # After
+    HTTPS_PROXY_HEADER = "X-Forwarded-Proto: https"
+    ```
+
+- Replace `plain setting <name>` command with `plain settings get <name>`
+
 ## [0.95.0](https://github.com/dropseed/plain/releases/plain@0.95.0) (2025-12-22)
 
 ### What's changed
