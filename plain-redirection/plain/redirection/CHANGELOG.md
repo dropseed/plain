@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-redirection@0.29.0) (2026-01-13)
+
+### What's changed
+
+- Updated internal redirect response to use the renamed `RedirectResponse` class (previously `ResponseRedirect`) to match the new naming convention in the core framework ([fad5bf28b0](https://github.com/dropseed/plain/commit/fad5bf28b0))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-redirection@0.28.0) (2025-12-01)
 
 ### What's changed
