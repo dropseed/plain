@@ -16,8 +16,8 @@ from .requests import get_request_user, set_request_user
 if TYPE_CHECKING:
     from plain.http import Request
 
-USER_ID_SESSION_KEY = "_auth_user_id"
-USER_HASH_SESSION_KEY = "_auth_user_hash"
+_USER_ID_SESSION_KEY = "_auth_user_id"
+_USER_HASH_SESSION_KEY = "_auth_user_hash"
 
 
 def get_session_auth_hash(user: Any) -> str:
@@ -40,10 +40,10 @@ def update_session_auth_hash(request: Request, user: Any) -> None:
     session = get_request_session(request)
     session.cycle_key()
     if get_request_user(request) == user:
-        session[USER_HASH_SESSION_KEY] = get_session_auth_hash(user)
+        session[_USER_HASH_SESSION_KEY] = get_session_auth_hash(user)
 
 
-def get_session_auth_fallback_hash(user: Any) -> Generator[str, None, None]:
+def _get_session_auth_fallback_hash(user: Any) -> Generator[str, None, None]:
     for fallback_secret in settings.SECRET_KEY_FALLBACKS:
         yield _get_session_auth_hash(user, secret=fallback_secret)
 
@@ -71,14 +71,14 @@ def login(request: Request, user: Any) -> None:
     else:
         session_auth_hash = ""
 
-    if USER_ID_SESSION_KEY in session:
-        if int(session[USER_ID_SESSION_KEY]) != user.id:
+    if _USER_ID_SESSION_KEY in session:
+        if int(session[_USER_ID_SESSION_KEY]) != user.id:
             # To avoid reusing another user's session, create a new, empty
             # session if the existing session corresponds to a different
             # authenticated user.
             session.flush()
         elif session_auth_hash and not hmac.compare_digest(
-            force_bytes(session.get(USER_HASH_SESSION_KEY, "")),
+            force_bytes(session.get(_USER_HASH_SESSION_KEY, "")),
             force_bytes(session_auth_hash),
         ):
             # If the session hash does not match the current hash, reset the
@@ -89,8 +89,8 @@ def login(request: Request, user: Any) -> None:
         # typically done after user login to prevent session fixation attacks.
         session.cycle_key()
 
-    session[USER_ID_SESSION_KEY] = user.id
-    session[USER_HASH_SESSION_KEY] = session_auth_hash
+    session[_USER_ID_SESSION_KEY] = user.id
+    session[_USER_HASH_SESSION_KEY] = session_auth_hash
     set_request_user(request, user)
 
 
@@ -129,12 +129,12 @@ def get_user(request: Request) -> Any | None:
     """
     session = get_request_session(request)
 
-    if USER_ID_SESSION_KEY not in session:
+    if _USER_ID_SESSION_KEY not in session:
         return None
 
     UserModel = get_user_model()
     try:
-        user = UserModel.query.get(id=session[USER_ID_SESSION_KEY])
+        user = UserModel.query.get(id=session[_USER_ID_SESSION_KEY])
     except UserModel.DoesNotExist:
         return None
 
@@ -145,7 +145,7 @@ def get_user(request: Request) -> Any | None:
     # If it has changed (i.e. password changed), then the session
     # is no longer valid and cleared out.
     if settings.AUTH_USER_SESSION_HASH_FIELD:
-        session_hash = session.get(USER_HASH_SESSION_KEY)
+        session_hash = session.get(_USER_HASH_SESSION_KEY)
         if not session_hash:
             session_hash_verified = False
         else:
@@ -161,10 +161,10 @@ def get_user(request: Request) -> Any | None:
                 hmac.compare_digest(
                     force_bytes(session_hash), force_bytes(fallback_auth_hash)
                 )
-                for fallback_auth_hash in get_session_auth_fallback_hash(user)
+                for fallback_auth_hash in _get_session_auth_fallback_hash(user)
             ):
                 session.cycle_key()
-                session[USER_HASH_SESSION_KEY] = session_auth_hash
+                session[_USER_HASH_SESSION_KEY] = session_auth_hash
             else:
                 session.flush()
                 user = None

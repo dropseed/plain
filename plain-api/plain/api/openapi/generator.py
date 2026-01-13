@@ -3,7 +3,7 @@ from http import HTTPMethod
 from typing import Any
 
 from plain.urls import Router, URLPattern, URLResolver
-from plain.urls.converters import get_converters
+from plain.urls.converters import _get_converters
 
 from .utils import merge_data
 
@@ -12,7 +12,7 @@ class OpenAPISchemaGenerator:
     def __init__(self, router: Router):
         self.url_converters = {
             class_instance.__class__: key
-            for key, class_instance in get_converters().items()
+            for key, class_instance in _get_converters().items()
         }
 
         # Get initial schema from the router

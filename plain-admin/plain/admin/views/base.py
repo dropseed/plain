@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from .viewsets import AdminViewset
 
 
-URL_NAMESPACE = "admin"
+_URL_NAMESPACE = "admin"
 
 
 class AdminView(AuthView, TemplateView):
@@ -117,9 +117,9 @@ class AdminView(AuthView, TemplateView):
     def get_view_url(cls, obj: Any = None) -> str:
         # Check if this view's path expects an id parameter
         if obj and "<int:id>" in cls.get_path():
-            return reverse(f"{URL_NAMESPACE}:" + cls.view_name(), id=obj.id)
+            return reverse(f"{_URL_NAMESPACE}:" + cls.view_name(), id=obj.id)
         else:
-            return reverse(f"{URL_NAMESPACE}:" + cls.view_name())
+            return reverse(f"{_URL_NAMESPACE}:" + cls.view_name())
 
     def get_links(self) -> dict[str, str]:
         return self.links.copy()

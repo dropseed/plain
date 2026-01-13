@@ -9,6 +9,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import NON_FIELD_ERRORS
+from plain.internal import internalcode
 from plain.utils.datastructures import MultiValueDict
 
 from .exceptions import ValidationError
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
 __all__ = ("BaseForm", "Form")
 
 
+@internalcode
 class DeclarativeFieldsMetaclass(type):
     """Collect Fields declared on the base classes."""
 

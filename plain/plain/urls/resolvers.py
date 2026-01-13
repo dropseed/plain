@@ -18,7 +18,7 @@ from plain.runtime import settings
 from plain.utils.datastructures import MultiValueDict
 from plain.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes
 from plain.utils.module_loading import import_string
-from plain.utils.regex_helper import normalize
+from plain.utils.regex_helper import _normalize
 
 from .exceptions import NoReverseMatch, Resolver404
 from .patterns import RegexPattern, RoutePattern, URLPattern
@@ -145,7 +145,7 @@ class URLResolver:
                 p_pattern = url_pattern.pattern.regex.pattern
                 p_pattern = p_pattern.removeprefix("^")
                 if isinstance(url_pattern, URLPattern):
-                    bits = normalize(url_pattern.pattern.regex.pattern)
+                    bits = _normalize(url_pattern.pattern.regex.pattern)
                     lookups.appendlist(
                         url_pattern.view,
                         (
@@ -174,7 +174,7 @@ class URLResolver:
                                 pat,
                                 converters,
                             ) in url_pattern.reverse_dict.getlist(name):
-                                new_matches = normalize(p_pattern + pat)
+                                new_matches = _normalize(p_pattern + pat)
                                 lookups.appendlist(
                                     name,
                                     (

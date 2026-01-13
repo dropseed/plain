@@ -11,7 +11,7 @@ from plain.exceptions import ImproperlyConfigured, PackageRegistryNotReady
 
 from .config import PackageConfig
 
-CONFIG_MODULE_NAME = "config"
+_CONFIG_MODULE_NAME = "config"
 
 
 class PackagesRegistry:
@@ -82,7 +82,7 @@ class PackagesRegistry:
                     self.register_config(package_config=entry)
                 else:
                     try:
-                        import_module(f"{entry}.{CONFIG_MODULE_NAME}")
+                        import_module(f"{entry}.{_CONFIG_MODULE_NAME}")
                     except ModuleNotFoundError:
                         pass
 
@@ -222,8 +222,8 @@ def register_config(package_config_class: type[PackageConfig]) -> type[PackageCo
     module_name = package_config_class.__module__
 
     # If it is in .config like expected, return the parent module name
-    if module_name.endswith(f".{CONFIG_MODULE_NAME}"):
-        module_name = module_name[: -len(CONFIG_MODULE_NAME) - 1]
+    if module_name.endswith(f".{_CONFIG_MODULE_NAME}"):
+        module_name = module_name[: -len(_CONFIG_MODULE_NAME) - 1]
 
     package_config = package_config_class(module_name)
 

@@ -14,6 +14,7 @@ import html
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
+from plain.internal import internalcode
 from plain.internal.files.uploadhandler import SkipFile, StopFutureHandlers, StopUpload
 from plain.runtime import settings
 from plain.utils.datastructures import MultiValueDict
@@ -48,10 +49,10 @@ class InputStreamExhausted(Exception):
     pass
 
 
-RAW = "raw"
-FILE = "file"
-FIELD = "field"
-FIELD_TYPES = frozenset([FIELD, RAW])
+_RAW = "raw"
+_FILE = "file"
+_FIELD = "field"
+_FIELD_TYPES = frozenset([_FIELD, _RAW])
 
 
 class MultiPartParser:
@@ -190,7 +191,7 @@ class MultiPartParser:
                     uploaded_file = True
 
                 if (
-                    item_type in FIELD_TYPES
+                    item_type in _FIELD_TYPES
                     and settings.DATA_UPLOAD_MAX_NUMBER_FIELDS is not None
                 ):
                     # Avoid storing more than DATA_UPLOAD_MAX_NUMBER_FIELDS.
@@ -214,7 +215,7 @@ class MultiPartParser:
                     transfer_encoding = transfer_encoding[0].strip()
                 field_name = force_str(field_name, encoding, errors="replace")
 
-                if item_type == FIELD:
+                if item_type == _FIELD:
                     # Avoid reading more than DATA_UPLOAD_MAX_MEMORY_SIZE.
                     if settings.DATA_UPLOAD_MAX_MEMORY_SIZE is not None:
                         read_size = (
@@ -248,7 +249,7 @@ class MultiPartParser:
                     self._post.appendlist(
                         field_name, force_str(data, encoding, errors="replace")
                     )
-                elif item_type == FILE:
+                elif item_type == _FILE:
                     # Avoid storing more than DATA_UPLOAD_MAX_NUMBER_FILES.
                     num_files += 1
                     if (
@@ -336,7 +337,7 @@ class MultiPartParser:
                     except SkipFile:
                         self._close_files()
                         # Just use up the rest of this file...
-                        exhaust(field_stream)
+                        _exhaust(field_stream)
                     else:
                         # Handle file upload completions on next iteration.
                         old_field_name = field_name
@@ -347,17 +348,17 @@ class MultiPartParser:
                     # after the other boundaries). This branch is usually not
                     # reached at all, because a missing content-disposition
                     # header will skip the whole boundary.
-                    exhaust(field_stream)
+                    _exhaust(field_stream)
         except StopUpload as e:
             self._close_files()
             if not e.connection_reset:
-                exhaust(self._request)
+                _exhaust(self._request)
         else:
             if not uploaded_file:
                 for handler in handlers:
                     handler.upload_interrupted()
             # Make sure that the request data is all fed
-            exhaust(self._request)
+            _exhaust(self._request)
 
         # Signal that the upload has completed.
         # any() shortcircuits if a handler's upload_complete() returns a value.
@@ -412,6 +413,7 @@ class MultiPartParser:
                 handler.file.close()  # type: ignore[union-attr]
 
 
+@internalcode
 class LazyStream:
     """
     The LazyStream wrapper allows one to get and "unget" bytes from a stream.
@@ -531,6 +533,7 @@ class LazyStream:
             )
 
 
+@internalcode
 class ChunkIter:
     """
     An iterable that will yield chunks of data. Given a file-like object as the
@@ -555,6 +558,7 @@ class ChunkIter:
         return self
 
 
+@internalcode
 class InterBoundaryIter:
     """
     A Producer that will iterate over boundaries.
@@ -574,6 +578,7 @@ class InterBoundaryIter:
             raise StopIteration()
 
 
+@internalcode
 class BoundaryIter:
     """
     A Producer that is sensitive to boundaries.
@@ -670,7 +675,7 @@ class BoundaryIter:
             return end, next
 
 
-def exhaust(stream_or_iterable: Any) -> None:
+def _exhaust(stream_or_iterable: Any) -> None:
     """Exhaust an iterator or stream."""
     try:
         iterator = iter(stream_or_iterable)
@@ -679,7 +684,7 @@ def exhaust(stream_or_iterable: Any) -> None:
     collections.deque(iterator, maxlen=0)  # consume iterator quickly.
 
 
-def parse_boundary_stream(
+def _parse_boundary_stream(
     stream: LazyStream, max_header_size: int
 ) -> tuple[str, dict[str, Any], LazyStream]:
     """
@@ -699,7 +704,7 @@ def parse_boundary_stream(
         # we find no header, so we just mark this fact and pass on
         # the stream verbatim
         stream.unget(chunk)
-        return (RAW, {}, stream)
+        return (_RAW, {}, stream)
 
     header = chunk[:header_end]
 
@@ -707,7 +712,7 @@ def parse_boundary_stream(
     # well as throwing away the CRLFCRLF bytes from above.
     stream.unget(chunk[header_end + 4 :])
 
-    TYPE = RAW
+    TYPE = _RAW
     outdict = {}
 
     # Eliminate blank lines
@@ -722,18 +727,19 @@ def parse_boundary_stream(
             continue
 
         if name == "content-disposition":
-            TYPE = FIELD
+            TYPE = _FIELD
             if params.get("filename"):
-                TYPE = FILE
+                TYPE = _FILE
 
         outdict[name] = value, params
 
-    if TYPE == RAW:
+    if TYPE == _RAW:
         stream.unget(chunk)
 
     return (TYPE, outdict, stream)
 
 
+@internalcode
 class Parser:
     def __init__(self, stream: LazyStream, boundary: bytes):
         self._stream = stream
@@ -743,4 +749,4 @@ class Parser:
         boundarystream = InterBoundaryIter(self._stream, self._separator)
         for sub_stream in boundarystream:
             # Iterate over each part
-            yield parse_boundary_stream(sub_stream, 1024)
+            yield _parse_boundary_stream(sub_stream, 1024)

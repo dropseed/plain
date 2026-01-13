@@ -10,7 +10,7 @@ from plain.preflight import PreflightResult
 from plain.runtime import settings
 from plain.utils.regex_helper import _lazy_re_compile
 
-from .converters import get_converter
+from .converters import _get_converter
 
 
 @internalcode
@@ -147,7 +147,7 @@ def _route_to_regex(
             # If a converter isn't specified, the default is `str`.
             raw_converter = "str"
         try:
-            converter = get_converter(raw_converter)
+            converter = _get_converter(raw_converter)
         except KeyError as e:
             raise ImproperlyConfigured(
                 f"URL route {original_route!r} uses invalid converter {raw_converter!r}."

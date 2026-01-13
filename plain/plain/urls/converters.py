@@ -43,7 +43,7 @@ class PathConverter(StringConverter):
     regex = ".+"
 
 
-DEFAULT_CONVERTERS = {
+_DEFAULT_CONVERTERS = {
     "int": IntConverter(),
     "path": PathConverter(),
     "slug": SlugConverter(),
@@ -52,18 +52,18 @@ DEFAULT_CONVERTERS = {
 }
 
 
-REGISTERED_CONVERTERS: dict[str, Any] = {}
+_REGISTERED_CONVERTERS: dict[str, Any] = {}
 
 
 def register_converter(converter: type, type_name: str) -> None:
-    REGISTERED_CONVERTERS[type_name] = converter()
-    get_converters.cache_clear()
+    _REGISTERED_CONVERTERS[type_name] = converter()
+    _get_converters.cache_clear()
 
 
 @functools.cache
-def get_converters() -> dict[str, Any]:
-    return {**DEFAULT_CONVERTERS, **REGISTERED_CONVERTERS}
+def _get_converters() -> dict[str, Any]:
+    return {**_DEFAULT_CONVERTERS, **_REGISTERED_CONVERTERS}
 
 
-def get_converter(raw_converter: str) -> Any:
-    return get_converters()[raw_converter]
+def _get_converter(raw_converter: str) -> Any:
+    return _get_converters()[raw_converter]

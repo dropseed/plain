@@ -8,9 +8,9 @@ from plain.utils.functional import SimpleLazyObject, keep_lazy_text, lazy
 from plain.utils.regex_helper import _lazy_re_compile
 
 # Set up regular expressions
-re_words = _lazy_re_compile(r"<[^>]+?>|([^<>\s]+)", re.S)
-re_chars = _lazy_re_compile(r"<[^>]+?>|(.)", re.S)
-re_tag = _lazy_re_compile(r"<(/)?(\S+?)(?:(\s*/)|\s.*?)?>", re.S)
+_re_words = _lazy_re_compile(r"<[^>]+?>|([^<>\s]+)", re.S)
+_re_chars = _lazy_re_compile(r"<[^>]+?>|(.)", re.S)
+_re_tag = _lazy_re_compile(r"<(/)?(\S+?)(?:(\s*/)|\s.*?)?>", re.S)
 
 
 class Truncator(SimpleLazyObject):
@@ -140,7 +140,7 @@ class Truncator(SimpleLazyObject):
         current_len = 0
         open_tags = []
 
-        regex = re_words if words else re_chars
+        regex = _re_words if words else _re_chars
 
         while current_len <= length:
             m = regex.search(text, pos)
@@ -155,7 +155,7 @@ class Truncator(SimpleLazyObject):
                     end_text_pos = pos
                 continue
             # Check for tag
-            tag = re_tag.match(m[0])
+            tag = _re_tag.match(m[0])
             if not tag or current_len >= truncate_len:
                 # Don't worry about non tags or tags after our truncate point
                 continue

@@ -13,9 +13,9 @@ from plain.exceptions import ImproperlyConfigured
 from plain.packages import PackageConfig
 from plain.runtime.secret import Secret
 
-ENVIRONMENT_VARIABLE = "PLAIN_SETTINGS_MODULE"
-DEFAULT_ENV_SETTINGS_PREFIXES = ["PLAIN_"]
-CUSTOM_SETTINGS_PREFIX = "APP_"
+_ENVIRONMENT_VARIABLE = "PLAIN_SETTINGS_MODULE"
+_DEFAULT_ENV_SETTINGS_PREFIXES = ["PLAIN_"]
+_CUSTOM_SETTINGS_PREFIX = "APP_"
 
 
 class Settings:
@@ -46,7 +46,9 @@ class Settings:
 
         # Determine the settings module
         if self._settings_module is None:
-            self._settings_module = os.environ.get(ENVIRONMENT_VARIABLE, "app.settings")
+            self._settings_module = os.environ.get(
+                _ENVIRONMENT_VARIABLE, "app.settings"
+            )
 
         # First load the global settings from plain
         self._load_module_settings(
@@ -67,7 +69,7 @@ class Settings:
 
         # Get env prefixes from settings module (must be configured in settings.py, not env)
         self._env_prefixes = getattr(
-            mod, "ENV_SETTINGS_PREFIXES", DEFAULT_ENV_SETTINGS_PREFIXES
+            mod, "ENV_SETTINGS_PREFIXES", _DEFAULT_ENV_SETTINGS_PREFIXES
         )
 
         # Load default settings from installed packages
@@ -159,8 +161,8 @@ class Settings:
                         self._errors.append(str(e))
                         continue
 
-                elif setting.startswith(CUSTOM_SETTINGS_PREFIX):
-                    # Accept custom settings prefixed with '{CUSTOM_SETTINGS_PREFIX}'
+                elif setting.startswith(_CUSTOM_SETTINGS_PREFIX):
+                    # Accept custom settings prefixed with '{_CUSTOM_SETTINGS_PREFIX}'
                     setting_def = SettingDefinition(
                         name=setting,
                         default_value=None,
@@ -176,7 +178,7 @@ class Settings:
                 else:
                     # Collect unrecognized settings individually
                     self._errors.append(
-                        f"Unknown setting '{setting}'. Custom settings must start with '{CUSTOM_SETTINGS_PREFIX}'."
+                        f"Unknown setting '{setting}'. Custom settings must start with '{_CUSTOM_SETTINGS_PREFIX}'."
                     )
 
         if hasattr(time, "tzset") and self.TIME_ZONE:

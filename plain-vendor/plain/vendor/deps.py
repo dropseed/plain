@@ -7,14 +7,14 @@ from pathlib import Path
 import requests
 import tomlkit
 
-from plain.assets.finders import APP_ASSETS_DIR
+from plain.assets.finders import _APP_ASSETS_DIR
 
 from .exceptions import (
     UnknownContentTypeError,
     VersionMismatchError,
 )
 
-VENDOR_DIR = APP_ASSETS_DIR / "vendor"
+VENDOR_DIR = _APP_ASSETS_DIR / "vendor"
 
 
 def iter_next_version(version: str) -> Generator[str, None, None]:

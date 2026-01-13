@@ -12,12 +12,13 @@ import re
 from collections.abc import Iterator
 from typing import Any
 
+from plain.internal import internalcode
 from plain.utils.functional import SimpleLazyObject
 
 # Mapping of an escape character to a representative of that class. So, e.g.,
 # "\w" is replaced by "x" in a reverse URL. A value of None means to ignore
 # this sequence. Any missing key is mapped to itself.
-ESCAPE_MAPPINGS = {
+_ESCAPE_MAPPINGS = {
     "A": None,
     "b": None,
     "B": None,
@@ -31,19 +32,22 @@ ESCAPE_MAPPINGS = {
 }
 
 
+@internalcode
 class Choice(list):
     """Represent multiple possibilities at this point in a pattern string."""
 
 
+@internalcode
 class Group(list):
     """Represent a capturing group in the pattern string."""
 
 
+@internalcode
 class NonCapture(list):
     """Represent a non-capturing group in the pattern string."""
 
 
-def normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
+def _normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
     r"""
     Given a reg-exp pattern, normalize it to an iterable of forms that
     suffice for reverse matching. This does the following:
@@ -69,7 +73,7 @@ def normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
     result = []
     non_capturing_groups = []
     consume_next = True
-    pattern_iter = next_char(iter(pattern))
+    pattern_iter = _next_char(iter(pattern))
     num_args = 0
 
     # A "while" loop is used here because later on we need to be able to peek
@@ -119,13 +123,13 @@ def normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
                     name = "_%d" % num_args  # noqa: UP031
                     num_args += 1
                     result.append(Group(((f"%({name})s"), name)))
-                    walk_to_end(ch, pattern_iter)
+                    _walk_to_end(ch, pattern_iter)
                 else:
                     ch, escaped = next(pattern_iter)
                     if ch in "!=<":
                         # All of these are ignorable. Walk to the end of the
                         # group.
-                        walk_to_end(ch, pattern_iter)
+                        _walk_to_end(ch, pattern_iter)
                     elif ch == ":":
                         # Non-capturing group
                         non_capturing_groups.append(len(result))
@@ -156,12 +160,12 @@ def normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
                         # parenthesis.
                         if terminal_char != ")":
                             result.append(Group(((f"%({param})s"), param)))
-                            walk_to_end(ch, pattern_iter)
+                            _walk_to_end(ch, pattern_iter)
                         else:
                             result.append(Group(((f"%({param})s"), None)))
             elif ch in "*?+{":
                 # Quantifiers affect the previous item in the result list.
-                count, ch = get_quantifier(ch, pattern_iter)
+                count, ch = _get_quantifier(ch, pattern_iter)
                 if ch:
                     # We had to look ahead, but it wasn't need to compute the
                     # quantifier, so use this character next time around the
@@ -169,7 +173,7 @@ def normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
                     consume_next = False
 
                 if count == 0:
-                    if contains(result[-1], Group):
+                    if _contains(result[-1], Group):
                         # If we are quantifying a capturing group (or
                         # something containing such a group) and the minimum is
                         # zero, we must also handle the case of one occurrence
@@ -194,10 +198,10 @@ def normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
         # A case of using the disjunctive form. No results for you!
         return [("", [])]
 
-    return list(zip(*flatten_result(result)))
+    return list(zip(*_flatten_result(result)))
 
 
-def next_char(input_iter: Iterator[str]) -> Iterator[tuple[str, bool]]:
+def _next_char(input_iter: Iterator[str]) -> Iterator[tuple[str, bool]]:
     r"""
     An iterator that yields the next character from "pattern_iter", respecting
     escape sequences. An escaped character is replaced by a representative of
@@ -212,13 +216,13 @@ def next_char(input_iter: Iterator[str]) -> Iterator[tuple[str, bool]]:
             yield ch, False
             continue
         ch = next(input_iter)
-        representative = ESCAPE_MAPPINGS.get(ch, ch)
+        representative = _ESCAPE_MAPPINGS.get(ch, ch)
         if representative is None:
             continue
         yield representative, True
 
 
-def walk_to_end(ch: str, input_iter: Iterator[tuple[str, bool]]) -> None:
+def _walk_to_end(ch: str, input_iter: Iterator[tuple[str, bool]]) -> None:
     """
     The iterator is currently inside a capturing group. Walk to the close of
     this group, skipping over any nested groups and handling escaped
@@ -239,7 +243,7 @@ def walk_to_end(ch: str, input_iter: Iterator[tuple[str, bool]]) -> None:
             nesting -= 1
 
 
-def get_quantifier(
+def _get_quantifier(
     ch: str, input_iter: Iterator[tuple[str, bool]]
 ) -> tuple[int, str | None]:
     """
@@ -280,7 +284,7 @@ def get_quantifier(
     return int(values[0]), ch2
 
 
-def contains(source: Any, inst: type) -> bool:
+def _contains(source: Any, inst: type) -> bool:
     """
     Return True if the "source" contains an instance of "inst". False,
     otherwise.
@@ -289,12 +293,12 @@ def contains(source: Any, inst: type) -> bool:
         return True
     if isinstance(source, NonCapture):
         for elt in source:
-            if contains(elt, inst):
+            if _contains(elt, inst):
                 return True
     return False
 
 
-def flatten_result(source: Any) -> tuple[list[str], list[list[str | None]]]:
+def _flatten_result(source: Any) -> tuple[list[str], list[list[str | None]]]:
     """
     Turn the given source sequence into a list of reg-exp possibilities and
     their arguments. Return a list of strings and a list of argument lists.
@@ -330,7 +334,7 @@ def flatten_result(source: Any) -> tuple[list[str], list[list[str | None]]]:
                 elt = [elt]
             inner_result, inner_args = [], []
             for item in elt:
-                res, args = flatten_result(item)
+                res, args = _flatten_result(item)
                 inner_result.extend(res)
                 inner_args.extend(args)
             new_result = []

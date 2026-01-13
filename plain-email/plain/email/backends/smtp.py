@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING, Any
 from plain.runtime import settings
 
 from ..backends.base import BaseEmailBackend
-from ..message import sanitize_address
-from ..utils import DNS_NAME
+from ..message import _sanitize_address
+from ..utils import _DNS_NAME
 
 if TYPE_CHECKING:
     from ..message import EmailMessage
@@ -84,7 +84,7 @@ class EmailBackend(BaseEmailBackend):
 
         # If local_hostname is not specified, socket.getfqdn() gets used.
         # For performance, we use the cached FQDN for local_hostname.
-        connection_params: dict[str, Any] = {"local_hostname": DNS_NAME.get_fqdn()}
+        connection_params: dict[str, Any] = {"local_hostname": _DNS_NAME.get_fqdn()}
         if self.timeout is not None:
             connection_params["timeout"] = self.timeout
         if self.use_ssl:
@@ -153,9 +153,9 @@ class EmailBackend(BaseEmailBackend):
         if not email_message.recipients():
             return False
         encoding = email_message.encoding or settings.DEFAULT_CHARSET
-        from_email = sanitize_address(email_message.from_email, encoding)
+        from_email = _sanitize_address(email_message.from_email, encoding)
         recipients = [
-            sanitize_address(addr, encoding) for addr in email_message.recipients()
+            _sanitize_address(addr, encoding) for addr in email_message.recipients()
         ]
         message = email_message.message()
         assert self.connection is not None, "connection should be open before sending"

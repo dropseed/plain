@@ -4,13 +4,13 @@ from pathlib import Path
 
 import click
 
-from plain.assets.finders import APP_ASSETS_DIR
+from plain.assets.finders import _APP_ASSETS_DIR
 from plain.cli import register_cli
 
 from .deps import Dependency, get_deps
 from .exceptions import DependencyError
 
-VENDOR_DIR = APP_ASSETS_DIR / "vendor"
+VENDOR_DIR = _APP_ASSETS_DIR / "vendor"
 
 
 @register_cli("vendor")

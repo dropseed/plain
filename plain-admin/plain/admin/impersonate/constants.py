@@ -1,1 +1,1 @@
-IMPERSONATE_SESSION_KEY = "impersonate"
+_IMPERSONATE_SESSION_KEY = "impersonate"

@@ -13,30 +13,19 @@ if TYPE_CHECKING:
     from .backends.base import BaseEmailBackend
 
 from .message import (
-    DEFAULT_ATTACHMENT_MIME_TYPE,
     BadHeaderError,
     EmailMessage,
     EmailMultiAlternatives,
-    SafeMIMEMultipart,
-    SafeMIMEText,
     TemplateEmail,
-    forbid_multi_line_headers,
     make_msgid,
 )
-from .utils import DNS_NAME, CachedDnsName
 
 __all__ = [
-    "CachedDnsName",
-    "DNS_NAME",
     "EmailMessage",
     "EmailMultiAlternatives",
     "TemplateEmail",
-    "SafeMIMEText",
-    "SafeMIMEMultipart",
-    "DEFAULT_ATTACHMENT_MIME_TYPE",
     "make_msgid",
     "BadHeaderError",
-    "forbid_multi_line_headers",
     "get_connection",
     "send_mail",
     "send_mass_mail",

@@ -20,12 +20,13 @@ from io import BytesIO, StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from plain.internal import internalcode
 from plain.runtime import settings
 from plain.templates import Template, TemplateFileMissing
 from plain.utils.encoding import force_str, punycode
 from plain.utils.html import strip_tags
 
-from .utils import DNS_NAME
+from .utils import _DNS_NAME
 
 if TYPE_CHECKING:
     from os import PathLike
@@ -34,16 +35,16 @@ if TYPE_CHECKING:
 
 # Don't BASE64-encode UTF-8 messages so that we avoid unwanted attention from
 # some spam filters.
-utf8_charset = Charset.Charset("utf-8")
-utf8_charset.body_encoding = None  # type: ignore[assignment]  # Python defaults to BASE64
-utf8_charset_qp = Charset.Charset("utf-8")
-utf8_charset_qp.body_encoding = Charset.QP
+_utf8_charset = Charset.Charset("utf-8")
+_utf8_charset.body_encoding = None  # type: ignore[assignment]  # Python defaults to BASE64
+_utf8_charset_qp = Charset.Charset("utf-8")
+_utf8_charset_qp.body_encoding = Charset.QP
 
 # Default MIME type to use on attachments (if it is not explicitly given
 # and cannot be guessed).
-DEFAULT_ATTACHMENT_MIME_TYPE = "application/octet-stream"
+_DEFAULT_ATTACHMENT_MIME_TYPE = "application/octet-stream"
 
-RFC5322_EMAIL_LINE_LENGTH_LIMIT = 998
+_RFC5322_EMAIL_LINE_LENGTH_LIMIT = 998
 
 
 class BadHeaderError(ValueError):
@@ -51,7 +52,7 @@ class BadHeaderError(ValueError):
 
 
 # Header names that contain structured address data (RFC 5322).
-ADDRESS_HEADERS = {
+_ADDRESS_HEADERS = {
     "from",
     "sender",
     "reply-to",
@@ -66,7 +67,7 @@ ADDRESS_HEADERS = {
 }
 
 
-def forbid_multi_line_headers(
+def _forbid_multi_line_headers(
     name: str, val: str, encoding: str | None
 ) -> tuple[str, str]:
     """Forbid multi-line headers to prevent header injection."""
@@ -79,9 +80,9 @@ def forbid_multi_line_headers(
     try:
         val.encode("ascii")
     except UnicodeEncodeError:
-        if name.lower() in ADDRESS_HEADERS:
+        if name.lower() in _ADDRESS_HEADERS:
             val = ", ".join(
-                sanitize_address(addr, encoding) for addr in getaddresses((val,))
+                _sanitize_address(addr, encoding) for addr in getaddresses((val,))
             )
         else:
             val = Header(val, encoding).encode()
@@ -91,7 +92,7 @@ def forbid_multi_line_headers(
     return name, val
 
 
-def sanitize_address(addr: str | tuple[str, str], encoding: str) -> str:
+def _sanitize_address(addr: str | tuple[str, str], encoding: str) -> str:
     """
     Format a pair of (name, address) or an email address string.
     """
@@ -135,6 +136,7 @@ def sanitize_address(addr: str | tuple[str, str], encoding: str) -> str:
     return formataddr((nm, parsed_address.addr_spec))
 
 
+@internalcode
 class MIMEMixin:
     def as_string(self, unixfrom: bool = False, linesep: str = "\n") -> str:
         """Return the entire formatted message as a string.
@@ -163,13 +165,15 @@ class MIMEMixin:
         return fp.getvalue()
 
 
+@internalcode
 class SafeMIMEMessage(MIMEMixin, MIMEMessage):
     def __setitem__(self, name: str, val: str) -> None:
         # message/rfc822 attachments must be ASCII
-        name, val = forbid_multi_line_headers(name, val, "ascii")
+        name, val = _forbid_multi_line_headers(name, val, "ascii")
         MIMEMessage.__setitem__(self, name, val)
 
 
+@internalcode
 class SafeMIMEText(MIMEMixin, MIMEText):
     def __init__(
         self, _text: str, _subtype: str = "plain", _charset: str | None = None
@@ -178,7 +182,7 @@ class SafeMIMEText(MIMEMixin, MIMEText):
         MIMEText.__init__(self, _text, _subtype=_subtype, _charset=_charset)
 
     def __setitem__(self, name: str, val: str) -> None:
-        name, val = forbid_multi_line_headers(name, val, self.encoding)
+        name, val = _forbid_multi_line_headers(name, val, self.encoding)
         MIMEText.__setitem__(self, name, val)
 
     def set_payload(  # type: ignore[override]
@@ -186,15 +190,16 @@ class SafeMIMEText(MIMEMixin, MIMEText):
     ) -> None:
         if charset == "utf-8" and not isinstance(charset, Charset.Charset):
             has_long_lines = any(
-                len(line.encode()) > RFC5322_EMAIL_LINE_LENGTH_LIMIT
+                len(line.encode()) > _RFC5322_EMAIL_LINE_LENGTH_LIMIT
                 for line in payload.splitlines()
             )
             # Quoted-Printable encoding has the side effect of shortening long
             # lines, if any (#22561).
-            charset = utf8_charset_qp if has_long_lines else utf8_charset
+            charset = _utf8_charset_qp if has_long_lines else _utf8_charset
         MIMEText.set_payload(self, payload, charset=charset)
 
 
+@internalcode
 class SafeMIMEMultipart(MIMEMixin, MIMEMultipart):
     def __init__(
         self,
@@ -208,7 +213,7 @@ class SafeMIMEMultipart(MIMEMixin, MIMEMultipart):
         MIMEMultipart.__init__(self, _subtype, boundary, _subparts, **_params)
 
     def __setitem__(self, name: str, val: str) -> None:
-        name, val = forbid_multi_line_headers(name, val, self.encoding)
+        name, val = _forbid_multi_line_headers(name, val, self.encoding)
         MIMEMultipart.__setitem__(self, name, val)
 
 
@@ -300,8 +305,8 @@ class EmailMessage:
             # will get picked up by formatdate().
             msg["Date"] = formatdate(localtime=settings.EMAIL_USE_LOCALTIME)
         if "message-id" not in header_names:
-            # Use cached DNS_NAME for performance
-            msg["Message-ID"] = make_msgid(domain=str(DNS_NAME))
+            # Use cached _DNS_NAME for performance
+            msg["Message-ID"] = make_msgid(domain=str(_DNS_NAME))
         for name, value in self.extra_headers.items():
             if name.lower() != "from":  # From is already handled
                 msg[name] = value
@@ -337,7 +342,7 @@ class EmailMessage:
 
         For a text/* mimetype (guessed or specified), when a bytes object is
         specified as content, decode it as UTF-8. If that fails, set the
-        mimetype to DEFAULT_ATTACHMENT_MIME_TYPE and don't decode the content.
+        mimetype to _DEFAULT_ATTACHMENT_MIME_TYPE and don't decode the content.
         """
         if isinstance(filename, MIMEBase):
             if content is not None or mimetype is not None:
@@ -352,7 +357,7 @@ class EmailMessage:
             if filename is not None and mimetype is None:
                 mimetype = mimetypes.guess_type(filename)[0]
             if mimetype is None:
-                mimetype = DEFAULT_ATTACHMENT_MIME_TYPE
+                mimetype = _DEFAULT_ATTACHMENT_MIME_TYPE
             basetype, subtype = mimetype.split("/", 1)
 
             if basetype == "text":
@@ -362,7 +367,7 @@ class EmailMessage:
                     except UnicodeDecodeError:
                         # If mimetype suggests the file is text but it's
                         # actually binary, read() raises a UnicodeDecodeError.
-                        mimetype = DEFAULT_ATTACHMENT_MIME_TYPE
+                        mimetype = _DEFAULT_ATTACHMENT_MIME_TYPE
 
             self.attachments.append((filename, content, mimetype))
 
@@ -372,12 +377,12 @@ class EmailMessage:
         """
         Attach a file from the filesystem.
 
-        Set the mimetype to DEFAULT_ATTACHMENT_MIME_TYPE if it isn't specified
+        Set the mimetype to _DEFAULT_ATTACHMENT_MIME_TYPE if it isn't specified
         and cannot be guessed.
 
         For a text/* mimetype (guessed or specified), decode the file's content
         as UTF-8. If that fails, set the mimetype to
-        DEFAULT_ATTACHMENT_MIME_TYPE and don't decode the content.
+        _DEFAULT_ATTACHMENT_MIME_TYPE and don't decode the content.
         """
         path = Path(path)
         with path.open("rb") as file:

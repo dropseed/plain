@@ -6,14 +6,14 @@ from .checks import PreflightCheck
 from .registry import register_check
 from .results import PreflightResult
 
-SECRET_KEY_MIN_LENGTH = 50
-SECRET_KEY_MIN_UNIQUE_CHARACTERS = 5
+_SECRET_KEY_MIN_LENGTH = 50
+_SECRET_KEY_MIN_UNIQUE_CHARACTERS = 5
 
 
 def _check_secret_key(secret_key: str) -> bool:
     return (
-        len(set(secret_key)) >= SECRET_KEY_MIN_UNIQUE_CHARACTERS
-        and len(secret_key) >= SECRET_KEY_MIN_LENGTH
+        len(set(secret_key)) >= _SECRET_KEY_MIN_UNIQUE_CHARACTERS
+        and len(secret_key) >= _SECRET_KEY_MIN_LENGTH
     )
 
 
@@ -25,8 +25,8 @@ class CheckSecretKey(PreflightCheck):
         if not _check_secret_key(settings.SECRET_KEY):
             return [
                 PreflightResult(
-                    fix=f"SECRET_KEY is too weak (needs {SECRET_KEY_MIN_LENGTH}+ characters, "
-                    f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS}+ unique). Generate a new long random value or "
+                    fix=f"SECRET_KEY is too weak (needs {_SECRET_KEY_MIN_LENGTH}+ characters, "
+                    f"{_SECRET_KEY_MIN_UNIQUE_CHARACTERS}+ unique). Generate a new long random value or "
                     f"Plain's security features will be vulnerable to attack.",
                     id="security.secret_key_weak",
                 )
@@ -44,8 +44,8 @@ class CheckSecretKeyFallbacks(PreflightCheck):
             if not _check_secret_key(key):
                 errors.append(
                     PreflightResult(
-                        fix=f"SECRET_KEY_FALLBACKS[{index}] is too weak (needs {SECRET_KEY_MIN_LENGTH}+ characters, "
-                        f"{SECRET_KEY_MIN_UNIQUE_CHARACTERS}+ unique). Generate a new long random value or "
+                        fix=f"SECRET_KEY_FALLBACKS[{index}] is too weak (needs {_SECRET_KEY_MIN_LENGTH}+ characters, "
+                        f"{_SECRET_KEY_MIN_UNIQUE_CHARACTERS}+ unique). Generate a new long random value or "
                         f"Plain's security features will be vulnerable to attack.",
                         id="security.secret_key_fallback_weak",
                     )

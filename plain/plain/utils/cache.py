@@ -27,7 +27,7 @@ from .regex_helper import _lazy_re_compile
 if TYPE_CHECKING:
     from plain.http import ResponseBase
 
-cc_delim_re = _lazy_re_compile(r"\s*,\s*")
+_cc_delim_re = _lazy_re_compile(r"\s*,\s*")
 
 
 def patch_response_headers(response: ResponseBase, cache_timeout: int | float) -> None:
@@ -82,7 +82,7 @@ def patch_cache_control(response: ResponseBase, **kwargs: Any) -> None:
 
     cc = defaultdict(set)
     if response.headers.get("Cache-Control"):
-        for field in cc_delim_re.split(response.headers["Cache-Control"]):
+        for field in _cc_delim_re.split(response.headers["Cache-Control"]):
             directive, value = dictitem(field)
             if directive == "no-cache":
                 # no-cache supports multiple field names.
@@ -134,7 +134,7 @@ def patch_vary_headers(response: ResponseBase, newheaders: list[str]) -> None:
     # implementations may rely on the order of the Vary contents in, say,
     # computing an MD5 hash.
     if "Vary" in response.headers:
-        vary_headers = cc_delim_re.split(response.headers["Vary"])
+        vary_headers = _cc_delim_re.split(response.headers["Vary"])
     else:
         vary_headers = []
     # Use .lower() here so we treat headers as case-insensitive.

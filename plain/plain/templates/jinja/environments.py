@@ -12,7 +12,7 @@ from .filters import default_filters
 from .globals import default_globals
 
 
-def finalize_callable_error(obj: Any) -> Any:
+def _finalize_callable_error(obj: Any) -> Any:
     """Prevent direct rendering of a callable (likely just forgotten ()) by raising a TypeError"""
     if callable(obj):
         raise TypeError(f"{obj} is callable, did you forget parentheses?")
@@ -55,7 +55,7 @@ class DefaultEnvironment(Environment):
             autoescape=True,
             auto_reload=settings.DEBUG,
             undefined=StrictUndefined,
-            finalize=finalize_callable_error,
+            finalize=_finalize_callable_error,
             extensions=["jinja2.ext.loopcontrols", "jinja2.ext.debug"],
         )
 

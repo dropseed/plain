@@ -11,7 +11,7 @@ from plain.exceptions import ImproperlyConfigured
 if TYPE_CHECKING:
     from plain.packages.registry import PackagesRegistry
 
-CONFIG_MODULE_NAME = "config"
+_CONFIG_MODULE_NAME = "config"
 
 
 class PackageConfig:

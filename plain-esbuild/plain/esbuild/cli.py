@@ -3,7 +3,7 @@ import os
 import click
 from watchfiles import Change, DefaultFilter, watch
 
-from plain.assets.finders import iter_asset_dirs, iter_assets
+from plain.assets.finders import _iter_asset_dirs, _iter_assets
 from plain.cli import register_cli
 
 from .core import esbuild, get_esbuilt_path
@@ -19,7 +19,7 @@ def cli() -> None:
 @click.option("--minify", is_flag=True, default=True)
 def build(minify: bool) -> None:
     returncode = 0
-    for asset in iter_assets():
+    for asset in _iter_assets():
         if ".esbuild." in asset.absolute_path:
             if not esbuild(
                 asset.absolute_path,
@@ -39,7 +39,7 @@ def dev(ctx: click.Context) -> None:
     # Do an initial build of the assets
     ctx.invoke(build, minify=False)
 
-    asset_dirs = list(iter_asset_dirs())
+    asset_dirs = list(_iter_asset_dirs())
 
     class EsbuildFilter(DefaultFilter):
         ignore_entity_patterns = (

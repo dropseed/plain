@@ -11,7 +11,7 @@ from plain.utils.inspect import func_accepts_kwargs
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-logger = logging.getLogger("plain.signals.dispatch")
+_logger = logging.getLogger("plain.signals.dispatch")
 
 
 def _make_id(target: Any) -> int | tuple[int, int]:
@@ -20,10 +20,10 @@ def _make_id(target: Any) -> int | tuple[int, int]:
     return id(target)
 
 
-NONE_ID = _make_id(None)
+_NONE_ID = _make_id(None)
 
 # A marker for caching
-NO_RECEIVERS = object()
+_NO_RECEIVERS = object()
 
 
 class Signal:
@@ -193,7 +193,7 @@ class Signal:
         """
         if (
             not self.receivers
-            or self.sender_receivers_cache.get(sender) is NO_RECEIVERS
+            or self.sender_receivers_cache.get(sender) is _NO_RECEIVERS
         ):
             return []
         responses = []
@@ -204,7 +204,7 @@ class Signal:
         return responses
 
     def _log_robust_failure(self, receiver: Callable[..., Any], err: Exception) -> None:
-        logger.error(
+        _logger.error(
             "Error calling %s in Signal.send_robust() (%s)",
             getattr(receiver, "__qualname__", repr(receiver)),
             err,
@@ -238,7 +238,7 @@ class Signal:
         """
         if (
             not self.receivers
-            or self.sender_receivers_cache.get(sender) is NO_RECEIVERS
+            or self.sender_receivers_cache.get(sender) is _NO_RECEIVERS
         ):
             return []
 
@@ -276,9 +276,9 @@ class Signal:
         receivers = None
         if self.use_caching and not self._dead_receivers:
             receivers = self.sender_receivers_cache.get(sender)
-            # We could end up here with NO_RECEIVERS even if we do check this case in
+            # We could end up here with _NO_RECEIVERS even if we do check this case in
             # .send() prior to calling _live_receivers() due to concurrent .send() call.
-            if receivers is NO_RECEIVERS:
+            if receivers is _NO_RECEIVERS:
                 return []
         if receivers is None:
             with self.lock:
@@ -286,11 +286,11 @@ class Signal:
                 senderkey = _make_id(sender)
                 receivers = []
                 for (_receiverkey, r_senderkey), receiver in self.receivers:
-                    if r_senderkey == NONE_ID or r_senderkey == senderkey:
+                    if r_senderkey == _NONE_ID or r_senderkey == senderkey:
                         receivers.append(receiver)
                 if self.use_caching:
                     if not receivers:
-                        self.sender_receivers_cache[sender] = NO_RECEIVERS
+                        self.sender_receivers_cache[sender] = _NO_RECEIVERS
                     else:
                         # Note, we must cache the weakref versions.
                         self.sender_receivers_cache[sender] = receivers

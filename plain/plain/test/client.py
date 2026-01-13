@@ -186,6 +186,7 @@ def _conditional_content_removal(
     return response
 
 
+@internalcode
 class ClientHandler(BaseHandler):
     """
     An HTTP Handler that can be used for testing purposes. Use the WSGI

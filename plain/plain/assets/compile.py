@@ -8,10 +8,10 @@ from pathlib import Path
 
 from plain.runtime import PLAIN_TEMP_PATH
 
-from .finders import Asset, iter_assets
-from .fingerprints import AssetsFingerprintsManifest, get_file_fingerprint
+from .finders import Asset, _iter_assets
+from .fingerprints import AssetsFingerprintsManifest, _get_file_fingerprint
 
-SKIP_COMPRESS_EXTENSIONS = (
+_SKIP_COMPRESS_EXTENSIONS = (
     # Images
     ".jpg",
     ".jpeg",
@@ -62,7 +62,7 @@ def compile_assets(
     """
     manifest = AssetsFingerprintsManifest()
 
-    for asset in iter_assets():
+    for asset in _iter_assets():
         url_path = asset.url_path
         resolved_path, compiled_paths = compile_asset(
             asset=asset,
@@ -112,7 +112,7 @@ def compile_asset(
         # Fingerprint it with an md5 hash
         # (maybe need a setting with fnmatch patterns for files to NOT fingerprint?
         # that would allow pre-fingerprinted files to be used as-is, and keep source maps etc in tact)
-        fingerprint_hash = get_file_fingerprint(asset.absolute_path)
+        fingerprint_hash = _get_file_fingerprint(asset.absolute_path)
 
         fingerprinted_basename = f"{base}.{fingerprint_hash}{extension}"
         fingerprinted_path = os.path.join(target_dir, fingerprinted_basename)
@@ -121,7 +121,7 @@ def compile_asset(
 
         resolved_url_path = str(os.path.relpath(fingerprinted_path, target_dir))
 
-    if compress and extension.lower() not in SKIP_COMPRESS_EXTENSIONS:
+    if compress and extension.lower() not in _SKIP_COMPRESS_EXTENSIONS:
         for path in compiled_paths.copy():
             gzip_path = f"{path}.gz"
             with gzip.GzipFile(gzip_path, "wb") as f:
