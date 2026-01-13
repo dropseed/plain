@@ -1,5 +1,16 @@
 # plain-passwords changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-passwords@0.20.0) (2026-01-13)
+
+### What's changed
+
+- Updated to use renamed `RedirectResponse` class (previously `ResponseRedirect`) ([fad5bf2](https://github.com/dropseed/plain/commit/fad5bf28b0))
+- Updated to use renamed `BadRequestError400` exception (previously `BadRequest`) ([5a1f020](https://github.com/dropseed/plain/commit/5a1f020f52))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.19.1](https://github.com/dropseed/plain/releases/plain-passwords@0.19.1) (2025-12-22)
 
 ### What's changed
