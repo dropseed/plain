@@ -14,12 +14,7 @@ from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 if TYPE_CHECKING:
     from plain.urls import ResolverMatch
 
-from plain.exceptions import (
-    BadRequestError400,
-    ImproperlyConfigured,
-    RequestDataTooBigError400,
-    TooManyFieldsSentError400,
-)
+from plain.exceptions import ImproperlyConfigured
 from plain.http.cookie import unsign_cookie_value
 from plain.http.multipartparser import (
     MultiPartParser,
@@ -31,6 +26,12 @@ from plain.utils.datastructures import (
 )
 from plain.utils.encoding import iri_to_uri
 from plain.utils.http import parse_header_parameters
+
+from .exceptions import (
+    BadRequestError400,
+    RequestDataTooBigError400,
+    TooManyFieldsSentError400,
+)
 
 _T = TypeVar("_T")
 

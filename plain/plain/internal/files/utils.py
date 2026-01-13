@@ -4,7 +4,7 @@ import os
 import pathlib
 from typing import TYPE_CHECKING
 
-from plain.exceptions import SuspiciousFileOperationError400
+from plain.http import SuspiciousFileOperationError400
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

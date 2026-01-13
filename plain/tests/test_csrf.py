@@ -319,7 +319,7 @@ def test_middleware_integration_rejected_request():
     """Rejected requests should raise SuspiciousOperationError400 without calling next."""
     from unittest.mock import Mock
 
-    from plain.exceptions import SuspiciousOperationError400
+    from plain.http import SuspiciousOperationError400
 
     rf = RequestFactory()
     mock_get_response = Mock()

@@ -4,8 +4,9 @@ from functools import cached_property
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
-from plain.exceptions import ForbiddenError403, NotFoundError404
 from plain.http import (
+    ForbiddenError403,
+    NotFoundError404,
     QueryDict,
     RedirectResponse,
     ResponseBase,

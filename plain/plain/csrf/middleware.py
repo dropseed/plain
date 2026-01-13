@@ -5,8 +5,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from plain.exceptions import SuspiciousOperationError400
-from plain.http import HttpMiddleware
+from plain.http import HttpMiddleware, SuspiciousOperationError400
 from plain.runtime import settings
 
 if TYPE_CHECKING:

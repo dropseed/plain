@@ -14,12 +14,6 @@ import html
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
-from plain.exceptions import (
-    RequestDataTooBigError400,
-    SuspiciousMultipartFormError400,
-    TooManyFieldsSentError400,
-    TooManyFilesSentError400,
-)
 from plain.internal.files.uploadhandler import SkipFile, StopFutureHandlers, StopUpload
 from plain.runtime import settings
 from plain.utils.datastructures import MultiValueDict
@@ -27,6 +21,13 @@ from plain.utils.encoding import force_str
 from plain.utils.http import parse_header_parameters
 from plain.utils.module_loading import import_string
 from plain.utils.regex_helper import _lazy_re_compile
+
+from .exceptions import (
+    RequestDataTooBigError400,
+    SuspiciousMultipartFormError400,
+    TooManyFieldsSentError400,
+    TooManyFilesSentError400,
+)
 
 if TYPE_CHECKING:
     from plain.http.request import Request

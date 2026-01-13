@@ -9,9 +9,9 @@ from plain.auth import get_user_model
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView
-from plain.exceptions import BadRequestError400
 from plain.forms import BaseForm
 from plain.http import (
+    BadRequestError400,
     RedirectResponse,
 )
 from plain.urls import reverse

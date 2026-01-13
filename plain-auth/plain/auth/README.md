@@ -139,7 +139,7 @@ Use the [`AuthViewMixin`](./views.py#AuthViewMixin) to restrict views to logged-
 
 ```python
 from plain.auth.views import AuthViewMixin
-from plain.exceptions import ForbiddenError403
+from plain.http import ForbiddenError403
 from plain.views import View
 
 
