@@ -20,7 +20,7 @@ def install_git_hook() -> None:
         with open(hook_path, "w") as f:
             f.write(
                 """#!/bin/sh
-plain pre-commit"""
+uv run plain pre-commit"""
             )
         os.chmod(hook_path, 0o755)
         print("pre-commit hook installed")
