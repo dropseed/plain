@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from plain.auth import login as auth_login
 from plain.auth.requests import get_request_user
-from plain.http import Request, Response, ResponseRedirect
+from plain.http import RedirectResponse, Request, Response
 from plain.runtime import settings
 from plain.sessions import get_request_session
 from plain.urls import reverse
@@ -205,7 +205,7 @@ class OAuthProvider(ABC):
         Returns a redirect response to the given URL.
         This is a utility method to ensure consistent redirect handling.
         """
-        response = ResponseRedirect(redirect_url)
+        response = RedirectResponse(redirect_url)
         add_never_cache_headers(response)
         return response
 

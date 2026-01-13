@@ -89,7 +89,7 @@ class ClientResponse:
         """
         Return redirect URL if this is a redirect response.
 
-        This property exists on ResponseRedirect and is added for redirects.
+        This property exists on RedirectResponse and is added for redirects.
         """
         response = object.__getattribute__(self, "_response")
         if hasattr(response, "url"):

@@ -2,7 +2,7 @@ from typing import Any
 
 from plain.auth import get_user_model
 from plain.auth.requests import get_request_user, set_request_user
-from plain.http import HttpMiddleware, Request, Response, ResponseForbidden
+from plain.http import HttpMiddleware, Request, Response
 from plain.sessions import get_request_session
 
 from .constants import IMPERSONATE_SESSION_KEY
@@ -35,7 +35,7 @@ class ImpersonateMiddleware(HttpMiddleware):
                 if not can_impersonate_user(user, user_to_impersonate):
                     # Can't impersonate this user, remove it and show an error
                     del session[IMPERSONATE_SESSION_KEY]
-                    return ResponseForbidden()
+                    return Response(status_code=403)
 
                 # Finally, change the request user and keep a reference to the original
                 set_request_impersonator(request, user)

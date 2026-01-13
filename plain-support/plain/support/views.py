@@ -5,7 +5,7 @@ from typing import Any
 from plain.assets.urls import get_asset_url
 from plain.auth.views import AuthView
 from plain.forms import Form
-from plain.http import Response, ResponseBase, ResponseRedirect
+from plain.http import RedirectResponse, Response, ResponseBase
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
 from plain.views import FormView, View
@@ -60,5 +60,5 @@ class SupportIFrameView(SupportFormView):
 
 
 class SupportFormJSView(View):
-    def get(self) -> ResponseRedirect:
-        return ResponseRedirect(get_asset_url("support/embed.js"))
+    def get(self) -> RedirectResponse:
+        return RedirectResponse(get_asset_url("support/embed.js"))

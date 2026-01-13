@@ -6,8 +6,8 @@ from typing import Any
 from plain.assets.views import AssetView
 from plain.http import (
     NotFoundError404,
+    RedirectResponse,
     Response,
-    ResponseRedirect,
 )
 from plain.runtime import settings
 from plain.views import TemplateView, View
@@ -65,14 +65,14 @@ class PageView(PageViewMixin, TemplateView):
 
 
 class PageRedirectView(PageViewMixin, View):
-    def get(self) -> ResponseRedirect:
+    def get(self) -> RedirectResponse:
         url = self.page.vars.get("url")
 
         if not url:
             raise RedirectPageError("Redirect page is missing a url")
 
         status_code = self.page.vars.get("status_code", 302)
-        return ResponseRedirect(url, status_code=status_code)
+        return RedirectResponse(url, status_code=status_code)
 
 
 class PageAssetView(PageViewMixin, AssetView):

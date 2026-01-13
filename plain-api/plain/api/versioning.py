@@ -2,7 +2,7 @@ import json
 from functools import cached_property
 from typing import Any
 
-from plain.http import Request, ResponseBadRequest, ResponseBase
+from plain.http import Request, Response, ResponseBase
 from plain.views import View
 from plain.views.exceptions import ResponseException
 
@@ -48,8 +48,9 @@ class VersionedAPIView(View):
             version = default_version
         else:
             raise ResponseException(
-                ResponseBadRequest(
-                    f"Missing API version header '{self.api_version_header}'"
+                Response(
+                    f"Missing API version header '{self.api_version_header}'",
+                    status_code=400,
                 )
             )
 
@@ -57,8 +58,9 @@ class VersionedAPIView(View):
             return version
         else:
             raise ResponseException(
-                ResponseBadRequest(
-                    f"Invalid API version '{version_name}'. Valid versions are: {', '.join(self.api_versions.keys())}"
+                Response(
+                    f"Invalid API version '{version_name}'. Valid versions are: {', '.join(self.api_versions.keys())}",
+                    status_code=400,
                 )
             )
 

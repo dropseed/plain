@@ -5,7 +5,7 @@ from typing import Any
 from plain.auth import login, logout
 from plain.auth.views import AuthView
 from plain.forms import BaseForm
-from plain.http import Response, ResponseRedirect
+from plain.http import RedirectResponse, Response
 from plain.runtime import settings
 from plain.urls import reverse, reverse_lazy
 from plain.views import FormView, TemplateView, View
@@ -27,7 +27,7 @@ class LoginLinkFormView(AuthView, FormView):
         # Redirect if the user is already logged in
         if self.user:
             form = self.get_form()
-            return ResponseRedirect(self.get_success_url(form))
+            return RedirectResponse(self.get_success_url(form))
 
         return super().get()
 
@@ -51,7 +51,7 @@ class LoginLinkSentView(AuthView, TemplateView):
         # Redirect if the user is already logged in
         if self.user:
             next_url = self.request.query_params.get("next", "/")
-            return ResponseRedirect(next_url)
+            return RedirectResponse(next_url)
 
         return super().get()
 
@@ -79,15 +79,15 @@ class LoginLinkLoginView(AuthView, View):
         try:
             user = get_link_token_user(token)
         except LoginLinkExpired:
-            return ResponseRedirect(reverse("loginlink:failed") + "?error=expired")
+            return RedirectResponse(reverse("loginlink:failed") + "?error=expired")
         except LoginLinkInvalid:
-            return ResponseRedirect(reverse("loginlink:failed") + "?error=invalid")
+            return RedirectResponse(reverse("loginlink:failed") + "?error=invalid")
         except LoginLinkChanged:
-            return ResponseRedirect(reverse("loginlink:failed") + "?error=changed")
+            return RedirectResponse(reverse("loginlink:failed") + "?error=changed")
 
         login(self.request, user)
 
         if next_url := self.request.query_params.get("next"):
-            return ResponseRedirect(next_url)
+            return RedirectResponse(next_url)
 
-        return ResponseRedirect(self.success_url)
+        return RedirectResponse(self.success_url)

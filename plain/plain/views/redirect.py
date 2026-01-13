@@ -1,4 +1,4 @@
-from plain.http import ResponseRedirect
+from plain.http import RedirectResponse
 from plain.urls import reverse
 
 from .base import View
@@ -46,24 +46,24 @@ class RedirectView(View):
             url = f"{url}?{self.request.query_string}"
         return url
 
-    def get(self) -> ResponseRedirect:
+    def get(self) -> RedirectResponse:
         url = self.get_redirect_url()
-        return ResponseRedirect(url, status_code=self.status_code)
+        return RedirectResponse(url, status_code=self.status_code)
 
-    def head(self) -> ResponseRedirect:
+    def head(self) -> RedirectResponse:
         return self.get()
 
-    def post(self) -> ResponseRedirect:
+    def post(self) -> RedirectResponse:
         return self.get()
 
-    def options(self) -> ResponseRedirect:
+    def options(self) -> RedirectResponse:
         return self.get()
 
-    def delete(self) -> ResponseRedirect:
+    def delete(self) -> RedirectResponse:
         return self.get()
 
-    def put(self) -> ResponseRedirect:
+    def put(self) -> RedirectResponse:
         return self.get()
 
-    def patch(self) -> ResponseRedirect:
+    def patch(self) -> RedirectResponse:
         return self.get()

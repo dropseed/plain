@@ -1,6 +1,6 @@
 from typing import Any
 
-from plain.http import Response, ResponseRedirect
+from plain.http import RedirectResponse, Response
 from plain.urls import Router, include, path
 
 from .impersonate.urls import ImpersonateRouter
@@ -16,7 +16,7 @@ class AdminIndexView(AdminView):
         # Slight hack to redirect to the first view that doesn't
         # require any url params...
         if views := registry.get_searchable_views():
-            return ResponseRedirect(list(views)[0].get_view_url())
+            return RedirectResponse(list(views)[0].get_view_url())
 
         return super().get()
 

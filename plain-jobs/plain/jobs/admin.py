@@ -10,7 +10,7 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
-from plain.http import ResponseRedirect
+from plain.http import RedirectResponse
 from plain.models.expressions import Case, When
 from plain.runtime import settings
 
@@ -241,6 +241,6 @@ class JobResultViewset(AdminViewset):
         model = JobResult
         title = "Result"
 
-        def post(self) -> ResponseRedirect:
+        def post(self) -> RedirectResponse:
             self.object.retry_job(delay=0)
-            return ResponseRedirect(".")
+            return RedirectResponse(".")

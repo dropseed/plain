@@ -2,7 +2,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ImproperlyConfigured
-from plain.http import Response, ResponseRedirect
+from plain.http import RedirectResponse, Response
 
 from .templates import TemplateView
 
@@ -40,7 +40,7 @@ class FormView(TemplateView):
 
     def form_valid(self, form: "BaseForm") -> Response:
         """If the form is valid, redirect to the supplied URL."""
-        return ResponseRedirect(self.get_success_url(form))
+        return RedirectResponse(self.get_success_url(form))
 
     def form_invalid(self, form: "BaseForm") -> Response:
         """If the form is invalid, render the invalid form."""

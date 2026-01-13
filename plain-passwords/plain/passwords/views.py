@@ -12,7 +12,7 @@ from plain.auth.views import AuthView
 from plain.exceptions import BadRequestError400
 from plain.forms import BaseForm
 from plain.http import (
-    ResponseRedirect,
+    RedirectResponse,
 )
 from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
@@ -97,7 +97,7 @@ class PasswordResetView(AuthView, FormView):
     def get(self) -> Response:
         if self.user:
             # Redirect if the user is already logged in
-            return ResponseRedirect(str(self.success_url) if self.success_url else "/")
+            return RedirectResponse(str(self.success_url) if self.success_url else "/")
 
         # Tokens are initially passed as GET parameters and we
         # immediately store them in the session and remove it from the URL.
@@ -108,7 +108,7 @@ class PasswordResetView(AuthView, FormView):
             # HTTP Referer header.
             self.session[self._reset_token_session_key] = token
             # Redirect to the path itself, without the GET parameters
-            response = ResponseRedirect(self.request.path)
+            response = RedirectResponse(self.request.path)
             add_never_cache_headers(response)
             return response
 
@@ -166,7 +166,7 @@ class PasswordLoginView(AuthView, FormView):
     def get(self) -> Response:
         # Redirect if the user is already logged in
         if self.user:
-            return ResponseRedirect(self.success_url)
+            return RedirectResponse(self.success_url)
 
         return super().get()
 

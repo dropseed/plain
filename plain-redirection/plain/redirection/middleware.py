@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plain.http import HttpMiddleware, ResponseRedirect
+from plain.http import HttpMiddleware, RedirectResponse
 
 if TYPE_CHECKING:
     from plain.http import Request, Response
@@ -23,7 +23,7 @@ class RedirectionMiddleware(HttpMiddleware):
                     # Log it
                     redirect_log = RedirectLog.from_redirect(redirect, request)
                     # Then redirect
-                    return ResponseRedirect(
+                    return RedirectResponse(
                         str(redirect_log.to_url), status_code=redirect.http_status
                     )
 

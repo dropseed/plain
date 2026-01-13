@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plain.http import HttpMiddleware, ResponseRedirect
+from plain.http import HttpMiddleware, RedirectResponse
 from plain.runtime import settings
 
 if TYPE_CHECKING:
@@ -30,7 +30,7 @@ class HttpsRedirectMiddleware(HttpMiddleware):
 
     def maybe_https_redirect(self, request: Request) -> Response | None:
         if self.https_redirect_enabled and not request.is_https():
-            return ResponseRedirect(
+            return RedirectResponse(
                 f"https://{request.host}{request.get_full_path()}", status_code=301
             )
         return None

@@ -2,7 +2,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from plain.htmx.views import HTMXView
-from plain.http import Response, ResponseRedirect
+from plain.http import RedirectResponse, Response
 from plain.models import Model, QuerySet
 from plain.paginator import Paginator
 from plain.views import (
@@ -97,7 +97,7 @@ class AdminListView(HTMXView, AdminView):
                 return response
             else:
                 # message in session first
-                return ResponseRedirect(".")
+                return RedirectResponse(".")
 
         raise ValueError("Invalid action")
 

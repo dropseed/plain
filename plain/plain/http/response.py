@@ -585,7 +585,7 @@ class FileResponse(StreamingResponse):
             self.headers["Content-Disposition"] = content_disposition
 
 
-class ResponseRedirect(Response):
+class RedirectResponse(Response):
     """HTTP redirect response"""
 
     status_code = 302
@@ -610,7 +610,7 @@ class ResponseRedirect(Response):
         )
 
 
-class ResponseNotModified(Response):
+class NotModifiedResponse(Response):
     """HTTP 304 response"""
 
     status_code = 304
@@ -628,25 +628,7 @@ class ResponseNotModified(Response):
         self._container = []
 
 
-class ResponseBadRequest(Response):
-    """HTTP 400 response"""
-
-    status_code = 400
-
-
-class ResponseNotFound(Response):
-    """HTTP 404 response"""
-
-    status_code = 404
-
-
-class ResponseForbidden(Response):
-    """HTTP 403 response"""
-
-    status_code = 403
-
-
-class ResponseNotAllowed(Response):
+class NotAllowedResponse(Response):
     """HTTP 405 response"""
 
     status_code = 405
@@ -662,18 +644,6 @@ class ResponseNotAllowed(Response):
             "content_type": self._content_type_for_repr,
             "methods": self.headers["Allow"],
         }
-
-
-class ResponseGone(Response):
-    """HTTP 410 response"""
-
-    status_code = 410
-
-
-class ResponseServerError(Response):
-    """HTTP 500 response"""
-
-    status_code = 500
 
 
 class JsonResponse(Response):

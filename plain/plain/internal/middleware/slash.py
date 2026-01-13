@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plain.http import HttpMiddleware, ResponseRedirect
+from plain.http import HttpMiddleware, RedirectResponse
 from plain.runtime import settings
 from plain.urls import Resolver404, get_resolver
 from plain.utils.http import escape_leading_slashes
@@ -27,7 +27,7 @@ class RedirectSlashMiddleware(HttpMiddleware):
         # If the given URL is "Not Found", then check if we should redirect to
         # a path with a slash appended.
         if response.status_code == 404 and self.should_redirect_with_slash(request):
-            return ResponseRedirect(
+            return RedirectResponse(
                 self.get_full_path_with_slash(request), status_code=301
             )
 

@@ -2,7 +2,7 @@ import logging
 
 from plain.auth.requests import get_request_user
 from plain.auth.views import AuthView
-from plain.http import Response, ResponseRedirect
+from plain.http import RedirectResponse, Response
 from plain.views import TemplateView, View
 
 from .exceptions import (
@@ -18,7 +18,7 @@ class OAuthLoginView(View):
         request = self.request
         provider = self.url_kwargs["provider"]
         if get_request_user(request):
-            return ResponseRedirect("/")
+            return RedirectResponse("/")
 
         provider_instance = get_oauth_provider_instance(provider_key=provider)
         return provider_instance.handle_login_request(request=request)

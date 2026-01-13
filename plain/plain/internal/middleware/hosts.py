@@ -4,7 +4,7 @@ import ipaddress
 import logging
 from typing import TYPE_CHECKING
 
-from plain.http import HttpMiddleware, Request, ResponseBadRequest
+from plain.http import HttpMiddleware, Request, Response
 from plain.runtime import settings
 from plain.utils.regex_helper import _lazy_re_compile
 
@@ -45,7 +45,7 @@ class HostValidationMiddleware(HttpMiddleware):
                 extra={"status_code": 400, "request": request},
             )
 
-            return ResponseBadRequest()
+            return Response(status_code=400)
 
         return self.get_response(request)
 

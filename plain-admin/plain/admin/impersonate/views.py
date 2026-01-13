@@ -1,5 +1,5 @@
 from plain.auth.views import AuthView
-from plain.http import Response, ResponseForbidden, ResponseRedirect
+from plain.http import RedirectResponse, Response
 from plain.sessions.views import SessionView
 
 from .constants import IMPERSONATE_SESSION_KEY
@@ -13,12 +13,12 @@ class ImpersonateStartView(AuthView):
         impersonator = get_request_impersonator(self.request) or self.user
         if impersonator and can_be_impersonator(impersonator):
             self.session[IMPERSONATE_SESSION_KEY] = self.url_kwargs["id"]
-            return ResponseRedirect(self.request.query_params.get("next", "/"))
+            return RedirectResponse(self.request.query_params.get("next", "/"))
 
-        return ResponseForbidden()
+        return Response(status_code=403)
 
 
 class ImpersonateStopView(SessionView):
     def get(self) -> Response:
         self.session.pop(IMPERSONATE_SESSION_KEY)
-        return ResponseRedirect(self.request.query_params.get("next", "/"))
+        return RedirectResponse(self.request.query_params.get("next", "/"))

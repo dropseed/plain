@@ -7,8 +7,8 @@ from urllib.parse import urlparse, urlunparse
 from plain.exceptions import ForbiddenError403, NotFoundError404
 from plain.http import (
     QueryDict,
+    RedirectResponse,
     ResponseBase,
-    ResponseRedirect,
 )
 from plain.runtime import settings
 from plain.sessions.views import SessionView
@@ -114,14 +114,14 @@ class AuthView(SessionView):
 
 
 class LogoutView(View):
-    def post(self) -> ResponseRedirect:
+    def post(self) -> RedirectResponse:
         logout(self.request)
-        return ResponseRedirect("/")
+        return RedirectResponse("/")
 
 
 def redirect_to_login(
     next: str, login_url: str | None = None, redirect_field_name: str = "next"
-) -> ResponseRedirect:
+) -> RedirectResponse:
     """
     Redirect the user to the login page, passing the given 'next' page.
     """
@@ -133,4 +133,4 @@ def redirect_to_login(
         querystring[redirect_field_name] = next
         login_url_parts[4] = querystring.urlencode(safe="/")
 
-    return ResponseRedirect(str(urlunparse(login_url_parts)))
+    return RedirectResponse(str(urlunparse(login_url_parts)))

@@ -11,7 +11,7 @@ from plain.exceptions import (
     SuspiciousOperationError400,
 )
 from plain.forms.exceptions import FormFieldMissingError
-from plain.http import ResponseServerError
+from plain.http import Response
 from plain.http.multipartparser import MultiPartParserError
 from plain.runtime import settings
 from plain.views.errors import ErrorView
@@ -146,6 +146,6 @@ def get_exception_response(
             raise
 
         # If we can't load the view, return a 500 response
-        response = ResponseServerError()
+        response = Response(status_code=500)
         response.exception = e
         return response

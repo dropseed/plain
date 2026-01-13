@@ -13,11 +13,11 @@ from opentelemetry.semconv._incubating.attributes.code_attributes import (
 
 from plain.http import (
     JsonResponse,
+    NotAllowedResponse,
     NotFoundError404,
     Request,
     Response,
     ResponseBase,
-    ResponseNotAllowed,
 )
 from plain.utils.decorators import classonlymethod
 
@@ -92,7 +92,7 @@ class View:
                 self.request.path,
                 extra={"status_code": 405, "request": self.request},
             )
-            return ResponseNotAllowed(self._allowed_methods())
+            return NotAllowedResponse(self._allowed_methods())
 
         try:
             result: Any = handler()

@@ -9,9 +9,9 @@ from io import BytesIO
 from plain.http import (
     FileResponse,
     NotFoundError404,
+    NotModifiedResponse,
+    RedirectResponse,
     Response,
-    ResponseNotModified,
-    ResponseRedirect,
     StreamingResponse,
 )
 from plain.http.response import ResponseHeaders
@@ -214,7 +214,7 @@ class AssetView(View):
                 return gzip_path
         return None
 
-    def get_redirect_response(self, path: str) -> ResponseRedirect | None:
+    def get_redirect_response(self, path: str) -> RedirectResponse | None:
         """If the asset is not found, try to redirect to the fingerprinted path"""
         fingerprinted_url_path = get_fingerprinted_url_path(path)
 
@@ -227,19 +227,19 @@ class AssetView(View):
 
         namespace = AssetsRouter.namespace
 
-        return ResponseRedirect(
+        return RedirectResponse(
             redirect_to=reverse(f"{namespace}:asset", fingerprinted_url_path),
             headers={
                 "Cache-Control": "max-age=60",  # Can cache this for a short time, but the fingerprinted path can change
             },
         )
 
-    def get_conditional_response(self, path: str) -> ResponseNotModified | None:
+    def get_conditional_response(self, path: str) -> NotModifiedResponse | None:
         """
         Support conditional requests (HTTP 304 response) based on ETag and Last-Modified headers.
         """
         if self.request.headers.get("If-None-Match") == self.get_etag(path):
-            response = ResponseNotModified()
+            response = NotModifiedResponse()
             response.headers = self.update_headers(response.headers, path)
             return response
 
@@ -251,7 +251,7 @@ class AssetView(View):
                 and last_modified
                 and if_modified_since >= last_modified
             ):
-                response = ResponseNotModified()
+                response = NotModifiedResponse()
                 response.headers = self.update_headers(response.headers, path)
                 return response
         return None
