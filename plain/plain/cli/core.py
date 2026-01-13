@@ -9,7 +9,6 @@ from click.core import Command, Context
 import plain.runtime
 from plain.exceptions import ImproperlyConfigured
 
-from .agent import agent
 from .build import build
 from .changelog import changelog
 from .chores import chores
@@ -18,10 +17,12 @@ from .formatting import PlainContext
 from .install import install
 from .preflight import preflight_cli
 from .registry import cli_registry
+from .request import request
 from .scaffold import create
 from .server import server
 from .settings import settings
 from .shell import run, shell
+from .skills import skills
 from .upgrade import upgrade
 from .urls import urls
 from .utils import utils
@@ -32,8 +33,9 @@ def plain_cli() -> None:
     pass
 
 
-plain_cli.add_command(agent)
 plain_cli.add_command(docs)
+plain_cli.add_command(request)
+plain_cli.add_command(skills)
 plain_cli.add_command(preflight_cli)
 plain_cli.add_command(create)
 plain_cli.add_command(chores)

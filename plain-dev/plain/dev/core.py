@@ -138,7 +138,7 @@ class DevProcess(ProcessManager):
         )
 
         self.symlink_plain_src()
-        self.generate_agents_md()
+        self.install_skills()
         self.modify_hosts_file()
 
         print_event("Running preflight checks...", newline=False)
@@ -225,24 +225,24 @@ class DevProcess(ProcessManager):
         if plain_path.exists() and not symlink_path.exists():
             symlink_path.symlink_to(plain_path)
 
-    def generate_agents_md(self) -> None:
-        """Generate .plain/AGENTS.md from installed packages with AGENTS.md files."""
+    def install_skills(self) -> None:
+        """Install skills from Plain packages to .claude/agents/."""
         try:
             result = subprocess.run(
-                [sys.executable, "-m", "plain", "agent", "md", "--save"],
+                [sys.executable, "-m", "plain", "skills", "--install"],
                 check=False,
                 capture_output=True,
                 text=True,
             )
             if result.returncode != 0 and result.stderr:
                 click.secho(
-                    f"Warning: Failed to generate .plain/AGENTS.md: {result.stderr}",
+                    f"Warning: Failed to install skills: {result.stderr}",
                     fg="yellow",
                     err=True,
                 )
         except Exception as e:
             click.secho(
-                f"Warning: Failed to generate .plain/AGENTS.md: {e}",
+                f"Warning: Failed to install skills: {e}",
                 fg="yellow",
                 err=True,
             )

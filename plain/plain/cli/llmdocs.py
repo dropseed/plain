@@ -26,7 +26,7 @@ class LLMDocs:
                 self.docs.add(path)
 
         # Exclude "migrations" code from plain apps, except for plain/models/migrations
-        # Also exclude CHANGELOG.md and AGENTS.md
+        # Also exclude CHANGELOG.md, AGENTS.md, and skills directory
         self.docs = {
             doc
             for doc in self.docs
@@ -35,6 +35,7 @@ class LLMDocs:
                 and "/plain/models/migrations/" not in str(doc)
             )
             and doc.name not in ("CHANGELOG.md", "AGENTS.md")
+            and "/skills/" not in str(doc)
         }
         self.sources = {
             source
@@ -44,6 +45,7 @@ class LLMDocs:
                 and "/plain/models/migrations/" not in str(source)
             )
             and source.name != "cli.py"
+            and "/skills/" not in str(source)
         }
 
         self.docs = sorted(self.docs)
