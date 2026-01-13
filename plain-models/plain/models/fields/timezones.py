@@ -74,9 +74,17 @@ class TimeZoneField(Field[zoneinfo.ZoneInfo]):
     }
 
     def __init__(self, **kwargs: Any):
+        if "choices" in kwargs:
+            raise TypeError("TimeZoneField does not accept custom choices.")
         kwargs.setdefault("max_length", 100)
-        kwargs.setdefault("choices", self._get_timezone_choices())
+        kwargs["choices"] = self._get_timezone_choices()
         super().__init__(**kwargs)
+
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+        name, path, args, kwargs = super().deconstruct()
+        # Don't serialize choices - they're computed dynamically from system tzdata
+        kwargs.pop("choices", None)
+        return name, path, args, kwargs
 
     def _get_timezone_choices(self) -> list[tuple[str, str]]:
         """Get timezone choices for form widgets."""
