@@ -1,6 +1,6 @@
 [project]
 name = "plain.elements"
-version = "0.10.3"
+version = "0.11.0"
 description = "Use HTML tags to include HTML template components."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"

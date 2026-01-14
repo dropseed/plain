@@ -1,5 +1,15 @@
 # plain-elements changelog
 
+## [0.11.0](https://github.com/dropseed/plain/releases/plain-elements@0.11.0) (2026-01-13)
+
+### What's changed
+
+- Rewrote README documentation with clearer examples, FAQs section, and improved organization ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb8a683c65863f4d0b7af9af5b16feec))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.3](https://github.com/dropseed/plain/releases/plain-elements@0.10.3) (2025-10-31)
 
 ### What's changed
