@@ -116,7 +116,10 @@ def check(
 
     if not skip_ty and config.get("ty", {}).get("enabled", True):
         print_event("ty check...", newline=False)
-        result = subprocess.run(["ty", "check", path, "--no-progress"])
+        ty_args = ["ty", "check", path, "--no-progress"]
+        for e in config.get("exclude", []):
+            ty_args.extend(["--exclude", e])
+        result = subprocess.run(ty_args)
         maybe_exit(result.returncode)
 
     if not skip_biome and config.get("biome", {}).get("enabled", True):
@@ -131,7 +134,9 @@ def check(
 
     if not skip_annotations and config.get("annotations", {}).get("enabled", True):
         print_event("annotations...", newline=False)
-        exclude_patterns = config.get("annotations", {}).get("exclude", [])
+        # Combine top-level exclude with annotation-specific exclude
+        exclude_patterns = list(config.get("exclude", []))
+        exclude_patterns.extend(config.get("annotations", {}).get("exclude", []))
         ann_result = check_annotations(path, exclude_patterns or None)
         if ann_result.missing_count > 0:
             click.secho(
@@ -152,7 +157,9 @@ def check(
 def annotations(path: str, details: bool, as_json: bool) -> None:
     """Check type annotation status"""
     config = get_code_config()
-    exclude_patterns = config.get("annotations", {}).get("exclude", [])
+    # Combine top-level exclude with annotation-specific exclude
+    exclude_patterns = list(config.get("exclude", []))
+    exclude_patterns.extend(config.get("annotations", {}).get("exclude", []))
     result = check_annotations(path, exclude_patterns or None)
     if as_json:
         _print_annotations_json(result)

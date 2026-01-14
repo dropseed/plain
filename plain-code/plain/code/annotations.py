@@ -232,6 +232,7 @@ def find_python_files(
         "*.egg-info",
         ".mypy_cache",
         ".pytest_cache",
+        "node_modules",
         # Exclude test files from annotation metrics
         "test_*.py",
         "*_test.py",

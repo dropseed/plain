@@ -9,6 +9,7 @@
     "includes": [
       "**",
       "!**/vendor/**",
+      "!**/node_modules/**",
       "!**/*.min.*",
       "!**/tests/**",
       "!**/htmlcov/**",
