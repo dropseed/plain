@@ -1,6 +1,6 @@
 [project]
 name = "plain.start"
-version = "0.1.0"
+version = "0.2.0"
 description = "Bootstrap a new Plain project from starter templates"
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
