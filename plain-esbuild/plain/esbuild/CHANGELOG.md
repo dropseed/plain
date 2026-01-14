@@ -1,5 +1,15 @@
 # plain-esbuild changelog
 
+## [0.8.0](https://github.com/dropseed/plain/releases/plain-esbuild@0.8.0) (2026-01-13)
+
+### What's changed
+
+- Documentation has been updated with improved structure, examples, and installation instructions ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb8a683c65863f4d0b7af9af5b16feec))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.7.1](https://github.com/dropseed/plain/releases/plain-esbuild@0.7.1) (2025-10-24)
 
 ### What's changed
