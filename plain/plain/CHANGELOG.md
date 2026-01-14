@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.98.1](https://github.com/dropseed/plain/releases/plain@0.98.1) (2026-01-13)
+
+### What's changed
+
+- Fixed `INSTALLED_PACKAGES` not being optional in user settings, restoring the default empty list behavior ([820773c473](https://github.com/dropseed/plain/commit/820773c473))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.98.0](https://github.com/dropseed/plain/releases/plain@0.98.0) (2026-01-13)
 
 ### What's changed
