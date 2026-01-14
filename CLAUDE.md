@@ -17,22 +17,36 @@ The `example` directory contains a demo app with all Plain packages installed. Y
 
 ## READMEs
 
-Inside each top level subdirectory is a `README.md` that is a symlink to the `README.md` in the of the Python package itself. You only need to edit the `README.md` inside of the package itself.
+Each top-level package directory (e.g., `plain-api/`) has a `README.md` symlink pointing to the actual README inside the package (e.g., `plain-api/plain/api/README.md`). Only edit the README inside the package itself.
 
-The README is the main written documentation for the package (or module). You can structure it using [`plain-api/plain/api/README.md`](/plain/plain/assets/README.md) as an example.
+The README answers: "How do I use this?" It's not a complete API reference. It gets users productive quickly and points them to code for deeper exploration. See [`plain-jobs/plain/jobs/README.md`](plain-jobs/plain/jobs/README.md) as a good example.
 
-Some instructions for writing READMEs:
+### Structure
 
-- Underneath the h1 should be a **<short description>** (in bold) that describes the package in one sentence.
-- There should be a table of contents at the top with links to the h2s and h3s in the README.
-- When referencing specific classes or functions in code, link to them with a # fragment identifier, like this: [`AssetView`](./views.py#AssetView).
-- The first section of the README should be an **Overview** that gets straight into basic examples of how to use the package.
-- An **Installation** section should always be present but it should be the last section of the README.
-- The **Installation** section should get the user from nothing to _something_, even if _something_ is a demo/example view or code that will need additional customization.
-- The **Installation** steps will typically be run by an agent like Claude Code, but they also need to be written in a way that a human can follow them.
-- Miscellaneous notes or information about the package should be added as **FAQs** in the second to last section of the README.
-- For the **FAQs**, use h4s for the questions.
-- The most advanced usages of the package don't need to be fully documented (i.e. every possible paramater, etc.). They can be mentioned if the user otherwise wouldn't know about them, but then they can be linked to the code itself for more information.
+Every README should follow this order:
+
+1. **h1** with package name
+2. **Bold one-liner** describing the package in one sentence
+3. **Table of contents** with links to h2s and h3s
+4. **Overview** section with basic working examples
+5. **Feature sections** as needed
+6. **FAQs** section (second to last) using h4s for questions
+7. **Installation** section (always last) - gets user from nothing to something working
+
+### Style
+
+- **Conversational tone**: "You can..." not "The module provides..."
+- **First code example must be copy-paste ready** with imports included
+- **Subsequent examples can be minimal**, building on what was shown
+- **Link to source for advanced features**: `[ClassName](./file.py#ClassName)`
+- **Cross-package references link to READMEs**: `[plain.auth](../../plain-auth/plain/auth/README.md)`
+
+### What to document
+
+- **If users import it, document it** - that's the bar for what needs docs
+- **Mention all public features**, even advanced ones briefly, then link to code
+- **Internal APIs stay undocumented** - `_prefix` functions and `@internalcode` decorated items are invisible to docs
+- **Don't fully document every parameter** - mention the feature exists, link to code for details
 
 ## Type annotations
 
