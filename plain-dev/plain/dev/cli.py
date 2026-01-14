@@ -1,7 +1,6 @@
 import os
 import subprocess
 import sys
-import time
 from importlib.metadata import entry_points
 
 import click
@@ -132,32 +131,6 @@ def cli(
     returncode = dev.run(reinstall_ssl=reinstall_ssl)
     if returncode:
         sys.exit(returncode)
-
-
-@cli.command()
-def debug() -> None:
-    """Connect to the remote debugger"""
-
-    def _connect() -> subprocess.CompletedProcess[bytes]:
-        if subprocess.run(["which", "nc"], capture_output=True).returncode == 0:
-            return subprocess.run(["nc", "-C", "localhost", "4444"])
-        else:
-            raise OSError("nc not found")
-
-    result = _connect()
-
-    # Try again once without a message
-    if result.returncode == 1:
-        time.sleep(1)
-        result = _connect()
-
-    # Keep trying...
-    while result.returncode == 1:
-        click.secho(
-            "Failed to connect. Make sure remote pdb is ready. Retrying...", fg="red"
-        )
-        result = _connect()
-        time.sleep(1)
 
 
 @cli.command()

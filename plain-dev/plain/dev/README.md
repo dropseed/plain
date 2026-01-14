@@ -12,7 +12,6 @@
     - [`plain dev services`](#plain-dev-services)
     - [`plain dev logs`](#plain-dev-logs)
     - [`plain pre-commit`](#plain-pre-commit)
-- [VS Code debugging](#vs-code-debugging)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -102,33 +101,6 @@ Runs:
 - `plain makemigrations --dry-run --check`
 - `plain build`
 - `plain test`
-
-## VS Code debugging
-
-![Debug Plain with VS Code](https://github.com/dropseed/plain-public/assets/649496/250138b6-7702-4ab6-bf38-e0c8e3c56d06)
-
-Since `plain dev` runs multiple processes at once, the regular [pdb](https://docs.python.org/3/library/pdb.html) debuggers don't quite work.
-
-Instead, the package provides a remote debugger based on [`DevPdb`](./pdb.py#DevPdb) that opens a telnet session for debugging.
-
-To use it, add a `breakpoint()` call in your code:
-
-```python
-class HomeView(TemplateView):
-    template_name = "home.html"
-
-    def get_template_context(self):
-        context = super().get_template_context()
-
-        # Add a breakpoint
-        breakpoint()
-
-        return context
-```
-
-When you load the page, a new terminal window will open automatically (on macOS) with a pdb session. You can then step through your code as usual.
-
-Alternatively, you can manually connect to the debugger using `plain dev debug` or by running `nc -C localhost 4444` in a terminal.
 
 ## FAQs
 
