@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.31.0) (2026-01-13)
+
+### What's changed
+
+- Improved README documentation with expanded examples, settings reference, and clearer explanations of client-side vs server-side tracking ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb8a683c65863f4d0b7af9af5b16feec))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.30.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.30.0) (2025-12-04)
 
 ### What's changed
