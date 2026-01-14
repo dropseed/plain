@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -29,7 +30,7 @@ class Card:
     description: str = ""
     text: str = ""
     link: str = ""
-    number: int | None = None
+    metric: int | float | Decimal | None = None
     presets: list[str] | Enum | None = None
 
     # These will be accessible at render time
@@ -53,7 +54,7 @@ class Card:
         context["title"] = self.get_title()
         context["slug"] = self.get_slug()
         context["description"] = self.get_description()
-        context["number"] = self.get_number()
+        context["metric"] = self.format_metric()
         context["text"] = self.get_text()
         context["link"] = self.get_link()
         context["presets"] = self.get_presets()
@@ -71,8 +72,14 @@ class Card:
     def get_description(self) -> str:
         return self.description
 
-    def get_number(self) -> int | None:
-        return self.number
+    def get_metric(self) -> int | float | Decimal | None:
+        return self.metric
+
+    def format_metric(self) -> str | None:
+        metric = self.get_metric()
+        if metric is None:
+            return None
+        return str(metric)
 
     def get_text(self) -> str:
         return self.text

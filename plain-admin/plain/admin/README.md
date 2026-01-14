@@ -158,7 +158,7 @@ Cards display summary information on admin pages. You can add them to any view b
 
 ### Basic cards
 
-The base [`Card`](./cards/base.py#Card) class displays a simple card with a title, optional description, number, text, and link.
+The base [`Card`](./cards/base.py#Card) class displays a simple card with a title, optional description, metric, text, and link.
 
 ```python
 from plain.admin.cards import Card
@@ -169,7 +169,7 @@ class UsersCard(Card):
     title = "Total Users"
     size = Card.Sizes.SMALL
 
-    def get_number(self):
+    def get_metric(self):
         from app.users.models import User
         return User.query.count()
 

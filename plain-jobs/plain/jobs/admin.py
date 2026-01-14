@@ -42,7 +42,7 @@ class SuccessfulJobsCard(Card):
     title = "Successful"
     text = "View"
 
-    def get_number(self) -> int:
+    def get_metric(self) -> int:
         return JobResult.query.successful().count()
 
     def get_link(self) -> str:
@@ -53,7 +53,7 @@ class ErroredJobsCard(Card):
     title = "Errored"
     text = "View"
 
-    def get_number(self) -> int:
+    def get_metric(self) -> int:
         return JobResult.query.errored().count()
 
     def get_link(self) -> str:
@@ -68,7 +68,7 @@ class LostJobsCard(Card):
         delta = timedelta(seconds=settings.JOBS_TIMEOUT)
         return f"Jobs are considered lost after {_td_format(delta)}"
 
-    def get_number(self) -> int:
+    def get_metric(self) -> int:
         return JobResult.query.lost().count()
 
     def get_link(self) -> str:
@@ -79,7 +79,7 @@ class RetriedJobsCard(Card):
     title = "Retried"
     text = "View"  # TODO make not required - just an icon?
 
-    def get_number(self) -> int:
+    def get_metric(self) -> int:
         return JobResult.query.retried().count()
 
     def get_link(self) -> str:
@@ -89,14 +89,14 @@ class RetriedJobsCard(Card):
 class WaitingJobsCard(Card):
     title = "Waiting"
 
-    def get_number(self) -> int:
+    def get_metric(self) -> int:
         return JobProcess.query.waiting().count()
 
 
 class RunningJobsCard(Card):
     title = "Running"
 
-    def get_number(self) -> int:
+    def get_metric(self) -> int:
         return JobProcess.query.running().count()
 
 

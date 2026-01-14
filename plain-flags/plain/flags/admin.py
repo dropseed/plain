@@ -22,7 +22,7 @@ class UnusedFlagsCard(Card):
     def flag_errors(self) -> list[PreflightResult]:
         return Flag.preflight()
 
-    def get_number(self) -> int:
+    def get_metric(self) -> int:
         return len(self.flag_errors)
 
     def get_text(self) -> str:
