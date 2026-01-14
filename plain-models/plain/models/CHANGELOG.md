@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.72.0](https://github.com/dropseed/plain/releases/plain-models@0.72.0) (2026-01-13)
+
+### What's changed
+
+- Fixed `TimezoneField` deconstruct path to correctly resolve to `plain.models` instead of `plain.models.fields.timezones`, preventing migration churn when using `TimezoneField` ([03cc263](https://github.com/dropseed/plain/commit/03cc263ffa))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.71.0](https://github.com/dropseed/plain/releases/plain-models@0.71.0) (2026-01-13)
 
 ### What's changed
