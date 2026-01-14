@@ -1,6 +1,6 @@
 [project]
 name = "plain.redirection"
-version = "0.29.0"
+version = "0.30.0"
 description = "A flexible URL redirection system with admin interface and logging."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
