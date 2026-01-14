@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.32.0](https://github.com/dropseed/plain/releases/plain-flags@0.32.0) (2026-01-13)
+
+### What's changed
+
+- Improved README documentation with expanded examples, FAQs section, and clearer explanations ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.31.0](https://github.com/dropseed/plain/releases/plain-flags@0.31.0) (2025-11-21)
 
 ### What's changed
