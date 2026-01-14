@@ -9,9 +9,11 @@
     - [Redirect pages](#redirect-pages)
     - [Assets](#assets)
     - [Template pages](#template-pages)
-- [Markdown URLs](#markdown-urls)
+- [Serving raw markdown](#serving-raw-markdown)
+    - [Linking to markdown URLs](#linking-to-markdown-urls)
 - [Frontmatter](#frontmatter)
 - [Custom views](#custom-views)
+- [FAQs](#faqs)
 - [Installation](#installation)
 
 ## Overview
@@ -115,7 +117,7 @@ app/templates/pages/
 
 ## Serving raw markdown
 
-Optionally serve raw markdown content (without frontmatter) alongside rendered HTML pages. When enabled, markdown pages can be accessed as raw markdown via:
+You can optionally serve raw markdown content (without frontmatter) alongside rendered HTML pages. When enabled, markdown pages can be accessed as raw markdown via:
 
 1. **Accept header negotiation** - Send `Accept: text/markdown` or `Accept: text/plain` to get raw markdown
 2. **Separate .md URLs** - Access `/docs/guide.md` alongside `/docs/guide/`
@@ -179,7 +181,7 @@ Available frontmatter options:
 
 ## Custom views
 
-The package provides view classes you can extend:
+You can extend the view classes to customize page rendering:
 
 ```python
 from plain.pages.views import PageView
@@ -196,6 +198,25 @@ The main view classes are:
 - [`PageView`](./views.py#PageView): Renders HTML and Markdown pages
 - [`PageRedirectView`](./views.py#PageRedirectView): Handles redirects
 - [`PageAssetView`](./views.py#PageAssetView): Serves static assets
+- [`PageMarkdownView`](./views.py#PageMarkdownView): Serves raw markdown content
+
+## FAQs
+
+#### How do I use a custom base template for markdown pages?
+
+Set the `template_name` in frontmatter to specify your own template. Your template should include `{{ page.content }}` to render the markdown content.
+
+#### Can I use template tags and filters in markdown files?
+
+Yes. Unless you set `render_plain: true` in the frontmatter, markdown files are processed as templates first, then converted to HTML. You can use any template tags and filters available in your project.
+
+#### How do I access frontmatter variables in templates?
+
+Custom frontmatter variables are available through `page.vars`. For example, if your frontmatter includes `author: Jane Doe`, you can access it with `{{ page.vars.author }}`.
+
+#### Why isn't my page showing up?
+
+Check that your file is in a `templates/pages/` directory and doesn't contain `.template.` in the filename. Template files are intentionally skipped.
 
 ## Installation
 

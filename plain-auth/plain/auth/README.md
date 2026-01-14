@@ -9,14 +9,15 @@
     - [Login views](#login-views)
 - [Checking if a user is logged in](#checking-if-a-user-is-logged-in)
 - [Restricting views](#restricting-views)
+- [Testing with authenticated users](#testing-with-authenticated-users)
+- [FAQs](#faqs)
 - [Installation](#installation)
 
 ## Overview
 
-The `plain.auth` package provides user authentication and authorization for Plain applications. Here's a basic example of checking if a user is logged in:
+The `plain.auth` package handles user authentication and authorization for Plain applications. You can check if a user is logged in like this:
 
 ```python
-# In a view
 from plain.auth import get_request_user
 
 user = get_request_user(request)
@@ -26,7 +27,7 @@ else:
     print("You are not logged in.")
 ```
 
-And restricting a view to logged-in users:
+You can restrict a view to logged-in users using [`AuthViewMixin`](./views.py#AuthViewMixin):
 
 ```python
 from plain.auth.views import AuthViewMixin
@@ -63,7 +64,7 @@ AUTH_LOGIN_URL = "login"
 
 ### Creating a user model
 
-Create your own user model using `plain create users` or manually:
+You can create your own user model using `plain create users` or manually:
 
 ```python
 # app/users/models.py
@@ -83,14 +84,13 @@ class User(models.Model):
 
 ### Login views
 
-To log users in, you'll need to pair this package with an authentication method:
+To log users in, you need to pair this package with an authentication method:
 
-- `plain-passwords` - Username/password authentication
-- `plain-oauth` - OAuth provider authentication
-- `plain-passkeys` (TBD) - WebAuthn/passkey authentication
-- `plain-passlinks` (TBD) - Magic link authentication
+- [plain.passwords](../../plain-passwords/plain/passwords/README.md) - Username/password authentication
+- [plain.oauth](../../plain-oauth/plain/oauth/README.md) - OAuth provider authentication
+- [plain.loginlink](../../plain-loginlink/plain/loginlink/README.md) - Magic link authentication
 
-Example with password authentication:
+Here's an example with password authentication:
 
 ```python
 # app/urls.py
@@ -111,7 +111,7 @@ urlpatterns = [
 
 ## Checking if a user is logged in
 
-In templates, use the `get_current_user()` function:
+In templates, you can use the `get_current_user()` function:
 
 ```html
 {% if get_current_user() %}
@@ -121,7 +121,7 @@ In templates, use the `get_current_user()` function:
 {% endif %}
 ```
 
-In Python code, use `get_request_user()`:
+In Python code, use [`get_request_user()`](./requests.py#get_request_user):
 
 ```python
 from plain.auth import get_request_user
@@ -135,7 +135,7 @@ else:
 
 ## Restricting views
 
-Use the [`AuthViewMixin`](./views.py#AuthViewMixin) to restrict views to logged-in users, admin users, or custom logic:
+You can use [`AuthViewMixin`](./views.py#AuthViewMixin) to restrict views to logged-in users, admin users, or custom logic:
 
 ```python
 from plain.auth.views import AuthViewMixin
@@ -164,6 +164,71 @@ The [`AuthViewMixin`](./views.py#AuthViewMixin) provides:
 - `login_required` - Requires a logged-in user
 - `admin_required` - Requires `user.is_admin` to be True
 - `check_auth()` - Override for custom authorization logic
+
+## Testing with authenticated users
+
+When writing tests, you can use [`login_client()`](./test.py#login_client) to simulate an authenticated user:
+
+```python
+from plain.auth.test import login_client
+from plain.test import Client
+
+from app.users.models import User
+
+
+def test_profile_view():
+    user = User.objects.create(email="test@example.com")
+    client = Client()
+    login_client(client, user)
+
+    response = client.get("/profile/")
+    assert response.status_code == 200
+```
+
+You can also log out a test user with [`logout_client()`](./test.py#logout_client):
+
+```python
+from plain.auth.test import login_client, logout_client
+
+# ... after logging in
+logout_client(client)
+```
+
+## FAQs
+
+#### How do I log in a user programmatically?
+
+You can use the [`login()`](./sessions.py#login) function to log in a user:
+
+```python
+from plain.auth.sessions import login
+
+login(request, user)
+```
+
+#### How do I log out a user programmatically?
+
+You can use the [`logout()`](./sessions.py#logout) function:
+
+```python
+from plain.auth.sessions import logout
+
+logout(request)
+```
+
+#### How do I invalidate sessions when a user changes their password?
+
+By default, if you have [plain.passwords](../../plain-passwords/plain/passwords/README.md) installed, sessions are automatically invalidated when the `password` field changes. This is controlled by the `AUTH_USER_SESSION_HASH_FIELD` setting. You can change this to a different field name, or set it to an empty string to disable this feature.
+
+#### How do I get the user model class?
+
+You can use the [`get_user_model()`](./sessions.py#get_user_model) function:
+
+```python
+from plain.auth.sessions import get_user_model
+
+User = get_user_model()
+```
 
 ## Installation
 

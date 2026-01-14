@@ -1,90 +1,124 @@
 # plain.tunnel
 
-**Connect to your local development server remotely.**
+**Expose your local development server to the internet.**
 
 - [Overview](#overview)
-- [Usage with plain.dev](#usage-with-plaindev)
-- [CLI Usage](#cli-usage)
-- [Configuration](#configuration)
-    - [Environment Variables](#environment-variables)
-    - [ALLOWED_HOSTS](#allowed_hosts)
+- [Integrating with plain.dev](#integrating-with-plaindev)
+- [CLI options](#cli-options)
+- [Environment variables](#environment-variables)
+- [FAQs](#faqs)
 - [Installation](#installation)
 
 ## Overview
 
-The Plain Tunnel is a hosted service, like [ngrok](https://ngrok.com/) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/), that is specifically designed to work with Plain and provide the minimum set of features you need to get your local development server connected to the internet. It will provision a subdomain of plaintunnel.com for you, and forward traffic to your local development server.
+Plain Tunnel is a hosted tunneling service that gives your local development server a public URL. You can use it to test webhooks from third-party services, preview your site on a mobile device, or share your work with someone temporarily.
 
-This is especially useful for testing webhooks, doing mobile styling on a real device, or temporarily sharing your local development URL with someone.
-
-Basic usage:
+To create a tunnel, run:
 
 ```console
 plain tunnel https://app.localhost:8443
 ```
 
-This will create a tunnel from a randomly generated subdomain to your local server. You can also specify a custom subdomain:
+This connects your local server to a randomly generated subdomain like `yourname-abc1234.plaintunnel.com`. The tunnel stays open until you stop it with Ctrl+C.
+
+To use a consistent subdomain, pass the `--subdomain` option:
 
 ```console
-plain tunnel https://app.localhost:8443 --subdomain myappname
+plain tunnel https://app.localhost:8443 --subdomain myapp
 ```
 
-## Usage with plain.dev
+Now your tunnel will always be available at `https://myapp.plaintunnel.com`.
 
-The simplest way to use `plain.tunnel` is to integrate it with your `plain.dev` configuration.
+## Integrating with plain.dev
 
-Add it to your `plain.dev` configuration in `pyproject.toml`:
+You can run the tunnel automatically alongside your development server by adding it to your `pyproject.toml`:
 
 ```toml
 [tool.plain.dev.run]
-tunnel = {cmd = "plain tunnel $PLAIN_DEV_URL --subdomain myappname --quiet"}
+tunnel = {cmd = "plain tunnel $PLAIN_DEV_URL --subdomain myapp --quiet"}
 ```
 
-To show a tunnel URL (whether you are using `plain.tunnel` or not), you can add `PLAIN_DEV_TUNNEL_URL` to your local `.env` file:
+The `$PLAIN_DEV_URL` variable is automatically set to your local server URL. The `--quiet` flag reduces log output so it does not clutter your terminal.
+
+To display the tunnel URL in the `plain dev` header, add `PLAIN_DEV_TUNNEL_URL` to your `.env` file:
 
 ```bash
-PLAIN_DEV_TUNNEL_URL=https://myappname.plaintunnel.com
+PLAIN_DEV_TUNNEL_URL=https://myapp.plaintunnel.com
 ```
 
 ![](https://assets.plainframework.com/docs/plain-dev-tunnel.png)
 
-## CLI Usage
+## CLI options
 
-The [`cli`](./cli.py#cli) command accepts the following options:
+The [`cli`](./cli.py#cli) command accepts these options:
 
-- `destination`: The URL of your local development server (required)
-- `--subdomain`: Custom subdomain to use (optional, auto-generated if not provided)
-- `--debug`: Enable debug logging
-- `--quiet`: Only log warnings and errors
+| Option        | Description                         |
+| ------------- | ----------------------------------- |
+| `destination` | URL of your local server (required) |
+| `--subdomain` | Custom subdomain to use             |
+| `--debug`     | Enable debug logging                |
+| `--quiet`     | Only log warnings and errors        |
 
 Examples:
 
 ```console
-# Basic usage with auto-generated subdomain
-plain tunnel https://app.localhost:8443
-
-# With custom subdomain
-plain tunnel https://app.localhost:8443 --subdomain myapp
-
-# With debug logging
+# With debug logging to troubleshoot connection issues
 plain tunnel https://app.localhost:8443 --debug
 
-# One-off usage without installation
+# Run as a standalone tool without installing
 uvx plain-tunnel https://app.localhost:8443
 ```
 
-## Configuration
+## Environment variables
 
-### Environment Variables
+You can configure the tunnel using environment variables instead of CLI options:
 
-The tunnel can be configured using environment variables:
+| Variable                 | Description                                 |
+| ------------------------ | ------------------------------------------- |
+| `PLAIN_TUNNEL_SUBDOMAIN` | Default subdomain to use                    |
+| `PLAIN_TUNNEL_HOST`      | Tunnel host (defaults to `plaintunnel.com`) |
 
-- `PLAIN_TUNNEL_SUBDOMAIN`: Default subdomain to use
-- `PLAIN_TUNNEL_HOST`: Tunnel host (defaults to plaintunnel.com)
+## FAQs
+
+#### How does the tunnel work?
+
+The tunnel establishes a WebSocket connection to the Plain Tunnel server. When a request arrives at your public URL, the server forwards it through the WebSocket to your local machine. The [`TunnelClient`](./client.py#TunnelClient) then makes the request to your local server and sends the response back.
+
+#### What happens if the connection drops?
+
+The tunnel automatically reconnects if the connection is lost. It will retry up to 5 times with a 2-second delay between attempts.
+
+#### Can I use this without installing Plain?
+
+Yes. You can run the tunnel as a standalone tool using `uvx`:
+
+```console
+uvx plain-tunnel https://localhost:8000
+```
+
+#### Do I need to configure ALLOWED_HOSTS?
+
+If you are using Plain with a custom subdomain, you may need to add it to your `ALLOWED_HOSTS` setting:
+
+```python
+# app/settings.py
+ALLOWED_HOSTS = [
+    "localhost",
+    "app.localhost",
+    "myapp.plaintunnel.com",
+]
+```
 
 ## Installation
 
-Install the `plain.tunnel` package from [PyPI](https://pypi.org/project/plain.tunnel/):
+Install from [PyPI](https://pypi.org/project/plain.tunnel/):
 
 ```bash
 uv add plain.tunnel --dev
+```
+
+Then run the tunnel:
+
+```console
+plain tunnel https://app.localhost:8443
 ```

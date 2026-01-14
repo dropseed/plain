@@ -1,71 +1,33 @@
 # plain.oauth
 
-**Let users log in with OAuth providers.**
+**Let users log in with OAuth providers like GitHub, Google, and more.**
 
 - [Overview](#overview)
-- [Usage](#usage)
-    - [Basic setup example](#basic-setup-example)
-    - [Handling OAuth errors](#handling-oauth-errors)
-    - [Connecting and disconnecting OAuth accounts](#connecting-and-disconnecting-oauth-accounts)
-    - [Using a saved access token](#using-a-saved-access-token)
-    - [Using the Django system check](#using-the-django-system-check)
+- [Creating a provider](#creating-a-provider)
+- [Connecting and disconnecting accounts](#connecting-and-disconnecting-accounts)
+- [Using saved access tokens](#using-saved-access-tokens)
+- [Customizing the provider](#customizing-the-provider)
 - [FAQs](#faqs)
+    - [How is this different from other OAuth libraries?](#how-is-this-different-from-other-oauth-libraries)
+    - [Why are providers not included in the library?](#why-are-providers-not-included-in-the-library)
+    - [What if there is a redirect URL mismatch in local development?](#what-if-there-is-a-redirect-url-mismatch-in-local-development)
+    - [What does the preflight check do?](#what-does-the-preflight-check-do)
 - [Installation](#installation)
 
 ## Overview
 
-[Watch on YouTube (3 mins) →](https://www.youtube.com/watch?v=UxbxBa6AFsU)
+This package provides a minimal OAuth integration with no dependencies and a single database model. You can let users sign up and log in with GitHub, Google, Twitter, or any other OAuth provider.
 
-This library is intentionally minimal.
-It has no dependencies and a single database model.
-If you simply want users to log in with GitHub, Google, Twitter, etc. (and maybe use that access token for API calls),
-then this is the library for you.
+Three OAuth flows are supported:
 
-There are three OAuth flows that it makes possible:
+1. **Signup** - new user, new OAuth connection
+2. **Login** - existing user, existing OAuth connection
+3. **Connect/disconnect** - existing user linking or unlinking an OAuth account
 
-1. Signup via OAuth (new user, new OAuth connection)
-2. Login via OAuth (existing user, existing OAuth connection)
-3. Connect/disconnect OAuth accounts to a user (existing user, new OAuth connection)
-
-## Usage
-
-### Basic setup example
-
-Here's a complete example showing how to set up OAuth login with GitHub:
-
-Add `plain.oauth` to your `INSTALLED_PACKAGES` in `settings.py`:
+Here is a complete example showing GitHub OAuth login.
 
 ```python
-INSTALLED_PACKAGES = [
-    ...
-    "plain.oauth",
-]
-```
-
-In your `urls.py`, include the [`OAuthRouter`](./urls.py#OAuthRouter):
-
-```python
-from plain.oauth.urls import OAuthRouter
-from plain.urls import Router, include
-
-class AppRouter(Router):
-    namespace = ""
-    urls = [
-        include("oauth/", OAuthRouter),
-        # ...
-    ]
-```
-
-Then run migrations:
-
-```sh
-plain migrate plain.oauth
-```
-
-Create a new OAuth provider ([or copy one from our examples](https://github.com/forgepackages/plain-oauth/tree/master/provider_examples)):
-
-```python
-# yourapp/oauth.py
+# app/oauth.py
 import requests
 
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
@@ -77,9 +39,7 @@ class GitHubOAuthProvider(OAuthProvider):
     def get_oauth_token(self, *, code, request):
         response = requests.post(
             "https://github.com/login/oauth/access_token",
-            headers={
-                "Accept": "application/json",
-            },
+            headers={"Accept": "application/json"},
             data={
                 "client_id": self.get_client_id(),
                 "client_secret": self.get_client_secret(),
@@ -88,9 +48,7 @@ class GitHubOAuthProvider(OAuthProvider):
         )
         response.raise_for_status()
         data = response.json()
-        return OAuthToken(
-            access_token=data["access_token"],
-        )
+        return OAuthToken(access_token=data["access_token"])
 
     def get_oauth_user(self, *, oauth_token):
         response = requests.get(
@@ -103,92 +61,87 @@ class GitHubOAuthProvider(OAuthProvider):
         response.raise_for_status()
         data = response.json()
         return OAuthUser(
-            # The provider ID is required
             provider_id=data["id"],
-            # Populate your User model fields using the user_model_fields dict
             user_model_fields={
                 "email": data["email"],
-                "username": data["username"],
+                "username": data["login"],
             },
         )
+
+    def refresh_oauth_token(self, *, oauth_token):
+        # GitHub tokens don't expire by default
+        return oauth_token
 ```
 
-Create your OAuth app/consumer on the provider's site (GitHub, Google, etc.).
-When setting it up, you'll likely need to give it a callback URL.
-In development this can be `http://localhost:8000/oauth/github/callback/` (if you name it `"github"` like in the example below).
-At the end you should get some sort of "client id" and "client secret" which you can then use in your `settings.py`:
+Configure the provider in your settings:
 
 ```python
+# app/settings.py
 OAUTH_LOGIN_PROVIDERS = {
     "github": {
-        "class": "yourapp.oauth.GitHubOAuthProvider",
+        "class": "app.oauth.GitHubOAuthProvider",
         "kwargs": {
             "client_id": environ["GITHUB_CLIENT_ID"],
             "client_secret": environ["GITHUB_CLIENT_SECRET"],
             # "scope" is optional, defaults to ""
-
-            # You can add other fields if you have additional kwargs in your class __init__
-            # def __init__(self, *args, custom_arg="default", **kwargs):
-            #     self.custom_arg = custom_arg
-            #     super().__init__(*args, **kwargs)
         },
     },
 }
 ```
 
-Then add a login button (which is a form using POST rather than a basic link, for security purposes):
+Add a login button in your template:
 
 ```html
-<h1>Login</h1>
 <form action="{% url 'oauth:login' 'github' %}" method="post">
     <button type="submit">Login with GitHub</button>
 </form>
 ```
 
-Depending on your URL and provider names,
-your OAuth callback will be something like `https://example.com/oauth/{provider}/callback/`.
+The provider name in the URL (`'github'`) must match the key in `OAUTH_LOGIN_PROVIDERS`. Your callback URL will be `https://yoursite.com/oauth/github/callback/`.
 
-That's pretty much it!
+## Creating a provider
 
-### Handling OAuth errors
+You need to subclass [`OAuthProvider`](./providers.py#OAuthProvider) and implement three methods:
 
-The most common error you'll run into is if an existing user clicks a login button,
-but they haven't yet connected that provider to their account.
-For security reasons,
-the required flow here is that the user actually logs in with another method (however they signed up) and then _connects_ the OAuth provider from a settings page.
+- `get_oauth_token` - exchanges an authorization code for an access token
+- `get_oauth_user` - fetches user information using the access token
+- `refresh_oauth_token` - refreshes an expired access token (return the same token if the provider does not support refresh)
 
-For this error (and a couple others),
-there is an error template that is rendered.
-You can customize this by copying `oauth/error.html` to one of your own template directories:
+Set the `authorization_url` class attribute to the provider's OAuth authorization endpoint.
 
-```html
-{% extends "base.html" %}
+The [`OAuthToken`](./providers.py#OAuthToken) class accepts these fields:
 
-{% block content %}
-<h1>OAuth Error</h1>
-<p>{{ oauth_error }}</p>
-{% endblock %}
+```python
+OAuthToken(
+    access_token="...",
+    refresh_token="",  # optional
+    access_token_expires_at=None,  # optional datetime
+    refresh_token_expires_at=None,  # optional datetime
+)
 ```
 
-![Django OAuth duplicate email address error](https://user-images.githubusercontent.com/649496/159065848-b4ee6e63-9aa0-47b5-94e8-7bee9b509e60.png)
+The [`OAuthUser`](./providers.py#OAuthUser) class requires a `provider_id` and an optional dict of fields to set on your User model:
 
-### Connecting and disconnecting OAuth accounts
+```python
+OAuthUser(
+    provider_id="12345",  # unique ID on the provider's system
+    user_model_fields={
+        "email": "user@example.com",
+        "username": "example_user",
+    },
+)
+```
 
-To connect and disconnect OAuth accounts,
-you can add a series of forms to a user/profile settings page.
-Here's an very basic example:
+## Connecting and disconnecting accounts
+
+Authenticated users can connect additional OAuth providers or disconnect existing ones. Add forms to a settings page:
 
 ```html
-{% extends "base.html" %}
-
-{% block content %}
-Hello {{ get_current_user() }}!
-
-<h2>Existing connections</h2>
+<h2>Connected accounts</h2>
 <ul>
     {% for connection in get_current_user().oauth_connections.all %}
     <li>
-        {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
+        {{ connection.provider_key }}
         <form action="{% url 'oauth:disconnect' connection.provider_key %}" method="post">
             <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
             <button type="submit">Disconnect</button>
@@ -201,129 +154,120 @@ Hello {{ get_current_user() }}!
 <ul>
     {% for provider_key in oauth_provider_keys %}
     <li>
-        {{ provider_key}}
         <form action="{% url 'oauth:connect' provider_key %}" method="post">
-            <button type="submit">Connect</button>
+            <button type="submit">Connect {{ provider_key }}</button>
         </form>
     </li>
     {% endfor %}
 </ul>
-
-{% endblock %}
 ```
 
-The [`get_provider_keys`](./providers.py#get_provider_keys) function can help populate the list of options:
+Use [`get_provider_keys`](./providers.py#get_provider_keys) to populate the list of available providers:
 
 ```python
 from plain.oauth.providers import get_provider_keys
+from plain.views import TemplateView
 
-class ExampleView(TemplateView):
-    template_name = "index.html"
 
-    def get_context(self, **kwargs):
-        context = super().get_context(**kwargs)
+class SettingsView(TemplateView):
+    template_name = "settings.html"
+
+    def get_template_context(self):
+        context = super().get_template_context()
         context["oauth_provider_keys"] = get_provider_keys()
         return context
 ```
 
-![Connecting and disconnecting Django OAuth accounts](https://user-images.githubusercontent.com/649496/159065096-30239a1f-62f6-4ee2-a944-45140f45af6f.png)
+## Using saved access tokens
 
-### Using a saved access token
+The [`OAuthConnection`](./models.py#OAuthConnection) model stores token data for each connected provider. You can use stored tokens to make API calls on behalf of users.
 
 ```python
-import requests
-
-# Get the OAuth connection for a user
+# Get the connection for a user
 connection = user.oauth_connections.get(provider_key="github")
 
-# If the token can expire, check and refresh it
+# Check if the token has expired and refresh it
 if connection.access_token_expired():
     connection.refresh_access_token()
 
-# Use the token in an API call
-token = connection.access_token
-response = requests.get(...)
+# Use the token
+response = requests.get(
+    "https://api.github.com/user/repos",
+    headers={"Authorization": f"token {connection.access_token}"},
+)
 ```
 
-### Using the Django system check
+## Customizing the provider
 
-This library comes with a Django system check to ensure you don't _remove_ a provider from `settings.py` that is still in use in your database.
-You do need to specify the `--database` for this to run when using the check command by itself:
+The [`OAuthProvider`](./providers.py#OAuthProvider) class has several methods you can override:
 
-```sh
-plain check --database default
-```
+- `get_authorization_url_params` - customize the OAuth authorization URL parameters
+- `get_login_redirect_url` - change where users are redirected after login
+- `get_disconnect_redirect_url` - change where users are redirected after disconnecting
+- `login` - customize the login process (uses [plain.auth](/plain-auth/plain/auth/README.md) by default)
 
 ## FAQs
 
-#### How is this different from [Django OAuth libraries](https://djangopackages.org/grids/g/oauth/)?
+#### How is this different from other OAuth libraries?
 
-The short answer is that _it does less_.
+This library does less. Popular alternatives like django-allauth provide features like email verification, multiple email addresses, and dozens of pre-configured providers. That adds complexity you may not need. This library focuses on the core OAuth flow with a single database model and no extra dependencies.
 
-In [django-allauth](https://github.com/pennersr/django-allauth)
-(maybe the most popular alternative)
-you get all kinds of other features like managing multiple email addresses,
-email verification,
-a long list of supported providers,
-and a whole suite of forms/urls/views/templates/signals/tags.
-And in my experience,
-it's too much.
-It often adds more complexity to your app than you actually need (or want) and honestly it can just be a lot to wrap your head around.
-Personally, I don't like the way that your OAuth settings are stored in the database vs when you use `settings.py`,
-and the implications for doing it one way or another.
+#### Why are providers not included in the library?
 
-The other popular OAuth libraries have similar issues,
-and I think their _weight_ outweighs their usefulness for 80% of the use cases.
+Providers are straightforward to implement. You find two OAuth URLs in the provider's docs and write two methods to fetch tokens and user data. This approach means you can fix issues immediately without waiting for upstream updates, and you can customize the implementation for your specific needs.
 
-#### Why aren't providers included in the library itself?
+#### What if there is a redirect URL mismatch in local development?
 
-One thing you'll notice is that we don't have a long list of pre-configured providers in this library.
-Instead, we have some examples (which you can usually just copy, paste, and use) and otherwise encourage you to wire up the provider yourself.
-Often times all this means is finding the two OAuth URLs ("oauth/authorize" and "oauth/token") in their docs,
-and writing two class methods that do the actual work of getting the user's data (which is often customized anyway).
-
-We've written examples for the following providers:
-
-- [GitHub](https://github.com/forgepackages/plain-oauth/tree/master/provider_examples/github.py)
-- [GitLab](https://github.com/forgepackages/plain-oauth/tree/master/provider_examples/gitlab.py)
-- [Bitbucket](https://github.com/forgepackages/plain-oauth/tree/master/provider_examples/bitbucket.py)
-
-Just copy that code and paste it in your project.
-Tweak as necessary!
-
-This might sound strange at first.
-But in the long run we think it's actually _much_ more maintainable for both us (as library authors) and you (as app author).
-If something breaks with a provider, you can fix it immediately!
-You don't need to try to run changes through us or wait for an upstream update.
-You're welcome to contribute an example to this repo,
-and there won't be an expectation that it "works perfectly for every use case until the end of time".
-
-#### Redirect/callback URL mismatch in local development?
-
-If you're doing local development through a proxy/tunnel like [ngrok](https://ngrok.com/),
-then the callback URL might be automatically built as `http` instead of `https`.
-
-This is the setting you're probably looking for:
+If you are using a proxy like ngrok, the callback URL might be built as `http` instead of `https`. Add this to your settings:
 
 ```python
 HTTPS_PROXY_HEADER = "X-Forwarded-Proto: https"
 ```
 
+#### What does the preflight check do?
+
+A preflight check warns you if a provider key exists in your database but is missing from your `OAUTH_LOGIN_PROVIDERS` setting. This prevents errors when users try to use a provider that has been removed from your configuration.
+
 ## Installation
 
-Install the `plain.oauth` package from [PyPI](https://pypi.org/project/plain.oauth/):
+Install the package from PyPI:
 
 ```bash
 uv add plain.oauth
 ```
 
-After installation, follow the basic setup example in the [Usage](#usage) section above to:
+Add `plain.oauth` to your `INSTALLED_PACKAGES`:
 
-1. Add `plain.oauth` to your `INSTALLED_PACKAGES`
-2. Include the OAuth router in your URLs
-3. Run migrations
-4. Create an OAuth provider class
-5. Configure OAuth settings
-6. Add login buttons to your templates
+```python
+# app/settings.py
+INSTALLED_PACKAGES = [
+    # ...
+    "plain.oauth",
+]
+```
 
-For a complete working example, see the [Basic setup example](#basic-setup-example) which shows how to set up GitHub OAuth login.
+Include the [`OAuthRouter`](./urls.py#OAuthRouter) in your URLs:
+
+```python
+# app/urls.py
+from plain.oauth.urls import OAuthRouter
+from plain.urls import Router, include
+
+
+class AppRouter(Router):
+    namespace = ""
+    urls = [
+        include("oauth/", OAuthRouter),
+        # ...
+    ]
+```
+
+Run migrations:
+
+```bash
+plain migrate
+```
+
+Create an OAuth app on your provider's site (GitHub, Google, etc.) and note the client ID and client secret. Set the callback URL to match your configuration, for example `http://localhost:8000/oauth/github/callback/` for local development.
+
+Create a provider class following the [Overview](#overview) example and configure `OAUTH_LOGIN_PROVIDERS` in your settings. Add login buttons to your templates and you are ready to go.

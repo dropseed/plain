@@ -1,20 +1,28 @@
 # Runtime
 
-**Access app and package settings at runtime.**
+**Access and configure settings for your Plain application.**
 
 - [Overview](#overview)
 - [Environment variables](#environment-variables)
     - [.env files](#env-files)
+    - [Custom prefixes](#custom-prefixes)
 - [Package settings](#package-settings)
-- [Custom app-wide settings](#custom-app-wide-settings)
-- [Using Plain in other environments](#using-plain-in-other-environments)
+- [Custom app settings](#custom-app-settings)
+- [Secret values](#secret-values)
+- [Using Plain outside of an app](#using-plain-outside-of-an-app)
+- [FAQs](#faqs)
+- [Installation](#installation)
 
 ## Overview
 
-Plain is configured by "settings", which are ultimately just Python variables. Most settings have default values which can be overidden either by your `app/settings.py` file or by environment variables.
+You configure Plain through settings, which are Python variables defined in your `app/settings.py` file.
 
 ```python
 # app/settings.py
+from plain.runtime import Secret
+
+SECRET_KEY: Secret[str]
+
 URLS_ROUTER = "app.urls.AppRouter"
 
 TIME_ZONE = "America/Chicago"
@@ -23,11 +31,9 @@ INSTALLED_PACKAGES = [
     "plain.models",
     "plain.tailwind",
     "plain.auth",
-    "plain.passwords",
     "plain.sessions",
     "plain.htmx",
     "plain.admin",
-    "plain.elements",
     # Local packages
     "app.users",
 ]
@@ -41,102 +47,95 @@ MIDDLEWARE = [
 ]
 ```
 
-While working inside a Plain application or package, you can access settings at runtime via `plain.runtime.settings`.
+You can access settings anywhere in your application via `plain.runtime.settings`.
 
 ```python
 from plain.runtime import settings
 
-print(settings.AN_EXAMPLE_SETTING)
+print(settings.TIME_ZONE)
+print(settings.DEBUG)
 ```
 
-The Plain core settings are defined in [`plain/runtime/global_settings.py`](global_settings.py) and you should look at that for reference. Each installed package can also define its own settings in a `default_settings.py` file.
+Plain's built-in settings are defined in [`global_settings.py`](./global_settings.py). Each installed package can also define its own settings in a `default_settings.py` file.
 
 ## Environment variables
 
-It's common in both development and production to use environment variables to manage settings. To handle this, any type-annotated setting can be loaded from the env with a `PLAIN_` prefix.
+Type-annotated settings can be loaded from environment variables using a `PLAIN_` prefix.
 
-For example, to set the `SECRET_KEY` setting is defined with a type annotation.
+For example, if you define a setting with a type annotation:
 
 ```python
 SECRET_KEY: str
 ```
 
-And can be set by an environment variable.
+You can set it via an environment variable:
 
 ```bash
 PLAIN_SECRET_KEY=supersecret
 ```
 
-For more complex types like lists or dictionaries, just use the `list` or `dict` type annotation and JSON-compatible types.
+For lists, dicts, and other complex types, use JSON-encoded values:
 
 ```python
-LIST_EXAMPLE: list[str]
+ALLOWED_HOSTS: list[str]
 ```
-
-And set the environment variable with a JSON-encoded string.
 
 ```bash
-PLAIN_LIST_EXAMPLE='["one", "two", "three"]'
+PLAIN_ALLOWED_HOSTS='["example.com", "www.example.com"]'
 ```
 
-Custom behavior can always be supported by checking the environment directly.
+Boolean settings accept `true`, `1`, `yes` (case-insensitive) as truthy values:
 
-```python
-# plain/models/default_settings.py
-from os import environ
-
-from . import database_url
-
-# Make DATABASE a required setting
-DATABASE: dict
-
-# Automatically configure DATABASE if a DATABASE_URL was given in the environment
-if "DATABASE_URL" in environ:
-    DATABASE = database_url.parse_database_url(
-        environ["DATABASE_URL"],
-        # Enable persistent connections by default
-        conn_max_age=int(environ.get("DATABASE_CONN_MAX_AGE", 600)),
-        conn_health_checks=environ.get("DATABASE_CONN_HEALTH_CHECKS", "true").lower()
-        in [
-            "true",
-            "1",
-        ],
-    )
+```bash
+PLAIN_DEBUG=true
 ```
 
 ### .env files
 
-Plain itself does not load `.env` files automatically, except in development if you use [`plain.dev`](/plain-dev/README.md). If you use `.env` files in production then you will need to load them yourself.
+Plain does not load `.env` files automatically. If you use [`plain.dev`](/plain-dev/README.md), it loads `.env` files for you during development. For production, you need to load them yourself or rely on your deployment platform to inject environment variables.
+
+### Custom prefixes
+
+You can configure additional environment variable prefixes using `ENV_SETTINGS_PREFIXES`:
+
+```python
+# app/settings.py
+ENV_SETTINGS_PREFIXES = ["PLAIN_", "MYAPP_"]
+```
+
+Now both `PLAIN_DEBUG=true` and `MYAPP_DEBUG=true` would set the `DEBUG` setting. The first matching prefix wins if the same setting appears with multiple prefixes.
 
 ## Package settings
 
-An installed package can provide a `default_settings.py` file. It is strongly recommended to prefix any defined settings with the package name to avoid conflicts.
+Installed packages can provide default settings via a `default_settings.py` file. It's best practice to prefix package settings with the package name to avoid conflicts.
 
 ```python
 # app/users/default_settings.py
 USERS_DEFAULT_ROLE = "user"
 ```
 
-The way you define these settings can impact the runtime behavior. For example, a required setting should be defined with a type annotation but no default value.
+To make a setting required (no default value), define it with only a type annotation:
 
 ```python
 # app/users/default_settings.py
 USERS_DEFAULT_ROLE: str
 ```
 
-Type annotations are only required for settings that don't provide a default value (to enable the environment variable loading). But generally type annotations are recommended as they also provide basic validation at runtime — if a setting is defined as a `str` but the user sets it to an `int`, an error will be raised.
+Type annotations provide basic runtime validation. If a setting is defined as `str` but someone sets it to an `int`, Plain raises an error.
 
 ```python
 # app/users/default_settings.py
-USERS_DEFAULT_ROLE: str = "user"
+USERS_DEFAULT_ROLE: str = "user"  # Optional with a default
 ```
 
-## Custom app-wide settings
+## Custom app settings
 
-At times it can be useful to create your own settings that are used across your application. When you define these in `app/settings.py`, you simply prefix them with `APP_` which marks them as a custom setting.
+You can create your own app-wide settings by prefixing them with `APP_`:
 
 ```python
 # app/settings.py
+import os
+
 # A required env setting
 APP_STRIPE_SECRET_KEY = os.environ["STRIPE_SECRET_KEY"]
 
@@ -148,12 +147,82 @@ with open("app/secret_key.txt") as f:
     APP_EXAMPLE_KEY = f.read().strip()
 ```
 
-## Using Plain in other environments
+Settings without the `APP_` prefix that aren't recognized by Plain or installed packages will raise an error.
 
-There may be some situations where you want to manually invoke Plain, like in a Python script. To get everything set up, you can call the `plain.runtime.setup()` function.
+## Secret values
+
+You can mark sensitive settings using the [`Secret`](./secret.py#Secret) type. Secret values are masked when displayed in logs or debugging output.
+
+```python
+from plain.runtime import Secret
+
+SECRET_KEY: Secret[str]
+DATABASE_PASSWORD: Secret[str]
+```
+
+At runtime, the value is still a plain string. The `Secret` type is purely a marker that tells Plain to mask the value when displaying settings.
+
+## Using Plain outside of an app
+
+If you need to use Plain in a standalone script, call `plain.runtime.setup()` first:
 
 ```python
 import plain.runtime
 
 plain.runtime.setup()
+
+# Now you can use Plain normally
+from plain.runtime import settings
+print(settings.DEBUG)
 ```
+
+The `setup()` function configures settings, logging, and populates the package registry. You can only call it once.
+
+## FAQs
+
+#### Where are the default settings defined?
+
+Plain's core settings are in [`global_settings.py`](./global_settings.py). Each installed package can also have a `default_settings.py` file with package-specific defaults.
+
+#### How do I see what settings are available?
+
+Check [`global_settings.py`](./global_settings.py) for core settings. For package-specific settings, look at the `default_settings.py` file in each package.
+
+#### What's the difference between required and optional settings?
+
+A setting with only a type annotation (no value) is required:
+
+```python
+SECRET_KEY: str  # Required - must be set
+```
+
+A setting with a value is optional (has a default):
+
+```python
+DEBUG: bool = False  # Optional - defaults to False
+```
+
+#### Can I modify settings at runtime?
+
+Yes, you can assign new values to settings after setup:
+
+```python
+from plain.runtime import settings
+
+settings.DEBUG = True
+```
+
+#### What paths are available without setup?
+
+`APP_PATH` and `PLAIN_TEMP_PATH` are available immediately without calling `setup()`:
+
+```python
+from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
+
+print(APP_PATH)  # /path/to/project/app
+print(PLAIN_TEMP_PATH)  # /path/to/project/.plain
+```
+
+## Installation
+
+The runtime module is included with Plain by default. No additional installation is required.

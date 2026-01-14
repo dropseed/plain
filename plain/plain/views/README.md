@@ -3,21 +3,25 @@
 **Take a request, return a response.**
 
 - [Overview](#overview)
-- [HTTP methods -> class methods](#http-methods---class-methods)
+- [HTTP methods map to class methods](#http-methods-map-to-class-methods)
 - [Return types](#return-types)
-- [Template views](#template-views)
-- [Form views](#form-views)
+- [TemplateView](#templateview)
+- [FormView](#formview)
 - [Object views](#object-views)
-- [Response exceptions](#response-exceptions)
+    - [DetailView](#detailview)
+    - [CreateView](#createview)
+    - [UpdateView](#updateview)
+    - [DeleteView](#deleteview)
+    - [ListView](#listview)
+- [RedirectView](#redirectview)
+- [ResponseException](#responseexception)
 - [Error views](#error-views)
-- [Redirect views](#redirect-views)
-- [CSRF exempt views](#csrf-exempt-views)
+- [FAQs](#faqs)
+- [Installation](#installation)
 
 ## Overview
 
-Plain views are written as classes,
-with a straightforward API that keeps simple views simple,
-but gives you the power of a full class to handle more complex cases.
+Plain views are class-based, with a straightforward API that keeps simple views simple while giving you the full power of a class for complex cases.
 
 ```python
 from plain.views import View
@@ -28,12 +32,11 @@ class ExampleView(View):
         return "<html><body>Hello, world!</body></html>"
 ```
 
-## HTTP methods -> class methods
+You can return strings, dicts, lists, integers (status codes), or full `Response` objects. Plain automatically converts them to the appropriate HTTP response.
 
-The HTTP method of the request will map to a class method of the same name on the view.
+## HTTP methods map to class methods
 
-If a request comes in and there isn't a matching method on the view,
-Plain will return a `405 Method Not Allowed` response.
+The HTTP method of the request maps directly to a class method of the same name. Define only the methods you want to support.
 
 ```python
 from plain.views import View
@@ -54,18 +57,15 @@ class ExampleView(View):
 
     def delete(self):
         pass
-
-    def trace(self):
-        pass
 ```
 
-The [base `View` class](./base.py#View) defines default `options` and `head` behavior,
-but you can override these too.
+If a request comes in for a method your view doesn't implement, Plain returns a `405 Method Not Allowed` response automatically.
+
+The [base `View` class](./base.py#View) provides default `options` and `head` behavior, but you can override these too.
 
 ## Return types
 
-For simple JSON responses, HTML, or status code responses,
-you don't need to instantiate a `Response` object.
+You can return common Python types directly from view methods without wrapping them in a `Response` object.
 
 ```python
 class JsonView(View):
@@ -81,11 +81,18 @@ class HtmlView(View):
 class StatusCodeView(View):
     def get(self):
         return 204  # No content
+
+
+class TupleView(View):
+    def get(self):
+        return (201, {"id": 123})  # Status code + data
 ```
 
-## Template views
+Returning `None` triggers a 404 response, which is useful when an object isn't found.
 
-The most common behavior for a view is to render a template.
+## TemplateView
+
+For rendering templates, use [`TemplateView`](./templates.py#TemplateView). This is the base class for most other built-in view classes.
 
 ```python
 from plain.views import TemplateView
@@ -100,9 +107,7 @@ class ExampleView(TemplateView):
         return context
 ```
 
-The [`TemplateView`](./templates.py#TemplateView) is also the base class for _most_ of the other built-in view classes.
-
-Template views that don't need any custom context can use `TemplateView.as_view()` directly in the URL route.
+For simple pages that don't need custom context, you can configure `TemplateView` directly in your URL routes.
 
 ```python
 from plain.views import TemplateView
@@ -115,9 +120,9 @@ class AppRouter(Router):
     ]
 ```
 
-## Form views
+## FormView
 
-Standard [forms](../forms) can be rendered and processed by a [`FormView`](./forms.py#FormView).
+[`FormView`](./forms.py#FormView) handles displaying and processing [forms](/plain/plain/forms/README.md).
 
 ```python
 from plain.views import FormView
@@ -130,11 +135,11 @@ class ExampleView(FormView):
     success_url = "."  # Redirect to the same page
 
     def form_valid(self, form):
-        # Do other successfull form processing here
+        # Do additional processing here
         return super().form_valid(form)
 ```
 
-Rendering forms is done directly in the HTML.
+The form is automatically available in your template as `form`.
 
 ```html
 {% extends "base.html" %}
@@ -147,7 +152,7 @@ Rendering forms is done directly in the HTML.
     <div>{{ error }}</div>
     {% endfor %}
 
-    <!-- Render form fields individually (or with Jinja helps or other concepts) -->
+    <!-- Render form fields -->
     <label for="{{ form.email.html_id }}">Email</label>
     <input
         type="email"
@@ -169,10 +174,14 @@ Rendering forms is done directly in the HTML.
 
 ## Object views
 
-The object views support the standard CRUD (create, read/detail, update, delete) operations, plus a list view.
+Plain provides views for standard CRUD operations. Each requires you to implement `get_object()` or `get_objects()` to control what data is accessed.
+
+### DetailView
+
+[`DetailView`](./objects.py#DetailView) displays a single object.
 
 ```python
-from plain.views import DetailView, CreateView, UpdateView, DeleteView, ListView
+from plain.views import DetailView
 
 
 class ExampleDetailView(DetailView):
@@ -181,14 +190,34 @@ class ExampleDetailView(DetailView):
     def get_object(self):
         return MyObjectClass.query.get(
             id=self.url_kwargs["id"],
-            user=self.user,  # Limit access
+            user=self.request.user,  # Limit access
         )
+```
+
+The object is available in your template as `object`. You can also set `context_object_name` for a more descriptive name.
+
+### CreateView
+
+[`CreateView`](./objects.py#CreateView) displays a form and creates a new object on successful submission.
+
+```python
+from plain.views import CreateView
+from .forms import CustomCreateForm
 
 
 class ExampleCreateView(CreateView):
     template_name = "create.html"
     form_class = CustomCreateForm
     success_url = "."
+```
+
+### UpdateView
+
+[`UpdateView`](./objects.py#UpdateView) displays a form pre-populated with an existing object and saves changes on submission.
+
+```python
+from plain.views import UpdateView
+from .forms import CustomUpdateForm
 
 
 class ExampleUpdateView(UpdateView):
@@ -199,22 +228,35 @@ class ExampleUpdateView(UpdateView):
     def get_object(self):
         return MyObjectClass.query.get(
             id=self.url_kwargs["id"],
-            user=self.user,  # Limit access
+            user=self.request.user,
         )
+```
+
+### DeleteView
+
+[`DeleteView`](./objects.py#DeleteView) confirms deletion of an object. POST to delete, no form class needed.
+
+```python
+from plain.views import DeleteView
 
 
 class ExampleDeleteView(DeleteView):
     template_name = "delete.html"
-    success_url = "."
-
-    # No form class necessary.
-    # Just POST to this view to delete the object.
+    success_url = "/list/"
 
     def get_object(self):
         return MyObjectClass.query.get(
             id=self.url_kwargs["id"],
-            user=self.user,  # Limit access
+            user=self.request.user,
         )
+```
+
+### ListView
+
+[`ListView`](./objects.py#ListView) displays a collection of objects.
+
+```python
+from plain.views import ListView
 
 
 class ExampleListView(ListView):
@@ -222,16 +264,44 @@ class ExampleListView(ListView):
 
     def get_objects(self):
         return MyObjectClass.query.filter(
-            user=self.user,  # Limit access
+            user=self.request.user,
         )
 ```
 
-## Response exceptions
+The objects are available in your template as `objects`.
 
-At any point in the request handling,
-a view can raise a [`ResponseException`](./exceptions.py#ResponseException) to immediately exit and return the wrapped response.
+## RedirectView
 
-This isn't always necessary, but can be useful for raising rate limits or authorization errors when you're a couple layers deep in the view handling or helper functions.
+[`RedirectView`](./redirect.py#RedirectView) redirects to another URL.
+
+```python
+from plain.views import RedirectView
+
+
+class ExampleRedirectView(RedirectView):
+    url = "/new-location/"
+```
+
+Set `status_code = 301` for permanent redirects (default is 302).
+
+For simple redirects, configure the view directly in your URL routes.
+
+```python
+from plain.views import RedirectView
+from plain.urls import path, Router
+
+
+class AppRouter(Router):
+    routes = [
+        path("/old-location/", RedirectView.as_view(url="/new-location/", status_code=301)),
+    ]
+```
+
+You can also redirect to a named URL using `url_name`, or preserve query parameters with `preserve_query_params=True`.
+
+## ResponseException
+
+At any point during request handling, you can raise a [`ResponseException`](./exceptions.py#ResponseException) to immediately return a response. This is useful for authorization checks or rate limiting in nested helper functions.
 
 ```python
 from plain.views import DetailView
@@ -241,7 +311,7 @@ from plain.http import Response
 
 class ExampleView(DetailView):
     def get_object(self):
-        if self.user and self.user.exceeds_rate_limit:
+        if self.request.user and self.request.user.exceeds_rate_limit:
             raise ResponseException(
                 Response("Rate limit exceeded", status_code=429)
             )
@@ -251,50 +321,67 @@ class ExampleView(DetailView):
 
 ## Error views
 
-HTTP errors are rendered using templates. Create templates for the errors users actually see:
+HTTP errors are rendered using templates. Create templates for the errors users see.
 
 - `templates/404.html` - Page not found
 - `templates/403.html` - Forbidden
 - `templates/500.html` - Server error
 
-Plain looks for `{status_code}.html` templates, then returns a plain HTTP response if not found. Most apps only need the three specific templates above.
+Plain looks for `{status_code}.html` templates, then returns a plain HTTP response if not found. Most apps only need these three templates.
 
 Templates receive `status_code` and `exception` in context.
 
-**Note:** `500.html` should be self-contained - avoid extending base templates or accessing database/session, since server errors can occur during middleware or template rendering. `404.html` and `403.html` can safely extend base templates since they occur during view execution after middleware runs.
+Your `500.html` template should be self-contained. Avoid extending base templates or accessing the database/session, since server errors can occur during middleware or template rendering. `404.html` and `403.html` can safely extend base templates since they occur during view execution after middleware runs.
 
-## Redirect views
+## FAQs
 
-```python
-from plain.views import RedirectView
+#### How do I exempt a view from CSRF protection?
 
-
-class ExampleRedirectView(RedirectView):
-    url = "/new-location/"
-    permanent = True
-```
-
-Redirect views can also be used in the URL router.
+Use the `CSRF_EXEMPT_PATHS` setting to specify path patterns that should bypass CSRF protection. For example:
 
 ```python
-from plain.views import RedirectView
-from plain.urls import path, Router
-
-
-class AppRouter(Router):
-    routes = [
-        path("/old-location/", RedirectView.as_view(url="/new-location/", permanent=True)),
-    ]
+# app/settings.py
+CSRF_EXEMPT_PATHS = [
+    r"^/api/",  # Exempt all API routes
+    r"^/webhooks/",  # Exempt webhook endpoints
+]
 ```
 
-## CSRF exempt views
+#### How do I access URL parameters?
+
+URL parameters are available via `self.url_kwargs` (keyword arguments) and `self.url_args` (positional arguments).
 
 ```python
-from plain.views import View
-from plain.views.csrf import CsrfExemptViewMixin
-
-
-class ExemptView(CsrfExemptViewMixin, View):
-    def post(self):
-        return "Hello, world!"
+class ExampleView(View):
+    def get(self):
+        user_id = self.url_kwargs["id"]
+        return f"User ID: {user_id}"
 ```
+
+#### How do I access the request object?
+
+The request is available as `self.request` after the view is set up.
+
+```python
+class ExampleView(View):
+    def get(self):
+        return f"Path: {self.request.path}"
+```
+
+#### Can I customize view initialization?
+
+Yes, define your own `__init__` method to accept custom arguments passed via `as_view()`.
+
+```python
+class CustomView(View):
+    def __init__(self, feature_enabled=False):
+        self.feature_enabled = feature_enabled
+
+
+# In URLs
+path("/custom/", CustomView.as_view(feature_enabled=True))
+```
+
+## Installation
+
+Views are included with the core `plain` package. No additional installation is required.

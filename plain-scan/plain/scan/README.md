@@ -1,96 +1,180 @@
 # plain.scan
 
-**Remotely test for production best practices.**
+**Scan websites for HTTP security misconfigurations.**
 
 - [Overview](#overview)
+- [Command line usage](#command-line-usage)
+    - [Output formats](#output-formats)
+    - [Disabling audits](#disabling-audits)
+    - [Verbose mode](#verbose-mode)
+- [Using the Scanner programmatically](#using-the-scanner-programmatically)
 - [Audits](#audits)
+    - [Required audits](#required-audits)
+    - [Optional audits](#optional-audits)
+    - [Conditional audits](#conditional-audits)
 - [FAQs](#faqs)
-- [Additional Resources](#additional-resources)
 - [Installation](#installation)
 
 ## Overview
 
-Plain Scan checks your production (or development) websites for common HTTP security misconfigurations—headers, SSL certificates, redirects, and other server-level security settings.
+Plain Scan checks production websites for common HTTP security issues: headers, SSL certificates, redirects, and server-level security settings.
 
-Unlike generic security scanners that flag everything as a potential issue, Plain Scan focuses on **practical checks you should actually pay attention to**. Every failure is **highly actionable** with specific guidance on what to fix.
+You can try it immediately without installing anything:
 
-**Try it now:** Visit [plainframework.com/scan](https://plainframework.com/scan/) or run `uvx plain-scan github.com`
+```bash
+uvx plain-scan github.com
+```
+
+Or visit [plainframework.com/scan](https://plainframework.com/scan/) to scan URLs in your browser.
+
+Plain Scan focuses on practical checks you should actually pay attention to. Every failure is highly actionable with specific guidance on what to fix.
+
+## Command line usage
+
+Scan any URL by passing a domain or full URL:
+
+```bash
+plain-scan example.com
+plain-scan https://example.com/login
+```
+
+Bare domains default to HTTPS.
+
+### Output formats
+
+Choose between CLI, JSON, or Markdown output:
+
+```bash
+plain-scan example.com --format cli      # default, human-readable
+plain-scan example.com --format json     # machine-readable
+plain-scan example.com --format markdown # for reports
+```
+
+### Disabling audits
+
+Skip specific audits using `--disable`:
+
+```bash
+plain-scan staging.example.com --disable hsts --disable csp
+```
+
+This is useful for staging servers where you might not have HSTS configured yet.
+
+Available audits to disable: `csp`, `hsts`, `tls`, `redirects`, `content-type-options`, `frame-options`, `referrer-policy`, `cookies`, `cors`.
+
+### Verbose mode
+
+See the full response chain including headers and cookies:
+
+```bash
+plain-scan example.com --verbose
+```
+
+## Using the Scanner programmatically
+
+You can use the [`Scanner`](./scanner.py#Scanner) class directly in Python:
+
+```python
+from plain.scan.scanner import Scanner
+
+scanner = Scanner("https://example.com")
+result = scanner.scan()
+
+print(f"URL: {result.url}")
+print(f"Passed: {result.passed}")
+print(f"Audits: {result.passed_count}/{result.total_count} passed")
+
+for audit in result.audits:
+    status = "PASS" if audit.passed else "FAIL"
+    print(f"  [{status}] {audit.name}")
+    for check in audit.checks:
+        print(f"    - {check.name}: {check.message}")
+```
+
+Disable specific audits by passing a set of slugs:
+
+```python
+scanner = Scanner("https://staging.example.com", disabled_audits={"hsts", "csp"})
+```
+
+The scan result can be serialized to JSON:
+
+```python
+import json
+result_dict = result.to_dict()
+print(json.dumps(result_dict, indent=2))
+```
+
+See [`ScanResult`](./results.py#ScanResult), [`AuditResult`](./results.py#AuditResult), and [`CheckResult`](./results.py#CheckResult) for the full result structure.
 
 ## Audits
 
-Security checks are organized into **actionable audits**. Each audit first checks if the security feature is detected on your site, then runs **specific, practical checks** to verify proper configuration. Results tell you exactly what's wrong and what to fix—no vague warnings or overwhelming noise.
+Security checks are organized into audits. Each audit first checks if a security feature is detected, then runs specific checks to verify proper configuration.
 
-**Smart Defaults: Required vs Optional Audits**
+### Required audits
 
-Plain Scan uses **intelligent audit organization** to ensure results are practical and actionable:
+These audits fail if the security feature is missing or misconfigured:
 
-**Required audits** (will fail if missing or misconfigured):
+| Audit                    | Description                                                     |
+| ------------------------ | --------------------------------------------------------------- |
+| **CSP**                  | Content Security Policy protects against XSS and data injection |
+| **HSTS**                 | HTTP Strict Transport Security enforces HTTPS connections       |
+| **TLS**                  | Validates SSL certificate and connection security               |
+| **Redirects**            | Ensures proper HTTP to HTTPS redirects                          |
+| **Content-Type-Options** | Prevents MIME-sniffing attacks                                  |
+| **Frame-Options**        | Prevents clickjacking attacks                                   |
+| **Referrer-Policy**      | Controls referrer information sharing                           |
 
-- **CSP (Content Security Policy)** - Protects against XSS attacks via content injection
-- **HSTS (HTTP Strict Transport Security)** - Enforces HTTPS connections
-- **Content Type Options** - Prevents MIME-sniffing attacks
-- **Frame Options** - Prevents clickjacking attacks
-- **Referrer-Policy** - Controls referrer information sharing
-- **Redirects** - Ensures proper HTTP to HTTPS redirects
-- **TLS** - Validates SSL certificate and connection security
+### Optional audits
 
-**Optional audits** (won't fail if not present, only if misconfigured):
+These audits only fail if the feature is detected but misconfigured:
 
-- **CORS (Cross-Origin Resource Sharing)** - Only needed for cross-origin API endpoints
+| Audit    | Description                                                       |
+| -------- | ----------------------------------------------------------------- |
+| **CORS** | Cross-Origin Resource Sharing (only needed for cross-origin APIs) |
 
-**Conditional audits** (automatically detected and only checked when relevant):
+### Conditional audits
 
-- **Cookies** - Only checked if your site sets cookies in the response
+These audits are automatically detected and only checked when relevant:
 
-This approach ensures you **only see failures for things you should actually fix**, not false positives for features you don't use. For deployment-specific exceptions (e.g., HSTS on staging), use `--disable <audit>` to skip specific checks.
+| Audit       | Description                                            |
+| ----------- | ------------------------------------------------------ |
+| **Cookies** | Only checked if your site sets cookies in the response |
 
 ## FAQs
 
+#### How does the scanner work?
+
+Plain Scan makes a single unauthenticated GET request to the provided URL. It checks what can be inferred from the HTTP response and performs a TLS socket probe. It does not crawl additional pages, execute JavaScript, render in a browser, or follow authenticated flows.
+
 #### Can I use this against development servers?
 
-Yes! Plain Scan can be used against development servers, but it's primarily designed to verify production configurations.
-
-#### Why does the scan fail if a security header is missing?
-
-Required headers (like CSP and HSTS) fail if missing because every production site needs them. See [Audits](#audits) for the complete list of required, optional, and conditional checks. Use `--disable <audit>` for deployment-specific exceptions.
+Yes. Plain Scan works against any URL, including localhost. Keep in mind that some checks (like TLS) may fail on development servers without valid certificates.
 
 #### Why does the scanner flag Google Analytics or Google Tag Manager in my CSP?
 
-These domains (and similar CDNs) host JSONP endpoints that can be exploited to bypass CSP and execute arbitrary JavaScript, even though they appear "safe". This is based on research from Google's CSP Evaluator team. If you must use these services, consider using [nonce-based or hash-based CSP](https://web.dev/articles/strict-csp) instead of domain allowlisting.
+These domains host JSONP endpoints that can be exploited to bypass CSP and execute arbitrary JavaScript. This is based on research from Google's CSP Evaluator team. If you must use these services, consider using [nonce-based or hash-based CSP](https://web.dev/articles/strict-csp) instead of domain allowlisting.
 
-#### Does Plain Scan enforce COOP/COEP/CORP (cross-origin isolation)?
+#### What about COOP/COEP/CORP headers?
 
-Not yet. Most sites still do not ship the full cross-origin isolation header trio, so we treat it as optional for now. When a site opts into isolation (by sending any of those headers) the plan is to enforce them as a bundle, but we avoid failing scans for teams that do not need SharedArrayBuffer-level capabilities today. This keeps results focused on the widely adopted 80/20 baseline while leaving room to harden checks once adoption increases.
+Cross-origin isolation headers are not currently enforced. Most sites do not ship the full header trio yet, so Plain Scan treats them as optional for now.
 
-#### What are the scope and limitations of Plain Scan?
-
-Plain Scan makes a single unauthenticated GET request to the provided URL. It checks what can be inferred from the HTTP response and performs a TLS socket probe. It does not:
-
-- Crawl additional pages or resources
-- Execute JavaScript or render in a browser
-- Follow authenticated flows
-
-Emerging protections like cross-origin isolation headers (COOP/COEP/CORP) are currently informational and only enforced when you explicitly opt in.
-
-## Additional Resources
-
-**Security standards:**
+#### What security standards does Plain Scan follow?
 
 Plain Scan implements checks based on:
 
 - [Google CSP Evaluator](https://github.com/google/csp-evaluator) for Content Security Policy
-- [Strict CSP (web.dev)](https://web.dev/articles/strict-csp) - Nonce and hash-based CSP implementation guide
 - [Mozilla Observatory](https://github.com/mdn/mdn-http-observatory) security header guidelines
 - OWASP security best practices
 - Modern web security standards (CSP Level 3, etc.)
 
-**Complementary tools:**
+#### What tools complement Plain Scan?
 
-Plain Scan focuses on HTTP-level security checks and intentionally avoids browser rendering and JavaScript analysis. For a complete security picture, consider also using:
+Plain Scan focuses on HTTP-level security checks. For browser-based audits, performance, and client-side security, consider:
 
-- [Lighthouse](https://developer.chrome.com/docs/lighthouse) - Browser-based audits including performance, accessibility, and client-side security
-- [Mozilla Observatory](https://observatory.mozilla.org/) - Additional HTTP security header analysis
-- [Qualys SSL Labs](https://www.ssllabs.com/ssltest/) - Deep SSL/TLS configuration analysis
+- [Lighthouse](https://developer.chrome.com/docs/lighthouse) for browser-based audits
+- [Mozilla Observatory](https://observatory.mozilla.org/) for additional header analysis
+- [Qualys SSL Labs](https://www.ssllabs.com/ssltest/) for deep SSL/TLS analysis
 
 ## Installation
 
@@ -104,25 +188,25 @@ Visit [plainframework.com/scan](https://plainframework.com/scan/) to scan any UR
 uvx plain-scan github.com
 ```
 
-This uses `uvx` to run plain-scan without adding it as a project dependency. You can use bare domains (which default to HTTPS) or full URLs.
+This uses `uvx` to run plain-scan without adding it as a project dependency.
 
 **As a project dependency:**
 
 ```bash
-pip install plain.scan
-```
-
-Or add to your `pyproject.toml`:
-
-```toml
-[project]
-dependencies = [
-    "plain.scan",
-]
+uv add plain.scan
 ```
 
 Then run scans:
 
 ```bash
-plain-scan github.com
+plain-scan example.com
+```
+
+Or use the Python API:
+
+```python
+from plain.scan.scanner import Scanner
+
+result = Scanner("https://example.com").scan()
+print(f"Passed: {result.passed}")
 ```

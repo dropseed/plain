@@ -1,104 +1,183 @@
 # plain.elements
 
-**Use HTML tags to include HTML template components.**
+**Build reusable HTML components using a tag-based syntax.**
 
 - [Overview](#overview)
-- [Element attributes](#element-attributes)
+- [Passing attributes](#passing-attributes)
+- [Nested content with `children`](#nested-content-with-children)
 - [Namespaced elements](#namespaced-elements)
+- [FAQs](#faqs)
 - [Installation](#installation)
 
 ## Overview
 
-Elements are an alternative to Jinja [`{% include %}`](https://jinja.palletsprojects.com/en/stable/templates/#include) or [macros](https://jinja.palletsprojects.com/en/stable/templates/#macros) and flow better with existing HTML by using a compatible syntax. They are distinguished from built-in HTML tags by using a capitalized tag name (so `<Button>` doesn't clash with `<button>`).
+Elements give you a component-like syntax for HTML templates. Instead of using Jinja `{% include %}` or macros, you write components as `.html` files and use them with capitalized HTML tags like `<Button>` or `<Card>`.
 
-To make a `<Submit>` element, for example, you would create a template named `templates/elements/Submit.html`.
+To create an element, add a template in `templates/elements/`. The filename becomes the tag name.
 
 ```html
-<!-- templates/elements/Submit.html -->
-<button type="submit" class="btn">
+<!-- templates/elements/Button.html -->
+<button type="button" class="btn btn-primary">
     {{ children }}
 </button>
 ```
 
-An element can be used in any other template by enabling them with `{% use_elements %}` and then using the capitalized tag name.
+To use elements in a template, add `{% use_elements %}` at the top. Then use your element with its capitalized tag name.
 
 ```html
-{% extends "admin/base.html" %}
-
 {% use_elements %}
 
-{% block content %}
-<form method="post">
-    <!-- Form fields here -->
-    <Submit>Save</Submit>
-</form>
-{% endblock %}
+<div class="actions">
+    <Button>Click me</Button>
+</div>
 ```
 
-## Element attributes
-
-Attributes will be passed through using regular strings or single braces `{}` for Python variables.
+The output will be:
 
 ```html
-{% extends "admin/base.html" %}
-
-{% use_elements %}
-
-{% block content %}
-<form method="post">
-    <FormInput field={form.username} placeholder="Username" label="Username" />
-    <Submit>Save</Submit>
-</form>
-{% endblock %}
+<div class="actions">
+    <button type="button" class="btn btn-primary">
+        Click me
+    </button>
+</div>
 ```
 
-The attributes are passed to the element as named variables. By default in Plain, you will get an error if you try to use an undefined variable, so Jinja features like [`|default`](https://jinja.palletsprojects.com/en/stable/templates/#jinja-filters.default) and [`is defined`](https://jinja.palletsprojects.com/en/stable/templates/#jinja-tests.defined) are useful for optional attributes.
+## Passing attributes
+
+You can pass attributes to elements in two ways: as strings or as Python expressions.
+
+String attributes use standard HTML syntax:
+
+```html
+{% use_elements %}
+
+<Button type="submit">Save</Button>
+```
+
+Python expressions use single braces `{}`:
+
+```html
+{% use_elements %}
+
+<FormInput field={form.email} label="Email address" />
+```
+
+Inside the element template, attributes become template variables:
 
 ```html
 <!-- templates/elements/FormInput.html -->
-<label for="{{ field.html_id }}">
-    {{ label }}
-</label>
+<label for="{{ field.html_id }}">{{ label }}</label>
 <input
     id="{{ field.html_id }}"
     type="{{ type|default('text') }}"
     name="{{ field.html_name }}"
     value="{{ field.value() or '' }}"
-    placeholder="{{ placeholder }}"
     {% if field.field.required %}required{% endif %}
-    />
+/>
 ```
 
-## Namespaced elements
+By default, Plain raises an error for undefined variables. Use the `|default` filter or `is defined` test for optional attributes.
 
-Especially for reusable packages, it can be useful to namespace your elements by putting them in a subdirectory of `templates/elements/`. To use namespaced elements, you need to include the full dot-separated path in your HTML tag.
+## Nested content with `children`
 
-For example, an element in `templates/elements/admin/Submit.html` would be used like this:
+Content between opening and closing tags is available as the `children` variable.
+
+```html
+<!-- templates/elements/Card.html -->
+<div class="card">
+    <div class="card-body">
+        {{ children }}
+    </div>
+</div>
+```
 
 ```html
 {% use_elements %}
 
-{% block content %}
-<form method="post">
-    <admin.Submit>Save</admin.Submit>
-</form>
-{% endblock %}
+<Card>
+    <h2>Welcome</h2>
+    <p>This content appears inside the card body.</p>
+</Card>
 ```
+
+Self-closing elements don't have children:
+
+```html
+{% use_elements %}
+
+<Divider />
+```
+
+## Namespaced elements
+
+You can organize elements into subdirectories. This is particularly useful for reusable packages or grouping related components.
+
+Put the element template in a subdirectory of `templates/elements/`:
+
+```html
+<!-- templates/elements/forms/Input.html -->
+<input type="text" class="form-input" />
+```
+
+Use the dot-separated path as the tag name:
+
+```html
+{% use_elements %}
+
+<forms.Input />
+```
+
+## FAQs
+
+#### Can I nest the same element inside itself?
+
+No. Elements cannot be nested inside themselves to prevent infinite recursion. If you need recursive structures, split them into separate element types.
+
+#### Why use capitalized tag names?
+
+Capitalized names like `<Button>` distinguish your elements from built-in HTML tags like `<button>`. This prevents conflicts and makes it clear which tags are custom components.
+
+#### How does this compare to Jinja macros?
+
+Elements are simpler for component-style usage. Macros require import statements and use function-call syntax. Elements look like HTML and feel more natural when building UIs. Use macros when you need complex logic or multiple return values.
+
+#### Can I use elements without `{% use_elements %}`?
+
+No. The `{% use_elements %}` tag enables element processing for that template. Without it, capitalized tags will be treated as literal text.
 
 ## Installation
 
-Install the `plain.elements` package from [PyPI](https://pypi.org/project/plain.elements/):
+Install the `plain.elements` package:
 
 ```bash
 uv add plain.elements
 ```
 
-Add it to your `INSTALLED_PACKAGES` setting. That's it! The Jinja extension will be enabled automatically.
+Add it to your `INSTALLED_PACKAGES`:
 
 ```python
-# settings.py
+# app/settings.py
 INSTALLED_PACKAGES = [
     # ...
     "plain.elements",
 ]
+```
+
+Create your first element template:
+
+```html
+<!-- templates/elements/Alert.html -->
+<div class="alert alert-{{ type|default('info') }}">
+    {{ children }}
+</div>
+```
+
+Use it in any template:
+
+```html
+{% use_elements %}
+
+<Alert type="success">
+    Your changes have been saved.
+</Alert>
 ```

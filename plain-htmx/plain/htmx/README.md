@@ -3,43 +3,35 @@
 **Integrate HTMX with templates and views.**
 
 - [Overview](#overview)
-- [Template Fragments](#template-fragments)
+- [Template fragments](#template-fragments)
     - [Lazy template fragments](#lazy-template-fragments)
-    - [How does it work?](#how-does-it-work)
-- [View Actions](#view-actions)
-- [Dedicated Templates](#dedicated-templates)
-- [Tailwind CSS variant](#tailwind-css-variant)
-- [CSRF tokens](#csrf-tokens)
-- [Error classes](#error-classes)
-- [CSP](#csp)
+    - [How template fragments work](#how-template-fragments-work)
+- [View actions](#view-actions)
+- [Dedicated templates](#dedicated-templates)
+- [FAQs](#faqs)
 - [Installation](#installation)
 
 ## Overview
 
-The `plain-htmx` package adds a couple of unique features for working with HTMX.
-One is [template fragments](#template-fragments) and the other is [view actions](#view-actions).
+You can use `plain.htmx` to build HTMX-powered views that focus on server-side rendering without needing complicated URL structures or REST APIs.
 
-The combination of these features lets you build HTMX-powered views that focus on server-side rendering and avoid overly complicated URL structures or REST APIs that you may not otherwise need.
+The two main features are [template fragments](#template-fragments) and [view actions](#view-actions).
 
-The [`HTMXViewMixin`](./views.py#HTMXViewMixin) is the starting point for the server-side HTMX behavior.
-To use these features on a view,
-simply inherit from the class (yes, this is designed to work with class-based views).
+The [`HTMXView`](./views.py#HTMXView) class is the starting point for the server-side HTMX behavior. To use these features on a view, inherit from this class (yes, this is designed to work with class-based views).
 
 ```python
-from plain.views import TemplateView
+# app/views.py
+from plain.htmx.views import HTMXView
 
-from plain.htmx.views import HTMXViewMixin
 
-
-class HomeView(HTMXViewMixin, TemplateView):
+class HomeView(HTMXView):
     template_name = "home.html"
 ```
 
-In your `base.html` template (or wherever need the HTMX scripts),
-you can use the `{% htmx_js %}` template tag:
+In your `base.html` template (or wherever you need the HTMX scripts), you can use the `{% htmx_js %}` template tag:
 
 ```html
-<!-- base.template.html -->
+<!-- base.html -->
 {% load htmx %}
 <!DOCTYPE html>
 <html lang="en">
@@ -53,12 +45,9 @@ you can use the `{% htmx_js %}` template tag:
 </body>
 ```
 
-## Template Fragments
+## Template fragments
 
-An `{% htmxfragment %}` can be used to render a specific part of your template in HTMX responses.
-When you use a fragment, all `hx-get`, `hx-post`, etc. elements inside that fragment will automatically send a request to the current URL,
-render _only_ the updated content for the fragment,
-and swap out the fragment.
+An `{% htmxfragment %}` can render a specific part of your template in HTMX responses. When you use a fragment, all `hx-get`, `hx-post`, etc. elements inside that fragment will automatically send a request to the current URL, render _only_ the updated content for the fragment, and swap out the fragment.
 
 Here's an example:
 
@@ -87,8 +76,7 @@ Everything inside `{% htmxfragment %}` will automatically update when "Refresh" 
 
 ### Lazy template fragments
 
-If you want to render a fragment lazily,
-you can add the `lazy` attribute to the `{% htmxfragment %}` tag.
+If you want to render a fragment lazily, you can add the `lazy` attribute to the `{% htmxfragment %}` tag.
 
 ```html
 {% htmxfragment "main" lazy=True %}
@@ -96,8 +84,7 @@ you can add the `lazy` attribute to the `{% htmxfragment %}` tag.
 {% endhtmxfragment %}
 ```
 
-This pairs nicely with passing a callable function or method as a context variable,
-which will only get invoked when the fragment actually gets rendered on the lazy load.
+This pairs nicely with passing a callable function or method as a context variable, which will only get invoked when the fragment actually gets rendered on the lazy load.
 
 ```python
 def fetch_items():
@@ -106,9 +93,9 @@ def fetch_items():
     return ["foo", "bar", "baz"]
 
 
-class HomeView(HTMXViewMixin, TemplateView):
-    def get_context(self, **kwargs):
-        context = super().get_context(**kwargs)
+class HomeView(HTMXView):
+    def get_template_context(self):
+        context = super().get_template_context()
         context["items"] = fetch_items  # Missing () are on purpose!
         return context
 ```
@@ -123,10 +110,9 @@ class HomeView(HTMXViewMixin, TemplateView):
 {% endhtmxfragment %}
 ```
 
-#### How does it work?
+### How template fragments work
 
-When you use the `{% htmxfragment %}` tag,
-a standard `div` is output that looks like this:
+When you use the `{% htmxfragment %}` tag, a standard `div` is output that looks like this:
 
 ```html
 <div plain-hx-fragment="main" hx-swap="outerHTML" hx-target="this" hx-indicator="this">
@@ -134,39 +120,25 @@ a standard `div` is output that looks like this:
 </div>
 ```
 
-The `plain-hx-fragment` is a custom attribute that we've added ("F" is for "Forge"),
-but the rest are standard HTMX attributes.
+The `plain-hx-fragment` is a custom attribute, but the rest are standard HTMX attributes.
 
-When Plain renders the response to an HTMX request,
-it will get the `Plain-HX-Fragment` header,
-find the fragment with that name in the template,
-and render that for the response.
+When Plain renders the response to an HTMX request, it will get the `Plain-HX-Fragment` header, find the fragment with that name in the template, and render that for the response.
 
 Then the response content is automatically swapped in to replace the content of your `{% htmxfragment %}` tag.
 
-Note that there is no URL specified on the `hx-get` attribute.
-By default, HTMX will send the request to the current URL for the page.
-When you're working with fragments, this is typically the behavior you want!
-(You're on a page and want to selectively re-render a part of that page.)
+Note that there is no URL specified on the `hx-get` attribute. By default, HTMX will send the request to the current URL for the page. When you're working with fragments, this is typically the behavior you want! (You're on a page and want to selectively re-render a part of that page.)
 
-The `{% htmxfragment %}` tag is somewhat similar to a `{% block %}` tag --
-the fragments on a page should be named and unique,
-and you can't use it inside of loops.
-For fragment-like behavior inside of a for-loop,
-you'll most likely want to set up a dedicated URL that can handle a single instance of the looped items,
-and maybe leverage [dedicated templates](#dedicated-templates).
+The `{% htmxfragment %}` tag is somewhat similar to a `{% block %}` tag -- the fragments on a page should be named and unique, and you can't use it inside of loops. For fragment-like behavior inside of a for-loop, you'll most likely want to set up a dedicated URL that can handle a single instance of the looped items, and maybe leverage [dedicated templates](#dedicated-templates).
 
-## View Actions
+## View actions
 
-View actions let you define multiple "actions" on a class-based view.
-This is an alternative to defining specific API endpoints or form views to handle basic button interactions.
+View actions let you define multiple "actions" on a class-based view. This is an alternative to defining specific API endpoints or form views to handle basic button interactions.
 
-With view actions you can design a single view that renders a single template,
-and associate buttons in that template with class methods in the view.
+With view actions you can design a single view that renders a single template, and associate buttons in that template with class methods in the view.
 
 As an example, let's say we have a `PullRequest` model and we want users to be able to open, close, or merge it with a button.
 
-In our template, we would use the `plain-hx-action` attribute to name the action:
+In your template, use the `plain-hx-action` attribute to name the action:
 
 ```html
 {% extends "base.html" %}
@@ -196,10 +168,14 @@ In our template, we would use the `plain-hx-action` attribute to name the action
 {% endblock %}
 ```
 
-Then in the view class, we can define methods for each HTTP method + `plain-hx-action`:
+Then in the view class, define methods for each HTTP method + `plain-hx-action`:
 
 ```python
-class PullRequestDetailView(HTMXViewMixin, DetailView):
+from plain.htmx.views import HTMXView
+from plain.views import DetailView
+
+
+class PullRequestDetailView(HTMXView, DetailView):
     def get_queryset(self):
         # The queryset will apply to all actions on the view, so "permission" logic can be shared
         return super().get_queryset().filter(users=self.user)
@@ -213,44 +189,39 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         self.object.state = "closed"
         self.object.save()
 
-        # Render the updated content the standard calls
-        # (which will selectively render our fragment if applicable)
-        context = self.get_context(object=self.object)
-        return self.render_to_response(context)
+        # Render the updated content with the standard calls
+        # (which will selectively render the fragment if applicable)
+        return self.render_template()
 
     def htmx_post_close(self):
         if self.object.state != "open":
-            raise ValueError("Only a open pull request can be closed")
+            raise ValueError("Only an open pull request can be closed")
 
         self.object.state = "open"
         self.object.save()
 
-        context = self.get_context(object=self.object)
-        return self.render_to_response(context)
+        return self.render_template()
 
     def htmx_post_merge(self):
         if self.object.state != "open":
-            raise ValueError("Only a open pull request can be merged")
+            raise ValueError("Only an open pull request can be merged")
 
         self.object.state = "merged"
         self.object.save()
 
-        context = self.get_context(object=self.object)
-        return self.render_to_response(context)
+        return self.render_template()
 ```
 
-This can be a matter of preference,
-but typically you may end up building out an entire form, API, or set of URLs to handle these behaviors.
-If you application is only going to handle these actions via HTMX,
-then a single View may be a simpler way to do it.
+This can be a matter of preference, but typically you may end up building out an entire form, API, or set of URLs to handle these behaviors. If your application is only going to handle these actions via HTMX, then a single View may be a simpler way to do it.
 
-Note that currently we don't have many helper-functions for parsing or returning HTMX responses --
-this can basically all be done through standard request and response headers:
+You can also handle HTMX requests without a specific action by just implementing the HTTP method:
 
 ```python
-class PullRequestDetailView(HTMXViewMixin, DetailView):
+from plain.http import HttpResponse
+
+
+class PullRequestDetailView(HTMXView, DetailView):
     def get_queryset(self):
-        # The queryset will apply to all actions on the view, so "permission" logic can be shared
         return super().get_queryset().filter(users=self.user)
 
     # You can also leave off the "plain-hx-action" attribute and just handle the HTTP method
@@ -263,18 +234,13 @@ class PullRequestDetailView(HTMXViewMixin, DetailView):
         return response
 ```
 
-## Dedicated Templates
+## Dedicated templates
 
-A small additional features of `plain-htmx` is that it will automatically find templates named `{template_name}_htmx.html` for HTMX requests.
-More than anything, this is just a nice way to formalize a naming scheme for template "partials" dedicated to HTMX.
+A small additional feature is that `plain.htmx` will automatically find templates named `{template_name}_htmx.html` for HTMX requests. More than anything, this is just a nice way to formalize a naming scheme for template "partials" dedicated to HTMX.
 
-Because template fragments don't work inside of loops,
-for example,
-you'll often need to define dedicated URLs to handle the HTMX behaviors for individual items in a loop.
-You can sometimes think of these as "pages within a page".
+Because template fragments don't work inside of loops, for example, you'll often need to define dedicated URLs to handle the HTMX behaviors for individual items in a loop. You can sometimes think of these as "pages within a page".
 
-So if you have a template that renders a collection of items,
-you can do the initial render using a Django `{% include %}`:
+So if you have a template that renders a collection of items, you can do the initial render using a `{% include %}`:
 
 ```html
 <!-- pullrequests/pullrequest_list.html -->
@@ -326,21 +292,20 @@ urlpatterns = [
 ]
 
 # views.py
-class PullRequestDetailView(HTMXViewMixin, DetailView):
+class PullRequestDetailView(HTMXView, DetailView):
   def htmx_post_update(self):
       self.object.update()
 
-      context = self.get_context(object=self.object)
-      return self.render_to_response(context)
+      return self.render_template()
 ```
 
-## Tailwind CSS variant
+## FAQs
 
-The standard behavior for `{% htmxfragment %}` is to set `hx-indicator="this"` on the rendered element.
-This tells HTMX to add the `htmx-request` class to the fragment element when it is loading.
+#### How do I add a Tailwind CSS variant for loading states?
 
-Since Plain emphasizes using Tailwind CSS,
-here's a simple variant you can add to your `tailwind.config.js` to easily style the loading state:
+The standard behavior for `{% htmxfragment %}` is to set `hx-indicator="this"` on the rendered element. This tells HTMX to add the `htmx-request` class to the fragment element when it is loading.
+
+Here's a simple variant you can add to your `tailwind.config.js` to easily style the loading state:
 
 ```js
 const plugin = require('tailwindcss/plugin')
@@ -368,14 +333,13 @@ You can then prefix any class with `htmx-request:` to decide what it looks like 
 </form>
 ```
 
-## CSRF tokens
+#### How are CSRF tokens handled?
 
-We configure CSRF tokens for you with the HTMX JS API.
-You don't have to put `hx-headers` on the `<body>` tag, for example.
+CSRF tokens are configured automatically with the HTMX JS API. You don't have to put `hx-headers` on the `<body>` tag.
 
-## Error classes
+#### How do I show error states?
 
-This app also includes an HTMX extension for adding error classes for failed requests.
+This package includes an HTMX extension for adding error classes for failed requests:
 
 - `htmx-error-response` for `htmx:responseError`
 - `htmx-error-response-{{ status_code }}` for `htmx:responseError`
@@ -383,7 +347,7 @@ This app also includes an HTMX extension for adding error classes for failed req
 
 To enable them, use `hx-ext="plain-errors"`.
 
-You can add the ones you want as Tailwind variants and use them to show error messages.
+You can add the ones you want as Tailwind variants and use them to show error messages:
 
 ```js
 const plugin = require('tailwindcss/plugin')
@@ -396,9 +360,11 @@ module.exports = {
 }
 ```
 
-## CSP
+#### How do I configure HTMX for CSP?
 
-```
+If you're using Content Security Policy, you can disable the indicator styles that HTMX adds inline:
+
+```html
 <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
 ```
 
@@ -410,11 +376,55 @@ Install the `plain.htmx` package from [PyPI](https://pypi.org/project/plain.htmx
 uv add plain.htmx
 ```
 
-Configure your Plain application:
+Add `plain.htmx` to your installed packages:
 
 ```python
+# app/settings.py
 INSTALLED_PACKAGES = [
     # ...
     "plain.htmx",
 ]
+```
+
+Add the HTMX JavaScript to your base template:
+
+```html
+<!-- base.html -->
+{% load htmx %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Site</title>
+    {% htmx_js %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+</body>
+```
+
+Create a view that inherits from `HTMXView`:
+
+```python
+# app/views.py
+from plain.htmx.views import HTMXView
+
+
+class HomeView(HTMXView):
+    template_name = "home.html"
+```
+
+Create a template with an HTMX fragment:
+
+```html
+<!-- home.html -->
+{% extends "base.html" %}
+{% load htmx %}
+
+{% block content %}
+{% htmxfragment "content" %}
+<p>The time is {% now "jS F Y H:i" %}</p>
+<button hx-get>Refresh</button>
+{% endhtmxfragment %}
+{% endblock %}
 ```

@@ -1,66 +1,104 @@
-# plain.server
+# Server
 
-**Plain's internal HTTP server based on vendored gunicorn.**
+**A production-ready WSGI HTTP server based on gunicorn.**
+
+- [Overview](#overview)
+- [Worker types](#worker-types)
+- [Configuration options](#configuration-options)
+- [Environment variables](#environment-variables)
+- [Signals](#signals)
+- [Using a different WSGI server](#using-a-different-wsgi-server)
+- [FAQs](#faqs)
+- [Installation](#installation)
 
 ## Overview
 
-This module provides a WSGI HTTP server for Plain applications. It is based on [gunicorn](https://gunicorn.org), which has been vendored into Plain's core to provide better integration and control over the HTTP server layer.
-
-The server is designed to work seamlessly with Plain's development workflow while still maintaining WSGI compatibility, allowing you to eject to any alternative WSGI server if needed.
-
-## Usage
-
-### Command Line
-
-The simplest way to run the server is using the `plain server` command:
+You can run the built-in HTTP server with the `plain server` command.
 
 ```bash
-# Run with defaults (127.0.0.1:8000)
 plain server
-
-# Specify host and port
-plain server --bind 0.0.0.0:8080
-
-# Run with SSL
-plain server --certfile cert.pem --keyfile key.pem
-
-# Enable auto-reload for development
-plain server --reload
-
-# Use multiple threads
-plain server --threads 8
 ```
 
-## Configuration Options
+By default, the server binds to `127.0.0.1:8000` and uses a single worker process. In production, you will typically want to increase the number of workers and optionally enable threading.
 
-Common options:
+```bash
+# Run with 4 worker processes
+plain server --workers 4
 
-- `--bind` / `-b` - Address to bind to (default: `127.0.0.1:8000`)
-- `--workers` / `-w` - Number of worker processes (default: 1, or `$WEB_CONCURRENCY` env var)
-- `--threads` - Number of threads per worker (default: 1)
-- `--timeout` / `-t` - Worker timeout in seconds (default: 30)
-- `--reload` - Enable auto-reload on code changes, including `.env*` files (default: False)
-- `--certfile` - Path to SSL certificate file
-- `--keyfile` - Path to SSL key file
-- `--log-level` - Logging level: debug, info, warning, error, critical (default: info)
-- `--access-log` - Access log file path (default: `-` for stdout)
-- `--error-log` - Error log file path (default: `-` for stderr)
-- `--log-format` - Log format string for error logs
-- `--access-log-format` - Access log format string for HTTP request details
-- `--max-requests` - Max requests before worker restart (default: 0, disabled)
-- `--pidfile` - PID file path
+# Run with 2 workers and 4 threads each
+plain server --workers 2 --threads 4
+```
 
-### Environment Variables
+For local development, you can enable auto-reload to restart workers when code changes.
 
-- `WEB_CONCURRENCY` - Sets the number of worker processes (commonly used by Heroku and other PaaS providers)
-- `SENDFILE` - Enable/disable use of sendfile() syscall (set to `1`, `yes`, `true`, or `y` to enable)
-- `FORWARDED_ALLOW_IPS` - Comma-separated list of trusted proxy IPs for secure headers (default: `127.0.0.1,::1`)
+```bash
+plain server --reload
+```
 
-For a complete list of options, run `plain server --help`.
+## Worker types
 
-## WSGI Ejection Point
+The server automatically selects the worker type based on your configuration.
 
-While Plain includes this built-in server, you can still use any WSGI-compatible server you prefer. Plain's `wsgi.py` module provides a standard WSGI application interface:
+**Sync workers** handle one request at a time per worker. These are simple and predictable.
+
+```bash
+# Single-threaded (uses sync worker)
+plain server --workers 4
+```
+
+**Threaded workers** handle multiple concurrent requests per worker using a thread pool. These are useful when your application does blocking I/O.
+
+```bash
+# Multi-threaded (uses threaded worker)
+plain server --workers 2 --threads 8
+```
+
+For advanced worker customization, see the [`SyncWorker`](./workers/sync.py#SyncWorker) and [`ThreadWorker`](./workers/thread.py#ThreadWorker) classes.
+
+## Configuration options
+
+All options are available via the command line. Run `plain server --help` to see the full list.
+
+| Option             | Default          | Description                                           |
+| ------------------ | ---------------- | ----------------------------------------------------- |
+| `--bind` / `-b`    | `127.0.0.1:8000` | Address to bind (can be used multiple times)          |
+| `--workers` / `-w` | `1`              | Number of worker processes                            |
+| `--threads`        | `1`              | Number of threads per worker                          |
+| `--timeout` / `-t` | `30`             | Worker timeout in seconds                             |
+| `--reload`         | `False`          | Restart workers when code changes                     |
+| `--certfile`       | -                | Path to SSL certificate file                          |
+| `--keyfile`        | -                | Path to SSL key file                                  |
+| `--log-level`      | `info`           | Logging level (debug, info, warning, error, critical) |
+| `--access-log`     | `-` (stdout)     | Access log file path                                  |
+| `--error-log`      | `-` (stderr)     | Error log file path                                   |
+| `--max-requests`   | `0` (disabled)   | Max requests before worker restart                    |
+| `--pidfile`        | -                | PID file path                                         |
+
+## Environment variables
+
+| Variable              | Description                                                          |
+| --------------------- | -------------------------------------------------------------------- |
+| `WEB_CONCURRENCY`     | Sets the number of workers (commonly used by Heroku and other PaaS)  |
+| `SENDFILE`            | Enable sendfile() syscall (`1`, `yes`, `true`, or `y` to enable)     |
+| `FORWARDED_ALLOW_IPS` | Comma-separated list of trusted proxy IPs (default: `127.0.0.1,::1`) |
+
+## Signals
+
+The server responds to UNIX signals for process management.
+
+| Signal    | Effect                           |
+| --------- | -------------------------------- |
+| `SIGTERM` | Graceful shutdown                |
+| `SIGINT`  | Quick shutdown                   |
+| `SIGQUIT` | Quick shutdown                   |
+| `SIGHUP`  | Reload configuration and workers |
+| `SIGTTIN` | Increase worker count by 1       |
+| `SIGTTOU` | Decrease worker count by 1       |
+| `SIGUSR1` | Reopen log files                 |
+
+## Using a different WSGI server
+
+You can use any WSGI-compatible server instead of the built-in one. Plain provides a standard WSGI application interface at `plain.wsgi:app`.
 
 ```bash
 # Using uvicorn
@@ -69,6 +107,46 @@ uvicorn plain.wsgi:app --port 8000
 # Using waitress
 waitress-serve --port=8000 plain.wsgi:app
 
-# Using gunicorn as an alternative
+# Using gunicorn directly
 gunicorn plain.wsgi:app --workers 4
 ```
+
+## FAQs
+
+#### How do I run with SSL/TLS?
+
+Provide both `--certfile` and `--keyfile` options pointing to your certificate and key files.
+
+```bash
+plain server --certfile cert.pem --keyfile key.pem
+```
+
+#### How do I run behind a reverse proxy?
+
+Configure your proxy to pass the appropriate headers, then set `FORWARDED_ALLOW_IPS` to include your proxy's IP address.
+
+```bash
+FORWARDED_ALLOW_IPS="10.0.0.1,10.0.0.2" plain server --bind 0.0.0.0:8000
+```
+
+The server recognizes `X-Forwarded-Proto`, `X-Forwarded-Protocol`, and `X-Forwarded-SSL` headers from trusted proxies.
+
+#### How do I handle worker timeouts?
+
+If workers are being killed due to timeouts, increase the `--timeout` value. This is common when handling long-running requests.
+
+```bash
+plain server --timeout 120
+```
+
+#### How do I rotate log files?
+
+Send `SIGUSR1` to the master process to reopen log files. This works with tools like `logrotate`.
+
+```bash
+kill -USR1 $(cat /path/to/pidfile)
+```
+
+## Installation
+
+The server module is included with Plain. No additional installation is required.

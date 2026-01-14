@@ -1,176 +1,238 @@
 # Logs
 
-**Logging configuration and utilities.**
+**Structured logging with sensible defaults and zero configuration.**
 
 - [Overview](#overview)
-- [`app_logger`](#app_logger)
+- [Using app_logger](#using-app_logger)
+    - [Basic logging](#basic-logging)
+    - [Adding context](#adding-context)
 - [Output formats](#output-formats)
+    - [Key-value format](#key-value-format)
+    - [JSON format](#json-format)
+    - [Standard format](#standard-format)
 - [Context management](#context-management)
+    - [Persistent context](#persistent-context)
+    - [Temporary context](#temporary-context)
 - [Debug mode](#debug-mode)
-- [Advanced usage](#advanced-usage)
-- [Logging settings](#logging-settings)
+- [Output streams](#output-streams)
+- [Settings reference](#settings-reference)
+- [FAQs](#faqs)
+- [Installation](#installation)
 
 ## Overview
 
-In Python, configuring logging can be surprisingly complex. For most use cases, Plain provides a [default configuration](./configure.py) that "just works".
+Python's logging module is powerful but notoriously difficult to configure. Plain provides a ready-to-use logging setup that works out of the box while supporting structured logging for production environments.
 
-By default, both the `plain` and `app` loggers are set to the `INFO` level. You can quickly change this by using the `PLAIN_LOG_LEVEL` and `APP_LOG_LEVEL` environment variables.
-
-The `app_logger` supports multiple output formats and provides a friendly kwargs-based API for structured logging.
-
-## `app_logger`
-
-The `app_logger` is an enhanced logger that supports kwargs-style logging and multiple output formats.
+You get two pre-configured loggers: `plain` (for framework internals) and `app` (for your application code). Both default to the `INFO` level and can be adjusted via environment variables.
 
 ```python
 from plain.logs import app_logger
 
+# Simple message logging
+app_logger.info("Application started")
 
-def example_function():
-    # Basic logging
-    app_logger.info("User logged in")
+# Structured logging with context data
+app_logger.info("User logged in", context={"user_id": 123, "method": "oauth"})
 
-    # With structured context data (explicit **context parameter)
-    app_logger.info("User action", user_id=123, action="login", success=True)
+# All log levels work the same way
+app_logger.warning("Rate limit approaching", context={"requests": 95, "limit": 100})
+app_logger.error("Payment failed", context={"order_id": "abc-123", "reason": "insufficient_funds"})
+```
 
-    # All log levels support context parameters
-    app_logger.debug("Debug info", step="validation", count=5)
-    app_logger.warning("Rate limit warning", user_id=456, limit_exceeded=True)
-    app_logger.error("Database error", error_code=500, table="users")
+## Using app_logger
 
-    # Standard logging parameters with context
-    try:
-        risky_operation()
-    except Exception:
-        app_logger.error(
-            "Operation failed",
-            exc_info=True,  # Include exception traceback
-            stack_info=True,  # Include stack trace
-            user_id=789,
-            operation="risky_operation"
-        )
+### Basic logging
+
+The [`app_logger`](./app.py#AppLogger) supports all standard logging levels: `debug`, `info`, `warning`, `error`, and `critical`.
+
+```python
+app_logger.debug("Entering validation step")
+app_logger.info("Request processed successfully")
+app_logger.warning("Cache miss, falling back to database")
+app_logger.error("Failed to connect to external service")
+app_logger.critical("Database connection pool exhausted")
+```
+
+### Adding context
+
+Pass structured data using the `context` parameter. This data appears in your log output based on your chosen format.
+
+```python
+app_logger.info("Order placed", context={
+    "order_id": "ord-456",
+    "items": 3,
+    "total": 99.99,
+})
+```
+
+You can also include exception tracebacks:
+
+```python
+try:
+    process_payment()
+except PaymentError:
+    app_logger.error(
+        "Payment processing failed",
+        exc_info=True,
+        context={"order_id": "ord-456"},
+    )
 ```
 
 ## Output formats
 
-The `app_logger` supports three output formats controlled by the `APP_LOG_FORMAT` environment variable:
+Control the log format with the `APP_LOG_FORMAT` environment variable.
 
-### Key-Value format (default)
+### Key-value format
+
+The default format. Context data appears as `key=value` pairs, easy for humans to read and machines to parse.
 
 ```bash
-export APP_LOG_FORMAT=keyvalue  # or leave unset for default
+export APP_LOG_FORMAT=keyvalue
 ```
 
 ```
-[INFO] User action user_id=123 action=login success=True
-[ERROR] Database error error_code=500 table=users
+[INFO] User logged in user_id=123 method=oauth
+[ERROR] Payment failed order_id="abc-123" reason="insufficient_funds"
 ```
 
 ### JSON format
+
+Each log entry is a single JSON object. Ideal for log aggregation services like Datadog, Splunk, or CloudWatch.
 
 ```bash
 export APP_LOG_FORMAT=json
 ```
 
 ```json
-{"timestamp": "2024-01-01 12:00:00,123", "level": "INFO", "message": "User action", "user_id": 123, "action": "login", "success": true}
-{"timestamp": "2024-01-01 12:00:01,456", "level": "ERROR", "message": "Database error", "error_code": 500, "table": "users"}
+{"timestamp": "2024-01-15 10:30:00,123", "level": "INFO", "message": "User logged in", "logger": "app", "user_id": 123, "method": "oauth"}
 ```
 
 ### Standard format
+
+A minimal format that omits context data entirely.
 
 ```bash
 export APP_LOG_FORMAT=standard
 ```
 
 ```
-[INFO] User action
-[ERROR] Database error
+[INFO] User logged in
 ```
-
-Note: In standard format, the context kwargs are ignored and not displayed.
 
 ## Context management
 
-The `app_logger` provides powerful context management for adding data to multiple log statements.
-
 ### Persistent context
 
-Use the `context` dict to add data that persists across log calls:
+Add context that applies to all subsequent log calls by modifying the `context` dict directly.
 
 ```python
-# Set persistent context
-app_logger.context["user_id"] = 123
-app_logger.context["request_id"] = "abc456"
+# Set context at the start of a request
+app_logger.context["request_id"] = "req-789"
+app_logger.context["user_id"] = 42
 
-app_logger.info("Started processing")      # Includes user_id and request_id
-app_logger.info("Validation complete")     # Includes user_id and request_id
-app_logger.info("Processing finished")     # Includes user_id and request_id
+app_logger.info("Starting request")  # Includes request_id and user_id
+app_logger.info("Fetching data")     # Includes request_id and user_id
 
-# Clear context
+# Clear when done
 app_logger.context.clear()
 ```
 
 ### Temporary context
 
-Use `include_context()` for temporary context that only applies within a block:
+Use `include_context()` when you need context for a specific block of code.
 
 ```python
-app_logger.context["user_id"] = 123  # Persistent
+app_logger.context["user_id"] = 42
 
-with app_logger.include_context(operation="payment", transaction_id="txn789"):
-    app_logger.info("Payment started")     # Has user_id, operation, transaction_id
-    app_logger.info("Payment validated")   # Has user_id, operation, transaction_id
+with app_logger.include_context(operation="checkout", cart_id="cart-123"):
+    app_logger.info("Starting checkout")  # Has user_id, operation, cart_id
+    app_logger.info("Validating items")   # Has user_id, operation, cart_id
 
-app_logger.info("Payment complete")        # Only has user_id
+app_logger.info("Checkout complete")      # Only has user_id
 ```
 
 ## Debug mode
 
-The `force_debug()` context manager allows temporarily enabling DEBUG level logging:
+When you need to temporarily see debug-level logs (even if the logger is set to `INFO`), use `force_debug()`.
 
 ```python
-# Debug messages might not show at INFO level
-app_logger.debug("This might not appear")
+# These won't show if log level is INFO
+app_logger.debug("Detailed trace info")
 
-# Temporarily enable debug logging
+# Temporarily enable debug output
 with app_logger.force_debug():
-    app_logger.debug("This will definitely appear", extra_data="debug_info")
+    app_logger.debug("This will appear")
+    app_logger.debug("So will this", context={"step": "validation"})
+
+# Back to normal
+app_logger.debug("This won't show again")
 ```
 
-## Advanced usage
+The [`DebugMode`](./debug.py#DebugMode) class handles reference counting, so nested `force_debug()` calls work correctly.
 
-### Output streams
+## Output streams
 
-By default, Plain splits log output by severity level to ensure proper log classification on cloud platforms:
+By default, Plain splits log output by severity:
 
-- **DEBUG, INFO** → `stdout` (standard output)
-- **WARNING, ERROR, CRITICAL** → `stderr` (error output)
+- **DEBUG, INFO** go to `stdout`
+- **WARNING, ERROR, CRITICAL** go to `stderr`
 
-This behavior ensures that platforms which automatically detect log severity based on output streams correctly classify logs as informational vs errors.
-
-You can customize this behavior using the `PLAIN_LOG_STREAM` environment variable:
+This helps cloud platforms automatically classify log severity. You can change this behavior with `PLAIN_LOG_STREAM`:
 
 ```bash
-# Default: split by level (INFO to stdout, WARNING+ to stderr)
+# Default: split by level
 export PLAIN_LOG_STREAM=split
 
-# Send all logs to stdout (simple, predictable)
+# All logs to stdout
 export PLAIN_LOG_STREAM=stdout
 
-# Send all logs to stderr (legacy Python behavior)
+# All logs to stderr (traditional Python behavior)
 export PLAIN_LOG_STREAM=stderr
 ```
 
-## Logging settings
+## Settings reference
 
-All logging settings can be configured via environment variables:
+All logging settings use environment variables:
 
-| Setting               | Environment Variable        | Default      | Description                                              |
-| --------------------- | --------------------------- | ------------ | -------------------------------------------------------- |
-| `FRAMEWORK_LOG_LEVEL` | `PLAIN_FRAMEWORK_LOG_LEVEL` | `"INFO"`     | Log level for the `plain` logger                         |
-| `LOG_LEVEL`           | `PLAIN_LOG_LEVEL`           | `"INFO"`     | Log level for the `app` logger                           |
-| `LOG_FORMAT`          | `PLAIN_LOG_FORMAT`          | `"keyvalue"` | Output format: `"json"`, `"keyvalue"`, or `"standard"`   |
-| `LOG_STREAM`          | `PLAIN_LOG_STREAM`          | `"split"`    | Output stream mode: `"split"`, `"stdout"`, or `"stderr"` |
+| Environment Variable        | Default    | Description                                      |
+| --------------------------- | ---------- | ------------------------------------------------ |
+| `PLAIN_FRAMEWORK_LOG_LEVEL` | `INFO`     | Log level for the `plain` logger                 |
+| `PLAIN_LOG_LEVEL`           | `INFO`     | Log level for the `app` logger                   |
+| `PLAIN_LOG_FORMAT`          | `keyvalue` | Output format: `json`, `keyvalue`, or `standard` |
+| `PLAIN_LOG_STREAM`          | `split`    | Output stream: `split`, `stdout`, or `stderr`    |
 
-**Log levels:** `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`
+Valid log levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+
+## FAQs
+
+#### How do I use a custom logger instead of app_logger?
+
+You can use Python's standard `logging.getLogger()` for additional loggers. They won't have the context features of `app_logger`, but they'll use Plain's output configuration.
+
+#### Can I use app_logger in library code?
+
+The `app_logger` is designed for application code. If you're writing a reusable library, use `logging.getLogger(__name__)` to allow users to configure logging independently.
+
+#### Why are my debug logs not showing?
+
+The default log level is `INFO`. Set `PLAIN_LOG_LEVEL=DEBUG` in your environment or use `app_logger.force_debug()` temporarily.
+
+#### How do I add context to exception logs?
+
+Pass both `exc_info=True` and `context` to include both the traceback and structured data:
+
+```python
+except Exception:
+    app_logger.error("Operation failed", exc_info=True, context={"operation": "sync"})
+```
+
+## Installation
+
+`plain.logs` is included with Plain by default. No additional installation is required.
+
+To adjust log levels for development, add environment variables to your shell or `.env` file:
+
+```bash
+PLAIN_LOG_LEVEL=DEBUG
+PLAIN_FRAMEWORK_LOG_LEVEL=WARNING
+```

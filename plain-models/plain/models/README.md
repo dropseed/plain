@@ -8,14 +8,21 @@
 - [Migrations](#migrations)
 - [Fields](#fields)
 - [Reverse relationships](#reverse-relationships)
+    - [Custom QuerySet typing](#custom-queryset-typing)
 - [Typing](#typing)
+    - [Typing QuerySets](#typing-querysets)
 - [Validation](#validation)
 - [Indexes and constraints](#indexes-and-constraints)
 - [Custom QuerySets](#custom-querysets)
+    - [Programmatic QuerySet usage](#programmatic-queryset-usage)
 - [Forms](#forms)
 - [Sharing fields across models](#sharing-fields-across-models)
 - [Raw SQL](#raw-sql)
+    - [Raw QuerySet](#raw-queryset)
+    - [Database cursor](#database-cursor)
+    - [SQL operations (UNION, etc.)](#sql-operations-union-etc)
 - [Architecture](#architecture)
+- [FAQs](#faqs)
 - [Installation](#installation)
 
 ## Overview
@@ -43,7 +50,7 @@ class User(models.Model):
 Every model automatically includes an `id` field which serves as the primary
 key. The name `id` is reserved and can't be used for other fields.
 
-Create, update, and delete instances of your models:
+You can create, update, and delete instances of your models:
 
 ```python
 from .models import User
@@ -139,7 +146,7 @@ Migrations are Python files that describe database schema changes. They're store
 
 ## Fields
 
-Plain provides many field types for different data:
+You can use many field types for different data:
 
 ```python
 from plain import models
@@ -328,7 +335,7 @@ With this annotation, type checkers will know that `User.query.get()` returns a 
 
 ## Validation
 
-Models can be validated before saving:
+You can validate models before saving:
 
 ```python
 class User(models.Model):
@@ -348,7 +355,7 @@ Field-level validation happens automatically based on field types and constraint
 
 ## Indexes and constraints
 
-Optimize queries and ensure data integrity with indexes and constraints:
+You can optimize queries and ensure data integrity with indexes and constraints:
 
 ```python
 class User(models.Model):
@@ -420,7 +427,7 @@ special_articles = special_qs.special_filter()
 
 ## Forms
 
-Models integrate with Plain's form system:
+Models integrate with [plain.forms](../../../plain-forms/plain/forms/README.md):
 
 ```python
 from plain import forms
@@ -590,6 +597,32 @@ graph TB
 - [`Query`](./sql/query.py#Query) - Internal representation of a query's logical structure (tables, joins, filters)
 - [`SQLCompiler`](./sql/compiler.py#SQLCompiler) - Transforms a Query into executable SQL
 - [`DatabaseOperations`](./backends/base/operations.py#BaseDatabaseOperations) - Vendor-specific SQL syntax (PostgreSQL, MySQL, SQLite)
+
+## FAQs
+
+#### How do I add a field to an existing model?
+
+Add the field to your model class, then run `plain makemigrations` to create a migration. If the field is required (no default value and not nullable), you'll be prompted to provide a default value for existing rows.
+
+#### What's the difference between `CharField` and `TextField`?
+
+`CharField` requires a `max_length` and is typically used for short strings like names or emails. `TextField` has no length limit and is used for longer content like descriptions or body text.
+
+#### How do I create a unique constraint on multiple fields?
+
+Use `UniqueConstraint` in your model's `model_options`:
+
+```python
+model_options = models.Options(
+    constraints=[
+        models.UniqueConstraint(fields=["email", "organization"], name="unique_email_per_org"),
+    ],
+)
+```
+
+#### Can I use multiple databases?
+
+Currently, Plain supports a single database connection per application. For applications requiring multiple databases, you can use raw SQL with separate connection management.
 
 ## Installation
 

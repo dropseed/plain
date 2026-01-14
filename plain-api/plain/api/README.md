@@ -9,20 +9,35 @@
 - [API keys](#api-keys)
 - [OpenAPI](#openapi)
     - [Deploying](#deploying)
+- [FAQs](#faqs)
 - [Installation](#installation)
 
 ## Overview
 
 This package includes lightweight view classes for building APIs using the same patterns as regular HTML views. It also provides an [`APIKey`](./models.py#APIKey) model and support for generating [OpenAPI](#openapi) documents.
 
-Because [Views](/plain/plain/views/README.md) can convert built-in types to responses, an API view can simply return a dict or list to send a JSON response back to the client. More complex responses can use the [`JsonResponse`](/plain/plain/http/response.py#JsonResponse) class.
+Because [Views](/plain/plain/views/README.md) can convert built-in types to responses, an API view can simply return a dict or list to send a JSON response back to the client.
+
+```python
+# app/api/views.py
+from plain.api.views import APIView
+
+
+class HelloWorldView(APIView):
+    def get(self):
+        return {"message": "Hello, world!"}
+```
+
+More complex responses can use the [`JsonResponse`](/plain/plain/http/response.py#JsonResponse) class, and you can return different status codes by returning an int (ex. `404`) or a tuple of `(status_code, data)`.
+
+Here is a more complete example that shows how to build a custom API with authentication and authorization:
 
 ```python
 # app/api/views.py
 from plain.api.views import APIKeyView, APIView
 from plain.auth import get_request_user, set_request_user
 from plain.http import JsonResponse
-from plain.views.exeptions import ResponseException
+from plain.views.exceptions import ResponseException
 
 from app.users.models import User
 from app.pullrequests.models import PullRequest
@@ -409,18 +424,62 @@ class APIRouter(Router):
     ]
 ```
 
+## FAQs
+
+#### How do I make an API key optional?
+
+You can set `api_key_required = False` on your view class to make API key authentication optional. The `self.api_key` will be `None` if no valid key is provided.
+
+```python
+class PublicAPIView(APIView, APIKeyView):
+    api_key_required = False
+
+    def get(self):
+        if self.api_key:
+            # Authenticated request
+            return {"status": "authenticated"}
+        else:
+            # Anonymous request
+            return {"status": "anonymous"}
+```
+
+#### Can I use plain.api without plain.models?
+
+Yes. The `APIKey` model requires `plain.models`, but you can use `APIView` without it. If you try to use `APIKeyView` without `plain.models` installed, you will need to override the [`get_api_key`](./views.py#get_api_key) method to provide your own API key lookup logic.
+
+#### How do I return different status codes?
+
+You can return status codes in several ways:
+
+- Return an int: `return 204` (for no content)
+- Return `None`: automatically returns 404
+- Return a `JsonResponse` with a custom status code: `return JsonResponse({"error": "Bad request"}, status_code=400)`
+- Raise an exception: `raise NotFoundError404` or `raise ForbiddenError403`
+
+#### How do I access the request body?
+
+You can access the parsed JSON body using `self.request.json()`. For form data, use `self.request.POST`.
+
+```python
+class CreateItemView(APIView):
+    def post(self):
+        data = self.request.json()
+        name = data.get("name")
+        return {"created": name}
+```
+
 ## Installation
 
 Install the `plain.api` package from [PyPI](https://pypi.org/project/plain.api/):
 
 ```console
-$ uv add plain.api
+uv add plain.api
 ```
 
 Typically you will want to create an `api` package to contain all of the views and URLs for your app's API.
 
 ```console
-$ plain create api
+plain create api
 ```
 
 The `app.api` package should be added to your app's `INSTALLED_APPS` setting in `app/settings.py`:

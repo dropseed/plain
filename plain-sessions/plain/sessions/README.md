@@ -11,13 +11,12 @@
     - [Cycling session keys](#cycling-session-keys)
     - [Checking if session is empty](#checking-if-session-is-empty)
 - [Admin interface](#admin-interface)
+- [FAQs](#faqs)
 - [Installation](#installation)
 
 ## Overview
 
-The `plain.sessions` package provides database-backed session management for Plain applications. Sessions allow you to store and retrieve arbitrary data on a per-visitor basis, using a session key stored in a cookie.
-
-Sessions are implemented as a dictionary-like object that automatically handles persistence to the database.
+Sessions allow you to store and retrieve arbitrary data on a per-visitor basis, using a session key stored in a cookie. You can use sessions as a dictionary-like object that automatically handles persistence to the database.
 
 ## Basic usage
 
@@ -58,7 +57,7 @@ The session data is automatically saved when you set or delete values. Sessions 
 
 ## Session configuration
 
-Sessions can be configured through various settings:
+You can configure sessions through various settings:
 
 ```python
 # Cookie name (default: "sessionid")
@@ -97,11 +96,11 @@ Sessions expire `SESSION_COOKIE_AGE` seconds after they are **last saved** (not 
 
 By default (`SESSION_SAVE_EVERY_REQUEST = False`), sessions are only saved when modified. For authenticated users, this means the expiration timer resets on login/logout but **not** when just browsing pages. Users will be logged out after `SESSION_COOKIE_AGE` even if actively using the site.
 
-To extend sessions on every page access, set `SESSION_SAVE_EVERY_REQUEST = True`. This creates a sliding window where users stay logged in as long as they visit within `SESSION_COOKIE_AGE`, but increases database writes
+To extend sessions on every page access, set `SESSION_SAVE_EVERY_REQUEST = True`. This creates a sliding window where users stay logged in as long as they visit within `SESSION_COOKIE_AGE`, but increases database writes.
 
 ## Session management
 
-The [`SessionStore`](./core.py#SessionStore) class provides additional methods for managing sessions:
+The [`SessionStore`](./core.py#SessionStore) class provides additional methods for managing sessions.
 
 ### Flushing sessions
 
@@ -149,13 +148,40 @@ if session.is_empty():
 
 ## Admin interface
 
-The package includes an admin interface for viewing and managing sessions. Sessions can be viewed in the admin panel under the "Sessions" section, where you can:
+You can view and manage sessions in the admin panel under the "Sessions" section. The admin interface allows you to:
 
 - Search sessions by session key
 - View session creation and expiration times
 - Delete expired or unwanted sessions
 
 The [`SessionAdmin`](./admin.py#SessionAdmin) viewset provides the interface for managing sessions in the admin panel.
+
+## FAQs
+
+#### How do I clear expired sessions?
+
+You can use the built-in [`ClearExpired`](./chores.py#ClearExpired) chore to delete expired sessions from the database:
+
+```bash
+plain chores run plain.sessions.chores.ClearExpired
+```
+
+You can schedule this chore to run periodically using `plain.worker` or your preferred task scheduler.
+
+#### How do I access the underlying Session model instance?
+
+You can access the database model instance through the `model_instance` property:
+
+```python
+from plain.sessions import get_request_session
+
+session = get_request_session(request)
+session_instance = session.model_instance  # Returns the Session model or None
+```
+
+#### Why is my session not being saved?
+
+Sessions are only saved when modified (when you set or delete a value). If you need the session to be saved on every request, set `SESSION_SAVE_EVERY_REQUEST = True` in your settings.
 
 ## Installation
 
