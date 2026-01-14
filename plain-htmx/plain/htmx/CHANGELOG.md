@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.16.0](https://github.com/dropseed/plain/releases/plain-htmx@0.16.0) (2026-01-13)
+
+### What's changed
+
+- Improved README documentation with better structure, examples, and FAQs section ([da37a78](https://github.com/dropseed/plain/commit/da37a78))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.1](https://github.com/dropseed/plain/releases/plain-htmx@0.15.1) (2025-12-22)
 
 ### What's changed
