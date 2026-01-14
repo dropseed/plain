@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.9.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.9.0) (2026-01-13)
+
+### What's changed
+
+- Added comprehensive README documentation for the package ([8f1aed3](https://github.com/dropseed/plain/commit/8f1aed34ff))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.8.2](https://github.com/dropseed/plain/releases/plain-toolbar@0.8.2) (2025-12-12)
 
 ### What's changed
