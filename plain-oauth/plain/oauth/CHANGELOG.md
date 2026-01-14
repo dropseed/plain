@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.41.0](https://github.com/dropseed/plain/releases/plain-oauth@0.41.0) (2026-01-13)
+
+### What's changed
+
+- Documentation restructured to follow consistent style with improved organization and clearer examples ([da37a78](https://github.com/dropseed/plain/commit/da37a78))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.40.0](https://github.com/dropseed/plain/releases/plain-oauth@0.40.0) (2026-01-13)
 
 ### What's changed
