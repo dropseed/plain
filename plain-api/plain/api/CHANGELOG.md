@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-api@0.25.0) (2026-01-13)
+
+### What's changed
+
+- Improved README documentation with FAQs section covering common questions about optional API keys, status codes, and request body access ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-api@0.24.0) (2026-01-13)
 
 ### What's changed
