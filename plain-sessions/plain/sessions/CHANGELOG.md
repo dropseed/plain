@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.41.0](https://github.com/dropseed/plain/releases/plain-sessions@0.41.0) (2026-01-13)
+
+### What's changed
+
+- README documentation has been standardized with improved structure including a new FAQs section, better code examples, and clearer explanations ([da37a78](https://github.com/dropseed/plain/commit/da37a78))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.40.1](https://github.com/dropseed/plain/releases/plain-sessions@0.40.1) (2025-11-24)
 
 ### What's changed
