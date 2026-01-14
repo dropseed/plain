@@ -1,5 +1,16 @@
 # plain-code changelog
 
+## [0.18.1](https://github.com/dropseed/plain/releases/plain-code@0.18.1) (2026-01-13)
+
+### What's changed
+
+- The top-level `exclude` config option now applies to ty type checking and annotation checks, in addition to tool-specific excludes ([f3ead51](https://github.com/dropseed/plain/commit/f3ead51))
+- Added `node_modules` to the default exclude patterns for both annotations and Biome ([f3ead51](https://github.com/dropseed/plain/commit/f3ead51))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-code@0.18.0) (2026-01-13)
 
 ### What's changed
