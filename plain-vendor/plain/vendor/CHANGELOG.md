@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.11.0](https://github.com/dropseed/plain/releases/plain-vendor@0.11.0) (2026-01-13)
+
+### What's changed
+
+- Improved README documentation with better structure, examples, and installation instructions ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.10.2](https://github.com/dropseed/plain/releases/plain-vendor@0.10.2) (2025-12-22)
 
 ### What's changed
