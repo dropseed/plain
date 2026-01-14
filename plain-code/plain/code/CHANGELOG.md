@@ -1,5 +1,18 @@
 # plain-code changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-code@0.18.0) (2026-01-13)
+
+### What's changed
+
+- Added `plain code annotations` command for checking type annotation coverage in Python files ([df353b8](https://github.com/dropseed/plain/commit/df353b8))
+    - Use `--details` to list untyped functions
+    - Use `--json` for machine-readable output
+- Renamed the `plain-check` skill to `plain-lint`, then to `plain-fix` to better match the primary command ([d51294a](https://github.com/dropseed/plain/commit/d51294a), [519c5af](https://github.com/dropseed/plain/commit/519c5af))
+
+### Upgrade instructions
+
+- If you were using the `plain-check` or `plain-lint` AI skill, it has been renamed to `plain-fix`
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-code@0.17.0) (2026-01-13)
 
 ### What's changed
