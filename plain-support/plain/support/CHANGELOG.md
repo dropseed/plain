@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-support@0.29.0) (2026-01-13)
+
+### What's changed
+
+- Improved README documentation with better structure, table of contents, and clearer examples ([da37a78](https://github.com/dropseed/plain/commit/da37a78))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-support@0.28.0) (2026-01-13)
 
 ### What's changed
