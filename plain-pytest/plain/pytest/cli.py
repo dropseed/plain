@@ -3,10 +3,10 @@ import subprocess
 import sys
 
 import click
-from dotenv import load_dotenv
 
 from plain.cli import register_cli
 from plain.cli.runtime import common_command
+from plain.utils.dotenv import load_dotenv
 
 
 @common_command

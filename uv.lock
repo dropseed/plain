@@ -545,7 +545,6 @@ dependencies = [
     { name = "click" },
     { name = "inotify" },
     { name = "plain" },
-    { name = "python-dotenv" },
     { name = "requests" },
     { name = "rich" },
 ]
@@ -555,7 +554,6 @@ requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
     { name = "inotify" },
     { name = "plain", editable = "plain" },
-    { name = "python-dotenv", specifier = "~=1.0.0" },
     { name = "requests", specifier = ">=2.0.0" },
     { name = "rich" },
 ]
@@ -810,7 +808,6 @@ dependencies = [
     { name = "cryptography" },
     { name = "plain" },
     { name = "pytest" },
-    { name = "python-dotenv" },
 ]
 
 [package.metadata]
@@ -819,7 +816,6 @@ requires-dist = [
     { name = "cryptography" },
     { name = "plain", editable = "plain" },
     { name = "pytest", specifier = ">=7.0.0" },
-    { name = "python-dotenv", specifier = "~=1.0.0" },
 ]
 
 [[package]]
@@ -1137,15 +1133,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/08/ba/45911d754e8eba3d5a841a5ce61a65a685ff1798421ac054f85aa8747dfb/pytest-8.4.1.tar.gz", hash = "sha256:7c67fd69174877359ed9371ec3af8a3d2b04741818c51e5e99cc1742251fa93c", size = 1517714, upload-time = "2025-06-18T05:48:06.109Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/29/16/c8a903f4c4dffe7a12843191437d7cd8e32751d5de349d45d3fe69544e87/pytest-8.4.1-py3-none-any.whl", hash = "sha256:539c70ba6fcead8e78eebbf1115e8b589e7565830d7d006a8723f19ac8a0afb7", size = 365474, upload-time = "2025-06-18T05:48:03.955Z" },
-]
-
-[[package]]
-name = "python-dotenv"
-version = "1.0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/bc/57/e84d88dfe0aec03b7a2d4327012c1627ab5f03652216c63d49846d7a6c58/python-dotenv-1.0.1.tar.gz", hash = "sha256:e324ee90a023d808f1959c46bcbc04446a10ced277783dc6ee09987c37ec10ca", size = 39115, upload-time = "2024-01-23T06:33:00.505Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/3e/b68c118422ec867fa7ab88444e1274aa40681c606d59ac27de5a5588f082/python_dotenv-1.0.1-py3-none-any.whl", hash = "sha256:f7b63ef50f1b690dddf550d03497b66d609393b40b564ed0d674909a68ebf16a", size = 19863, upload-time = "2024-01-23T06:32:58.246Z" },
 ]
 
 [[package]]

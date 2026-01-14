@@ -1,6 +1,6 @@
 import os
 
-from dotenv import load_dotenv
+from plain.utils.dotenv import load_dotenv
 
 
 def setup() -> None:
