@@ -1,5 +1,15 @@
 # plain-scan changelog
 
+## [0.6.0](https://github.com/dropseed/plain/releases/plain-scan@0.6.0) (2026-01-13)
+
+### What's changed
+
+- Improved README documentation with clearer structure, programmatic usage examples, and command line reference ([da37a78](https://github.com/dropseed/plain/commit/da37a78))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.5.1](https://github.com/dropseed/plain/releases/plain-scan@0.5.1) (2025-12-22)
 
 ### What's changed
