@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-pages@0.18.0) (2026-01-13)
+
+### What's changed
+
+- Improved README documentation with FAQs section and clearer structure ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-pages@0.17.0) (2026-01-13)
 
 ### What's changed
