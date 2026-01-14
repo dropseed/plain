@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.98.0](https://github.com/dropseed/plain/releases/plain@0.98.0) (2026-01-13)
+
+### What's changed
+
+- The `plain skills --install` command now removes orphaned skills from destination directories when skills are renamed or removed from packages ([d51294ace1](https://github.com/dropseed/plain/commit/d51294ace1))
+- Added README documentation for `plain.skills` with available skills and installation instructions ([7c90fc8595](https://github.com/dropseed/plain/commit/7c90fc8595))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.97.0](https://github.com/dropseed/plain/releases/plain@0.97.0) (2026-01-13)
 
 ### What's changed
