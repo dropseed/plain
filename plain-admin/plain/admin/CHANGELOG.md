@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.60.0](https://github.com/dropseed/plain/releases/plain-admin@0.60.0) (2026-01-13)
+
+### What's changed
+
+- README documentation expanded with comprehensive examples for viewsets, cards, forms, actions, toolbar, and impersonation ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.59.0](https://github.com/dropseed/plain/releases/plain-admin@0.59.0) (2026-01-13)
 
 ### What's changed
