@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.18.0) (2026-01-13)
+
+### What's changed
+
+- Expanded README with comprehensive documentation including usage examples, customization options, and FAQs ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.17.0) (2026-01-13)
 
 ### What's changed
