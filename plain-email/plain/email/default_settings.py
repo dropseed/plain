@@ -1,3 +1,5 @@
+from plain.runtime import Secret
+
 # The email backend to use. For possible shortcuts see plain.email.
 # The default is to use the SMTP backend.
 # Third-party backends can be specified by providing a Python path
@@ -19,7 +21,7 @@ EMAIL_USE_LOCALTIME: bool = False
 
 # Optional SMTP authentication information for EMAIL_HOST.
 EMAIL_HOST_USER: str = ""
-EMAIL_HOST_PASSWORD: str = ""
+EMAIL_HOST_PASSWORD: Secret[str] = ""  # type: ignore[assignment]
 EMAIL_USE_TLS: bool = True
 EMAIL_USE_SSL: bool = False
 EMAIL_SSL_CERTFILE: str | None = None
