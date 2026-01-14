@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-observer@0.25.0) (2026-01-13)
+
+### What's changed
+
+- Expanded README documentation with comprehensive usage examples, settings reference, and FAQs ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-observer@0.24.0) (2026-01-13)
 
 ### What's changed
