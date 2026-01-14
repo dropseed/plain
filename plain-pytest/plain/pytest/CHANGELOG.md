@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.15.0](https://github.com/dropseed/plain/releases/plain-pytest@0.15.0) (2026-01-13)
+
+### What's changed
+
+- Expanded README documentation with more examples and a FAQs section ([da37a78f](https://github.com/dropseed/plain/commit/da37a78f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.0](https://github.com/dropseed/plain/releases/plain-pytest@0.14.0) (2026-01-13)
 
 ### What's changed
