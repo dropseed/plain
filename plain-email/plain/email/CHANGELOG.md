@@ -1,5 +1,16 @@
 # plain-email changelog
 
+## [0.14.0](https://github.com/dropseed/plain/releases/plain-email@0.14.0) (2026-01-13)
+
+### What's changed
+
+- Simplified public API exports to only include user-facing classes and functions ([28f4849](https://github.com/dropseed/plain/commit/28f4849ca5692acc1dbef97f1590ddbd2f5afe96))
+- Improved README documentation with comprehensive usage examples and installation instructions ([da37a78](https://github.com/dropseed/plain/commit/da37a78fbb8a683c65863f4d0b7af9af5b16feec))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.13.0](https://github.com/dropseed/plain/releases/plain-email@0.13.0) (2025-12-04)
 
 ### What's changed
