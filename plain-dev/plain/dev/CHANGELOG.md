@@ -1,5 +1,18 @@
 # plain-dev changelog
 
+## [0.51.0](https://github.com/dropseed/plain/releases/plain-dev@0.51.0) (2026-01-13)
+
+### What's changed
+
+- Dev services auto-start now runs via the runtime setup hook instead of at CLI load time, which prevents services from starting unnecessarily for commands that don't need the runtime like `plain code`, `plain fix`, and `plain scan` ([fc1c8624b6](https://github.com/dropseed/plain/commit/fc1c8624b6))
+- Added new `plain-pre-commit` skill for AI assistants to run pre-commit checks when finishing code changes ([d51294ace1](https://github.com/dropseed/plain/commit/d51294ace1))
+- Renamed the `plain-check` skill to `plain-lint` to better describe its purpose ([d51294ace1](https://github.com/dropseed/plain/commit/d51294ace1))
+- Pre-commit install now uses `uv run plain` instead of just `plain` for better environment consistency ([8104c9b29f](https://github.com/dropseed/plain/commit/8104c9b29f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.50.0](https://github.com/dropseed/plain/releases/plain-dev@0.50.0) (2026-01-13)
 
 ### What's changed
