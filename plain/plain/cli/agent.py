@@ -199,17 +199,21 @@ def install() -> None:
     for dest in destinations:
         installed_count, removed_count = _install_skills_to(dest, skills_by_package)
 
-        # Setup hook in parent directory
         parent_dir = dest.parent  # .claude/ or .codex/
-        _setup_session_hook(parent_dir)
+
+        # Setup hook only for Claude (Codex uses a different config format)
+        if parent_dir.name == ".claude":
+            _setup_session_hook(parent_dir)
 
         parts = []
         if installed_count > 0:
             parts.append(f"installed {installed_count} skills")
         if removed_count > 0:
             parts.append(f"removed {removed_count} skills")
-        parts.append("updated hooks")
-        click.echo(f"Agent: {', '.join(parts)} in {parent_dir}/")
+        if parent_dir.name == ".claude":
+            parts.append("updated hooks")
+        if parts:
+            click.echo(f"Agent: {', '.join(parts)} in {parent_dir}/")
 
 
 @agent.command()
