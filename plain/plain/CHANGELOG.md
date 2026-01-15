@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.99.0](https://github.com/dropseed/plain/releases/plain@0.99.0) (2026-01-15)
+
+### What's changed
+
+- Added `plain.utils.dotenv` module with `load_dotenv()` and `parse_dotenv()` functions for bash-compatible `.env` file parsing, supporting variable expansion, command substitution, multiline values, and escape sequences ([a9b2dc3e16](https://github.com/dropseed/plain/commit/a9b2dc3e16))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.98.1](https://github.com/dropseed/plain/releases/plain@0.98.1) (2026-01-13)
 
 ### What's changed
