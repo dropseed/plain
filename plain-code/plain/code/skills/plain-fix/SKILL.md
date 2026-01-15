@@ -11,6 +11,11 @@ uv run plain fix [path]
 
 Automatically fixes formatting and linting issues using ruff and biome.
 
+## Code Style
+
+- Add `from __future__ import annotations` at the top of Python files
+- Keep imports at the top of the file unless avoiding circular imports
+
 Options:
 
 - `--unsafe-fixes` - Apply ruff unsafe fixes

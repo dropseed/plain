@@ -1,6 +1,7 @@
 ---
 name: plain-models
 description: Manages database migrations and model changes. Use when creating migrations, running migrations, or modifying models.
+user-invocable: false
 ---
 
 # Database Migrations

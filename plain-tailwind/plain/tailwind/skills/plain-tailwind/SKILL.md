@@ -1,6 +1,7 @@
 ---
 name: plain-tailwind
 description: Provides Tailwind CSS patterns for Plain templates. Use when styling templates or working with conditional CSS classes.
+user-invocable: false
 ---
 
 # Tailwind CSS Patterns

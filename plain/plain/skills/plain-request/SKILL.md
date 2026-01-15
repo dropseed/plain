@@ -1,6 +1,6 @@
 ---
 name: plain-request
-description: Makes test HTTP requests against the development database with auth support. Use when debugging endpoints or testing API responses.
+description: Makes HTTP requests to test URLs, check endpoints, fetch pages, or debug routes. Use when asked to look at a URL, hit an endpoint, test a route, or make GET/POST requests.
 ---
 
 # Making HTTP Requests
@@ -29,4 +29,11 @@ uv run plain request /path --header "Accept: application/json"
 
 ```
 uv run plain request /path --method POST --data '{"key": "value"}'
+```
+
+## Limiting Output
+
+```
+uv run plain request /path --no-body    # Headers only
+uv run plain request /path --no-headers # Body only
 ```

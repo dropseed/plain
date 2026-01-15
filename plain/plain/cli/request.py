@@ -40,6 +40,16 @@ from plain.test import Client
     multiple=True,
     help="Additional headers (format: 'Name: Value')",
 )
+@click.option(
+    "--no-headers",
+    is_flag=True,
+    help="Hide response headers from output",
+)
+@click.option(
+    "--no-body",
+    is_flag=True,
+    help="Hide response body from output",
+)
 def request(
     path: str,
     method: str,
@@ -48,6 +58,8 @@ def request(
     follow: bool,
     content_type: str | None,
     headers: tuple[str, ...],
+    no_headers: bool,
+    no_body: bool,
 ) -> None:
     """Make HTTP requests against the dev database"""
 
@@ -155,14 +167,14 @@ def request(
         click.echo()
 
         # Show headers
-        if response.headers:
+        if response.headers and not no_headers:
             click.secho("Response Headers:", fg="yellow", bold=True)
             for key, value in response.headers.items():
                 click.echo(f"  {key}: {value}")
             click.echo()
 
         # Show response content last
-        if response.content:
+        if response.content and not no_body:
             content_type = response.headers.get("Content-Type", "")
 
             if "json" in content_type.lower():
@@ -187,7 +199,7 @@ def request(
                 click.secho("Response Body:", fg="yellow", bold=True)
                 content = response.content.decode("utf-8", errors="replace")
                 click.echo(content)
-        else:
+        elif not no_body:
             click.secho("(No response body)", fg="yellow", dim=True)
 
     except Exception as e:

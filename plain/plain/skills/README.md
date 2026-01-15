@@ -6,21 +6,31 @@ These skills provide context and workflows for common tasks when using [Claude C
 
 ## Available skills
 
-| Skill              | Description                                                    |
-| ------------------ | -------------------------------------------------------------- |
-| `plain-docs`       | Retrieves detailed documentation for Plain packages            |
-| `plain-install`    | Installs Plain packages and guides through setup steps         |
-| `plain-upgrade`    | Upgrades Plain packages and applies required migration changes |
-| `plain-shell`      | Runs Python with Plain configured and database access          |
-| `plain-request`    | Makes test HTTP requests against the development database      |
-| `plain-principles` | Provides Plain framework context and coding conventions        |
+| Skill           | Description                                                    |
+| --------------- | -------------------------------------------------------------- |
+| `plain-docs`    | Retrieves detailed documentation for Plain packages            |
+| `plain-install` | Installs Plain packages and guides through setup steps         |
+| `plain-upgrade` | Upgrades Plain packages and applies required migration changes |
+| `plain-shell`   | Runs Python with Plain configured and database access          |
+| `plain-request` | Makes test HTTP requests against the development database      |
 
 ## Installation
 
 To install skills to your project's `.claude/` or `.codex/` directory:
 
 ```bash
-uv run plain skills --install
+uv run plain agent install
 ```
 
-This copies the skill definitions so your agent can use them. Run it again after upgrading Plain to get updated skills.
+This command:
+
+- Copies skill definitions so your agent can use them
+- Sets up a `SessionStart` hook that runs `plain agent context` at the start of every session
+
+Run it again after upgrading Plain to get updated skills.
+
+## Commands
+
+- `plain agent install` - Install skills and set up hooks
+- `plain agent skills` - List available skills from installed packages
+- `plain agent context` - Output framework context (used by the SessionStart hook)

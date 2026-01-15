@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import pkgutil
 import shutil
 from pathlib import Path
@@ -127,27 +128,61 @@ def _install_skills_to(
     return installed_count, removed_count
 
 
-@click.command()
-@click.option(
-    "--install/--no-install",
-    is_flag=True,
-    help="Install skills to agent directories",
-)
-def skills(install: bool) -> None:
-    """Install skills from Plain packages"""
+def _setup_session_hook(dest_dir: Path) -> None:
+    """Create or update settings.json with SessionStart hook."""
+    settings_file = dest_dir / "settings.json"
 
+    # Load existing settings or start fresh
+    if settings_file.exists():
+        settings = json.loads(settings_file.read_text())
+    else:
+        settings = {}
+
+    # Ensure hooks structure exists
+    if "hooks" not in settings:
+        settings["hooks"] = {}
+
+    # Define the Plain hook - calls the agent context command directly
+    plain_hook = {
+        "matcher": "startup|resume",
+        "hooks": [
+            {
+                "type": "command",
+                "command": "uv run plain agent context 2>/dev/null || true",
+            }
+        ],
+    }
+
+    # Get existing SessionStart hooks, remove any existing plain hook
+    session_hooks = settings["hooks"].get("SessionStart", [])
+    session_hooks = [h for h in session_hooks if "plain agent" not in str(h)]
+    # Also remove old plain-context.md hooks for migration
+    session_hooks = [h for h in session_hooks if "plain-context.md" not in str(h)]
+    session_hooks.append(plain_hook)
+    settings["hooks"]["SessionStart"] = session_hooks
+
+    settings_file.write_text(json.dumps(settings, indent=2) + "\n")
+
+
+@click.group()
+def agent() -> None:
+    """AI agent integration for Plain projects"""
+    pass
+
+
+@agent.command()
+def context() -> None:
+    """Output Plain framework context for AI agents"""
+    click.echo("This is a Plain project. Use the /plain-* skills for common tasks.")
+
+
+@agent.command()
+def install() -> None:
+    """Install skills and hooks to agent directories"""
     skills_by_package = _get_packages_with_skills()
 
     if not skills_by_package:
         click.echo("No skills found in installed packages.")
-        return
-
-    if not install:
-        # Just list available skills
-        click.echo("Available skills:")
-        for pkg_name in sorted(skills_by_package.keys()):
-            for skill_dir in skills_by_package[pkg_name]:
-                click.echo(f"  - {skill_dir.name} (from {pkg_name})")
         return
 
     # Find destinations based on what agent directories exist
@@ -163,10 +198,30 @@ def skills(install: bool) -> None:
     # Install to each destination
     for dest in destinations:
         installed_count, removed_count = _install_skills_to(dest, skills_by_package)
-        if installed_count > 0 or removed_count > 0:
-            parts = []
-            if installed_count > 0:
-                parts.append(f"installed {installed_count}")
-            if removed_count > 0:
-                parts.append(f"removed {removed_count}")
-            click.echo(f"Skills: {', '.join(parts)} in {dest}/")
+
+        # Setup hook in parent directory
+        parent_dir = dest.parent  # .claude/ or .codex/
+        _setup_session_hook(parent_dir)
+
+        parts = []
+        if installed_count > 0:
+            parts.append(f"installed {installed_count} skills")
+        if removed_count > 0:
+            parts.append(f"removed {removed_count} skills")
+        parts.append("updated hooks")
+        click.echo(f"Agent: {', '.join(parts)} in {parent_dir}/")
+
+
+@agent.command()
+def skills() -> None:
+    """List available skills from installed packages"""
+    skills_by_package = _get_packages_with_skills()
+
+    if not skills_by_package:
+        click.echo("No skills found in installed packages.")
+        return
+
+    click.echo("Available skills:")
+    for pkg_name in sorted(skills_by_package.keys()):
+        for skill_dir in skills_by_package[pkg_name]:
+            click.echo(f"  - {skill_dir.name} (from {pkg_name})")

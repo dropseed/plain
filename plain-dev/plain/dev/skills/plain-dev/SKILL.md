@@ -11,6 +11,8 @@ Run `uv run plain dev` to start the development server.
 
 The server URL will be displayed (typically `https://<project>.localhost:8443`).
 
+This also runs `plain agent install` to set up AI agent skills and hooks.
+
 ## Logs
 
 - `uv run plain dev logs` - Show log output for running processes
