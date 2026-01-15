@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-code@0.19.0) (2026-01-15)
+
+### What's changed
+
+- Added code style guidelines to the `plain-fix` AI skill for consistent formatting practices ([fac8673](https://github.com/dropseed/plain/commit/fac8673))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.18.1](https://github.com/dropseed/plain/releases/plain-code@0.18.1) (2026-01-13)
 
 ### What's changed
