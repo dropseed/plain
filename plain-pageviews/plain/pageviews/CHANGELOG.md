@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.32.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.32.0) (2026-01-15)
+
+### What's changed
+
+- Added description to the admin pageviews list view as part of the admin redesign ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345fefd26e0873416c8db715d5e2d2e265))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.31.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.31.0) (2026-01-13)
 
 ### What's changed
