@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-api@0.26.0) (2026-01-15)
+
+### What's changed
+
+- Added description text to the API keys admin viewset ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.25.0](https://github.com/dropseed/plain/releases/plain-api@0.25.0) (2026-01-13)
 
 ### What's changed
