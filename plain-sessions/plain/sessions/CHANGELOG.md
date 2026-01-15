@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.42.0](https://github.com/dropseed/plain/releases/plain-sessions@0.42.0) (2026-01-15)
+
+### What's changed
+
+- Session admin list view now displays a description for better clarity in the admin interface ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd3))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.41.0](https://github.com/dropseed/plain/releases/plain-sessions@0.41.0) (2026-01-13)
 
 ### What's changed
