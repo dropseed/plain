@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.73.0](https://github.com/dropseed/plain/releases/plain-models@0.73.0) (2026-01-15)
+
+### What's changed
+
+- The `__repr__` method on models now returns `<ClassName: id>` instead of `<ClassName: str(self)>`, avoiding potential side effects from custom `__str__` implementations ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.72.0](https://github.com/dropseed/plain/releases/plain-models@0.72.0) (2026-01-13)
 
 ### What's changed
