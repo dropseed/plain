@@ -1,0 +1,598 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="max-w-4xl">
+
+    <!-- On-page navigation -->
+    <nav class="mb-12 pb-4 border-b border-stone-200">
+        <ul class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            <li><a href="#principles" class="text-stone-500 hover:text-stone-900">Principles</a></li>
+            <li><a href="#technical-overview" class="text-stone-500 hover:text-stone-900">Technical Overview</a></li>
+            <li><a href="#css-variables" class="text-stone-500 hover:text-stone-900">CSS Variables</a></li>
+            <li><a href="#global-css" class="text-stone-500 hover:text-stone-900">Global CSS</a></li>
+            <li><a href="#css-classes" class="text-stone-500 hover:text-stone-900">CSS Classes</a></li>
+            <li><a href="#data-attributes" class="text-stone-500 hover:text-stone-900">Data Attributes</a></li>
+            <li><a href="#tailwind-patterns" class="text-stone-500 hover:text-stone-900">Tailwind Patterns</a></li>
+        </ul>
+    </nav>
+
+    <!-- Principles -->
+    <section id="principles" class="mb-20">
+        <h2 class="text-lg font-semibold text-stone-900 mb-1">Principles</h2>
+        <p class="text-sm text-stone-500 mb-8">The philosophy behind Plain Admin's design</p>
+
+        <div class="space-y-6">
+            <div class="grid sm:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-medium text-stone-900 mb-1">Unpretentious</h3>
+                    <p class="text-sm text-stone-600">Honest and straightforward. Not trying too hard. The design should feel natural and unforced, never showy or overwrought.</p>
+                </div>
+                <div>
+                    <h3 class="font-medium text-stone-900 mb-1">A well-made tool</h3>
+                    <p class="text-sm text-stone-600">Polished and professional, but approachable. Like a quality hand tool—clean, functional, built to last. Not a showpiece.</p>
+                </div>
+                <div>
+                    <h3 class="font-medium text-stone-900 mb-1">Natural &amp; organic</h3>
+                    <p class="text-sm text-stone-600">Warm stone neutrals inspired by nature. Colors that feel grounded and real, not synthetic or harsh. Earthy without being rustic.</p>
+                </div>
+                <div>
+                    <h3 class="font-medium text-stone-900 mb-1">Efficient</h3>
+                    <p class="text-sm text-stone-600">Dense where it needs to be, spacious where it helps. Every element earns its place. No wasteful whitespace, no unnecessary decoration.</p>
+                </div>
+                <div>
+                    <h3 class="font-medium text-stone-900 mb-1">Familiar patterns</h3>
+                    <p class="text-sm text-stone-600">Blue links, obvious buttons, clear hierarchy. Use patterns people already know. Innovate on functionality, not on basic interactions.</p>
+                </div>
+                <div>
+                    <h3 class="font-medium text-stone-900 mb-1">Brand-neutral</h3>
+                    <p class="text-sm text-stone-600">Should complement, not compete with, the user's own brand. Neutral enough to feel at home in any project. Themeable in spirit.</p>
+                </div>
+            </div>
+
+            <div class="border-t border-stone-200 pt-6 mt-6">
+                <h3 class="text-[11px] font-semibold uppercase tracking-wider text-stone-400 mb-3">What to avoid</h3>
+                <ul class="text-sm text-stone-600 space-y-1.5">
+                    <li>• Overly minimal "design agency" aesthetics that feel cold or unattainable</li>
+                    <li>• Gratuitous embellishment—shadows, gradients, animations without purpose</li>
+                    <li>• Trendy patterns that will age poorly</li>
+                    <li>• Sparse layouts that waste space in the name of "clean"</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Technical Overview -->
+    <section id="technical-overview" class="mb-20">
+        <h2 class="text-lg font-semibold text-stone-900 mb-1">Technical Overview</h2>
+        <p class="text-sm text-stone-500 mb-8">How styling is organized and applied</p>
+
+        <div class="grid sm:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-medium text-stone-900 mb-1">Global CSS</h3>
+                <p class="text-sm text-stone-600 mb-2">Element selectors that apply automatically. No classes needed.</p>
+                <p class="text-xs text-stone-400 font-mono">table, input, select, textarea, label, button, aside, code, dl</p>
+            </div>
+            <div>
+                <h3 class="font-medium text-stone-900 mb-1">CSS Classes</h3>
+                <p class="text-sm text-stone-600 mb-2">Reusable classes for explicit styling. Apply where needed.</p>
+                <p class="text-xs text-stone-400 font-mono">.plain-btn .plain-btn-primary, .plain-label .plain-label-success, .plain-link</p>
+            </div>
+            <div>
+                <h3 class="font-medium text-stone-900 mb-1">Data Attributes</h3>
+                <p class="text-sm text-stone-600 mb-2">Semantic attributes for behavior.</p>
+                <p class="text-xs text-stone-400 font-mono">data-dropdown</p>
+            </div>
+            <div>
+                <h3 class="font-medium text-stone-900 mb-1">Tailwind Patterns</h3>
+                <p class="text-sm text-stone-600 mb-2">Documented class combinations for common UI patterns.</p>
+                <p class="text-xs text-stone-400 font-mono">Typography, breadcrumbs, pagination, empty states</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CSS Variables -->
+    <section id="css-variables" class="mb-20">
+        <h2 class="text-lg font-semibold text-stone-900 mb-1">CSS Variables</h2>
+        <p class="text-sm text-stone-500 mb-8">Color tokens defined in <code>:root</code> for theming</p>
+
+        <div class="space-y-10">
+
+            <!-- Primary -->
+            <div>
+                <h3 class="text-[11px] font-semibold uppercase tracking-wider text-stone-400 mb-4">Primary</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div>
+                        <div class="h-16 rounded-lg mb-3 plain-swatch-olive"></div>
+                        <div class="text-sm font-medium text-stone-900">Olive</div>
+                        <code class="text-xs text-stone-400 font-mono">--plain-olive</code>
+                        <p class="text-xs text-stone-500 mt-1">Primary buttons, checkboxes</p>
+                    </div>
+                    <div>
+                        <div class="h-16 rounded-lg mb-3 plain-swatch-steel"></div>
+                        <div class="text-sm font-medium text-stone-900">Steel</div>
+                        <code class="text-xs text-stone-400 font-mono">--plain-steel</code>
+                        <p class="text-xs text-stone-500 mt-1">Links</p>
+                    </div>
+                    <div>
+                        <div class="h-16 rounded-lg bg-stone-800 mb-3"></div>
+                        <div class="text-sm font-medium text-stone-900">Dark</div>
+                        <code class="text-xs text-stone-400 font-mono">stone-800</code>
+                        <p class="text-xs text-stone-500 mt-1">Text, headings</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Semantic -->
+            <div>
+                <h3 class="text-[11px] font-semibold uppercase tracking-wider text-stone-400 mb-4">Semantic</h3>
+                <div class="grid grid-cols-4 gap-4">
+                    <div>
+                        <div class="h-14 rounded-lg mb-3 plain-swatch-success"></div>
+                        <div class="text-sm font-medium text-stone-900">Success</div>
+                        <code class="text-xs text-stone-400 font-mono">--plain-success</code>
+                    </div>
+                    <div>
+                        <div class="h-14 rounded-lg mb-3 plain-swatch-warning"></div>
+                        <div class="text-sm font-medium text-stone-900">Warning</div>
+                        <code class="text-xs text-stone-400 font-mono">--plain-warning</code>
+                    </div>
+                    <div>
+                        <div class="h-14 rounded-lg mb-3 plain-swatch-danger"></div>
+                        <div class="text-sm font-medium text-stone-900">Danger</div>
+                        <code class="text-xs text-stone-400 font-mono">--plain-danger</code>
+                    </div>
+                    <div>
+                        <div class="h-14 rounded-lg mb-3 plain-swatch-info"></div>
+                        <div class="text-sm font-medium text-stone-900">Info</div>
+                        <code class="text-xs text-stone-400 font-mono">--plain-info</code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Neutrals -->
+            <div>
+                <h3 class="text-[11px] font-semibold uppercase tracking-wider text-stone-400 mb-4">Neutrals (Tailwind Stone)</h3>
+                <div class="flex gap-1">
+                    <div class="flex-1 h-12 rounded bg-stone-900"></div>
+                    <div class="flex-1 h-12 rounded bg-stone-800"></div>
+                    <div class="flex-1 h-12 rounded bg-stone-700"></div>
+                    <div class="flex-1 h-12 rounded bg-stone-600"></div>
+                    <div class="flex-1 h-12 rounded bg-stone-500"></div>
+                    <div class="flex-1 h-12 rounded bg-stone-400"></div>
+                    <div class="flex-1 h-12 rounded bg-stone-300"></div>
+                    <div class="flex-1 h-12 rounded bg-stone-200"></div>
+                    <div class="flex-1 h-12 rounded bg-stone-100"></div>
+                    <div class="flex-1 h-12 rounded bg-stone-50 border border-stone-200"></div>
+                </div>
+                <div class="flex gap-1 mt-2 text-[10px] text-stone-400 font-mono">
+                    <div class="flex-1 text-center">900</div>
+                    <div class="flex-1 text-center">800</div>
+                    <div class="flex-1 text-center">700</div>
+                    <div class="flex-1 text-center">600</div>
+                    <div class="flex-1 text-center">500</div>
+                    <div class="flex-1 text-center">400</div>
+                    <div class="flex-1 text-center">300</div>
+                    <div class="flex-1 text-center">200</div>
+                    <div class="flex-1 text-center">100</div>
+                    <div class="flex-1 text-center">50</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Global CSS -->
+    <section id="global-css" class="mb-20">
+        <h2 class="text-lg font-semibold text-stone-900 mb-1">Global CSS</h2>
+        <p class="text-sm text-stone-500 mb-8">These elements are styled automatically via element selectors. Just use the HTML—no classes needed.</p>
+
+        <div class="space-y-16">
+
+            <!-- Tables -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Tables</h3>
+                <p class="text-sm text-stone-500 mb-4">Styled via <code>table</code>, <code>th</code>, <code>td</code>, <code>tbody tr</code> selectors.</p>
+
+                <div class="overflow-hidden mb-4">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Package</th>
+                                <th>Version</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>plain-models</td>
+                                <td>1.0.0</td>
+                                <td><span class="plain-label plain-label-success">Stable</span></td>
+                            </tr>
+                            <tr>
+                                <td>plain-htmx</td>
+                                <td>0.9.0</td>
+                                <td><span class="plain-label plain-label-warning">Beta</span></td>
+                            </tr>
+                            <tr>
+                                <td>plain-cache</td>
+                                <td>1.2.0</td>
+                                <td><span class="plain-label plain-label-success">Stable</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-stone-400">Includes hover states, border styling, and proper spacing.</p>
+            </div>
+
+            <!-- Form Inputs -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Form Inputs</h3>
+                <p class="text-sm text-stone-500 mb-4">Styled via <code>label</code>, <code>input[type="*"]</code>, <code>textarea</code>, <code>select</code> selectors.</p>
+
+                <div class="space-y-6 max-w-sm">
+                    <div>
+                        <label>Project name</label>
+                        <input type="text" placeholder="my-project">
+                    </div>
+
+                    <div>
+                        <label>Database</label>
+                        <select>
+                            <option>PostgreSQL</option>
+                            <option>SQLite</option>
+                            <option>MySQL</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label>Description</label>
+                        <textarea placeholder="Enter a description..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="flex items-center gap-2.5 cursor-pointer">
+                            <input type="checkbox" checked>
+                            <span class="font-normal">Enable authentication</span>
+                        </label>
+                    </div>
+                </div>
+                <p class="text-xs text-stone-400 mt-4">Includes focus states, placeholder styling, and checkbox accent color.</p>
+            </div>
+
+            <!-- Links -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Links</h3>
+                <p class="text-sm text-stone-500 mb-4">Styled via <code>main :is(p, li, dd) a</code> selector. Links in prose content (paragraphs, lists, definition lists) are steel blue with underline.</p>
+
+                <p class="text-sm text-stone-700">
+                    Manage your settings in the <a href="#">dashboard</a>. See <a href="#">documentation</a> for details.
+                </p>
+            </div>
+
+            <!-- Code -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Code</h3>
+                <p class="text-sm text-stone-500 mb-4">Styled via <code>code</code> and <code>pre code</code> selectors.</p>
+
+                <p class="text-sm text-stone-700 mb-4">
+                    Run <code>plain dev</code> to start the server, or <code>plain test</code> for tests.
+                </p>
+
+                <pre><code>from plain.models import Model
+
+class User(Model):
+    name = models.CharField(max_length=100)</code></pre>
+            </div>
+
+            <!-- Cards -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Cards</h3>
+                <p class="text-sm text-stone-500 mb-4">Styled via <code>.card</code> class. Use <code>section</code> for the body.</p>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                    <div class="card">
+                        <header>
+                            <h2>Total Users</h2>
+                        </header>
+                        <section>
+                            <div>1,234</div>
+                            <a href="#">View all</a>
+                        </section>
+                    </div>
+                    <div class="card">
+                        <header>
+                            <h2>Active Jobs</h2>
+                        </header>
+                        <section>
+                            <div>42</div>
+                        </section>
+                    </div>
+                    <div class="card">
+                        <header>
+                            <h2>Cache Status</h2>
+                        </header>
+                        <section>
+                            <div>Connected</div>
+                        </section>
+                    </div>
+                    <div class="card">
+                        <header>
+                            <h2>Last Deploy</h2>
+                        </header>
+                        <section>
+                            <div>Success</div>
+                        </section>
+                    </div>
+                </div>
+
+                <p class="text-sm text-stone-500 mb-4">Use <code>col-span-4</code> for full-width table cards:</p>
+
+                <div class="grid grid-cols-4 gap-4 mb-4">
+                    <div class="card col-span-4">
+                        <header>
+                            <h2>Recent Activity</h2>
+                            <a href="#">View all</a>
+                        </header>
+                        <section>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Event</th>
+                                        <th>User</th>
+                                        <th>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>User created</td>
+                                        <td>admin@example.com</td>
+                                        <td>2 min ago</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Settings updated</td>
+                                        <td>dave@example.com</td>
+                                        <td>1 hour ago</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </section>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description Lists -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Description Lists</h3>
+                <p class="text-sm text-stone-500 mb-4">Styled via <code>dl</code>, <code>dt</code>, <code>dd</code> selectors. Add grid classes for layout.</p>
+
+                <div class="max-w-lg border-t border-stone-200">
+                    <dl class="py-3 grid grid-cols-[160px_1fr] gap-x-4">
+                        <dt>Creator</dt>
+                        <dd>dave@example.com</dd>
+                    </dl>
+                    <dl class="py-3 grid grid-cols-[160px_1fr] gap-x-4 border-t border-stone-100">
+                        <dt>Machine name</dt>
+                        <dd>daves-macbook-pro</dd>
+                    </dl>
+                    <dl class="py-3 grid grid-cols-[160px_1fr] gap-x-4 border-t border-stone-100">
+                        <dt>Status</dt>
+                        <dd>Active</dd>
+                    </dl>
+                </div>
+                <p class="text-xs text-stone-400 mt-4">Use <code>grid grid-cols-[160px_1fr]</code> for key-value layout.</p>
+            </div>
+
+            <!-- Buttons -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Buttons</h3>
+                <p class="text-sm text-stone-500 mb-4">Styled via <code>main button</code> and <code>button[type="submit"]</code> selectors.</p>
+
+                <div class="flex flex-wrap gap-3 items-center mb-4">
+                    <button>Default</button>
+                    <button type="submit">Submit</button>
+                </div>
+                <p class="text-xs text-stone-400">Submit buttons automatically get primary (olive) styling. Regular buttons get default (gray) styling.</p>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- CSS Classes -->
+    <section id="css-classes" class="mb-20">
+        <h2 class="text-lg font-semibold text-stone-900 mb-1">CSS Classes</h2>
+        <p class="text-sm text-stone-500 mb-8">Explicit classes for when you need specific styling beyond the defaults.</p>
+
+        <div class="space-y-16">
+
+            <!-- Button Classes -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Buttons</h3>
+                <p class="text-sm text-stone-500 mb-4">Use <code>.plain-btn</code> as the base class, optionally with a variant for color.</p>
+
+                <div class="flex flex-wrap gap-3 items-center mb-4">
+                    <button class="plain-btn">Default</button>
+                    <button class="plain-btn plain-btn-primary">Primary</button>
+                    <button class="plain-btn plain-btn-success">Success</button>
+                    <button class="plain-btn plain-btn-warning">Warning</button>
+                    <button class="plain-btn plain-btn-danger">Danger</button>
+                </div>
+                <code class="text-xs text-stone-400 font-mono">.plain-btn, .plain-btn .plain-btn-primary, .plain-btn .plain-btn-success, ...</code>
+            </div>
+
+            <!-- Label Classes -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Labels</h3>
+                <p class="text-sm text-stone-500 mb-4">Use <code>.plain-label</code> as the base class, optionally with a variant for color.</p>
+
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <span class="plain-label">Default</span>
+                    <span class="plain-label plain-label-success">Success</span>
+                    <span class="plain-label plain-label-warning">Warning</span>
+                    <span class="plain-label plain-label-danger">Danger</span>
+                    <span class="plain-label plain-label-info">Info</span>
+                </div>
+                <code class="text-xs text-stone-400 font-mono block">.plain-label, .plain-label .plain-label-success, .plain-label .plain-label-warning, ...</code>
+            </div>
+
+            <!-- Link Classes -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Link Colors</h3>
+                <p class="text-sm text-stone-500 mb-4">For links outside of <code>&lt;main&gt;</code> that need steel blue color.</p>
+
+                <p class="text-sm">
+                    <a href="#" class="plain-link underline">Steel link</a> for use in headers or navigation.
+                </p>
+                <code class="text-xs text-stone-400 font-mono mt-2 block">.plain-link</code>
+            </div>
+
+            <!-- Error Classes -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Error States</h3>
+                <p class="text-sm text-stone-500 mb-4">For form validation errors.</p>
+
+                <div class="max-w-sm mb-4">
+                    <label>Email</label>
+                    <input type="email" value="invalid-email" class="plain-error">
+                    <p class="text-xs mt-1.5 text-[var(--plain-danger)]">Please enter a valid email address.</p>
+                </div>
+
+                <code class="text-xs text-stone-400 font-mono block">.plain-error (on input), text-[var(--plain-danger)] (on error text)</code>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Data Attributes -->
+    <section id="data-attributes" class="mb-20">
+        <h2 class="text-lg font-semibold text-stone-900 mb-1">Data Attributes</h2>
+        <p class="text-sm text-stone-500 mb-8">Semantic attributes that trigger styling or behavior.</p>
+
+        <div class="space-y-16">
+
+            <!-- data-has-error -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">data-has-error</h3>
+                <p class="text-sm text-stone-500 mb-4">Apply to a wrapper to style all inputs inside as errored.</p>
+
+                <div class="max-w-sm" data-has-error>
+                    <label>Username</label>
+                    <input type="text" value="invalid">
+                </div>
+                <code class="text-xs text-stone-400 font-mono mt-4 block">&lt;div data-has-error&gt;...&lt;/div&gt;</code>
+            </div>
+
+            <!-- data-dropdown -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">data-dropdown</h3>
+                <p class="text-sm text-stone-500 mb-4">Triggers Tippy.js dropdown behavior. The button is excluded from default button styling.</p>
+
+                <div class="flex items-center gap-4">
+                    <button data-dropdown class="px-2 py-1 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded">•••</button>
+                    <div class="bg-white rounded-md shadow-lg ring-1 ring-stone-200 py-1 w-48">
+                        <a href="#" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">Edit</a>
+                        <a href="#" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">Duplicate</a>
+                        <a href="#" class="block px-4 py-2 text-sm text-red-600 hover:bg-stone-50">Delete</a>
+                    </div>
+                </div>
+                <code class="text-xs text-stone-400 font-mono mt-4 block">&lt;button data-dropdown&gt;•••&lt;/button&gt;</code>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Tailwind Patterns -->
+    <section id="tailwind-patterns" class="mb-20">
+        <h2 class="text-lg font-semibold text-stone-900 mb-1">Tailwind Patterns</h2>
+        <p class="text-sm text-stone-500 mb-8">Documented class combinations for common UI patterns not covered by Global CSS.</p>
+
+        <div class="space-y-16">
+
+            <!-- Typography -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Typography</h3>
+                <p class="text-sm text-stone-500 mb-4">Text styles and hierarchy.</p>
+
+                <div class="border border-stone-200 rounded-lg divide-y divide-stone-100 bg-white">
+                    <div class="flex items-baseline justify-between px-6 py-5">
+                        <span class="text-2xl font-semibold text-stone-900">Page Title</span>
+                        <code class="text-xs text-stone-400 font-mono">text-2xl font-semibold</code>
+                    </div>
+                    <div class="flex items-baseline justify-between px-6 py-5">
+                        <span class="text-lg font-semibold text-stone-900">Section Heading</span>
+                        <code class="text-xs text-stone-400 font-mono">text-lg font-semibold</code>
+                    </div>
+                    <div class="flex items-baseline justify-between px-6 py-5">
+                        <span class="text-base font-medium text-stone-900">Subsection</span>
+                        <code class="text-xs text-stone-400 font-mono">text-base font-medium</code>
+                    </div>
+                    <div class="flex items-baseline justify-between px-6 py-5">
+                        <span class="text-sm text-stone-900">Body text</span>
+                        <code class="text-xs text-stone-400 font-mono">text-sm</code>
+                    </div>
+                    <div class="flex items-baseline justify-between px-6 py-5">
+                        <span class="text-sm text-black/60">Description text</span>
+                        <code class="text-xs text-stone-400 font-mono">text-sm text-black/60</code>
+                    </div>
+                    <div class="flex items-baseline justify-between px-6 py-5">
+                        <span class="text-sm text-stone-500">Muted text</span>
+                        <code class="text-xs text-stone-400 font-mono">text-sm text-stone-500</code>
+                    </div>
+                    <div class="flex items-baseline justify-between px-6 py-5">
+                        <span class="text-[11px] font-semibold uppercase tracking-wider text-stone-400">Section Label</span>
+                        <code class="text-xs text-stone-400 font-mono">text-[11px] font-semibold uppercase tracking-wider text-stone-400</code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Breadcrumbs -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Breadcrumbs</h3>
+                <p class="text-sm text-stone-500 mb-4">Navigation path showing current location.</p>
+
+                <nav class="text-sm text-stone-500 mb-4">
+                    <a href="#" class="hover:text-stone-700">Carts</a>
+                    <span class="mx-1">/</span>
+                    <span class="text-stone-700">&lt;Cart: dropseed - north newton...&gt;</span>
+                </nav>
+                <code class="text-xs text-stone-400 font-mono">Links separated by / with current item in text-stone-700</code>
+            </div>
+
+            <!-- Pagination -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Pagination</h3>
+                <p class="text-sm text-stone-500 mb-4">Page navigation for list views.</p>
+
+                <div class="flex items-center justify-between text-sm border-t border-stone-200 pt-4 max-w-2xl">
+                    <span class="text-stone-500">Page 1 of 2 (21 results, 20 per page)</span>
+                    <div class="flex items-center gap-2">
+                        <select class="text-xs py-1 pl-2 pr-6 border-stone-200 rounded">
+                            <option>Page 1</option>
+                            <option>Page 2</option>
+                        </select>
+                        <button class="px-2 py-1 text-xs border border-stone-200 rounded hover:bg-stone-50">&gt;</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty States -->
+            <div>
+                <h3 class="text-base font-medium text-stone-800 mb-2">Empty States</h3>
+                <p class="text-sm text-stone-500 mb-4">Informational placeholders for empty views. Keep them subtle—they inform without demanding attention.</p>
+
+                <div class="border-t border-stone-200 py-10 text-center max-w-2xl">
+                    <p class="text-sm text-stone-400">No items yet</p>
+                </div>
+
+                <p class="text-xs text-stone-400 mt-4">A hairline border maintains visual flow. Centered text reads as a state message. Differentiate between "no results" (search) and "no items yet" (empty table).</p>
+
+                <div class="mt-6 p-4 bg-stone-50 rounded-lg">
+                    <h4 class="text-xs font-semibold text-stone-500 mb-2">Avoid drop-zone aesthetics</h4>
+                    <p class="text-xs text-stone-500">Bordered containers with background fills, prominent centered icons (especially in circles), and inbox/tray icons signal interactivity—drag-and-drop, file upload. Empty states should feel informational, not interactive.</p>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+
+</div>
+{% endblock %}

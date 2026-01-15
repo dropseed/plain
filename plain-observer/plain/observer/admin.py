@@ -17,8 +17,9 @@ from .models import Log, Span, Trace
 class TraceViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Observer"
-        nav_icon = "activity"
+        nav_icon = "diagram-3"
         model = Trace
+        description = "Request traces linking spans and logs together."
         fields = [
             "trace_id",
             "request_id",
@@ -43,6 +44,9 @@ class SpanViewset(AdminViewset):
         nav_section = "Observer"
         nav_icon = "activity"
         model = Span
+        description = (
+            "Individual operations within a trace (DB queries, HTTP calls, etc)."
+        )
         fields = [
             "name",
             "kind",
@@ -88,8 +92,9 @@ class SpanViewset(AdminViewset):
 class LogViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Observer"
-        nav_icon = "activity"
+        nav_icon = "journal-text"
         model = Log
+        description = "Application logs captured during request processing."
         fields = [
             "timestamp",
             "level",

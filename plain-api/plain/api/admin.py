@@ -15,6 +15,7 @@ class APIKeyViewset(AdminViewset):
         nav_icon = "key"
         model = APIKey
         title = "API keys"
+        description = "Keys used to authenticate API requests."
         fields = [
             "name",
             "uuid",

@@ -2,221 +2,56 @@
 These standard CSS rules are intended to make it easier for the
 end-user to drop in HTML elements and have a decent, consistent starting point.
 
-We shouldn't use many custom classes in here (like .btn) because the user
+We shouldn't use many custom classes in here (like .plain-btn) because the user
 could unintentionally overwrite those since our CSS is combined.
  */
 
-/* biome-disable lint/style/noDescendingSpecificity */
+/*
+Plain Admin Color Palette
+Natural, earthy colors aligned with design principles.
+See /admin/style/ for the full style guide.
+*/
+:root {
+  /* Primary */
+  --plain-olive: #4d5246;
+  --plain-olive-hover: #5d6356;
+  --plain-olive-border: #3f4439;
+  --plain-steel: #4a6fa5;
+  --plain-steel-hover: #3d5d8a;
 
-/* Base element styles - using @layer base so Tailwind utilities can override */
-@layer base {
-  table {
-    width: 100%;
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    table-layout: auto;
-  }
+  /* Semantic */
+  --plain-success: #3d7a5a;
+  --plain-success-light: #3d7a5a20;
+  --plain-success-text: #2d5a42;
+  --plain-success-border: #326349;
+  --plain-warning: #c27c3e;
+  --plain-warning-light: #c27c3e20;
+  --plain-warning-text: #8a5a2c;
+  --plain-warning-border: #a66a35;
+  --plain-danger: #a64b4b;
+  --plain-danger-light: #a64b4b20;
+  --plain-danger-text: #7a3636;
+  --plain-danger-border: #8c3f3f;
+  --plain-info: #5c7a99;
+  --plain-info-light: #5c7a9920;
+  --plain-info-text: #4a5d73;
 
-  th {
-    text-align: left;
-    padding: 0.5rem 0.5rem;
-    background-color: rgb(250, 250, 249); /* stone-50 */
-  }
+  /* Status badge colors - derived from semantic */
+  --status-pending-bg: var(--plain-warning-light);
+  --status-pending-text: var(--plain-warning-text);
+  --status-success-bg: var(--plain-success-light);
+  --status-success-text: var(--plain-success-text);
+  --status-error-bg: var(--plain-danger-light);
+  --status-error-text: var(--plain-danger-text);
+  --status-info-bg: var(--plain-info-light);
+  --status-info-text: var(--plain-info-text);
 
-  td {
-    padding: 0.5rem 0.5rem;
-    white-space: nowrap;
-    border-bottom: 1px solid rgb(231, 229, 228); /* stone-200 */
-  }
-
-  tr:last-child td {
-    border-bottom: none;
-  }
-
-  tbody tr:hover {
-    background-color: rgb(250, 250, 249); /* stone-50 */
-  }
-
-  table img {
-    height: 1.2rem;
-    border-radius: 2px;
-  }
-
-  main a {
-    color: rgb(29, 78, 216); /* blue-700 */
-  }
-
-  main a:hover {
-    text-decoration: underline;
-  }
-
-  table th a {
-    color: rgba(0, 0, 0, 0.6); /* black/60 */
-  }
-
-  table td a {
-    color: rgba(0, 0, 0, 0.9); /* black/90 */
-
-    &:hover {
-      text-decoration: none;
-    }
-  }
-
-  /* Form elements */
-  label {
-    display: block;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: rgba(0, 0, 0, 0.9); /* black/90 */
-    margin-bottom: 0.25rem;
-  }
-
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="number"],
-  input[type="url"],
-  input[type="tel"],
-  input[type="search"],
-  input[type="date"],
-  input[type="time"],
-  input[type="datetime-local"],
-  textarea,
-  select {
-    display: block;
-    width: 100%;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    color: rgba(0, 0, 0, 0.9); /* black/90 */
-    background-color: rgb(255, 255, 255); /* white */
-    border: 1px solid rgb(214, 211, 209); /* stone-300 */
-    border-radius: 6px;
-  }
-
-  input[type="text"]:focus,
-  input[type="email"]:focus,
-  input[type="password"]:focus,
-  input[type="number"]:focus,
-  input[type="url"]:focus,
-  input[type="tel"]:focus,
-  input[type="search"]:focus,
-  input[type="date"]:focus,
-  input[type="time"]:focus,
-  input[type="datetime-local"]:focus,
-  textarea:focus,
-  select:focus {
-    outline: none;
-    border-color: rgb(29, 78, 216); /* blue-700 */
-    box-shadow: 0 0 0 1px rgb(29, 78, 216); /* blue-700 */
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: rgba(0, 0, 0, 0.4); /* black/40 */
-  }
-
-  textarea {
-    field-sizing: content;
-    min-height: 4rem;
-  }
-
-  select {
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 0.25rem center;
-    background-repeat: no-repeat;
-    background-size: 1.5em 1.5em;
-  }
-
-  /* Buttons */
-  main button:not([data-dropdown]):not([data-nav-toggle]),
-  main a.button,
-  .actions button,
-  .actions a {
-    display: inline-block;
-    padding: 5px 14px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(0, 0, 0, 0.9); /* black/90 */
-    text-align: center;
-    text-decoration: none;
-    background-color: rgb(245, 245, 244); /* stone-100 */
-    border: 1px solid rgb(214, 211, 209); /* stone-300 */
-    border-radius: 6px;
-    transition:
-      background-color 0.2s,
-      border-color 0.2s,
-      transform 0.2s;
-    cursor: pointer;
-    flex-shrink: 0;
-
-    @media (max-width: 640px) {
-      font-size: 12px;
-      padding: 6px 12px;
-    }
-
-    &:hover {
-      background-color: rgb(231, 229, 228); /* stone-200 */
-      border-color: rgb(168, 162, 158); /* stone-400 */
-      transform: translateY(-1px);
-    }
-
-    &:active {
-      background-color: rgb(214, 211, 209); /* stone-300 */
-      border-color: rgb(168, 162, 158); /* stone-400 */
-      transform: translateY(0);
-    }
-
-    &:focus {
-      outline: 2px solid rgb(29, 78, 216); /* blue-700 */
-      outline-offset: 2px;
-    }
-  }
-
-  main button[type="submit"] {
-    background-color: #434f40; /* sage green from plainframework.com */
-    border-color: #434f40;
-    color: rgb(250, 250, 249); /* stone-50 */
-
-    &:hover {
-      background-color: #3a4438; /* darker sage */
-      border-color: #3a4438;
-    }
-    &:focus {
-      outline: 2px solid #434f40;
-      outline-offset: 2px;
-    }
-  }
-
-  /* Card elements (aside) */
-  aside {
-    border: rgb(231, 229, 228) 1px solid; /* stone-200 */
-    border-radius: 0.275rem;
-    overflow: auto;
-    background-color: rgb(255, 255, 255); /* white */
-    color: rgba(0, 0, 0, 0.7); /* black/70 */
-    display: flex;
-    flex-direction: column;
-  }
-
-  aside > header {
-    padding: 0.5rem;
-    border-bottom: rgb(245, 245, 244) 1px solid; /* stone-100 */
-  }
-
-  .card-content {
-    padding: 0.75rem 0.5rem 0;
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    overflow: auto;
-  }
+  /* Neutral/Default - stone tones */
+  --status-neutral-bg: rgb(245, 245, 244); /* stone-100 */
+  --status-neutral-text: rgb(68, 64, 60); /* stone-700 */
 }
 
-/* Tippy dropdown styling */
+/* Tippy dropdown styling - must come before scoped rules for specificity */
 .tippy-box {
   background-color: rgb(255, 255, 255) !important; /* white */
   color: rgba(0, 0, 0, 0.9) !important; /* black/90 */
@@ -230,8 +65,541 @@ could unintentionally overwrite those since our CSS is combined.
   color: rgba(0, 0, 0, 0.7) !important; /* black/70 */
 }
 
-/* Content area adjustments */
-.admin-content {
-  width: 100%;
-  min-width: 0; /* Allow flex child to shrink below content size */
+/* Base element styles - scoped to .plain-admin to avoid conflicts */
+@layer base {
+  .plain-admin {
+    table {
+      width: 100%;
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+      table-layout: auto;
+    }
+
+    th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid rgb(231, 229, 228); /* stone-200 */
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.6);
+      letter-spacing: 0.01em;
+    }
+
+    td {
+      padding: 0.5rem 0.75rem;
+      white-space: nowrap;
+      border-bottom: 1px solid rgb(231, 229, 228); /* stone-200 */
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background-color: rgb(250, 250, 249); /* stone-50 */
+    }
+
+    table img {
+      height: 1.2rem;
+      border-radius: 2px;
+    }
+
+    /* Links in prose content only - not UI elements like pagination */
+    main :is(p, li, dd) a {
+      color: var(--plain-steel);
+      text-decoration: underline;
+    }
+
+    main :is(p, li, dd) a:hover {
+      color: var(--plain-steel-hover);
+    }
+
+    table th a {
+      color: rgba(0, 0, 0, 0.6); /* black/60 */
+      text-decoration: none;
+    }
+
+    table td a {
+      color: rgba(0, 0, 0, 0.9); /* black/90 */
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    /* Form elements */
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.9); /* black/90 */
+      margin-bottom: 0.25rem;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="url"],
+    input[type="tel"],
+    input[type="search"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    textarea,
+    select {
+      display: block;
+      width: 100%;
+      padding: 0.375rem 0.75rem;
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+      color: rgba(0, 0, 0, 0.9); /* black/90 */
+      background-color: rgb(255, 255, 255); /* white */
+      border: 1px solid rgb(214, 211, 209); /* stone-300 */
+      border-radius: 6px;
+    }
+
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="password"]:focus,
+    input[type="number"]:focus,
+    input[type="url"]:focus,
+    input[type="tel"]:focus,
+    input[type="search"]:focus,
+    input[type="date"]:focus,
+    input[type="time"]:focus,
+    input[type="datetime-local"]:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: rgb(120, 113, 108); /* stone-500 */
+      box-shadow: 0 0 0 1px rgb(120, 113, 108); /* stone-500 */
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: rgba(0, 0, 0, 0.4); /* black/40 */
+    }
+
+    textarea {
+      field-sizing: content;
+      min-height: 4rem;
+    }
+
+    /* Error states for form inputs */
+    input.plain-error,
+    textarea.plain-error,
+    select.plain-error,
+    [data-has-error] input,
+    [data-has-error] textarea,
+    [data-has-error] select {
+      border-color: rgb(220, 38, 38); /* red-600 */
+    }
+
+    input.plain-error:focus,
+    textarea.plain-error:focus,
+    select.plain-error:focus,
+    [data-has-error] input:focus,
+    [data-has-error] textarea:focus,
+    [data-has-error] select:focus {
+      border-color: rgb(220, 38, 38); /* red-600 */
+      box-shadow: 0 0 0 1px rgb(220, 38, 38); /* red-600 */
+    }
+
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+      background-position: right 0.25rem center;
+      background-repeat: no-repeat;
+      background-size: 1.5em 1.5em;
+    }
+
+    /* Checkbox styling */
+    input[type="checkbox"] {
+      width: 1rem;
+      height: 1rem;
+      border-radius: 0.25rem;
+      border: 1px solid rgb(214, 211, 209); /* stone-300 */
+      cursor: pointer;
+      accent-color: var(--plain-olive);
+    }
+
+    /* Override Tailwind forms plugin */
+    [type="checkbox"]:checked {
+      background-color: var(--plain-olive);
+      border-color: var(--plain-olive);
+    }
+
+    [type="checkbox"]:checked:hover,
+    [type="checkbox"]:checked:focus {
+      background-color: var(--plain-olive-hover);
+      border-color: var(--plain-olive-hover);
+    }
+
+    input[type="checkbox"]:focus {
+      outline: 2px solid rgb(120, 113, 108); /* stone-500 */
+      outline-offset: 2px;
+    }
+
+    /* Buttons */
+    main button:not([data-dropdown]),
+    main a.button {
+      display: inline-block;
+      padding: 5px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.9); /* black/90 */
+      text-align: center;
+      text-decoration: none;
+      background-color: rgb(245, 245, 244); /* stone-100 */
+      border: 1px solid rgb(214, 211, 209); /* stone-300 */
+      border-radius: 6px;
+      transition:
+        background-color 0.15s,
+        border-color 0.15s;
+      cursor: pointer;
+      flex-shrink: 0;
+
+      @media (max-width: 640px) {
+        font-size: 12px;
+        padding: 6px 12px;
+      }
+
+      &:where(:hover) {
+        background-color: rgb(231, 229, 228); /* stone-200 */
+        border-color: rgb(168, 162, 158); /* stone-400 */
+      }
+
+      &:where(:active) {
+        background-color: rgb(214, 211, 209); /* stone-300 */
+        border-color: rgb(168, 162, 158); /* stone-400 */
+      }
+
+      &:focus {
+        outline: 2px solid rgb(120, 113, 108); /* stone-500 */
+        outline-offset: 2px;
+      }
+    }
+
+    main button[type="submit"] {
+      background-color: var(--plain-olive);
+      border-color: var(--plain-olive);
+      color: rgb(255, 255, 255); /* white */
+
+      &:hover {
+        background-color: var(--plain-olive-hover);
+        border-color: var(--plain-olive-hover);
+      }
+      &:active {
+        background-color: #3d4236; /* darker olive */
+        border-color: #3d4236;
+      }
+      &:focus {
+        outline: 2px solid rgb(120, 113, 108); /* stone-500 */
+        outline-offset: 2px;
+      }
+    }
+
+    /* Description lists */
+    dl {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+
+    dt {
+      color: rgba(0, 0, 0, 0.5);
+    }
+
+    dd {
+      color: rgba(0, 0, 0, 0.9);
+    }
+
+    /* Card elements */
+    .card {
+      border: rgb(231, 229, 228) 1px solid; /* stone-200 */
+      border-radius: 0.375rem;
+      overflow: auto;
+      background-color: rgb(255, 255, 255); /* white */
+      color: rgba(0, 0, 0, 0.7); /* black/70 */
+      display: flex;
+      flex-direction: column;
+      padding: 0.75rem 1rem;
+    }
+
+    /* Size 1 cards (small metric cards) - ensure consistent height */
+    .card.col-span-1 {
+      min-height: auto;
+      height: auto;
+    }
+
+    .card > header {
+      margin-bottom: 0.5rem;
+    }
+
+    .card > header h2 {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.6);
+    }
+
+    .card > section {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    /* Metric cards - large numbers */
+    .card > section > div:first-child {
+      font-size: 1.75rem;
+      font-weight: 600;
+      line-height: 1.2;
+      color: rgba(0, 0, 0, 0.85);
+      letter-spacing: -0.02em;
+      font-feature-settings: "tnum" 1;
+    }
+
+    /* Text below metric (links, secondary text) */
+    .card > section > a {
+      margin-top: 0.375rem;
+      font-size: 0.75rem;
+      color: var(--plain-steel);
+      text-decoration: underline;
+    }
+
+    .card > section > a:hover {
+      color: var(--plain-steel-hover);
+    }
+
+    /* Table cards */
+    .card.col-span-4 {
+      padding: 1rem 0;
+    }
+
+    .card.col-span-4 > header {
+      padding: 0 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .card.col-span-4 .card > section {
+      justify-content: flex-start;
+      overflow-x: auto;
+    }
+
+    /* Align table content with card header */
+    .card.col-span-4 table th:first-child,
+    .card.col-span-4 table td:first-child {
+      padding-left: 1.25rem;
+    }
+
+    .card.col-span-4 table th:last-child,
+    .card.col-span-4 table td:last-child {
+      padding-right: 1.25rem;
+    }
+
+    /* Table text should not be bold */
+    .card table td {
+      font-weight: 400;
+    }
+
+    .card table th {
+      font-weight: 500;
+      font-size: 0.8125rem;
+      color: rgba(0, 0, 0, 0.6);
+    }
+
+    /* Table footer - totals row */
+    .card table tfoot td {
+      border-bottom: none;
+      border-top: 2px solid rgb(214, 211, 209); /* stone-300 */
+      font-weight: 600;
+      color: rgba(0, 0, 0, 0.8);
+      padding-top: 0.75rem;
+    }
+  }
+}
+
+/* Menu dialog styling */
+#admin-menu-dialog::backdrop {
+  background-color: rgb(28 25 23 / 0.2);
+  backdrop-filter: blur(2px);
+  animation: menu-backdrop-fade 0.15s ease-out forwards;
+}
+
+#admin-menu-dialog > div > div {
+  animation: menu-panel-enter 0.2s ease-out forwards;
+}
+
+@keyframes menu-backdrop-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes menu-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Nav tab drag-and-drop styling */
+.nav-tab[draggable="true"] {
+  cursor: pointer;
+}
+
+.nav-tab.dragging {
+  opacity: 0.5;
+}
+
+.nav-tab.drag-over {
+  border-left: 2px solid rgb(245, 158, 11); /* amber-500 */
+}
+
+/* Code blocks - scoped to .plain-admin to avoid conflicts */
+.plain-admin {
+  /* Inline code */
+  code {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.875rem;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    background-color: rgb(245, 245, 244); /* stone-100 */
+    color: rgb(68, 64, 60); /* stone-700 */
+    border-radius: 0.25rem;
+  }
+
+  /* Code blocks */
+  pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  pre code {
+    display: block;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    background-color: rgb(250, 250, 249); /* stone-50 */
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    border: 1px solid rgb(231, 229, 228); /* stone-200 */
+  }
+}
+
+/* Label classes - base + variants */
+.plain-label {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  /* Default/neutral colors */
+  background-color: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+}
+
+.plain-label-success {
+  background-color: var(--plain-success-light);
+  color: var(--plain-success-text);
+}
+.plain-label-warning {
+  background-color: var(--plain-warning-light);
+  color: var(--plain-warning-text);
+}
+.plain-label-danger {
+  background-color: var(--plain-danger-light);
+  color: var(--plain-danger-text);
+}
+.plain-label-info {
+  background-color: var(--plain-info-light);
+  color: var(--plain-info-text);
+}
+
+/* Button classes - base + variants */
+.plain-btn {
+  display: inline-block;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  border-width: 1px;
+  border-style: solid;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+  cursor: pointer;
+  /* Default colors */
+  background-color: rgb(245, 245, 244); /* stone-100 */
+  border-color: rgb(214, 211, 209); /* stone-300 */
+  color: rgba(0, 0, 0, 0.9); /* black/90 */
+}
+
+.plain-btn:hover {
+  background-color: rgb(231, 229, 228); /* stone-200 */
+  border-color: rgb(168, 162, 158); /* stone-400 */
+}
+.plain-btn:active {
+  background-color: rgb(214, 211, 209); /* stone-300 */
+  border-color: rgb(168, 162, 158); /* stone-400 */
+}
+
+.plain-btn-primary {
+  background-color: var(--plain-olive);
+  border-color: var(--plain-olive-border);
+  color: white;
+}
+.plain-btn-primary:hover {
+  background-color: var(--plain-olive-hover);
+  border-color: var(--plain-olive-border);
+}
+.plain-btn-primary:active {
+  background-color: #3d4236;
+  border-color: #3d4236;
+}
+
+.plain-btn-success {
+  background-color: var(--plain-success);
+  border-color: var(--plain-success-border);
+  color: white;
+}
+.plain-btn-success:hover {
+  background-color: var(--plain-success-text);
+  border-color: var(--plain-success-text);
+}
+
+.plain-btn-warning {
+  background-color: var(--plain-warning);
+  border-color: var(--plain-warning-border);
+  color: white;
+}
+.plain-btn-warning:hover {
+  background-color: var(--plain-warning-text);
+  border-color: var(--plain-warning-text);
+}
+
+.plain-btn-danger {
+  background-color: var(--plain-danger);
+  border-color: var(--plain-danger-border);
+  color: white;
+}
+.plain-btn-danger:hover {
+  background-color: var(--plain-danger-text);
+  border-color: var(--plain-danger-text);
+}
+
+/* Link color class for inline use */
+.plain-link {
+  color: var(--plain-steel);
+}
+.plain-link:hover {
+  color: var(--plain-steel-hover);
 }

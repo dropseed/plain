@@ -195,7 +195,7 @@ class Model(metaclass=ModelBase):
         return new
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}: {self}>"
+        return f"<{self.__class__.__name__}: {self.id}>"
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__} object ({self.id})"

@@ -104,9 +104,10 @@ class RunningJobsCard(Card):
 class JobRequestViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Jobs"
-        nav_icon = "gear"
+        nav_icon = "inbox"
         model = JobRequest
         title = "Requests"
+        description = "Jobs waiting to be picked up by a worker."
         fields = [
             "id",
             "job_class",
@@ -134,6 +135,7 @@ class JobProcessViewset(AdminViewset):
         nav_icon = "gear"
         model = JobProcess
         title = "Processes"
+        description = "Jobs currently being processed by a worker."
         fields = [
             "id",
             "job_class",
@@ -161,9 +163,10 @@ class JobProcessViewset(AdminViewset):
 class JobResultViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Jobs"
-        nav_icon = "gear"
+        nav_icon = "clipboard-check"
         model = JobResult
         title = "Results"
+        description = "Completed jobs with their success/failure status."
         fields = [
             "id",
             "job_class",

@@ -33,6 +33,7 @@ class UnusedFlagsCard(Card):
 class FlagAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = Flag
+        description = "Toggle features on/off without deploying code."
         fields = ["name", "enabled", "created_at__date", "used_at__date"]
         search_fields = ["name", "description"]
         cards = [UnusedFlagsCard]
@@ -54,6 +55,7 @@ class FlagResultAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = FlagResult
         title = "Flag results"
+        description = "Cached flag evaluations for specific keys (users, teams, etc)."
         fields = [
             "flag",
             "key",
@@ -63,7 +65,7 @@ class FlagResultAdmin(AdminViewset):
         ]
         search_fields = ["flag__name", "key"]
         nav_section = "Feature flags"
-        nav_icon = "flag"
+        nav_icon = "check2-square"
 
         def get_initial_queryset(self) -> QuerySet:
             return self.model.query.all().select_related("flag")

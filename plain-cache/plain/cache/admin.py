@@ -14,9 +14,10 @@ from plain.models import QuerySet
 class CachedItemViewset(AdminViewset):
     class ListView(AdminModelListView):
         nav_section = "Cache"
-        nav_icon = "archive"
+        nav_icon = "database"
         model = CachedItem
         title = "Cached items"
+        description = "Database cache entries with expiration times."
         fields = [
             "key",
             "created_at",

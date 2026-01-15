@@ -1,4 +1,4 @@
-<label for="{{ field.html_id }}" class="flex items-baseline justify-between w-full">
+<label for="{{ field.html_id }}" class="flex items-baseline gap-1 w-full">
     <div class="text-sm font-medium">{{ children }}</div>
-    {% if not field.field.required %}<div class="text-black/60 text-xs">Optional</div>{% endif %}
+    {% if field.field.required %}<span class="text-[var(--plain-danger)] text-sm">*</span>{% endif %}
 </label>

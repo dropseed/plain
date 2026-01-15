@@ -20,6 +20,7 @@ class SupportFormEntryAdmin(AdminViewset):
         nav_section = "Support"
         nav_icon = "headset"
         title = "Form entries"
+        description = "User-submitted support and feedback forms."
         fields = ["user", "email", "name", "form_slug", "created_at"]
 
     class DetailView(AdminModelDetailView):

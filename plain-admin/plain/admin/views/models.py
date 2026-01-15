@@ -229,7 +229,7 @@ class AdminModelUpdateView(AdminUpdateView):
         if path := super().get_path():
             return path
 
-        return f"{cls.model.model_options.model_name}/<int:id>/update/"
+        return f"{cls.model.model_options.model_name}/<int:id>/edit/"
 
     def get_object(self) -> models.Model:
         return self.model.query.get(id=self.url_kwargs["id"])

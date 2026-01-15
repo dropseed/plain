@@ -197,10 +197,10 @@ class DatetimeRange:
         return (self.end - self.start).days
 
     def iter_days(self) -> Iterator[datetime.date]:
-        """Yields each day in the range."""
+        """Yields each day in the range (inclusive of end date)."""
         return iter(
             self.start.date() + datetime.timedelta(days=i)
-            for i in range(0, self.total_days())
+            for i in range(0, self.total_days() + 1)
         )
 
     def iter_weeks(self) -> Iterator[datetime.datetime]:

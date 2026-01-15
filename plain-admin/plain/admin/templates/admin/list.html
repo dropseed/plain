@@ -11,11 +11,11 @@
 {% htmxfragment "list" %}
 
 <header class="flex items-center justify-between">
-    <div class="text-xs text-black/50">
+    <div>
         {% if table_style == "preview" %}
-            <div class="mb-3">{{ title }}</div>
+            <div class="text-sm font-medium text-black/70 mb-2">{{ title }}</div>
         {% else %}
-            {{ page.paginator.count }} result{{ page.paginator.count|pluralize }}
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-stone-500">{{ page.paginator.count }} result{{ page.paginator.count|pluralize }}</h3>
         {% endif %}
     </div>
     <div class="flex space-x-2">
@@ -65,10 +65,11 @@
     </div>
 </header>
 
+{% if objects %}
 <div class="w-full overflow-auto mt-2">
     <table class="text-sm table-auto">
         <thead>
-            <tr class="bg-stone-100 [&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
+            <tr class="[&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
                 {% if table_style != "preview" and actions %}
                 <th class="p-0 pl-1">
                     <input
@@ -83,15 +84,15 @@
                     {% if order_by_field is defined %}
                     <th>
                         {% if table_style == "preview" %}
-                        <div class="font-mono text-xs font-normal">
-                            {{ field }}
+                        <div class="text-xs font-normal">
+                            {{ get_field_label(field) }}
                         </div>
                         {% else %}
                         <a
                             data-merge-params
-                            class="font-mono text-xs font-normal flex space-x-1 items-center"
+                            class="text-xs font-normal flex space-x-1 items-center"
                             href="?page=1&order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
-                            <span>{{ field }}</span>
+                            <span>{{ get_field_label(field) }}</span>
                             {% if field == order_by_field %}
                             {% if order_by_direction == "-" %}
                             <span class="text-xs">▼</span>
@@ -103,7 +104,7 @@
                         {% endif %}
                     </th>
                     {% else %}
-                    <th class="font-mono text-xs font-normal text-black/60">{{ field }}</th>
+                    <th class="text-xs font-normal text-black/60">{{ get_field_label(field) }}</th>
                     {% endif %}
                 {% endfor %}
 
@@ -157,28 +158,39 @@
         </tbody>
     </table>
 </div>
+{% else %}
+<div class="mt-2 border-t border-stone-200 py-10 text-center">
+    <p class="text-sm text-stone-400">
+        {% if search_query %}
+        No results for "{{ search_query }}"
+        {% else %}
+        No items yet
+        {% endif %}
+    </p>
+</div>
+{% endif %}
 
 {% if table_style != "preview" and page.has_other_pages() %}
-<footer class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-white border-t border-stone-200 py-2">
-    <div class="flex items-center justify-between">
-        <div class="text-xs text-black/50">
+<footer class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-white/95 backdrop-blur-sm border-t border-stone-200 pt-4 pb-3">
+    <div class="flex items-center justify-between text-sm">
+        <span class="text-stone-500">
             Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results, {{ page.paginator.per_page }} per page)
-        </div>
-        <div class="flex items-center justify-center space-x-2">
+        </span>
+        <div class="flex items-center gap-2">
             {% if page.has_previous() %}
-            <a data-merge-params href="?page={{ page.previous_page_number() }}">&lsaquo;</a>
+            <a data-merge-params href="?page={{ page.previous_page_number() }}" class="px-2 py-1 text-xs border border-stone-200 rounded hover:bg-stone-50">&lt;</a>
             {% endif %}
             <form data-autosubmit method="GET">
                 {% if show_search and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
                 {% if presets and current_preset %}<input type="hidden" name="preset" value="{{ current_preset }}" />{% endif %}
-                <select name="page" class="text-xs py-0.5 pl-2 pr-7">
+                <select name="page" class="text-xs py-1 pl-2 pr-6 border-stone-200 rounded">
                 {% for page_num in page.paginator.page_range %}
                     <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>
                 {% endfor %}
                 </select>
             </form>
             {% if page.has_next() %}
-            <a data-merge-params href="?page={{ page.next_page_number() }}">&rsaquo;</a>
+            <a data-merge-params href="?page={{ page.next_page_number() }}" class="px-2 py-1 text-xs border border-stone-200 rounded hover:bg-stone-50">&gt;</a>
             {% endif %}
         </div>
     </div>

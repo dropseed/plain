@@ -91,12 +91,35 @@ class TrendCard(ChartCard):
                 "datasets": [
                     {
                         "data": trend_data,
-                        "backgroundColor": "rgba(120, 113, 108, 0.6)",  # stone-500 with opacity
+                        # Gradient will be applied via JS - this is the fallback
+                        "backgroundColor": "rgba(168, 162, 158, 0.7)",  # stone-400
+                        "hoverBackgroundColor": "rgba(120, 113, 108, 0.9)",  # stone-500
+                        "borderRadius": {"topLeft": 4, "topRight": 4},
+                        "borderSkipped": False,
                     },
                 ],
             },
             "options": {
-                "plugins": {"legend": {"display": False}},
+                "responsive": True,
+                "maintainAspectRatio": False,
+                "animation": {
+                    "duration": 600,
+                    "easing": "easeOutQuart",
+                },
+                "plugins": {
+                    "legend": {"display": False},
+                    "tooltip": {
+                        "enabled": True,
+                        "backgroundColor": "rgba(41, 37, 36, 0.95)",  # stone-800
+                        "titleColor": "rgba(255, 255, 255, 0.7)",
+                        "bodyColor": "#ffffff",
+                        "bodyFont": {"size": 13, "weight": "600"},
+                        "titleFont": {"size": 11},
+                        "padding": {"x": 12, "y": 8},
+                        "cornerRadius": 6,
+                        "displayColors": False,
+                    },
+                },
                 "scales": {
                     "x": {
                         "display": False,
@@ -104,14 +127,22 @@ class TrendCard(ChartCard):
                     },
                     "y": {
                         "beginAtZero": True,
-                        "display": False,
-                        "grid": {"display": False},
+                        "display": True,
+                        "position": "right",
+                        "grid": {
+                            "display": True,
+                            "color": "rgba(0, 0, 0, 0.04)",
+                            "drawTicks": False,
+                        },
+                        "border": {"display": False},
+                        "ticks": {
+                            "display": False,
+                            "maxTicksLimit": 4,
+                        },
                     },
                 },
-                "maintainAspectRatio": False,
-                "elements": {"bar": {"borderRadius": 3}},
                 "layout": {
-                    "padding": 0,
+                    "padding": {"top": 4, "bottom": 0, "left": 0, "right": 0},
                 },
             },
         }

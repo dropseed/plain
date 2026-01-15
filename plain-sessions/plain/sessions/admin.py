@@ -12,6 +12,7 @@ from .models import Session
 class SessionAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = Session
+        description = "Active user sessions stored in the database."
         fields = ["id", "expires_at", "created_at"]
         search_fields = ["session_key"]
         nav_section = "Sessions"

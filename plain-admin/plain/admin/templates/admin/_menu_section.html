@@ -1,0 +1,64 @@
+{% use_elements %}
+{# Macro for rendering a menu section (App or Packages) #}
+{# Parameters: sections (dict), header_label (string), pinned_slugs (set), slug (string) #}
+
+{% if sections %}
+<div class="menu-section data-[header=packages]:pt-3 data-[header=packages]:mt-3" data-header="{{ header_label|lower }}">
+    <div class="relative flex items-center px-1.5 pt-1 pb-2">
+        <span class="text-[10px] font-medium text-stone-400 uppercase tracking-widest">{{ header_label }}</span>
+        <div class="flex-1 ml-2.5 h-px bg-gradient-to-r from-stone-200 to-transparent"></div>
+    </div>
+    {% for section, views in sections.items() %}
+    {% if section %}
+    <div class="mt-4 mb-1.5 px-1.5 menu-subsection" data-section="{{ section|lower }}">
+        <span class="text-[10px] font-medium text-stone-400 uppercase tracking-wider">{{ section }}</span>
+    </div>
+    {% endif %}
+    <div class="space-y-0.5 menu-items-group" data-section="{{ section|lower if section else '' }}">
+        {% for view in views %}
+        {% set nav_url = view.get_view_url() %}
+        {% set view_slug = view.get_slug() %}
+        {% set is_pinned = view_slug in pinned_slugs %}
+        {% set is_current = view_slug == slug %}
+        <div
+            class="menu-item group flex items-center gap-1 rounded-lg transition-colors data-[current]:bg-stone-100"
+            data-title="{{ view.get_nav_title()|lower }}"
+            {% if is_current %}data-current{% endif %}
+        >
+            <a
+                href="{{ nav_url }}"
+                class="flex-1 flex items-center gap-2 px-1.5 py-2 text-sm rounded-lg transition-colors text-stone-700 hover:text-stone-900 hover:bg-stone-50 data-[current]:text-stone-900 data-[current]:font-medium data-[current]:hover:bg-transparent"
+                {% if is_current %}data-current{% endif %}
+            >
+                {% if view.nav_icon %}<admin.Icon name={view.nav_icon} class="w-4 h-4 text-stone-400 flex-shrink-0" />{% endif %}
+                <span>{{ view.get_nav_title() }}</span>
+            </a>
+            {% if is_pinned %}
+            <form method="POST" action="{{ url('admin:unpin') }}" class="contents">
+                <input type="hidden" name="view_slug" value="{{ view_slug }}">
+                <button
+                    type="submit"
+                    class="p-1 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors mr-1"
+                    title="Unpin"
+                >
+                    <admin.Icon name="pin-fill" class="w-3.5 h-3.5" />
+                </button>
+            </form>
+            {% else %}
+            <form method="POST" action="{{ url('admin:pin') }}" class="contents">
+                <input type="hidden" name="view_slug" value="{{ view_slug }}">
+                <button
+                    type="submit"
+                    class="p-1 text-stone-300 hover:text-amber-500 hover:bg-amber-50 rounded opacity-0 group-hover:opacity-100 transition-all duration-150 mr-1"
+                    title="Pin to nav"
+                >
+                    <admin.Icon name="pin" class="w-3.5 h-3.5" />
+                </button>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}

@@ -11,3 +11,9 @@ class Img:
         self.alt = alt
         self.width = width
         self.height = height
+
+
+class Avatar:
+    def __init__(self, src: str, *, alt: str = ""):
+        self.src = src
+        self.alt = alt

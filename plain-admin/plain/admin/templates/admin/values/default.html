@@ -1,5 +1,7 @@
 {% if value is none %}
-<code class="text-white/30 italic">None</code>
+<span class="text-stone-400 font-mono text-sm">None</span>
+{% elif value == "" %}
+<span class="text-stone-300">—</span>
 {% else %}
 {{ value }}
 {% endif %}

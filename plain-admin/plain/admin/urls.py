@@ -1,41 +1,25 @@
-from typing import Any
-
-from plain.http import RedirectResponse, Response
 from plain.urls import Router, include, path
 
+from .builtin_views import (
+    AdminIndexView,
+    AdminSearchView,
+    PinNavView,
+    ReorderPinnedView,
+    StyleGuideView,
+    UnpinNavView,
+)
 from .impersonate.urls import ImpersonateRouter
-from .views.base import AdminView
 from .views.registry import registry
-
-
-class AdminIndexView(AdminView):
-    template_name = "admin/index.html"
-    title = "Dashboard"
-
-    def get(self) -> Response:
-        # Slight hack to redirect to the first view that doesn't
-        # require any url params...
-        if views := registry.get_searchable_views():
-            return RedirectResponse(list(views)[0].get_view_url())
-
-        return super().get()
-
-
-class AdminSearchView(AdminView):
-    template_name = "admin/search.html"
-    title = "Search"
-
-    def get_template_context(self) -> dict[str, Any]:
-        context = super().get_template_context()
-        context["searchable_views"] = registry.get_searchable_views()
-        context["global_search_query"] = self.request.query_params.get("query", "")
-        return context
 
 
 class AdminRouter(Router):
     namespace = "admin"
     urls = [
         path("search/", AdminSearchView, name="search"),
+        path("style/", StyleGuideView, name="style"),
+        path("_/pin/", PinNavView, name="pin"),
+        path("_/unpin/", UnpinNavView, name="unpin"),
+        path("_/reorder/", ReorderPinnedView, name="reorder"),
         include("impersonate/", ImpersonateRouter),
         include("", registry.get_urls()),
         path("", AdminIndexView, name="index"),

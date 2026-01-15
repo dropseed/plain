@@ -10,8 +10,9 @@ from plain.views import (
     TemplateView,
 )
 
+from ..models import PinnedNavItem
 from ..utils import get_gravatar_url
-from .registry import registry
+from .registry import registry, track_recent_nav
 from .types import Img
 
 if TYPE_CHECKING:
@@ -28,6 +29,7 @@ class AdminView(AuthView, TemplateView):
     admin_required = True
 
     title: str = ""
+    description: str = ""  # Optional description shown below the title
     path: str = ""
     image: Img | None = None
 
@@ -38,7 +40,7 @@ class AdminView(AuthView, TemplateView):
     # so you can also use this for pages that can never be bookmarked
     nav_title = ""
     nav_section = ""
-    nav_icon = "dot"
+    nav_icon = ""  # Bootstrap Icons name (e.g., "cart", "person", "flag")
 
     links: dict[str, str] = {}
 
@@ -51,15 +53,21 @@ class AdminView(AuthView, TemplateView):
     cards: list[Card] = []
 
     def get_response(self) -> ResponseBase:
+        # Track this page visit for recent nav tabs
+        if self.nav_section is not None:
+            track_recent_nav(self.request, self.get_slug())
+
         response = super().get_response()
         response.headers["Cache-Control"] = (
             "no-cache, no-store, must-revalidate, max-age=0"
         )
+
         return response
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
         context["title"] = self.get_title()
+        context["description"] = self.get_description()
         context["image"] = self.get_image()
         context["slug"] = self.get_slug()
         context["links"] = self.get_links()
@@ -71,6 +79,13 @@ class AdminView(AuthView, TemplateView):
         context["view_class"] = self.__class__
         context["app_name"] = settings.NAME
         context["get_gravatar_url"] = get_gravatar_url
+        context["nav_tabs"] = registry.get_nav_tabs(self.request)
+        context["pinned_slugs"] = set(
+            PinnedNavItem.query.filter(user=self.user).values_list(
+                "view_slug", flat=True
+            )
+        )
+
         return context
 
     @classmethod
@@ -84,6 +99,9 @@ class AdminView(AuthView, TemplateView):
     # Can actually use @classmethod, @staticmethod or regular method for these?
     def get_title(self) -> str:
         return self.title
+
+    def get_description(self) -> str:
+        return self.description
 
     def get_image(self) -> Img | None:
         return self.image

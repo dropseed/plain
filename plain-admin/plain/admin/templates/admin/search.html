@@ -8,32 +8,36 @@ Search
 {%- endif -%}
 {% endblock %}
 
+{% block header %}
+{{ super() }}
+<p class="text-sm text-black/50 mt-1">Searches all pages with <code class="text-xs bg-stone-100 px-1 py-0.5 rounded">search_fields</code> configured.</p>
+{% endblock %}
+
 {% block content %}
 
-{# Mobile search bar #}
-<div class="sm:hidden">
-    <form method="GET" action="{{ url('admin:search') }}" class="">
-        <div class="relative">
-            <label for="query" class="sr-only">Search</label>
-            <input
-                type="text"
-                name="query"
-                id="query"
-                class="block w-full pr-10 pl-10 placeholder:text-center border-gray-200/10 text-white rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white/5 py-1"
-                placeholder="Search everything"
-                value="{{ global_search_query|default('') }}"
-                >
-            <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                <svg class="h-3.5 w-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"></path>
-                </svg>
-            </div>
+{# Search input on page #}
+<form method="GET" action="{{ url('admin:search') }}" class="mb-6">
+    <div class="relative max-w-md">
+        <label for="query" class="sr-only">Search</label>
+        <input
+            type="text"
+            name="query"
+            id="query"
+            class="block w-full py-2 pl-10 pr-4 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-stone-400 focus:border-stone-300"
+            placeholder="Search admin..."
+            value="{{ global_search_query|default('') }}"
+            autofocus
+            >
+        <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+            <svg class="h-4 w-4 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"></path>
+            </svg>
         </div>
-    </form>
-</div>
+    </div>
+</form>
 
 {% if global_search_query %}
-<div class="*:mt-14 *:empty:mt-0">
+<div id="search-results" class="*:mt-10 *:first:mt-0 *:empty:mt-0 *:empty:hidden">
     {% for view in searchable_views %}
     <div
         hx-get="{{ view.get_view_url() }}?search={{ global_search_query }}&page_size=5"
@@ -42,8 +46,33 @@ Search
     </div>
     {% endfor %}
 </div>
+<div id="no-results" class="hidden text-center py-12">
+    <p class="text-black/50">No results found for "{{ global_search_query }}"</p>
+</div>
+<script nonce="{{ request.csp_nonce }}">
+    // Show "no results" message if all search result containers are empty
+    function checkForResults() {
+        const results = document.getElementById('search-results');
+        const noResults = document.getElementById('no-results');
+        if (results && noResults) {
+            const hasContent = Array.from(results.children).some(child => child.innerHTML.trim() !== '');
+            noResults.classList.toggle('hidden', hasContent);
+        }
+    }
+    // Listen for HTMX swap events on the container with debounce
+    let checkTimeout;
+    const resultsContainer = document.getElementById('search-results');
+    if (resultsContainer) {
+        resultsContainer.addEventListener('htmx:afterSwap', function() {
+            clearTimeout(checkTimeout);
+            checkTimeout = setTimeout(checkForResults, 100);
+        });
+        // Also check after a delay in case events don't fire as expected
+        setTimeout(checkForResults, 500);
+    }
+</script>
 {% else %}
-<p class="text-stone-500 hidden sm:inline">Enter a search query in the top bar</p>
+<p class="text-black/50 hidden sm:block">Enter a search query in the top bar</p>
 {% endif %}
 
 {% endblock %}

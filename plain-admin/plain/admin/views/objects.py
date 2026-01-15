@@ -18,6 +18,29 @@ if TYPE_CHECKING:
     from plain.forms import BaseForm
 
 
+def get_field_label(field: str) -> str:
+    """Convert snake_case field names to human-readable labels.
+
+    Handles:
+    - Double underscore notation for lookups (e.g., created_at__date -> Created At)
+    - Dot notation for related fields (e.g., user.email -> User Email)
+    - Snake_case to Title Case conversion
+    """
+    # Handle double underscore notation for related fields (e.g., created_at__date)
+    if "__" in field:
+        parts = field.split("__")
+        # Only take the first part for display
+        field = parts[0]
+
+    # Handle dot notation for related fields
+    if "." in field:
+        parts = field.split(".")
+        return " ".join(get_field_label(part) for part in parts)
+
+    # Convert snake_case to Title Case
+    return field.replace("_", " ").title()
+
+
 class AdminListView(HTMXView, AdminView):
     template_name = "admin/list.html"
     fields: list[str]
@@ -60,6 +83,7 @@ class AdminListView(HTMXView, AdminView):
         context["get_object_id"] = self.get_object_id
         context["get_field_value"] = self.get_field_value
         context["get_field_value_template"] = self.get_field_value_template
+        context["get_field_label"] = get_field_label
 
         context["get_object_url"] = self.get_object_url
         context["get_object_links"] = self.get_object_links
@@ -178,7 +202,7 @@ class AdminListView(HTMXView, AdminView):
     def get_object_links(self, obj: Any) -> dict[str, str]:
         links = {}
         if self.get_detail_url(obj):
-            links["View"] = self.get_detail_url(obj)
+            links["Detail"] = self.get_detail_url(obj)
         if self.get_update_url(obj):
             links["Edit"] = self.get_update_url(obj)
         if self.get_delete_url(obj):
@@ -230,6 +254,7 @@ class AdminDetailView(AdminView, DetailView):
         context = super().get_template_context()
         context["get_field_value"] = self.get_field_value
         context["get_field_value_template"] = self.get_field_value_template
+        context["get_field_label"] = get_field_label
         context["fields"] = self.get_fields()
         return context
 
@@ -338,7 +363,7 @@ class AdminUpdateView(AdminView, UpdateView):
             links["View in app"] = self.object.get_absolute_url()
 
         if detail_url := self.get_detail_url(self.object):
-            links["View"] = detail_url
+            links["Detail"] = detail_url
 
         if delete_url := self.get_delete_url(self.object):
             links["Delete"] = delete_url
@@ -384,7 +409,7 @@ class AdminDeleteView(AdminView, DeleteView):
             links["View in app"] = self.object.get_absolute_url()
 
         if detail_url := self.get_detail_url(self.object):
-            links["View"] = detail_url
+            links["Detail"] = detail_url
 
         if update_url := self.get_update_url(self.object):
             links["Edit"] = update_url

@@ -2,15 +2,23 @@
 
 {% block content %}
 
-<dl class="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] sm:gap-y-2 gap-x-8">
-    {% for field in fields %}
-    <dt class="mt-4 sm:mt-0 text-black/60"><code>{{ field }}</code></dt>
-    <dd class="mt-1 sm:mt-0 text-black/90">
-        {% with value=get_field_value(object, field) %}
-        {% include get_field_value_template(object, field, value) with context %}
-        {% endwith %}
-    </dd>
-    {% endfor %}
-</dl>
+<h3 class="text-lg font-semibold text-black mb-1">{{ object.__class__.__name__ }} Details</h3>
+<p class="text-sm text-black/60 mb-4">Data stored in the database for this {{ object.__class__.__name__|lower }}.</p>
+<div class="card">
+    <section>
+        <dl>
+            {% for field in fields %}
+            <div class="flex gap-8 py-1.5">
+                <dt class="w-40 flex-shrink-0">{{ get_field_label(field) }}</dt>
+                <dd class="min-w-0">
+                    {% with value=get_field_value(object, field) %}
+                    {% include get_field_value_template(object, field, value) with context %}
+                    {% endwith %}
+                </dd>
+            </div>
+            {% endfor %}
+        </dl>
+    </section>
+</div>
 
 {% endblock %}

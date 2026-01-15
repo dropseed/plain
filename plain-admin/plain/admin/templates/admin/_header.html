@@ -1,0 +1,146 @@
+{% use_elements %}
+{# Admin header partial - includes nav tabs and menu dialog #}
+{# Context: app_name, user, get_gravatar_url, nav_tabs, slug, parent_view_classes, pinned_slugs, admin_registry #}
+
+<header id="admin-header" class="sticky top-0 z-50 border-b border-stone-200 pt-2 bg-[#f6f3f2]">
+    <!-- Top row -->
+    <div class="flex items-center justify-between px-4 lg:px-8 h-11">
+        <div class="flex items-center gap-1.5">
+            <a href="/" class="text-sm font-medium text-stone-500 hover:text-stone-700">{{ app_name }}</a>
+            <span class="text-stone-300">/</span>
+            <a href="{{ url('admin:index') }}" class="text-sm font-medium text-stone-900 hover:text-stone-700">Admin</a>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3">
+            <!-- Search (desktop) -->
+            <form method="GET" action="{{ url('admin:search') }}" class="hidden sm:flex">
+                <div class="relative group">
+                    <label for="topbar-search" class="sr-only">Search</label>
+                    <input
+                        type="text"
+                        name="query"
+                        id="topbar-search"
+                        class="w-52 pr-10 pl-8 text-sm bg-stone-100/60 border border-transparent py-1.5 rounded-md transition-all duration-150 placeholder:text-stone-400 focus:outline-none focus:bg-white focus:border-stone-300 focus:ring-1 focus:ring-stone-300 focus:w-64"
+                        placeholder="Search..."
+                        value="{{ global_search_query|default('') }}"
+                    >
+                    <div class="absolute inset-y-0 left-2.5 flex items-center pointer-events-none">
+                        <admin.Icon name="search" class="w-3.5 h-3.5 text-stone-400" />
+                    </div>
+                    <div class="absolute inset-y-0 right-2 flex items-center pointer-events-none">
+                        <kbd class="text-[10px] font-sans text-stone-400 bg-stone-200/80 px-1.5 py-0.5 rounded">/</kbd>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Search (mobile) -->
+            <a
+                href="{{ url('admin:search') }}"
+                class="sm:hidden flex items-center justify-center w-7 h-7 text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100"
+            >
+                <admin.Icon name="search" class="w-4 h-4" />
+            </a>
+
+            <button type="button" data-dropdown class="flex items-center cursor-pointer">
+                {% set gravatar_url = get_gravatar_url(user) %}
+                {% if gravatar_url %}
+                    <img
+                        src="{{ gravatar_url }}"
+                        alt="{{ user }}"
+                        class="w-7 h-7 rounded-full"
+                    />
+                {% else %}
+                    <div class="w-7 h-7 rounded-full bg-stone-200 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 text-stone-500" viewBox="0 0 16 16">
+                            <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                            <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                        </svg>
+                    </div>
+                {% endif %}
+                <template>
+                    <div class="py-1">
+                        <form method="POST" action="{{ url('logout') }}">
+                            <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
+                                <admin.Icon name="box-arrow-right" class="w-4 h-4" />
+                                Log out
+                            </button>
+                        </form>
+                    </div>
+                </template>
+            </button>
+
+            <!-- Menu button (mobile) -->
+            <button
+                type="button"
+                class="menu-toggle sm:hidden flex items-center justify-center w-7 h-7 text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100"
+            >
+                <admin.Icon name="grid-3x3-gap" class="w-4 h-4" />
+            </button>
+        </div>
+    </div>
+
+    <!-- Nav tabs row (hidden on mobile) -->
+    <nav id="pinned-nav" class="hidden sm:flex items-center justify-between px-4 lg:px-8">
+        <div id="nav-tabs-container" class="flex items-center -ml-3 overflow-x-auto" data-reorder-url="{{ url('admin:reorder') }}">
+            {% for tab in nav_tabs %}
+            {% set nav_url = tab.view.get_view_url() %}
+            {% set view_slug = tab.view.get_slug() %}
+            {% set is_current = view_slug == slug or tab.view in parent_view_classes %}
+            <a
+                href="{{ nav_url }}"
+                {% if is_current %}data-active{% endif %}
+                {% if tab.pinned %}draggable="true" data-slug="{{ view_slug }}"{% else %}data-recent{% endif %}
+                class="nav-tab flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap text-stone-600 hover:text-stone-900 border-b-2 hover:border-stone-300 data-[active]:text-stone-900 data-[active]:font-medium data-[recent]:text-stone-500 data-[recent]:font-normal data-[recent]:italic {% if is_current %}border-[var(--plain-olive)]{% else %}border-transparent{% endif %}"
+            >{% if tab.view.nav_icon %}<admin.Icon name={tab.view.nav_icon} class="w-4 h-4 opacity-60" />{% endif %}{{ tab.view.get_nav_title() }}</a>
+            {% endfor %}
+        </div>
+
+        <!-- Menu button (desktop) -->
+        <button
+            type="button"
+            class="menu-toggle hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100 ml-auto"
+        >
+            <admin.Icon name="grid-3x3-gap" class="w-4 h-4" />
+            <span>Menu</span>
+        </button>
+    </nav>
+
+    <!-- Menu dialog -->
+    <dialog id="admin-menu-dialog" class="m-0 p-0 bg-transparent border-none max-w-none max-h-none w-full h-full overflow-visible">
+        <div class="fixed inset-0 flex justify-end pt-14 sm:pt-16 px-4 sm:px-6">
+            <div class="w-full sm:w-80 max-h-[75vh] overflow-hidden flex flex-col bg-white rounded-xl shadow-2xl ring-1 ring-stone-200/80">
+                {# Filter input #}
+                <div class="p-3 bg-gradient-to-b from-stone-50 to-stone-50/80 border-b border-stone-200/60">
+                    <div class="relative">
+                        <admin.Icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
+                        <input
+                            type="text"
+                            id="menu-filter-input"
+                            placeholder="Filter pages..."
+                            class="w-full pl-8 pr-3 py-2 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-300 placeholder:text-stone-400 transition-shadow"
+                        />
+                    </div>
+                </div>
+
+                {# Menu content #}
+                <div class="overflow-auto flex-1 py-2 px-1.5" id="menu-items-container">
+                    {% with sections=admin_registry.get_nav_sections(plain_packages=False), header_label="App" %}
+                        {% include "admin/_menu_section.html" %}
+                    {% endwith %}
+
+                    {% with sections=admin_registry.get_nav_sections(plain_packages=True), header_label="Packages" %}
+                        {% include "admin/_menu_section.html" %}
+                    {% endwith %}
+                </div>
+
+                {# Footer with keyboard hint #}
+                <div class="px-3 py-2 border-t border-stone-100 bg-stone-50/50">
+                    <div class="flex items-center justify-between text-[11px] text-stone-400">
+                        <span>Type to filter</span>
+                        <kbd class="px-1.5 py-0.5 bg-stone-100 rounded text-[10px] font-mono">esc</kbd>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </dialog>
+</header>
