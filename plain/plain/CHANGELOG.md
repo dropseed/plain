@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.100.1](https://github.com/dropseed/plain/releases/plain@0.100.1) (2026-01-15)
+
+### What's changed
+
+- The `plain agent install` command now only sets up session hooks for Claude Code, not Codex, since the `settings.json` hook format is Claude Code-specific ([a41e08bcd2](https://github.com/dropseed/plain/commit/a41e08bcd2))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.100.0](https://github.com/dropseed/plain/releases/plain@0.100.0) (2026-01-15)
 
 ### What's changed
