@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.16.0](https://github.com/dropseed/plain/releases/plain-pytest@0.16.0) (2026-01-15)
+
+### What's changed
+
+- Replaced `python-dotenv` dependency with Plain's built-in dotenv parser, which supports bash-compatible features like variable expansion, command substitution, and backslash escapes ([a9b2dc3e](https://github.com/dropseed/plain/commit/a9b2dc3e))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.15.0](https://github.com/dropseed/plain/releases/plain-pytest@0.15.0) (2026-01-13)
 
 ### What's changed
