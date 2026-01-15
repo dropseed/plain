@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.52.0](https://github.com/dropseed/plain/releases/plain-dev@0.52.0) (2026-01-15)
+
+### What's changed
+
+- Removed the `plain dev debug` command and custom remote pdb debugger since Python 3.14 provides native remote debugging via `python -m pdb -p <pid>` ([db19b5ef00](https://github.com/dropseed/plain/commit/db19b5ef00))
+- Replaced `python-dotenv` dependency with a custom bash-compatible `.env` parser that supports variable expansion (`$VAR`), command substitution (`$(command)`), and multiline values ([a9b2dc3e16](https://github.com/dropseed/plain/commit/a9b2dc3e16))
+
+### Upgrade instructions
+
+- If you were using `plain dev debug` for remote debugging, use Python's native `python -m pdb -p <pid>` command instead
+
 ## [0.51.0](https://github.com/dropseed/plain/releases/plain-dev@0.51.0) (2026-01-13)
 
 ### What's changed
