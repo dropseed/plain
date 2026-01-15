@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.53.0](https://github.com/dropseed/plain/releases/plain-dev@0.53.0) (2026-01-15)
+
+### What's changed
+
+- Service auto-start now uses an allow-list instead of deny-list, only starting services for commands that need the database (`db`, `makemigrations`, `migrate`, `migrations`, `preflight`, `request`, `run`, `shell`, `test`) ([0b11c79656](https://github.com/dropseed/plain/commit/0b11c79656))
+- The `plain dev` command now runs `plain agent install` instead of `plain skills --install` to set up AI agent skills and hooks ([fac8673436](https://github.com/dropseed/plain/commit/fac8673436))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.52.0](https://github.com/dropseed/plain/releases/plain-dev@0.52.0) (2026-01-15)
 
 ### What's changed
