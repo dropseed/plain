@@ -28,19 +28,19 @@ def auto_start_services() -> None:
     ]:
         return
 
-    # Skip for commands that don't need runtime/services
-    # These use @without_runtime_setup but still trigger setup() when loading the registry
-    skip_commands = {
-        "code",
-        "fix",
-        "scan",
-        "pre-commit",
-        "contrib",
-        "upgrade",
-        "changelog",
-        "server",
+    # Only auto-start services for commands that need the database/runtime
+    service_commands = {
+        "db",
+        "makemigrations",
+        "migrate",
+        "migrations",
+        "preflight",
+        "request",
+        "run",
+        "shell",
+        "test",
     }
-    if skip_commands & set(sys.argv):
+    if not (service_commands & set(sys.argv)):
         return
 
     # Don't do anything if it looks like a "services" command is being run explicitly
