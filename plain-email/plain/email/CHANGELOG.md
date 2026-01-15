@@ -1,5 +1,15 @@
 # plain-email changelog
 
+## [0.15.0](https://github.com/dropseed/plain/releases/plain-email@0.15.0) (2026-01-15)
+
+### What's changed
+
+- `EMAIL_HOST_PASSWORD` is now marked as a `Secret` type, ensuring the password is masked when displaying settings in CLI output ([7666190](https://github.com/dropseed/plain/commit/7666190305e13ebd1fc9b536e6415e863c2c0b25))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.14.0](https://github.com/dropseed/plain/releases/plain-email@0.14.0) (2026-01-13)
 
 ### What's changed
