@@ -1,5 +1,20 @@
 # plain changelog
 
+## [0.100.0](https://github.com/dropseed/plain/releases/plain@0.100.0) (2026-01-15)
+
+### What's changed
+
+- The `plain skills` command has been renamed to `plain agent` with new subcommands: `plain agent install` (installs skills and sets up hooks), `plain agent skills` (lists available skills), and `plain agent context` (outputs framework context) ([fac8673436](https://github.com/dropseed/plain/commit/fac8673436))
+- Added `SessionStart` hook that automatically runs `plain agent context` at the start of every Claude Code or Codex session, providing framework context without needing a separate skill ([fac8673436](https://github.com/dropseed/plain/commit/fac8673436))
+- The `plain-principles` skill has been removed - its content is now provided by the `plain agent context` command via the SessionStart hook ([fac8673436](https://github.com/dropseed/plain/commit/fac8673436))
+- Added `--no-headers` and `--no-body` flags to `plain request` for limiting output ([fac8673436](https://github.com/dropseed/plain/commit/fac8673436))
+
+### Upgrade instructions
+
+- Replace `plain skills --install` with `plain agent install`
+- Replace `plain skills` (without flags) with `plain agent skills`
+- Run `plain agent install` to set up the new SessionStart hook in your project's `.claude/` or `.codex/` directory
+
 ## [0.99.0](https://github.com/dropseed/plain/releases/plain@0.99.0) (2026-01-15)
 
 ### What's changed
