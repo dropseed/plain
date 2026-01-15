@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-support@0.30.0) (2026-01-15)
+
+### What's changed
+
+- Added description to the Support admin viewset for the admin redesign ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd3))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.29.0](https://github.com/dropseed/plain/releases/plain-support@0.29.0) (2026-01-13)
 
 ### What's changed
