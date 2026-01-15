@@ -1,6 +1,6 @@
 [project]
 name = "plain.admin"
-version = "0.61.0"
+version = "0.61.1"
 description = "Manage your app with a backend interface."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"

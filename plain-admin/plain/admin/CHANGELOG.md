@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.61.1](https://github.com/dropseed/plain/releases/plain-admin@0.61.1) (2026-01-15)
+
+### What's changed
+
+- TableCard now supports multiple footer rows by passing a list of lists to `footers`, enabling subtotals and grand totals display ([698e4a8](https://github.com/dropseed/plain/commit/698e4a8811))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.61.0](https://github.com/dropseed/plain/releases/plain-admin@0.61.0) (2026-01-15)
 
 ### What's changed
