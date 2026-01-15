@@ -1,5 +1,35 @@
 # plain-admin changelog
 
+## [0.61.0](https://github.com/dropseed/plain/releases/plain-admin@0.61.0) (2026-01-15)
+
+### What's changed
+
+- Complete admin interface redesign with new color palette, improved typography, and modern styling ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- New pinned navigation system that lets users pin frequently-used pages to the header for quick access ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Recently visited pages now appear as tabs in the header navigation ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- New menu dialog with filtering for quick access to any admin page ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- New `/admin/style/` page documenting the design system with CSS variables, component patterns, and usage examples ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Card `number` field renamed to `metric` with new `get_metric()` and `format_metric()` methods for custom formatting ([1a1c622](https://github.com/dropseed/plain/commit/1a1c622539))
+- Field labels in list and detail views now display human-readable names (e.g., `created_at` → "Created At") ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Boolean values now display as "True"/"False" labels instead of checkmark/X icons ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Datetime values now display in a friendlier format (e.g., "Jan 15, 2026 at 4:30 PM") ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Empty states added to list views when there are no results ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Charts now display an empty state when there's no data for the selected period ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Form required fields now show a red asterisk instead of "Optional" label on optional fields ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Delete confirmation page redesigned with clearer messaging and cancel option ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Model update URL path changed from `/update/` to `/edit/` ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- New CSS classes available: `.plain-btn`, `.plain-btn-primary`, `.plain-btn-danger`, `.plain-btn-success`, `.plain-btn-warning`, `.plain-label`, `.plain-label-success`, `.plain-label-warning`, `.plain-label-danger`, `.plain-label-info`, `.plain-link`, `.plain-error`, `.card` ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- New avatar template value type for circular profile images ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Admin `description` attribute restored for showing subtitle text below page titles ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+
+### Upgrade instructions
+
+- Run migrations with `plain migrate` to create the new `PinnedNavItem` model for navigation pins
+- If you have custom Card subclasses that override `get_number()`, rename it to `get_metric()`. The return type can now be `int | float | Decimal | None`
+- If you want custom metric display formatting, override `format_metric()` which returns a string
+- If you have hardcoded links to admin update pages ending in `/update/`, update them to `/edit/`
+- The sidebar has been removed; if you have custom CSS targeting sidebar elements, those styles can be removed
+
 ## [0.60.0](https://github.com/dropseed/plain/releases/plain-admin@0.60.0) (2026-01-13)
 
 ### What's changed
