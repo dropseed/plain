@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.42.0](https://github.com/dropseed/plain/releases/plain-oauth@0.42.0) (2026-01-15)
+
+### What's changed
+
+- Admin connections list view now includes a description for better context ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd3))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.41.0](https://github.com/dropseed/plain/releases/plain-oauth@0.41.0) (2026-01-13)
 
 ### What's changed
