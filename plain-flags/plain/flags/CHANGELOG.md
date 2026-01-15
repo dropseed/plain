@@ -1,5 +1,17 @@
 # plain-flags changelog
 
+## [0.33.0](https://github.com/dropseed/plain/releases/plain-flags@0.33.0) (2026-01-15)
+
+### What's changed
+
+- Admin Card now uses `get_metric()` instead of `get_number()` to follow the updated Card API ([1a1c622](https://github.com/dropseed/plain/commit/1a1c622539))
+- Added descriptions to admin list views for Flag and FlagResult models ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Changed FlagResult nav icon from "flag" to "check2-square" ([0fc4dd3](https://github.com/dropseed/plain/commit/0fc4dd345f))
+
+### Upgrade instructions
+
+- If you have custom Card subclasses, rename `get_number()` to `get_metric()`
+
 ## [0.32.0](https://github.com/dropseed/plain/releases/plain-flags@0.32.0) (2026-01-13)
 
 ### What's changed
