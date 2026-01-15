@@ -408,13 +408,21 @@ See /admin/style/ for the full style guide.
       color: rgba(0, 0, 0, 0.6);
     }
 
-    /* Table footer - totals row */
+    /* Table footer - totals rows */
     .card table tfoot td {
       border-bottom: none;
+      padding-top: 0.5rem;
+      padding-bottom: 0.25rem;
+    }
+
+    .card table tfoot tr:first-child td {
       border-top: 2px solid rgb(214, 211, 209); /* stone-300 */
+      padding-top: 0.75rem;
+    }
+
+    .card table tfoot tr:last-child td {
       font-weight: 600;
       color: rgba(0, 0, 0, 0.8);
-      padding-top: 0.75rem;
     }
   }
 }

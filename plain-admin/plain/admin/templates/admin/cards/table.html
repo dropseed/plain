@@ -23,11 +23,21 @@
     </tbody>
     {% if footers %}
     <tfoot>
+      {% if footers[0] is sequence and footers[0] is not string %}
+      {% for footer_row in footers %}
+      <tr>
+        {% for cell in footer_row %}
+        <td>{{ cell }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      {% else %}
       <tr>
         {% for footer in footers %}
         <td>{{ footer }}</td>
         {% endfor %}
       </tr>
+      {% endif %}
     </tfoot>
     {% endif %}
   </table>
