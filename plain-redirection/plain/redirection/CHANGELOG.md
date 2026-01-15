@@ -1,5 +1,16 @@
 # plain-redirection changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-redirection@0.31.0) (2026-01-15)
+
+### What's changed
+
+- Admin navigation icons updated to use more distinctive icons: `signpost-split` for redirects, `arrow-repeat` for redirect logs, and `exclamation-circle` for 404 logs ([0fc4dd345f](https://github.com/dropseed/plain/commit/0fc4dd345f))
+- Admin list views for Redirects and 404 logs now include descriptive text to help users understand their purpose ([0fc4dd345f](https://github.com/dropseed/plain/commit/0fc4dd345f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.30.0](https://github.com/dropseed/plain/releases/plain-redirection@0.30.0) (2026-01-13)
 
 ### What's changed
