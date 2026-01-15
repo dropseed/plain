@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.74.0](https://github.com/dropseed/plain/releases/plain-models@0.74.0) (2026-01-15)
+
+### What's changed
+
+- Internal skill configuration update - no user-facing changes ([fac8673](https://github.com/dropseed/plain/commit/fac8673436))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.73.0](https://github.com/dropseed/plain/releases/plain-models@0.73.0) (2026-01-15)
 
 ### What's changed
