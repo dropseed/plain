@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.43.0](https://github.com/dropseed/plain/releases/plain-jobs@0.43.0) (2026-01-15)
+
+### What's changed
+
+- Improved admin interface with updated icons and descriptions for job request, process, and result list views ([0fc4dd345f](https://github.com/dropseed/plain/commit/0fc4dd345f))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.42.0](https://github.com/dropseed/plain/releases/plain-jobs@0.42.0) (2026-01-13)
 
 ### What's changed
