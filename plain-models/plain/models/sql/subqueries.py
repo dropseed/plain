@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from plain.models.constants import OnConflict
 from plain.models.exceptions import FieldError
 from plain.models.expressions import ResolvableExpression
 from plain.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE, NO_RESULTS
@@ -164,7 +165,7 @@ class InsertQuery(Query):
     def __init__(
         self,
         *args: Any,
-        on_conflict: str | None = None,
+        on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
         **kwargs: Any,
