@@ -1,5 +1,19 @@
 # plain-toolbar changelog
 
+## [0.10.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.10.0) (2026-01-15)
+
+### What's changed
+
+- The toolbar now displays on mobile devices instead of being hidden ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+- Panel tabs are horizontally scrollable on mobile for better touch navigation ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+- Panel content area uses a taller height (50vh) on mobile for improved usability ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+- Resize handle is hidden on mobile since touch-based resizing is not practical ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+- Buttons and icons are sized larger on mobile for better touch targets ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.9.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.9.0) (2026-01-13)
 
 ### What's changed
