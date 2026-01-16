@@ -99,11 +99,8 @@ def _related_non_m2m_objects(
 
 class DatabaseSchemaEditor:
     """
-    This class and its subclasses are responsible for emitting schema-changing
-    statements to the databases - model creation/removal/alteration, field
-    renaming, index fiddling, and so on.
-
-    PostgreSQL is the only supported database backend.
+    Responsible for emitting schema-changing statements to PostgreSQL - model
+    creation/removal/alteration, field renaming, index management, and so on.
     """
 
     sql_create_table = "CREATE TABLE %(table)s (%(definition)s)"
@@ -1056,10 +1053,8 @@ class DatabaseSchemaEditor:
         self, model: type[Model], old_field: Field, new_field: Field
     ) -> tuple[str, list[Any]]:
         """
-        Hook to specialize column null alteration.
-
         Return a (sql, params) fragment to set a column to null or non-null
-        as required by new_field, or None if no changes are required.
+        as required by new_field.
         """
         new_db_params = new_field.db_parameters(connection=self.connection)
         sql = (
@@ -1084,8 +1079,6 @@ class DatabaseSchemaEditor:
         drop: bool = False,
     ) -> tuple[str, list[Any]]:
         """
-        Hook to specialize column default alteration.
-
         Return a (sql, params) fragment to add or drop (depending on the drop
         argument) a default to new_field's column.
         """
@@ -1121,12 +1114,9 @@ class DatabaseSchemaEditor:
         new_collation: str | None,
     ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         """
-        Hook to specialize column type alteration for cases when a creation
-        type is different to an alteration type (e.g. SERIAL, PostGIS fields).
-
         Return a two-tuple of: an SQL fragment of (sql, params) to insert into
         an ALTER TABLE statement and a list of extra (sql, params) tuples to
-        run once the field is altered.
+        run once the field is altered. Handles IDENTITY column transitions.
         """
         # Drop indexes on varchar/text/citext columns that are changing to a
         # different type.

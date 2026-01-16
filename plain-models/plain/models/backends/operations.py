@@ -434,10 +434,7 @@ class DatabaseOperations:
 
     @cached_property
     def compilers(self) -> dict[type[Query], type[SQLCompiler]]:
-        """
-        Return a mapping of Query types to their SQLCompiler implementations.
-        Subclasses can override this to provide custom compiler implementations.
-        """
+        """Return a mapping of Query types to their SQLCompiler implementations."""
         from plain.models.sql.compiler import (
             SQLAggregateCompiler,
             SQLCompiler,

@@ -315,7 +315,7 @@ class DatabaseWrapper:
                 f"PostgreSQL 12 or later is required (found {major}.{minor})."
             )
 
-    # ##### Backend-specific methods for creating connections and cursors #####
+    # ##### Connection and cursor methods #####
 
     def get_connection_params(self) -> dict[str, Any]:
         """Return a dict of parameters suitable for get_new_connection."""
@@ -572,7 +572,7 @@ class DatabaseWrapper:
     def make_debug_cursor(self, cursor: Any) -> CursorDebugWrapper:
         return CursorDebugWrapper(cursor, self)
 
-    # ##### Backend-specific methods for creating connections #####
+    # ##### Connection lifecycle #####
 
     def connect(self) -> None:
         """Connect to the database. Assume that the connection is closed."""
@@ -603,7 +603,7 @@ class DatabaseWrapper:
             with self.wrap_database_errors:
                 self.connect()
 
-    # ##### Backend-specific wrappers for PEP-249 connection methods #####
+    # ##### PEP-249 connection method wrappers #####
 
     def _prepare_cursor(self, cursor: Any) -> utils.CursorWrapper:
         """
@@ -681,7 +681,7 @@ class DatabaseWrapper:
             else:
                 self.connection = None
 
-    # ##### Backend-specific savepoint management methods #####
+    # ##### Savepoint management #####
 
     def _savepoint(self, sid: str) -> None:
         with self.cursor() as cursor:

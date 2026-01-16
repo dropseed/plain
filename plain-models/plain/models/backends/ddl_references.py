@@ -5,7 +5,6 @@ discarded within when executing a migration.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Callable
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
@@ -14,7 +13,7 @@ if TYPE_CHECKING:
     from plain.models.sql.compiler import SQLCompiler
 
 
-class Reference(ABC):
+class Reference:
     """Base class that defines the reference interface."""
 
     def references_table(self, table: str) -> bool:
@@ -46,8 +45,8 @@ class Reference(ABC):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {str(self)!r}>"
 
-    @abstractmethod
-    def __str__(self) -> str: ...
+    def __str__(self) -> str:
+        raise NotImplementedError("Subclasses must implement __str__")
 
 
 class Table(Reference):
