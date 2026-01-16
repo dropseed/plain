@@ -36,9 +36,7 @@ class FieldInfo(NamedTuple):
 
 class DatabaseIntrospection:
     """
-    Encapsulate backend-specific introspection utilities.
-
-    PostgreSQL is the only supported database backend.
+    PostgreSQL-specific database introspection utilities.
     """
 
     # Maps PostgreSQL type codes to Plain Field types.

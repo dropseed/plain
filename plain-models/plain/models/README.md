@@ -586,7 +586,7 @@ graph TB
 
 1. **Model.query** returns a [`QuerySet`](./query.py#QuerySet) bound to the model
 2. **QuerySet** methods like `.filter()` modify the internal [`Query`](./sql/query.py#Query) object
-3. When results are needed, **Query.get_compiler()** asks [`DatabaseOperations`](./backends/base/operations.py#BaseDatabaseOperations) to create the appropriate [`SQLCompiler`](./sql/compiler.py#SQLCompiler)
+3. When results are needed, **Query.get_compiler()** asks [`DatabaseOperations`](./backends/operations.py#DatabaseOperations) to create the appropriate [`SQLCompiler`](./sql/compiler.py#SQLCompiler)
 4. **SQLCompiler.as_sql()** renders the Query to SQL
 5. **SQLCompiler.execute_sql()** runs the SQL and returns results
 
@@ -596,7 +596,7 @@ graph TB
 - [`QuerySet`](./query.py#QuerySet) - Chainable API (`.filter()`, `.exclude()`, `.order_by()`) that builds a Query
 - [`Query`](./sql/query.py#Query) - Internal representation of a query's logical structure (tables, joins, filters)
 - [`SQLCompiler`](./sql/compiler.py#SQLCompiler) - Transforms a Query into executable SQL
-- [`DatabaseOperations`](./backends/base/operations.py#BaseDatabaseOperations) - PostgreSQL-specific SQL syntax
+- [`DatabaseOperations`](./backends/operations.py#DatabaseOperations) - PostgreSQL-specific SQL syntax
 
 ## FAQs
 

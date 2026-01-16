@@ -18,10 +18,7 @@ TEST_DATABASE_PREFIX = "test_"
 
 class DatabaseCreation:
     """
-    Encapsulate backend-specific differences pertaining to creation and
-    destruction of the test database.
-
-    PostgreSQL is the only supported database backend.
+    PostgreSQL-specific test database creation and destruction utilities.
     """
 
     def __init__(self, connection: DatabaseWrapper):

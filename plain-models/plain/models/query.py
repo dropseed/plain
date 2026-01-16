@@ -791,9 +791,7 @@ class QuerySet(Generic[T]):
         # PK is used twice in the resulting update query, once in the filter
         # and once in the WHEN. Each field will also have one CAST.
         self._for_write = True
-        max_batch_size = db_connection.ops.bulk_batch_size(
-            ["id", "id"] + fields_list, objs_tuple
-        )
+        max_batch_size = len(objs_tuple)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         batches = (
             objs_tuple[i : i + batch_size]
@@ -1498,8 +1496,7 @@ class QuerySet(Generic[T]):
         """
         Helper method for bulk_create() to insert objs one batch at a time.
         """
-        ops = db_connection.ops
-        max_batch_size = max(ops.bulk_batch_size(fields, objs), 1)
+        max_batch_size = max(len(objs), 1)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         inserted_rows = []
         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:

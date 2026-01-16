@@ -37,10 +37,10 @@ def get_json_dumps(
 
 class DatabaseOperations:
     """
-    Encapsulate backend-specific differences, such as the way a backend
-    performs ordering or calculates the ID of a recently-inserted row.
+    PostgreSQL-specific SQL generation and type handling.
 
-    PostgreSQL is the only supported database backend.
+    Encapsulates PostgreSQL-specific differences, such as the way it performs
+    ordering or calculates the ID of a recently-inserted row.
     """
 
     # Integer field safe ranges by `internal_type` as documented
@@ -84,6 +84,8 @@ class DatabaseOperations:
             "WAL",
         ]
     )
+    # PostgreSQL EXPLAIN output formats
+    supported_explain_formats: set[str] = {"JSON", "TEXT", "XML", "YAML"}
 
     # PostgreSQL integer type mapping for psycopg
     integerfield_type_map = {
@@ -100,14 +102,6 @@ class DatabaseOperations:
 
     def __init__(self, connection: DatabaseWrapper):
         self.connection = connection
-
-    def bulk_batch_size(self, fields: list[Field], objs: list[Any]) -> int:
-        """
-        Return the maximum allowed batch size for the backend. The fields
-        are the fields going to be inserted in the batch, the objs contains
-        all the objects to be inserted.
-        """
-        return len(objs)
 
     def unification_cast_sql(self, output_field: Field) -> str:
         """
@@ -142,7 +136,7 @@ class DatabaseOperations:
         """
         # https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT
         if lookup_type == "week_day":
-            # For consistency across backends, we return Sunday=1, Saturday=7.
+            # PostgreSQL DOW returns 0=Sunday, 6=Saturday; we return 1=Sunday, 7=Saturday.
             return f"EXTRACT(DOW FROM {sql}) + 1", params
         elif lookup_type == "iso_week_day":
             return f"EXTRACT(ISODOW FROM {sql})", params
@@ -300,22 +294,6 @@ class DatabaseOperations:
         """
         return cursor.fetchone()
 
-    def field_cast_sql(self, db_type: str | None, internal_type: str) -> str:
-        """
-        Given a column type (e.g. 'BLOB', 'VARCHAR') and an internal type
-        (e.g. 'GenericIPAddressField'), return the SQL to cast it before using
-        it in a WHERE statement. The resulting string should contain a '%s'
-        placeholder for the column being searched against.
-        """
-        return "%s"
-
-    def force_no_ordering(self) -> list[tuple[Any, tuple[str, tuple[Any, ...], bool]]]:
-        """
-        Return a list used in the "ORDER BY" clause to force no ordering at
-        all. Return an empty list to include nothing in the ordering.
-        """
-        return []
-
     def for_update_sql(
         self,
         nowait: bool = False,
@@ -340,7 +318,7 @@ class DatabaseOperations:
         if high_mark is not None:
             return (high_mark - offset), offset
         elif offset:
-            return self.connection.ops.no_limit_value(), offset
+            return None, offset  # PostgreSQL allows omitting LIMIT clause
         return None, offset
 
     def limit_offset_sql(self, low_mark: int | None, high_mark: int | None) -> str:
@@ -366,9 +344,7 @@ class DatabaseOperations:
         placeholders replaced with actual values.
 
         `sql` is the raw query containing placeholders and `params` is the
-        sequence of parameters. These are used by default, but this method
-        exists for database backends to provide a better implementation
-        according to their own quoting schemes.
+        sequence of parameters.
         """
         try:
             return self.compose_sql(sql, params)
@@ -424,13 +400,6 @@ class DatabaseOperations:
 
         return lookup
 
-    def max_in_list_size(self) -> int | None:
-        """
-        Return the maximum number of items that can be passed in a single 'IN'
-        list condition, or None if the backend does not impose a limit.
-        """
-        return None
-
     def max_name_length(self) -> int:
         """
         Return the maximum length of an identifier.
@@ -444,13 +413,6 @@ class DatabaseOperations:
         """
         return 63
 
-    def no_limit_value(self) -> None:
-        """
-        Return the value to use for the LIMIT when we are wanting "LIMIT
-        infinity". Return None if the limit clause can be omitted in this case.
-        """
-        return None
-
     def pk_default_value(self) -> str:
         """
         Return the value to use during an INSERT statement to specify that
@@ -458,20 +420,9 @@ class DatabaseOperations:
         """
         return "DEFAULT"
 
-    def prepare_sql_script(self, sql: str) -> list[str]:
-        """
-        Take an SQL script that may contain multiple lines and return a list
-        of statements to feed to successive cursor.execute() calls.
-
-        PostgreSQL can handle multi-statement scripts in a single execute call.
-        """
-        return [sql]
-
     def return_insert_columns(self, fields: list[Field]) -> tuple[str, tuple[Any, ...]]:
         """
-        For backends that support returning columns as part of an insert query,
-        return the SQL and params to append to the INSERT query. The returned
-        fragment should contain a format string to hold the appropriate column.
+        Return the RETURNING clause SQL and params to append to an INSERT query.
         """
         if not fields:
             return "", ()
@@ -595,13 +546,6 @@ class DatabaseOperations:
 
     def prep_for_iexact_query(self, x: str) -> str:
         return x
-
-    def validate_autopk_value(self, value: int) -> int:
-        """
-        Validate values for auto-incrementing primary key fields.
-        PostgreSQL accepts all integer values including zero.
-        """
-        return value
 
     def adapt_unknown_value(self, value: Any) -> Any:
         """
@@ -730,31 +674,11 @@ class DatabaseOperations:
         second_adapted = self.adapt_datetimefield_value(second)
         return [first_adapted, second_adapted]
 
-    def get_db_converters(self, expression: Any) -> list[Any]:
-        """
-        Return a list of functions needed to convert field data.
-
-        Some field types on some backends do not provide data in the correct
-        format, this is the hook for converter functions.
-        """
-        return []
-
     def convert_durationfield_value(
         self, value: int | None, expression: Any, connection: DatabaseWrapper
     ) -> datetime.timedelta | None:
         if value is not None:
             return datetime.timedelta(0, 0, value)
-        return None
-
-    def check_expression_support(self, expression: Any) -> None:
-        """
-        Check that the backend supports the provided expression.
-
-        This is used on specific backends to rule out known expressions
-        that have problematic or nonexistent implementations. If the
-        expression has a known problem, the backend should raise
-        NotSupportedError.
-        """
         return None
 
     def combine_expression(self, connector: str, sub_expressions: list[str]) -> str:
@@ -764,15 +688,6 @@ class DatabaseOperations:
         """
         conn = f" {connector} "
         return conn.join(sub_expressions)
-
-    def combine_duration_expression(
-        self, connector: str, sub_expressions: list[str]
-    ) -> str:
-        return self.combine_expression(connector, sub_expressions)
-
-    def binary_placeholder_sql(self, value: Any) -> str:
-        """Return the SQL placeholder for binary content."""
-        return "%s"
 
     def integer_field_range(self, internal_type: str) -> tuple[int, int]:
         """
@@ -854,18 +769,11 @@ class DatabaseOperations:
                 if value is not None:
                     extra[valid_option] = value
         if format:
-            supported_formats = self.connection.features.supported_explain_formats
             normalized_format = format.upper()
-            if normalized_format not in supported_formats:
-                msg = f"{normalized_format} is not a recognized format."
-                if supported_formats:
-                    msg += " Allowed formats: {}".format(
-                        ", ".join(sorted(supported_formats))
-                    )
-                else:
-                    msg += (
-                        f" {self.connection.display_name} does not support any formats."
-                    )
+            if normalized_format not in self.supported_explain_formats:
+                msg = "{} is not a recognized format. Allowed formats: {}".format(
+                    normalized_format, ", ".join(sorted(self.supported_explain_formats))
+                )
                 raise ValueError(msg)
             extra["FORMAT"] = format
         if options:

@@ -798,7 +798,6 @@ class TemporalSubtraction(CombinedExpression):
     def as_sql(
         self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        connection.ops.check_expression_support(self)
         lhs = compiler.compile(self.lhs)
         rhs = compiler.compile(self.rhs)
         sql, params = connection.ops.subtract_temporals(
@@ -971,7 +970,6 @@ class Func(Expression):
         arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
-        connection.ops.check_expression_support(self)
         sql_parts = []
         params = []
         for arg in self.source_expressions:
@@ -1034,7 +1032,6 @@ class Value(Expression):
     def as_sql(
         self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        connection.ops.check_expression_support(self)
         val = self.value
         output_field = self._output_field_or_none
         if output_field is not None:
@@ -1409,7 +1406,6 @@ class When(Expression):
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
-        connection.ops.check_expression_support(self)
         template_params = extra_context
         sql_params = []
         # After resolve_expression, condition is WhereNode | resolved Expression (both SQLCompilable)
@@ -1510,7 +1506,6 @@ class Case(Expression):
         case_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
-        connection.ops.check_expression_support(self)
         if not self.cases:
             sql, params = compiler.compile(self.default)
             return sql, list(params)
@@ -1605,7 +1600,6 @@ class Subquery(BaseExpression, Combinable):
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
-        connection.ops.check_expression_support(self)
         template_params = {**self.extra, **extra_context}
         subquery_sql, sql_params = self.query.as_sql(compiler, connection)
         template_params["subquery"] = subquery_sql[1:-1]
@@ -1679,7 +1673,6 @@ class OrderBy(Expression):
             template = f"{template} NULLS LAST"
         elif self.nulls_first:
             template = f"{template} NULLS FIRST"
-        connection.ops.check_expression_support(self)
         expression_sql, params = compiler.compile(self.expression)
         placeholders = {
             "expression": expression_sql,
@@ -1775,7 +1768,6 @@ class Window(Expression):
         connection: DatabaseWrapper,
         template: str | None = None,
     ) -> tuple[str, tuple[Any, ...]]:
-        connection.ops.check_expression_support(self)
         expr_sql, params = compiler.compile(self.source_expression)
         window_sql, window_params = [], ()
 
@@ -1850,7 +1842,6 @@ class WindowFrame(Expression, ABC):
     def as_sql(
         self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        connection.ops.check_expression_support(self)
         start, end = self.window_frame_start_end(
             connection, self.start.value, self.end.value
         )

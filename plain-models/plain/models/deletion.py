@@ -12,7 +12,7 @@ from plain.models import (
     sql,
     transaction,
 )
-from plain.models.db import IntegrityError, db_connection
+from plain.models.db import IntegrityError
 from plain.models.meta import Meta
 from plain.models.query import QuerySet
 
@@ -246,11 +246,7 @@ class Collector:
         """
         Return the objs in suitably sized batches for the used db_connection.
         """
-        field_names = [field.name for field in fields]
-        conn_batch_size = max(
-            db_connection.ops.bulk_batch_size(field_names, objs),
-            1,
-        )
+        conn_batch_size = max(len(objs), 1)
         if len(objs) > conn_batch_size:
             return [
                 objs[i : i + conn_batch_size]

@@ -2049,7 +2049,7 @@ class BinaryField(Field[bytes | memoryview]):
     def get_placeholder(
         self, value: Any, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> Any:
-        return connection.ops.binary_placeholder_sql(value)
+        return "%s"
 
     def get_default(self) -> bytes | memoryview | None:
         if self.has_default() and not callable(self.default):
@@ -2159,7 +2159,6 @@ class PrimaryKeyField(BigIntegerField):
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
-            value = connection.ops.validate_autopk_value(value)
         return value
 
     def get_internal_type(self) -> str:

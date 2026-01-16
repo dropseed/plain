@@ -48,10 +48,8 @@ tracer = trace.get_tracer("plain.models")
 
 
 def db_system_for(vendor: str) -> str:  # noqa: D401 – simple helper
-    """Return the canonical ``db.system.name`` value for a backend vendor."""
-    if vendor == "postgresql":
-        return DbSystemValues.POSTGRESQL.value
-    return vendor
+    """Return the canonical ``db.system.name`` value for PostgreSQL."""
+    return DbSystemValues.POSTGRESQL.value
 
 
 def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]:
@@ -76,7 +74,7 @@ def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]
             collection_name = _clean_identifier(match.group(1))
             summary = f"{operation} {collection_name}"
 
-    elif operation in ("INSERT", "REPLACE"):
+    elif operation == "INSERT":
         match = re.search(rf"INTO\s+{identifier_pattern}", sql, re.IGNORECASE)
         if match:
             collection_name = _clean_identifier(match.group(1))

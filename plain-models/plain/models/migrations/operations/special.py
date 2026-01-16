@@ -126,10 +126,8 @@ class RunSQL(Operation):
                     sql = sql_item
                 schema_editor.execute(sql, params=params)
         else:
-            # sqls is a str in this branch
-            statements = schema_editor.connection.ops.prepare_sql_script(sqls)
-            for statement in statements:
-                schema_editor.execute(statement, params=None)
+            # PostgreSQL can handle multi-statement scripts in a single execute call
+            schema_editor.execute(sqls, params=None)
 
 
 class RunPython(Operation):

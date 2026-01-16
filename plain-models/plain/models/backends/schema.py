@@ -147,7 +147,6 @@ class DatabaseSchemaEditor:
         "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s FOREIGN KEY (%(column)s) "
         "REFERENCES %(to_table)s (%(to_column)s)%(deferrable)s"
     )
-    sql_create_inline_fk = None
     # Setting the constraint to IMMEDIATE to allow changing data in the same transaction.
     sql_create_column_inline_fk = (
         "CONSTRAINT %(name)s REFERENCES %(to_table)s(%(to_column)s)%(deferrable)s"
@@ -280,27 +279,11 @@ class DatabaseSchemaEditor:
                 definition += f" {col_type_suffix}"
             if extra_params:
                 params.extend(extra_params)
-            # FK.
+            # PostgreSQL creates FK constraints via deferred ALTER TABLE
             if isinstance(field, ForeignKeyField) and field.db_constraint:
-                to_table = field.remote_field.model.model_options.db_table
-                field_name = field.remote_field.field_name
-                if field_name is None:
-                    raise ValueError("Foreign key field_name cannot be None")
-                to_field = field.remote_field.model._model_meta.get_forward_field(
-                    field_name
+                self.deferred_sql.append(
+                    self._create_fk_sql(model, field, "_fk_%(to_table)s_%(to_column)s")
                 )
-                to_column = to_field.column
-                if self.sql_create_inline_fk:
-                    definition += " " + self.sql_create_inline_fk % {
-                        "to_table": self.quote_name(to_table),
-                        "to_column": self.quote_name(to_column),
-                    }
-                else:
-                    self.deferred_sql.append(
-                        self._create_fk_sql(
-                            model, field, "_fk_%(to_table)s_%(to_column)s"
-                        )
-                    )
             # Add the SQL to our big list.
             column_sqls.append(f"{self.quote_name(field.column)} {definition}")
         constraints = [
@@ -1405,7 +1388,7 @@ class DatabaseSchemaEditor:
             hash_suffix_part,
         )
         # Prepend D if needed to prevent the name from starting with an
-        # underscore or a number (not permitted on Oracle).
+        # underscore or a number.
         if index_name[0] == "_" or index_name[0].isdigit():
             index_name = f"D{index_name[:-1]}"
         return index_name

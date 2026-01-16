@@ -713,7 +713,7 @@ class SQLCompiler:
                         raise NotImplementedError(
                             "annotate() + distinct(fields) is not implemented."
                         )
-                    order_by = order_by or self.connection.ops.force_no_ordering()
+                    order_by = order_by or []
                     result.append("GROUP BY {}".format(", ".join(grouping)))
                     if self._meta_ordering:
                         order_by = None
@@ -1308,10 +1308,9 @@ class SQLCompiler:
         converters = {}
         for i, expression in enumerate(expressions):
             if expression:
-                backend_converters = self.connection.ops.get_db_converters(expression)
                 field_converters = expression.get_db_converters(self.connection)
-                if backend_converters or field_converters:
-                    converters[i] = (backend_converters + field_converters, expression)
+                if field_converters:
+                    converters[i] = (field_converters, expression)
         return converters
 
     def apply_converters(
@@ -1417,7 +1416,7 @@ class SQLCompiler:
 
         result = cursor_iter(
             cursor,
-            self.connection.features.empty_fetchmany_value,
+            [],  # empty_fetchmany_value for PostgreSQL
             self.col_count if self.has_extra_select else None,
             chunk_size,
         )

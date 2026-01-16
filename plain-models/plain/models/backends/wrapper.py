@@ -29,7 +29,6 @@ from plain.models.backends import utils
 # Import component classes directly (no longer need lazy imports since we only support PostgreSQL)
 from plain.models.backends.client import DatabaseClient
 from plain.models.backends.creation import DatabaseCreation
-from plain.models.backends.features import DatabaseFeatures
 from plain.models.backends.introspection import DatabaseIntrospection
 from plain.models.backends.operations import DatabaseOperations
 from plain.models.backends.schema import DatabaseSchemaEditor
@@ -120,11 +119,13 @@ class DatabaseWrapper:
     ops: DatabaseOperations
     client: DatabaseClient
     creation: DatabaseCreation
-    features: DatabaseFeatures
     introspection: DatabaseIntrospection
 
     vendor = "postgresql"
     display_name = "PostgreSQL"
+
+    # PostgreSQL 12+ is required
+    minimum_database_version: tuple[int, ...] = (12,)
 
     # This dictionary maps Field objects to their associated PostgreSQL column
     # types, as strings. Column-type strings can contain format strings; they'll
@@ -268,7 +269,6 @@ class DatabaseWrapper:
         # Instantiate component classes directly
         self.client = DatabaseClient(self)
         self.creation = DatabaseCreation(self)
-        self.features = DatabaseFeatures(self)
         self.introspection = DatabaseIntrospection(self)
         self.ops = DatabaseOperations(self)
 
@@ -327,14 +327,9 @@ class DatabaseWrapper:
         Raise an error if the database version isn't supported by this
         version of Plain.
         """
-        if (
-            self.features.minimum_database_version is not None
-            and self.get_database_version() < self.features.minimum_database_version
-        ):
+        if self.get_database_version() < self.minimum_database_version:
             db_version = ".".join(str(v) for v in self.get_database_version())
-            min_db_version = ".".join(
-                str(v) for v in self.features.minimum_database_version
-            )
+            min_db_version = ".".join(str(v) for v in self.minimum_database_version)
             raise NotSupportedError(
                 f"{self.display_name} {min_db_version} or later is required "
                 f"(found {db_version})."

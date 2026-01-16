@@ -192,8 +192,7 @@ class Index:
         )
         if len(self.name) > self.max_name_length:
             raise ValueError(
-                "Index too long for multiple database support. Is self.suffix "
-                "longer than 3 characters?"
+                "Index name too long. Is self.suffix longer than 3 characters?"
             )
         if self.name[0] == "_" or self.name[0].isdigit():
             self.name = f"D{self.name[1:]}"

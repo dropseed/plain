@@ -228,8 +228,6 @@ class BuiltinLookup(Lookup):
         )
         lhs_sql, params = super().process_lhs(compiler, connection, lhs)
         field_internal_type = self.lhs.output_field.get_internal_type()
-        db_type = self.lhs.output_field.db_type(connection=connection)
-        lhs_sql = connection.ops.field_cast_sql(db_type, field_internal_type) % lhs_sql
         lhs_sql = (
             connection.ops.lookup_cast(self.lookup_name, field_internal_type) % lhs_sql
         )
@@ -535,42 +533,7 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
     def get_rhs_op(self, connection: DatabaseWrapper, rhs: str | list[str]) -> str:
         return f"IN {rhs}"
 
-    def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
-    ) -> tuple[str, list[Any]]:
-        max_in_list_size = connection.ops.max_in_list_size()
-        if (
-            self.rhs_is_direct_value()
-            and max_in_list_size
-            and len(self.rhs) > max_in_list_size
-        ):
-            return self.split_parameter_list_as_sql(compiler, connection)
-        return super().as_sql(compiler, connection)
-
-    def split_parameter_list_as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
-    ) -> tuple[str, list[Any]]:
-        # This is a special case for databases which limit the number of
-        # elements which can appear in an 'IN' clause.
-        max_in_list_size = connection.ops.max_in_list_size()
-        assert max_in_list_size is not None
-        lhs, lhs_params = self.process_lhs(compiler, connection)
-        rhs, rhs_params = self.batch_process_rhs(compiler, connection)
-        in_clause_elements = ["("]
-        params = []
-        for offset in range(0, len(rhs_params), max_in_list_size):
-            if offset > 0:
-                in_clause_elements.append(" OR ")
-            in_clause_elements.append(f"{lhs} IN (")
-            params.extend(lhs_params)
-            sqls = rhs[offset : offset + max_in_list_size]
-            sqls_params = rhs_params[offset : offset + max_in_list_size]
-            param_group = ", ".join(sqls)
-            in_clause_elements.append(param_group)
-            in_clause_elements.append(")")
-            params.extend(sqls_params)
-        in_clause_elements.append(")")
-        return "".join(in_clause_elements), params
+    # PostgreSQL has no limit on IN clause size, so no need to override as_sql()
 
 
 class PatternLookup(BuiltinLookup):
