@@ -9,7 +9,6 @@ from itertools import chain
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import NotSupportedError
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.expressions import (
     F,
@@ -213,18 +212,13 @@ class SQLCompiler:
         seen = set()
         expressions = self.collapse_group_by(expressions, having_group_by)
 
-        allows_group_by_select_index = (
-            self.connection.features.allows_group_by_select_index
-        )
         for expr in expressions:
             try:
                 sql, params = self.compile(expr)
             except (EmptyResultSet, FullResultSet):
                 continue
-            if (
-                allows_group_by_select_index
-                and (position := selected_expr_positions.get(expr)) is not None
-            ):
+            # PostgreSQL supports GROUP BY with select index
+            if (position := selected_expr_positions.get(expr)) is not None:
                 sql, params = str(position), ()
             else:
                 sql, params = expr.select_format(self, sql, params)
@@ -235,32 +229,26 @@ class SQLCompiler:
         return result
 
     def collapse_group_by(self, expressions: list[Any], having: list[Any]) -> list[Any]:
-        # If the database supports group by functional dependence reduction,
-        # then the expressions can be reduced to the set of selected table
+        # PostgreSQL supports group by functional dependence reduction,
+        # so expressions can be reduced to the set of selected table
         # primary keys as all other columns are functionally dependent on them.
-        if self.connection.features.allows_group_by_selected_pks:
-            # Filter out all expressions associated with a table's primary key
-            # present in the grouped columns. This is done by identifying all
-            # tables that have their primary key included in the grouped
-            # columns and removing non-primary key columns referring to them.
-            pks = {
-                expr
-                for expr in expressions
-                if (
-                    hasattr(expr, "target")
-                    and expr.target.primary_key
-                    and self.connection.features.allows_group_by_selected_pks
-                )
-            }
-            aliases = {expr.alias for expr in pks}
-            expressions = [
-                expr
-                for expr in expressions
-                if expr in pks
-                or expr in having
-                or getattr(expr, "alias", None) not in aliases
-            ]
-        return expressions
+        # Filter out all expressions associated with a table's primary key
+        # present in the grouped columns. This is done by identifying all
+        # tables that have their primary key included in the grouped
+        # columns and removing non-primary key columns referring to them.
+        pks = {
+            expr
+            for expr in expressions
+            if hasattr(expr, "target") and expr.target.primary_key
+        }
+        aliases = {expr.alias for expr in pks}
+        return [
+            expr
+            for expr in expressions
+            if expr in pks
+            or expr in having
+            or getattr(expr, "alias", None) not in aliases
+        ]
 
     def get_select(
         self, with_col_aliases: bool = False
@@ -654,7 +642,6 @@ class SQLCompiler:
             for_update_part = None
             # Is a LIMIT/OFFSET clause needed?
             with_limit_offset = with_limits and self.query.is_sliced
-            features = self.connection.features
             if self.qualify:
                 result, params = self.get_qualify_sql()
                 order_by = None
@@ -703,58 +690,19 @@ class SQLCompiler:
                 result += [", ".join(out_cols)]
                 if from_:
                     result += ["FROM", *from_]
-                elif self.connection.features.bare_select_suffix:
-                    result += [self.connection.features.bare_select_suffix]
                 params.extend(f_params)
 
-                if self.query.select_for_update and features.has_select_for_update:
-                    if (
-                        self.connection.get_autocommit()
-                        # Don't raise an exception when database doesn't
-                        # support transactions, as it's a noop.
-                        and features.supports_transactions
-                    ):
+                if self.query.select_for_update:
+                    if self.connection.get_autocommit():
                         raise TransactionManagementError(
                             "select_for_update cannot be used outside of a transaction."
                         )
 
-                    if (
-                        with_limit_offset
-                        and not features.supports_select_for_update_with_limit
-                    ):
-                        raise NotSupportedError(
-                            "LIMIT/OFFSET is not supported with "
-                            "select_for_update on this database backend."
-                        )
-                    nowait = self.query.select_for_update_nowait
-                    skip_locked = self.query.select_for_update_skip_locked
-                    of = self.query.select_for_update_of
-                    no_key = self.query.select_for_no_key_update
-                    # If it's a NOWAIT/SKIP LOCKED/OF/NO KEY query but the
-                    # backend doesn't support it, raise NotSupportedError to
-                    # prevent a possible deadlock.
-                    if nowait and not features.has_select_for_update_nowait:
-                        raise NotSupportedError(
-                            "NOWAIT is not supported on this database backend."
-                        )
-                    elif skip_locked and not features.has_select_for_update_skip_locked:
-                        raise NotSupportedError(
-                            "SKIP LOCKED is not supported on this database backend."
-                        )
-                    elif of and not features.has_select_for_update_of:
-                        raise NotSupportedError(
-                            "FOR UPDATE OF is not supported on this database backend."
-                        )
-                    elif no_key and not features.has_select_for_no_key_update:
-                        raise NotSupportedError(
-                            "FOR NO KEY UPDATE is not supported on this "
-                            "database backend."
-                        )
                     for_update_part = self.connection.ops.for_update_sql(
-                        nowait=nowait,
-                        skip_locked=skip_locked,
+                        nowait=self.query.select_for_update_nowait,
+                        skip_locked=self.query.select_for_update_skip_locked,
                         of=tuple(self.get_select_for_update_of_arguments()),
-                        no_key=no_key,
+                        no_key=self.query.select_for_no_key_update,
                     )
 
                 if where:
@@ -1478,11 +1426,10 @@ class SQLCompiler:
             self.col_count if self.has_extra_select else None,
             chunk_size,
         )
-        if not chunked_fetch or not self.connection.features.can_use_chunked_reads:
+        if not chunked_fetch:
             # If we are using non-chunked reads, we return the same data
             # structure as normally, but ensure it is all read into memory
-            # before going any further. Use chunked_fetch if requested,
-            # unless the database doesn't support it.
+            # before going any further.
             return list(result)
         return result
 
@@ -1653,14 +1600,6 @@ class SQLInsertCompiler(SQLCompiler):
             ]
             fields = [None]
 
-        # Currently the backends just accept values when generating bulk
-        # queries and generate their own placeholders. Doing that isn't
-        # necessary and it should be possible to use placeholders and
-        # expressions in bulk inserts too.
-        can_bulk = (
-            not self.returning_fields and self.connection.features.has_bulk_insert
-        )
-
         placeholder_rows, param_rows = self.assemble_as_sql(fields, value_rows)
 
         on_conflict_suffix_sql = self.connection.ops.on_conflict_suffix_sql(
@@ -1669,18 +1608,12 @@ class SQLInsertCompiler(SQLCompiler):
             (f.column for f in self.query.update_fields),
             (f.column for f in self.query.unique_fields),
         )
-        if (
-            self.returning_fields
-            and self.connection.features.can_return_columns_from_insert
-        ):
-            if self.connection.features.can_return_rows_from_bulk_insert:
-                result.append(
-                    self.connection.ops.bulk_insert_sql(fields, placeholder_rows)  # type: ignore[arg-type]
-                )
-                params = param_rows
-            else:
-                result.append("VALUES ({})".format(", ".join(placeholder_rows[0])))
-                params = [param_rows[0]]
+        if self.returning_fields:
+            # PostgreSQL supports RETURNING clause for bulk inserts
+            result.append(
+                self.connection.ops.bulk_insert_sql(fields, placeholder_rows)  # type: ignore[arg-type]
+            )
+            params = param_rows
             if on_conflict_suffix_sql:
                 result.append(on_conflict_suffix_sql)
             # Skip empty r_sql to allow subclasses to customize behavior for
@@ -1695,29 +1628,16 @@ class SQLInsertCompiler(SQLCompiler):
                     params += [list(self.returning_params)]
             return [(" ".join(result), tuple(chain.from_iterable(params)))]
 
-        if can_bulk:
-            result.append(self.connection.ops.bulk_insert_sql(fields, placeholder_rows))  # type: ignore[arg-type]
-            if on_conflict_suffix_sql:
-                result.append(on_conflict_suffix_sql)
-            return [(" ".join(result), tuple(p for ps in param_rows for p in ps))]
-        else:
-            if on_conflict_suffix_sql:
-                result.append(on_conflict_suffix_sql)
-            return [
-                (" ".join(result + ["VALUES ({})".format(", ".join(p))]), vals)
-                for p, vals in zip(placeholder_rows, param_rows)
-            ]
+        # Bulk insert without returning fields
+        result.append(self.connection.ops.bulk_insert_sql(fields, placeholder_rows))  # type: ignore[arg-type]
+        if on_conflict_suffix_sql:
+            result.append(on_conflict_suffix_sql)
+        return [(" ".join(result), tuple(p for ps in param_rows for p in ps))]
 
     def execute_sql(  # type: ignore[override]
         self, returning_fields: list | None = None
     ) -> list:
-        assert not (
-            returning_fields
-            and len(self.query.objs) != 1
-            and not self.connection.features.can_return_rows_from_bulk_insert
-        )
         assert self.query.model is not None, "INSERT execution requires a model"
-        meta = self.query.model._model_meta
         options = self.query.model.model_options
         self.returning_fields = returning_fields
         with self.connection.cursor() as cursor:
@@ -1725,28 +1645,14 @@ class SQLInsertCompiler(SQLCompiler):
                 cursor.execute(sql, params)
             if not self.returning_fields:
                 return []
-            if (
-                self.connection.features.can_return_rows_from_bulk_insert
-                and len(self.query.objs) > 1
-            ):
+            # PostgreSQL supports RETURNING for both single and bulk inserts
+            if len(self.query.objs) > 1:
                 rows = self.connection.ops.fetch_returned_insert_rows(cursor)
-            elif self.connection.features.can_return_columns_from_insert:
-                assert len(self.query.objs) == 1
+            else:
                 rows = [
                     self.connection.ops.fetch_returned_insert_columns(
                         cursor,
                         self.returning_params,
-                    )
-                ]
-            else:
-                id_field = meta.get_forward_field("id")
-                rows = [
-                    (
-                        self.connection.ops.last_insert_id(
-                            cursor,
-                            options.db_table,
-                            id_field.column,
-                        ),
                     )
                 ]
         cols = [field.get_col(options.db_table) for field in self.returning_fields]
@@ -1807,11 +1713,6 @@ class SQLDeleteCompiler(SQLCompiler):
         id_field = self.query.model._model_meta.get_forward_field("id")
         innerq.select = [id_field.get_col(self.query.get_initial_alias())]
         outerq = Query(self.query.model)
-        if not self.connection.features.update_can_self_select:
-            # Force the materialization of the inner query to allow reference
-            # to the target table on MySQL.
-            sql, params = innerq.get_compiler().as_sql()
-            innerq = RawSQL(f"SELECT * FROM ({sql}) subquery", params)
         outerq.add_filter("id__in", innerq)
         return self._as_sql(outerq)
 
@@ -1940,17 +1841,12 @@ class SQLUpdateCompiler(SQLCompiler):
         query.add_fields(fields)
         super().pre_sql_setup()
 
-        must_pre_select = (
-            count > 1 and not self.connection.features.update_can_self_select
-        )
-
         # Now we adjust the current query: reset the where clause and get rid
         # of all the tables we don't need (since they're in the sub-select).
         self.query.clear_where()
-        if related_updates or must_pre_select:
-            # Either we're using the idents in multiple update queries (so
-            # don't want them to change), or the db backend doesn't support
-            # selecting from the updating table (e.g. MySQL).
+        if related_updates:
+            # We're using the idents in multiple update queries (so
+            # don't want them to change).
             idents = []
             related_ids = collections.defaultdict(list)
             for rows in query.get_compiler().execute_sql(MULTI):
@@ -1961,6 +1857,7 @@ class SQLUpdateCompiler(SQLCompiler):
             self.query.related_ids = related_ids  # type: ignore[assignment]
         else:
             # The fast path. Filters and updates in one query.
+            # PostgreSQL supports UPDATE with self-select subqueries.
             self.query.add_filter("id__in", query)
         self.query.reset_refcounts(refcounts_before)
 

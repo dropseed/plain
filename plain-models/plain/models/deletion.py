@@ -41,8 +41,6 @@ def CASCADE(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
         nullable=field.allow_null,
         fail_on_restricted=False,
     )
-    if field.allow_null and not db_connection.features.can_defer_constraint_checks:
-        collector.add_field_update(field, None, sub_objs)
 
 
 def PROTECT(collector: Collector, field: RelatedField, sub_objs: Any) -> None:

@@ -185,9 +185,6 @@ class WhereNode(tree.Node):
         if not sql_string:
             raise FullResultSet
         if self.negated:
-            # Some backends (Oracle at least) need parentheses around the inner
-            # SQL in the negated case, even if the inner SQL contains just a
-            # single expression.
             sql_string = f"NOT ({sql_string})"
         elif len(result) > 1 or self.resolved:
             sql_string = f"({sql_string})"
@@ -304,11 +301,7 @@ class WhereNode(tree.Node):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: list[Any]
     ) -> tuple[str, list[Any]]:
-        # Wrap filters with a CASE WHEN expression if a database backend
-        # (e.g. Oracle) doesn't support boolean expression in SELECT or GROUP
-        # BY list.
-        if not compiler.connection.features.supports_boolean_expr_in_select_clause:
-            sql = f"CASE WHEN {sql} THEN 1 ELSE 0 END"
+        # PostgreSQL supports boolean expressions in SELECT clause directly
         return sql, params
 
     def get_db_converters(self, connection: DatabaseWrapper) -> list[Any]:

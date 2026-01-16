@@ -141,13 +141,7 @@ class RawQuery:
         # Always execute a new query for a new iterator.
         # This could be optimized with a cache at the expense of RAM.
         self._execute_query()
-        if not db_connection.features.can_use_chunked_reads:
-            # If the database can't use chunked reads we need to make sure we
-            # evaluate the entire query up front.
-            result = list(self.cursor)
-        else:
-            result = self.cursor
-        return iter(result)
+        return iter(self.cursor)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"
@@ -1180,13 +1174,6 @@ class Query(BaseExpression):
     def as_sql(
         self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> SqlWithParams:
-        # Some backends (e.g. Oracle) raise an error when a subquery contains
-        # unnecessary ORDER BY clause.
-        if (
-            self.subquery
-            and not db_connection.features.ignores_unnecessary_order_by_in_subqueries
-        ):
-            self.clear_ordering(force=False)
         sql, params = self.get_compiler().as_sql()
         if self.subquery:
             sql = f"({sql})"

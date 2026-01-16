@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 import builtins
 
 from plain.models import transaction
-from plain.models.db import NotSupportedError, db_connection
+from plain.models.db import db_connection
 from plain.models.expressions import Window
 from plain.models.functions import RowNumber
 from plain.models.lookups import GreaterThan, LessThanOrEqual
@@ -39,11 +39,7 @@ def _filter_prefetch_queryset(
     filter_kwargs: dict[str, Any] = {f"{field_name}__in": instances}
     predicate = Q(**filter_kwargs)
     if queryset.sql_query.is_sliced:
-        if not db_connection.features.supports_over_clause:
-            raise NotSupportedError(
-                "Prefetching from a limited queryset is only supported on backends "
-                "that support window functions."
-            )
+        # PostgreSQL supports window functions for limited queryset prefetching
         low_mark, high_mark = queryset.sql_query.low_mark, queryset.sql_query.high_mark
         order_by = [
             expr for expr, _ in queryset.sql_query.get_compiler().get_order_by()

@@ -71,9 +71,6 @@ def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
     # Set .cursor() back to the original implementation to unblock it
     DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
 
-    if not db_connection.features.supports_transactions:
-        pytest.fail("Database does not support transactions")
-
     with suppress_db_tracing():
         atomic = transaction.atomic()
         atomic._from_testcase = True
@@ -82,11 +79,8 @@ def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
     yield
 
     with suppress_db_tracing():
-        if (
-            db_connection.features.can_defer_constraint_checks
-            and not db_connection.needs_rollback
-            and db_connection.is_usable()
-        ):
+        # PostgreSQL can defer constraint checks
+        if not db_connection.needs_rollback and db_connection.is_usable():
             db_connection.check_constraints()
 
         db_connection.set_rollback(True)

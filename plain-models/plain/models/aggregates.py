@@ -4,12 +4,10 @@ from typing import TYPE_CHECKING, Any
 
 from plain.models.exceptions import FieldError, FullResultSet
 from plain.models.expressions import (
-    Case,
     Func,
     ResolvableExpression,
     Star,
     Value,
-    When,
 )
 from plain.models.fields import IntegerField
 from plain.models.functions.comparison import Coalesce
@@ -140,39 +138,25 @@ class Aggregate(Func):
     ) -> tuple[str, list[Any]]:
         extra_context["distinct"] = "DISTINCT " if self.distinct else ""
         if self.filter is not None:
-            if connection.features.supports_aggregate_filter_clause:
-                try:
-                    filter_sql, filter_params = self.filter.as_sql(compiler, connection)  # type: ignore[union-attr]
-                except FullResultSet:
-                    pass
-                else:
-                    filter_template = self.filter_template % extra_context.get(
-                        "template", template or self.template
-                    )
-                    sql, params = super().as_sql(
-                        compiler,
-                        connection,
-                        function=function,
-                        template=filter_template,
-                        arg_joiner=arg_joiner,
-                        filter=filter_sql,
-                        **extra_context,
-                    )
-                    return sql, [*params, *filter_params]
+            # PostgreSQL supports FILTER clause for aggregates
+            try:
+                filter_sql, filter_params = self.filter.as_sql(compiler, connection)  # type: ignore[union-attr]
+            except FullResultSet:
+                pass
             else:
-                copy = self.copy()
-                copy.filter = None
-                source_expressions = copy.get_source_expressions()
-                condition = When(self.filter, then=source_expressions[0])
-                copy.set_source_expressions([Case(condition)] + source_expressions[1:])
-                return super(Aggregate, copy).as_sql(
+                filter_template = self.filter_template % extra_context.get(
+                    "template", template or self.template
+                )
+                sql, params = super().as_sql(
                     compiler,
                     connection,
                     function=function,
-                    template=template,
+                    template=filter_template,
                     arg_joiner=arg_joiner,
+                    filter=filter_sql,
                     **extra_context,
                 )
+                return sql, [*params, *filter_params]
         return super().as_sql(
             compiler,
             connection,

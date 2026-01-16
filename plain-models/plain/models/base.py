@@ -1281,12 +1281,10 @@ class Model(metaclass=ModelBase):
         for each database in which the model will be created.
         """
         errors: list[PreflightResult] = []
-        allowed_len = None
 
-        max_name_length = db_connection.ops.max_name_length()
-        if max_name_length is not None and not db_connection.features.truncates_names:
-            allowed_len = max_name_length
-
+        # PostgreSQL has a 63-character limit on identifier names and doesn't
+        # silently truncate, so we check for names that are too long
+        allowed_len = db_connection.ops.max_name_length()
         if allowed_len is None:
             return errors
 

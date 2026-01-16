@@ -15,7 +15,7 @@ from collections.abc import Callable, Generator
 from typing import TYPE_CHECKING, Any, NamedTuple, Self
 
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import DatabaseError, db_connection
+from plain.models.db import DatabaseError
 from plain.models.exceptions import FieldError
 from plain.utils import tree
 
@@ -163,10 +163,8 @@ class Q(tree.Node):
             query.add_annotation(value, name, select=False)
         query.add_annotation(Value(1), "_check")
         # This will raise a FieldError if a field is missing in "against".
-        if db_connection.features.supports_comparing_boolean_expr:
-            query.add_q(Q(Coalesce(self, True, output_field=BooleanField())))
-        else:
-            query.add_q(self)
+        # PostgreSQL supports comparing boolean expressions
+        query.add_q(Q(Coalesce(self, True, output_field=BooleanField())))
         compiler = query.get_compiler()
         try:
             return compiler.execute_sql(SINGLE) is not None
