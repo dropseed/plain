@@ -18,14 +18,14 @@ from plain.models.backends.ddl_references import (
     Statement,
     Table,
 )
-from plain.models.backends.utils import names_digest, split_identifier, truncate_name
+from plain.models.backends.utils import names_digest, split_identifier
 from plain.models.constraints import Deferrable
 from plain.models.fields import DbParameters, Field
 from plain.models.fields.related import ForeignKeyField, RelatedField
 from plain.models.fields.reverse_related import ForeignObjectRel, ManyToManyRel
 from plain.models.indexes import Index
 from plain.models.sql import Query
-from plain.models.transaction import TransactionManagementError, atomic
+from plain.models.transaction import atomic
 from plain.utils import timezone
 
 if TYPE_CHECKING:
@@ -170,7 +170,7 @@ class BaseDatabaseSchemaEditor(ABC):
         atomic: bool = True,
     ):
         self.connection = connection
-        self.atomic_migration = self.connection.features.can_rollback_ddl and atomic
+        self.atomic_migration = atomic
 
     # State-managing methods
 
@@ -195,14 +195,6 @@ class BaseDatabaseSchemaEditor(ABC):
         self, sql: str | Statement, params: tuple[Any, ...] | list[Any] | None = ()
     ) -> None:
         """Execute the given SQL statement, with optional parameters."""
-        if (
-            self.connection.in_atomic_block
-            and not self.connection.features.can_rollback_ddl
-        ):
-            raise TransactionManagementError(
-                "Executing DDL statements while in a transaction on databases "
-                "that can't perform a rollback is prohibited."
-            )
         # Account for non-string statement objects.
         sql = str(sql)
         # Log the command we're running, then run it
@@ -294,8 +286,6 @@ class BaseDatabaseSchemaEditor(ABC):
         yield column_db_type
         if collation := field_db_params.get("collation"):
             yield self._collate_sql(collation)
-        if self.connection.features.supports_comments_inline and field.db_comment:
-            yield self._comment_sql(field.db_comment)
         # Work out nullability.
         null = field.allow_null
         # Include a default value, if requested.
@@ -403,26 +393,22 @@ class BaseDatabaseSchemaEditor(ABC):
         # definition.
         self.execute(sql, params or None)
 
-        if self.connection.features.supports_comments:
-            # Add table comment.
-            if model.model_options.db_table_comment:
-                self.alter_db_table_comment(
-                    model, None, model.model_options.db_table_comment
+        # Add table comment.
+        if model.model_options.db_table_comment:
+            self.alter_db_table_comment(
+                model, None, model.model_options.db_table_comment
+            )
+        # Add column comments.
+        for field in model._model_meta.local_fields:
+            if field.db_comment:
+                field_db_params = field.db_parameters(connection=self.connection)
+                field_type = field_db_params["type"]
+                assert field_type is not None
+                self.execute(
+                    *self._alter_column_comment_sql(
+                        model, field, field_type, field.db_comment
+                    )
                 )
-            # Add column comments.
-            if not self.connection.features.supports_comments_inline:
-                for field in model._model_meta.local_fields:
-                    if field.db_comment:
-                        field_db_params = field.db_parameters(
-                            connection=self.connection
-                        )
-                        field_type = field_db_params["type"]
-                        assert field_type is not None
-                        self.execute(
-                            *self._alter_column_comment_sql(
-                                model, field, field_type, field.db_comment
-                            )
-                        )
         # Add any field indexes.
         self.deferred_sql.extend(self._model_indexes_sql(model))
 
@@ -445,35 +431,21 @@ class BaseDatabaseSchemaEditor(ABC):
 
     def add_index(self, model: type[Model], index: Index) -> None:
         """Add an index on a model."""
-        if (
-            index.contains_expressions
-            and not self.connection.features.supports_expression_indexes
-        ):
-            return None
         # Index.create_sql returns interpolated SQL which makes params=None a
         # necessity to avoid escaping attempts on execution.
         self.execute(index.create_sql(model, self), params=None)
 
     def remove_index(self, model: type[Model], index: Index) -> None:
         """Remove an index from a model."""
-        if (
-            index.contains_expressions
-            and not self.connection.features.supports_expression_indexes
-        ):
-            return None
         self.execute(index.remove_sql(model, self))
 
     def rename_index(
         self, model: type[Model], old_index: Index, new_index: Index
     ) -> None:
-        if self.connection.features.can_rename_index:
-            self.execute(
-                self._rename_index_sql(model, old_index.name, new_index.name),
-                params=None,
-            )
-        else:
-            self.remove_index(model, old_index)
-            self.add_index(model, new_index)
+        self.execute(
+            self._rename_index_sql(model, old_index.name, new_index.name),
+            params=None,
+        )
 
     def add_constraint(self, model: type[Model], constraint: BaseConstraint) -> None:
         """Add a constraint to a model."""
@@ -493,10 +465,7 @@ class BaseDatabaseSchemaEditor(ABC):
         self, model: type[Model], old_db_table: str, new_db_table: str
     ) -> None:
         """Rename the table a model points to."""
-        if old_db_table == new_db_table or (
-            self.connection.features.ignores_table_name_case
-            and old_db_table.lower() == new_db_table.lower()
-        ):
+        if old_db_table == new_db_table:
             return
         self.execute(
             self.sql_rename_table
@@ -589,11 +558,7 @@ class BaseDatabaseSchemaEditor(ABC):
             }
             self.execute(sql, params)
         # Add field comment, if required.
-        if (
-            field.db_comment
-            and self.connection.features.supports_comments
-            and not self.connection.features.supports_comments_inline
-        ):
+        if field.db_comment:
             field_type = db_params["type"]
             assert field_type is not None
             self.execute(
@@ -714,8 +679,7 @@ class BaseDatabaseSchemaEditor(ABC):
         # Drop any FK constraints, we'll remake them later
         fks_dropped = set()
         if (
-            self.connection.features.supports_foreign_keys
-            and isinstance(old_field, ForeignKeyField)
+            isinstance(old_field, ForeignKeyField)
             and old_field.db_constraint
             and self._field_should_be_altered(
                 old_field,
@@ -761,10 +725,8 @@ class BaseDatabaseSchemaEditor(ABC):
         # which might be a to_field target, and things are going to change.
         old_collation = old_db_params.get("collation")
         new_collation = new_db_params.get("collation")
-        drop_foreign_keys = (
-            self.connection.features.supports_foreign_keys
-            and (old_field.primary_key and new_field.primary_key)
-            and ((old_type != new_type) or (old_collation != new_collation))
+        drop_foreign_keys = (old_field.primary_key and new_field.primary_key) and (
+            (old_type != new_type) or (old_collation != new_collation)
         )
         if drop_foreign_keys:
             # '_model_meta.related_field' also contains M2M reverse fields, these
@@ -896,8 +858,8 @@ class BaseDatabaseSchemaEditor(ABC):
                 # If we don't have to do a 4-way default alteration we can
                 # directly run a (NOT) NULL alteration
                 actions += null_actions
-            # Combine actions together if we can (e.g. postgres)
-            if self.connection.features.supports_combined_alters and actions:
+            # Combine actions together (PostgreSQL supports this)
+            if actions:
                 sql, params = tuple(zip(*actions))
                 actions = [(", ".join(sql), sum(params, []))]
             # Apply those actions
@@ -998,8 +960,7 @@ class BaseDatabaseSchemaEditor(ABC):
                 self.execute(sql, params)
         # Does it have a foreign key?
         if (
-            self.connection.features.supports_foreign_keys
-            and isinstance(new_field, ForeignKeyField)
+            isinstance(new_field, ForeignKeyField)
             and (
                 fks_dropped
                 or not isinstance(old_field, ForeignKeyField)
@@ -1127,11 +1088,9 @@ class BaseDatabaseSchemaEditor(ABC):
         from plain.models.fields.related import ManyToManyField
 
         comment_sql = ""
-        if self.connection.features.supports_comments and not isinstance(
-            new_field, ManyToManyField
-        ):
+        if not isinstance(new_field, ManyToManyField):
             if old_field.db_comment != new_field.db_comment:
-                # PostgreSQL and Oracle can't execute 'ALTER COLUMN ...' and
+                # PostgreSQL can't execute 'ALTER COLUMN ...' and
                 # 'COMMENT ON ...' at the same time.
                 sql, params = self._alter_column_comment_sql(
                     model, new_field, new_type, new_field.db_comment
@@ -1267,7 +1226,7 @@ class BaseDatabaseSchemaEditor(ABC):
     def _index_include_sql(
         self, model: type[Model], columns: list[str] | None
     ) -> str | Statement:
-        if not columns or not self.connection.features.supports_covering_indexes:
+        if not columns:
             return ""
         return Statement(
             " INCLUDE (%(columns)s)",
@@ -1475,11 +1434,6 @@ class BaseDatabaseSchemaEditor(ABC):
         opclasses: tuple[str, ...] | None = None,
         expressions: Any = None,
     ) -> str | None:
-        if (
-            deferrable
-            and not self.connection.features.supports_deferrable_unique_constraints
-        ):
-            return None
         if condition or include or opclasses or expressions:
             # Databases support conditional, covering, and functional unique
             # constraints via a unique index.
@@ -1515,19 +1469,6 @@ class BaseDatabaseSchemaEditor(ABC):
         opclasses: tuple[str, ...] | None = None,
         expressions: Any = None,
     ) -> Statement | None:
-        if (
-            (
-                deferrable
-                and not self.connection.features.supports_deferrable_unique_constraints
-            )
-            or (condition and not self.connection.features.supports_partial_indexes)
-            or (include and not self.connection.features.supports_covering_indexes)
-            or (
-                expressions and not self.connection.features.supports_expression_indexes
-            )
-        ):
-            return None
-
         compiler = Query(model, alias_cols=False).get_compiler()
         table = model.model_options.db_table
         columns = [field.column for field in fields]
@@ -1578,19 +1519,7 @@ class BaseDatabaseSchemaEditor(ABC):
         include: list[str] | None = None,
         opclasses: tuple[str, ...] | None = None,
         expressions: Any = None,
-    ) -> Statement | None:
-        if (
-            (
-                deferrable
-                and not self.connection.features.supports_deferrable_unique_constraints
-            )
-            or (condition and not self.connection.features.supports_partial_indexes)
-            or (include and not self.connection.features.supports_covering_indexes)
-            or (
-                expressions and not self.connection.features.supports_expression_indexes
-            )
-        ):
-            return None
+    ) -> Statement:
         if condition or include or opclasses or expressions:
             sql = self.sql_delete_index
         else:
@@ -1603,11 +1532,7 @@ class BaseDatabaseSchemaEditor(ABC):
             "constraint": self.sql_check_constraint % {"check": check},
         }
 
-    def _create_check_sql(
-        self, model: type[Model], name: str, check: str
-    ) -> Statement | None:
-        if not self.connection.features.supports_table_check_constraints:
-            return None
+    def _create_check_sql(self, model: type[Model], name: str, check: str) -> Statement:
         return Statement(
             self.sql_create_check,
             table=Table(model.model_options.db_table, self.quote_name),
@@ -1615,9 +1540,7 @@ class BaseDatabaseSchemaEditor(ABC):
             check=check,
         )
 
-    def _delete_check_sql(self, model: type[Model], name: str) -> Statement | None:
-        if not self.connection.features.supports_table_check_constraints:
-            return None
+    def _delete_check_sql(self, model: type[Model], name: str) -> Statement:
         return self._delete_constraint_sql(self.sql_delete_check, model, name)
 
     def _delete_constraint_sql(
@@ -1644,11 +1567,7 @@ class BaseDatabaseSchemaEditor(ABC):
         """Return all constraint names matching the columns and conditions."""
         if column_names is not None:
             column_names = [
-                self.connection.introspection.identifier_converter(
-                    truncate_name(name, self.connection.ops.max_name_length())
-                )
-                if self.connection.features.truncates_names
-                else self.connection.introspection.identifier_converter(name)
+                self.connection.introspection.identifier_converter(name)
                 for name in column_names
             ]
         with self.connection.cursor() as cursor:
