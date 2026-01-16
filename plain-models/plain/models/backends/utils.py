@@ -16,7 +16,7 @@ from plain.models.otel import db_span
 from plain.utils.dateparse import parse_time
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
 
 logger = logging.getLogger("plain.models.backends")
 
@@ -75,7 +75,7 @@ class DBAPICursor(Protocol):
 
 
 class CursorWrapper:
-    def __init__(self, cursor: DBAPICursor, db: BaseDatabaseWrapper) -> None:
+    def __init__(self, cursor: DBAPICursor, db: DatabaseWrapper) -> None:
         self.cursor = cursor
         self.db = db
 
@@ -246,7 +246,7 @@ class CursorDebugWrapper(CursorWrapper):
 
 @contextmanager
 def debug_transaction(
-    connection: BaseDatabaseWrapper, sql: str
+    connection: DatabaseWrapper, sql: str
 ) -> Generator[None, None, None]:
     start = time.monotonic()
     try:

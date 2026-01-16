@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
 
 
 class PostgresBackupClient:
-    def __init__(self, connection: BaseDatabaseWrapper) -> None:
+    def __init__(self, connection: DatabaseWrapper) -> None:
         self.connection = connection
 
     def get_env(self) -> dict[str, str]:

@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
 
 
-class BaseDatabaseFeatures:
+class DatabaseFeatures:
     """
     Database features for PostgreSQL.
 
@@ -135,5 +135,5 @@ class BaseDatabaseFeatures:
     # PostgreSQL always supports transactions
     supports_transactions = True
 
-    def __init__(self, connection: BaseDatabaseWrapper):
+    def __init__(self, connection: DatabaseWrapper):
         self.connection = connection

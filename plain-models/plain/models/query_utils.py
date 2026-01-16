@@ -20,7 +20,7 @@ from plain.models.exceptions import FieldError
 from plain.utils import tree
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.fields import Field
     from plain.models.fields.related import ForeignKeyField
@@ -449,7 +449,7 @@ class FilteredRelation:
         """
         raise NotImplementedError("FilteredRelation.resolve_expression() is unused.")
 
-    def as_sql(self, compiler: SQLCompiler, connection: BaseDatabaseWrapper) -> Any:
+    def as_sql(self, compiler: SQLCompiler, connection: DatabaseWrapper) -> Any:
         # Resolve the condition in Join.filtered_relation.
         query = compiler.query
         where = query.build_filtered_relation_q(self.condition, reuse=set(self.path))

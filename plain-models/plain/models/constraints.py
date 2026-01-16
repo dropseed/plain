@@ -20,7 +20,7 @@ from plain.models.query_utils import Q
 from plain.models.sql.query import Query
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.backends.base.schema import DatabaseSchemaEditor
     from plain.models.backends.ddl_references import Statement
     from plain.models.base import Model
 
@@ -53,17 +53,17 @@ class BaseConstraint(ABC):
 
     @abstractmethod
     def constraint_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> str | None: ...
 
     @abstractmethod
     def create_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> str | Statement | None: ...
 
     @abstractmethod
     def remove_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> str | Statement | None: ...
 
     @abstractmethod
@@ -114,7 +114,7 @@ class CheckConstraint(BaseConstraint):
         )
 
     def _get_check_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> str:
         query = Query(model=model, alias_cols=False)
         where = query.build_where(self.check)
@@ -123,19 +123,19 @@ class CheckConstraint(BaseConstraint):
         return sql % tuple(schema_editor.quote_value(p) for p in params)
 
     def constraint_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> str:
         check = self._get_check_sql(model, schema_editor)
         return schema_editor._check_sql(self.name, check)
 
     def create_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> Statement | None:
         check = self._get_check_sql(model, schema_editor)
         return schema_editor._create_check_sql(model, self.name, check)
 
     def remove_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> Statement | None:
         return schema_editor._delete_check_sql(model, self.name)
 
@@ -268,7 +268,7 @@ class UniqueConstraint(BaseConstraint):
         return bool(self.expressions)
 
     def _get_condition_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> str | None:
         if self.condition is None:
             return None
@@ -279,7 +279,7 @@ class UniqueConstraint(BaseConstraint):
         return sql % tuple(schema_editor.quote_value(p) for p in params)
 
     def _get_index_expressions(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> Any:
         if not self.expressions:
             return None
@@ -293,7 +293,7 @@ class UniqueConstraint(BaseConstraint):
         )
 
     def constraint_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> str | None:
         fields = [
             model._model_meta.get_forward_field(field_name)
@@ -317,7 +317,7 @@ class UniqueConstraint(BaseConstraint):
         )
 
     def create_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> Statement | None:
         fields = [
             model._model_meta.get_forward_field(field_name)
@@ -341,7 +341,7 @@ class UniqueConstraint(BaseConstraint):
         )
 
     def remove_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> Statement | None:
         condition = self._get_condition_sql(model, schema_editor)
         include = [

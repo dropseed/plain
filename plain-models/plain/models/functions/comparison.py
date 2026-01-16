@@ -10,7 +10,7 @@ from plain.models.fields.json import JSONField
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -27,7 +27,7 @@ class Cast(Func):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -74,7 +74,7 @@ class Collate(Func):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -116,7 +116,7 @@ class JSONObject(Func):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,

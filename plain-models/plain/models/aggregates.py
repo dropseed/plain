@@ -18,7 +18,7 @@ from plain.models.functions.mixins import NumericOutputFieldMixin
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.expressions import Expression
     from plain.models.query_utils import Q
     from plain.models.sql.compiler import SQLCompiler
@@ -132,7 +132,7 @@ class Aggregate(Func):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,

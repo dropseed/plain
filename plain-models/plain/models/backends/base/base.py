@@ -8,78 +8,244 @@ import threading
 import time
 import warnings
 import zoneinfo
-from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Generator
 from contextlib import contextmanager
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, Any
 
+import psycopg as Database
+from psycopg import IsolationLevel, adapt, adapters, sql
+from psycopg.abc import Buffer, PyFormat
+from psycopg.postgres import types as pg_types
+from psycopg.pq import Format
+from psycopg.types.datetime import TimestamptzLoader
+from psycopg.types.range import BaseRangeDumper, Range, RangeDumper
+from psycopg.types.string import TextLoader
+
+from plain.exceptions import ImproperlyConfigured
 from plain.models.backends import utils
-from plain.models.backends.base.validation import BaseDatabaseValidation
+from plain.models.backends.base.validation import DatabaseValidation
+from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.models.backends.utils import debug_transaction
 from plain.models.db import (
     DatabaseError,
     DatabaseErrorWrapper,
     NotSupportedError,
+    db_connection,
 )
+from plain.models.db import DatabaseError as WrappedDatabaseError
 from plain.models.transaction import TransactionManagementError
 from plain.runtime import settings
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.client import BaseDatabaseClient
-    from plain.models.backends.base.creation import BaseDatabaseCreation
-    from plain.models.backends.base.features import BaseDatabaseFeatures
-    from plain.models.backends.base.introspection import BaseDatabaseIntrospection
-    from plain.models.backends.base.operations import BaseDatabaseOperations
-    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from psycopg import Connection as PsycopgConnection
+
+    from plain.models.backends.base.client import DatabaseClient
+    from plain.models.backends.base.creation import DatabaseCreation
+    from plain.models.backends.base.features import DatabaseFeatures
+    from plain.models.backends.base.introspection import DatabaseIntrospection
+    from plain.models.backends.base.operations import DatabaseOperations
+    from plain.models.backends.base.schema import DatabaseSchemaEditor
     from plain.models.connections import DatabaseConfig
 
 RAN_DB_VERSION_CHECK = False
 
 logger = logging.getLogger("plain.models.backends.base")
 
+# Type OIDs
+TIMESTAMPTZ_OID = adapters.types["timestamptz"].oid
+TSRANGE_OID = pg_types["tsrange"].oid
+TSTZRANGE_OID = pg_types["tstzrange"].oid
 
-class BaseDatabaseWrapper(ABC):
-    """Represent a database connection."""
 
-    # Mapping of Field objects to their column types.
-    data_types: dict[str, str] = {}
-    # Mapping of Field objects to their SQL suffix such as AUTOINCREMENT.
-    data_types_suffix: dict[str, str] = {}
-    # Mapping of Field objects to their SQL for CHECK constraints.
-    data_type_check_constraints: dict[str, str] = {}
-    # Mapping of lookup operators to SQL templates (defined on backend subclasses)
-    operators: dict[str, str]
-    # Mapping of pattern lookup operators to SQL templates using str.format syntax (defined on backend subclasses)
-    pattern_ops: dict[str, str]
-    # SQL template for escaping patterns in LIKE queries using str.format syntax (defined on backend subclasses)
-    pattern_esc: str
-    # Instance attributes - always assigned in __init__
-    ops: BaseDatabaseOperations
-    client: BaseDatabaseClient
-    creation: BaseDatabaseCreation
-    features: BaseDatabaseFeatures
-    introspection: BaseDatabaseIntrospection
-    validation: BaseDatabaseValidation
-    vendor: str = "unknown"
-    display_name: str = "unknown"
-    SchemaEditorClass: type[BaseDatabaseSchemaEditor] | None = None
-    # Classes instantiated in __init__() - subclasses must set these.
-    client_class: type[BaseDatabaseClient]
-    creation_class: type[BaseDatabaseCreation]
-    features_class: type[BaseDatabaseFeatures]
-    introspection_class: type[BaseDatabaseIntrospection]
-    ops_class: type[BaseDatabaseOperations]
-    validation_class: type[BaseDatabaseValidation] = BaseDatabaseValidation
-    Database: Any
+class BaseTzLoader(TimestamptzLoader):
+    """
+    Load a PostgreSQL timestamptz using a specific timezone.
+    The timezone can be None too, in which case it will be chopped.
+    """
+
+    timezone: datetime.tzinfo | None = None
+
+    def load(self, data: Buffer) -> datetime.datetime:
+        res = super().load(data)
+        return res.replace(tzinfo=self.timezone)
+
+
+def register_tzloader(tz: datetime.tzinfo | None, context: Any) -> None:
+    class SpecificTzLoader(BaseTzLoader):
+        timezone = tz
+
+    context.adapters.register_loader("timestamptz", SpecificTzLoader)
+
+
+class PlainRangeDumper(RangeDumper):
+    """A Range dumper customized for Plain."""
+
+    def upgrade(self, obj: Range[Any], format: PyFormat) -> BaseRangeDumper:
+        dumper = super().upgrade(obj, format)
+        if dumper is not self and dumper.oid == TSRANGE_OID:
+            dumper.oid = TSTZRANGE_OID
+        return dumper
+
+
+@lru_cache
+def get_adapters_template(timezone: datetime.tzinfo | None) -> adapt.AdaptersMap:
+    ctx = adapt.AdaptersMap(adapters)
+    # No-op JSON loader to avoid psycopg3 round trips
+    ctx.register_loader("jsonb", TextLoader)
+    # Treat inet/cidr as text
+    ctx.register_loader("inet", TextLoader)
+    ctx.register_loader("cidr", TextLoader)
+    ctx.register_dumper(Range, PlainRangeDumper)
+    register_tzloader(timezone, ctx)
+    return ctx
+
+
+def _get_varchar_column(data: dict[str, Any]) -> str:
+    if data["max_length"] is None:
+        return "varchar"
+    return "varchar({max_length})".format(**data)
+
+
+class DatabaseWrapper:
+    """
+    PostgreSQL database connection wrapper.
+
+    This is the only database backend supported by Plain.
+    """
+
+    # Type checker hints for component classes
+    ops: DatabaseOperations
+    client: DatabaseClient
+    creation: DatabaseCreation
+    features: DatabaseFeatures
+    introspection: DatabaseIntrospection
+    validation: DatabaseValidation
+
+    vendor = "postgresql"
+    display_name = "PostgreSQL"
+
+    # This dictionary maps Field objects to their associated PostgreSQL column
+    # types, as strings. Column-type strings can contain format strings; they'll
+    # be interpolated against the values of Field.__dict__ before being output.
+    # If a column type is set to None, it won't be included in the output.
+    data_types: dict[str, Any] = {
+        "PrimaryKeyField": "bigint",
+        "BinaryField": "bytea",
+        "BooleanField": "boolean",
+        "CharField": _get_varchar_column,
+        "DateField": "date",
+        "DateTimeField": "timestamp with time zone",
+        "DecimalField": "numeric(%(max_digits)s, %(decimal_places)s)",
+        "DurationField": "interval",
+        "FloatField": "double precision",
+        "IntegerField": "integer",
+        "BigIntegerField": "bigint",
+        "GenericIPAddressField": "inet",
+        "JSONField": "jsonb",
+        "PositiveBigIntegerField": "bigint",
+        "PositiveIntegerField": "integer",
+        "PositiveSmallIntegerField": "smallint",
+        "SmallIntegerField": "smallint",
+        "TextField": "text",
+        "TimeField": "time",
+        "UUIDField": "uuid",
+    }
+    data_type_check_constraints: dict[str, str] = {
+        "PositiveBigIntegerField": '"%(column)s" >= 0',
+        "PositiveIntegerField": '"%(column)s" >= 0',
+        "PositiveSmallIntegerField": '"%(column)s" >= 0',
+    }
+    data_types_suffix: dict[str, str] = {
+        "PrimaryKeyField": "GENERATED BY DEFAULT AS IDENTITY",
+    }
+    operators: dict[str, str] = {
+        "exact": "= %s",
+        "iexact": "= UPPER(%s)",
+        "contains": "LIKE %s",
+        "icontains": "LIKE UPPER(%s)",
+        "regex": "~ %s",
+        "iregex": "~* %s",
+        "gt": "> %s",
+        "gte": ">= %s",
+        "lt": "< %s",
+        "lte": "<= %s",
+        "startswith": "LIKE %s",
+        "endswith": "LIKE %s",
+        "istartswith": "LIKE UPPER(%s)",
+        "iendswith": "LIKE UPPER(%s)",
+    }
+
+    # The patterns below are used to generate SQL pattern lookup clauses when
+    # the right-hand side of the lookup isn't a raw string (it might be an expression
+    # or the result of a bilateral transformation).
+    # In those cases, special characters for LIKE operators (e.g. \, *, _) should be
+    # escaped on database side.
+    #
+    # Note: we use str.format() here for readability as '%' is used as a wildcard for
+    # the LIKE operator.
+    pattern_esc = (
+        r"REPLACE(REPLACE(REPLACE({}, E'\\', E'\\\\'), E'%%', E'\\%%'), E'_', E'\\_')"
+    )
+    pattern_ops: dict[str, str] = {
+        "contains": "LIKE '%%' || {} || '%%'",
+        "icontains": "LIKE '%%' || UPPER({}) || '%%'",
+        "startswith": "LIKE {} || '%%'",
+        "istartswith": "LIKE UPPER({}) || '%%'",
+        "endswith": "LIKE '%%' || {}",
+        "iendswith": "LIKE '%%' || UPPER({})",
+    }
+
+    Database = Database
+    # Import these lazily to avoid circular imports
+    SchemaEditorClass: type[DatabaseSchemaEditor] | None = None
+    client_class: type[DatabaseClient] | None = None
+    creation_class: type[DatabaseCreation] | None = None
+    features_class: type[DatabaseFeatures] | None = None
+    introspection_class: type[DatabaseIntrospection] | None = None
+    ops_class: type[DatabaseOperations] | None = None
+    validation_class: type[DatabaseValidation] | None = None
 
     queries_limit: int = 9000
 
+    # PostgreSQL backend-specific attributes.
+    _named_cursor_idx = 0
+
     def __init__(self, settings_dict: DatabaseConfig):
+        # Import component classes lazily to avoid circular imports
+        if self.SchemaEditorClass is None:
+            from plain.models.backends.base.schema import DatabaseSchemaEditor
+
+            DatabaseWrapper.SchemaEditorClass = DatabaseSchemaEditor
+        if self.client_class is None:
+            from plain.models.backends.base.client import DatabaseClient
+
+            DatabaseWrapper.client_class = DatabaseClient
+        if self.creation_class is None:
+            from plain.models.backends.base.creation import DatabaseCreation
+
+            DatabaseWrapper.creation_class = DatabaseCreation
+        if self.features_class is None:
+            from plain.models.backends.base.features import DatabaseFeatures
+
+            DatabaseWrapper.features_class = DatabaseFeatures
+        if self.introspection_class is None:
+            from plain.models.backends.base.introspection import DatabaseIntrospection
+
+            DatabaseWrapper.introspection_class = DatabaseIntrospection
+        if self.ops_class is None:
+            from plain.models.backends.base.operations import DatabaseOperations
+
+            DatabaseWrapper.ops_class = DatabaseOperations
+        if self.validation_class is None:
+            from plain.models.backends.base.validation import DatabaseValidation
+
+            DatabaseWrapper.validation_class = DatabaseValidation
+
         # Connection related attributes.
         # The underlying database connection (from the database library, not a wrapper).
-        self.connection: Any = None
+        self.connection: PsycopgConnection[Any] | None = None
         # `settings_dict` should be a dictionary containing keys such as
         # NAME, USER, etc. It's called `settings_dict` instead of `settings`
         # to disambiguate it from Plain settings modules.
@@ -136,22 +302,23 @@ class BaseDatabaseWrapper(ABC):
         # call execute(sql, params, many, context).
         self.execute_wrappers: list[Any] = []
 
-        self.client: BaseDatabaseClient = self.client_class(self)
-        self.creation: BaseDatabaseCreation = self.creation_class(self)
-        self.features: BaseDatabaseFeatures = self.features_class(self)
-        self.introspection: BaseDatabaseIntrospection = self.introspection_class(self)
-        self.ops: BaseDatabaseOperations = self.ops_class(self)
-        self.validation: BaseDatabaseValidation = self.validation_class(self)
+        # Component classes are guaranteed to be set by the lazy import blocks above
+        assert self.client_class is not None
+        assert self.creation_class is not None
+        assert self.features_class is not None
+        assert self.introspection_class is not None
+        assert self.ops_class is not None
+        assert self.validation_class is not None
+
+        self.client = self.client_class(self)
+        self.creation = self.creation_class(self)
+        self.features = self.features_class(self)
+        self.introspection = self.introspection_class(self)
+        self.ops = self.ops_class(self)
+        self.validation = self.validation_class(self)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__qualname__} vendor={self.vendor!r}>"
-
-    def ensure_timezone(self) -> bool:
-        """
-        Ensure the connection's timezone is set to `self.timezone_name` and
-        return whether it changed or not.
-        """
-        return False
 
     @cached_property
     def timezone(self) -> datetime.tzinfo:
@@ -164,10 +331,6 @@ class BaseDatabaseWrapper(ABC):
         When the database backend supports time zones, it doesn't matter which
         time zone Plain uses, as long as aware datetimes are used everywhere.
         Other users connecting to the database can choose their own time zone.
-
-        When the database backend doesn't support time zones, the time zone
-        Plain uses may be constrained by the requirements of other users of
-        the database.
         """
         if self.settings_dict["TIME_ZONE"] is None:
             return datetime.UTC
@@ -197,10 +360,12 @@ class BaseDatabaseWrapper(ABC):
             )
         return list(self.queries_log)
 
-    @abstractmethod
     def get_database_version(self) -> tuple[int, ...]:
-        """Return a tuple of the database's version."""
-        ...
+        """
+        Return a tuple of the database's version.
+        E.g. for pg_version 120004, return (12, 4).
+        """
+        return divmod(self.pg_version, 10000)
 
     def check_database_version_supported(self) -> None:
         """
@@ -222,15 +387,116 @@ class BaseDatabaseWrapper(ABC):
 
     # ##### Backend-specific methods for creating connections and cursors #####
 
-    @abstractmethod
     def get_connection_params(self) -> dict[str, Any]:
         """Return a dict of parameters suitable for get_new_connection."""
-        ...
+        settings_dict = self.settings_dict
+        options = settings_dict.get("OPTIONS", {})
+        # None may be used to connect to the default 'postgres' db
+        if settings_dict.get("NAME") == "" and not options.get("service"):
+            raise ImproperlyConfigured(
+                "settings.DATABASE is improperly configured. "
+                "Please supply the NAME or OPTIONS['service'] value."
+            )
+        db_name = settings_dict.get("NAME")
+        if len(db_name or "") > self.ops.max_name_length():
+            raise ImproperlyConfigured(
+                "The database name '%s' (%d characters) is longer than "  # noqa: UP031
+                "PostgreSQL's limit of %d characters. Supply a shorter NAME "
+                "in settings.DATABASE."
+                % (
+                    db_name,
+                    len(db_name or ""),
+                    self.ops.max_name_length(),
+                )
+            )
+        conn_params: dict[str, Any] = {"client_encoding": "UTF8"}
+        if db_name:
+            conn_params = {
+                "dbname": db_name,
+                **options,
+            }
+        elif db_name is None:
+            # Connect to the default 'postgres' db.
+            options.pop("service", None)
+            conn_params = {"dbname": "postgres", **options}
+        else:
+            conn_params = {**options}
 
-    @abstractmethod
-    def get_new_connection(self, conn_params: dict[str, Any]) -> Any:
+        conn_params.pop("assume_role", None)
+        conn_params.pop("isolation_level", None)
+        conn_params.pop("server_side_binding", None)
+        if settings_dict["USER"]:
+            conn_params["user"] = settings_dict["USER"]
+        if settings_dict["PASSWORD"]:
+            conn_params["password"] = settings_dict["PASSWORD"]
+        if settings_dict["HOST"]:
+            conn_params["host"] = settings_dict["HOST"]
+        if settings_dict["PORT"]:
+            conn_params["port"] = settings_dict["PORT"]
+        conn_params["context"] = get_adapters_template(self.timezone)
+        # Disable prepared statements by default to keep connection poolers
+        # working. Can be reenabled via OPTIONS in the settings dict.
+        conn_params["prepare_threshold"] = conn_params.pop("prepare_threshold", None)
+        return conn_params
+
+    def get_new_connection(self, conn_params: dict[str, Any]) -> PsycopgConnection[Any]:
         """Open a connection to the database."""
-        ...
+        # self.isolation_level must be set:
+        # - after connecting to the database in order to obtain the database's
+        #   default when no value is explicitly specified in options.
+        # - before calling _set_autocommit() because if autocommit is on, that
+        #   will set connection.isolation_level to ISOLATION_LEVEL_AUTOCOMMIT.
+        options = self.settings_dict.get("OPTIONS", {})
+        set_isolation_level = False
+        try:
+            isolation_level_value = options["isolation_level"]
+        except KeyError:
+            self.isolation_level = IsolationLevel.READ_COMMITTED
+        else:
+            # Set the isolation level to the value from OPTIONS.
+            try:
+                self.isolation_level = IsolationLevel(isolation_level_value)
+                set_isolation_level = True
+            except ValueError:
+                raise ImproperlyConfigured(
+                    f"Invalid transaction isolation level {isolation_level_value} "
+                    f"specified. Use one of the psycopg.IsolationLevel values."
+                )
+        connection = self.Database.connect(**conn_params)
+        if set_isolation_level:
+            connection.isolation_level = self.isolation_level
+        # Use server-side binding cursor if requested, otherwise standard cursor
+        connection.cursor_factory = (
+            ServerBindingCursor
+            if options.get("server_side_binding") is True
+            else Cursor
+        )
+        return connection
+
+    def ensure_timezone(self) -> bool:
+        """
+        Ensure the connection's timezone is set to `self.timezone_name` and
+        return whether it changed or not.
+        """
+        if self.connection is None:
+            return False
+        conn_timezone_name = self.connection.info.parameter_status("TimeZone")
+        timezone_name = self.timezone_name
+        if timezone_name and conn_timezone_name != timezone_name:
+            with self.connection.cursor() as cursor:
+                cursor.execute(self.ops.set_time_zone_sql(), [timezone_name])  # type: ignore[arg-type]
+            return True
+        return False
+
+    def ensure_role(self) -> bool:
+        if self.connection is None:
+            return False
+        if new_role := self.settings_dict.get("OPTIONS", {}).get("assume_role"):
+            with self.connection.cursor() as cursor:
+                sql_str = self.ops.compose_sql("SET ROLE %s", [new_role])
+                cursor.execute(sql_str)  # type: ignore[arg-type]
+            return True
+        return False
 
     def init_connection_state(self) -> None:
         """Initialize the database connection settings."""
@@ -239,10 +505,143 @@ class BaseDatabaseWrapper(ABC):
             self.check_database_version_supported()
             RAN_DB_VERSION_CHECK = True
 
-    @abstractmethod
+        # Commit after setting the time zone.
+        commit_tz = self.ensure_timezone()
+        # Set the role on the connection. This is useful if the credential used
+        # to login is not the same as the role that owns database resources. As
+        # can be the case when using temporary or ephemeral credentials.
+        commit_role = self.ensure_role()
+
+        if (commit_role or commit_tz) and not self.get_autocommit():
+            assert self.connection is not None
+            self.connection.commit()
+
     def create_cursor(self, name: str | None = None) -> Any:
         """Create a cursor. Assume that a connection is established."""
-        ...
+        assert self.connection is not None
+        if name:
+            # In autocommit mode, the cursor will be used outside of a
+            # transaction, hence use a holdable cursor.
+            cursor = self.connection.cursor(
+                name, scrollable=False, withhold=self.connection.autocommit
+            )
+        else:
+            cursor = self.connection.cursor()
+
+        # Register the cursor timezone only if the connection disagrees, to avoid copying the adapter map.
+        tzloader = self.connection.adapters.get_loader(TIMESTAMPTZ_OID, Format.TEXT)
+        if self.timezone != tzloader.timezone:  # type: ignore[union-attr]
+            register_tzloader(self.timezone, cursor)
+        return cursor
+
+    def tzinfo_factory(self, offset: int) -> datetime.tzinfo | None:
+        return self.timezone
+
+    def chunked_cursor(self) -> utils.CursorWrapper:
+        """
+        Return a cursor that tries to avoid caching in the database (if
+        supported by the database), otherwise return a regular cursor.
+        """
+        self._named_cursor_idx += 1
+        # Get the current async task
+        # Note that right now this is behind @async_unsafe, so this is
+        # unreachable, but in future we'll start loosening this restriction.
+        # For now, it's here so that every use of "threading" is
+        # also async-compatible.
+        task_ident = "sync"
+        # Use that and the thread ident to get a unique name
+        return self._cursor(
+            name="_plain_curs_%d_%s_%d"  # noqa: UP031
+            % (
+                # Avoid reusing name in other threads / tasks
+                threading.current_thread().ident,
+                task_ident,
+                self._named_cursor_idx,
+            )
+        )
+
+    def _set_autocommit(self, autocommit: bool) -> None:
+        """Backend-specific implementation to enable or disable autocommit."""
+        assert self.connection is not None
+        with self.wrap_database_errors:
+            self.connection.autocommit = autocommit
+
+    def check_constraints(self, table_names: list[str] | None = None) -> None:
+        """
+        Check constraints by setting them to immediate. Return them to deferred
+        afterward.
+        """
+        with self.cursor() as cursor:
+            cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+            cursor.execute("SET CONSTRAINTS ALL DEFERRED")
+
+    def is_usable(self) -> bool:
+        """
+        Test if the database connection is usable.
+
+        This method may assume that self.connection is not None.
+
+        Actual implementations should take care not to raise exceptions
+        as that may prevent Plain from recycling unusable connections.
+        """
+        assert self.connection is not None
+        try:
+            # Use a psycopg cursor directly, bypassing Plain's utilities.
+            with self.connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+        except Database.Error:
+            return False
+        else:
+            return True
+
+    @contextmanager
+    def _nodb_cursor(self) -> Generator[utils.CursorWrapper, None, None]:
+        """
+        Return a cursor from an alternative connection to be used when there is
+        no need to access the main database, specifically for test db
+        creation/deletion. This also prevents the production database from
+        being exposed to potential child threads while (or after) the test
+        database is destroyed. Refs #10868, #17786, #16969.
+        """
+        cursor = None
+        try:
+            conn = self.__class__({**self.settings_dict, "NAME": None})
+            try:
+                with conn.cursor() as cursor:
+                    yield cursor
+            finally:
+                conn.close()
+        except (Database.DatabaseError, WrappedDatabaseError):
+            if cursor is not None:
+                raise
+            warnings.warn(
+                "Normally Plain will use a connection to the 'postgres' database "
+                "to avoid running initialization queries against the production "
+                "database when it's not needed (for example, when running tests). "
+                "Plain was unable to create a connection to the 'postgres' database "
+                "and will use the first PostgreSQL database instead.",
+                RuntimeWarning,
+            )
+            conn = self.__class__(
+                {
+                    **self.settings_dict,
+                    "NAME": db_connection.settings_dict["NAME"],
+                },
+            )
+            try:
+                with conn.cursor() as cursor:
+                    yield cursor
+            finally:
+                conn.close()
+
+    @cached_property
+    def pg_version(self) -> int:
+        with self.temporary_connection():
+            assert self.connection is not None
+            return self.connection.info.server_version
+
+    def make_debug_cursor(self, cursor: Any) -> CursorDebugWrapper:
+        return CursorDebugWrapper(cursor, self)
 
     # ##### Backend-specific methods for creating connections #####
 
@@ -426,15 +825,6 @@ class BaseDatabaseWrapper(ABC):
         """
         self.savepoint_state = 0
 
-    # ##### Backend-specific transaction management methods #####
-
-    @abstractmethod
-    def _set_autocommit(self, autocommit: bool) -> None:
-        """
-        Backend-specific implementation to enable or disable autocommit.
-        """
-        ...
-
     # ##### Generic transaction management methods #####
 
     def get_autocommit(self) -> bool:
@@ -508,27 +898,7 @@ class BaseDatabaseWrapper(ABC):
         """
         pass
 
-    def check_constraints(self, table_names: list[str] | None = None) -> None:
-        """
-        Backends can override this method if they can apply constraint
-        checking (e.g. via "SET CONSTRAINTS ALL IMMEDIATE"). Should raise an
-        IntegrityError if any invalid foreign key references are encountered.
-        """
-        pass
-
     # ##### Connection termination handling #####
-
-    @abstractmethod
-    def is_usable(self) -> bool:
-        """
-        Test if the database connection is usable.
-
-        This method may assume that self.connection is not None.
-
-        Actual implementations should take care not to raise exceptions
-        as that may prevent Plain from recycling unusable connections.
-        """
-        ...
 
     def close_if_health_check_failed(self) -> None:
         """Close existing connection if it fails a health check."""
@@ -609,17 +979,6 @@ class BaseDatabaseWrapper(ABC):
         """
         return DatabaseErrorWrapper(self)
 
-    def chunked_cursor(self) -> utils.CursorWrapper:
-        """
-        Return a cursor that tries to avoid caching in the database (if
-        supported by the database), otherwise return a regular cursor.
-        """
-        return self.cursor()
-
-    def make_debug_cursor(self, cursor: utils.DBAPICursor) -> utils.CursorDebugWrapper:
-        """Create a cursor that logs all queries in self.queries_log."""
-        return utils.CursorDebugWrapper(cursor, self)
-
     def make_cursor(self, cursor: utils.DBAPICursor) -> utils.CursorWrapper:
         """Create a cursor without debug logging."""
         return utils.CursorWrapper(cursor, self)
@@ -641,23 +1000,7 @@ class BaseDatabaseWrapper(ABC):
             if must_close:
                 self.close()
 
-    @contextmanager
-    def _nodb_cursor(self) -> Generator[utils.CursorWrapper, None, None]:
-        """
-        Return a cursor from an alternative connection to be used when there is
-        no need to access the main database, specifically for test db
-        creation/deletion. This also prevents the production database from
-        being exposed to potential child threads while (or after) the test
-        database is destroyed. Refs #10868, #17786, #16969.
-        """
-        conn = self.__class__({**self.settings_dict, "NAME": None})
-        try:
-            with conn.cursor() as cursor:
-                yield cursor
-        finally:
-            conn.close()
-
-    def schema_editor(self, *args: Any, **kwargs: Any) -> BaseDatabaseSchemaEditor:
+    def schema_editor(self, *args: Any, **kwargs: Any) -> DatabaseSchemaEditor:
         """
         Return a new instance of this backend's SchemaEditor.
         """
@@ -723,7 +1066,7 @@ class BaseDatabaseWrapper(ABC):
         finally:
             self.execute_wrappers.pop()
 
-    def copy(self) -> BaseDatabaseWrapper:
+    def copy(self) -> DatabaseWrapper:
         """
         Return a copy of this connection.
 
@@ -731,3 +1074,41 @@ class BaseDatabaseWrapper(ABC):
         """
         settings_dict = copy.deepcopy(self.settings_dict)
         return type(self)(settings_dict)
+
+
+class CursorMixin:
+    """
+    A subclass of psycopg cursor implementing callproc.
+    """
+
+    def callproc(
+        self, name: str | sql.Identifier, args: list[Any] | None = None
+    ) -> list[Any] | None:
+        if not isinstance(name, sql.Identifier):
+            name = sql.Identifier(name)
+
+        qparts: list[sql.Composable] = [sql.SQL("SELECT * FROM "), name, sql.SQL("(")]
+        if args:
+            for item in args:
+                qparts.append(sql.Literal(item))
+                qparts.append(sql.SQL(","))
+            del qparts[-1]
+
+        qparts.append(sql.SQL(")"))
+        stmt = sql.Composed(qparts)
+        self.execute(stmt)  # type: ignore[attr-defined]
+        return args
+
+
+class ServerBindingCursor(CursorMixin, Database.Cursor):
+    pass
+
+
+class Cursor(CursorMixin, Database.ClientCursor):
+    pass
+
+
+class CursorDebugWrapper(BaseCursorDebugWrapper):
+    def copy(self, statement: Any) -> Any:
+        with self.debug_sql(statement):
+            return self.cursor.copy(statement)  # type: ignore[union-attr]

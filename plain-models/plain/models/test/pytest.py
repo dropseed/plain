@@ -10,7 +10,7 @@ from plain.models.otel import suppress_db_tracing
 from plain.signals import request_finished, request_started
 
 from .. import transaction
-from ..backends.base.base import BaseDatabaseWrapper
+from ..backends.base.base import DatabaseWrapper
 from ..db import close_old_connections, db_connection
 from .utils import (
     setup_database,
@@ -29,13 +29,13 @@ def _db_disabled() -> Generator[None, None, None]:
         pytest.fail("Database access not allowed without the `db` fixture")
 
     # Save original cursor method and replace with disabled version
-    setattr(BaseDatabaseWrapper, "_enabled_cursor", BaseDatabaseWrapper.cursor)
-    BaseDatabaseWrapper.cursor = cursor_disabled  # type: ignore[assignment]
+    setattr(DatabaseWrapper, "_enabled_cursor", DatabaseWrapper.cursor)
+    DatabaseWrapper.cursor = cursor_disabled  # type: ignore[assignment]
 
     yield
 
     # Restore original cursor method
-    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")
+    DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
 
 
 @pytest.fixture(scope="session")
@@ -69,7 +69,7 @@ def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
 
     # Set .cursor() back to the original implementation to unblock it
-    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")
+    DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
 
     if not db_connection.features.supports_transactions:
         pytest.fail("Database does not support transactions")
@@ -105,7 +105,7 @@ def isolated_db(request: Any) -> Generator[None, None, None]:
     if "db" in request.fixturenames:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
     # Set .cursor() back to the original implementation to unblock it
-    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")
+    DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
 
     verbosity = 1
 

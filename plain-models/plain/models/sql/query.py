@@ -62,7 +62,7 @@ from plain.utils.tree import Node
 
 if TYPE_CHECKING:
     from plain.models import Model
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.fields.related import RelatedField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.meta import Meta
@@ -1178,7 +1178,7 @@ class Query(BaseExpression):
         return cast(list[BaseExpression], external_cols)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> SqlWithParams:
         # Some backends (e.g. Oracle) raise an error when a subquery contains
         # unnecessary ORDER BY clause.

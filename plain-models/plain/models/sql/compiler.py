@@ -39,7 +39,7 @@ from plain.utils.hashable import make_hashable
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.expressions import BaseExpression
     from plain.models.sql.subqueries import InsertQuery
 
@@ -52,7 +52,7 @@ class SQLCompilable(Protocol):
     """Protocol for objects that can be compiled to SQL."""
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         """Return SQL string and parameters for this object."""
         ...
@@ -64,7 +64,7 @@ class PositionRef(Ref):
         super().__init__(refs, source)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         return str(self.ordinal), []
 
@@ -77,7 +77,7 @@ class SQLCompiler:
     )
 
     def __init__(
-        self, query: Query, connection: BaseDatabaseWrapper, elide_empty: bool = True
+        self, query: Query, connection: DatabaseWrapper, elide_empty: bool = True
     ):
         self.query = query
         self.connection = connection

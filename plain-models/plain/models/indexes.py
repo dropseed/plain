@@ -11,8 +11,8 @@ from plain.models.sql import Query
 from plain.utils.functional import partition
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.base.schema import DatabaseSchemaEditor
     from plain.models.backends.ddl_references import Statement
     from plain.models.base import Model
     from plain.models.expressions import Expression
@@ -91,7 +91,7 @@ class Index:
         return bool(self.expressions)
 
     def _get_condition_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> str | None:
         if self.condition is None:
             return None
@@ -102,7 +102,7 @@ class Index:
         return sql % tuple(schema_editor.quote_value(p) for p in params)
 
     def create_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor, **kwargs: Any
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor, **kwargs: Any
     ) -> Statement:
         include = [
             model._model_meta.get_forward_field(field_name).column
@@ -143,7 +143,7 @@ class Index:
         )
 
     def remove_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor, **kwargs: Any
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor, **kwargs: Any
     ) -> Statement:
         return schema_editor._delete_index_sql(model, self.name, **kwargs)
 
@@ -224,9 +224,7 @@ class IndexExpression(Func):
     template = "%(expressions)s"
     wrapper_classes = (OrderBy, Collate)
 
-    def set_wrapper_classes(
-        self, connection: BaseDatabaseWrapper | None = None
-    ) -> None:
+    def set_wrapper_classes(self, connection: DatabaseWrapper | None = None) -> None:
         # Some databases (e.g. MySQL) treats COLLATE as an indexed expression.
         if connection and connection.features.collate_as_index_expression:
             self.wrapper_classes = tuple(

@@ -12,7 +12,7 @@ from opentelemetry import trace
 if TYPE_CHECKING:
     from opentelemetry.trace import Span
 
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,
     DB_USER,
@@ -105,7 +105,7 @@ def _clean_identifier(identifier: str) -> str:
 
 @contextmanager
 def db_span(
-    db: BaseDatabaseWrapper, sql: Any, *, many: bool = False, params: Any = None
+    db: DatabaseWrapper, sql: Any, *, many: bool = False, params: Any = None
 ) -> Generator[Span | None, None, None]:
     """Open an OpenTelemetry CLIENT span for a database query.
 

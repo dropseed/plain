@@ -20,7 +20,7 @@ from plain.utils import timezone
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.fields import Field
     from plain.models.sql.compiler import SQLCompiler
     from plain.models.sql.query import Query
@@ -35,7 +35,7 @@ def get_json_dumps(
     return partial(json.dumps, cls=encoder)
 
 
-class BaseDatabaseOperations:
+class DatabaseOperations:
     """
     Encapsulate backend-specific differences, such as the way a backend
     performs ordering or calculates the ID of a recently-inserted row.
@@ -98,7 +98,7 @@ class BaseDatabaseOperations:
     # EXTRACT format cannot be passed in parameters.
     _extract_format_re = _lazy_re_compile(r"[A-Z_]+")
 
-    def __init__(self, connection: BaseDatabaseWrapper):
+    def __init__(self, connection: DatabaseWrapper):
         self.connection = connection
 
     def bulk_batch_size(self, fields: list[Field], objs: list[Any]) -> int:
@@ -111,7 +111,7 @@ class BaseDatabaseOperations:
 
     def format_for_duration_arithmetic(self, sql: str) -> str:
         raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a "
+            "subclasses of DatabaseOperations may require a "
             "format_for_duration_arithmetic() method."
         )
 
@@ -553,6 +553,7 @@ class BaseDatabaseOperations:
         return f'"{name}"'
 
     def compose_sql(self, query: str, params: Any) -> str:
+        assert self.connection.connection is not None
         return ClientCursor(self.connection.connection).mogrify(
             sql.SQL(cast(LiteralString, query)), params
         )
@@ -567,7 +568,7 @@ class BaseDatabaseOperations:
         NotImplementedError.
         """
         raise NotImplementedError(
-            "subclasses of BaseDatabaseOperations may require a regex_lookup() method"
+            "subclasses of DatabaseOperations may require a regex_lookup() method"
         )
 
     def savepoint_create_sql(self, sid: str) -> str:
@@ -748,7 +749,7 @@ class BaseDatabaseOperations:
         return []
 
     def convert_durationfield_value(
-        self, value: int | None, expression: Any, connection: BaseDatabaseWrapper
+        self, value: int | None, expression: Any, connection: DatabaseWrapper
     ) -> datetime.timedelta | None:
         if value is not None:
             return datetime.timedelta(0, 0, value)
@@ -930,7 +931,3 @@ class BaseDatabaseOperations:
                 ),
             )
         return ""
-
-
-# Backwards compatibility alias
-DatabaseOperations = BaseDatabaseOperations

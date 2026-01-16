@@ -8,7 +8,7 @@ from plain.models.migrations.utils import get_migration_name_timestamp
 from plain.models.transaction import atomic
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.backends.base.schema import DatabaseSchemaEditor
     from plain.models.migrations.state import ProjectState
 
 
@@ -95,7 +95,7 @@ class Migration:
     def apply(
         self,
         project_state: ProjectState,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         operation_callback: Callable[..., Any] | None = None,
     ) -> ProjectState:
         """

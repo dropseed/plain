@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -168,7 +168,7 @@ class DatabaseErrorWrapper:
     exceptions using Plain's common wrappers.
     """
 
-    def __init__(self, wrapper: BaseDatabaseWrapper) -> None:
+    def __init__(self, wrapper: DatabaseWrapper) -> None:
         """
         wrapper is a database wrapper.
 

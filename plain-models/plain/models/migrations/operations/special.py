@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from .base import Operation
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.backends.base.schema import DatabaseSchemaEditor
     from plain.models.migrations.state import ProjectState
 
 
@@ -43,7 +43,7 @@ class SeparateDatabaseAndState(Operation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
@@ -96,7 +96,7 @@ class RunSQL(Operation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
@@ -107,7 +107,7 @@ class RunSQL(Operation):
 
     def _run_sql(
         self,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         sqls: str
         | list[str | tuple[str, list[Any]]]
         | tuple[str | tuple[str, list[Any]], ...],
@@ -169,7 +169,7 @@ class RunPython(Operation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:

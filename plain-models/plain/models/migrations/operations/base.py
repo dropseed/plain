@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
+    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.base.schema import DatabaseSchemaEditor
     from plain.models.migrations.state import ProjectState
 
 
@@ -73,7 +73,7 @@ class Operation(ABC):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
@@ -118,7 +118,7 @@ class Operation(ABC):
         """
         return self.references_model(model_name, package_label)
 
-    def allow_migrate_model(self, connection: BaseDatabaseWrapper, model: Any) -> bool:
+    def allow_migrate_model(self, connection: DatabaseWrapper, model: Any) -> bool:
         """Return whether or not a model may be migrated."""
         if not model.model_options.can_migrate(connection):
             return False

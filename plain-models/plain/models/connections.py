@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from importlib import import_module
 from threading import local
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from plain.runtime import settings as plain_settings
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
 
 
 class DatabaseConfig(TypedDict, total=False):
@@ -15,7 +14,6 @@ class DatabaseConfig(TypedDict, total=False):
     CONN_MAX_AGE: int | None
     CONN_HEALTH_CHECKS: bool
     DISABLE_SERVER_SIDE_CURSORS: bool
-    ENGINE: str
     HOST: str
     NAME: str | None
     OPTIONS: dict[str, Any]
@@ -58,20 +56,11 @@ class DatabaseConnection:
 
         return database
 
-    def create_connection(self) -> BaseDatabaseWrapper:
-        database_config = self.configure_settings()
-        backend = import_module(f"{database_config['ENGINE']}.base")
+    def create_connection(self) -> DatabaseWrapper:
+        from plain.models.backends.base.base import DatabaseWrapper
 
-        # PostgreSQL is the only supported database
-        if database_config["ENGINE"] != "plain.models.backends.postgresql":
-            raise ValueError(
-                f"Unsupported database engine '{database_config['ENGINE']}'. "
-                "PostgreSQL is the only supported database. "
-                "Use DATABASE_URL=postgres://... or ENGINE='plain.models.backends.postgresql'"
-            )
-        wrapper_class_name = "PostgreSQLDatabaseWrapper"
-        wrapper_class = getattr(backend, wrapper_class_name)
-        return wrapper_class(database_config)
+        database_config = self.configure_settings()
+        return DatabaseWrapper(database_config)
 
     def has_connection(self) -> bool:
         return hasattr(self._local, "conn")

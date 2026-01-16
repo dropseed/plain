@@ -26,7 +26,7 @@ from plain.utils.hashable import make_hashable
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.fields import Field
     from plain.models.lookups import Lookup, Transform
     from plain.models.query import QuerySet
@@ -211,7 +211,7 @@ class BaseExpression:
         return state
 
     def get_db_converters(
-        self, connection: BaseDatabaseWrapper
+        self, connection: DatabaseWrapper
     ) -> list[Callable[..., Any]]:
         converters = []
         if self.convert_value is not self._convert_value_noop:
@@ -234,7 +234,7 @@ class BaseExpression:
         ]
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         """
         Return a (sql, params) tuple to be included in the current query.
@@ -365,7 +365,7 @@ class BaseExpression:
 
     @staticmethod
     def _convert_value_noop(
-        value: Any, expression: Any, connection: BaseDatabaseWrapper
+        value: Any, expression: Any, connection: DatabaseWrapper
     ) -> Any:
         return value
 
@@ -712,7 +712,7 @@ class CombinedExpression(Expression):
         return combined_type()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         expressions = []
         expression_params = []
@@ -782,7 +782,7 @@ class CombinedExpression(Expression):
 
 class DurationExpression(CombinedExpression):
     def compile(
-        self, side: Any, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, side: Any, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         try:
             output = side.output_field
@@ -795,7 +795,7 @@ class DurationExpression(CombinedExpression):
         return compiler.compile(side)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         if connection.features.has_native_duration_field:
             return super().as_sql(compiler, connection)
@@ -821,7 +821,7 @@ class TemporalSubtraction(CombinedExpression):
         super().__init__(lhs, self.SUB, rhs)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         connection.ops.check_expression_support(self)
         lhs = compiler.compile(self.lhs)
@@ -990,7 +990,7 @@ class Func(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -1057,7 +1057,7 @@ class Value(Expression):
         return f"{self.__class__.__name__}({self.value!r})"
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         connection.ops.check_expression_support(self)
         val = self.value
@@ -1133,7 +1133,7 @@ class RawSQL(Expression):
         return f"{self.__class__.__name__}({self.sql}, {self.params})"
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         return f"({self.sql})", self.params
 
@@ -1146,7 +1146,7 @@ class Star(Expression):
         return "'*'"
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         return "*", []
 
@@ -1169,7 +1169,7 @@ class Col(Expression):
         return "{}({})".format(self.__class__.__name__, ", ".join(identifiers))
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         alias, column = self.alias, self.target.column
         identifiers = (alias, column) if alias else (column,)
@@ -1187,7 +1187,7 @@ class Col(Expression):
         return [self]
 
     def get_db_converters(
-        self, connection: BaseDatabaseWrapper
+        self, connection: DatabaseWrapper
     ) -> list[Callable[..., Any]]:
         if self.target == self.output_field:
             return self.output_field.get_db_converters(connection)
@@ -1234,7 +1234,7 @@ class Ref(Expression):
         return self
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         return connection.ops.quote_name(self.refs), []
 
@@ -1316,7 +1316,7 @@ class ExpressionWrapper(Expression):
         return super().get_group_by_cols()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         return compiler.compile(self.expression)
 
@@ -1334,7 +1334,7 @@ class NegatedExpression(ExpressionWrapper):
         return self.expression.copy()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         try:
             sql, params = super().as_sql(compiler, connection)
@@ -1453,7 +1453,7 @@ class When(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
@@ -1553,7 +1553,7 @@ class Case(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         template: str | None = None,
         case_joiner: str | None = None,
         **extra_context: Any,
@@ -1649,7 +1649,7 @@ class Subquery(BaseExpression, Combinable):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
@@ -1721,7 +1721,7 @@ class OrderBy(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
@@ -1833,7 +1833,7 @@ class Window(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         template: str | None = None,
     ) -> tuple[str, tuple[Any, ...]]:
         connection.ops.check_expression_support(self)
@@ -1911,7 +1911,7 @@ class WindowFrame(Expression, ABC):
         return [self.start, self.end]
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         connection.ops.check_expression_support(self)
         start, end = self.window_frame_start_end(
@@ -1955,7 +1955,7 @@ class WindowFrame(Expression, ABC):
 
     @abstractmethod
     def window_frame_start_end(
-        self, connection: BaseDatabaseWrapper, start: int | None, end: int | None
+        self, connection: DatabaseWrapper, start: int | None, end: int | None
     ) -> tuple[str, str]: ...
 
 
@@ -1963,7 +1963,7 @@ class RowRange(WindowFrame):
     frame_type = "ROWS"
 
     def window_frame_start_end(
-        self, connection: BaseDatabaseWrapper, start: int | None, end: int | None
+        self, connection: DatabaseWrapper, start: int | None, end: int | None
     ) -> tuple[str, str]:
         return connection.ops.window_frame_rows_start_end(start, end)
 
@@ -1972,6 +1972,6 @@ class ValueRange(WindowFrame):
     frame_type = "RANGE"
 
     def window_frame_start_end(
-        self, connection: BaseDatabaseWrapper, start: int | None, end: int | None
+        self, connection: DatabaseWrapper, start: int | None, end: int | None
     ) -> tuple[str, str]:
         return connection.ops.window_frame_range_start_end(start, end)

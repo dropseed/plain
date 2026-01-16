@@ -42,10 +42,10 @@ def get_git_commit() -> str | None:
 
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
 
 # Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
-db_connection = cast("BaseDatabaseWrapper", _db_connection)
+db_connection = cast("DatabaseWrapper", _db_connection)
 
 
 class DatabaseBackups:

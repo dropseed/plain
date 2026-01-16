@@ -33,7 +33,7 @@ from plain.utils import timezone
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
@@ -97,7 +97,7 @@ def _related_non_m2m_objects(
         )
 
 
-class BaseDatabaseSchemaEditor:
+class DatabaseSchemaEditor:
     """
     This class and its subclasses are responsible for emitting schema-changing
     statements to the databases - model creation/removal/alteration, field
@@ -197,7 +197,7 @@ class BaseDatabaseSchemaEditor:
 
     def __init__(
         self,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         atomic: bool = True,
     ):
         self.connection = connection
@@ -1881,7 +1881,3 @@ class BaseDatabaseSchemaEditor:
         table_name: str | None = None,
     ) -> str:
         return "COLLATE " + self.quote_name(collation) if collation else ""
-
-
-# Backwards compatibility alias
-DatabaseSchemaEditor = BaseDatabaseSchemaEditor

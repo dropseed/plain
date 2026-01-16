@@ -10,14 +10,14 @@ from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
 
 # The prefix to put on the default database name when creating
 # the test database.
 TEST_DATABASE_PREFIX = "test_"
 
 
-class BaseDatabaseCreation:
+class DatabaseCreation:
     """
     Encapsulate backend-specific differences pertaining to creation and
     destruction of the test database.
@@ -25,7 +25,7 @@ class BaseDatabaseCreation:
     PostgreSQL is the only supported database backend.
     """
 
-    def __init__(self, connection: BaseDatabaseWrapper):
+    def __init__(self, connection: DatabaseWrapper):
         self.connection = connection
 
     def _nodb_cursor(self) -> Any:
@@ -231,7 +231,3 @@ class BaseDatabaseCreation:
             settings_dict.get("ENGINE") or "",
             self._get_test_db_name(prefix),
         )
-
-
-# Backwards compatibility alias
-DatabaseCreation = BaseDatabaseCreation

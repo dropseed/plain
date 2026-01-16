@@ -3,14 +3,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.fields import Field
 
 
-class BaseDatabaseValidation:
+class DatabaseValidation:
     """Encapsulate backend-specific validation."""
 
-    def __init__(self, connection: BaseDatabaseWrapper) -> None:
+    def __init__(self, connection: DatabaseWrapper) -> None:
         self.connection = connection
 
     def preflight(self) -> list[Any]:

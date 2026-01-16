@@ -11,7 +11,7 @@ from plain.models.exceptions import FullResultSet
 from plain.models.sql.constants import INNER, LOUTER
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.sql.compiler import SQLCompiler
@@ -82,7 +82,7 @@ class Join:
         self.filtered_relation = filtered_relation
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         """
         Generate the full
@@ -192,7 +192,7 @@ class BaseTable:
         self.table_alias = alias
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         alias_str = (
             "" if self.table_alias == self.table_name else (f" {self.table_alias}")

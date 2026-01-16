@@ -7,7 +7,7 @@ from plain.models.backends.utils import CursorWrapper
 from plain.models.indexes import Index
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
 
 
 # Protocols for structural typing - allows backends to extend with extra fields
@@ -58,7 +58,7 @@ class FieldInfo(NamedTuple):
     comment: str | None
 
 
-class BaseDatabaseIntrospection:
+class DatabaseIntrospection:
     """
     Encapsulate backend-specific introspection utilities.
 
@@ -93,7 +93,7 @@ class BaseDatabaseIntrospection:
 
     ignored_tables: list[str] = []
 
-    def __init__(self, connection: BaseDatabaseWrapper) -> None:
+    def __init__(self, connection: DatabaseWrapper) -> None:
         self.connection = connection
 
     def get_field_type(self, data_type: Any, description: Any) -> str:
@@ -465,7 +465,3 @@ class BaseDatabaseIntrospection:
                     "options": options,
                 }
         return constraints
-
-
-# Backwards compatibility alias
-DatabaseIntrospection = BaseDatabaseIntrospection

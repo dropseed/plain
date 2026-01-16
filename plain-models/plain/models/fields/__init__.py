@@ -45,7 +45,7 @@ from plain.utils.itercompat import is_iterable
 from ..registry import models_registry
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.backends.base.base import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.expressions import Col
     from plain.models.fields.reverse_related import ForeignObjectRel
@@ -667,10 +667,10 @@ class Field(RegisterLookupMixin, Generic[T]):
         self.run_validators(value)
         return value
 
-    def db_type_parameters(self, connection: BaseDatabaseWrapper) -> DictWrapper:
+    def db_type_parameters(self, connection: DatabaseWrapper) -> DictWrapper:
         return DictWrapper(self.__dict__, connection.ops.quote_name, "qn_")
 
-    def db_check(self, connection: BaseDatabaseWrapper) -> str | None:
+    def db_check(self, connection: DatabaseWrapper) -> str | None:
         """
         Return the database column check constraint for this field, for the
         provided connection. Works the same way as db_type() for the case that
@@ -684,7 +684,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         except KeyError:
             return None
 
-    def db_type(self, connection: BaseDatabaseWrapper) -> str | None:
+    def db_type(self, connection: DatabaseWrapper) -> str | None:
         """
         Return the database column data type for this field, for the provided
         connection.
@@ -715,21 +715,21 @@ class Field(RegisterLookupMixin, Generic[T]):
                 return column_type(data)
             return column_type % data
 
-    def rel_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
+    def rel_db_type(self, connection: DatabaseWrapper) -> str | None:
         """
         Return the data type that a related field pointing to this field should
         use. For example, this method is called by ForeignKeyField to determine its data type.
         """
         return self.db_type(connection)
 
-    def cast_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
+    def cast_db_type(self, connection: DatabaseWrapper) -> str | None:
         """Return the data type to use in the Cast() function."""
         db_type = connection.ops.cast_data_types.get(self.get_internal_type())
         if db_type:
             return db_type % self.db_type_parameters(connection)
         return self.db_type(connection)
 
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
+    def db_parameters(self, connection: DatabaseWrapper) -> DbParameters:
         """
         Extension of db_type(), providing a range of different return values
         (type, checks). This will look at db_type(), allowing custom model
@@ -742,11 +742,11 @@ class Field(RegisterLookupMixin, Generic[T]):
             "check": check_string,
         }
 
-    def db_type_suffix(self, connection: BaseDatabaseWrapper) -> str | None:
+    def db_type_suffix(self, connection: DatabaseWrapper) -> str | None:
         return connection.data_types_suffix.get(self.get_internal_type())
 
     def get_db_converters(
-        self, connection: BaseDatabaseWrapper
+        self, connection: DatabaseWrapper
     ) -> list[Callable[..., Any]]:
         if from_db_value := getattr(self, "from_db_value", None):
             return [from_db_value]
@@ -874,7 +874,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         return value
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         """
         Return field's value prepared for interacting with the database backend.
@@ -885,7 +885,7 @@ class Field(RegisterLookupMixin, Generic[T]):
             value = self.get_prep_value(value)
         return value
 
-    def get_db_prep_save(self, value: Any, connection: BaseDatabaseWrapper) -> Any:
+    def get_db_prep_save(self, value: Any, connection: DatabaseWrapper) -> Any:
         """Return field's value prepared for saving into a database."""
         if hasattr(value, "as_sql"):
             return value
@@ -1090,12 +1090,12 @@ class CharField(Field[str]):
             )
         return errors
 
-    def cast_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
+    def cast_db_type(self, connection: DatabaseWrapper) -> str | None:
         if self.max_length is None:
             return connection.ops.cast_char_field_without_max_length
         return super().cast_db_type(connection)
 
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
+    def db_parameters(self, connection: DatabaseWrapper) -> DbParameters:
         db_params = super().db_parameters(connection)
         db_params["collation"] = self.db_collation
         return db_params
@@ -1299,7 +1299,7 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
         return self.to_python(value)
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         # Casts dates into the format expected by the backend
         if not prepared:
@@ -1418,7 +1418,7 @@ class DateTimeField(DateField):
         return value
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         # Casts datetimes into the format expected by the backend
         if not prepared:
@@ -1565,7 +1565,7 @@ class DecimalField(Field[decimal.Decimal]):
         return decimal_value
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
@@ -1617,7 +1617,7 @@ class DurationField(Field[datetime.timedelta]):
         )
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         if connection.features.has_native_duration_field:
             return value
@@ -1626,7 +1626,7 @@ class DurationField(Field[datetime.timedelta]):
         return duration_microseconds(value)
 
     def get_db_converters(
-        self, connection: BaseDatabaseWrapper
+        self, connection: DatabaseWrapper
     ) -> list[Callable[..., Any]]:
         converters = []
         if not connection.features.has_native_duration_field:
@@ -1760,7 +1760,7 @@ class IntegerField(Field[int]):
             ) from e
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
         return connection.ops.adapt_integerfield_value(value, self.get_internal_type())
@@ -1863,7 +1863,7 @@ class GenericIPAddressField(Field[str]):
         return value
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
@@ -1886,7 +1886,7 @@ class _HasDbType(Protocol):
 
     integer_field_class: type[IntegerField]
 
-    def db_type(self, connection: BaseDatabaseWrapper) -> str | None: ...
+    def db_type(self, connection: DatabaseWrapper) -> str | None: ...
 
 
 class PositiveIntegerRelDbTypeMixin(IntegerField):
@@ -1907,7 +1907,7 @@ class PositiveIntegerRelDbTypeMixin(IntegerField):
             if integer_parent is not None:
                 cls.integer_field_class = integer_parent
 
-    def rel_db_type(self: _HasDbType, connection: BaseDatabaseWrapper) -> str | None:
+    def rel_db_type(self: _HasDbType, connection: DatabaseWrapper) -> str | None:
         """
         Return the data type that a related field pointing to this field should
         use. In most cases, a foreign key pointing to a positive integer
@@ -1974,7 +1974,7 @@ class TextField(Field[str]):
             )
         return errors
 
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
+    def db_parameters(self, connection: DatabaseWrapper) -> DbParameters:
         db_params = super().db_parameters(connection)
         db_params["collation"] = self.db_collation
         return db_params
@@ -2090,7 +2090,7 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
         return self.to_python(value)
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         # Casts times into the format expected by the backend
         if not prepared:
@@ -2145,7 +2145,7 @@ class BinaryField(Field[bytes | memoryview]):
         return "BinaryField"
 
     def get_placeholder(
-        self, value: Any, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, value: Any, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> Any:
         return connection.ops.binary_placeholder_sql(value)
 
@@ -2158,7 +2158,7 @@ class BinaryField(Field[bytes | memoryview]):
         return default
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
         if value is not None:
@@ -2203,7 +2203,7 @@ class UUIDField(Field[uuid.UUID]):
         return self.to_python(value)
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> str | uuid.UUID | None:
         if value is None:
             return None
@@ -2257,7 +2257,7 @@ class PrimaryKeyField(BigIntegerField):
         pass
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
@@ -2267,5 +2267,5 @@ class PrimaryKeyField(BigIntegerField):
     def get_internal_type(self) -> str:
         return "PrimaryKeyField"
 
-    def rel_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
+    def rel_db_type(self, connection: DatabaseWrapper) -> str | None:
         return BigIntegerField().db_type(connection=connection)
