@@ -230,7 +230,9 @@ class SQLiteDatabaseWrapper(BaseDatabaseWrapper):
             # Foreign key constraints cannot be turned off while in a multi-
             # statement transaction. Fetch the current state of the pragma
             # to determine if constraints are effectively disabled.
-            enabled = cursor.execute("PRAGMA foreign_keys").fetchone()[0]
+            row = cursor.execute("PRAGMA foreign_keys").fetchone()
+            assert row is not None
+            enabled = row[0]
         return not bool(enabled)
 
     def enable_constraint_checking(self) -> None:
@@ -273,10 +275,12 @@ class SQLiteDatabaseWrapper(BaseDatabaseWrapper):
                 assert primary_key_column_name is not None, (
                     f"Table {table_name} must have a primary key"
                 )
-                primary_key_value, bad_value = cursor.execute(
+                row = cursor.execute(
                     f"SELECT {self.ops.quote_name(primary_key_column_name)}, {self.ops.quote_name(column_name)} FROM {self.ops.quote_name(table_name)} WHERE rowid = %s",
                     (rowid,),
                 ).fetchone()
+                assert row is not None
+                primary_key_value, bad_value = row
                 raise IntegrityError(
                     f"The row in table '{table_name}' with primary key '{primary_key_value}' has an "
                     f"invalid foreign key: {table_name}.{column_name} contains a value '{bad_value}' that "

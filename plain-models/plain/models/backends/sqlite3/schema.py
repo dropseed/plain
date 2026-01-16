@@ -168,9 +168,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 # that don't affect the on-disk content.
                 # https://sqlite.org/lang_altertable.html#otheralter
                 with self.connection.cursor() as cursor:
-                    schema_version = cursor.execute("PRAGMA schema_version").fetchone()[
-                        0
-                    ]
+                    row = cursor.execute("PRAGMA schema_version").fetchone()
+                    assert row is not None
+                    schema_version = row[0]
                     cursor.execute("PRAGMA writable_schema = 1")
                     references_template = f' REFERENCES "{table_name}" ("%s") '
                     new_column_name = new_field.get_attname_column()[1]

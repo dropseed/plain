@@ -357,6 +357,7 @@ class MySQLDatabaseWrapper(BaseDatabaseWrapper):
             """
             )
             row = cursor.fetchone()
+        assert row is not None
         return {
             "version": row[0],
             "sql_mode": row[1],

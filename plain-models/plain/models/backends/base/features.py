@@ -184,6 +184,8 @@ class BaseDatabaseFeatures:
             self.connection.rollback()
             self.connection.set_autocommit(True)
             cursor.execute("SELECT COUNT(X) FROM ROLLBACK_TEST")
-            (count,) = cursor.fetchone()
+            row = cursor.fetchone()
+            assert row is not None
+            (count,) = row
             cursor.execute("DROP TABLE ROLLBACK_TEST")
         return count == 0

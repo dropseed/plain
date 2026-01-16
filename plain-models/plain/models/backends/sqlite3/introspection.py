@@ -338,14 +338,11 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         """
         constraints: dict[str, dict[str, Any]] = {}
         # Find inline check constraints.
-        try:
-            table_schema = cursor.execute(
-                f"SELECT sql FROM sqlite_master WHERE type='table' and name={self.connection.ops.quote_name(table_name)}"
-            ).fetchone()[0]
-        except TypeError:
-            # table_name is a view.
-            pass
-        else:
+        row = cursor.execute(
+            f"SELECT sql FROM sqlite_master WHERE type='table' and name={self.connection.ops.quote_name(table_name)}"
+        ).fetchone()
+        if row is not None:
+            table_schema = row[0]
             columns = {
                 info.name for info in self.get_table_description(cursor, table_name)
             }

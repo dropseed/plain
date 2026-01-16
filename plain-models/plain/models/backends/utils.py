@@ -61,7 +61,7 @@ class DBAPICursor(Protocol):
         """Fetch the next row of a query result set."""
         ...
 
-    def fetchmany(self, size: int = 0) -> list[tuple[Any, ...]]:
+    def fetchmany(self, size: int | None = None) -> list[tuple[Any, ...]]:
         """Fetch the next set of rows of a query result set."""
         ...
 
@@ -79,7 +79,7 @@ class CursorWrapper:
         self.cursor = cursor
         self.db = db
 
-    WRAP_ERROR_ATTRS = frozenset(["fetchone", "fetchmany", "fetchall", "nextset"])
+    WRAP_ERROR_ATTRS = frozenset(["nextset"])
 
     def __getattr__(self, attr: str) -> Any:
         cursor_attr = getattr(self.cursor, attr)
@@ -91,6 +91,20 @@ class CursorWrapper:
     def __iter__(self) -> Iterator[tuple[Any, ...]]:
         with self.db.wrap_database_errors:
             yield from self.cursor
+
+    def fetchone(self) -> tuple[Any, ...] | None:
+        with self.db.wrap_database_errors:
+            return self.cursor.fetchone()
+
+    def fetchmany(self, size: int | None = None) -> list[tuple[Any, ...]]:
+        with self.db.wrap_database_errors:
+            if size is None:
+                return self.cursor.fetchmany()
+            return self.cursor.fetchmany(size)
+
+    def fetchall(self) -> list[tuple[Any, ...]]:
+        with self.db.wrap_database_errors:
+            return self.cursor.fetchall()
 
     def __enter__(self) -> Self:
         return self
