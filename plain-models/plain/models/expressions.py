@@ -485,10 +485,7 @@ class BaseExpression:
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
-        """
-        Custom format for select clauses. For example, EXISTS expressions need
-        to be wrapped in CASE WHEN on Oracle.
-        """
+        """Custom format for select clauses."""
         if output_field := getattr(self, "output_field", None):
             if select_format := getattr(output_field, "select_format", None):
                 return select_format(compiler, sql, params)
@@ -549,8 +546,6 @@ _connector_combinations = [
             Combinable.ADD,
             Combinable.SUB,
             Combinable.MUL,
-            # Behavior for DIV with integer arguments follows Postgres/SQLite,
-            # not MySQL/Oracle.
             Combinable.DIV,
             Combinable.MOD,
             Combinable.POW,
@@ -784,34 +779,14 @@ class DurationExpression(CombinedExpression):
     def compile(
         self, side: Any, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
-        try:
-            output = side.output_field
-        except FieldError:
-            pass
-        else:
-            if output.get_internal_type() == "DurationField":
-                sql, params = compiler.compile(side)
-                return connection.ops.format_for_duration_arithmetic(sql), params
+        # PostgreSQL has native interval (duration) type, no special formatting needed
         return compiler.compile(side)
 
     def as_sql(
         self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        if connection.features.has_native_duration_field:
-            return super().as_sql(compiler, connection)
-        connection.ops.check_expression_support(self)
-        expressions = []
-        expression_params = []
-        sql, params = self.compile(self.lhs, compiler, connection)
-        expressions.append(sql)
-        expression_params.extend(params)
-        sql, params = self.compile(self.rhs, compiler, connection)
-        expressions.append(sql)
-        expression_params.extend(params)
-        # order of precedence
-        expression_wrapper = "(%s)"
-        sql = connection.ops.combine_duration_expression(self.connector, expressions)
-        return expression_wrapper % sql, expression_params
+        # PostgreSQL has native duration field support
+        return super().as_sql(compiler, connection)
 
 
 class TemporalSubtraction(CombinedExpression):
@@ -1369,18 +1344,7 @@ class NegatedExpression(ExpressionWrapper):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
-        # Wrap boolean expressions with a CASE WHEN expression if a database
-        # backend (e.g. Oracle) doesn't support boolean expression in SELECT or
-        # GROUP BY list.
-        expression_supported_in_where_clause = (
-            compiler.connection.ops.conditional_expression_supported_in_where_clause
-        )
-        if (
-            not compiler.connection.features.supports_boolean_expr_in_select_clause
-            # Avoid double wrapping.
-            and expression_supported_in_where_clause(self.expression)
-        ):
-            sql = f"CASE WHEN {sql} THEN 1 ELSE 0 END"
+        # PostgreSQL supports boolean expressions in SELECT
         return sql, params
 
 
@@ -1678,11 +1642,7 @@ class Exists(Subquery):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
-        # Wrap EXISTS() with a CASE WHEN expression if a database backend
-        # (e.g. Oracle) doesn't support boolean expression in SELECT or GROUP
-        # BY list.
-        if not compiler.connection.features.supports_boolean_expr_in_select_clause:
-            sql = f"CASE WHEN {sql} THEN 1 ELSE 0 END"
+        # PostgreSQL supports boolean expressions in SELECT
         return sql, params
 
 
@@ -1726,20 +1686,11 @@ class OrderBy(Expression):
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         template = template or self.template
-        if connection.features.supports_order_by_nulls_modifier:
-            if self.nulls_last:
-                template = f"{template} NULLS LAST"
-            elif self.nulls_first:
-                template = f"{template} NULLS FIRST"
-        else:
-            if self.nulls_last and not (
-                self.descending and connection.features.order_by_nulls_first
-            ):
-                template = f"%(expression)s IS NULL, {template}"
-            elif self.nulls_first and not (
-                not self.descending and connection.features.order_by_nulls_first
-            ):
-                template = f"%(expression)s IS NOT NULL, {template}"
+        # PostgreSQL supports NULLS FIRST/LAST modifiers
+        if self.nulls_last:
+            template = f"{template} NULLS LAST"
+        elif self.nulls_first:
+            template = f"{template} NULLS FIRST"
         connection.ops.check_expression_support(self)
         expression_sql, params = compiler.compile(self.expression)
         placeholders = {
@@ -1837,8 +1788,6 @@ class Window(Expression):
         template: str | None = None,
     ) -> tuple[str, tuple[Any, ...]]:
         connection.ops.check_expression_support(self)
-        if not connection.features.supports_over_clause:
-            raise NotSupportedError("This backend does not support window expressions.")
         expr_sql, params = compiler.compile(self.source_expression)
         window_sql, window_params = [], ()
 

@@ -22,8 +22,7 @@ __all__ = ["Index"]
 
 class Index:
     suffix = "idx"
-    # The max length of the name of the index (restricted to 30 for
-    # cross-database compatibility with Oracle)
+    # The max length of the name of the index
     max_name_length = 30
 
     def __init__(
@@ -125,10 +124,8 @@ class Index:
                 model._model_meta.get_forward_field(field_name)
                 for field_name, _ in self.fields_orders
             ]
-            if schema_editor.connection.features.supports_index_column_ordering:
-                col_suffixes = tuple(order[1] for order in self.fields_orders)
-            else:
-                col_suffixes = ("",) * len(self.fields_orders)
+            # PostgreSQL supports index column ordering (ASC/DESC)
+            col_suffixes = tuple(order[1] for order in self.fields_orders)
             expressions = None
         return schema_editor._create_index_sql(
             model,
@@ -225,15 +222,9 @@ class IndexExpression(Func):
     wrapper_classes = (OrderBy, Collate)
 
     def set_wrapper_classes(self, connection: DatabaseWrapper | None = None) -> None:
-        # Some databases (e.g. MySQL) treats COLLATE as an indexed expression.
-        if connection and connection.features.collate_as_index_expression:
-            self.wrapper_classes = tuple(
-                [
-                    wrapper_cls
-                    for wrapper_cls in self.wrapper_classes
-                    if wrapper_cls is not Collate
-                ]
-            )
+        # PostgreSQL does not treat COLLATE as an indexed expression,
+        # so no modification needed.
+        pass
 
     def resolve_expression(
         self,

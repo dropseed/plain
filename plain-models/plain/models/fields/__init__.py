@@ -37,7 +37,7 @@ from plain.utils.dateparse import (
     parse_duration,
     parse_time,
 )
-from plain.utils.duration import duration_microseconds, duration_string
+from plain.utils.duration import duration_string
 from plain.utils.functional import Promise
 from plain.utils.ipv6 import clean_ipv6_address
 from plain.utils.itercompat import is_iterable
@@ -243,7 +243,6 @@ class Field(RegisterLookupMixin, Generic[T]):
         return [
             *self._check_field_name(),
             *self._check_choices(),
-            *self._check_db_comment(),
             *self._check_null_allowed_for_primary_keys(),
             *self._check_backend_specific_checks(),
             *self._check_validators(),
@@ -357,25 +356,6 @@ class Field(RegisterLookupMixin, Generic[T]):
                 id="fields.choices_invalid_format",
             )
         ]
-
-    def _check_db_comment(self) -> list[PreflightResult]:
-        if not self.db_comment:
-            return []
-        errors = []
-        if not (
-            db_connection.features.supports_comments
-            or "supports_comments" in self.model.model_options.required_db_features
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support comments on "
-                    f"columns (db_comment).",
-                    obj=self,
-                    id="fields.db_comment_unsupported",
-                    warning=True,
-                )
-            )
-        return errors
 
     def _check_null_allowed_for_primary_keys(self) -> list[PreflightResult]:
         if self.primary_key and self.allow_null:
@@ -1038,25 +1018,13 @@ class CharField(Field[str]):
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *super().preflight(**kwargs),
-            *self._check_db_collation(),
             *self._check_max_length_attribute(),
         ]
 
     def _check_max_length_attribute(self, **kwargs: Any) -> list[PreflightResult]:
+        # PostgreSQL supports unlimited VARCHAR (no max_length required)
         if self.max_length is None:
-            if (
-                db_connection.features.supports_unlimited_charfield
-                or "supports_unlimited_charfield"
-                in self.model.model_options.required_db_features
-            ):
-                return []
-            return [
-                PreflightResult(
-                    fix="CharFields must define a 'max_length' attribute.",
-                    obj=self,
-                    id="fields.charfield_missing_max_length",
-                )
-            ]
+            return []
         elif (
             not isinstance(self.max_length, int)
             or isinstance(self.max_length, bool)
@@ -1071,24 +1039,6 @@ class CharField(Field[str]):
             ]
         else:
             return []
-
-    def _check_db_collation(self) -> list[PreflightResult]:
-        errors = []
-        if not (
-            self.db_collation is None
-            or "supports_collation_on_charfield"
-            in self.model.model_options.required_db_features
-            or db_connection.features.supports_collation_on_charfield
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support a database collation on "
-                    "CharFields.",
-                    obj=self,
-                    id="fields.db_collation_unsupported",
-                ),
-            )
-        return errors
 
     def cast_db_type(self, connection: DatabaseWrapper) -> str | None:
         if self.max_length is None:
@@ -1619,19 +1569,14 @@ class DurationField(Field[datetime.timedelta]):
     def get_db_prep_value(
         self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
-        if connection.features.has_native_duration_field:
-            return value
-        if value is None:
-            return None
-        return duration_microseconds(value)
+        # PostgreSQL has native interval (duration) type
+        return value
 
     def get_db_converters(
         self, connection: DatabaseWrapper
     ) -> list[Callable[..., Any]]:
-        converters = []
-        if not connection.features.has_native_duration_field:
-            converters.append(connection.ops.convert_durationfield_value)
-        return converters + super().get_db_converters(connection)
+        # PostgreSQL has native duration field, no converters needed
+        return super().get_db_converters(connection)
 
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
@@ -1910,16 +1855,9 @@ class PositiveIntegerRelDbTypeMixin(IntegerField):
     def rel_db_type(self: _HasDbType, connection: DatabaseWrapper) -> str | None:
         """
         Return the data type that a related field pointing to this field should
-        use. In most cases, a foreign key pointing to a positive integer
-        primary key will have an integer column data type but some databases
-        (e.g. MySQL) have an unsigned integer type. In that case
-        (related_fields_match_type=True), the primary key should return its
-        db_type.
+        use. PostgreSQL uses standard integer types for foreign keys.
         """
-        if connection.features.related_fields_match_type:
-            return self.db_type(connection)
-        else:
-            return self.integer_field_class().db_type(connection=connection)
+        return self.integer_field_class().db_type(connection=connection)
 
 
 class PositiveBigIntegerField(PositiveIntegerRelDbTypeMixin, BigIntegerField):
@@ -1949,30 +1887,6 @@ class TextField(Field[str]):
     def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
         super().__init__(**kwargs)
         self.db_collation = db_collation
-
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        return [
-            *super().preflight(**kwargs),
-            *self._check_db_collation(),
-        ]
-
-    def _check_db_collation(self) -> list[PreflightResult]:
-        errors = []
-        if not (
-            self.db_collation is None
-            or "supports_collation_on_textfield"
-            in self.model.model_options.required_db_features
-            or db_connection.features.supports_collation_on_textfield
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support a database collation on "
-                    "TextFields.",
-                    obj=self,
-                    id="fields.db_collation_unsupported",
-                ),
-            )
-        return errors
 
     def db_parameters(self, connection: DatabaseWrapper) -> DbParameters:
         db_params = super().db_parameters(connection)
@@ -2204,17 +2118,13 @@ class UUIDField(Field[uuid.UUID]):
 
     def get_db_prep_value(
         self, value: Any, connection: DatabaseWrapper, prepared: bool = False
-    ) -> str | uuid.UUID | None:
+    ) -> uuid.UUID | None:
+        # PostgreSQL has native UUID type
         if value is None:
             return None
         if not isinstance(value, uuid.UUID):
             value = self.to_python(value)
-            if value is None:
-                return None
-
-        if connection.features.has_native_uuid_field:
-            return value
-        return value.hex
+        return value
 
     def to_python(self, value: Any) -> uuid.UUID | None:
         if value is not None and not isinstance(value, uuid.UUID):

@@ -109,12 +109,6 @@ class DatabaseOperations:
         """
         return len(objs)
 
-    def format_for_duration_arithmetic(self, sql: str) -> str:
-        raise NotImplementedError(
-            "subclasses of DatabaseOperations may require a "
-            "format_for_duration_arithmetic() method."
-        )
-
     def unification_cast_sql(self, output_field: Field) -> str:
         """
         Given a field instance, return the SQL that casts the result of a union
@@ -563,13 +557,11 @@ class DatabaseOperations:
         Return the string to use in a query when performing regular expression
         lookups (using "regex" or "iregex"). It should contain a '%s'
         placeholder for the column being searched against.
-
-        If the feature is not supported (or part of it is not supported), raise
-        NotImplementedError.
         """
-        raise NotImplementedError(
-            "subclasses of DatabaseOperations may require a regex_lookup() method"
-        )
+        # PostgreSQL uses ~ for regex and ~* for case-insensitive regex
+        if lookup_type == "regex":
+            return "%s ~ %s"
+        return "%s ~* %s"
 
     def savepoint_create_sql(self, sid: str) -> str:
         """
@@ -606,9 +598,8 @@ class DatabaseOperations:
 
     def validate_autopk_value(self, value: int) -> int:
         """
-        Certain backends do not accept some values for "serial" fields
-        (for example zero in MySQL). Raise a ValueError if the value is
-        invalid, otherwise return the validated value.
+        Validate values for auto-incrementing primary key fields.
+        PostgreSQL accepts all integer values including zero.
         """
         return value
 
@@ -776,9 +767,7 @@ class DatabaseOperations:
     def combine_expression(self, connector: str, sub_expressions: list[str]) -> str:
         """
         Combine a list of subexpressions into a single expression, using
-        the provided connecting operator. This is required because operators
-        can vary between backends (e.g., Oracle with %% and &) and between
-        subexpression types (e.g., date expressions).
+        the provided connecting operator.
         """
         conn = f" {connector} "
         return conn.join(sub_expressions)
@@ -789,10 +778,7 @@ class DatabaseOperations:
         return self.combine_expression(connector, sub_expressions)
 
     def binary_placeholder_sql(self, value: Any) -> str:
-        """
-        Some backends require special syntax to insert binary content (MySQL
-        for example uses '_binary %s').
-        """
+        """Return the SQL placeholder for binary content."""
         return "%s"
 
     def integer_field_range(self, internal_type: str) -> tuple[int, int]:
@@ -809,18 +795,13 @@ class DatabaseOperations:
         lhs: tuple[str, list[Any] | tuple[Any, ...]],
         rhs: tuple[str, list[Any] | tuple[Any, ...]],
     ) -> tuple[str, tuple[Any, ...]]:
+        lhs_sql, lhs_params = lhs
+        rhs_sql, rhs_params = rhs
+        params = (*lhs_params, *rhs_params)
         if internal_type == "DateField":
-            lhs_sql, lhs_params = lhs
-            rhs_sql, rhs_params = rhs
-            params = (*lhs_params, *rhs_params)
             return f"(interval '1 day' * ({lhs_sql} - {rhs_sql}))", params
-        if self.connection.features.supports_temporal_subtraction:
-            lhs_sql, lhs_params = lhs
-            rhs_sql, rhs_params = rhs
-            return f"({lhs_sql} - {rhs_sql})", (*lhs_params, *rhs_params)
-        raise NotSupportedError(
-            f"This backend does not support {internal_type} subtraction."
-        )
+        # PostgreSQL supports temporal subtraction natively
+        return f"({lhs_sql} - {rhs_sql})", params
 
     def window_frame_start(self, start: int | None) -> str:
         if isinstance(start, int):
@@ -852,8 +833,7 @@ class DatabaseOperations:
         """
         Return SQL for start and end points in an OVER clause window frame.
         """
-        if not self.connection.features.supports_over_clause:
-            raise NotSupportedError("This backend does not support window expressions.")
+        # PostgreSQL supports window functions
         return self.window_frame_start(start), self.window_frame_end(end)
 
     def window_frame_range_start_end(

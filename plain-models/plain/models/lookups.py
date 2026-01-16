@@ -11,7 +11,6 @@ from plain.models.exceptions import EmptyResultSet, FullResultSet
 from plain.models.expressions import Expression, Func, ResolvableExpression, Value
 from plain.models.fields import (
     BooleanField,
-    CharField,
     DateTimeField,
     Field,
     IntegerField,
@@ -194,11 +193,7 @@ class Lookup(Expression):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
-        # Wrap filters with a CASE WHEN expression if a database backend
-        # (e.g. Oracle) doesn't support boolean expression in SELECT or GROUP
-        # BY list.
-        if not compiler.connection.features.supports_boolean_expr_in_select_clause:
-            sql = f"CASE WHEN {sql} THEN 1 ELSE 0 END"
+        # PostgreSQL supports boolean expressions in SELECT
         return sql, params
 
 
@@ -786,8 +781,7 @@ class YearLte(YearLookup, LessThanOrEqual):
 
 class UUIDTextMixin(Lookup):
     """
-    Strip hyphens from a value when filtering a UUIDField on backends without
-    a native datatype for UUID.
+    Mixin for UUID text lookups. PostgreSQL has native UUID support.
     """
 
     rhs: Any
@@ -795,14 +789,7 @@ class UUIDTextMixin(Lookup):
     def process_rhs(
         self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
-        if not connection.features.has_native_uuid_field:
-            from plain.models.functions import Replace
-
-            if self.rhs_is_direct_value():
-                self.rhs = Value(self.rhs)
-            self.rhs = Replace(
-                self.rhs, Value("-"), Value(""), output_field=CharField()
-            )
+        # PostgreSQL has native UUID type, no preprocessing needed
         return super().process_rhs(compiler, connection)
 
 

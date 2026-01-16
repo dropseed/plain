@@ -30,20 +30,15 @@ from typing import Any
 
 from .connections import DatabaseConfig
 
-SCHEMES = {
-    "postgres": "plain.models.backends.postgresql",
-    "postgresql": "plain.models.backends.postgresql",
-    "pgsql": "plain.models.backends.postgresql",
-}
+SCHEMES = {"postgres", "postgresql", "pgsql"}
 
 # Register database schemes in URLs.
-for key in SCHEMES.keys():
-    urlparse.uses_netloc.append(key)
+for scheme in SCHEMES:
+    urlparse.uses_netloc.append(scheme)
 
 
 def parse_database_url(
     url: str,
-    engine: str | None = None,
     conn_max_age: int | None = 0,
     conn_health_checks: bool = False,
 ) -> DatabaseConfig:
@@ -51,6 +46,14 @@ def parse_database_url(
     parsed_config: DatabaseConfig = {}
 
     spliturl = urlparse.urlsplit(url)
+
+    # Validate scheme is PostgreSQL.
+    if spliturl.scheme not in SCHEMES:
+        raise ValueError(
+            "No support for '{}'. We support: {}".format(
+                spliturl.scheme, ", ".join(sorted(SCHEMES))
+            )
+        )
 
     # Split query strings from path.
     path = spliturl.path[1:]
@@ -66,16 +69,6 @@ def parse_database_url(
         # Use URL Parse library to decode % encodes
         hostname = urlparse.unquote(hostname)
 
-    # Lookup specified engine.
-    if engine is None:
-        engine = SCHEMES.get(spliturl.scheme)
-        if engine is None:
-            raise ValueError(
-                "No support for '{}'. We support: {}".format(
-                    spliturl.scheme, ", ".join(sorted(SCHEMES.keys()))
-                )
-            )
-
     port = spliturl.port
 
     # Update with environment configuration.
@@ -88,7 +81,6 @@ def parse_database_url(
             "PORT": port or "",
             "CONN_MAX_AGE": conn_max_age,
             "CONN_HEALTH_CHECKS": conn_health_checks,
-            "ENGINE": engine,
         }
     )
 
@@ -105,20 +97,6 @@ def parse_database_url(
 
 def build_database_url(config: DatabaseConfig) -> str:
     """Build a database URL from a configuration dictionary."""
-    engine = config.get("ENGINE")
-    if not engine:
-        raise ValueError("ENGINE is required to build a database URL")
-
-    reverse_schemes: dict[str, str] = {}
-    for scheme, eng in SCHEMES.items():
-        reverse_schemes.setdefault(eng, scheme)
-
-    scheme = reverse_schemes.get(engine)
-    if scheme is None:
-        raise ValueError(
-            f"No scheme known for engine '{engine}'. We support: {', '.join(sorted(SCHEMES.values()))}"
-        )
-
     options = config.get("OPTIONS", {})
     query_parts: list[tuple[str, Any]] = []
     for key, value in options.items():
@@ -143,5 +121,5 @@ def build_database_url(config: DatabaseConfig) -> str:
         netloc += f":{port}"
 
     path = f"/{name}"
-    url = urlparse.urlunsplit((scheme, netloc, path, query, ""))
+    url = urlparse.urlunsplit(("postgresql", netloc, path, query, ""))
     return str(url)

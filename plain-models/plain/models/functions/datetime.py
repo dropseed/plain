@@ -88,10 +88,7 @@ class Extract(TimezoneMixin, Transform):
                 self.lookup_name, sql, tuple(params)
             )
         elif isinstance(lhs_output_field, DurationField):
-            if not connection.features.has_native_duration_field:
-                raise ValueError(
-                    "Extract requires native DurationField database support."
-                )
+            # PostgreSQL has native duration (interval) type
             sql, params = connection.ops.time_extract_sql(
                 self.lookup_name, sql, tuple(params)
             )
@@ -356,11 +353,6 @@ class TruncBase(TimezoneMixin, Transform):
             if value is not None:
                 value = value.replace(tzinfo=None)
                 value = timezone.make_aware(value, self.tzinfo)
-            elif not connection.features.has_zoneinfo_database:
-                raise ValueError(
-                    "Database returned an invalid datetime value. Are time "
-                    "zone definitions for your database installed?"
-                )
         elif isinstance(value, datetime):
             if value is None:
                 pass

@@ -228,6 +228,5 @@ class DatabaseCreation:
         return (
             settings_dict.get("HOST") or "",
             settings_dict.get("PORT") or "",
-            settings_dict.get("ENGINE") or "",
             self._get_test_db_name(prefix),
         )

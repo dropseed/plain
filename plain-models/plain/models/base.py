@@ -910,23 +910,8 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_db_table_comment(cls) -> list[PreflightResult]:
-        if not cls.model_options.db_table_comment:
-            return []
-        errors: list[PreflightResult] = []
-        if not (
-            db_connection.features.supports_comments
-            or "supports_comments" in cls.model_options.required_db_features
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support comments on "
-                    f"tables (db_table_comment).",
-                    obj=cls,
-                    id="models.db_table_comment_unsupported",
-                    warning=True,
-                )
-            )
-        return errors
+        # PostgreSQL supports table comments
+        return []
 
     @classmethod
     def _check_fields(cls) -> list[PreflightResult]:
@@ -1110,8 +1095,7 @@ class Model(metaclass=ModelBase):
         errors: list[PreflightResult] = []
         references: set[str] = set()
         for index in cls.model_options.indexes:
-            # Index name can't start with an underscore or a number, restricted
-            # for cross-database compatibility with Oracle.
+            # Index name can't start with an underscore or a number
             if index.name[0] == "_" or index.name[0].isdigit():
                 errors.append(
                     PreflightResult(
@@ -1135,48 +1119,7 @@ class Model(metaclass=ModelBase):
                     references.update(
                         ref[0] for ref in cls._get_expr_references(expression)
                     )
-        if not (
-            db_connection.features.supports_partial_indexes
-            or "supports_partial_indexes" in cls.model_options.required_db_features
-        ) and any(index.condition is not None for index in cls.model_options.indexes):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support indexes with conditions. "
-                    "Conditions will be ignored. Silence this warning "
-                    "if you don't care about it.",
-                    warning=True,
-                    obj=cls,
-                    id="models.index_conditions_ignored",
-                )
-            )
-        if not (
-            db_connection.features.supports_covering_indexes
-            or "supports_covering_indexes" in cls.model_options.required_db_features
-        ) and any(index.include for index in cls.model_options.indexes):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support indexes with non-key columns. "
-                    "Non-key columns will be ignored. Silence this "
-                    "warning if you don't care about it.",
-                    warning=True,
-                    obj=cls,
-                    id="models.index_non_key_columns_ignored",
-                )
-            )
-        if not (
-            db_connection.features.supports_expression_indexes
-            or "supports_expression_indexes" in cls.model_options.required_db_features
-        ) and any(index.contains_expressions for index in cls.model_options.indexes):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support indexes on expressions. "
-                    "An index won't be created. Silence this warning "
-                    "if you don't care about it.",
-                    warning=True,
-                    obj=cls,
-                    id="models.index_on_foreign_key",
-                )
-            )
+        # PostgreSQL supports partial indexes, covering indexes, and expression indexes
         fields = [
             field
             for index in cls.model_options.indexes
@@ -1412,100 +1355,9 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_constraints(cls) -> list[PreflightResult]:
+        # PostgreSQL supports all constraint types: check constraints, partial indexes,
+        # deferrable unique constraints, covering indexes, and expression indexes
         errors: list[PreflightResult] = []
-        if not (
-            db_connection.features.supports_table_check_constraints
-            or "supports_table_check_constraints"
-            in cls.model_options.required_db_features
-        ) and any(
-            isinstance(constraint, CheckConstraint)
-            for constraint in cls.model_options.constraints
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support check constraints. "
-                    "A constraint won't be created. Silence this "
-                    "warning if you don't care about it.",
-                    obj=cls,
-                    id="models.constraint_on_non_db_field",
-                    warning=True,
-                )
-            )
-
-        if not (
-            db_connection.features.supports_partial_indexes
-            or "supports_partial_indexes" in cls.model_options.required_db_features
-        ) and any(
-            isinstance(constraint, UniqueConstraint)
-            and constraint.condition is not None
-            for constraint in cls.model_options.constraints
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support unique constraints with "
-                    "conditions. A constraint won't be created. Silence this "
-                    "warning if you don't care about it.",
-                    obj=cls,
-                    id="models.constraint_on_virtual_field",
-                    warning=True,
-                )
-            )
-
-        if not (
-            db_connection.features.supports_deferrable_unique_constraints
-            or "supports_deferrable_unique_constraints"
-            in cls.model_options.required_db_features
-        ) and any(
-            isinstance(constraint, UniqueConstraint)
-            and constraint.deferrable is not None
-            for constraint in cls.model_options.constraints
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support deferrable unique constraints. "
-                    "A constraint won't be created. Silence this "
-                    "warning if you don't care about it.",
-                    obj=cls,
-                    id="models.constraint_on_foreign_key",
-                    warning=True,
-                )
-            )
-
-        if not (
-            db_connection.features.supports_covering_indexes
-            or "supports_covering_indexes" in cls.model_options.required_db_features
-        ) and any(
-            isinstance(constraint, UniqueConstraint) and constraint.include
-            for constraint in cls.model_options.constraints
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support unique constraints with non-key "
-                    "columns. A constraint won't be created. Silence this "
-                    "warning if you don't care about it.",
-                    obj=cls,
-                    id="models.constraint_on_m2m_field",
-                    warning=True,
-                )
-            )
-
-        if not (
-            db_connection.features.supports_expression_indexes
-            or "supports_expression_indexes" in cls.model_options.required_db_features
-        ) and any(
-            isinstance(constraint, UniqueConstraint) and constraint.contains_expressions
-            for constraint in cls.model_options.constraints
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support unique constraints on "
-                    "expressions. A constraint won't be created. Silence this "
-                    "warning if you don't care about it.",
-                    obj=cls,
-                    id="models.constraint_on_self_referencing_fk",
-                    warning=True,
-                )
-            )
         fields = set(
             chain.from_iterable(
                 (*constraint.fields, *constraint.include)
@@ -1516,41 +1368,26 @@ class Model(metaclass=ModelBase):
         references = set()
         for constraint in cls.model_options.constraints:
             if isinstance(constraint, UniqueConstraint):
-                if (
-                    db_connection.features.supports_partial_indexes
-                    or "supports_partial_indexes"
-                    not in cls.model_options.required_db_features
-                ) and isinstance(constraint.condition, Q):
+                if isinstance(constraint.condition, Q):
                     references.update(cls._get_expr_references(constraint.condition))
-                if (
-                    db_connection.features.supports_expression_indexes
-                    or "supports_expression_indexes"
-                    not in cls.model_options.required_db_features
-                ) and constraint.contains_expressions:
+                if constraint.contains_expressions:
                     for expression in constraint.expressions:
                         references.update(cls._get_expr_references(expression))
             elif isinstance(constraint, CheckConstraint):
-                if (
-                    db_connection.features.supports_table_check_constraints
-                    or "supports_table_check_constraints"
-                    not in cls.model_options.required_db_features
-                ):
-                    if isinstance(constraint.check, Q):
-                        references.update(cls._get_expr_references(constraint.check))
-                    if any(
-                        isinstance(expr, RawSQL) for expr in constraint.check.flatten()
-                    ):
-                        errors.append(
-                            PreflightResult(
-                                fix=f"Check constraint {constraint.name!r} contains "
-                                f"RawSQL() expression and won't be validated "
-                                f"during the model full_clean(). "
-                                "Silence this warning if you don't care about it.",
-                                warning=True,
-                                obj=cls,
-                                id="models.constraint_name_collision_autogenerated",
-                            ),
-                        )
+                if isinstance(constraint.check, Q):
+                    references.update(cls._get_expr_references(constraint.check))
+                if any(isinstance(expr, RawSQL) for expr in constraint.check.flatten()):
+                    errors.append(
+                        PreflightResult(
+                            fix=f"Check constraint {constraint.name!r} contains "
+                            f"RawSQL() expression and won't be validated "
+                            f"during the model full_clean(). "
+                            "Silence this warning if you don't care about it.",
+                            warning=True,
+                            obj=cls,
+                            id="models.constraint_name_collision_autogenerated",
+                        ),
+                    )
         for field_name, *lookups in references:
             fields.add(field_name)
             if not lookups:

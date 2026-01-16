@@ -599,13 +599,8 @@ class QuerySet(Generic[T]):
         clone = self.filter(*args, **kwargs)
         if self.sql_query.can_filter() and not self.sql_query.distinct_fields:
             clone = clone.order_by()
-        limit = None
-        if (
-            not clone.sql_query.select_for_update
-            or db_connection.features.supports_select_for_update_with_limit
-        ):
-            limit = MAX_GET_RESULTS
-            clone.sql_query.set_limits(high=limit)
+        limit = MAX_GET_RESULTS
+        clone.sql_query.set_limits(high=limit)
         num = len(clone)
         if num == 1:
             assert clone._result_cache is not None  # len() fetches results
@@ -783,10 +778,7 @@ class QuerySet(Generic[T]):
                     update_fields=update_fields_objs,
                     unique_fields=unique_fields_objs,
                 )
-                if (
-                    db_connection.features.can_return_rows_from_bulk_insert
-                    and on_conflict is None
-                ):
+                if on_conflict is None:
                     assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
@@ -830,7 +822,6 @@ class QuerySet(Generic[T]):
             ["id", "id"] + fields_list, objs_tuple
         )
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
-        requires_casting = db_connection.features.requires_casted_case_in_updates
         batches = (
             objs_tuple[i : i + batch_size]
             for i in range(0, len(objs_tuple), batch_size)
@@ -846,8 +837,8 @@ class QuerySet(Generic[T]):
                         attr = Value(attr, output_field=field)
                     when_statements.append(When(id=obj.id, then=attr))
                 case_statement = Case(*when_statements, output_field=field)
-                if requires_casting:
-                    case_statement = Cast(case_statement, output_field=field)
+                # PostgreSQL requires casted CASE in updates
+                case_statement = Cast(case_statement, output_field=field)
                 update_kwargs[field.attname] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
@@ -1538,9 +1529,8 @@ class QuerySet(Generic[T]):
         max_batch_size = max(ops.bulk_batch_size(fields, objs), 1)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         inserted_rows = []
-        bulk_return = db_connection.features.can_return_rows_from_bulk_insert
         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
-            if bulk_return and on_conflict is None:
+            if on_conflict is None:
                 inserted_rows.extend(
                     self._insert(  # type: ignore[arg-type]
                         item,
