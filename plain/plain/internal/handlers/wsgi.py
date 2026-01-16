@@ -146,7 +146,8 @@ class WSGIHandler(base.BaseHandler):
 
         status = "%d %s" % (response.status_code, response.reason_phrase)  # noqa: UP031
         response_headers = [
-            *response.headers.items(),
+            # Filter out None values (used to opt-out of default headers)
+            *((k, v) for k, v in response.headers.items() if v is not None),
             *(("Set-Cookie", c.output(header="")) for c in response.cookies.values()),
         ]
         start_response(status, response_headers)

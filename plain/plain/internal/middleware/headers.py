@@ -21,18 +21,13 @@ class DefaultHeadersMiddleware(HttpMiddleware):
     View Customization Patterns:
     - Use default: Don't set the header (middleware applies it)
     - Override: Set the header to a different value
-    - Remove: Set the header to None (middleware will delete it)
+    - Remove: Set the header to None (not serialized in the response)
     - Extend: Read from settings.DEFAULT_RESPONSE_HEADERS, modify, then set
 
     Format Strings:
     Header values can include {request.attribute} placeholders for dynamic
     content. Example: 'nonce-{request.csp_nonce}' will be formatted with
     the request's csp_nonce value. Headers without placeholders are used as-is.
-
-    None Removal:
-    Views can set a header to None to opt-out of that default header entirely.
-    The middleware will delete any header set to None, preventing the default
-    from being applied.
     """
 
     def process_request(self, request: Request) -> Response:
@@ -47,9 +42,6 @@ class DefaultHeadersMiddleware(HttpMiddleware):
                     response.headers[header] = value.format(request=request)
                 else:
                     response.headers[header] = value
-            elif response.headers[header] is None:
-                # Header explicitly set to None by view - remove it
-                del response.headers[header]
 
         # Add the Content-Length header to non-streaming responses if not
         # already set.

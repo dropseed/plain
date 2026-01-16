@@ -54,7 +54,7 @@ class SupportIFrameView(SupportFormView):
         # X-Frame-Options are typically in DEFAULT_RESPONSE_HEADERS.
         # Set to None to signal the middleware to skip applying this default header.
         # We can't del/pop it because middleware runs after and would add it back.
-        response.headers["X-Frame-Options"] = None  # type: ignore[assignment]
+        response.headers["X-Frame-Options"] = None
 
         return response
 

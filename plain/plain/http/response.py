@@ -10,7 +10,6 @@ import sys
 import time
 from collections.abc import Iterator
 from email.header import Header
-from functools import cached_property
 from http.client import responses
 from http.cookies import SimpleCookie
 from typing import IO, Any
@@ -86,10 +85,13 @@ class ResponseHeaders(CaseInsensitiveMapping):
     def __delitem__(self, key: str) -> None:
         self.pop(key)
 
-    def __setitem__(self, key: str, value: str | bytes) -> None:
+    def __setitem__(self, key: str, value: str | bytes | None) -> None:
         key = self._convert_to_charset(key, "ascii")
-        value = self._convert_to_charset(value, "latin-1", mime_encode=True)
-        self._store[key.lower()] = (key, value)
+        if value is None:
+            self._store[key.lower()] = (key, None)
+        else:
+            value = self._convert_to_charset(value, "latin-1", mime_encode=True)
+            self._store[key.lower()] = (key, value)
 
     def pop(self, key: str, default: Any = None) -> Any:
         return self._store.pop(key.lower(), default)
@@ -181,17 +183,6 @@ class ResponseBase:
     @charset.setter
     def charset(self, value: str) -> None:
         self._charset = value
-
-    def serialize_headers(self) -> bytes:
-        """HTTP headers as a bytestring."""
-        return b"\r\n".join(
-            [
-                key.encode("ascii") + b": " + value.encode("latin-1")
-                for key, value in self.headers.items()
-            ]
-        )
-
-    __bytes__ = serialize_headers
 
     @property
     def _content_type_for_repr(self) -> str:
@@ -315,9 +306,6 @@ class ResponseBase:
         # Handle non-string types.
         return str(value).encode(self.charset)
 
-    # These methods partially implement the file-like object interface.
-    # See https://docs.python.org/library/io.html#io.IOBase
-
     # The WSGI server must call this method upon completion of the request.
     # See http://blog.dscpl.com.au/2012/10/obligations-for-calling-close-on.html
     def close(self) -> None:
@@ -331,32 +319,6 @@ class ResponseBase:
         self.closed = True
         signals.request_finished.send(sender=self._handler_class)
 
-    def write(self, content: bytes) -> None:
-        raise OSError(f"This {self.__class__.__name__} instance is not writable")
-
-    def flush(self) -> None:
-        pass
-
-    def tell(self) -> int:
-        raise OSError(
-            f"This {self.__class__.__name__} instance cannot tell its position"
-        )
-
-    # These methods partially implement a stream-like object interface.
-    # See https://docs.python.org/library/io.html#io.IOBase
-
-    def readable(self) -> bool:
-        return False
-
-    def seekable(self) -> bool:
-        return False
-
-    def writable(self) -> bool:
-        return False
-
-    def writelines(self, lines: list[bytes | str]) -> None:
-        raise OSError(f"This {self.__class__.__name__} instance is not writable")
-
 
 class Response(ResponseBase):
     """
@@ -366,28 +328,11 @@ class Response(ResponseBase):
     """
 
     streaming = False
-    non_picklable_attrs = frozenset(
-        [
-            "resolver_match",
-            # Non-picklable attributes added by test clients.
-            "client",
-            "context",
-            "json",
-            "templates",
-        ]
-    )
 
     def __init__(self, content: bytes | str | Iterator[bytes] = b"", **kwargs: Any):
         super().__init__(**kwargs)
         # Content is a bytestring. See the `content` property methods.
         self.content = content
-
-    def __getstate__(self) -> dict[str, Any]:
-        obj_dict = self.__dict__.copy()
-        for attr in self.non_picklable_attrs:
-            if attr in obj_dict:
-                del obj_dict[attr]
-        return obj_dict
 
     def __repr__(self) -> str:
         return "<%(cls)s status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
@@ -395,12 +340,6 @@ class Response(ResponseBase):
             "status_code": self.status_code,
             "content_type": self._content_type_for_repr,
         }
-
-    def serialize(self) -> bytes:
-        """Full HTTP message, including headers, as a bytestring."""
-        return self.serialize_headers() + b"\r\n\r\n" + self.content
-
-    __bytes__ = serialize
 
     @property
     def content(self) -> bytes:
@@ -420,31 +359,10 @@ class Response(ResponseBase):
                     pass
         else:
             content = self.make_bytes(value)
-        # Create a list of properly encoded bytestrings to support write().
         self._container = [content]
-
-    @cached_property
-    def text(self) -> str:
-        return self.content.decode(self.charset or "utf-8")
 
     def __iter__(self) -> Iterator[bytes]:
         return iter(self._container)
-
-    def write(self, content: bytes | str) -> None:
-        self._container.append(self.make_bytes(content))
-
-    def tell(self) -> int:
-        return len(self.content)
-
-    def getvalue(self) -> bytes:
-        return self.content
-
-    def writable(self) -> bool:
-        return True
-
-    def writelines(self, lines: list[bytes | str]) -> None:
-        for line in lines:
-            self.write(line)
 
 
 class StreamingResponse(ResponseBase):
@@ -494,9 +412,6 @@ class StreamingResponse(ResponseBase):
 
     def __iter__(self) -> Iterator[bytes]:
         return iter(self.streaming_content)
-
-    def getvalue(self) -> bytes:
-        return b"".join(self.streaming_content)
 
 
 class FileResponse(StreamingResponse):
