@@ -19,7 +19,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // Menu toggle buttons (use class for both mobile and desktop)
   document.addEventListener("click", (e) => {
     if (e.target.closest(".menu-toggle")) {
-      openMenu();
+      if (dialog.open) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
     }
   });
 

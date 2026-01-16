@@ -79,9 +79,9 @@
         </div>
     </div>
 
-    <!-- Nav tabs row (hidden on mobile) -->
-    <nav id="pinned-nav" class="hidden sm:flex items-center justify-between px-4 lg:px-8">
-        <div id="nav-tabs-container" class="flex items-center -ml-3 overflow-x-auto" data-reorder-url="{{ url('admin:reorder') }}">
+    <!-- Nav tabs row -->
+    <nav id="pinned-nav" class="flex items-center justify-between px-4 lg:px-8">
+        <div id="nav-tabs-container" class="flex items-center -ml-3 overflow-x-auto scrollbar-hide" data-reorder-url="{{ url('admin:reorder') }}">
             {% for tab in nav_tabs %}
             {% set nav_url = tab.view.get_view_url() %}
             {% set view_slug = tab.view.get_slug() %}
@@ -108,17 +108,28 @@
     <!-- Menu dialog -->
     <dialog id="admin-menu-dialog" class="m-0 p-0 bg-transparent border-none max-w-none max-h-none w-full h-full overflow-visible">
         <div class="fixed inset-0 flex justify-end pt-14 sm:pt-16 px-4 sm:px-6">
+            {# Backdrop - clicking closes the menu #}
+            <div class="menu-toggle absolute inset-0 bg-black/20 backdrop-blur-sm -z-10 cursor-default"></div>
             <div class="w-full sm:w-80 max-h-[75vh] overflow-hidden flex flex-col bg-white rounded-xl shadow-2xl ring-1 ring-stone-200/80">
                 {# Filter input #}
                 <div class="p-3 bg-gradient-to-b from-stone-50 to-stone-50/80 border-b border-stone-200/60">
-                    <div class="relative">
-                        <admin.Icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            id="menu-filter-input"
-                            placeholder="Filter pages..."
-                            class="w-full pl-8 pr-3 py-2 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-300 placeholder:text-stone-400 transition-shadow"
-                        />
+                    <div class="flex items-center gap-2">
+                        <div class="relative flex-1">
+                            <admin.Icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
+                            <input
+                                type="text"
+                                id="menu-filter-input"
+                                placeholder="Filter pages..."
+                                class="w-full pl-8 pr-3 py-2 text-base sm:text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-300 placeholder:text-stone-400 transition-shadow"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            class="menu-toggle flex items-center justify-center w-8 h-8 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                            aria-label="Close menu"
+                        >
+                            <admin.Icon name="x-lg" class="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
 
@@ -131,14 +142,6 @@
                     {% with sections=admin_registry.get_nav_sections(plain_packages=True), header_label="Packages" %}
                         {% include "admin/_menu_section.html" %}
                     {% endwith %}
-                </div>
-
-                {# Footer with keyboard hint #}
-                <div class="px-3 py-2 border-t border-stone-100 bg-stone-50/50">
-                    <div class="flex items-center justify-between text-[11px] text-stone-400">
-                        <span>Type to filter</span>
-                        <kbd class="px-1.5 py-0.5 bg-stone-100 rounded text-[10px] font-mono">esc</kbd>
-                    </div>
                 </div>
             </div>
         </div>

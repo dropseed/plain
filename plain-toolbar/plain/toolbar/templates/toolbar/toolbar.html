@@ -1,20 +1,22 @@
 {% if toolbar.should_render() %}
 {% set items=toolbar.get_items() %}
 <script defer src="{{ asset('toolbar/toolbar.js') }}" nonce="{{ request.csp_nonce }}"></script>
-<div id="plaintoolbar" class="print:hidden text-stone-300 fixed bottom-0 w-full z-50 hidden sm:flex sm:flex-col">
+<style nonce="{{ request.csp_nonce }}">#plaintoolbar-tabs::-webkit-scrollbar { display: none; }</style>
+<div id="plaintoolbar" class="print:hidden text-stone-300 fixed bottom-0 w-full z-50 flex flex-col">
 
     <div id="plaintoolbar-details" class="hidden relative text-sm border-white/5 shadow-xl border-t inset-shadow-xs inset-shadow-stone-800 rounded-t-xl bg-stone-950/95 backdrop-blur-sm">
 
         <div class="flex border-b border-white/5 px-2">
-            <div class="flex flex-grow">
+            {# Mobile: scrollable tabs #}
+            <div id="plaintoolbar-tabs" class="flex flex-grow overflow-x-auto" style="-ms-overflow-style: none; scrollbar-width: none;">
                 {% for item in items %}
                 {% if item.name and item.panel_template_name %}
-                <button {% if loop.first %}data-active{% endif %} data-toolbar-tab="{{ item.name }}" class="data-active:border-yellow-500 px-4 py-2.5 -mb-px cursor-pointer border-b border-transparent hover:border-yellow-600" type="button">{{ item.name }}</button>
+                <button {% if loop.first %}data-active{% endif %} data-toolbar-tab="{{ item.name }}" class="data-active:border-yellow-500 px-3 sm:px-4 py-3 sm:py-2.5 -mb-px cursor-pointer border-b-2 border-transparent hover:border-yellow-600 whitespace-nowrap text-sm" type="button">{{ item.name }}</button>
                 {% endif %}
                 {% endfor %}
-                <button data-plaintoolbar-expand class="flex-grow cursor-pointer inline-flex h-full" type="button"></button>
+                <button data-plaintoolbar-expand class="flex-grow cursor-pointer inline-flex h-full min-w-[2rem]" type="button"></button>
             </div>
-            <div class="px-4 flex items-center space-x-4">
+            <div class="px-2 sm:px-4 flex items-center gap-3 flex-shrink-0">
                 <button title="Hide toolbar for 1 hour" class="cursor-pointer hover:text-white text-white/50" type="button" data-plaintoolbar-hideuntil>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4" viewBox="0 0 16 16">
                         <path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z"/>
@@ -30,9 +32,11 @@
             </div>
         </div>
 
-        <div data-resizer class="cursor-grab w-20 h-1.5 top-1 bg-white/15 rounded-full absolute top-0 left-1/2 -translate-x-1/2"></div>
+        {# Resize handle - hidden on mobile (touch resize not supported) #}
+        <div data-resizer class="hidden sm:block cursor-grab w-20 h-1.5 bg-white/15 rounded-full absolute top-1 left-1/2 -translate-x-1/2"></div>
 
-        <div class="overflow-auto h-[30vh] flex flex-col">
+        {# Panel content - taller on mobile for better usability #}
+        <div class="overflow-auto h-[50vh] sm:h-[30vh] flex flex-col">
             {% for item in items %}
             {% if item.name and item.panel_template_name %}
             <div data-toolbar-tab="{{ item.name }}" class="h-full {% if not loop.first %}hidden{% endif %}">
@@ -44,13 +48,15 @@
 
     </div>
 
-    <div class="flex px-3 text-xs border-t border-white/5 space-x-4 py-2 bg-stone-950 shadow-xl">
-        <div class="flex items-center">
-            <code class="ml-1.5 bg-white/10 px-1.5 rounded-sm whitespace-nowrap text-mono">{{ toolbar.version }}</code>
+    {# Bottom bar #}
+    <div class="flex px-3 text-xs border-t border-white/5 gap-3 py-2.5 sm:py-2 bg-stone-950 shadow-xl">
+        {# Version badge #}
+        <div class="flex items-center flex-shrink-0">
+            <code class="bg-white/10 px-1.5 rounded-sm whitespace-nowrap text-mono">{{ toolbar.version }}</code>
         </div>
-        <button type="button" data-plaintoolbar-expand class="flex-grow cursor-pointer"></button>
-        <div class="flex items-center space-x-4">
-            <div class="flex items-center space-x-3 transition-all">
+        <button type="button" data-plaintoolbar-expand class="flex-grow cursor-pointer min-w-0"></button>
+        <div class="flex items-center min-w-0">
+            <div class="flex items-center gap-3 transition-all min-w-0 [&>button]:max-w-[200px] sm:[&>button]:max-w-none">
 
                 {% for item in items %}
                 {% if item.button_template_name %}
@@ -61,13 +67,13 @@
                 {% include "toolbar/links.html" ignore missing %}
 
                 <button data-plaintoolbar-expand class="hover:text-white text-white/50 cursor-pointer" type="button" title="Expand toolbar">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5" viewBox="0 0 16 16">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 sm:w-3.5 sm:h-3.5" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708z"/>
                     </svg>
                 </button>
 
                 <button data-plaintoolbar-hide class="hover:text-red-500 text-white/50 cursor-pointer" type="button" title="Hide toolbar">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5" viewBox="0 0 16 16">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 sm:w-3.5 sm:h-3.5" viewBox="0 0 16 16">
                         <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/>
                     </svg>
                 </button>

@@ -1,20 +1,20 @@
 <button
     type="button"
-    class="inline-flex items-center cursor-pointer text-xs rounded-full px-2.5 py-px bg-white/20 text-white/80 whitespace-nowrap hover:bg-white/30"
+    class="inline-flex items-center cursor-pointer text-xs rounded-full px-2.5 py-px bg-white/20 text-white/80 hover:bg-white/30 overflow-hidden"
     data-toolbar-tab="Observer">
     {% if observer.is_persisting() %}
-        <span class="relative inline-flex size-2 mr-2.5">
+        <span class="relative inline-flex size-2 mr-2.5 flex-shrink-0">
             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
             <span class="relative inline-flex size-2 rounded-full bg-red-500"></span>
         </span>
     {% elif observer.is_summarizing() %}
-        <span class="relative inline-flex size-2 mr-2">
+        <span class="relative inline-flex size-2 mr-2 flex-shrink-0">
             <span class="relative inline-flex size-2 rounded-full bg-zinc-500"></span>
         </span>
     {% elif not observer.is_enabled() %}
-        <span class="rounded-full bg-zinc-500 w-2 h-2 inline-block mr-2"></span>
+        <span class="rounded-full bg-zinc-500 w-2 h-2 inline-block mr-2 flex-shrink-0"></span>
     {% endif %}
-
+    <span class="truncate">
     {% if observer.get_current_trace_summary() %}
         {{ observer.get_current_trace_summary() }}
     {% elif observer.is_persisting() %}
@@ -26,4 +26,5 @@
     {% else %}
         Observer disabled
     {% endif %}
+    </span>
 </button>

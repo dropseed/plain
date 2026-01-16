@@ -103,7 +103,7 @@
 
             {% if cards %}
             <div class="px-4 mt-4 lg:px-8">
-                <div class="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2 lg:grid-cols-4 [&>aside]:col-span-1 sm:[&>aside.col-span-2]:col-span-2 lg:[&>aside.col-span-2]:col-span-2 sm:[&>aside.col-span-4]:col-span-2 lg:[&>aside.col-span-4]:col-span-4">
+                <div class="grid grid-cols-2 items-start gap-4 mt-4 lg:grid-cols-4 [&>aside]:col-span-1 [&>aside.col-span-2]:col-span-2 [&>aside.col-span-3]:col-span-2 lg:[&>aside.col-span-3]:col-span-3 [&>aside.col-span-4]:col-span-2 lg:[&>aside.col-span-4]:col-span-4">
                     {% for card in cards %}
                         {{ render_card(card)|safe }}
                     {% endfor %}

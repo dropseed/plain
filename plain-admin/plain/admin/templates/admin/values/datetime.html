@@ -1,1 +1,1 @@
-<span class="tabular-nums" title="{{ value.isoformat() }}">{{ value|localtime|strftime("%b %-d, %Y at %-I:%M %p") }}</span>
+<span class="tabular-nums" title="{{ value.isoformat() }}"><span class="sm:hidden">{{ value|localtime|strftime("%-m/%-d/%y") }}</span><span class="hidden sm:inline">{{ value|localtime|strftime("%b %-d, %Y at %-I:%M %p") }}</span></span>
