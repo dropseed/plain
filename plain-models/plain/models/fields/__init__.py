@@ -359,9 +359,6 @@ class Field(RegisterLookupMixin, Generic[T]):
 
     def _check_null_allowed_for_primary_keys(self) -> list[PreflightResult]:
         if self.primary_key and self.allow_null:
-            # We cannot reliably check this for backends like Oracle which
-            # consider NULL and '' to be equal (and thus set up
-            # character-based fields a little differently).
             return [
                 PreflightResult(
                     fix="Primary keys must not have allow_null=True. "
@@ -1962,8 +1959,7 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
             return value
         if isinstance(value, datetime.datetime):
             # Not usually a good idea to pass in a datetime here (it loses
-            # information), but this can be a side-effect of interacting with a
-            # database backend (e.g. Oracle), so we'll be accommodating.
+            # information), but we'll be accommodating.
             return value.time()
 
         try:

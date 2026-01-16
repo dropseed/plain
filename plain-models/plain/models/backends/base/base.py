@@ -25,6 +25,14 @@ from psycopg.types.string import TextLoader
 
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends import utils
+
+# Import component classes directly (no longer need lazy imports since we only support PostgreSQL)
+from plain.models.backends.base.client import DatabaseClient
+from plain.models.backends.base.creation import DatabaseCreation
+from plain.models.backends.base.features import DatabaseFeatures
+from plain.models.backends.base.introspection import DatabaseIntrospection
+from plain.models.backends.base.operations import DatabaseOperations
+from plain.models.backends.base.schema import DatabaseSchemaEditor
 from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.models.backends.utils import debug_transaction
 from plain.models.db import (
@@ -40,12 +48,6 @@ from plain.runtime import settings
 if TYPE_CHECKING:
     from psycopg import Connection as PsycopgConnection
 
-    from plain.models.backends.base.client import DatabaseClient
-    from plain.models.backends.base.creation import DatabaseCreation
-    from plain.models.backends.base.features import DatabaseFeatures
-    from plain.models.backends.base.introspection import DatabaseIntrospection
-    from plain.models.backends.base.operations import DatabaseOperations
-    from plain.models.backends.base.schema import DatabaseSchemaEditor
     from plain.models.connections import DatabaseConfig
 
 RAN_DB_VERSION_CHECK = False
@@ -196,13 +198,12 @@ class DatabaseWrapper:
     }
 
     Database = Database
-    # Import these lazily to avoid circular imports
-    SchemaEditorClass: type[DatabaseSchemaEditor] | None = None
-    client_class: type[DatabaseClient] | None = None
-    creation_class: type[DatabaseCreation] | None = None
-    features_class: type[DatabaseFeatures] | None = None
-    introspection_class: type[DatabaseIntrospection] | None = None
-    ops_class: type[DatabaseOperations] | None = None
+    SchemaEditorClass: type[DatabaseSchemaEditor] = DatabaseSchemaEditor
+    client_class: type[DatabaseClient] = DatabaseClient
+    creation_class: type[DatabaseCreation] = DatabaseCreation
+    features_class: type[DatabaseFeatures] = DatabaseFeatures
+    introspection_class: type[DatabaseIntrospection] = DatabaseIntrospection
+    ops_class: type[DatabaseOperations] = DatabaseOperations
 
     queries_limit: int = 9000
 
@@ -210,32 +211,6 @@ class DatabaseWrapper:
     _named_cursor_idx = 0
 
     def __init__(self, settings_dict: DatabaseConfig):
-        # Import component classes lazily to avoid circular imports
-        if self.SchemaEditorClass is None:
-            from plain.models.backends.base.schema import DatabaseSchemaEditor
-
-            DatabaseWrapper.SchemaEditorClass = DatabaseSchemaEditor
-        if self.client_class is None:
-            from plain.models.backends.base.client import DatabaseClient
-
-            DatabaseWrapper.client_class = DatabaseClient
-        if self.creation_class is None:
-            from plain.models.backends.base.creation import DatabaseCreation
-
-            DatabaseWrapper.creation_class = DatabaseCreation
-        if self.features_class is None:
-            from plain.models.backends.base.features import DatabaseFeatures
-
-            DatabaseWrapper.features_class = DatabaseFeatures
-        if self.introspection_class is None:
-            from plain.models.backends.base.introspection import DatabaseIntrospection
-
-            DatabaseWrapper.introspection_class = DatabaseIntrospection
-        if self.ops_class is None:
-            from plain.models.backends.base.operations import DatabaseOperations
-
-            DatabaseWrapper.ops_class = DatabaseOperations
-
         # Connection related attributes.
         # The underlying database connection (from the database library, not a wrapper).
         self.connection: PsycopgConnection[Any] | None = None

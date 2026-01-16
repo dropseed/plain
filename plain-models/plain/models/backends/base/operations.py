@@ -833,12 +833,10 @@ class DatabaseOperations:
         self, start: int | None = None, end: int | None = None
     ) -> tuple[str, str]:
         start_, end_ = self.window_frame_rows_start_end(start, end)
-        features = self.connection.features
-        if features.only_supports_unbounded_with_preceding_and_following and (
-            (start and start < 0) or (end and end > 0)
-        ):
+        # PostgreSQL only supports UNBOUNDED with PRECEDING/FOLLOWING
+        if (start and start < 0) or (end and end > 0):
             raise NotSupportedError(
-                f"{self.connection.display_name} only supports UNBOUNDED together with PRECEDING and "
+                "PostgreSQL only supports UNBOUNDED together with PRECEDING and "
                 "FOLLOWING."
             )
         return start_, end_

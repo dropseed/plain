@@ -137,8 +137,8 @@ class WhereNode(tree.Node):
         else:
             full_needed, empty_needed = 1, len(self.children)
 
-        if self.connector == XOR and not connection.features.supports_logical_xor:
-            # Convert if the database doesn't support XOR:
+        if self.connector == XOR:
+            # PostgreSQL doesn't have a native XOR operator, so convert:
             #   a XOR b XOR c XOR ...
             # to:
             #   (a OR b OR c OR ...) AND (a + b + c + ...) == 1

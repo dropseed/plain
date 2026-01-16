@@ -201,7 +201,7 @@ class DatabaseCreation:
         """
         test_settings = self.connection.settings_dict["TEST"]
         return self._get_database_create_suffix(
-            encoding=test_settings["CHARSET"],
+            encoding=test_settings.get("CHARSET"),
             template=test_settings.get("TEMPLATE"),
         )
 

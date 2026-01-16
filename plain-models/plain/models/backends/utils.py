@@ -132,22 +132,17 @@ class CursorWrapper:
         params: Sequence[Any] | None = None,
         kparams: Mapping[str, Any] | None = None,
     ) -> Any:
-        # Keyword parameters for callproc aren't supported in PEP 249, but the
-        # database driver may support them.
-        if kparams is not None and not self.db.features.supports_callproc_kwargs:
+        # Keyword parameters for callproc aren't supported in PEP 249.
+        # PostgreSQL's psycopg doesn't support them either.
+        if kparams is not None:
             raise NotSupportedError(
-                "Keyword parameters for callproc are not supported on this "
-                "database backend."
+                "Keyword parameters for callproc are not supported."
             )
         self.db.validate_no_broken_transaction()
         with self.db.wrap_database_errors:
-            if params is None and kparams is None:
+            if params is None:
                 return self.cursor.callproc(procname)
-            elif kparams is None:
-                return self.cursor.callproc(procname, params)
-            else:
-                params = params or ()
-                return self.cursor.callproc(procname, params, kparams)
+            return self.cursor.callproc(procname, params)
 
     def execute(
         self, sql: str, params: Sequence[Any] | Mapping[str, Any] | None = None
