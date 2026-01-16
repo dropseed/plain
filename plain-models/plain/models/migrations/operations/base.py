@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -8,7 +7,7 @@ if TYPE_CHECKING:
     from plain.models.migrations.state import ProjectState
 
 
-class Operation(ABC):
+class Operation:
     """
     Base class for migration operations.
 
@@ -59,15 +58,15 @@ class Operation(ABC):
             self._constructor_args[1],
         )
 
-    @abstractmethod
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         """
         Take the state from the previous migration, and mutate it
         so that it matches what this migration would perform.
         """
-        ...
+        raise NotImplementedError(
+            "subclasses of Operation must provide a state_forwards() method"
+        )
 
-    @abstractmethod
     def database_forwards(
         self,
         package_label: str,
@@ -79,7 +78,9 @@ class Operation(ABC):
         Perform the mutation on the database schema in the normal
         (forwards) direction.
         """
-        ...
+        raise NotImplementedError(
+            "subclasses of Operation must provide a database_forwards() method"
+        )
 
     def describe(self) -> str:
         """

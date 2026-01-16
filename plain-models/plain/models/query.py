@@ -7,7 +7,6 @@ from __future__ import annotations
 import copy
 import operator
 import warnings
-from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Sequence
 from functools import cached_property
 from itertools import chain, islice
@@ -57,7 +56,7 @@ MAX_GET_RESULTS = 21
 REPR_OUTPUT_SIZE = 20
 
 
-class BaseIterable(ABC):
+class BaseIterable:
     def __init__(
         self,
         queryset: QuerySet[Any],
@@ -68,8 +67,10 @@ class BaseIterable(ABC):
         self.chunked_fetch = chunked_fetch
         self.chunk_size = chunk_size
 
-    @abstractmethod
-    def __iter__(self) -> Iterator[Any]: ...
+    def __iter__(self) -> Iterator[Any]:
+        raise NotImplementedError(
+            "subclasses of BaseIterable must provide an __iter__() method"
+        )
 
 
 class ModelIterable(BaseIterable):
@@ -140,10 +141,10 @@ class RawModelIterable(BaseIterable):
     def __iter__(self) -> Iterator[Model]:
         # Cache some things for performance reasons outside the loop.
         # RawQuery is not a Query subclass, so we directly get SQLCompiler
-        from plain.models.sql.query import Query as SqlQuery
+        from plain.models.sql.compiler import SQLCompiler
 
         query = self.queryset.sql_query
-        compiler = db_connection.ops.compilers[SqlQuery](query, db_connection, True)
+        compiler = SQLCompiler(query, db_connection, True)  # type: ignore[arg-type]
         query_iterator = iter(query)
 
         try:

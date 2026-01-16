@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from enum import Enum
 from types import NoneType
 from typing import TYPE_CHECKING, Any
@@ -27,7 +26,7 @@ if TYPE_CHECKING:
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]
 
 
-class BaseConstraint(ABC):
+class BaseConstraint:
     default_violation_error_message = 'Constraint "%(name)s" is violated.'
     violation_error_code: str | None = None
     violation_error_message: str | None = None
@@ -51,25 +50,33 @@ class BaseConstraint(ABC):
     def contains_expressions(self) -> bool:
         return False
 
-    @abstractmethod
     def constraint_sql(
         self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str | None: ...
+    ) -> str | None:
+        raise NotImplementedError(
+            "subclasses of BaseConstraint must provide a constraint_sql() method"
+        )
 
-    @abstractmethod
     def create_sql(
         self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str | Statement | None: ...
+    ) -> str | Statement | None:
+        raise NotImplementedError(
+            "subclasses of BaseConstraint must provide a create_sql() method"
+        )
 
-    @abstractmethod
     def remove_sql(
         self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str | Statement | None: ...
+    ) -> str | Statement | None:
+        raise NotImplementedError(
+            "subclasses of BaseConstraint must provide a remove_sql() method"
+        )
 
-    @abstractmethod
     def validate(
         self, model: type[Model], instance: Model, exclude: set[str] | None = None
-    ) -> None: ...
+    ) -> None:
+        raise NotImplementedError(
+            "subclasses of BaseConstraint must provide a validate() method"
+        )
 
     def get_violation_error_message(self) -> str:
         assert self.violation_error_message is not None

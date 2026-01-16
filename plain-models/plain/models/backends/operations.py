@@ -4,7 +4,7 @@ import datetime
 import ipaddress
 import json
 from collections.abc import Callable, Iterable
-from functools import cached_property, lru_cache, partial
+from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any, LiteralString, cast
 
 from psycopg import ClientCursor, errors, sql
@@ -21,8 +21,6 @@ from plain.utils.regex_helper import _lazy_re_compile
 if TYPE_CHECKING:
     from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.fields import Field
-    from plain.models.sql.compiler import SQLCompiler
-    from plain.models.sql.query import Query
 
 
 @lru_cache
@@ -431,42 +429,6 @@ class DatabaseOperations:
         statement into a table, return the list of returned data.
         """
         return cursor.fetchall()
-
-    @cached_property
-    def compilers(self) -> dict[type[Query], type[SQLCompiler]]:
-        """Return a mapping of Query types to their SQLCompiler implementations."""
-        from plain.models.sql.compiler import (
-            SQLAggregateCompiler,
-            SQLCompiler,
-            SQLDeleteCompiler,
-            SQLInsertCompiler,
-            SQLUpdateCompiler,
-        )
-        from plain.models.sql.query import Query
-        from plain.models.sql.subqueries import (
-            AggregateQuery,
-            DeleteQuery,
-            InsertQuery,
-            UpdateQuery,
-        )
-
-        return {
-            Query: SQLCompiler,
-            DeleteQuery: SQLDeleteCompiler,
-            UpdateQuery: SQLUpdateCompiler,
-            InsertQuery: SQLInsertCompiler,
-            AggregateQuery: SQLAggregateCompiler,
-        }
-
-    def get_compiler_for(self, query: Query, elide_empty: bool = True) -> SQLCompiler:
-        """
-        Return a compiler instance for the given query.
-        Walks the query's MRO to find the appropriate compiler class.
-        """
-        for query_cls in type(query).__mro__:
-            if query_cls in self.compilers:
-                return self.compilers[query_cls](query, self.connection, elide_empty)
-        raise TypeError(f"No compiler registered for {type(query)}")
 
     def quote_name(self, name: str) -> str:
         """

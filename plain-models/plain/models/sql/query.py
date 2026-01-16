@@ -211,6 +211,8 @@ class Query(BaseExpression):
 
     base_table_class = BaseTable
     join_class = Join
+    compiler_class: type[SQLCompiler]
+    _compiler_class_initialized: bool = False
 
     default_cols = True
     default_ordering = True
@@ -335,7 +337,13 @@ class Query(BaseExpression):
 
     def get_compiler(self, *, elide_empty: bool = True) -> SQLCompiler:
         """Return a compiler instance for this query."""
-        return db_connection.ops.get_compiler_for(self, elide_empty)
+        # Lazy initialization to avoid circular imports at module load time
+        if not Query._compiler_class_initialized:
+            _setup_compiler_class()
+            Query._compiler_class_initialized = True
+        # db_connection is a proxy that acts as DatabaseWrapper
+        connection = cast("DatabaseWrapper", db_connection)
+        return self.compiler_class(self, connection, elide_empty)
 
     def clone(self) -> Self:
         """
@@ -2734,3 +2742,27 @@ class JoinPromoter:
         query.promote_joins(to_promote)
         query.demote_joins(to_demote)
         return to_demote
+
+
+# Set compiler_class lazily to avoid circular imports at module load time.
+# Called by get_compiler() on first use.
+def _setup_compiler_class() -> None:
+    from plain.models.sql.compiler import (
+        SQLAggregateCompiler,
+        SQLCompiler,
+        SQLDeleteCompiler,
+        SQLInsertCompiler,
+        SQLUpdateCompiler,
+    )
+    from plain.models.sql.subqueries import (
+        AggregateQuery,
+        DeleteQuery,
+        InsertQuery,
+        UpdateQuery,
+    )
+
+    Query.compiler_class = SQLCompiler
+    DeleteQuery.compiler_class = SQLDeleteCompiler
+    UpdateQuery.compiler_class = SQLUpdateCompiler
+    InsertQuery.compiler_class = SQLInsertCompiler
+    AggregateQuery.compiler_class = SQLAggregateCompiler
