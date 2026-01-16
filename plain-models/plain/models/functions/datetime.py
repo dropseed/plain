@@ -276,7 +276,6 @@ class Now(Func):
 
 class TruncBase(TimezoneMixin, Transform):
     kind: str | None = None
-    tzinfo = None
 
     def __init__(
         self,
