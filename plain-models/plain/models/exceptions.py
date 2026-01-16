@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
+import psycopg
+
 if TYPE_CHECKING:
     from plain.models.backends.wrapper import DatabaseWrapper
 
@@ -198,7 +200,7 @@ class DatabaseErrorWrapper:
             InterfaceError,
             Error,
         ):
-            db_exc_type = getattr(self.wrapper.Database, plain_exc_type.__name__)
+            db_exc_type = getattr(psycopg, plain_exc_type.__name__)
             if issubclass(exc_type, db_exc_type):
                 plain_exc_value = (
                     plain_exc_type(*exc_value.args) if exc_value else plain_exc_type()

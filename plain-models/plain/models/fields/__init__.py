@@ -23,6 +23,8 @@ from typing import (
     overload,
 )
 
+import psycopg
+
 from plain import exceptions, validators
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import db_connection
@@ -2057,7 +2059,7 @@ class BinaryField(Field[bytes | memoryview]):
     ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
         if value is not None:
-            return connection.Database.Binary(value)
+            return psycopg.Binary(value)
         return value
 
     def value_to_string(self, obj: Model) -> str:

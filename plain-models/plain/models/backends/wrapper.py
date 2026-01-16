@@ -121,12 +121,6 @@ class DatabaseWrapper:
     creation: DatabaseCreation
     introspection: DatabaseIntrospection
 
-    vendor = "postgresql"
-    display_name = "PostgreSQL"
-
-    # PostgreSQL 12+ is required
-    minimum_database_version: tuple[int, ...] = (12,)
-
     # This dictionary maps Field objects to their associated PostgreSQL column
     # types, as strings. Column-type strings can contain format strings; they'll
     # be interpolated against the values of Field.__dict__ before being output.
@@ -197,9 +191,6 @@ class DatabaseWrapper:
         "endswith": "LIKE '%%' || {}",
         "iendswith": "LIKE '%%' || UPPER({})",
     }
-
-    Database = Database
-    SchemaEditorClass: type[DatabaseSchemaEditor] = DatabaseSchemaEditor
 
     queries_limit: int = 9000
 
@@ -273,7 +264,7 @@ class DatabaseWrapper:
         self.ops = DatabaseOperations(self)
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__qualname__} vendor={self.vendor!r}>"
+        return f"<{self.__class__.__qualname__} vendor='postgresql'>"
 
     @cached_property
     def timezone(self) -> datetime.tzinfo:
@@ -313,24 +304,15 @@ class DatabaseWrapper:
             )
         return list(self.queries_log)
 
-    def get_database_version(self) -> tuple[int, ...]:
-        """
-        Return a tuple of the database's version.
-        E.g. for pg_version 120004, return (12, 4).
-        """
-        return divmod(self.pg_version, 10000)
-
     def check_database_version_supported(self) -> None:
         """
         Raise an error if the database version isn't supported by this
-        version of Plain.
+        version of Plain. PostgreSQL 12+ is required.
         """
-        if self.get_database_version() < self.minimum_database_version:
-            db_version = ".".join(str(v) for v in self.get_database_version())
-            min_db_version = ".".join(str(v) for v in self.minimum_database_version)
+        major, minor = divmod(self.pg_version, 10000)
+        if major < 12:
             raise NotSupportedError(
-                f"{self.display_name} {min_db_version} or later is required "
-                f"(found {db_version})."
+                f"PostgreSQL 12 or later is required (found {major}.{minor})."
             )
 
     # ##### Backend-specific methods for creating connections and cursors #####
@@ -410,7 +392,7 @@ class DatabaseWrapper:
                     f"Invalid transaction isolation level {isolation_level_value} "
                     f"specified. Use one of the psycopg.IsolationLevel values."
                 )
-        connection = self.Database.connect(**conn_params)
+        connection = Database.connect(**conn_params)
         if set_isolation_level:
             connection.isolation_level = self.isolation_level
         # Use server-side binding cursor if requested, otherwise standard cursor
@@ -927,14 +909,8 @@ class DatabaseWrapper:
                 self.close()
 
     def schema_editor(self, *args: Any, **kwargs: Any) -> DatabaseSchemaEditor:
-        """
-        Return a new instance of this backend's SchemaEditor.
-        """
-        if self.SchemaEditorClass is None:
-            raise NotImplementedError(
-                "The SchemaEditorClass attribute of this database wrapper is still None"
-            )
-        return self.SchemaEditorClass(self, *args, **kwargs)
+        """Return a new instance of the schema editor."""
+        return DatabaseSchemaEditor(self, *args, **kwargs)
 
     def on_commit(self, func: Any, robust: bool = False) -> None:
         if not callable(func):
@@ -1037,4 +1013,4 @@ class Cursor(CursorMixin, Database.ClientCursor):
 class CursorDebugWrapper(BaseCursorDebugWrapper):
     def copy(self, statement: Any) -> Any:
         with self.debug_sql(statement):
-            return self.cursor.copy(statement)  # type: ignore[union-attr]
+            return self.cursor.copy(statement)

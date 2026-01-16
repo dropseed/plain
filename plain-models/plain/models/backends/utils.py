@@ -10,6 +10,8 @@ from hashlib import md5
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
 
+import psycopg
+
 from plain.models.db import NotSupportedError
 from plain.models.otel import db_span
 from plain.utils.dateparse import parse_time
@@ -66,7 +68,7 @@ class CursorWrapper:
         # aren't useful.
         try:
             self.close()
-        except self.db.Database.Error:
+        except psycopg.Error:
             pass
 
     # The following methods cannot be implemented in __getattr__, because the
