@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-observer@0.27.0) (2026-01-15)
+
+### What's changed
+
+- Improved mobile support with text truncation and constrained button width on smaller screens ([ee7acaa6](https://github.com/dropseed/plain/commit/ee7acaa67c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.26.0](https://github.com/dropseed/plain/releases/plain-observer@0.26.0) (2026-01-15)
 
 ### What's changed
