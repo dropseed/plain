@@ -39,19 +39,6 @@ class FixDecimalInputMixin(Func):
         return clone.as_sql(compiler, connection, **extra_context)
 
 
-class FixDurationInputMixin(Func):
-    def as_mysql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        sql, params = super().as_sql(compiler, connection, **extra_context)
-        if self.output_field.get_internal_type() == "DurationField":
-            sql = f"CAST({sql} AS SIGNED)"
-        return sql, params
-
-
 class NumericOutputFieldMixin(Func):
     def _resolve_output_field(self) -> DecimalField | FloatField | Field:
         source_fields = self.get_source_fields()

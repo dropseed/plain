@@ -34,9 +34,6 @@ SCHEMES = {
     "postgres": "plain.models.backends.postgresql",
     "postgresql": "plain.models.backends.postgresql",
     "pgsql": "plain.models.backends.postgresql",
-    "mysql": "plain.models.backends.mysql",
-    "mysql2": "plain.models.backends.mysql",
-    "sqlite": "plain.models.backends.sqlite3",
 }
 
 # Register database schemes in URLs.
@@ -51,14 +48,6 @@ def parse_database_url(
     conn_health_checks: bool = False,
 ) -> DatabaseConfig:
     """Parses a database URL."""
-    if url == "sqlite://:memory:":
-        # this is a special case, because if we pass this URL into
-        # urlparse, urlparse will choke trying to interpret "memory"
-        # as a port number
-        return {"ENGINE": SCHEMES["sqlite"], "NAME": ":memory:"}
-        # note: no other settings are required for sqlite
-
-    # otherwise parse the url as normal
     parsed_config: DatabaseConfig = {}
 
     spliturl = urlparse.urlsplit(url)
@@ -66,11 +55,6 @@ def parse_database_url(
     # Split query strings from path.
     path = spliturl.path[1:]
     query = urlparse.parse_qs(spliturl.query)
-
-    # If we are using sqlite and we have no path, then assume we
-    # want an in-memory database (this is the behaviour of sqlalchemy)
-    if spliturl.scheme == "sqlite" and path == "":
-        path = ":memory:"
 
     # Handle postgres percent-encoded paths.
     hostname = spliturl.hostname or ""
@@ -111,10 +95,6 @@ def parse_database_url(
     # Pass the query string into OPTIONS.
     options: dict[str, Any] = {}
     for key, values in query.items():
-        if spliturl.scheme == "mysql" and key == "ssl-ca":
-            options["ssl"] = {"ca": values[-1]}
-            continue
-
         options[key] = values[-1]
 
     if options:
@@ -142,27 +122,9 @@ def build_database_url(config: DatabaseConfig) -> str:
     options = config.get("OPTIONS", {})
     query_parts: list[tuple[str, Any]] = []
     for key, value in options.items():
-        if scheme == "mysql" and key == "ssl" and isinstance(value, dict):
-            ca = value.get("ca")
-            if ca:
-                query_parts.append(("ssl-ca", ca))
-            continue
-
         query_parts.append((key, value))
 
     query = urlparse.urlencode(query_parts)
-
-    if scheme == "sqlite":
-        name = config.get("NAME") or ""
-        if name == ":memory:":
-            url = "sqlite://:memory:"
-        else:
-            url = f"sqlite:///{urlparse.quote(name, safe='/')}"
-
-        if query:
-            url += f"?{query}"
-
-        return url
 
     user = urlparse.quote(str(config.get("USER", "")))
     password = urlparse.quote(str(config.get("PASSWORD", "")))

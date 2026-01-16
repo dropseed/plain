@@ -15,7 +15,6 @@ from uuid import UUID
 from plain.models import fields
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import (
-    DatabaseError,
     NotSupportedError,
     db_connection,
 )
@@ -685,28 +684,7 @@ def _resolve_combined_type(
     return None
 
 
-class SQLiteNumericMixin(Expression):
-    """
-    Some expressions with output_field=DecimalField() must be cast to
-    numeric to be properly filtered.
-    """
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        sql, params = self.as_sql(compiler, connection, **extra_context)
-        try:
-            if self.output_field.get_internal_type() == "DecimalField":
-                sql = f"CAST({sql} AS NUMERIC)"
-        except FieldError:
-            pass
-        return sql, params
-
-
-class CombinedExpression(SQLiteNumericMixin, Expression):
+class CombinedExpression(Expression):
     def __init__(
         self, lhs: Any, connector: str, rhs: Any, output_field: Field | None = None
     ):
@@ -846,32 +824,6 @@ class DurationExpression(CombinedExpression):
         sql = connection.ops.combine_duration_expression(self.connector, expressions)
         return expression_wrapper % sql, expression_params
 
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        sql, params = self.as_sql(compiler, connection, **extra_context)
-        if self.connector in {Combinable.MUL, Combinable.DIV}:
-            try:
-                lhs_type = self.lhs.output_field.get_internal_type()
-                rhs_type = self.rhs.output_field.get_internal_type()
-            except (AttributeError, FieldError):
-                pass
-            else:
-                allowed_fields = {
-                    "DecimalField",
-                    "DurationField",
-                    "FloatField",
-                    "IntegerField",
-                }
-                if lhs_type not in allowed_fields or rhs_type not in allowed_fields:
-                    raise DatabaseError(
-                        f"Invalid arguments for operator {self.connector}."
-                    )
-        return sql, params
-
 
 class TemporalSubtraction(CombinedExpression):
     output_field = fields.DurationField()
@@ -986,7 +938,7 @@ class OuterRef(F):
 
 
 @deconstructible(path="plain.models.Func")
-class Func(SQLiteNumericMixin, Expression):
+class Func(Expression):
     """An SQL function call."""
 
     function = None
@@ -1093,7 +1045,7 @@ class Func(SQLiteNumericMixin, Expression):
 
 
 @deconstructible(path="plain.models.Value")
-class Value(SQLiteNumericMixin, Expression):
+class Value(Expression):
     """Represent a wrapped value as a node within an expression."""
 
     # Provide a default value for `for_save` in order to allow unresolved
@@ -1320,15 +1272,6 @@ class ExpressionList(Func):
     def __str__(self) -> str:
         return self.arg_joiner.join(str(arg) for arg in self.source_expressions)
 
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        # Casting to numeric is unnecessary.
-        return self.as_sql(compiler, connection, **extra_context)
-
 
 class OrderByList(Func):
     template = "ORDER BY %(expressions)s"
@@ -1358,7 +1301,7 @@ class OrderByList(Func):
 
 
 @deconstructible(path="plain.models.ExpressionWrapper")
-class ExpressionWrapper(SQLiteNumericMixin, Expression):
+class ExpressionWrapper(Expression):
     """
     An expression that can wrap another expression so that it can provide
     extra context to the inner expression, such as the output_field.
@@ -1549,7 +1492,7 @@ class When(Expression):
 
 
 @deconstructible(path="plain.models.Case")
-class Case(SQLiteNumericMixin, Expression):
+class Case(Expression):
     """
     An SQL searched CASE expression:
 
@@ -1841,7 +1784,7 @@ class OrderBy(Expression):
         self.descending = True
 
 
-class Window(SQLiteNumericMixin, Expression):
+class Window(Expression):
     template = "%(expression)s OVER (%(window)s)"
     # Although the main expression may either be an aggregate or an
     # expression with an aggregate function, the GROUP BY that will
@@ -1935,21 +1878,6 @@ class Window(SQLiteNumericMixin, Expression):
             template % {"expression": expr_sql, "window": " ".join(window_sql).strip()},
             (*params, *window_params),
         )
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        if isinstance(self.output_field, fields.DecimalField):
-            # Casting to numeric must be outside of the window expression.
-            copy = self.copy()
-            source_expressions = copy.get_source_expressions()
-            source_expressions[0].output_field = fields.FloatField()
-            copy.set_source_expressions(source_expressions)
-            return super(Window, copy).as_sqlite(compiler, connection, **extra_context)
-        return self.as_sql(compiler, connection, **extra_context)
 
     def __str__(self) -> str:
         return "{} OVER ({}{}{})".format(

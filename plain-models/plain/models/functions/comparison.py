@@ -38,49 +38,6 @@ class Cast(Func):
             compiler, connection, function, template, arg_joiner, **extra_context
         )
 
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        db_type = self.output_field.db_type(connection)
-        if db_type in {"datetime", "time"}:
-            # Use strftime as datetime/time don't keep fractional seconds.
-            template = "strftime(%%s, %(expressions)s)"
-            sql, params = super().as_sql(
-                compiler, connection, template=template, **extra_context
-            )
-            format_string = "%H:%M:%f" if db_type == "time" else "%Y-%m-%d %H:%M:%f"
-            params.insert(0, format_string)
-            return sql, params
-        elif db_type == "date":
-            template = "date(%(expressions)s)"
-            return super().as_sql(
-                compiler, connection, template=template, **extra_context
-            )
-        return self.as_sql(compiler, connection, **extra_context)
-
-    def as_mysql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        template = None
-        output_type = self.output_field.get_internal_type()
-        # MySQL doesn't support explicit cast to float.
-        if output_type == "FloatField":
-            template = "(%(expressions)s + 0.0)"
-        # MariaDB doesn't support explicit cast to JSON.
-        elif (
-            output_type == "JSONField"
-            and hasattr(connection, "mysql_is_mariadb")
-            and connection.mysql_is_mariadb
-        ):
-            template = "JSON_EXTRACT(%(expressions)s, '$')"
-        return self.as_sql(compiler, connection, template=template, **extra_context)
-
     def as_postgresql(
         self,
         compiler: SQLCompiler,
@@ -151,7 +108,6 @@ class Greatest(Func):
 
     If any expression is null the return value is database-specific:
     On PostgreSQL, the maximum not-null expression is returned.
-    On MySQL, Oracle, and SQLite, if any expression is null, null is returned.
     """
 
     function = "GREATEST"
@@ -160,18 +116,6 @@ class Greatest(Func):
         if len(expressions) < 2:
             raise ValueError("Greatest must take at least two expressions")
         super().__init__(*expressions, **extra)
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        """Use the MAX function on SQLite."""
-        sql, params = super().as_sqlite(
-            compiler, connection, function="MAX", **extra_context
-        )
-        return sql, list(params)
 
 
 class JSONObject(Func):
@@ -228,7 +172,6 @@ class Least(Func):
 
     If any expression is null the return value is database-specific:
     On PostgreSQL, return the minimum not-null expression.
-    On MySQL, Oracle, and SQLite, if any expression is null, return null.
     """
 
     function = "LEAST"
@@ -237,18 +180,6 @@ class Least(Func):
         if len(expressions) < 2:
             raise ValueError("Least must take at least two expressions")
         super().__init__(*expressions, **extra)
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        """Use the MIN function on SQLite."""
-        sql, params = super().as_sqlite(
-            compiler, connection, function="MIN", **extra_context
-        )
-        return sql, list(params)
 
 
 class NullIf(Func):

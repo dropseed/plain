@@ -15,4 +15,4 @@ echo "${BOLD}Running tests${NORMAL}"
 
 echo ""
 echo "${BOLD}Running preflight in example${NORMAL}"
-cd example && DATABASE_URL=sqlite://:memory: uv run plain preflight
+cd example && DATABASE_URL=postgres://postgres:postgres@localhost/plain_example uv run plain preflight

@@ -13,10 +13,7 @@ from plain.models.expressions import (
 )
 from plain.models.fields import IntegerField
 from plain.models.functions.comparison import Coalesce
-from plain.models.functions.mixins import (
-    FixDurationInputMixin,
-    NumericOutputFieldMixin,
-)
+from plain.models.functions.mixins import NumericOutputFieldMixin
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -194,7 +191,7 @@ class Aggregate(Func):
         return options
 
 
-class Avg(FixDurationInputMixin, NumericOutputFieldMixin, Aggregate):
+class Avg(NumericOutputFieldMixin, Aggregate):
     function = "AVG"
     name = "Avg"
     allow_distinct = True
@@ -238,7 +235,7 @@ class StdDev(NumericOutputFieldMixin, Aggregate):
         return {**super()._get_repr_options(), "sample": self.function == "STDDEV_SAMP"}
 
 
-class Sum(FixDurationInputMixin, Aggregate):
+class Sum(Aggregate):
     function = "SUM"
     name = "Sum"
     allow_distinct = True

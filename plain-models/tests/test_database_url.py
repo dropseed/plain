@@ -11,13 +11,9 @@ def test_postgres_roundtrip():
     roundtrip("postgres://user:pass@localhost:5432/dbname?sslmode=require")
 
 
-def test_mysql_roundtrip():
-    roundtrip("mysql://user:pass@localhost/dbname?ssl-ca=/path/ca.pem")
+def test_postgresql_roundtrip():
+    roundtrip("postgresql://user:pass@localhost:5432/dbname")
 
 
-def test_sqlite_memory_roundtrip():
-    roundtrip("sqlite://:memory:")
-
-
-def test_sqlite_file_roundtrip():
-    roundtrip("sqlite:///mydb.sqlite3")
+def test_pgsql_roundtrip():
+    roundtrip("pgsql://user:pass@localhost:5432/dbname")

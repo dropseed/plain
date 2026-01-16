@@ -62,15 +62,14 @@ class DatabaseConnection:
         database_config = self.configure_settings()
         backend = import_module(f"{database_config['ENGINE']}.base")
 
-        # Map vendor to wrapper class name
-        vendor_map = {
-            "plain.models.backends.sqlite3": "SQLiteDatabaseWrapper",
-            "plain.models.backends.mysql": "MySQLDatabaseWrapper",
-            "plain.models.backends.postgresql": "PostgreSQLDatabaseWrapper",
-        }
-        wrapper_class_name = vendor_map.get(
-            database_config["ENGINE"], "DatabaseWrapper"
-        )
+        # PostgreSQL is the only supported database
+        if database_config["ENGINE"] != "plain.models.backends.postgresql":
+            raise ValueError(
+                f"Unsupported database engine '{database_config['ENGINE']}'. "
+                "PostgreSQL is the only supported database. "
+                "Use DATABASE_URL=postgres://... or ENGINE='plain.models.backends.postgresql'"
+            )
+        wrapper_class_name = "PostgreSQLDatabaseWrapper"
         wrapper_class = getattr(backend, wrapper_class_name)
         return wrapper_class(database_config)
 

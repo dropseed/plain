@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 from plain.runtime import PLAIN_TEMP_PATH
 
 from .. import db_connection as _db_connection
-from .clients import PostgresBackupClient, SQLiteBackupClient
+from .clients import PostgresBackupClient
 
 
 def get_git_branch() -> str | None:
@@ -103,15 +103,10 @@ class DatabaseBackup:
 
         backup_path = self.path / "default.backup"
 
-        if db_connection.vendor == "postgresql":
-            PostgresBackupClient(db_connection).create_backup(
-                backup_path,
-                pg_dump=create_kwargs.get("pg_dump", "pg_dump"),
-            )
-        elif db_connection.vendor == "sqlite":
-            SQLiteBackupClient(db_connection).create_backup(backup_path)
-        else:
-            raise Exception("Unsupported database vendor")
+        PostgresBackupClient(db_connection).create_backup(
+            backup_path,
+            pg_dump=create_kwargs.get("pg_dump", "pg_dump"),
+        )
 
         # Write metadata
         metadata = {
@@ -129,15 +124,10 @@ class DatabaseBackup:
     def restore(self, **restore_kwargs: Any) -> None:
         backup_file = self.path / "default.backup"
 
-        if db_connection.vendor == "postgresql":
-            PostgresBackupClient(db_connection).restore_backup(
-                backup_file,
-                pg_restore=restore_kwargs.get("pg_restore", "pg_restore"),
-            )
-        elif db_connection.vendor == "sqlite":
-            SQLiteBackupClient(db_connection).restore_backup(backup_file)
-        else:
-            raise Exception("Unsupported database vendor")
+        PostgresBackupClient(db_connection).restore_backup(
+            backup_file,
+            pg_restore=restore_kwargs.get("pg_restore", "pg_restore"),
+        )
 
     @property
     def metadata(self) -> dict[str, Any]:

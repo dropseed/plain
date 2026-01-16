@@ -12,24 +12,6 @@ if TYPE_CHECKING:
     from plain.models.sql.compiler import SQLCompiler
 
 
-class MySQLSHA2Mixin(Transform):
-    """Mixin for Transform subclasses that implement SHA2 hashing on MySQL."""
-
-    def as_mysql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        assert self.function is not None
-        return super().as_sql(
-            compiler,
-            connection,
-            template=f"SHA2(%(expressions)s, {self.function[3:]})",
-            **extra_context,
-        )
-
-
 class PostgreSQLSHAMixin(Transform):
     """Mixin for Transform subclasses that implement SHA hashing on PostgreSQL."""
 
@@ -53,28 +35,6 @@ class Chr(Transform):
     function = "CHR"
     lookup_name = "chr"
 
-    def as_mysql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        return super().as_sql(
-            compiler,
-            connection,
-            function="CHAR",
-            template="%(function)s(%(expressions)s USING utf16)",
-            **extra_context,
-        )
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        return super().as_sql(compiler, connection, function="CHAR", **extra_context)
-
 
 class ConcatPair(Func):
     """
@@ -83,21 +43,6 @@ class ConcatPair(Func):
     """
 
     function = "CONCAT"
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        coalesced = self.coalesce()
-        return super(ConcatPair, coalesced).as_sql(
-            compiler,
-            connection,
-            template="%(expressions)s",
-            arg_joiner=" || ",
-            **extra_context,
-        )
 
     def as_postgresql(
         self,
@@ -115,21 +60,6 @@ class ConcatPair(Func):
         return super(ConcatPair, copy).as_sql(
             compiler,
             connection,
-            **extra_context,
-        )
-
-    def as_mysql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        # Use CONCAT_WS with an empty separator so that NULLs are ignored.
-        return super().as_sql(
-            compiler,
-            connection,
-            function="CONCAT_WS",
-            template="%(function)s('', %(expressions)s)",
             **extra_context,
         )
 
@@ -188,14 +118,6 @@ class Left(Func):
     def get_substr(self) -> Substr:
         return Substr(self.source_expressions[0], Value(1), self.source_expressions[1])
 
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        return self.get_substr().as_sqlite(compiler, connection, **extra_context)
-
 
 class Length(Transform):
     """Return the number of characters in the expression."""
@@ -203,16 +125,6 @@ class Length(Transform):
     function = "LENGTH"
     lookup_name = "length"
     output_field = IntegerField()
-
-    def as_mysql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        return super().as_sql(
-            compiler, connection, function="CHAR_LENGTH", **extra_context
-        )
 
 
 class Lower(Transform):
@@ -250,22 +162,6 @@ class Ord(Transform):
     function = "ASCII"
     lookup_name = "ord"
     output_field = IntegerField()
-
-    def as_mysql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        return super().as_sql(compiler, connection, function="ORD", **extra_context)
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        return super().as_sql(compiler, connection, function="UNICODE", **extra_context)
 
 
 class Repeat(Func):
@@ -319,22 +215,22 @@ class SHA1(PostgreSQLSHAMixin, Transform):
     lookup_name = "sha1"
 
 
-class SHA224(MySQLSHA2Mixin, PostgreSQLSHAMixin, Transform):
+class SHA224(PostgreSQLSHAMixin, Transform):
     function = "SHA224"
     lookup_name = "sha224"
 
 
-class SHA256(MySQLSHA2Mixin, PostgreSQLSHAMixin, Transform):
+class SHA256(PostgreSQLSHAMixin, Transform):
     function = "SHA256"
     lookup_name = "sha256"
 
 
-class SHA384(MySQLSHA2Mixin, PostgreSQLSHAMixin, Transform):
+class SHA384(PostgreSQLSHAMixin, Transform):
     function = "SHA384"
     lookup_name = "sha384"
 
 
-class SHA512(MySQLSHA2Mixin, PostgreSQLSHAMixin, Transform):
+class SHA512(PostgreSQLSHAMixin, Transform):
     function = "SHA512"
     lookup_name = "sha512"
 
@@ -378,14 +274,6 @@ class Substr(Func):
         if length is not None:
             expressions.append(length)
         super().__init__(*expressions, **extra)
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        return super().as_sql(compiler, connection, function="SUBSTR", **extra_context)
 
 
 class Trim(Transform):

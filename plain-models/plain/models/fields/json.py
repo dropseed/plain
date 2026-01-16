@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from plain import exceptions, preflight
 from plain.models import expressions, lookups
-from plain.models.backends.guards import is_mysql_connection, is_sqlite_connection
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import NotSupportedError, db_connection
 from plain.models.fields import TextField
@@ -255,13 +254,6 @@ class HasKeyLookup(PostgresOperatorLookup):
             sql = f"({self.logical_operator.join([sql] * len(rhs_params))})"
         return sql, tuple(lhs_params) + tuple(rhs_params)
 
-    def as_mysql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
-        return self.as_sql(
-            compiler, connection, template="JSON_CONTAINS_PATH(%s, 'one', %%s)"
-        )
-
     def as_postgresql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, tuple[Any, ...]]:
@@ -271,13 +263,6 @@ class HasKeyLookup(PostgresOperatorLookup):
                 self.lhs = KeyTransform(key, self.lhs)
             self.rhs = rhs_key_transforms[-1]
         return super().as_postgresql(compiler, connection)
-
-    def as_sqlite(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
-        return self.as_sql(
-            compiler, connection, template="JSON_TYPE(%s, %%s) IS NOT NULL"
-        )
 
 
 class HasKey(HasKeyLookup):
@@ -306,34 +291,6 @@ class HasKeyOrArrayIndex(HasKey):
         return compile_json_path([key_transform], include_root=False)
 
 
-class CaseInsensitiveMixin(Lookup):
-    """
-    Mixin to allow case-insensitive comparison of JSON values on MySQL.
-    MySQL handles strings used in JSON context using the utf8mb4_bin collation.
-    Because utf8mb4_bin is a binary collation, comparison of JSON values is
-    case-sensitive.
-    """
-
-    def process_lhs(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper, lhs: Any = None
-    ) -> tuple[str, list[Any]]:
-        lhs_sql, lhs_params = super().process_lhs(compiler, connection, lhs)
-        if connection.vendor == "mysql":
-            return f"LOWER({lhs_sql})", lhs_params
-        return lhs_sql, lhs_params
-
-    def process_rhs(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
-        rhs, rhs_params = super().process_rhs(compiler, connection)
-        if isinstance(rhs, str):
-            if connection.vendor == "mysql":
-                return f"LOWER({rhs})", rhs_params
-            return rhs, rhs_params
-        else:
-            return rhs, rhs_params
-
-
 class JSONExact(lookups.Exact):
     can_use_none_as_rhs = True
 
@@ -345,15 +302,12 @@ class JSONExact(lookups.Exact):
             # Treat None lookup values as null.
             if rhs == "%s" and rhs_params == [None]:
                 rhs_params = ["null"]
-            if connection.vendor == "mysql":
-                func = ["JSON_EXTRACT(%s, '$')"] * len(rhs_params)
-                rhs = rhs % tuple(func)
             return rhs, rhs_params
         else:
             return rhs, rhs_params
 
 
-class JSONIContains(CaseInsensitiveMixin, lookups.IContains):
+class JSONIContains(lookups.IContains):
     pass
 
 
@@ -385,13 +339,6 @@ class KeyTransform(Transform):
         lhs, params = compiler.compile(previous)
         return lhs, params, key_transforms
 
-    def as_mysql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
-        lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
-        json_path = compile_json_path(key_transforms)
-        return f"JSON_EXTRACT({lhs}, %s)", tuple(params) + (json_path,)
-
     def as_postgresql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, tuple[Any, ...]]:
@@ -405,43 +352,11 @@ class KeyTransform(Transform):
             lookup = self.key_name
         return f"({lhs} {self.postgres_operator} %s)", tuple(params) + (lookup,)
 
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        # as_sqlite is only called for SQLite connections
-        assert is_sqlite_connection(connection)
-        lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
-        json_path = compile_json_path(key_transforms)
-        datatype_values = ",".join(
-            [repr(datatype) for datatype in connection.ops.jsonfield_datatype_values]
-        )
-        return (
-            f"(CASE WHEN JSON_TYPE({lhs}, %s) IN ({datatype_values}) "
-            f"THEN JSON_TYPE({lhs}, %s) ELSE JSON_EXTRACT({lhs}, %s) END)"
-        ), (tuple(params) + (json_path,)) * 3
-
 
 class KeyTextTransform(KeyTransform):
     postgres_operator = "->>"
     postgres_nested_operator = "#>>"
     output_field = TextField()
-
-    def as_mysql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
-        # as_mysql is only called for MySQL connections
-        assert is_mysql_connection(connection)
-        if connection.mysql_is_mariadb:
-            # MariaDB doesn't support -> and ->> operators (see MDEV-13594).
-            sql, params = super().as_mysql(compiler, connection)
-            return f"JSON_UNQUOTE({sql})", params
-        else:
-            lhs, params, key_transforms = self.preprocess_lhs(compiler, connection)
-            json_path = compile_json_path(key_transforms)
-            return f"({lhs} ->> %s)", tuple(params) + (json_path,)
 
     @classmethod
     def from_lookup(cls, lookup: str) -> Any:
@@ -480,17 +395,7 @@ class KeyTransformTextLookupMixin(Lookup):
 
 class KeyTransformIsNull(lookups.IsNull):
     # key__isnull=False is the same as has_key='key'
-    def as_sqlite(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, tuple[Any, ...]]:
-        template = "JSON_TYPE(%s, %%s) IS NULL"
-        if not self.rhs:
-            template = "JSON_TYPE(%s, %%s) IS NOT NULL"
-        return HasKeyOrArrayIndex(self.lhs.lhs, self.lhs.key_name).as_sql(
-            compiler,
-            connection,
-            template=template,
-        )
+    pass
 
 
 class KeyTransformIn(lookups.In):
@@ -507,20 +412,6 @@ class KeyTransformIn(lookups.In):
             sql,
             param,
         )
-        if (
-            not hasattr(param, "as_sql")
-            and not connection.features.has_native_json_field
-        ):
-            if connection.vendor == "mysql":
-                sql = "JSON_EXTRACT(%s, '$')"
-            elif is_sqlite_connection(connection):
-                # Type guard narrows connection to SQLiteDatabaseWrapper
-                if params[0] not in connection.ops.jsonfield_datatype_values:
-                    sql = "JSON_EXTRACT(%s, '$')"
-        if is_mysql_connection(connection):
-            # Type guard narrows connection to MySQLDatabaseWrapper
-            if connection.mysql_is_mariadb:
-                sql = f"JSON_UNQUOTE({sql})"
         return sql, list(params)
 
 
@@ -530,31 +421,14 @@ class KeyTransformExact(JSONExact):
     ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
         if isinstance(self.rhs, KeyTransform):
             return super(lookups.Exact, self).process_rhs(compiler, connection)
-        rhs, rhs_params = super().process_rhs(compiler, connection)
-        if isinstance(rhs, str):
-            if is_sqlite_connection(connection):
-                # Type guard narrows connection to SQLiteDatabaseWrapper
-                func = []
-                for value in rhs_params:
-                    if value in connection.ops.jsonfield_datatype_values:
-                        func.append("%s")
-                    else:
-                        func.append("JSON_EXTRACT(%s, '$')")
-                rhs = rhs % tuple(func)
-            return rhs, rhs_params
-        else:
-            return rhs, rhs_params
+        return super().process_rhs(compiler, connection)
 
 
-class KeyTransformIExact(
-    CaseInsensitiveMixin, KeyTransformTextLookupMixin, lookups.IExact
-):
+class KeyTransformIExact(KeyTransformTextLookupMixin, lookups.IExact):
     pass
 
 
-class KeyTransformIContains(
-    CaseInsensitiveMixin, KeyTransformTextLookupMixin, lookups.IContains
-):
+class KeyTransformIContains(KeyTransformTextLookupMixin, lookups.IContains):
     pass
 
 
@@ -562,9 +436,7 @@ class KeyTransformStartsWith(KeyTransformTextLookupMixin, lookups.StartsWith):
     pass
 
 
-class KeyTransformIStartsWith(
-    CaseInsensitiveMixin, KeyTransformTextLookupMixin, lookups.IStartsWith
-):
+class KeyTransformIStartsWith(KeyTransformTextLookupMixin, lookups.IStartsWith):
     pass
 
 
@@ -572,9 +444,7 @@ class KeyTransformEndsWith(KeyTransformTextLookupMixin, lookups.EndsWith):
     pass
 
 
-class KeyTransformIEndsWith(
-    CaseInsensitiveMixin, KeyTransformTextLookupMixin, lookups.IEndsWith
-):
+class KeyTransformIEndsWith(KeyTransformTextLookupMixin, lookups.IEndsWith):
     pass
 
 
@@ -582,9 +452,7 @@ class KeyTransformRegex(KeyTransformTextLookupMixin, lookups.Regex):
     pass
 
 
-class KeyTransformIRegex(
-    CaseInsensitiveMixin, KeyTransformTextLookupMixin, lookups.IRegex
-):
+class KeyTransformIRegex(KeyTransformTextLookupMixin, lookups.IRegex):
     pass
 
 

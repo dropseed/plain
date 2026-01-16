@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from types import NoneType
 from typing import TYPE_CHECKING, Any, Self
 
@@ -17,7 +16,6 @@ if TYPE_CHECKING:
     from plain.models.backends.ddl_references import Statement
     from plain.models.base import Model
     from plain.models.expressions import Expression
-    from plain.models.sql.compiler import SQLCompiler
 
 __all__ = ["Index"]
 
@@ -307,12 +305,3 @@ class IndexExpression(Func):
         return super().resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        # Casting to numeric is unnecessary.
-        return self.as_sql(compiler, connection, **extra_context)

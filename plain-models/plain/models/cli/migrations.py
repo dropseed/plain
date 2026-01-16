@@ -468,19 +468,11 @@ def apply(
         use_atomic_batch = False
         atomic_batch_message = None
         if len(migration_plan) > 1:
-            # Check database capabilities
-            can_rollback_ddl = db_connection.features.can_rollback_ddl
-
             # Check if all migrations support atomic
             non_atomic_migrations = [m for m in migration_plan if not m.atomic]
 
             if atomic_batch is True:
                 # User explicitly requested atomic batch
-                if not can_rollback_ddl:
-                    raise click.UsageError(
-                        f"--atomic-batch not supported on {db_connection.vendor}. "
-                        "Remove the flag or use a database that supports transactional DDL."
-                    )
                 if non_atomic_migrations:
                     names = ", ".join(
                         f"{m.package_label}.{m.name}" for m in non_atomic_migrations[:3]
@@ -503,13 +495,8 @@ def apply(
                     )
             else:
                 # Auto-detect (atomic_batch is None)
-                # SQLite is excluded because it requires foreign key constraints to be
-                # disabled before entering a transaction, which conflicts with batch mode
-                if (
-                    can_rollback_ddl
-                    and not non_atomic_migrations
-                    and db_connection.vendor != "sqlite"
-                ):
+                # PostgreSQL supports transactional DDL, so use atomic batch by default
+                if not non_atomic_migrations:
                     use_atomic_batch = True
                     atomic_batch_message = (
                         f"Running {len(migration_plan)} migrations in atomic batch"
@@ -517,16 +504,7 @@ def apply(
                 else:
                     use_atomic_batch = False
                     if len(migration_plan) > 1:
-                        if not can_rollback_ddl:
-                            atomic_batch_message = f"Running {len(migration_plan)} migrations separately ({db_connection.vendor} doesn't support batch)"
-                        elif non_atomic_migrations:
-                            atomic_batch_message = f"Running {len(migration_plan)} migrations separately (some have atomic=False)"
-                        elif db_connection.vendor == "sqlite":
-                            atomic_batch_message = f"Running {len(migration_plan)} migrations separately (SQLite doesn't support batch)"
-                        else:
-                            atomic_batch_message = (
-                                f"Running {len(migration_plan)} migrations separately"
-                            )
+                        atomic_batch_message = f"Running {len(migration_plan)} migrations separately (some have atomic=False)"
 
         if backup or (backup is None and settings.DEBUG):
             backup_name = time.strftime("%Y%m%d_%H%M%S")
