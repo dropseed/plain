@@ -25,7 +25,6 @@ from psycopg.types.string import TextLoader
 
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends import utils
-from plain.models.backends.base.validation import DatabaseValidation
 from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.models.backends.utils import debug_transaction
 from plain.models.db import (
@@ -121,7 +120,6 @@ class DatabaseWrapper:
     creation: DatabaseCreation
     features: DatabaseFeatures
     introspection: DatabaseIntrospection
-    validation: DatabaseValidation
 
     vendor = "postgresql"
     display_name = "PostgreSQL"
@@ -205,7 +203,6 @@ class DatabaseWrapper:
     features_class: type[DatabaseFeatures] | None = None
     introspection_class: type[DatabaseIntrospection] | None = None
     ops_class: type[DatabaseOperations] | None = None
-    validation_class: type[DatabaseValidation] | None = None
 
     queries_limit: int = 9000
 
@@ -238,10 +235,6 @@ class DatabaseWrapper:
             from plain.models.backends.base.operations import DatabaseOperations
 
             DatabaseWrapper.ops_class = DatabaseOperations
-        if self.validation_class is None:
-            from plain.models.backends.base.validation import DatabaseValidation
-
-            DatabaseWrapper.validation_class = DatabaseValidation
 
         # Connection related attributes.
         # The underlying database connection (from the database library, not a wrapper).
@@ -308,14 +301,12 @@ class DatabaseWrapper:
         assert self.features_class is not None
         assert self.introspection_class is not None
         assert self.ops_class is not None
-        assert self.validation_class is not None
 
         self.client = self.client_class(self)
         self.creation = self.creation_class(self)
         self.features = self.features_class(self)
         self.introspection = self.introspection_class(self)
         self.ops = self.ops_class(self)
-        self.validation = self.validation_class(self)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__qualname__} vendor={self.vendor!r}>"
@@ -768,7 +759,8 @@ class DatabaseWrapper:
 
     def _savepoint_allowed(self) -> bool:
         # Savepoints cannot be created outside a transaction
-        return self.features.uses_savepoints and not self.get_autocommit()
+        # PostgreSQL always supports savepoints
+        return not self.get_autocommit()
 
     # ##### Generic savepoint management methods #####
 
@@ -880,23 +872,6 @@ class DatabaseWrapper:
                 "An error occurred in the current transaction. You can't "
                 "execute queries until the end of the 'atomic' block."
             ) from self.rollback_exc
-
-    # ##### Foreign key constraints checks handling #####
-
-    def disable_constraint_checking(self) -> bool:
-        """
-        Backends can implement as needed to temporarily disable foreign key
-        constraint checking. Should return True if the constraints were
-        disabled and will need to be reenabled.
-        """
-        return False
-
-    def enable_constraint_checking(self) -> None:
-        """
-        Backends can implement as needed to re-enable foreign key constraint
-        checking.
-        """
-        pass
 
     # ##### Connection termination handling #####
 

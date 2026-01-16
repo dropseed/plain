@@ -13,7 +13,6 @@ class DatabaseConfig(TypedDict, total=False):
     AUTOCOMMIT: bool
     CONN_MAX_AGE: int | None
     CONN_HEALTH_CHECKS: bool
-    DISABLE_SERVER_SIDE_CURSORS: bool
     HOST: str
     NAME: str | None
     OPTIONS: dict[str, Any]
@@ -45,12 +44,7 @@ class DatabaseConnection:
             database.setdefault(setting, "")
 
         test_settings = database.setdefault("TEST", {})
-        default_test_settings = [
-            ("CHARSET", None),
-            ("NAME", None),
-        ]
-        for key, value in default_test_settings:
-            test_settings.setdefault(key, value)
+        test_settings.setdefault("NAME", None)
 
         return database
 

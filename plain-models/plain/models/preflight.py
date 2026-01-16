@@ -11,14 +11,6 @@ from plain.packages import packages_registry
 from plain.preflight import PreflightCheck, PreflightResult, register_check
 
 
-@register_check("models.database_backends")
-class CheckDatabaseBackends(PreflightCheck):
-    """Validates database backend configuration when plain.models is available."""
-
-    def run(self) -> list[PreflightResult]:
-        return db_connection.validation.preflight()
-
-
 @register_check("models.all_models")
 class CheckAllModels(PreflightCheck):
     """Validates all model definitions for common issues."""

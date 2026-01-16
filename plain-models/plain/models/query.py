@@ -547,10 +547,8 @@ class QuerySet(Generic[T]):
                 )
         elif chunk_size <= 0:
             raise ValueError("Chunk size must be strictly positive.")
-        use_chunked_fetch = not db_connection.settings_dict.get(
-            "DISABLE_SERVER_SIDE_CURSORS"
-        )
-        return self._iterator(use_chunked_fetch, chunk_size)
+        # PostgreSQL always supports server-side cursors for chunked fetches
+        return self._iterator(use_chunked_fetch=True, chunk_size=chunk_size)
 
     def aggregate(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """
@@ -697,22 +695,9 @@ class QuerySet(Generic[T]):
     ) -> list[T]:
         """
         Insert each of the instances into the database. Do *not* call
-        save() on each of the instances, and do not set the primary key attribute if it is an
-        autoincrement field (except if features.can_return_rows_from_bulk_insert=True).
-        Multi-table models are not supported.
+        save() on each of the instances. Primary keys are set on the objects
+        via the PostgreSQL RETURNING clause. Multi-table models are not supported.
         """
-        # When you bulk insert you don't get the primary keys back (if it's an
-        # autoincrement, except if can_return_rows_from_bulk_insert=True), so
-        # you can't insert into the child tables which references this. There
-        # are two workarounds:
-        # 1) This could be implemented if you didn't have an autoincrement pk
-        # 2) You could do it by doing O(n) normal inserts into the parent
-        #    tables to get the primary keys back and then doing a single bulk
-        #    insert into the childmost table.
-        # We currently set the primary keys on the objects when using
-        # PostgreSQL via the RETURNING ID clause. It should be possible for
-        # Oracle as well, but the semantics for extracting the primary keys is
-        # trickier so it's not done yet.
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
 

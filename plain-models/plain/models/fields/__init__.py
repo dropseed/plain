@@ -375,9 +375,8 @@ class Field(RegisterLookupMixin, Generic[T]):
             return []
 
     def _check_backend_specific_checks(self) -> list[PreflightResult]:
-        errors = []
-        errors.extend(db_connection.validation.check_field(self))
-        return errors
+        # PostgreSQL supports all field types, no backend-specific checks needed
+        return []
 
     def _check_validators(self) -> list[PreflightResult]:
         errors = []
