@@ -62,7 +62,6 @@ class DatabaseIntrospection:
         2950: "UUIDField",
         3802: "JSONField",
     }
-    # A hook for subclasses.
     index_default_access_method = "btree"
 
     ignored_tables: list[str] = []
@@ -83,14 +82,6 @@ class DatabaseIntrospection:
             if field_type == "BigIntegerField":
                 return "PrimaryKeyField"
         return field_type
-
-    def identifier_converter(self, name: str) -> str:
-        """
-        Apply a conversion to the identifier for the purposes of comparison.
-
-        The default identifier converter is for case sensitive comparison.
-        """
-        return name
 
     def table_names(
         self, cursor: CursorWrapper | None = None, include_views: bool = False
@@ -201,7 +192,6 @@ class DatabaseIntrospection:
             for model in models_registry.get_models(
                 package_label=package_config.package_label
             )
-            if model.model_options.can_migrate(self.connection)
         )
 
     def plain_table_names(
@@ -222,9 +212,7 @@ class DatabaseIntrospection:
         tables = list(tables)
         if only_existing:
             existing_tables = set(self.table_names(include_views=include_views))
-            tables = [
-                t for t in tables if self.identifier_converter(t) in existing_tables
-            ]
+            tables = [t for t in tables if t in existing_tables]
         return tables
 
     def sequence_list(self) -> list[dict[str, Any]]:

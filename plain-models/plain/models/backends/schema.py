@@ -106,7 +106,6 @@ class DatabaseSchemaEditor:
     PostgreSQL is the only supported database backend.
     """
 
-    # Overrideable SQL templates
     sql_create_table = "CREATE TABLE %(table)s (%(definition)s)"
     sql_rename_table = "ALTER TABLE %(old_table)s RENAME TO %(new_table)s"
     sql_delete_table = "DROP TABLE %(table)s CASCADE"
@@ -691,12 +690,6 @@ class DatabaseSchemaEditor:
             field.db_type(self.connection),
         )
 
-    def _using_sql(self, new_field: Field, old_field: Field) -> str:
-        using_sql = " USING %(column)s::%(type)s"
-        if self._field_data_type(old_field) != self._field_data_type(new_field):
-            return using_sql
-        return ""
-
     def _get_sequence_name(self, table: str, column: str) -> str | None:
         with self.connection.cursor() as cursor:
             for sequence in self.connection.introspection.get_sequences(cursor, table):
@@ -1156,8 +1149,8 @@ class DatabaseSchemaEditor:
             "ALTER COLUMN %(column)s TYPE %(type)s%(collation)s"
         )
         # Cast when data type changed.
-        if using_sql := self._using_sql(new_field, old_field):
-            self.sql_alter_column_type += using_sql
+        if self._field_data_type(old_field) != self._field_data_type(new_field):
+            self.sql_alter_column_type += " USING %(column)s::%(type)s"
         new_internal_type = new_field.get_internal_type()
         old_internal_type = old_field.get_internal_type()
         # Make ALTER TYPE with IDENTITY make sense.
@@ -1253,9 +1246,7 @@ class DatabaseSchemaEditor:
     ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         """Base implementation of _alter_column_type_sql without IDENTITY handling."""
         other_actions = []
-        if collate_sql := self._collate_sql(
-            new_collation, old_collation, model.model_options.db_table
-        ):
+        if collate_sql := self._collate_sql(new_collation):
             collate_sql = f" {collate_sql}"
         else:
             collate_sql = ""
@@ -1803,11 +1794,6 @@ class DatabaseSchemaEditor:
         exclude: set[str] | None = None,
     ) -> list[str]:
         """Return all constraint names matching the columns and conditions."""
-        if column_names is not None:
-            column_names = [
-                self.connection.introspection.identifier_converter(name)
-                for name in column_names
-            ]
         with self.connection.cursor() as cursor:
             constraints = self.connection.introspection.get_constraints(
                 cursor, model.model_options.db_table
@@ -1857,10 +1843,5 @@ class DatabaseSchemaEditor:
     def _delete_primary_key_sql(self, model: type[Model], name: str) -> Statement:
         return self._delete_constraint_sql(self.sql_delete_pk, model, name)
 
-    def _collate_sql(
-        self,
-        collation: str | None,
-        old_collation: str | None = None,
-        table_name: str | None = None,
-    ) -> str:
+    def _collate_sql(self, collation: str | None) -> str:
         return "COLLATE " + self.quote_name(collation) if collation else ""

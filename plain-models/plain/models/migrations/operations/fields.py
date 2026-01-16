@@ -113,20 +113,19 @@ class AddField(FieldOperation):
         to_state: ProjectState,
     ) -> None:
         to_model = to_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection, to_model):
-            from_model = from_state.models_registry.get_model(
-                package_label, self.model_name
-            )
-            field = to_model._model_meta.get_field(self.name)
-            assert self.field is not None
-            if not self.preserve_default:
-                field.default = self.field.default
-            schema_editor.add_field(
-                from_model,
-                field,
-            )
-            if not self.preserve_default:
-                field.default = NOT_PROVIDED
+        from_model = from_state.models_registry.get_model(
+            package_label, self.model_name
+        )
+        field = to_model._model_meta.get_field(self.name)
+        assert self.field is not None
+        if not self.preserve_default:
+            field.default = self.field.default
+        schema_editor.add_field(
+            from_model,
+            field,
+        )
+        if not self.preserve_default:
+            field.default = NOT_PROVIDED
 
     def describe(self) -> str:
         return f"Add field {self.name} to {self.model_name}"
@@ -187,10 +186,9 @@ class RemoveField(FieldOperation):
         from_model = from_state.models_registry.get_model(
             package_label, self.model_name
         )
-        if self.allow_migrate_model(schema_editor.connection, from_model):
-            schema_editor.remove_field(
-                from_model, from_model._model_meta.get_field(self.name)
-            )
+        schema_editor.remove_field(
+            from_model, from_model._model_meta.get_field(self.name)
+        )
 
     def describe(self) -> str:
         return f"Remove field {self.name} from {self.model_name}"
@@ -251,18 +249,17 @@ class AlterField(FieldOperation):
         to_state: ProjectState,
     ) -> None:
         to_model = to_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection, to_model):
-            from_model = from_state.models_registry.get_model(
-                package_label, self.model_name
-            )
-            from_field = from_model._model_meta.get_field(self.name)
-            to_field = to_model._model_meta.get_field(self.name)
-            assert self.field is not None
-            if not self.preserve_default:
-                to_field.default = self.field.default
-            schema_editor.alter_field(from_model, from_field, to_field)
-            if not self.preserve_default:
-                to_field.default = NOT_PROVIDED
+        from_model = from_state.models_registry.get_model(
+            package_label, self.model_name
+        )
+        from_field = from_model._model_meta.get_field(self.name)
+        to_field = to_model._model_meta.get_field(self.name)
+        assert self.field is not None
+        if not self.preserve_default:
+            to_field.default = self.field.default
+        schema_editor.alter_field(from_model, from_field, to_field)
+        if not self.preserve_default:
+            to_field.default = NOT_PROVIDED
 
     def describe(self) -> str:
         return f"Alter field {self.name} on {self.model_name}"
@@ -332,15 +329,14 @@ class RenameField(FieldOperation):
         to_state: ProjectState,
     ) -> None:
         to_model = to_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection, to_model):
-            from_model = from_state.models_registry.get_model(
-                package_label, self.model_name
-            )
-            schema_editor.alter_field(
-                from_model,
-                from_model._model_meta.get_field(self.old_name),
-                to_model._model_meta.get_field(self.new_name),
-            )
+        from_model = from_state.models_registry.get_model(
+            package_label, self.model_name
+        )
+        schema_editor.alter_field(
+            from_model,
+            from_model._model_meta.get_field(self.old_name),
+            to_model._model_meta.get_field(self.new_name),
+        )
 
     def describe(self) -> str:
         return f"Rename field {self.old_name} on {self.model_name} to {self.new_name}"

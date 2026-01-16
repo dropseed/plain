@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from plain.models.backends.schema import DatabaseSchemaEditor
-    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.migrations.state import ProjectState
 
 
@@ -117,13 +116,6 @@ class Operation(ABC):
         Used for optimization. If in doubt, return True.
         """
         return self.references_model(model_name, package_label)
-
-    def allow_migrate_model(self, connection: DatabaseWrapper, model: Any) -> bool:
-        """Return whether or not a model may be migrated."""
-        if not model.model_options.can_migrate(connection):
-            return False
-
-        return True
 
     def reduce(
         self, operation: Operation, package_label: str

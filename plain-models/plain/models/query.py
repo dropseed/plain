@@ -1659,20 +1659,17 @@ class RawQuerySet:
         self,
     ) -> tuple[list[str], list[int], list[tuple[str, int]]]:
         """Resolve the init field names and value positions."""
-        converter = db_connection.introspection.identifier_converter
         model = self.model
         assert model is not None
         model_init_fields = [
-            f for f in model._model_meta.fields if converter(f.column) in self.columns
+            f for f in model._model_meta.fields if f.column in self.columns
         ]
         annotation_fields = [
             (column, pos)
             for pos, column in enumerate(self.columns)
             if column not in self.model_fields
         ]
-        model_init_order = [
-            self.columns.index(converter(f.column)) for f in model_init_fields
-        ]
+        model_init_order = [self.columns.index(f.column) for f in model_init_fields]
         model_init_names = [f.attname for f in model_init_fields]
         return model_init_names, model_init_order, annotation_fields
 
@@ -1752,13 +1749,12 @@ class RawQuerySet:
     @cached_property
     def model_fields(self) -> dict[str, Field]:
         """A dict mapping column names to model field names."""
-        converter = db_connection.introspection.identifier_converter
         model_fields = {}
         model = self.model
         assert model is not None
         for field in model._model_meta.fields:
             name, column = field.get_attname_column()
-            model_fields[converter(column)] = field
+            model_fields[column] = field
         return model_fields
 
 

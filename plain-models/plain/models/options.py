@@ -204,13 +204,6 @@ class Options:
             )
         ]
 
-    def can_migrate(self, connection: Any) -> bool:
-        """
-        Return True if the model can/should be migrated on the given
-        `connection` object.
-        """
-        return True
-
     def __repr__(self) -> str:
         return f"<Options for {self.model.__name__}>"
 

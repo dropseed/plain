@@ -131,11 +131,7 @@ class RawQuery:
     def get_columns(self) -> list[str]:
         if self.cursor is None:
             self._execute_query()
-        converter = db_connection.introspection.identifier_converter
-        return [
-            converter(column_model_meta[0])
-            for column_model_meta in self.cursor.description
-        ]
+        return [column_meta[0] for column_meta in self.cursor.description]
 
     def __iter__(self) -> TypingIterator[Any]:
         # Always execute a new query for a new iterator.
