@@ -1,5 +1,21 @@
 # plain-admin changelog
 
+## [0.62.0](https://github.com/dropseed/plain/releases/plain-admin@0.62.0) (2026-01-15)
+
+### What's changed
+
+- Mobile support added with responsive navigation, improved menu interactions, and optimized card layouts ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+- Navigation tabs now visible on mobile with horizontal scrolling and hidden scrollbars ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+- Menu dialog now includes a close button and closes when clicking the backdrop ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+- Menu filter input uses 16px font on mobile to prevent iOS auto-zoom ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+- Cards now use a 2-column grid on mobile with small cards displayed side-by-side ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+- Datetime values display in condensed format (m/d/yy) on mobile screens ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+- New `.scrollbar-hide` CSS utility class available for hiding scrollbars while preserving scroll functionality ([ee7acaa](https://github.com/dropseed/plain/commit/ee7acaa67c))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.61.1](https://github.com/dropseed/plain/releases/plain-admin@0.61.1) (2026-01-15)
 
 ### What's changed
