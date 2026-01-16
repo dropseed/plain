@@ -237,8 +237,7 @@ class DatabaseIntrospection:
     ) -> list[dict[str, Any]]:
         """
         Return a list of introspected sequences for table_name. Each sequence
-        is a dict: {'table': <table_name>, 'column': <column_name>}. An optional
-        'name' key can be added if the backend supports named sequences.
+        is a dict: {'table': <table_name>, 'column': <column_name>, 'name': <sequence_name>}.
         """
         cursor.execute(
             """

@@ -280,10 +280,8 @@ class DatabaseWrapper:
         """
         Return a tzinfo of the database connection time zone.
 
-        This is only used when time zone support is enabled. When a datetime is
-        read from the database, it is always returned in this time zone.
-
-        When the database backend supports time zones, it doesn't matter which
+        When a datetime is read from the database, it is returned in this time
+        zone. Since PostgreSQL supports time zones, it doesn't matter which
         time zone Plain uses, as long as aware datetimes are used everywhere.
         Other users connecting to the database can choose their own time zone.
         """
@@ -489,8 +487,7 @@ class DatabaseWrapper:
 
     def chunked_cursor(self) -> utils.CursorWrapper:
         """
-        Return a cursor that tries to avoid caching in the database (if
-        supported by the database), otherwise return a regular cursor.
+        Return a server-side cursor that avoids caching results in memory.
         """
         self._named_cursor_idx += 1
         # Get the current async task
@@ -626,7 +623,7 @@ class DatabaseWrapper:
 
     # ##### Backend-specific wrappers for PEP-249 connection methods #####
 
-    def _prepare_cursor(self, cursor: utils.DBAPICursor) -> utils.CursorWrapper:
+    def _prepare_cursor(self, cursor: Any) -> utils.CursorWrapper:
         """
         Validate the connection is usable and perform database cursor wrapping.
         """
@@ -716,20 +713,15 @@ class DatabaseWrapper:
         with self.cursor() as cursor:
             cursor.execute(self.ops.savepoint_commit_sql(sid))
 
-    def _savepoint_allowed(self) -> bool:
-        # Savepoints cannot be created outside a transaction
-        # PostgreSQL always supports savepoints
-        return not self.get_autocommit()
-
     # ##### Generic savepoint management methods #####
 
     def savepoint(self) -> str | None:
         """
         Create a savepoint inside the current transaction. Return an
         identifier for the savepoint that will be used for the subsequent
-        rollback or commit. Do nothing if savepoints are not supported.
+        rollback or commit. Return None if in autocommit mode (no transaction).
         """
-        if not self._savepoint_allowed():
+        if self.get_autocommit():
             return None
 
         thread_ident = _thread.get_ident()
@@ -745,9 +737,9 @@ class DatabaseWrapper:
 
     def savepoint_rollback(self, sid: str) -> None:
         """
-        Roll back to a savepoint. Do nothing if savepoints are not supported.
+        Roll back to a savepoint. Do nothing if in autocommit mode.
         """
-        if not self._savepoint_allowed():
+        if self.get_autocommit():
             return
 
         self.validate_thread_sharing()
@@ -762,9 +754,9 @@ class DatabaseWrapper:
 
     def savepoint_commit(self, sid: str) -> None:
         """
-        Release a savepoint. Do nothing if savepoints are not supported.
+        Release a savepoint. Do nothing if in autocommit mode.
         """
-        if not self._savepoint_allowed():
+        if self.get_autocommit():
             return
 
         self.validate_thread_sharing()
@@ -913,7 +905,7 @@ class DatabaseWrapper:
         """
         return DatabaseErrorWrapper(self)
 
-    def make_cursor(self, cursor: utils.DBAPICursor) -> utils.CursorWrapper:
+    def make_cursor(self, cursor: Any) -> utils.CursorWrapper:
         """Create a cursor without debug logging."""
         return utils.CursorWrapper(cursor, self)
 

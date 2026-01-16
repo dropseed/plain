@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 import decimal
 import functools
 import logging
@@ -9,7 +8,7 @@ from collections.abc import Generator, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from hashlib import md5
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Protocol, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from plain.models.db import NotSupportedError
 from plain.models.otel import db_span
@@ -21,61 +20,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger("plain.models.backends")
 
 
-class DBAPICursor(Protocol):
-    """Protocol for DB-API 2.0 (PEP 249) cursor objects."""
-
-    @property
-    def description(self) -> Sequence[Any] | None:
-        """Column descriptions from the last query."""
-        ...
-
-    @property
-    def rowcount(self) -> int:
-        """Number of rows affected by the last query."""
-        ...
-
-    @property
-    def lastrowid(self) -> int:
-        """ID of the last inserted row (if applicable)."""
-        ...
-
-    def close(self) -> None:
-        """Close the cursor."""
-        ...
-
-    def callproc(self, procname: str, *args: Any, **kwargs: Any) -> Any:
-        """Call a stored database procedure (optional in DB-API 2.0)."""
-        ...
-
-    def execute(
-        self, sql: str, params: Sequence[Any] | Mapping[str, Any] | None = None
-    ) -> Any:
-        """Execute a database operation."""
-        ...
-
-    def executemany(self, sql: str, params: Sequence[Sequence[Any]]) -> Any:
-        """Execute a database operation multiple times."""
-        ...
-
-    def fetchone(self) -> tuple[Any, ...] | None:
-        """Fetch the next row of a query result set."""
-        ...
-
-    def fetchmany(self, size: int | None = None) -> list[tuple[Any, ...]]:
-        """Fetch the next set of rows of a query result set."""
-        ...
-
-    def fetchall(self) -> list[tuple[Any, ...]]:
-        """Fetch all remaining rows of a query result set."""
-        ...
-
-    def __iter__(self) -> Iterator[tuple[Any, ...]]:
-        """Iterate over rows in the result set."""
-        ...
-
-
 class CursorWrapper:
-    def __init__(self, cursor: DBAPICursor, db: DatabaseWrapper) -> None:
+    def __init__(self, cursor: Any, db: DatabaseWrapper) -> None:
         self.cursor = cursor
         self.db = db
 
@@ -278,65 +224,6 @@ def split_tzname_delta(tzname: str) -> tuple[str, str | None, str | None]:
             if offset and parse_time(offset):
                 return name, sign, offset
     return tzname, None, None
-
-
-###############################################
-# Converters from database (string) to Python #
-###############################################
-
-
-def typecast_date(s: str | None) -> datetime.date | None:
-    return (
-        datetime.date(*map(int, s.split("-"))) if s else None
-    )  # return None if s is null
-
-
-def typecast_time(
-    s: str | None,
-) -> datetime.time | None:  # does NOT store time zone information
-    if not s:
-        return None
-    hour, minutes, seconds = s.split(":")
-    if "." in seconds:  # check whether seconds have a fractional part
-        seconds, microseconds = seconds.split(".")
-    else:
-        microseconds = "0"
-    return datetime.time(
-        int(hour), int(minutes), int(seconds), int((microseconds + "000000")[:6])
-    )
-
-
-def typecast_timestamp(
-    s: str | None,
-) -> datetime.date | datetime.datetime | None:  # does NOT store time zone information
-    # "2005-07-29 15:48:00.590358-05"
-    # "2005-07-29 09:56:00-05"
-    if not s:
-        return None
-    if " " not in s:
-        return typecast_date(s)
-    d, t = s.split()
-    # Remove timezone information.
-    if "-" in t:
-        t, _ = t.split("-", 1)
-    elif "+" in t:
-        t, _ = t.split("+", 1)
-    dates = d.split("-")
-    times = t.split(":")
-    seconds = times[2]
-    if "." in seconds:  # check whether seconds have a fractional part
-        seconds, microseconds = seconds.split(".")
-    else:
-        microseconds = "0"
-    return datetime.datetime(
-        int(dates[0]),
-        int(dates[1]),
-        int(dates[2]),
-        int(times[0]),
-        int(times[1]),
-        int(seconds),
-        int((microseconds + "000000")[:6]),
-    )
 
 
 ###############################################
