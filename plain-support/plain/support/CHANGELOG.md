@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-support@0.31.0) (2026-01-15)
+
+### What's changed
+
+- Internal type annotation cleanup for iframe X-Frame-Options handling ([cbf27e7](https://github.com/dropseed/plain/commit/cbf27e7))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.30.0](https://github.com/dropseed/plain/releases/plain-support@0.30.0) (2026-01-15)
 
 ### What's changed
