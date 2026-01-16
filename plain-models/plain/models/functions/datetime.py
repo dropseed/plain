@@ -234,21 +234,11 @@ ExtractIsoYear.register_lookup(YearLte)
 
 
 class Now(Func):
-    template = "CURRENT_TIMESTAMP"
+    # STATEMENT_TIMESTAMP() returns the time at the start of the current statement,
+    # as opposed to CURRENT_TIMESTAMP which returns the time at the start of the
+    # transaction.
+    template = "STATEMENT_TIMESTAMP()"
     output_field = DateTimeField()
-
-    def as_postgresql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        # PostgreSQL's CURRENT_TIMESTAMP means "the time at the start of the
-        # transaction". Use STATEMENT_TIMESTAMP to be cross-compatible with
-        # other databases.
-        return self.as_sql(
-            compiler, connection, template="STATEMENT_TIMESTAMP()", **extra_context
-        )
 
 
 class TruncBase(TimezoneMixin, Transform):

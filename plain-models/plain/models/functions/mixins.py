@@ -13,18 +13,23 @@ if TYPE_CHECKING:
 
 
 class FixDecimalInputMixin(Func):
-    """Mixin for Func subclasses that need to convert FloatField to DecimalField on PostgreSQL."""
+    """
+    Mixin for Func subclasses that need to convert FloatField to DecimalField.
 
-    def as_postgresql(
+    PostgreSQL doesn't support the following function signatures:
+    - LOG(double, double)
+    - MOD(double, double)
+    """
+
+    def as_sql(
         self,
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
-        # Cast FloatField to DecimalField as PostgreSQL doesn't support the
-        # following function signatures:
-        # - LOG(double, double)
-        # - MOD(double, double)
         output_field = DecimalField(decimal_places=sys.float_info.dig, max_digits=1000)
 
         clone = self.copy()
@@ -36,7 +41,9 @@ class FixDecimalInputMixin(Func):
                 for expression in self.get_source_expressions()
             ]
         )
-        return clone.as_sql(compiler, connection, **extra_context)
+        return super(FixDecimalInputMixin, clone).as_sql(
+            compiler, connection, **extra_context
+        )
 
 
 class NumericOutputFieldMixin(Func):

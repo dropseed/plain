@@ -11,7 +11,7 @@ echo "${BOLD}Validating type annotations${NORMAL}"
 
 echo ""
 echo "${BOLD}Running tests${NORMAL}"
-./scripts/test
+DATABASE_URL=postgres://postgres:postgres@localhost/plain_tests ./scripts/test
 
 echo ""
 echo "${BOLD}Running preflight in example${NORMAL}"

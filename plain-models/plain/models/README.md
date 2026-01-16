@@ -95,7 +95,7 @@ DATABASE = {
 }
 ```
 
-Multiple backends are supported, including Postgres, MySQL, and SQLite.
+**PostgreSQL is the only supported database.**
 
 ## Querying
 
@@ -596,7 +596,7 @@ graph TB
 - [`QuerySet`](./query.py#QuerySet) - Chainable API (`.filter()`, `.exclude()`, `.order_by()`) that builds a Query
 - [`Query`](./sql/query.py#Query) - Internal representation of a query's logical structure (tables, joins, filters)
 - [`SQLCompiler`](./sql/compiler.py#SQLCompiler) - Transforms a Query into executable SQL
-- [`DatabaseOperations`](./backends/base/operations.py#BaseDatabaseOperations) - Vendor-specific SQL syntax (PostgreSQL, MySQL, SQLite)
+- [`DatabaseOperations`](./backends/base/operations.py#BaseDatabaseOperations) - PostgreSQL-specific SQL syntax
 
 ## FAQs
 

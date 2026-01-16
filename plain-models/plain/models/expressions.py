@@ -237,18 +237,7 @@ class BaseExpression:
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         """
-        Responsible for returning a (sql, [params]) tuple to be included
-        in the current query.
-
-        Different backends can provide their own implementation, by
-        providing an `as_{vendor}` method and patching the Expression:
-
-        ```
-        def override_as_sql(self, compiler, connection):
-            # custom logic
-            return super().as_sql(compiler, connection)
-        setattr(Expression, 'as_' + connection.vendor, override_as_sql)
-        ```
+        Return a (sql, params) tuple to be included in the current query.
 
         Arguments:
          * compiler: the query compiler responsible for generating the query.

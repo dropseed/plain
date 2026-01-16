@@ -49,13 +49,9 @@ tracer = trace.get_tracer("plain.models")
 
 def db_system_for(vendor: str) -> str:  # noqa: D401 – simple helper
     """Return the canonical ``db.system.name`` value for a backend vendor."""
-
-    return {
-        "postgresql": DbSystemValues.POSTGRESQL.value,
-        "mysql": DbSystemValues.MYSQL.value,
-        "mariadb": DbSystemValues.MARIADB.value,
-        "sqlite": DbSystemValues.SQLITE.value,
-    }.get(vendor, vendor)
+    if vendor == "postgresql":
+        return DbSystemValues.POSTGRESQL.value
+    return vendor
 
 
 def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]:

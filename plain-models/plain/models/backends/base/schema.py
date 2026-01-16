@@ -299,27 +299,12 @@ class BaseDatabaseSchemaEditor(ABC):
         # Work out nullability.
         null = field.allow_null
         # Include a default value, if requested.
-        include_default = (
-            include_default
-            and not self.skip_default(field)
-            and
-            # Don't include a default value if it's a nullable field and the
-            # default cannot be dropped in the ALTER COLUMN statement (e.g.
-            # MySQL longtext and longblob).
-            not (null and self.skip_default_on_alter(field))
-        )
         if include_default:
             default_value = self.effective_default(field)
             if default_value is not None:
                 column_default = "DEFAULT " + self._column_default_sql(field)
-                if self.connection.features.requires_literal_defaults:
-                    # Some databases can't take defaults as a parameter (Oracle).
-                    # If this is the case, the individual schema backend should
-                    # implement prepare_default().
-                    yield column_default % self.prepare_default(default_value)
-                else:
-                    yield column_default
-                    params.append(default_value)
+                yield column_default
+                params.append(default_value)
 
         if not null:
             yield "NOT NULL"
@@ -356,29 +341,6 @@ class BaseDatabaseSchemaEditor(ABC):
                 )
             ),
             params,
-        )
-
-    def skip_default(self, field: Field) -> bool:
-        """
-        Some backends don't accept default values for certain columns types
-        (i.e. MySQL longtext and longblob).
-        """
-        return False
-
-    def skip_default_on_alter(self, field: Field) -> bool:
-        """
-        Some backends don't accept default values for certain columns types
-        (i.e. MySQL longtext and longblob) in the ALTER COLUMN statement.
-        """
-        return False
-
-    def prepare_default(self, value: Any) -> str:
-        """
-        Only used for backends which have requires_literal_defaults feature
-        """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseSchemaEditor for backends which have "
-            "requires_literal_defaults must provide a prepare_default() method"
         )
 
     def _column_default_sql(self, field: Field) -> str:
@@ -461,7 +423,7 @@ class BaseDatabaseSchemaEditor(ABC):
                                 model, field, field_type, field.db_comment
                             )
                         )
-        # Add any field index (deferred as SQLite _remake_table needs it).
+        # Add any field indexes.
         self.deferred_sql.extend(self._model_indexes_sql(model))
 
     def delete_model(self, model: type[Model]) -> None:
@@ -617,10 +579,7 @@ class BaseDatabaseSchemaEditor(ABC):
         self.execute(sql, params)
         # Drop the default if we need to
         # (Plain usually does not use in-database defaults)
-        if (
-            not self.skip_default_on_alter(field)
-            and self.effective_default(field) is not None
-        ):
+        if self.effective_default(field) is not None:
             changes_sql, params = self._alter_column_default_sql(
                 model, None, field, drop=True
             )
@@ -653,7 +612,7 @@ class BaseDatabaseSchemaEditor(ABC):
         # It might not actually have a column behind it
         if field.db_parameters(connection=self.connection)["type"] is None:
             return
-        # Drop any FK constraints, MySQL requires explicit deletion
+        # Drop any FK constraints
         if isinstance(field, RelatedField):
             fk_names = self._constraint_names(model, [field.column], foreign_key=True)
             for fk_name in fk_names:
@@ -918,11 +877,7 @@ class BaseDatabaseSchemaEditor(ABC):
         if old_field.allow_null and not new_field.allow_null:
             old_default = self.effective_default(old_field)
             new_default = self.effective_default(new_field)
-            if (
-                not self.skip_default_on_alter(new_field)
-                and old_default != new_default
-                and new_default is not None
-            ):
+            if old_default != new_default and new_default is not None:
                 needs_database_default = True
                 actions.append(
                     self._alter_column_default_sql(model, old_field, new_field)
@@ -1123,16 +1078,7 @@ class BaseDatabaseSchemaEditor(ABC):
         """
         new_default = self.effective_default(new_field)
         default = self._column_default_sql(new_field)
-        params = [new_default]
-
-        if drop:
-            params = []
-        elif self.connection.features.requires_literal_defaults:
-            # Some databases (Oracle) can't take defaults as a parameter
-            # If this is the case, the SchemaEditor for that database should
-            # implement prepare_default().
-            default = self.prepare_default(new_default)
-            params = []
+        params: list[Any] = [] if drop else [new_default]
 
         new_db_params = new_field.db_parameters(connection=self.connection)
         if drop:

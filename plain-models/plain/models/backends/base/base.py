@@ -442,35 +442,13 @@ class BaseDatabaseWrapper(ABC):
         self.ensure_connection()
         return self.autocommit
 
-    def set_autocommit(
-        self,
-        autocommit: bool,
-        force_begin_transaction_with_broken_autocommit: bool = False,
-    ) -> None:
-        """
-        Enable or disable autocommit.
-
-        The usual way to start a transaction is to turn autocommit off.
-        SQLite does not properly start a transaction when disabling
-        autocommit. To avoid this buggy behavior and to actually enter a new
-        transaction, an explicit BEGIN is required. Using
-        force_begin_transaction_with_broken_autocommit=True will issue an
-        explicit BEGIN with SQLite. This option will be ignored for other
-        backends.
-        """
+    def set_autocommit(self, autocommit: bool) -> None:
+        """Enable or disable autocommit."""
         self.validate_no_atomic_block()
         self.close_if_health_check_failed()
         self.ensure_connection()
 
-        start_transaction_under_autocommit = (
-            force_begin_transaction_with_broken_autocommit
-            and not autocommit
-            and hasattr(self, "_start_transaction_under_autocommit")
-        )
-
-        if start_transaction_under_autocommit:
-            self._start_transaction_under_autocommit()  # type: ignore[attr-defined]
-        elif autocommit:
+        if autocommit:
             self._set_autocommit(autocommit)
         else:
             with debug_transaction(self, "BEGIN"):

@@ -12,13 +12,16 @@ if TYPE_CHECKING:
     from plain.models.sql.compiler import SQLCompiler
 
 
-class PostgreSQLSHAMixin(Transform):
-    """Mixin for Transform subclasses that implement SHA hashing on PostgreSQL."""
+class SHAMixin(Transform):
+    """Mixin for Transform subclasses that implement SHA hashing using PostgreSQL's pgcrypto."""
 
-    def as_postgresql(
+    def as_sql(
         self,
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
         assert self.function is not None
@@ -37,19 +40,20 @@ class Chr(Transform):
 
 
 class ConcatPair(Func):
-    """
-    Concatenate two arguments together. This is used by `Concat` because not
-    all backend databases support more than two arguments.
-    """
+    """Concatenate two arguments together."""
 
     function = "CONCAT"
 
-    def as_postgresql(
+    def as_sql(
         self,
         compiler: SQLCompiler,
         connection: BaseDatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
+        # PostgreSQL requires explicit cast to text for CONCAT.
         copy = self.copy()
         copy.set_source_expressions(
             [
@@ -210,27 +214,27 @@ class RTrim(Transform):
     lookup_name = "rtrim"
 
 
-class SHA1(PostgreSQLSHAMixin, Transform):
+class SHA1(SHAMixin, Transform):
     function = "SHA1"
     lookup_name = "sha1"
 
 
-class SHA224(PostgreSQLSHAMixin, Transform):
+class SHA224(SHAMixin, Transform):
     function = "SHA224"
     lookup_name = "sha224"
 
 
-class SHA256(PostgreSQLSHAMixin, Transform):
+class SHA256(SHAMixin, Transform):
     function = "SHA256"
     lookup_name = "sha256"
 
 
-class SHA384(PostgreSQLSHAMixin, Transform):
+class SHA384(SHAMixin, Transform):
     function = "SHA384"
     lookup_name = "sha384"
 
 
-class SHA512(PostgreSQLSHAMixin, Transform):
+class SHA512(SHAMixin, Transform):
     function = "SHA512"
     lookup_name = "sha512"
 
@@ -242,17 +246,10 @@ class StrIndex(Func):
     substring is not found.
     """
 
-    function = "INSTR"
+    # PostgreSQL uses STRPOS instead of INSTR.
+    function = "STRPOS"
     arity = 2
     output_field = IntegerField()
-
-    def as_postgresql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        return super().as_sql(compiler, connection, function="STRPOS", **extra_context)
 
 
 class Substr(Func):

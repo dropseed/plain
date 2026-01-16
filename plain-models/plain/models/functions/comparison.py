@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from plain.models.db import NotSupportedError
 from plain.models.expressions import Func, Value
 from plain.models.fields import Field, TextField
 from plain.models.fields.json import JSONField
@@ -19,7 +18,8 @@ class Cast(Func):
     """Coerce an expression to a new field type."""
 
     function = "CAST"
-    template = "%(function)s(%(expressions)s AS %(db_type)s)"
+    # PostgreSQL :: shortcut syntax is more readable than standard CAST().
+    template = "(%(expressions)s)::%(db_type)s"
 
     def __init__(self, expression: Any, output_field: Field) -> None:
         super().__init__(expression, output_field=output_field)
@@ -36,22 +36,6 @@ class Cast(Func):
         extra_context["db_type"] = self.output_field.cast_db_type(connection)
         return super().as_sql(
             compiler, connection, function, template, arg_joiner, **extra_context
-        )
-
-    def as_postgresql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        # CAST would be valid too, but the :: shortcut syntax is more readable.
-        # 'expressions' is wrapped in parentheses in case it's a complex
-        # expression.
-        return self.as_sql(
-            compiler,
-            connection,
-            template="(%(expressions)s)::%(db_type)s",
-            **extra_context,
         )
 
 
@@ -119,7 +103,8 @@ class Greatest(Func):
 
 
 class JSONObject(Func):
-    function = "JSON_OBJECT"
+    # PostgreSQL uses JSONB_BUILD_OBJECT for JSON object construction.
+    function = "JSONB_BUILD_OBJECT"
     output_field = JSONField()
 
     def __init__(self, **fields: Any) -> None:
@@ -137,20 +122,7 @@ class JSONObject(Func):
         arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
-        if not connection.features.has_json_object_function:
-            raise NotSupportedError(
-                "JSONObject() is not supported on this database backend."
-            )
-        return super().as_sql(
-            compiler, connection, function, template, arg_joiner, **extra_context
-        )
-
-    def as_postgresql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
+        # PostgreSQL requires keys to be cast to text.
         copy = self.copy()
         copy.set_source_expressions(
             [
@@ -159,10 +131,7 @@ class JSONObject(Func):
             ]
         )
         return super(JSONObject, copy).as_sql(
-            compiler,
-            connection,
-            function="JSONB_BUILD_OBJECT",
-            **extra_context,
+            compiler, connection, function, template, arg_joiner, **extra_context
         )
 
 

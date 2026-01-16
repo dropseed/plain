@@ -125,9 +125,7 @@ class Atomic(ContextDecorator):
             else:
                 db_connection.savepoint_ids.append(None)
         else:
-            db_connection.set_autocommit(
-                False, force_begin_transaction_with_broken_autocommit=True
-            )
+            db_connection.set_autocommit(False)
             db_connection.in_atomic_block = True
 
         if db_connection.in_atomic_block:

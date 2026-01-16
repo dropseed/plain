@@ -530,11 +530,7 @@ class SQLCompiler:
         return r
 
     def compile(self, node: SQLCompilable) -> SqlWithParams:
-        vendor_impl = getattr(node, "as_" + self.connection.vendor, None)
-        if vendor_impl:
-            sql, params = vendor_impl(self, self.connection)
-        else:
-            sql, params = node.as_sql(self, self.connection)
+        sql, params = node.as_sql(self, self.connection)
         return sql, tuple(params)
 
     def get_qualify_sql(self) -> tuple[list[str], list[Any]]:

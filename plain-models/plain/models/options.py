@@ -31,7 +31,6 @@ class Options:
     indexes: Sequence[Index]
     constraints: Sequence[BaseConstraint]
     required_db_features: Sequence[str]
-    required_db_vendor: str | None
     _provided_options: set[str]
 
     def __init__(
@@ -43,7 +42,6 @@ class Options:
         indexes: Sequence[Index] | None = None,
         constraints: Sequence[BaseConstraint] | None = None,
         required_db_features: Sequence[str] | None = None,
-        required_db_vendor: str | None = None,
         package_label: str | None = None,
     ):
         """
@@ -60,7 +58,6 @@ class Options:
             "indexes": indexes,
             "constraints": constraints,
             "required_db_features": required_db_features,
-            "required_db_vendor": required_db_vendor,
             "package_label": package_label,
         }
         self._cache: dict[type[Model], Options] = {}
@@ -132,7 +129,6 @@ class Options:
         instance.indexes = self._config.get("indexes") or []
         instance.constraints = self._config.get("constraints") or []
         instance.required_db_features = self._config.get("required_db_features") or []
-        instance.required_db_vendor = self._config.get("required_db_vendor")
 
         # Format names with class interpolation
         instance.constraints = instance._format_names_with_class(instance.constraints)
@@ -217,8 +213,6 @@ class Options:
         Return True if the model can/should be migrated on the given
         `connection` object.
         """
-        if self.required_db_vendor:
-            return self.required_db_vendor == connection.vendor
         if self.required_db_features:
             return all(
                 getattr(connection.features, feat, False)

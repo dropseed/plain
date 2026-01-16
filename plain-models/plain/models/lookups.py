@@ -353,18 +353,22 @@ class FieldGetDbPrepValueIterableMixin(FieldGetDbPrepValueMixin):
         return list(sql), params_list
 
 
-class PostgresOperatorLookup(Lookup):
-    """Lookup defined by operators on PostgreSQL."""
+class OperatorLookup(Lookup):
+    """Lookup defined by a SQL operator."""
 
-    postgres_operator: str | None = None
+    operator: str | None = None
 
-    def as_postgresql(
+    def as_sql(
         self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
     ) -> tuple[str, tuple[Any, ...]]:
         lhs, lhs_params = self.process_lhs(compiler, connection)
         rhs, rhs_params = self.process_rhs(compiler, connection)
         params = tuple(lhs_params) + tuple(rhs_params)
-        return f"{lhs} {self.postgres_operator} {rhs}", params
+        return f"{lhs} {self.operator} {rhs}", params
+
+
+# Backwards compatibility alias
+PostgresOperatorLookup = OperatorLookup
 
 
 @Field.register_lookup
