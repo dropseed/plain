@@ -909,7 +909,7 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_db_table_comment(cls) -> list[PreflightResult]:
-        # PostgreSQL supports table comments
+        # Table comments are supported, nothing to check
         return []
 
     @classmethod
@@ -1118,7 +1118,7 @@ class Model(metaclass=ModelBase):
                     references.update(
                         ref[0] for ref in cls._get_expr_references(expression)
                     )
-        # PostgreSQL supports partial indexes, covering indexes, and expression indexes
+        # Check fields referenced in indexes
         fields = [
             field
             for index in cls.model_options.indexes
@@ -1350,8 +1350,6 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_constraints(cls) -> list[PreflightResult]:
-        # PostgreSQL supports all constraint types: check constraints, partial indexes,
-        # deferrable unique constraints, covering indexes, and expression indexes
         errors: list[PreflightResult] = []
         fields = set(
             chain.from_iterable(

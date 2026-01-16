@@ -163,7 +163,6 @@ class Q(tree.Node):
             query.add_annotation(value, name, select=False)
         query.add_annotation(Value(1), "_check")
         # This will raise a FieldError if a field is missing in "against".
-        # PostgreSQL supports comparing boolean expressions
         query.add_q(Q(Coalesce(self, True, output_field=BooleanField())))
         compiler = query.get_compiler()
         try:

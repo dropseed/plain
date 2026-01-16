@@ -301,7 +301,7 @@ class WhereNode(tree.Node):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: list[Any]
     ) -> tuple[str, list[Any]]:
-        # PostgreSQL supports boolean expressions in SELECT clause directly
+        # Boolean expressions work directly in SELECT
         return sql, params
 
     def get_db_converters(self, connection: DatabaseWrapper) -> list[Any]:

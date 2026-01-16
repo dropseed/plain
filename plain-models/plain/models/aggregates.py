@@ -138,7 +138,7 @@ class Aggregate(Func):
     ) -> tuple[str, list[Any]]:
         extra_context["distinct"] = "DISTINCT " if self.distinct else ""
         if self.filter is not None:
-            # PostgreSQL supports FILTER clause for aggregates
+            # Use FILTER clause for aggregates when filter is specified
             try:
                 filter_sql, filter_params = self.filter.as_sql(compiler, connection)  # type: ignore[union-attr]
             except FullResultSet:

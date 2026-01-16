@@ -884,7 +884,7 @@ class DatabaseSchemaEditor:
                 # If we don't have to do a 4-way default alteration we can
                 # directly run a (NOT) NULL alteration
                 actions += null_actions
-            # Combine actions together (PostgreSQL supports this)
+            # Combine actions together
             if actions:
                 sql, params = tuple(zip(*actions))
                 actions = [(", ".join(sql), sum(params, []))]

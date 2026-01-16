@@ -50,8 +50,7 @@ class Migration:
     # introspection. If False, never perform introspection.
     initial: bool | None = None
 
-    # Whether to wrap the whole migration in a transaction. Only has an effect
-    # on database backends which support transactional DDL.
+    # Whether to wrap the whole migration in a transaction.
     atomic: bool = True
 
     def __init__(self, name: str, package_label: str) -> None:
@@ -120,8 +119,7 @@ class Migration:
                 self.atomic and operation.atomic is not False
             )
             if not schema_editor.atomic_migration and atomic_operation:
-                # Force a transaction on a non-transactional-DDL backend or an
-                # atomic operation inside a non-atomic migration.
+                # Force a transaction for an atomic operation inside a non-atomic migration.
                 with atomic():
                     operation.database_forwards(
                         self.package_label, schema_editor, old_state, project_state

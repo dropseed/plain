@@ -4,7 +4,6 @@ import copy
 import datetime
 import functools
 import inspect
-from abc import ABC, abstractmethod
 from collections import defaultdict
 from decimal import Decimal
 from functools import cached_property
@@ -1329,7 +1328,7 @@ class NegatedExpression(ExpressionWrapper):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
-        # PostgreSQL supports boolean expressions in SELECT
+        # Boolean expressions work directly in SELECT
         return sql, params
 
 
@@ -1624,7 +1623,7 @@ class Exists(Subquery):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
-        # PostgreSQL supports boolean expressions in SELECT
+        # Boolean expressions work directly in SELECT
         return sql, params
 
 
@@ -1668,7 +1667,7 @@ class OrderBy(Expression):
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         template = template or self.template
-        # PostgreSQL supports NULLS FIRST/LAST modifiers
+        # Handle NULLS FIRST/LAST modifiers
         if self.nulls_last:
             template = f"{template} NULLS LAST"
         elif self.nulls_first:
@@ -1817,7 +1816,7 @@ class Window(Expression):
         return group_by_cols
 
 
-class WindowFrame(Expression, ABC):
+class WindowFrame(Expression):
     """
     Model the frame clause in window expressions. There are two types of frame
     clauses which are subclasses, however, all processing and validation (by no
@@ -1881,10 +1880,11 @@ class WindowFrame(Expression, ABC):
             "end": end,
         }
 
-    @abstractmethod
     def window_frame_start_end(
         self, connection: DatabaseWrapper, start: int | None, end: int | None
-    ) -> tuple[str, str]: ...
+    ) -> tuple[str, str]:
+        """Return the window frame start and end for the given connection."""
+        raise NotImplementedError("Subclasses must implement window_frame_start_end()")
 
 
 class RowRange(WindowFrame):

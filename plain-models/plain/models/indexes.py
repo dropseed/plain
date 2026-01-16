@@ -124,7 +124,7 @@ class Index:
                 model._model_meta.get_forward_field(field_name)
                 for field_name, _ in self.fields_orders
             ]
-            # PostgreSQL supports index column ordering (ASC/DESC)
+            # Support index column ordering (ASC/DESC)
             col_suffixes = tuple(order[1] for order in self.fields_orders)
             expressions = None
         return schema_editor._create_index_sql(

@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 import itertools
 import math
-from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
@@ -193,7 +192,7 @@ class Lookup(Expression):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
-        # PostgreSQL supports boolean expressions in SELECT
+        # Boolean expressions work directly in SELECT
         return sql, params
 
 
@@ -660,7 +659,7 @@ class IRegex(Regex):
     lookup_name: str = "iregex"
 
 
-class YearLookup(Lookup, ABC):
+class YearLookup(Lookup):
     def year_lookup_bounds(
         self, connection: DatabaseWrapper, year: int
     ) -> list[datetime.date] | list[datetime.datetime]:
@@ -704,8 +703,9 @@ class YearLookup(Lookup, ABC):
         )
         return connection.operators[self.lookup_name] % rhs
 
-    @abstractmethod
-    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any, ...]: ...
+    def get_bound_params(self, start: Any, finish: Any) -> tuple[Any, ...]:
+        """Return bound parameters for the year lookup."""
+        raise NotImplementedError("Subclasses must implement get_bound_params()")
 
 
 class YearExact(YearLookup, Exact):
@@ -736,50 +736,40 @@ class YearLte(YearLookup, LessThanOrEqual):
         return (finish,)
 
 
-class UUIDTextMixin(Lookup):
-    """
-    Mixin for UUID text lookups. PostgreSQL has native UUID support.
-    """
-
-    rhs: Any
-
-    def process_rhs(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
-    ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
-        # PostgreSQL has native UUID type, no preprocessing needed
-        return super().process_rhs(compiler, connection)
+# UUID lookups - PostgreSQL has native UUID support so these inherit directly
+# from their base classes without any special processing.
 
 
 @UUIDField.register_lookup
-class UUIDIExact(UUIDTextMixin, IExact):
+class UUIDIExact(IExact):
     pass
 
 
 @UUIDField.register_lookup
-class UUIDContains(UUIDTextMixin, Contains):
+class UUIDContains(Contains):
     pass
 
 
 @UUIDField.register_lookup
-class UUIDIContains(UUIDTextMixin, IContains):
+class UUIDIContains(IContains):
     pass
 
 
 @UUIDField.register_lookup
-class UUIDStartsWith(UUIDTextMixin, StartsWith):
+class UUIDStartsWith(StartsWith):
     pass
 
 
 @UUIDField.register_lookup
-class UUIDIStartsWith(UUIDTextMixin, IStartsWith):
+class UUIDIStartsWith(IStartsWith):
     pass
 
 
 @UUIDField.register_lookup
-class UUIDEndsWith(UUIDTextMixin, EndsWith):
+class UUIDEndsWith(EndsWith):
     pass
 
 
 @UUIDField.register_lookup
-class UUIDIEndsWith(UUIDTextMixin, IEndsWith):
+class UUIDIEndsWith(IEndsWith):
     pass

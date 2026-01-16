@@ -217,7 +217,7 @@ class SQLCompiler:
                 sql, params = self.compile(expr)
             except (EmptyResultSet, FullResultSet):
                 continue
-            # PostgreSQL supports GROUP BY with select index
+            # Use select index for GROUP BY when possible
             if (position := selected_expr_positions.get(expr)) is not None:
                 sql, params = str(position), ()
             else:
@@ -229,8 +229,8 @@ class SQLCompiler:
         return result
 
     def collapse_group_by(self, expressions: list[Any], having: list[Any]) -> list[Any]:
-        # PostgreSQL supports group by functional dependence reduction,
-        # so expressions can be reduced to the set of selected table
+        # Use group by functional dependence reduction:
+        # expressions can be reduced to the set of selected table
         # primary keys as all other columns are functionally dependent on them.
         # Filter out all expressions associated with a table's primary key
         # present in the grouped columns. This is done by identifying all
@@ -1603,7 +1603,7 @@ class SQLInsertCompiler(SQLCompiler):
             (f.column for f in self.query.unique_fields),
         )
         if self.returning_fields:
-            # PostgreSQL supports RETURNING clause for bulk inserts
+            # Use RETURNING clause to get inserted values
             result.append(
                 self.connection.ops.bulk_insert_sql(fields, placeholder_rows)  # type: ignore[arg-type]
             )
@@ -1639,7 +1639,7 @@ class SQLInsertCompiler(SQLCompiler):
                 cursor.execute(sql, params)
             if not self.returning_fields:
                 return []
-            # PostgreSQL supports RETURNING for both single and bulk inserts
+            # Use RETURNING clause for both single and bulk inserts
             if len(self.query.objs) > 1:
                 rows = self.connection.ops.fetch_returned_insert_rows(cursor)
             else:
@@ -1850,8 +1850,7 @@ class SQLUpdateCompiler(SQLCompiler):
             self.query.add_filter("id__in", idents)
             self.query.related_ids = related_ids  # type: ignore[assignment]
         else:
-            # The fast path. Filters and updates in one query.
-            # PostgreSQL supports UPDATE with self-select subqueries.
+            # The fast path. Filters and updates in one query using a subquery.
             self.query.add_filter("id__in", query)
         self.query.reset_refcounts(refcounts_before)
 

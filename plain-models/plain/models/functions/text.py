@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class SHAMixin(Transform):
-    """Mixin for Transform subclasses that implement SHA hashing using PostgreSQL's pgcrypto."""
+    """Base class for SHA hashing using PostgreSQL's pgcrypto extension."""
 
     def as_sql(
         self,

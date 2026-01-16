@@ -7,7 +7,6 @@ through foreign key and many-to-many relationships.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
@@ -39,7 +38,7 @@ def _filter_prefetch_queryset(
     filter_kwargs: dict[str, Any] = {f"{field_name}__in": instances}
     predicate = Q(**filter_kwargs)
     if queryset.sql_query.is_sliced:
-        # PostgreSQL supports window functions for limited queryset prefetching
+        # Use window functions for limited queryset prefetching
         low_mark, high_mark = queryset.sql_query.low_mark, queryset.sql_query.high_mark
         order_by = [
             expr for expr, _ in queryset.sql_query.get_compiler().get_order_by()
@@ -52,7 +51,7 @@ def _filter_prefetch_queryset(
     return queryset.filter(predicate)
 
 
-class BaseRelatedManager(ABC, Generic[T, QS]):
+class BaseRelatedManager(Generic[T, QS]):
     """
     Base class for all related object managers.
 
@@ -64,10 +63,9 @@ class BaseRelatedManager(ABC, Generic[T, QS]):
         """Access the QuerySet for this relationship."""
         return self.get_queryset()
 
-    @abstractmethod
     def get_queryset(self) -> QS:
         """Return the QuerySet for this relationship."""
-        ...
+        raise NotImplementedError("Subclasses must implement get_queryset()")
 
 
 class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):

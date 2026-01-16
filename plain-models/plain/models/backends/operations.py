@@ -644,7 +644,7 @@ class DatabaseOperations:
         params = (*lhs_params, *rhs_params)
         if internal_type == "DateField":
             return f"(interval '1 day' * ({lhs_sql} - {rhs_sql}))", params
-        # PostgreSQL supports temporal subtraction natively
+        # Use native temporal subtraction
         return f"({lhs_sql} - {rhs_sql})", params
 
     def window_frame_start(self, start: int | None) -> str:
@@ -674,10 +674,7 @@ class DatabaseOperations:
     def window_frame_rows_start_end(
         self, start: int | None = None, end: int | None = None
     ) -> tuple[str, str]:
-        """
-        Return SQL for start and end points in an OVER clause window frame.
-        """
-        # PostgreSQL supports window functions
+        """Return SQL for start and end points in an OVER clause window frame."""
         return self.window_frame_start(start), self.window_frame_end(end)
 
     def window_frame_range_start_end(

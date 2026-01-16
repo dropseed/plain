@@ -374,7 +374,7 @@ class Field(RegisterLookupMixin, Generic[T]):
             return []
 
     def _check_backend_specific_checks(self) -> list[PreflightResult]:
-        # PostgreSQL supports all field types, no backend-specific checks needed
+        # All field types are supported, nothing to check
         return []
 
     def _check_validators(self) -> list[PreflightResult]:
@@ -1018,7 +1018,7 @@ class CharField(Field[str]):
         ]
 
     def _check_max_length_attribute(self, **kwargs: Any) -> list[PreflightResult]:
-        # PostgreSQL supports unlimited VARCHAR (no max_length required)
+        # Unlimited VARCHAR is supported (no max_length required)
         if self.max_length is None:
             return []
         elif (

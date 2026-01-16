@@ -495,7 +495,7 @@ def apply(
                     )
             else:
                 # Auto-detect (atomic_batch is None)
-                # PostgreSQL supports transactional DDL, so use atomic batch by default
+                # Use atomic batch by default
                 if not non_atomic_migrations:
                     use_atomic_batch = True
                     atomic_batch_message = (
