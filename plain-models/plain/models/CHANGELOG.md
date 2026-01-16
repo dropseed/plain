@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.75.0](https://github.com/dropseed/plain/releases/plain-models@0.75.0) (2026-01-15)
+
+### What's changed
+
+- Added type annotations to `CursorWrapper` fetch methods (`fetchone`, `fetchmany`, `fetchall`) for better type checker support ([7635258](https://github.com/dropseed/plain/commit/7635258de0))
+- Internal cleanup: removed redundant `tzinfo` class attribute from `TruncBase` ([0cb5a84](https://github.com/dropseed/plain/commit/0cb5a84718))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.74.0](https://github.com/dropseed/plain/releases/plain-models@0.74.0) (2026-01-15)
 
 ### What's changed
