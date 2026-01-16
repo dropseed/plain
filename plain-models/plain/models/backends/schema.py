@@ -549,7 +549,7 @@ class DatabaseSchemaEditor:
                     "column": self.quote_name(field.column),
                     "to_table": self.quote_name(to_table),
                     "to_column": self.quote_name(to_column),
-                    "deferrable": self.connection.ops.deferrable_sql(),
+                    "deferrable": self.connection.ops.DEFERRABLE_SQL,
                 }
             # Otherwise, add FK constraints later.
             else:
@@ -1371,7 +1371,7 @@ class DatabaseSchemaEditor:
         hash_suffix_part = (
             f"{names_digest(table_name, *column_names, length=8)}{suffix}"
         )
-        max_length = self.connection.ops.max_name_length() or 200
+        max_length = self.connection.ops.MAX_NAME_LENGTH
         # If everything fits into max_length, use that name.
         index_name = "{}_{}_{}".format(
             table_name, "_".join(column_names), hash_suffix_part
@@ -1623,7 +1623,7 @@ class DatabaseSchemaEditor:
             [field.target_field.column],
             self.quote_name,
         )
-        deferrable = self.connection.ops.deferrable_sql()
+        deferrable = self.connection.ops.DEFERRABLE_SQL
         return Statement(
             self.sql_create_fk,
             table=table,

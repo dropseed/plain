@@ -1245,10 +1245,9 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
     def get_db_prep_value(
         self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
-        # Casts dates into the format expected by the backend
         if not prepared:
             value = self.get_prep_value(value)
-        return connection.ops.adapt_datefield_value(value)
+        return value
 
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
@@ -1364,10 +1363,9 @@ class DateTimeField(DateField):
     def get_db_prep_value(
         self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
-        # Casts datetimes into the format expected by the backend
         if not prepared:
             value = self.get_prep_value(value)
-        return connection.ops.adapt_datetimefield_value(value)
+        return value
 
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
@@ -1513,11 +1511,7 @@ class DecimalField(Field[decimal.Decimal]):
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
-        if hasattr(value, "as_sql"):
-            return value
-        return connection.ops.adapt_decimalfield_value(
-            value, self.max_digits, self.decimal_places
-        )
+        return value
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
@@ -1994,10 +1988,9 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
     def get_db_prep_value(
         self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
-        # Casts times into the format expected by the backend
         if not prepared:
             value = self.get_prep_value(value)
-        return connection.ops.adapt_timefield_value(value)
+        return value
 
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)

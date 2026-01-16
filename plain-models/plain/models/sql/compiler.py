@@ -1590,7 +1590,7 @@ class SQLInsertCompiler(SQLCompiler):
         else:
             # An empty object.
             value_rows = [
-                [self.connection.ops.pk_default_value()] for _ in self.query.objs
+                [self.connection.ops.PK_DEFAULT_VALUE] for _ in self.query.objs
             ]
             fields = [None]
 

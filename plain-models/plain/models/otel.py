@@ -47,9 +47,7 @@ _SUPPRESS_KEY = "plain.models.suppress_db_tracing"
 tracer = trace.get_tracer("plain.models")
 
 
-def db_system_for(vendor: str) -> str:  # noqa: D401 – simple helper
-    """Return the canonical ``db.system.name`` value for PostgreSQL."""
-    return DbSystemValues.POSTGRESQL.value
+DB_SYSTEM = DbSystemValues.POSTGRESQL.value
 
 
 def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]:
@@ -127,7 +125,7 @@ def db_span(
 
     # Build attribute set following semantic conventions
     attrs: dict[str, Any] = {
-        DB_SYSTEM_NAME: db_system_for(db.vendor),
+        DB_SYSTEM_NAME: DB_SYSTEM,
         DB_NAMESPACE: db.settings_dict.get("NAME"),
         DB_QUERY_TEXT: sql,  # Already parameterized from Django/Plain
         DB_QUERY_SUMMARY: summary,

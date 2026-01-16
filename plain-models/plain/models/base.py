@@ -1283,9 +1283,7 @@ class Model(metaclass=ModelBase):
 
         # PostgreSQL has a 63-character limit on identifier names and doesn't
         # silently truncate, so we check for names that are too long
-        allowed_len = db_connection.ops.max_name_length()
-        if allowed_len is None:
-            return errors
+        allowed_len = db_connection.ops.MAX_NAME_LENGTH
 
         for f in cls._model_meta.local_fields:
             _, column_name = f.get_attname_column()

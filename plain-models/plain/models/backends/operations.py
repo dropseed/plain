@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import decimal
 import ipaddress
 import json
 from collections.abc import Callable, Iterable
@@ -96,6 +95,17 @@ class DatabaseOperations:
         "PositiveIntegerField": numeric.Int4,
         "PositiveBigIntegerField": numeric.Int8,
     }
+
+    # Maximum length of an identifier (63 by default in PostgreSQL).
+    # Can be changed by recompiling PostgreSQL after editing the NAMEDATALEN
+    # macro in src/include/pg_config_manual.h.
+    MAX_NAME_LENGTH: int = 63
+
+    # Value to use during INSERT to specify that a field should use its default value.
+    PK_DEFAULT_VALUE: str = "DEFAULT"
+
+    # SQL clause to make a constraint "initially deferred" during CREATE TABLE.
+    DEFERRABLE_SQL: str = " DEFERRABLE INITIALLY DEFERRED"
 
     # EXTRACT format cannot be passed in parameters.
     _extract_format_re = _lazy_re_compile(r"[A-Z_]+")
@@ -264,13 +274,6 @@ class DatabaseOperations:
         sql, params = self._convert_sql_to_tz(sql, params, tzname)
         return f"DATE_TRUNC(%s, {sql})::time", (lookup_type, *params)
 
-    def deferrable_sql(self) -> str:
-        """
-        Return the SQL to make a constraint "initially deferred" during a
-        CREATE TABLE statement.
-        """
-        return " DEFERRABLE INITIALLY DEFERRED"
-
     def distinct_sql(
         self, fields: list[str], params: list[Any] | tuple[Any, ...]
     ) -> tuple[list[str], list[Any]]:
@@ -399,26 +402,6 @@ class DatabaseOperations:
             lookup = f"UPPER({lookup})"
 
         return lookup
-
-    def max_name_length(self) -> int:
-        """
-        Return the maximum length of an identifier.
-
-        The maximum length of an identifier is 63 by default, but can be
-        changed by recompiling PostgreSQL after editing the NAMEDATALEN
-        macro in src/include/pg_config_manual.h.
-
-        This implementation returns 63, but can be overridden by a custom
-        database backend that inherits most of its behavior from this one.
-        """
-        return 63
-
-    def pk_default_value(self) -> str:
-        """
-        Return the value to use during an INSERT statement to specify that
-        the field should use its default value.
-        """
-        return "DEFAULT"
 
     def return_insert_columns(self, fields: list[Field]) -> tuple[str, tuple[Any, ...]]:
         """
@@ -554,17 +537,11 @@ class DatabaseOperations:
         This method only depends on the type of the value. It's designed for
         cases where the target type isn't known, such as .raw() SQL queries.
         As a consequence it may not work perfectly in all circumstances.
+
+        PostgreSQL's psycopg driver handles datetime, date, time, and decimal
+        types natively, so no adaptation is needed.
         """
-        if isinstance(value, datetime.datetime):  # must be before date
-            return self.adapt_datetimefield_value(value)
-        elif isinstance(value, datetime.date):
-            return self.adapt_datefield_value(value)
-        elif isinstance(value, datetime.time):
-            return self.adapt_timefield_value(value)
-        elif isinstance(value, decimal.Decimal):
-            return self.adapt_decimalfield_value(value)
-        else:
-            return value
+        return value
 
     def adapt_integerfield_value(
         self, value: int | Any | None, internal_type: str
@@ -572,39 +549,6 @@ class DatabaseOperations:
         if value is None or isinstance(value, ResolvableExpression):
             return value
         return self.integerfield_type_map[internal_type](value)
-
-    def adapt_datefield_value(self, value: Any) -> Any:
-        """
-        Transform a date value to an object compatible with what is expected
-        by the backend driver for date columns.
-        """
-        return value
-
-    def adapt_datetimefield_value(self, value: Any) -> Any:
-        """
-        Transform a datetime value to an object compatible with what is expected
-        by the backend driver for datetime columns.
-        """
-        return value
-
-    def adapt_timefield_value(self, value: Any) -> Any:
-        """
-        Transform a time value to an object compatible with what is expected
-        by the backend driver for time columns.
-        """
-        return value
-
-    def adapt_decimalfield_value(
-        self,
-        value: Any,
-        max_digits: int | None = None,
-        decimal_places: int | None = None,
-    ) -> Any:
-        """
-        Transform a decimal.Decimal value to an object compatible with what is
-        expected by the backend driver for decimal (numeric) columns.
-        """
-        return value
 
     def adapt_ipaddressfield_value(
         self, value: str | None
@@ -624,7 +568,7 @@ class DatabaseOperations:
 
     def year_lookup_bounds_for_date_field(
         self, value: int, iso_year: bool = False
-    ) -> list[str | None]:
+    ) -> list[datetime.date]:
         """
         Return a two-elements list with the lower and upper bound to be used
         with a BETWEEN operator to query a DateField value using a year
@@ -641,13 +585,11 @@ class DatabaseOperations:
         else:
             first = datetime.date(value, 1, 1)
             second = datetime.date(value, 12, 31)
-        first_adapted = self.adapt_datefield_value(first)
-        second_adapted = self.adapt_datefield_value(second)
-        return [first_adapted, second_adapted]
+        return [first, second]
 
     def year_lookup_bounds_for_datetime_field(
         self, value: int, iso_year: bool = False
-    ) -> list[str | Any | None]:
+    ) -> list[datetime.datetime]:
         """
         Return a two-elements list with the lower and upper bound to be used
         with a BETWEEN operator to query a DateTimeField value using a year
@@ -669,10 +611,7 @@ class DatabaseOperations:
         tz = timezone.get_current_timezone()
         first = timezone.make_aware(first, tz)
         second = timezone.make_aware(second, tz)
-
-        first_adapted = self.adapt_datetimefield_value(first)
-        second_adapted = self.adapt_datetimefield_value(second)
-        return [first_adapted, second_adapted]
+        return [first, second]
 
     def convert_durationfield_value(
         self, value: int | None, expression: Any, connection: DatabaseWrapper

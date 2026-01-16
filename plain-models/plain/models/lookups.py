@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import itertools
 import math
 from abc import ABC, abstractmethod
@@ -662,7 +663,7 @@ class IRegex(Regex):
 class YearLookup(Lookup, ABC):
     def year_lookup_bounds(
         self, connection: DatabaseWrapper, year: int
-    ) -> list[str | Any | None]:
+    ) -> list[datetime.date] | list[datetime.datetime]:
         from plain.models.functions import ExtractIsoYear
 
         iso_year = isinstance(self.lhs, ExtractIsoYear)

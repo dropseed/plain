@@ -348,7 +348,7 @@ class DatabaseWrapper:
                 "Please supply the NAME or OPTIONS['service'] value."
             )
         db_name = settings_dict.get("NAME")
-        if len(db_name or "") > self.ops.max_name_length():
+        if len(db_name or "") > self.ops.MAX_NAME_LENGTH:
             raise ImproperlyConfigured(
                 "The database name '%s' (%d characters) is longer than "  # noqa: UP031
                 "PostgreSQL's limit of %d characters. Supply a shorter NAME "
@@ -356,7 +356,7 @@ class DatabaseWrapper:
                 % (
                     db_name,
                     len(db_name or ""),
-                    self.ops.max_name_length(),
+                    self.ops.MAX_NAME_LENGTH,
                 )
             )
         conn_params: dict[str, Any] = {"client_encoding": "UTF8"}

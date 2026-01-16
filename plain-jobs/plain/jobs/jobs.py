@@ -329,7 +329,7 @@ class Job(metaclass=JobType):
         """
         Return a context manager for the enqueue lock, or None for no locking.
 
-        Default: PostgreSQL advisory lock (None on SQLite/MySQL or empty concurrency_key).
+        Default: PostgreSQL advisory lock (None if empty concurrency_key).
         Override to provide custom locking (Redis, etcd, etc.).
 
         The returned context manager is used to wrap the should_enqueue() check

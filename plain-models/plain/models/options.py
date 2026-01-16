@@ -116,7 +116,7 @@ class Options:
         if db_table is None:
             instance.db_table = truncate_name(
                 f"{instance.package_label}_{model.__name__.lower()}",
-                db_connection.ops.max_name_length(),
+                db_connection.ops.MAX_NAME_LENGTH,
             )
         else:
             instance.db_table = db_table
