@@ -25,6 +25,9 @@ By default, the server binds to `127.0.0.1:8000` and uses a single worker proces
 # Run with 4 worker processes
 plain server --workers 4
 
+# Auto-detect based on available CPUs
+plain server --workers auto
+
 # Run with 2 workers and 4 threads each
 plain server --workers 2 --threads 4
 ```
@@ -62,7 +65,7 @@ All options are available via the command line. Run `plain server --help` to see
 | Option             | Default          | Description                                           |
 | ------------------ | ---------------- | ----------------------------------------------------- |
 | `--bind` / `-b`    | `127.0.0.1:8000` | Address to bind (can be used multiple times)          |
-| `--workers` / `-w` | `1`              | Number of worker processes                            |
+| `--workers` / `-w` | `1`              | Number of worker processes (or `auto` for CPU count)  |
 | `--threads`        | `1`              | Number of threads per worker                          |
 | `--timeout` / `-t` | `30`             | Worker timeout in seconds                             |
 | `--reload`         | `False`          | Restart workers when code changes                     |
@@ -76,11 +79,11 @@ All options are available via the command line. Run `plain server --help` to see
 
 ## Environment variables
 
-| Variable              | Description                                                          |
-| --------------------- | -------------------------------------------------------------------- |
-| `WEB_CONCURRENCY`     | Sets the number of workers (commonly used by Heroku and other PaaS)  |
-| `SENDFILE`            | Enable sendfile() syscall (`1`, `yes`, `true`, or `y` to enable)     |
-| `FORWARDED_ALLOW_IPS` | Comma-separated list of trusted proxy IPs (default: `127.0.0.1,::1`) |
+| Variable              | Description                                                              |
+| --------------------- | ------------------------------------------------------------------------ |
+| `WEB_CONCURRENCY`     | Sets the number of workers (use `auto` to detect CPU cores, or a number) |
+| `SENDFILE`            | Enable sendfile() syscall (`1`, `yes`, `true`, or `y` to enable)         |
+| `FORWARDED_ALLOW_IPS` | Comma-separated list of trusted proxy IPs (default: `127.0.0.1,::1`)     |
 
 ## Signals
 

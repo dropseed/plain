@@ -1,6 +1,15 @@
+import os
+
 import click
 
 from plain.cli.runtime import without_runtime_setup
+
+
+def parse_workers(ctx: click.Context, param: click.Parameter, value: str) -> int:
+    """Parse workers value - accepts int or 'auto' for CPU count."""
+    if value == "auto":
+        return os.cpu_count() or 1
+    return int(value)
 
 
 @without_runtime_setup
@@ -22,10 +31,11 @@ from plain.cli.runtime import without_runtime_setup
 @click.option(
     "--workers",
     "-w",
-    type=int,
-    default=1,
+    type=str,
+    default="1",
     envvar="WEB_CONCURRENCY",
-    help="Number of worker processes",
+    callback=parse_workers,
+    help="Number of worker processes (or 'auto' for CPU count)",
     show_default=True,
 )
 @click.option(
