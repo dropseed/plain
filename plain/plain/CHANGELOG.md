@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.101.0](https://github.com/dropseed/plain/releases/plain@0.101.0) (2026-01-15)
+
+### What's changed
+
+- The `plain server` command now accepts `--workers auto` (or `WEB_CONCURRENCY=auto`) to automatically set worker count based on CPU count ([02a1769948](https://github.com/dropseed/plain/commit/02a1769948))
+- Response headers can now be set to `None` to opt out of default headers; `None` values are filtered out at the WSGI layer rather than being deleted by middleware ([cbf27e728d](https://github.com/dropseed/plain/commit/cbf27e728d))
+- Removed unused `Response` methods: `serialize_headers`, `serialize`, file-like interface stubs (`write`, `flush`, `tell`, `readable`, `seekable`, `writable`, `writelines`), `text` property, pickling support, and `getvalue` ([cbf27e728d](https://github.com/dropseed/plain/commit/cbf27e728d))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.100.1](https://github.com/dropseed/plain/releases/plain@0.100.1) (2026-01-15)
 
 ### What's changed
