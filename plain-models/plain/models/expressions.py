@@ -26,7 +26,7 @@ from plain.utils.hashable import make_hashable
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.fields import Field
     from plain.models.lookups import Lookup, Transform
     from plain.models.query import QuerySet

@@ -21,7 +21,7 @@ from plain.utils.datastructures import OrderedSet
 from plain.utils.hashable import make_hashable
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 

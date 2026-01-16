@@ -16,7 +16,7 @@ from plain.models.otel import db_span
 from plain.utils.dateparse import parse_time
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
 
 logger = logging.getLogger("plain.models.backends")
 

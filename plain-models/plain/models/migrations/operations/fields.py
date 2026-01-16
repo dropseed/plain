@@ -9,7 +9,7 @@ from plain.models.migrations.utils import field_references
 from .base import Operation
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.schema import DatabaseSchemaEditor
+    from plain.models.backends.schema import DatabaseSchemaEditor
     from plain.models.fields import Field
     from plain.models.migrations.state import ProjectState
 

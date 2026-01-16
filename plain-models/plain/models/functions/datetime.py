@@ -23,7 +23,7 @@ from plain.models.lookups import (
 from plain.utils import timezone
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 

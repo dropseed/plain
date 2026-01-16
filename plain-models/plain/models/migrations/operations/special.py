@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from .base import Operation
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.schema import DatabaseSchemaEditor
+    from plain.models.backends.schema import DatabaseSchemaEditor
     from plain.models.migrations.state import ProjectState
 
 

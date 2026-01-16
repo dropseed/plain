@@ -1,37 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Sequence
-from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from plain.models.backends.utils import CursorWrapper
 from plain.models.indexes import Index
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
-
-
-# Protocols for structural typing - allows backends to extend with extra fields
-@runtime_checkable
-class TableInfoProtocol(Protocol):
-    """Protocol for TableInfo - backends can add extra fields."""
-
-    name: str
-    type: str
-
-
-@runtime_checkable
-class FieldInfoProtocol(Protocol):
-    """Protocol for FieldInfo - backends can add extra fields."""
-
-    name: str
-    type_code: Any
-    display_size: int | None
-    internal_size: int | None
-    precision: int | None
-    scale: int | None
-    null_ok: bool | None
-    default: Any
-    collation: str | None
+    from plain.models.backends.wrapper import DatabaseWrapper
 
 
 class TableInfo(NamedTuple):

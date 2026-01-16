@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, TypedDict
 from plain.runtime import settings as plain_settings
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
 
 
 class DatabaseConfig(TypedDict, total=False):
@@ -49,7 +49,7 @@ class DatabaseConnection:
         return database
 
     def create_connection(self) -> DatabaseWrapper:
-        from plain.models.backends.base.base import DatabaseWrapper
+        from plain.models.backends.wrapper import DatabaseWrapper
 
         database_config = self.configure_settings()
         return DatabaseWrapper(database_config)

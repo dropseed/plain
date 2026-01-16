@@ -20,8 +20,8 @@ from plain.models.query_utils import Q
 from plain.models.sql.query import Query
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.schema import DatabaseSchemaEditor
     from plain.models.backends.ddl_references import Statement
+    from plain.models.backends.schema import DatabaseSchemaEditor
     from plain.models.base import Model
 
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]

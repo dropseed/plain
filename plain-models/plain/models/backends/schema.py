@@ -33,7 +33,7 @@ from plain.utils import timezone
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field

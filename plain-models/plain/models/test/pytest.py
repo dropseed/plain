@@ -10,7 +10,7 @@ from plain.models.otel import suppress_db_tracing
 from plain.signals import request_finished, request_started
 
 from .. import transaction
-from ..backends.base.base import DatabaseWrapper
+from ..backends.wrapper import DatabaseWrapper
 from ..db import close_old_connections, db_connection
 from .utils import (
     setup_database,

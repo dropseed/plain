@@ -45,7 +45,7 @@ from plain.utils.itercompat import is_iterable
 from ..registry import models_registry
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.expressions import Col
     from plain.models.fields.reverse_related import ForeignObjectRel

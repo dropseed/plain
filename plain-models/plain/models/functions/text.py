@@ -8,7 +8,7 @@ from plain.models.functions import Cast, Coalesce
 from plain.models.lookups import Transform
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 

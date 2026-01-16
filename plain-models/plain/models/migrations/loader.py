@@ -18,7 +18,7 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.migrations.migration import Migration
 
 MIGRATIONS_MODULE_NAME = "migrations"

@@ -702,7 +702,6 @@ class Model(metaclass=ModelBase):
             for field_name in unique_check:
                 f = self._model_meta.get_forward_field(field_name)
                 lookup_value = getattr(self, f.attname)
-                # TODO: Handle multiple backends with different feature flags.
                 if lookup_value is None:
                     # no value, skip the lookup
                     continue

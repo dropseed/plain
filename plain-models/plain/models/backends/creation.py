@@ -9,7 +9,7 @@ from psycopg import errors
 from plain.runtime import settings
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
 
 # The prefix to put on the default database name when creating
 # the test database.

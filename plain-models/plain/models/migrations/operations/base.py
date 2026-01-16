@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
-    from plain.models.backends.base.schema import DatabaseSchemaEditor
+    from plain.models.backends.schema import DatabaseSchemaEditor
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.migrations.state import ProjectState
 
 

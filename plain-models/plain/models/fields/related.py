@@ -32,7 +32,7 @@ from .related_lookups import (
 from .reverse_related import ForeignKeyRel, ManyToManyRel
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.fields.reverse_related import ForeignObjectRel
 

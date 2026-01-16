@@ -27,12 +27,12 @@ from plain.exceptions import ImproperlyConfigured
 from plain.models.backends import utils
 
 # Import component classes directly (no longer need lazy imports since we only support PostgreSQL)
-from plain.models.backends.base.client import DatabaseClient
-from plain.models.backends.base.creation import DatabaseCreation
-from plain.models.backends.base.features import DatabaseFeatures
-from plain.models.backends.base.introspection import DatabaseIntrospection
-from plain.models.backends.base.operations import DatabaseOperations
-from plain.models.backends.base.schema import DatabaseSchemaEditor
+from plain.models.backends.client import DatabaseClient
+from plain.models.backends.creation import DatabaseCreation
+from plain.models.backends.features import DatabaseFeatures
+from plain.models.backends.introspection import DatabaseIntrospection
+from plain.models.backends.operations import DatabaseOperations
+from plain.models.backends.schema import DatabaseSchemaEditor
 from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.models.backends.utils import debug_transaction
 from plain.models.db import (
@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 
 RAN_DB_VERSION_CHECK = False
 
-logger = logging.getLogger("plain.models.backends.base")
+logger = logging.getLogger("plain.models.backends")
 
 # Type OIDs
 TIMESTAMPTZ_OID = adapters.types["timestamptz"].oid
@@ -199,11 +199,6 @@ class DatabaseWrapper:
 
     Database = Database
     SchemaEditorClass: type[DatabaseSchemaEditor] = DatabaseSchemaEditor
-    client_class: type[DatabaseClient] = DatabaseClient
-    creation_class: type[DatabaseCreation] = DatabaseCreation
-    features_class: type[DatabaseFeatures] = DatabaseFeatures
-    introspection_class: type[DatabaseIntrospection] = DatabaseIntrospection
-    ops_class: type[DatabaseOperations] = DatabaseOperations
 
     queries_limit: int = 9000
 
@@ -270,18 +265,12 @@ class DatabaseWrapper:
         # call execute(sql, params, many, context).
         self.execute_wrappers: list[Any] = []
 
-        # Component classes are guaranteed to be set by the lazy import blocks above
-        assert self.client_class is not None
-        assert self.creation_class is not None
-        assert self.features_class is not None
-        assert self.introspection_class is not None
-        assert self.ops_class is not None
-
-        self.client = self.client_class(self)
-        self.creation = self.creation_class(self)
-        self.features = self.features_class(self)
-        self.introspection = self.introspection_class(self)
-        self.ops = self.ops_class(self)
+        # Instantiate component classes directly
+        self.client = DatabaseClient(self)
+        self.creation = DatabaseCreation(self)
+        self.features = DatabaseFeatures(self)
+        self.introspection = DatabaseIntrospection(self)
+        self.ops = DatabaseOperations(self)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__qualname__} vendor={self.vendor!r}>"

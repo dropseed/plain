@@ -20,7 +20,7 @@ from plain.utils import timezone
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import DatabaseWrapper
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.fields import Field
     from plain.models.sql.compiler import SQLCompiler
     from plain.models.sql.query import Query
