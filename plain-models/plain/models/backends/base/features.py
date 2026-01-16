@@ -55,7 +55,6 @@ class DatabaseFeatures:
     supports_temporal_subtraction = True
 
     has_zoneinfo_database = True
-    supports_order_by_nulls_modifier = True
     order_by_nulls_first = False
     max_query_params = None
     allows_auto_pk_0 = True
@@ -97,10 +96,6 @@ class DatabaseFeatures:
     # PostgreSQL EXPLAIN formats
     supported_explain_formats = {"JSON", "TEXT", "XML", "YAML"}
 
-    # PostgreSQL supports ON CONFLICT (upsert)
-    supports_update_conflicts = True
-    supports_update_conflicts_with_target = True
-
     # PostgreSQL requires casted CASE in UPDATE
     requires_casted_case_in_updates = True
 
@@ -110,7 +105,6 @@ class DatabaseFeatures:
     supports_expression_indexes = True
     collate_as_index_expression = False
 
-    supports_boolean_expr_in_select_clause = True
     supports_comparing_boolean_expr = True
 
     supports_json_field = True

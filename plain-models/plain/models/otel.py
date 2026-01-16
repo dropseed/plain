@@ -63,8 +63,8 @@ def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]
     operation = sql_upper.split()[0] if sql_upper else "UNKNOWN"
 
     # Pattern to match quoted and unquoted identifiers
-    # Matches: "quoted", `quoted`, [quoted], unquoted.name
-    identifier_pattern = r'("([^"]+)"|`([^`]+)`|\[([^\]]+)\]|([\w.]+))'
+    # Matches: "quoted" (PostgreSQL), unquoted.name
+    identifier_pattern = r'("([^"]+)"|([\w.]+))'
 
     # Extract table/collection name based on operation
     collection_name = None
@@ -93,12 +93,7 @@ def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]
 
 def _clean_identifier(identifier: str) -> str:
     """Remove quotes from SQL identifiers."""
-    # Remove different types of SQL quotes
     if identifier.startswith('"') and identifier.endswith('"'):
-        return identifier[1:-1]
-    elif identifier.startswith("`") and identifier.endswith("`"):
-        return identifier[1:-1]
-    elif identifier.startswith("[") and identifier.endswith("]"):
         return identifier[1:-1]
     return identifier
 

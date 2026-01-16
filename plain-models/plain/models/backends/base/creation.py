@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 
 from psycopg import errors
 
-from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
 
 if TYPE_CHECKING:
@@ -76,13 +75,6 @@ class DatabaseCreation:
         self.connection.ensure_connection()
 
         return test_database_name
-
-    def set_as_test_mirror(self, primary_settings_dict: dict[str, Any]) -> None:
-        """
-        Set this database up to be used in testing as a mirror of a primary
-        database whose settings are given.
-        """
-        self.connection.settings_dict["NAME"] = primary_settings_dict["NAME"]
 
     def _get_test_db_name(self, prefix: str = "") -> str:
         """
@@ -208,11 +200,6 @@ class DatabaseCreation:
         SQL to append to the end of the test table creation statements.
         """
         test_settings = self.connection.settings_dict["TEST"]
-        if test_settings.get("COLLATION") is not None:
-            raise ImproperlyConfigured(
-                "PostgreSQL does not support collation setting at database "
-                "creation time."
-            )
         return self._get_database_create_suffix(
             encoding=test_settings["CHARSET"],
             template=test_settings.get("TEMPLATE"),

@@ -133,7 +133,7 @@ class CursorWrapper:
         kparams: Mapping[str, Any] | None = None,
     ) -> Any:
         # Keyword parameters for callproc aren't supported in PEP 249, but the
-        # database driver may support them (e.g. cx_Oracle).
+        # database driver may support them.
         if kparams is not None and not self.db.features.supports_callproc_kwargs:
             raise NotSupportedError(
                 "Keyword parameters for callproc are not supported on this "
@@ -420,8 +420,7 @@ def format_number(
 def strip_quotes(table_name: str) -> str:
     """
     Strip quotes off of quoted table names to make them safe for use in index
-    names, sequence names, etc. For example '"USER"."TABLE"' (an Oracle naming
-    scheme) becomes 'USER"."TABLE'.
+    names, sequence names, etc.
     """
     has_quotes = table_name.startswith('"') and table_name.endswith('"')
     return table_name[1:-1] if has_quotes else table_name

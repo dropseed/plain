@@ -22,18 +22,6 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-      mysql:
-        image: mysql:8
-        env:
-          MYSQL_ROOT_PASSWORD: mysql
-          MYSQL_DATABASE: plain
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root --password=mysql"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]
@@ -44,25 +32,10 @@ jobs:
         uses: astral-sh/setup-uv@v2
       - name: Set up Python
         run: uv python install ${{ matrix.python-version }}
-      - name: Install system libraries for MySQL client build
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
-
-      - name: Test (SQLite)
-        run: ./scripts/test
-        env:
-          DATABASE_URL: "sqlite://:memory:"
-
       - name: Test (PostgreSQL)
         run: ./scripts/test
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/plain
-
-      - name: Test (MySQL)
-        run: ./scripts/test
-        env:
-          DATABASE_URL: mysql://root:mysql@127.0.0.1:3306/plain
 
   lint:
     runs-on: ubuntu-latest

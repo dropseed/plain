@@ -381,13 +381,8 @@ class SQLCompiler:
                     isinstance(field.expression, F)
                     and (select_ref := selected_exprs.get(field.expression.name))
                 ):
-                    # Emulation of NULLS (FIRST|LAST) cannot be combined with
-                    # the usage of ordering by position.
-                    if (
-                        field.nulls_first is None and field.nulls_last is None
-                    ) or self.connection.features.supports_order_by_nulls_modifier:
-                        field = field.copy()
-                        field.expression = select_ref
+                    field = field.copy()
+                    field.expression = select_ref
                 yield field, select_ref is not None
                 continue
             if field == "?":  # random

@@ -757,13 +757,6 @@ class DatabaseOperations:
         """
         return None
 
-    def conditional_expression_supported_in_where_clause(self, expression: Any) -> bool:
-        """
-        Return True, if the conditional expression is supported in the WHERE
-        clause.
-        """
-        return True
-
     def combine_expression(self, connector: str, sub_expressions: list[str]) -> str:
         """
         Combine a list of subexpressions into a single expression, using

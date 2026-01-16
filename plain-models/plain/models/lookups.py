@@ -138,8 +138,7 @@ class Lookup(Expression):
         if hasattr(value, "as_sql"):
             sql, params = compiler.compile(value)
             # Ensure expression is wrapped in parentheses to respect operator
-            # precedence but avoid double wrapping as it can be misinterpreted
-            # on some backends (e.g. subqueries on SQLite).
+            # precedence but avoid double wrapping.
             if sql and sql[0] != "(":
                 sql = f"({sql})"
             return sql, list(params)
@@ -391,13 +390,7 @@ class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
         # Avoid comparison against direct rhs if lhs is a boolean value. That
         # turns "boolfield__exact=True" into "WHERE boolean_field" instead of
         # "WHERE boolean_field = True" when allowed.
-        if (
-            isinstance(self.rhs, bool)
-            and getattr(self.lhs, "conditional", False)
-            and connection.ops.conditional_expression_supported_in_where_clause(
-                self.lhs
-            )
-        ):
+        if isinstance(self.rhs, bool) and getattr(self.lhs, "conditional", False):
             lhs_sql, params = self.process_lhs(compiler, connection)
             template = "%s" if self.rhs else "NOT %s"
             return template % lhs_sql, params

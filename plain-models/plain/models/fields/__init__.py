@@ -415,9 +415,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         self, compiler: SQLCompiler, sql: str, params: Any
     ) -> tuple[str, Any]:
         """
-        Custom format for select clauses. For example, GIS columns need to be
-        selected as AsText(table.col) on MySQL as the table.col data can't be
-        used by Plain.
+        Custom format for select clauses.
         """
         return sql, params
 
@@ -1531,12 +1529,7 @@ class DecimalField(Field[decimal.Decimal]):
 
 
 class DurationField(Field[datetime.timedelta]):
-    """
-    Store timedelta objects.
-
-    Use interval on PostgreSQL, INTERVAL DAY TO SECOND on Oracle, and bigint
-    of microseconds on other databases.
-    """
+    """Store timedelta objects using PostgreSQL's interval type."""
 
     empty_strings_allowed = False
     default_error_messages = {

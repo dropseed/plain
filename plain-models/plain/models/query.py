@@ -23,7 +23,6 @@ from plain.models.constants import LOOKUP_SEP, OnConflict
 from plain.models.db import (
     PLAIN_VERSION_PICKLE_KEY,
     IntegrityError,
-    NotSupportedError,
     db_connection,
 )
 from plain.models.exceptions import (
@@ -650,24 +649,13 @@ class QuerySet(Generic[T]):
         update_fields: list[Field] | None,
         unique_fields: list[Field] | None,
     ) -> OnConflict | None:
-        db_features = db_connection.features
         if update_conflicts:
-            if not db_features.supports_update_conflicts:
-                raise NotSupportedError(
-                    "This database backend does not support updating conflicts."
-                )
             if not update_fields:
                 raise ValueError(
                     "Fields that will be updated when a row insertion fails "
                     "on conflicts must be provided."
                 )
-            if unique_fields and not db_features.supports_update_conflicts_with_target:
-                raise NotSupportedError(
-                    "This database backend does not support updating "
-                    "conflicts with specifying unique fields that can trigger "
-                    "the upsert."
-                )
-            if not unique_fields and db_features.supports_update_conflicts_with_target:
+            if not unique_fields:
                 raise ValueError(
                     "Unique fields that can trigger the upsert must be provided."
                 )

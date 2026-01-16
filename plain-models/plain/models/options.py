@@ -30,7 +30,6 @@ class Options:
     ordering: Sequence[str]
     indexes: Sequence[Index]
     constraints: Sequence[BaseConstraint]
-    required_db_features: Sequence[str]
     _provided_options: set[str]
 
     def __init__(
@@ -41,7 +40,6 @@ class Options:
         ordering: Sequence[str] | None = None,
         indexes: Sequence[Index] | None = None,
         constraints: Sequence[BaseConstraint] | None = None,
-        required_db_features: Sequence[str] | None = None,
         package_label: str | None = None,
     ):
         """
@@ -57,7 +55,6 @@ class Options:
             "ordering": ordering,
             "indexes": indexes,
             "constraints": constraints,
-            "required_db_features": required_db_features,
             "package_label": package_label,
         }
         self._cache: dict[type[Model], Options] = {}
@@ -128,7 +125,6 @@ class Options:
         instance.ordering = self._config.get("ordering") or []
         instance.indexes = self._config.get("indexes") or []
         instance.constraints = self._config.get("constraints") or []
-        instance.required_db_features = self._config.get("required_db_features") or []
 
         # Format names with class interpolation
         instance.constraints = instance._format_names_with_class(instance.constraints)
@@ -213,11 +209,6 @@ class Options:
         Return True if the model can/should be migrated on the given
         `connection` object.
         """
-        if self.required_db_features:
-            return all(
-                getattr(connection.features, feat, False)
-                for feat in self.required_db_features
-            )
         return True
 
     def __repr__(self) -> str:

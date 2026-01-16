@@ -47,8 +47,6 @@ class DatabaseConnection:
         test_settings = database.setdefault("TEST", {})
         default_test_settings = [
             ("CHARSET", None),
-            ("COLLATION", None),
-            ("MIRROR", None),
             ("NAME", None),
         ]
         for key, value in default_test_settings:

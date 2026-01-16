@@ -24,7 +24,6 @@ from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
 
 from plain import models
 from plain.models import transaction
-from plain.models.db import db_connection
 from plain.utils import timezone
 
 from .locks import postgres_advisory_lock
@@ -360,9 +359,4 @@ class Job(metaclass=JobType):
         if not concurrency_key:
             return None
 
-        # PostgreSQL: use advisory locks
-        if db_connection.vendor == "postgresql":
-            return postgres_advisory_lock(self, concurrency_key)
-
-        # Other databases: no locking
-        return None
+        return postgres_advisory_lock(self, concurrency_key)
