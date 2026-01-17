@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.101.1](https://github.com/dropseed/plain/releases/plain@0.101.1) (2026-01-17)
+
+### What's changed
+
+- Fixed a crash when running the development server with `--reload` when an app's `assets` directory doesn't exist ([df33f93ece](https://github.com/dropseed/plain/commit/df33f93ece))
+- The `plain agent install` command now preserves user-created skills (those without the `plain-` prefix) instead of removing them as orphans ([bbc87498ed](https://github.com/dropseed/plain/commit/bbc87498ed))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.101.0](https://github.com/dropseed/plain/releases/plain@0.101.0) (2026-01-15)
 
 ### What's changed
