@@ -23,7 +23,6 @@ from plain.utils import timezone
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
-    from plain.models.backends.utils import CursorWrapper
     from plain.models.fields import Field
 
 
@@ -263,14 +262,6 @@ def distinct_sql(
         return ["DISTINCT"], []
 
 
-def fetch_returned_insert_columns(cursor: CursorWrapper, returning_params: Any) -> Any:
-    """
-    Given a cursor object that has just performed an INSERT...RETURNING
-    statement into a table, return the newly created data.
-    """
-    return cursor.fetchone()
-
-
 def for_update_sql(
     nowait: bool = False,
     skip_locked: bool = False,
@@ -286,20 +277,13 @@ def for_update_sql(
     )
 
 
-def _get_limit_offset_params(
-    low_mark: int | None, high_mark: int | None
-) -> tuple[int | None, int]:
-    offset = low_mark or 0
-    if high_mark is not None:
-        return (high_mark - offset), offset
-    elif offset:
-        return None, offset  # PostgreSQL allows omitting LIMIT clause
-    return None, offset
-
-
 def limit_offset_sql(low_mark: int | None, high_mark: int | None) -> str:
     """Return LIMIT/OFFSET SQL clause."""
-    limit, offset = _get_limit_offset_params(low_mark, high_mark)
+    offset = low_mark or 0
+    if high_mark is not None:
+        limit = high_mark - offset
+    else:
+        limit = None
     return " ".join(
         sql
         for sql in (
@@ -308,14 +292,6 @@ def limit_offset_sql(low_mark: int | None, high_mark: int | None) -> str:
         )
         if sql
     )
-
-
-def last_insert_id(cursor: CursorWrapper, table_name: str, pk_name: str) -> int:
-    """
-    Given a cursor object that has just performed an INSERT statement into
-    a table that has an auto-incrementing ID, return the newly created ID.
-    """
-    return cursor.lastrowid
 
 
 def lookup_cast(lookup_type: str, internal_type: str | None = None) -> str:
@@ -375,14 +351,6 @@ def bulk_insert_sql(fields: list[Field], placeholder_rows: list[list[str]]) -> s
     return "VALUES " + values_sql
 
 
-def fetch_returned_insert_rows(cursor: CursorWrapper) -> list[Any]:
-    """
-    Given a cursor object that has just performed an INSERT...RETURNING
-    statement into a table, return the list of returned data.
-    """
-    return cursor.fetchall()
-
-
 def regex_lookup(lookup_type: str) -> str:
     """
     Return the string to use in a query when performing regular expression
@@ -394,43 +362,9 @@ def regex_lookup(lookup_type: str) -> str:
     return "%s ~* %s"
 
 
-def savepoint_create_sql(sid: str) -> str:
-    """Return the SQL for starting a new savepoint."""
-    return f"SAVEPOINT {quote_name(sid)}"
-
-
-def savepoint_commit_sql(sid: str) -> str:
-    """Return the SQL for committing the given savepoint."""
-    return f"RELEASE SAVEPOINT {quote_name(sid)}"
-
-
-def savepoint_rollback_sql(sid: str) -> str:
-    """Return the SQL for rolling back the given savepoint."""
-    return f"ROLLBACK TO SAVEPOINT {quote_name(sid)}"
-
-
-def set_time_zone_sql() -> str:
-    """Return the SQL that will set the connection's time zone."""
-    return "SELECT set_config('TimeZone', %s, false)"
-
-
 def prep_for_like_query(x: str) -> str:
     """Prepare a value for use in a LIKE query."""
     return str(x).replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
-
-
-def prep_for_iexact_query(x: str) -> str:
-    return x
-
-
-def adapt_unknown_value(value: Any) -> Any:
-    """
-    Transform a value to something compatible with the backend driver.
-
-    This method only depends on the type of the value. It's designed for
-    cases where the target type isn't known, such as .raw() SQL queries.
-    """
-    return value
 
 
 def adapt_integerfield_value(
@@ -506,14 +440,6 @@ def year_lookup_bounds_for_datetime_field(
     return [first, second]
 
 
-def convert_durationfield_value(
-    value: int | None, expression: Any, connection: Any
-) -> datetime.timedelta | None:
-    if value is not None:
-        return datetime.timedelta(0, 0, value)
-    return None
-
-
 def combine_expression(connector: str, sub_expressions: list[str]) -> str:
     """
     Combine a list of subexpressions into a single expression, using
@@ -521,15 +447,6 @@ def combine_expression(connector: str, sub_expressions: list[str]) -> str:
     """
     conn = f" {connector} "
     return conn.join(sub_expressions)
-
-
-def integer_field_range(internal_type: str) -> tuple[int, int]:
-    """
-    Given an integer field internal type (e.g. 'PositiveIntegerField'),
-    return a tuple of the (min_value, max_value) form representing the
-    range of the column type bound to the field.
-    """
-    return INTEGER_FIELD_RANGES[internal_type]
 
 
 def subtract_temporals(
@@ -619,10 +536,6 @@ def explain_query_prefix(format: str | None = None, **options: Any) -> str:
     if extra:
         prefix += " ({})".format(", ".join("{} {}".format(*i) for i in extra.items()))
     return prefix
-
-
-def insert_statement(on_conflict: Any = None) -> str:
-    return "INSERT INTO"
 
 
 def on_conflict_suffix_sql(

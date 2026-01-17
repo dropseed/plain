@@ -13,10 +13,7 @@ from plain.models.backends.sql import (
     bulk_insert_sql,
     distinct_sql,
     explain_query_prefix,
-    fetch_returned_insert_columns,
-    fetch_returned_insert_rows,
     for_update_sql,
-    insert_statement,
     limit_offset_sql,
     on_conflict_suffix_sql,
     quote_name,
@@ -1577,8 +1574,7 @@ class SQLInsertCompiler(SQLCompiler):
         assert self.query.model is not None, "INSERT requires a model"
         meta = self.query.model._model_meta
         options = self.query.model.model_options
-        insert_stmt = insert_statement(on_conflict=self.query.on_conflict)
-        result = [f"{insert_stmt} {qn(options.db_table)}"]
+        result = [f"INSERT INTO {qn(options.db_table)}"]
         if self.query.fields:
             fields = self.query.fields
         else:
@@ -1643,9 +1639,9 @@ class SQLInsertCompiler(SQLCompiler):
                 return []
             # Use RETURNING clause for both single and bulk inserts
             if len(self.query.objs) > 1:
-                rows = fetch_returned_insert_rows(cursor)
+                rows = cursor.fetchall()
             else:
-                rows = [fetch_returned_insert_columns(cursor, self.returning_params)]
+                rows = [cursor.fetchone()]
         cols = [field.get_col(options.db_table) for field in self.returning_fields]
         converters = self.get_converters(cols)
         if converters:

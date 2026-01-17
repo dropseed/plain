@@ -25,12 +25,6 @@ class DatabaseCreation:
     def __init__(self, connection: DatabaseWrapper):
         self.connection = connection
 
-    def _nodb_cursor(self) -> Any:
-        return self.connection._nodb_cursor()
-
-    def _quote_name(self, name: str) -> str:
-        return quote_name(name)
-
     def log(self, msg: str) -> None:
         sys.stderr.write(msg + os.linesep)
 
@@ -104,7 +98,7 @@ class DatabaseCreation:
         if encoding:
             suffix += f" ENCODING '{encoding}'"
         if template:
-            suffix += f" TEMPLATE {self._quote_name(template)}"
+            suffix += f" TEMPLATE {quote_name(template)}"
         return suffix and "WITH" + suffix
 
     def _execute_create_test_db(self, cursor: Any, parameters: dict[str, str]) -> None:
@@ -130,7 +124,7 @@ class DatabaseCreation:
             "suffix": self.sql_table_creation_suffix(),
         }
         # Create the test database and connect to it.
-        with self._nodb_cursor() as cursor:
+        with self.connection._nodb_cursor() as cursor:
             try:
                 self._execute_create_test_db(cursor, test_db_params)
             except Exception as e:
@@ -188,7 +182,7 @@ class DatabaseCreation:
         # ourselves. Connect to the previous database (not the test database)
         # to do so, because it's not allowed to delete a database while being
         # connected to it.
-        with self._nodb_cursor() as cursor:
+        with self.connection._nodb_cursor() as cursor:
             cursor.execute(f"DROP DATABASE {quote_name(test_database_name)}")
 
     def sql_table_creation_suffix(self) -> str:

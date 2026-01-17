@@ -34,9 +34,9 @@ from plain.models.backends.constants import (
 from plain.models.backends.sql import (
     CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH,
     CAST_DATA_TYPES,
+    INTEGER_FIELD_RANGES,
     adapt_integerfield_value,
     adapt_ipaddressfield_value,
-    integer_field_range,
     quote_name,
 )
 from plain.models.constants import LOOKUP_SEP
@@ -1659,7 +1659,7 @@ class IntegerField(Field[int]):
         # they're based on values retrieved from the database connection.
         validators_ = super().validators
         internal_type = self.get_internal_type()
-        min_value, max_value = integer_field_range(internal_type)
+        min_value, max_value = INTEGER_FIELD_RANGES[internal_type]
         if min_value is not None and not any(
             (
                 isinstance(validator, validators.MinValueValidator)

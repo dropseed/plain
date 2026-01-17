@@ -9,9 +9,8 @@ from typing import TYPE_CHECKING, Any
 
 from plain.models.backends.constants import OPERATORS, PATTERN_ESC, PATTERN_OPS
 from plain.models.backends.sql import (
-    integer_field_range,
+    INTEGER_FIELD_RANGES,
     lookup_cast,
-    prep_for_iexact_query,
     prep_for_like_query,
     regex_lookup,
     year_lookup_bounds_for_date_field,
@@ -408,17 +407,6 @@ class IExact(BuiltinLookup):
     lookup_name: str = "iexact"
     prepare_rhs: bool = False
 
-    def process_rhs(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
-    ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
-        rhs, params = super().process_rhs(compiler, connection)
-        if isinstance(rhs, str):
-            if params:
-                params[0] = prep_for_iexact_query(params[0])
-            return rhs, params
-        else:
-            return rhs, params
-
 
 @Field.register_lookup
 class GreaterThan(FieldGetDbPrepValueMixin, BuiltinLookup):
@@ -452,7 +440,7 @@ class IntegerFieldOverflow:
         rhs = self.rhs
         if isinstance(rhs, int):
             field_internal_type = self.lhs.output_field.get_internal_type()
-            min_value, max_value = integer_field_range(field_internal_type)
+            min_value, max_value = INTEGER_FIELD_RANGES[field_internal_type]
             if min_value is not None and rhs < min_value:
                 raise self.underflow_exception
             if max_value is not None and rhs > max_value:

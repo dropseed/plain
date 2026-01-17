@@ -32,13 +32,7 @@ from plain.models.backends.client import DatabaseClient
 from plain.models.backends.creation import DatabaseCreation
 from plain.models.backends.introspection import DatabaseIntrospection
 from plain.models.backends.schema import DatabaseSchemaEditor
-from plain.models.backends.sql import (
-    MAX_NAME_LENGTH,
-    savepoint_commit_sql,
-    savepoint_create_sql,
-    savepoint_rollback_sql,
-    set_time_zone_sql,
-)
+from plain.models.backends.sql import MAX_NAME_LENGTH, quote_name
 from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.models.backends.utils import debug_transaction
 from plain.models.db import (
@@ -343,7 +337,9 @@ class DatabaseWrapper:
         timezone_name = self.timezone_name
         if timezone_name and conn_timezone_name != timezone_name:
             with self.connection.cursor() as cursor:
-                cursor.execute(set_time_zone_sql(), [timezone_name])  # type: ignore[arg-type]
+                cursor.execute(
+                    "SELECT set_config('TimeZone', %s, false)", [timezone_name]
+                )
             return True
         return False
 
@@ -392,9 +388,6 @@ class DatabaseWrapper:
         if self.timezone != tzloader.timezone:  # type: ignore[union-attr]
             register_tzloader(self.timezone, cursor)
         return cursor
-
-    def tzinfo_factory(self, offset: int) -> datetime.tzinfo | None:
-        return self.timezone
 
     def chunked_cursor(self) -> utils.CursorWrapper:
         """
@@ -614,15 +607,15 @@ class DatabaseWrapper:
 
     def _savepoint(self, sid: str) -> None:
         with self.cursor() as cursor:
-            cursor.execute(savepoint_create_sql(sid))
+            cursor.execute(f"SAVEPOINT {quote_name(sid)}")
 
     def _savepoint_rollback(self, sid: str) -> None:
         with self.cursor() as cursor:
-            cursor.execute(savepoint_rollback_sql(sid))
+            cursor.execute(f"ROLLBACK TO SAVEPOINT {quote_name(sid)}")
 
     def _savepoint_commit(self, sid: str) -> None:
         with self.cursor() as cursor:
-            cursor.execute(savepoint_commit_sql(sid))
+            cursor.execute(f"RELEASE SAVEPOINT {quote_name(sid)}")
 
     # ##### Generic savepoint management methods #####
 

@@ -144,7 +144,9 @@ class CheckConstraint(BaseConstraint):
     def remove_sql(
         self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> Statement | None:
-        return schema_editor._delete_check_sql(model, self.name)
+        return schema_editor._delete_constraint_sql(
+            schema_editor.sql_delete_check, model, self.name
+        )
 
     def validate(
         self, model: type[Model], instance: Model, exclude: set[str] | None = None

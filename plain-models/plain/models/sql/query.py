@@ -31,7 +31,6 @@ from typing import (
 )
 
 from plain.models.aggregates import Count
-from plain.models.backends.sql import adapt_unknown_value
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import NotSupportedError, db_connection
 from plain.models.exceptions import FieldDoesNotExist, FieldError
@@ -155,23 +154,8 @@ class RawQuery:
         return self.sql % self.params_type(self.params)
 
     def _execute_query(self) -> None:
-        # Adapt parameters to the database, as much as possible considering
-        # that the target type isn't known. See #17755.
-        params_type = self.params_type
-        adapter = adapt_unknown_value
-        if params_type is tuple:
-            assert isinstance(self.params, tuple)
-            params = tuple(adapter(val) for val in self.params)
-        elif params_type is dict:
-            assert isinstance(self.params, dict)
-            params = {key: adapter(val) for key, val in self.params.items()}
-        elif params_type is None:
-            params = None
-        else:
-            raise RuntimeError(f"Unexpected params type: {params_type}")
-
         self.cursor = db_connection.cursor()
-        self.cursor.execute(self.sql, params)
+        self.cursor.execute(self.sql, self.params)
 
 
 class ExplainInfo(NamedTuple):

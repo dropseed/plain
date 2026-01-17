@@ -242,9 +242,6 @@ class DatabaseSchemaEditor:
         with self.connection.cursor() as cursor:
             cursor.execute(sql_str, params)
 
-    def quote_name(self, name: str) -> str:
-        return quote_name(name)
-
     def quote_value(self, value: Any) -> str:
         """
         Return a quoted version of the value so it's safe to use in an SQL
@@ -282,13 +279,13 @@ class DatabaseSchemaEditor:
                     self._create_fk_sql(model, field, "_fk_%(to_table)s_%(to_column)s")
                 )
             # Add the SQL to our big list.
-            column_sqls.append(f"{self.quote_name(field.column)} {definition}")
+            column_sqls.append(f"{quote_name(field.column)} {definition}")
         constraints = [
             constraint.constraint_sql(model, self)
             for constraint in model.model_options.constraints
         ]
         sql = self.sql_create_table % {
-            "table": self.quote_name(model.model_options.db_table),
+            "table": quote_name(model.model_options.db_table),
             "definition": ", ".join(
                 str(constraint)
                 for constraint in (*column_sqls, *constraints)
@@ -310,7 +307,7 @@ class DatabaseSchemaEditor:
     ) -> Generator[str, None, None]:
         yield column_db_type
         if collation := field_db_params.get("collation"):
-            yield self._collate_sql(collation)
+            yield "COLLATE " + quote_name(collation)
         # Work out nullability.
         null = field.allow_null
         # Include a default value, if requested.
@@ -433,7 +430,7 @@ class DatabaseSchemaEditor:
         self.execute(
             self.sql_delete_table
             % {
-                "table": self.quote_name(model.model_options.db_table),
+                "table": quote_name(model.model_options.db_table),
             }
         )
         # Remove all deferred statements referencing the deleted table.
@@ -488,8 +485,8 @@ class DatabaseSchemaEditor:
         self.execute(
             self.sql_rename_table
             % {
-                "old_table": self.quote_name(old_db_table),
-                "new_table": self.quote_name(new_db_table),
+                "old_table": quote_name(old_db_table),
+                "new_table": quote_name(new_db_table),
             }
         )
         # Rename all references to the old table name.
@@ -506,7 +503,7 @@ class DatabaseSchemaEditor:
         self.execute(
             self.sql_alter_table_comment
             % {
-                "table": self.quote_name(model.model_options.db_table),
+                "table": quote_name(model.model_options.db_table),
                 "comment": self.quote_value(new_db_table_comment or ""),
             }
         )
@@ -542,10 +539,10 @@ class DatabaseSchemaEditor:
                 namespace, _ = split_identifier(model.model_options.db_table)
                 definition += " " + self.sql_create_column_inline_fk % {
                     "name": self._fk_constraint_name(model, field, constraint_suffix),
-                    "namespace": f"{self.quote_name(namespace)}." if namespace else "",
-                    "column": self.quote_name(field.column),
-                    "to_table": self.quote_name(to_table),
-                    "to_column": self.quote_name(to_column),
+                    "namespace": f"{quote_name(namespace)}." if namespace else "",
+                    "column": quote_name(field.column),
+                    "to_table": quote_name(to_table),
+                    "to_column": quote_name(to_column),
                     "deferrable": DEFERRABLE_SQL,
                 }
             # Otherwise, add FK constraints later.
@@ -555,8 +552,8 @@ class DatabaseSchemaEditor:
                 )
         # Build the SQL and run it
         sql = self.sql_create_column % {
-            "table": self.quote_name(model.model_options.db_table),
-            "column": self.quote_name(field.column),
+            "table": quote_name(model.model_options.db_table),
+            "column": quote_name(field.column),
             "definition": definition,
         }
         self.execute(sql, params)
@@ -567,7 +564,7 @@ class DatabaseSchemaEditor:
                 model, None, field, drop=True
             )
             sql = self.sql_alter_column % {
-                "table": self.quote_name(model.model_options.db_table),
+                "table": quote_name(model.model_options.db_table),
                 "changes": changes_sql,
             }
             self.execute(sql, params)
@@ -595,11 +592,13 @@ class DatabaseSchemaEditor:
         if isinstance(field, RelatedField):
             fk_names = self._constraint_names(model, [field.column], foreign_key=True)
             for fk_name in fk_names:
-                self.execute(self._delete_fk_sql(model, fk_name))
+                self.execute(
+                    self._delete_constraint_sql(self.sql_delete_fk, model, fk_name)
+                )
         # Delete the column
         sql = self.sql_delete_column % {
-            "table": self.quote_name(model.model_options.db_table),
-            "column": self.quote_name(field.column),
+            "table": quote_name(model.model_options.db_table),
+            "column": quote_name(field.column),
         }
         self.execute(sql)
         # Remove all deferred statements referencing the deleted column.
@@ -726,7 +725,9 @@ class DatabaseSchemaEditor:
                 )
             for fk_name in fk_names:
                 fks_dropped.add((old_field.column,))
-                self.execute(self._delete_fk_sql(model, fk_name))
+                self.execute(
+                    self._delete_constraint_sql(self.sql_delete_fk, model, fk_name)
+                )
         # Has unique been removed?
         if old_field.primary_key and (
             not new_field.primary_key
@@ -766,7 +767,11 @@ class DatabaseSchemaEditor:
                     new_rel.related_model, [new_rel.field.column], foreign_key=True
                 )
                 for fk_name in rel_fk_names:
-                    self.execute(self._delete_fk_sql(new_rel.related_model, fk_name))
+                    self.execute(
+                        self._delete_constraint_sql(
+                            self.sql_delete_fk, new_rel.related_model, fk_name
+                        )
+                    )
         # Removed an index? (no strict check, as multiple indexes are possible)
         # Remove indexes if db_index switched to False or a unique constraint
         # will now be used in lieu of an index. The following lines from the
@@ -820,7 +825,9 @@ class DatabaseSchemaEditor:
                     f"Found wrong number ({len(constraint_names)}) of check constraints for {model.model_options.db_table}.{old_field.column}"
                 )
             for constraint_name in constraint_names:
-                sql = self._delete_check_sql(model, constraint_name)
+                sql = self._delete_constraint_sql(
+                    self.sql_delete_check, model, constraint_name
+                )
                 if sql is not None:
                     self.execute(sql)
         # Have they renamed the column?
@@ -894,7 +901,7 @@ class DatabaseSchemaEditor:
                 self.execute(
                     self.sql_alter_column
                     % {
-                        "table": self.quote_name(model.model_options.db_table),
+                        "table": quote_name(model.model_options.db_table),
                         "changes": sql,
                     },
                     params,
@@ -904,8 +911,8 @@ class DatabaseSchemaEditor:
                 self.execute(
                     self.sql_update_with_default
                     % {
-                        "table": self.quote_name(model.model_options.db_table),
-                        "column": self.quote_name(new_field.column),
+                        "table": quote_name(model.model_options.db_table),
+                        "column": quote_name(new_field.column),
                         "default": "%s",
                     },
                     [new_default],
@@ -916,7 +923,7 @@ class DatabaseSchemaEditor:
                     self.execute(
                         self.sql_alter_column
                         % {
-                            "table": self.quote_name(model.model_options.db_table),
+                            "table": quote_name(model.model_options.db_table),
                             "changes": sql,
                         },
                         params,
@@ -976,9 +983,7 @@ class DatabaseSchemaEditor:
             self.execute(
                 self.sql_alter_column
                 % {
-                    "table": self.quote_name(
-                        new_rel.related_model.model_options.db_table
-                    ),
+                    "table": quote_name(new_rel.related_model.model_options.db_table),
                     "changes": fragment[0],
                 },
                 fragment[1],
@@ -1022,7 +1027,7 @@ class DatabaseSchemaEditor:
                 model, old_field, new_field, drop=True
             )
             sql = self.sql_alter_column % {
-                "table": self.quote_name(model.model_options.db_table),
+                "table": quote_name(model.model_options.db_table),
                 "changes": changes_sql,
             }
             self.execute(sql, params)
@@ -1066,7 +1071,7 @@ class DatabaseSchemaEditor:
         return (
             sql
             % {
-                "column": self.quote_name(new_field.column),
+                "column": quote_name(new_field.column),
                 "type": new_db_params["type"],
             },
             [],
@@ -1098,7 +1103,7 @@ class DatabaseSchemaEditor:
         return (
             sql
             % {
-                "column": self.quote_name(new_field.column),
+                "column": quote_name(new_field.column),
                 "type": new_db_params["type"],
                 "default": default,
             },
@@ -1153,7 +1158,7 @@ class DatabaseSchemaEditor:
                 (
                     self.sql_alter_column_type
                     % {
-                        "column": self.quote_name(column),
+                        "column": quote_name(column),
                         "type": new_type,
                         "collation": "",
                     },
@@ -1163,8 +1168,8 @@ class DatabaseSchemaEditor:
                     (
                         self.sql_add_identity
                         % {
-                            "table": self.quote_name(table),
-                            "column": self.quote_name(column),
+                            "table": quote_name(table),
+                            "column": quote_name(column),
                         },
                         [],
                     ),
@@ -1176,8 +1181,8 @@ class DatabaseSchemaEditor:
             self.execute(
                 self.sql_drop_indentity
                 % {
-                    "table": self.quote_name(table),
-                    "column": self.quote_name(strip_quotes(new_field.column)),
+                    "table": quote_name(table),
+                    "column": quote_name(strip_quotes(new_field.column)),
                 }
             )
             column = strip_quotes(new_field.column)
@@ -1192,7 +1197,7 @@ class DatabaseSchemaEditor:
                     (
                         self.sql_delete_sequence
                         % {
-                            "sequence": self.quote_name(sequence_name),
+                            "sequence": quote_name(sequence_name),
                         },
                         [],
                     )
@@ -1212,7 +1217,7 @@ class DatabaseSchemaEditor:
                     (
                         self.sql_alter_sequence_type
                         % {
-                            "sequence": self.quote_name(sequence_name),
+                            "sequence": quote_name(sequence_name),
                             "type": db_types[new_internal_type],
                         },
                         [],
@@ -1235,8 +1240,8 @@ class DatabaseSchemaEditor:
     ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         """Base implementation of _alter_column_type_sql without IDENTITY handling."""
         other_actions = []
-        if collate_sql := self._collate_sql(new_collation):
-            collate_sql = f" {collate_sql}"
+        if new_collation:
+            collate_sql = " COLLATE " + quote_name(new_collation)
         else:
             collate_sql = ""
         # Comment change?
@@ -1253,12 +1258,12 @@ class DatabaseSchemaEditor:
                 if sql:
                     other_actions.append((sql, params))
             if new_field.db_comment:
-                comment_sql = self._comment_sql(new_field.db_comment)
+                comment_sql = self.quote_value(new_field.db_comment)
         return (
             (
                 self.sql_alter_column_type
                 % {
-                    "column": self.quote_name(new_field.column),
+                    "column": quote_name(new_field.column),
                     "type": new_type,
                     "collation": collate_sql,
                     "comment": comment_sql,
@@ -1278,15 +1283,12 @@ class DatabaseSchemaEditor:
         return (
             self.sql_alter_column_comment
             % {
-                "table": self.quote_name(model.model_options.db_table),
-                "column": self.quote_name(new_field.column),
-                "comment": self._comment_sql(new_db_comment),
+                "table": quote_name(model.model_options.db_table),
+                "column": quote_name(new_field.column),
+                "comment": self.quote_value(new_db_comment or ""),
             },
             [],
         )
-
-    def _comment_sql(self, comment: str | None) -> str:
-        return self.quote_value(comment or "")
 
     def _alter_many_to_many(
         self,
@@ -1373,11 +1375,6 @@ class DatabaseSchemaEditor:
             index_name = f"D{index_name[:-1]}"
         return index_name
 
-    def _index_condition_sql(self, condition: str | None) -> str:
-        if condition:
-            return " WHERE " + condition
-        return ""
-
     def _index_include_sql(
         self, model: type[Model], columns: list[str] | None
     ) -> str | Statement:
@@ -1385,7 +1382,7 @@ class DatabaseSchemaEditor:
             return ""
         return Statement(
             " INCLUDE (%(columns)s)",
-            columns=Columns(model.model_options.db_table, columns, self.quote_name),
+            columns=Columns(model.model_options.db_table, columns, quote_name),
         )
 
     def _create_index_sql(
@@ -1425,11 +1422,11 @@ class DatabaseSchemaEditor:
             nonlocal name
             if name is None:
                 name = self._create_index_name(*args, **kwargs)
-            return self.quote_name(name)
+            return quote_name(name)
 
         return Statement(
             sql,
-            table=Table(table, self.quote_name),
+            table=Table(table, quote_name),
             name=IndexName(table, columns, suffix, create_index_name),
             using=using,
             columns=(
@@ -1438,7 +1435,7 @@ class DatabaseSchemaEditor:
                 else Expressions(table, expressions, compiler, self.quote_value)
             ),
             extra="",
-            condition=self._index_condition_sql(condition),
+            condition=(" WHERE " + condition if condition else ""),
             include=self._index_include_sql(model, include),
         )
 
@@ -1457,8 +1454,8 @@ class DatabaseSchemaEditor:
             )
         return Statement(
             sql,
-            table=Table(model.model_options.db_table, self.quote_name),
-            name=self.quote_name(name),
+            table=Table(model.model_options.db_table, quote_name),
+            name=quote_name(name),
         )
 
     def _rename_index_sql(
@@ -1466,9 +1463,9 @@ class DatabaseSchemaEditor:
     ) -> Statement:
         return Statement(
             self.sql_rename_index,
-            table=Table(model.model_options.db_table, self.quote_name),
-            old_name=self.quote_name(old_name),
-            new_name=self.quote_name(new_name),
+            table=Table(model.model_options.db_table, quote_name),
+            old_name=quote_name(old_name),
+            new_name=quote_name(new_name),
         )
 
     def _index_columns(
@@ -1482,11 +1479,11 @@ class DatabaseSchemaEditor:
             return IndexColumns(
                 table,
                 columns,
-                self.quote_name,
+                quote_name,
                 col_suffixes=col_suffixes,
                 opclasses=opclasses,
             )
-        return Columns(table, columns, self.quote_name, col_suffixes=col_suffixes)
+        return Columns(table, columns, quote_name, col_suffixes=col_suffixes)
 
     def _model_indexes_sql(self, model: type[Model]) -> list[Statement | None]:
         """
@@ -1567,9 +1564,11 @@ class DatabaseSchemaEditor:
             old_kwargs.pop(attr, None)
         for attr in ignore.union(new_field.non_db_attrs):
             new_kwargs.pop(attr, None)
-        return self.quote_name(old_field.column) != self.quote_name(
-            new_field.column
-        ) or (old_path, old_args, old_kwargs) != (new_path, new_args, new_kwargs)
+        return quote_name(old_field.column) != quote_name(new_field.column) or (
+            old_path,
+            old_args,
+            old_kwargs,
+        ) != (new_path, new_args, new_kwargs)
 
     def _field_should_be_indexed(self, model: type[Model], field: Field) -> bool:
         if isinstance(field, ForeignKeyField):
@@ -1583,25 +1582,23 @@ class DatabaseSchemaEditor:
         self, table: str, old_field: Field, new_field: Field, new_type: str
     ) -> str:
         return self.sql_rename_column % {
-            "table": self.quote_name(table),
-            "old_column": self.quote_name(old_field.column),
-            "new_column": self.quote_name(new_field.column),
+            "table": quote_name(table),
+            "old_column": quote_name(old_field.column),
+            "new_column": quote_name(new_field.column),
             "type": new_type,
         }
 
     def _create_fk_sql(
         self, model: type[Model], field: ForeignKeyField, suffix: str
     ) -> Statement:
-        table = Table(model.model_options.db_table, self.quote_name)
+        table = Table(model.model_options.db_table, quote_name)
         name = self._fk_constraint_name(model, field, suffix)
-        column = Columns(model.model_options.db_table, [field.column], self.quote_name)
-        to_table = Table(
-            field.target_field.model.model_options.db_table, self.quote_name
-        )
+        column = Columns(model.model_options.db_table, [field.column], quote_name)
+        to_table = Table(field.target_field.model.model_options.db_table, quote_name)
         to_column = Columns(
             field.target_field.model.model_options.db_table,
             [field.target_field.column],
-            self.quote_name,
+            quote_name,
         )
         deferrable = DEFERRABLE_SQL
         return Statement(
@@ -1618,7 +1615,7 @@ class DatabaseSchemaEditor:
         self, model: type[Model], field: ForeignKeyField, suffix: str
     ) -> ForeignKeyName:
         def create_fk_name(*args: Any, **kwargs: Any) -> str:
-            return self.quote_name(self._create_index_name(*args, **kwargs))
+            return quote_name(self._create_index_name(*args, **kwargs))
 
         return ForeignKeyName(
             model.model_options.db_table,
@@ -1628,9 +1625,6 @@ class DatabaseSchemaEditor:
             suffix,
             create_fk_name,
         )
-
-    def _delete_fk_sql(self, model: type[Model], name: str) -> Statement:
-        return self._delete_constraint_sql(self.sql_delete_fk, model, name)
 
     def _deferrable_constraint_sql(self, deferrable: Deferrable | None) -> str:
         if deferrable is None:
@@ -1668,11 +1662,11 @@ class DatabaseSchemaEditor:
                 self.deferred_sql.append(sql)
             return None
         constraint = self.sql_unique_constraint % {
-            "columns": ", ".join([self.quote_name(field.column) for field in fields]),
+            "columns": ", ".join([quote_name(field.column) for field in fields]),
             "deferrable": self._deferrable_constraint_sql(deferrable),
         }
         return self.sql_constraint % {
-            "name": self.quote_name(name),
+            "name": quote_name(name),
             "constraint": constraint,
         }
 
@@ -1694,7 +1688,7 @@ class DatabaseSchemaEditor:
         if name is None:
             constraint_name = self._unique_constraint_name(table, columns, quote=True)
         else:
-            constraint_name = self.quote_name(name)
+            constraint_name = quote_name(name)
         if condition or include or opclasses or expressions:
             sql = self.sql_create_unique_index
         else:
@@ -1707,10 +1701,10 @@ class DatabaseSchemaEditor:
             columns_obj = Expressions(table, expressions, compiler, self.quote_value)
         return Statement(
             sql,
-            table=Table(table, self.quote_name),
+            table=Table(table, quote_name),
             name=constraint_name,
             columns=columns_obj,
-            condition=self._index_condition_sql(condition),
+            condition=(" WHERE " + condition if condition else ""),
             deferrable=self._deferrable_constraint_sql(deferrable),
             include=self._index_include_sql(model, include),
         )
@@ -1721,7 +1715,7 @@ class DatabaseSchemaEditor:
         if quote:
 
             def create_unique_name(*args: Any, **kwargs: Any) -> str:
-                return self.quote_name(self._create_index_name(*args, **kwargs))
+                return quote_name(self._create_index_name(*args, **kwargs))
 
         else:
             create_unique_name = self._create_index_name
@@ -1746,28 +1740,25 @@ class DatabaseSchemaEditor:
 
     def _check_sql(self, name: str, check: str) -> str:
         return self.sql_constraint % {
-            "name": self.quote_name(name),
+            "name": quote_name(name),
             "constraint": self.sql_check_constraint % {"check": check},
         }
 
     def _create_check_sql(self, model: type[Model], name: str, check: str) -> Statement:
         return Statement(
             self.sql_create_check,
-            table=Table(model.model_options.db_table, self.quote_name),
-            name=self.quote_name(name),
+            table=Table(model.model_options.db_table, quote_name),
+            name=quote_name(name),
             check=check,
         )
-
-    def _delete_check_sql(self, model: type[Model], name: str) -> Statement:
-        return self._delete_constraint_sql(self.sql_delete_check, model, name)
 
     def _delete_constraint_sql(
         self, template: str, model: type[Model], name: str
     ) -> Statement:
         return Statement(
             template,
-            table=Table(model.model_options.db_table, self.quote_name),
-            name=self.quote_name(name),
+            table=Table(model.model_options.db_table, quote_name),
+            name=quote_name(name),
         )
 
     def _constraint_names(
@@ -1818,19 +1809,14 @@ class DatabaseSchemaEditor:
     def _create_primary_key_sql(self, model: type[Model], field: Field) -> Statement:
         return Statement(
             self.sql_create_pk,
-            table=Table(model.model_options.db_table, self.quote_name),
-            name=self.quote_name(
+            table=Table(model.model_options.db_table, quote_name),
+            name=quote_name(
                 self._create_index_name(
                     model.model_options.db_table, [field.column], suffix="_pk"
                 )
             ),
-            columns=Columns(
-                model.model_options.db_table, [field.column], self.quote_name
-            ),
+            columns=Columns(model.model_options.db_table, [field.column], quote_name),
         )
 
     def _delete_primary_key_sql(self, model: type[Model], name: str) -> Statement:
         return self._delete_constraint_sql(self.sql_delete_pk, model, name)
-
-    def _collate_sql(self, collation: str | None) -> str:
-        return "COLLATE " + self.quote_name(collation) if collation else ""
