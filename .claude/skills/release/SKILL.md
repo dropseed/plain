@@ -39,23 +39,14 @@ Release Plain packages with version bumping, changelog generation, and git taggi
 
 ### Phase 2: Discover Packages with Changes
 
-For each package directory (directories starting with `plain` that are not `.egg-info`):
+Run the discover-changes script to find packages with unreleased changes:
 
-1. Find the last commit that changed the version in `<package>/pyproject.toml`:
+```
+./.claude/skills/release/discover-changes
+```
 
-    ```
-    git log --format="%H" -- <package>/pyproject.toml
-    ```
-
-    For each commit, check if it actually changed the version line using `git show`.
-
-2. Get commits since the last version change (excluding tests):
-
-    ```
-    git log --format="%H %s" <last_version_commit>..HEAD -- <package> ":(exclude)<package>/tests"
-    ```
-
-3. If no commits, skip this package.
+This outputs JSON with each package's name, current version, and commits since last release.
+If specific packages were requested, filter the results to only those packages.
 
 ### Phase 3: Collect Release Decisions
 
@@ -71,57 +62,44 @@ For each package with changes:
 
 ### Phase 4: Bump Versions
 
-For each package to release:
+For each package to release (using `current_version` from discover-changes output):
 
-1. Get current version:
+```
+cd <path> && uv version --bump <minor|patch>
+```
 
-    ```
-    uv version --short
-    ```
-
-    (run in package directory)
-
-2. Bump version:
-
-    ```
-    uv version --bump <minor|patch>
-    ```
-
-    (run in package directory)
-
-3. Get new version and display the change
+Display the version change (e.g., "plain-code: 0.19.0 → 0.20.0").
 
 ### Phase 5: Generate Release Notes in Parallel
 
 **IMPORTANT**: Use the Task tool to spawn one agent per package for parallel release notes generation.
 
-For each package to release, spawn a Task agent with this prompt:
+For each package to release, spawn a Task agent with this prompt (using values from the discover-changes output):
 
 ```
-Generate release notes for <package> version <new_version>.
+Generate release notes for <name> version <new_version>.
 
-Find the previous release by looking at git tags matching "<package>@*" and get the most recent one.
+1. Get the actual file changes since the last release:
+   git diff <last_tag>..HEAD -- <name> ":(exclude)<name>/tests"
 
-Analyze all commits between the previous version tag and HEAD for this package directory.
+2. Read the diff output carefully to understand what actually changed.
 
-Write release notes to the CHANGELOG.md file in the package (e.g., plain-admin/plain/admin/CHANGELOG.md).
+3. Write release notes to <changelog_path>, prepending to the existing content.
 
-The release notes should include:
+Format:
 
-## [<version>](https://github.com/dropseed/plain/releases/<package>@<version>) (<date>)
+## [<new_version>](https://github.com/dropseed/plain/releases/<name>@<new_version>) (<today's date>)
 
 ### What's changed
 
-- Short summaries of changes an end-user would care about
-- Include git commit hash links: ([abc1234](https://github.com/dropseed/plain/commit/abc1234))
-- Skip internal refactors that don't affect public API
+- Summarize user-facing changes based on the actual diff (not just commit messages)
+- Include commit hash links: ([abc1234](https://github.com/dropseed/plain/commit/abc1234))
+- Skip test changes, internal refactors that don't affect public API
 
 ### Upgrade instructions
 
-- Specific, actionable steps for upgrading from the previous version
-- If no changes required, write: "- No changes required."
-
-DO NOT include changes from other packages unless directly relevant.
+- Specific steps if any API changed
+- If no changes required: "- No changes required."
 ```
 
 Wait for all agents to complete.
