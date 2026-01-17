@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-code@0.20.0) (2026-01-17)
+
+### What's changed
+
+- Added docstring style guideline to the `plain-fix` AI skill: don't include args/returns in docstrings if already type annotated ([bbc8749](https://github.com/dropseed/plain/commit/bbc8749))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-code@0.19.0) (2026-01-15)
 
 ### What's changed
