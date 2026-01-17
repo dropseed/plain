@@ -120,6 +120,10 @@ Use `plain dev --start` to run the server in the background. You can then use `p
 
 Services are processes that your app needs to function (like a database). They run during `plain dev` and also during `plain pre-commit`. Custom processes only run during `plain dev` and are typically for development conveniences like ngrok or a job worker.
 
+#### Why am I seeing deprecation warnings?
+
+The development server is configured to show `DeprecationWarning` and `PendingDeprecationWarning` messages so you can catch deprecated code before it breaks in future versions. You can override this by setting your own `PYTHONWARNINGS` environment variable.
+
 ## Installation
 
 Install the `plain.dev` package from [PyPI](https://pypi.org/project/plain.dev/):
