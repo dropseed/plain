@@ -7,6 +7,16 @@ from collections.abc import Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
+from plain.models.backends.constants import OPERATORS, PATTERN_ESC, PATTERN_OPS
+from plain.models.backends.sql import (
+    integer_field_range,
+    lookup_cast,
+    prep_for_iexact_query,
+    prep_for_like_query,
+    regex_lookup,
+    year_lookup_bounds_for_date_field,
+    year_lookup_bounds_for_datetime_field,
+)
 from plain.models.exceptions import EmptyResultSet, FullResultSet
 from plain.models.expressions import Expression, Func, ResolvableExpression, Value
 from plain.models.fields import (
@@ -228,9 +238,7 @@ class BuiltinLookup(Lookup):
         )
         lhs_sql, params = super().process_lhs(compiler, connection, lhs)
         field_internal_type = self.lhs.output_field.get_internal_type()
-        lhs_sql = (
-            connection.ops.lookup_cast(self.lookup_name, field_internal_type) % lhs_sql
-        )
+        lhs_sql = lookup_cast(self.lookup_name, field_internal_type) % lhs_sql
         return lhs_sql, list(params)
 
     def as_sql(
@@ -246,7 +254,7 @@ class BuiltinLookup(Lookup):
         assert self.lookup_name is not None, (
             "lookup_name must be set on Lookup subclass"
         )
-        return connection.operators[self.lookup_name] % rhs
+        return OPERATORS[self.lookup_name] % rhs
 
 
 class FieldGetDbPrepValueMixin(Lookup):
@@ -406,7 +414,7 @@ class IExact(BuiltinLookup):
         rhs, params = super().process_rhs(compiler, connection)
         if isinstance(rhs, str):
             if params:
-                params[0] = connection.ops.prep_for_iexact_query(params[0])
+                params[0] = prep_for_iexact_query(params[0])
             return rhs, params
         else:
             return rhs, params
@@ -444,9 +452,7 @@ class IntegerFieldOverflow:
         rhs = self.rhs
         if isinstance(rhs, int):
             field_internal_type = self.lhs.output_field.get_internal_type()
-            min_value, max_value = connection.ops.integer_field_range(
-                field_internal_type
-            )
+            min_value, max_value = integer_field_range(field_internal_type)
             if min_value is not None and rhs < min_value:
                 raise self.underflow_exception
             if max_value is not None and rhs > max_value:
@@ -555,9 +561,7 @@ class PatternLookup(BuiltinLookup):
             assert self.lookup_name is not None, (
                 "lookup_name must be set on Lookup subclass"
             )
-            pattern = connection.pattern_ops[self.lookup_name].format(
-                connection.pattern_esc
-            )
+            pattern = PATTERN_OPS[self.lookup_name].format(PATTERN_ESC)
             return pattern.format(rhs)
         else:
             return super().get_rhs_op(connection, rhs)
@@ -568,9 +572,7 @@ class PatternLookup(BuiltinLookup):
         rhs, params = super().process_rhs(compiler, connection)
         if isinstance(rhs, str):
             if self.rhs_is_direct_value() and params and not self.bilateral_transforms:
-                params[0] = self.param_pattern % connection.ops.prep_for_like_query(
-                    params[0]
-                )
+                params[0] = self.param_pattern % prep_for_like_query(params[0])
             return rhs, params
         else:
             return rhs, params
@@ -645,12 +647,12 @@ class Regex(BuiltinLookup):
     def as_sql(
         self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        if self.lookup_name in connection.operators:
+        if self.lookup_name in OPERATORS:
             return super().as_sql(compiler, connection)
         else:
             lhs, lhs_params = self.process_lhs(compiler, connection)
             rhs, rhs_params = self.process_rhs(compiler, connection)
-            sql_template = connection.ops.regex_lookup(self.lookup_name)
+            sql_template = regex_lookup(self.lookup_name)
             return sql_template % (lhs, rhs), lhs_params + rhs_params
 
 
@@ -668,15 +670,9 @@ class YearLookup(Lookup):
         iso_year = isinstance(self.lhs, ExtractIsoYear)
         output_field = self.lhs.lhs.output_field
         if isinstance(output_field, DateTimeField):
-            bounds = connection.ops.year_lookup_bounds_for_datetime_field(
-                year,
-                iso_year=iso_year,
-            )
+            bounds = year_lookup_bounds_for_datetime_field(year, iso_year=iso_year)
         else:
-            bounds = connection.ops.year_lookup_bounds_for_date_field(
-                year,
-                iso_year=iso_year,
-            )
+            bounds = year_lookup_bounds_for_date_field(year, iso_year=iso_year)
         return bounds
 
     def as_sql(
@@ -701,7 +697,7 @@ class YearLookup(Lookup):
         assert self.lookup_name is not None, (
             "lookup_name must be set on Lookup subclass"
         )
-        return connection.operators[self.lookup_name] % rhs
+        return OPERATORS[self.lookup_name] % rhs
 
     def get_bound_params(self, start: Any, finish: Any) -> tuple[Any, ...]:
         """Return bound parameters for the year lookup."""

@@ -564,11 +564,11 @@ graph TB
     end
 
     subgraph "Compilation"
-        Ops["DatabaseOperations"]
         Compiler["SQLCompiler"]
     end
 
     subgraph "Database"
+        Connection["DatabaseWrapper"]
         DB[(Database)]
     end
 
@@ -577,18 +577,18 @@ graph TB
     Expr -- "used by" --> Query
     Query -- "contains" --> Where
     Query -- "contains" --> Join
-    Query -- "get_compiler()" --> Ops
-    Ops -- "creates" --> Compiler
-    Compiler -- "execute_sql()" --> DB
+    Query -- "get_compiler()" --> Compiler
+    Compiler -- "execute_sql()" --> Connection
+    Connection -- "executes" --> DB
 ```
 
 **Query execution flow:**
 
 1. **Model.query** returns a [`QuerySet`](./query.py#QuerySet) bound to the model
 2. **QuerySet** methods like `.filter()` modify the internal [`Query`](./sql/query.py#Query) object
-3. When results are needed, **Query.get_compiler()** asks [`DatabaseOperations`](./backends/operations.py#DatabaseOperations) to create the appropriate [`SQLCompiler`](./sql/compiler.py#SQLCompiler)
+3. When results are needed, **Query.get_compiler()** creates the appropriate [`SQLCompiler`](./sql/compiler.py#SQLCompiler)
 4. **SQLCompiler.as_sql()** renders the Query to SQL
-5. **SQLCompiler.execute_sql()** runs the SQL and returns results
+5. **SQLCompiler.execute_sql()** runs the SQL via [`DatabaseWrapper`](./backends/wrapper.py#DatabaseWrapper) and returns results
 
 **Key components:**
 
@@ -596,7 +596,7 @@ graph TB
 - [`QuerySet`](./query.py#QuerySet) - Chainable API (`.filter()`, `.exclude()`, `.order_by()`) that builds a Query
 - [`Query`](./sql/query.py#Query) - Internal representation of a query's logical structure (tables, joins, filters)
 - [`SQLCompiler`](./sql/compiler.py#SQLCompiler) - Transforms a Query into executable SQL
-- [`DatabaseOperations`](./backends/operations.py#DatabaseOperations) - PostgreSQL-specific SQL syntax
+- [`DatabaseWrapper`](./backends/wrapper.py#DatabaseWrapper) - PostgreSQL connection and query execution
 
 ## FAQs
 

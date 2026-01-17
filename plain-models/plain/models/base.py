@@ -13,12 +13,12 @@ if TYPE_CHECKING:
 import plain.runtime
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.models import models_registry, transaction, types
+from plain.models.backends.sql import MAX_NAME_LENGTH
 from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import CheckConstraint, UniqueConstraint
 from plain.models.db import (
     PLAIN_VERSION_PICKLE_KEY,
     DatabaseError,
-    db_connection,
 )
 from plain.models.deletion import Collector
 from plain.models.exceptions import (
@@ -1283,7 +1283,7 @@ class Model(metaclass=ModelBase):
 
         # PostgreSQL has a 63-character limit on identifier names and doesn't
         # silently truncate, so we check for names that are too long
-        allowed_len = db_connection.ops.MAX_NAME_LENGTH
+        allowed_len = MAX_NAME_LENGTH
 
         for f in cls._model_meta.local_fields:
             _, column_name = f.get_attname_column()

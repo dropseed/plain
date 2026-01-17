@@ -11,6 +11,7 @@ from psycopg import sql as psycopg_sql
 if TYPE_CHECKING:
     from typing import Self
 
+from plain.models.backends.constants import DATA_TYPE_CHECK_CONSTRAINTS, DATA_TYPES
 from plain.models.backends.ddl_references import (
     Columns,
     Expressions,
@@ -20,6 +21,7 @@ from plain.models.backends.ddl_references import (
     Statement,
     Table,
 )
+from plain.models.backends.sql import DEFERRABLE_SQL, MAX_NAME_LENGTH, quote_name
 from plain.models.backends.utils import names_digest, split_identifier, strip_quotes
 from plain.models.constraints import Deferrable
 from plain.models.fields import DbParameters, Field
@@ -226,7 +228,7 @@ class DatabaseSchemaEditor:
 
         # Merge the query client-side, as PostgreSQL won't do it server-side.
         if params is not None:
-            sql_str = self.connection.ops.compose_sql(sql_str, params)
+            sql_str = self.connection.compose_sql(sql_str, params)
             params = None
 
         # Log the command we're running, then run it
@@ -241,7 +243,7 @@ class DatabaseSchemaEditor:
             cursor.execute(sql_str, params)
 
     def quote_name(self, name: str) -> str:
-        return self.connection.ops.quote_name(name)
+        return quote_name(name)
 
     def quote_value(self, value: Any) -> str:
         """
@@ -544,7 +546,7 @@ class DatabaseSchemaEditor:
                     "column": self.quote_name(field.column),
                     "to_table": self.quote_name(to_table),
                     "to_column": self.quote_name(to_column),
-                    "deferrable": self.connection.ops.DEFERRABLE_SQL,
+                    "deferrable": DEFERRABLE_SQL,
                 }
             # Otherwise, add FK constraints later.
             else:
@@ -668,11 +670,10 @@ class DatabaseSchemaEditor:
     ) -> str | None:
         # Always check constraints with the same mocked column name to avoid
         # recreating constrains when the column is renamed.
-        check_constraints = self.connection.data_type_check_constraints
         data = field.db_type_parameters(self.connection)
         data["column"] = "__column_name__"
         try:
-            return check_constraints[field.get_internal_type()] % data
+            return DATA_TYPE_CHECK_CONSTRAINTS[field.get_internal_type()] % data
         except KeyError:
             return None
 
@@ -681,7 +682,7 @@ class DatabaseSchemaEditor:
     ) -> str | None | Callable[[dict[str, Any]], str]:
         if isinstance(field, RelatedField):
             return field.rel_db_type(self.connection)
-        return self.connection.data_types.get(
+        return DATA_TYPES.get(
             field.get_internal_type(),
             field.db_type(self.connection),
         )
@@ -1350,7 +1351,7 @@ class DatabaseSchemaEditor:
         hash_suffix_part = (
             f"{names_digest(table_name, *column_names, length=8)}{suffix}"
         )
-        max_length = self.connection.ops.MAX_NAME_LENGTH
+        max_length = MAX_NAME_LENGTH
         # If everything fits into max_length, use that name.
         index_name = "{}_{}_{}".format(
             table_name, "_".join(column_names), hash_suffix_part
@@ -1602,7 +1603,7 @@ class DatabaseSchemaEditor:
             [field.target_field.column],
             self.quote_name,
         )
-        deferrable = self.connection.ops.DEFERRABLE_SQL
+        deferrable = DEFERRABLE_SQL
         return Statement(
             self.sql_create_fk,
             table=table,

@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 import builtins
 
 from plain.models import transaction
+from plain.models.backends.sql import quote_name
 from plain.models.db import db_connection
 from plain.models.expressions import Window
 from plain.models.functions import RowNumber
@@ -422,7 +423,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
             self.through._model_meta.get_forward_field(self.source_field_name),
         )  # M2M through model fields are always ForeignKey
         join_table = fk.model.model_options.db_table
-        qn = db_connection.ops.quote_name
+        qn = quote_name
         queryset = queryset.extra(
             select={
                 f"_prefetch_related_val_{f.attname}": f"{qn(join_table)}.{qn(f.column)}"

@@ -162,7 +162,7 @@ class CursorDebugWrapper(CursorWrapper):
             stop = time.monotonic()
             duration = stop - start
             if use_last_executed_query:
-                sql = self.db.ops.last_executed_query(self.cursor, sql, params)  # type: ignore[arg-type]
+                sql = self.db.last_executed_query(self.cursor, sql, params)  # type: ignore[arg-type]
             try:
                 times = len(params) if many else ""
             except TypeError:

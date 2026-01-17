@@ -31,6 +31,7 @@ from typing import (
 )
 
 from plain.models.aggregates import Count
+from plain.models.backends.sql import adapt_unknown_value
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import NotSupportedError, db_connection
 from plain.models.exceptions import FieldDoesNotExist, FieldError
@@ -157,7 +158,7 @@ class RawQuery:
         # Adapt parameters to the database, as much as possible considering
         # that the target type isn't known. See #17755.
         params_type = self.params_type
-        adapter = db_connection.ops.adapt_unknown_value
+        adapter = adapt_unknown_value
         if params_type is tuple:
             assert isinstance(self.params, tuple)
             params = tuple(adapter(val) for val in self.params)

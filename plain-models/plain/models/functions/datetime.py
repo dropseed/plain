@@ -3,6 +3,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from plain.models.backends.sql import (
+    date_extract_sql,
+    date_trunc_sql,
+    datetime_cast_date_sql,
+    datetime_cast_time_sql,
+    datetime_extract_sql,
+    datetime_trunc_sql,
+    time_extract_sql,
+    time_trunc_sql,
+)
 from plain.models.expressions import Func
 from plain.models.fields import (
     DateField,
@@ -74,24 +84,18 @@ class Extract(TimezoneMixin, Transform):
         lhs_output_field = self.lhs.output_field
         if isinstance(lhs_output_field, DateTimeField):
             tzname = self.get_tzname()
-            sql, params = connection.ops.datetime_extract_sql(
+            sql, params = datetime_extract_sql(
                 self.lookup_name, sql, tuple(params), tzname
             )
         elif self.tzinfo is not None:
             raise ValueError("tzinfo can only be used with DateTimeField.")
         elif isinstance(lhs_output_field, DateField):
-            sql, params = connection.ops.date_extract_sql(
-                self.lookup_name, sql, tuple(params)
-            )
+            sql, params = date_extract_sql(self.lookup_name, sql, tuple(params))
         elif isinstance(lhs_output_field, TimeField):
-            sql, params = connection.ops.time_extract_sql(
-                self.lookup_name, sql, tuple(params)
-            )
+            sql, params = time_extract_sql(self.lookup_name, sql, tuple(params))
         elif isinstance(lhs_output_field, DurationField):
             # PostgreSQL has native duration (interval) type
-            sql, params = connection.ops.time_extract_sql(
-                self.lookup_name, sql, tuple(params)
-            )
+            sql, params = time_extract_sql(self.lookup_name, sql, tuple(params))
         else:
             # resolve_expression has already validated the output_field so this
             # assert should never be hit.
@@ -269,17 +273,11 @@ class TruncBase(TimezoneMixin, Transform):
         elif self.tzinfo is not None:
             raise ValueError("tzinfo can only be used with DateTimeField.")
         if isinstance(self.output_field, DateTimeField):
-            sql, params = connection.ops.datetime_trunc_sql(
-                self.kind, sql, tuple(params), tzname
-            )
+            sql, params = datetime_trunc_sql(self.kind, sql, tuple(params), tzname)
         elif isinstance(self.output_field, DateField):
-            sql, params = connection.ops.date_trunc_sql(
-                self.kind, sql, tuple(params), tzname
-            )
+            sql, params = date_trunc_sql(self.kind, sql, tuple(params), tzname)
         elif isinstance(self.output_field, TimeField):
-            sql, params = connection.ops.time_trunc_sql(
-                self.kind, sql, tuple(params), tzname
-            )
+            sql, params = time_trunc_sql(self.kind, sql, tuple(params), tzname)
         else:
             raise ValueError(
                 "Trunc only valid on DateField, TimeField, or DateTimeField."
@@ -415,7 +413,7 @@ class TruncDate(TruncBase):
         # Cast to date rather than truncate to date.
         sql, params = compiler.compile(self.lhs)
         tzname = self.get_tzname()
-        sql, params = connection.ops.datetime_cast_date_sql(sql, tuple(params), tzname)
+        sql, params = datetime_cast_date_sql(sql, tuple(params), tzname)
         return sql, list(params)
 
 
@@ -436,7 +434,7 @@ class TruncTime(TruncBase):
         # Cast to time rather than truncate to time.
         sql, params = compiler.compile(self.lhs)
         tzname = self.get_tzname()
-        sql, params = connection.ops.datetime_cast_time_sql(sql, tuple(params), tzname)
+        sql, params = datetime_cast_time_sql(sql, tuple(params), tzname)
         return sql, list(params)
 
 

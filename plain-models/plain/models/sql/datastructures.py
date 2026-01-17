@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from plain.models.backends.sql import quote_name
 from plain.models.exceptions import FullResultSet
 from plain.models.sql.constants import INNER, LOUTER
 
@@ -92,7 +93,7 @@ class Join:
         join_conditions = []
         params = []
         qn = compiler.quote_name_unless_alias
-        qn2 = connection.ops.quote_name
+        qn2 = quote_name
 
         # Add a join condition for each pair of joining columns.
         for lhs_col, rhs_col in self.join_cols:

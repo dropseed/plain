@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain import exceptions, preflight
 from plain.models import expressions, lookups
+from plain.models.backends.sql import adapt_json_value
 from plain.models.constants import LOOKUP_SEP
 from plain.models.fields import TextField
 from plain.models.lookups import (
@@ -113,7 +114,7 @@ class JSONField(Field):
             value = value.value
         elif hasattr(value, "as_sql"):
             return value
-        return connection.ops.adapt_json_value(value, self.encoder)
+        return adapt_json_value(value, self.encoder)
 
     def get_db_prep_save(self, value: Any, connection: DatabaseWrapper) -> Any:
         if value is None:

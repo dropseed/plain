@@ -26,8 +26,20 @@ from typing import (
 import psycopg
 
 from plain import exceptions, validators
+from plain.models.backends.constants import (
+    DATA_TYPE_CHECK_CONSTRAINTS,
+    DATA_TYPES,
+    DATA_TYPES_SUFFIX,
+)
+from plain.models.backends.sql import (
+    CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH,
+    CAST_DATA_TYPES,
+    adapt_integerfield_value,
+    adapt_ipaddressfield_value,
+    integer_field_range,
+    quote_name,
+)
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import db_connection
 from plain.models.enums import ChoicesMeta
 from plain.models.query_utils import RegisterLookupMixin
 from plain.preflight import PreflightResult
@@ -644,7 +656,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         return value
 
     def db_type_parameters(self, connection: DatabaseWrapper) -> DictWrapper:
-        return DictWrapper(self.__dict__, connection.ops.quote_name, "qn_")
+        return DictWrapper(self.__dict__, quote_name, "qn_")
 
     def db_check(self, connection: DatabaseWrapper) -> str | None:
         """
@@ -654,9 +666,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         """
         data = self.db_type_parameters(connection)
         try:
-            return (
-                connection.data_type_check_constraints[self.get_internal_type()] % data
-            )
+            return DATA_TYPE_CHECK_CONSTRAINTS[self.get_internal_type()] % data
         except KeyError:
             return None
 
@@ -682,7 +692,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         # exactly which wacky database column type you want to use.
         data = self.db_type_parameters(connection)
         try:
-            column_type = connection.data_types[self.get_internal_type()]
+            column_type = DATA_TYPES[self.get_internal_type()]
         except KeyError:
             return None
         else:
@@ -700,7 +710,7 @@ class Field(RegisterLookupMixin, Generic[T]):
 
     def cast_db_type(self, connection: DatabaseWrapper) -> str | None:
         """Return the data type to use in the Cast() function."""
-        db_type = connection.ops.cast_data_types.get(self.get_internal_type())
+        db_type = CAST_DATA_TYPES.get(self.get_internal_type())
         if db_type:
             return db_type % self.db_type_parameters(connection)
         return self.db_type(connection)
@@ -719,7 +729,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         }
 
     def db_type_suffix(self, connection: DatabaseWrapper) -> str | None:
-        return connection.data_types_suffix.get(self.get_internal_type())
+        return DATA_TYPES_SUFFIX.get(self.get_internal_type())
 
     def get_db_converters(
         self, connection: DatabaseWrapper
@@ -1038,7 +1048,7 @@ class CharField(Field[str]):
 
     def cast_db_type(self, connection: DatabaseWrapper) -> str | None:
         if self.max_length is None:
-            return connection.ops.cast_char_field_without_max_length
+            return CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH
         return super().cast_db_type(connection)
 
     def db_parameters(self, connection: DatabaseWrapper) -> DbParameters:
@@ -1649,7 +1659,7 @@ class IntegerField(Field[int]):
         # they're based on values retrieved from the database connection.
         validators_ = super().validators
         internal_type = self.get_internal_type()
-        min_value, max_value = db_connection.ops.integer_field_range(internal_type)
+        min_value, max_value = integer_field_range(internal_type)
         if min_value is not None and not any(
             (
                 isinstance(validator, validators.MinValueValidator)
@@ -1693,7 +1703,7 @@ class IntegerField(Field[int]):
         self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
-        return connection.ops.adapt_integerfield_value(value, self.get_internal_type())
+        return adapt_integerfield_value(value, self.get_internal_type())
 
     def get_internal_type(self) -> str:
         return "IntegerField"
@@ -1797,7 +1807,7 @@ class GenericIPAddressField(Field[str]):
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
-        return connection.ops.adapt_ipaddressfield_value(value)
+        return adapt_ipaddressfield_value(value)
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)

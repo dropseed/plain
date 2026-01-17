@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
+from plain.models.backends.sql import MAX_NAME_LENGTH
 from plain.models.backends.utils import truncate_name
-from plain.models.db import db_connection
 from plain.packages import packages_registry
 
 if TYPE_CHECKING:
@@ -116,7 +116,7 @@ class Options:
         if db_table is None:
             instance.db_table = truncate_name(
                 f"{instance.package_label}_{model.__name__.lower()}",
-                db_connection.ops.MAX_NAME_LENGTH,
+                MAX_NAME_LENGTH,
             )
         else:
             instance.db_table = db_table

@@ -8,6 +8,20 @@ from functools import cached_property, partial
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
+from plain.models.backends.sql import (
+    PK_DEFAULT_VALUE,
+    bulk_insert_sql,
+    distinct_sql,
+    explain_query_prefix,
+    fetch_returned_insert_columns,
+    fetch_returned_insert_rows,
+    for_update_sql,
+    insert_statement,
+    limit_offset_sql,
+    on_conflict_suffix_sql,
+    quote_name,
+    return_insert_columns,
+)
 from plain.models.constants import LOOKUP_SEP
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.expressions import (
@@ -492,9 +506,9 @@ class SQLCompiler:
 
     def quote_name_unless_alias(self, name: str) -> str:
         """
-        A wrapper around connection.ops.quote_name that doesn't quote aliases
-        for table names. This avoids problems with some SQL dialects that treat
-        quoted strings specially (e.g. PostgreSQL).
+        A wrapper around quote_name() that doesn't quote aliases for table
+        names. This avoids problems with some SQL dialects that treat quoted
+        strings specially (e.g. PostgreSQL).
         """
         if name in self.quote_cache:
             return self.quote_cache[name]
@@ -508,7 +522,7 @@ class SQLCompiler:
         ):
             self.quote_cache[name] = name
             return name
-        r = self.connection.ops.quote_name(name)
+        r = quote_name(name)
         self.quote_cache[name] = r
         return r
 
@@ -585,25 +599,21 @@ class SQLCompiler:
             "SELECT * FROM (",
             inner_sql,
             ")",
-            self.connection.ops.quote_name("qualify"),
+            quote_name("qualify"),
             "WHERE",
             qualify_sql,
         ]
         if qual_aliases:
             # If some select aliases were unmasked for filtering purposes they
             # must be masked back.
-            cols = [
-                self.connection.ops.quote_name(alias)
-                for alias in select.values()
-                if alias is not None
-            ]
+            cols = [quote_name(alias) for alias in select.values() if alias is not None]
             result = [
                 "SELECT",
                 ", ".join(cols),
                 "FROM (",
                 *result,
                 ")",
-                self.connection.ops.quote_name("qualify_mask"),
+                quote_name("qualify_mask"),
             ]
         params = list(inner_params) + list(qualify_params)
         # As the SQL spec is unclear on whether or not derived tables
@@ -668,7 +678,7 @@ class SQLCompiler:
                 params = []
 
                 if self.query.distinct:
-                    distinct_result, distinct_params = self.connection.ops.distinct_sql(
+                    distinct_result, distinct_params = distinct_sql(
                         distinct_fields,
                         distinct_params,
                     )
@@ -678,7 +688,7 @@ class SQLCompiler:
                 out_cols = []
                 for _, (s_sql, s_params), alias in self.select + extra_select:
                     if alias:
-                        s_sql = f"{s_sql} AS {self.connection.ops.quote_name(alias)}"
+                        s_sql = f"{s_sql} AS {quote_name(alias)}"
                     params.extend(s_params)
                     out_cols.append(s_sql)
 
@@ -693,7 +703,7 @@ class SQLCompiler:
                             "select_for_update cannot be used outside of a transaction."
                         )
 
-                    for_update_part = self.connection.ops.for_update_sql(
+                    for_update_part = for_update_sql(
                         nowait=self.query.select_for_update_nowait,
                         skip_locked=self.query.select_for_update_skip_locked,
                         of=tuple(self.get_select_for_update_of_arguments()),
@@ -724,7 +734,7 @@ class SQLCompiler:
             if self.query.explain_info:
                 result.insert(
                     0,
-                    self.connection.ops.explain_query_prefix(
+                    explain_query_prefix(
                         self.query.explain_info.format,
                         **self.query.explain_info.options,
                     ),
@@ -739,9 +749,7 @@ class SQLCompiler:
 
             if with_limit_offset:
                 result.append(
-                    self.connection.ops.limit_offset_sql(
-                        self.query.low_mark, self.query.high_mark
-                    )
+                    limit_offset_sql(self.query.low_mark, self.query.high_mark)
                 )
 
             if for_update_part:
@@ -760,8 +768,8 @@ class SQLCompiler:
                     if alias:
                         sub_selects.append(
                             "{}.{}".format(
-                                self.connection.ops.quote_name("subquery"),
-                                self.connection.ops.quote_name(alias),
+                                quote_name("subquery"),
+                                quote_name(alias),
                             )
                         )
                     else:
@@ -844,7 +852,7 @@ class SQLCompiler:
             targets, alias, _ = self.query.trim_joins(targets, joins, path)
             for target in targets:
                 if name in self.query.annotation_select:
-                    result.append(self.connection.ops.quote_name(name))
+                    result.append(quote_name(name))
                 else:
                     r, p = self.compile(transform_function(target, alias))
                     result.append(r)
@@ -1431,7 +1439,7 @@ class SQLCompiler:
         self, alias: str, columns: list[str], compiler: SQLCompiler
     ) -> SqlWithParams:
         qn = compiler.quote_name_unless_alias
-        qn2 = self.connection.ops.quote_name
+        qn2 = quote_name
 
         for index, select_col in enumerate(self.query.select):
             lhs_sql, lhs_params = self.compile(select_col)
@@ -1565,14 +1573,12 @@ class SQLInsertCompiler(SQLCompiler):
     ) -> list[SqlWithParams]:
         # We don't need quote_name_unless_alias() here, since these are all
         # going to be column names (so we can avoid the extra overhead).
-        qn = self.connection.ops.quote_name
+        qn = quote_name
         assert self.query.model is not None, "INSERT requires a model"
         meta = self.query.model._model_meta
         options = self.query.model.model_options
-        insert_statement = self.connection.ops.insert_statement(
-            on_conflict=self.query.on_conflict,
-        )
-        result = [f"{insert_statement} {qn(options.db_table)}"]
+        insert_stmt = insert_statement(on_conflict=self.query.on_conflict)
+        result = [f"{insert_stmt} {qn(options.db_table)}"]
         if self.query.fields:
             fields = self.query.fields
         else:
@@ -1589,14 +1595,12 @@ class SQLInsertCompiler(SQLCompiler):
             ]
         else:
             # An empty object.
-            value_rows = [
-                [self.connection.ops.PK_DEFAULT_VALUE] for _ in self.query.objs
-            ]
+            value_rows = [[PK_DEFAULT_VALUE] for _ in self.query.objs]
             fields = [None]
 
         placeholder_rows, param_rows = self.assemble_as_sql(fields, value_rows)
 
-        on_conflict_suffix_sql = self.connection.ops.on_conflict_suffix_sql(
+        conflict_suffix_sql = on_conflict_suffix_sql(
             fields,  # type: ignore[arg-type]
             self.query.on_conflict,
             (f.column for f in self.query.update_fields),
@@ -1605,16 +1609,14 @@ class SQLInsertCompiler(SQLCompiler):
         if self.returning_fields:
             # Use RETURNING clause to get inserted values
             result.append(
-                self.connection.ops.bulk_insert_sql(fields, placeholder_rows)  # type: ignore[arg-type]
+                bulk_insert_sql(fields, placeholder_rows)  # type: ignore[arg-type]
             )
             params = param_rows
-            if on_conflict_suffix_sql:
-                result.append(on_conflict_suffix_sql)
+            if conflict_suffix_sql:
+                result.append(conflict_suffix_sql)
             # Skip empty r_sql to allow subclasses to customize behavior for
             # 3rd party backends. Refs #19096.
-            returning_cols = self.connection.ops.return_insert_columns(
-                self.returning_fields
-            )
+            returning_cols = return_insert_columns(self.returning_fields)
             if returning_cols:
                 r_sql, self.returning_params = returning_cols
                 if r_sql:
@@ -1623,9 +1625,9 @@ class SQLInsertCompiler(SQLCompiler):
             return [(" ".join(result), tuple(chain.from_iterable(params)))]
 
         # Bulk insert without returning fields
-        result.append(self.connection.ops.bulk_insert_sql(fields, placeholder_rows))  # type: ignore[arg-type]
-        if on_conflict_suffix_sql:
-            result.append(on_conflict_suffix_sql)
+        result.append(bulk_insert_sql(fields, placeholder_rows))  # type: ignore[arg-type]
+        if conflict_suffix_sql:
+            result.append(conflict_suffix_sql)
         return [(" ".join(result), tuple(p for ps in param_rows for p in ps))]
 
     def execute_sql(  # type: ignore[override]
@@ -1641,14 +1643,9 @@ class SQLInsertCompiler(SQLCompiler):
                 return []
             # Use RETURNING clause for both single and bulk inserts
             if len(self.query.objs) > 1:
-                rows = self.connection.ops.fetch_returned_insert_rows(cursor)
+                rows = fetch_returned_insert_rows(cursor)
             else:
-                rows = [
-                    self.connection.ops.fetch_returned_insert_columns(
-                        cursor,
-                        self.returning_params,
-                    )
-                ]
+                rows = [fetch_returned_insert_columns(cursor, self.returning_params)]
         cols = [field.get_col(options.db_table) for field in self.returning_fields]
         converters = self.get_converters(cols)
         if converters:

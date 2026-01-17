@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from plain.models.backends.sql import quote_name
 from plain.models.expressions import Func, Value
 from plain.models.fields import Field, TextField
 from plain.models.fields.json import JSONField
@@ -80,7 +81,7 @@ class Collate(Func):
         arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
-        extra_context.setdefault("collation", connection.ops.quote_name(self.collation))
+        extra_context.setdefault("collation", quote_name(self.collation))
         return super().as_sql(
             compiler, connection, function, template, arg_joiner, **extra_context
         )

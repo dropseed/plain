@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from psycopg import errors
 
+from plain.models.backends.sql import quote_name
 from plain.runtime import settings
 
 if TYPE_CHECKING:
@@ -28,7 +29,7 @@ class DatabaseCreation:
         return self.connection._nodb_cursor()
 
     def _quote_name(self, name: str) -> str:
-        return self.connection.ops.quote_name(name)
+        return quote_name(name)
 
     def log(self, msg: str) -> None:
         sys.stderr.write(msg + os.linesep)
@@ -125,7 +126,7 @@ class DatabaseCreation:
         Internal implementation - create the test db tables.
         """
         test_db_params = {
-            "dbname": self.connection.ops.quote_name(test_database_name),
+            "dbname": quote_name(test_database_name),
             "suffix": self.sql_table_creation_suffix(),
         }
         # Create the test database and connect to it.
@@ -188,9 +189,7 @@ class DatabaseCreation:
         # to do so, because it's not allowed to delete a database while being
         # connected to it.
         with self._nodb_cursor() as cursor:
-            cursor.execute(
-                f"DROP DATABASE {self.connection.ops.quote_name(test_database_name)}"
-            )
+            cursor.execute(f"DROP DATABASE {quote_name(test_database_name)}")
 
     def sql_table_creation_suffix(self) -> str:
         """

@@ -12,11 +12,20 @@ from typing import TYPE_CHECKING, Any, Protocol, Self, runtime_checkable
 from uuid import UUID
 
 from plain.models import fields
-from plain.models.constants import LOOKUP_SEP
-from plain.models.db import (
-    NotSupportedError,
-    db_connection,
+from plain.models.backends.sql import (
+    CURRENT_ROW,
+    FOLLOWING,
+    PRECEDING,
+    UNBOUNDED_FOLLOWING,
+    UNBOUNDED_PRECEDING,
+    combine_expression,
+    quote_name,
+    subtract_temporals,
+    window_frame_range_start_end,
+    window_frame_rows_start_end,
 )
+from plain.models.constants import LOOKUP_SEP
+from plain.models.db import NotSupportedError
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.query_utils import Q
 from plain.utils.deconstruct import deconstructible
@@ -718,7 +727,7 @@ class CombinedExpression(Expression):
         expression_params.extend(params)
         # order of precedence
         expression_wrapper = "(%s)"
-        sql = connection.ops.combine_expression(self.connector, expressions)
+        sql = combine_expression(self.connector, expressions)
         return expression_wrapper % sql, expression_params
 
     def resolve_expression(
@@ -799,7 +808,7 @@ class TemporalSubtraction(CombinedExpression):
     ) -> tuple[str, list[Any]]:
         lhs = compiler.compile(self.lhs)
         rhs = compiler.compile(self.rhs)
-        sql, params = connection.ops.subtract_temporals(
+        sql, params = subtract_temporals(
             self.lhs.output_field.get_internal_type(), lhs, rhs
         )
         return sql, list(params)
@@ -1204,7 +1213,7 @@ class Ref(Expression):
     def as_sql(
         self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        return connection.ops.quote_name(self.refs), []
+        return quote_name(self.refs), []
 
     def get_group_by_cols(self) -> list[BaseExpression]:
         return [self]
@@ -1531,7 +1540,7 @@ class Case(Expression):
         template = template or template_params.get("template", self.template)
         sql = template % template_params
         if self._output_field_or_none is not None:
-            sql = connection.ops.unification_cast_sql(self.output_field) % sql
+            sql = connection.unification_cast_sql(self.output_field) % sql
         return sql, sql_params
 
     def get_group_by_cols(self) -> list[Any]:
@@ -1862,18 +1871,18 @@ class WindowFrame(Expression):
 
     def __str__(self) -> str:
         if self.start.value is not None and self.start.value < 0:
-            start = f"{abs(self.start.value)} {db_connection.ops.PRECEDING}"
+            start = f"{abs(self.start.value)} {PRECEDING}"
         elif self.start.value is not None and self.start.value == 0:
-            start = db_connection.ops.CURRENT_ROW
+            start = CURRENT_ROW
         else:
-            start = db_connection.ops.UNBOUNDED_PRECEDING
+            start = UNBOUNDED_PRECEDING
 
         if self.end.value is not None and self.end.value > 0:
-            end = f"{self.end.value} {db_connection.ops.FOLLOWING}"
+            end = f"{self.end.value} {FOLLOWING}"
         elif self.end.value is not None and self.end.value == 0:
-            end = db_connection.ops.CURRENT_ROW
+            end = CURRENT_ROW
         else:
-            end = db_connection.ops.UNBOUNDED_FOLLOWING
+            end = UNBOUNDED_FOLLOWING
         return self.template % {
             "frame_type": self.frame_type,
             "start": start,
@@ -1893,7 +1902,7 @@ class RowRange(WindowFrame):
     def window_frame_start_end(
         self, connection: DatabaseWrapper, start: int | None, end: int | None
     ) -> tuple[str, str]:
-        return connection.ops.window_frame_rows_start_end(start, end)
+        return window_frame_rows_start_end(start, end)
 
 
 class ValueRange(WindowFrame):
@@ -1902,4 +1911,4 @@ class ValueRange(WindowFrame):
     def window_frame_start_end(
         self, connection: DatabaseWrapper, start: int | None, end: int | None
     ) -> tuple[str, str]:
-        return connection.ops.window_frame_range_start_end(start, end)
+        return window_frame_range_start_end(start, end)

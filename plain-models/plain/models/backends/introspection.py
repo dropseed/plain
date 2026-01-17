@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Generator, Sequence
 from typing import TYPE_CHECKING, Any, NamedTuple
 
+from plain.models.backends.sql import quote_name
 from plain.models.backends.utils import CursorWrapper
 from plain.models.indexes import Index
 
@@ -166,9 +167,7 @@ class DatabaseIntrospection:
             [table_name],
         )
         field_map = {line[0]: line[1:] for line in cursor.fetchall()}
-        cursor.execute(
-            f"SELECT * FROM {self.connection.ops.quote_name(table_name)} LIMIT 1"
-        )
+        cursor.execute(f"SELECT * FROM {quote_name(table_name)} LIMIT 1")
         return [
             FieldInfo(
                 line.name,
