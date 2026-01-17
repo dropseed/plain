@@ -98,10 +98,15 @@ def _install_skills_to(
     installed_count = 0
     removed_count = 0
 
-    # Remove orphaned skills (exist in dest but not in source)
+    # Remove orphaned plain-* skills (exist in dest but not in source)
+    # Only remove skills with plain- prefix to preserve user-created skills
     if dest_skills_dir.exists():
         for dest_dir in dest_skills_dir.iterdir():
-            if dest_dir.is_dir() and dest_dir.name not in source_skill_names:
+            if (
+                dest_dir.is_dir()
+                and dest_dir.name.startswith("plain-")
+                and dest_dir.name not in source_skill_names
+            ):
                 shutil.rmtree(dest_dir)
                 removed_count += 1
 
