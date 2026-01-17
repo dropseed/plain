@@ -17,9 +17,9 @@ from plain.models.otel import db_span
 from plain.utils.dateparse import parse_time
 
 if TYPE_CHECKING:
-    from plain.models.backends.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
-logger = logging.getLogger("plain.models.backends")
+logger = logging.getLogger("plain.models.postgres")
 
 
 class CursorWrapper:

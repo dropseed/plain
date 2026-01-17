@@ -14,7 +14,7 @@ from ..db import OperationalError
 from ..db import db_connection as _db_connection
 
 if TYPE_CHECKING:
-    from ..backends.wrapper import DatabaseWrapper
+    from ..postgres.wrapper import DatabaseWrapper
 
 # Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
 db_connection = cast("DatabaseWrapper", _db_connection)

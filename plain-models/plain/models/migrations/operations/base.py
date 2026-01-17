@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from plain.models.backends.schema import DatabaseSchemaEditor
     from plain.models.migrations.state import ProjectState
+    from plain.models.postgres.schema import DatabaseSchemaEditor
 
 
 class Operation:

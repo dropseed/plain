@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from plain.models.backends.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 
 class PostgresBackupClient:

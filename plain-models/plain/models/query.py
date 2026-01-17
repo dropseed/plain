@@ -36,7 +36,7 @@ from plain.models.fields import (
 )
 from plain.models.functions import Cast
 from plain.models.query_utils import FilteredRelation, Q
-from plain.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE
+from plain.models.sql import CURSOR, GET_ITERATOR_CHUNK_SIZE
 from plain.models.utils import resolve_callables
 from plain.utils.functional import partition
 

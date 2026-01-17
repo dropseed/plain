@@ -26,21 +26,19 @@ from typing import (
 import psycopg
 
 from plain import exceptions, validators
-from plain.models.backends.constants import (
+from plain.models.constants import LOOKUP_SEP
+from plain.models.enums import ChoicesMeta
+from plain.models.postgres.sql import (
+    CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH,
+    CAST_DATA_TYPES,
     DATA_TYPE_CHECK_CONSTRAINTS,
     DATA_TYPES,
     DATA_TYPES_SUFFIX,
-)
-from plain.models.backends.sql import (
-    CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH,
-    CAST_DATA_TYPES,
     INTEGER_FIELD_RANGES,
     adapt_integerfield_value,
     adapt_ipaddressfield_value,
     quote_name,
 )
-from plain.models.constants import LOOKUP_SEP
-from plain.models.enums import ChoicesMeta
 from plain.models.query_utils import RegisterLookupMixin
 from plain.preflight import PreflightResult
 from plain.utils import timezone
@@ -59,10 +57,10 @@ from plain.utils.itercompat import is_iterable
 from ..registry import models_registry
 
 if TYPE_CHECKING:
-    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.expressions import Col
     from plain.models.fields.reverse_related import ForeignObjectRel
+    from plain.models.postgres.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 

@@ -18,11 +18,11 @@ if TYPE_CHECKING:
 import builtins
 
 from plain.models import transaction
-from plain.models.backends.sql import quote_name
 from plain.models.db import db_connection
 from plain.models.expressions import Window
 from plain.models.functions import RowNumber
 from plain.models.lookups import GreaterThan, LessThanOrEqual
+from plain.models.postgres.sql import quote_name
 from plain.models.query import QuerySet
 from plain.models.query_utils import Q
 from plain.models.utils import resolve_callables

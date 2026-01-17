@@ -20,13 +20,13 @@ from plain.models.exceptions import FieldError
 from plain.utils import tree
 
 if TYPE_CHECKING:
-    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.fields import Field
     from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.lookups import Lookup, Transform
     from plain.models.meta import Meta
+    from plain.models.postgres.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
     from plain.models.sql.where import WhereNode
 
@@ -153,8 +153,7 @@ class Q(tree.Node):
         from plain.models.expressions import ResolvableExpression, Value
         from plain.models.fields import BooleanField
         from plain.models.functions import Coalesce
-        from plain.models.sql import Query
-        from plain.models.sql.constants import SINGLE
+        from plain.models.sql import SINGLE, Query
 
         query = Query(None)
         for name, value in against.items():

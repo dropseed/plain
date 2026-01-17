@@ -13,7 +13,7 @@ from plain.utils.timezone import now
 from .exceptions import MigrationSchemaMissing
 
 if TYPE_CHECKING:
-    from plain.models.backends.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 
 class MigrationRecorder:

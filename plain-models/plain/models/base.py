@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 import plain.runtime
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.models import models_registry, transaction, types
-from plain.models.backends.sql import MAX_NAME_LENGTH
 from plain.models.constants import LOOKUP_SEP
 from plain.models.constraints import CheckConstraint, UniqueConstraint
 from plain.models.db import (
@@ -32,6 +31,7 @@ from plain.models.fields.related import RelatedField
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.meta import Meta
 from plain.models.options import Options
+from plain.models.postgres.sql import MAX_NAME_LENGTH
 from plain.models.query import F, Q, QuerySet
 from plain.preflight import PreflightResult
 from plain.utils.encoding import force_str

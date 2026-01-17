@@ -19,8 +19,8 @@ from plain.models.query_utils import Q
 from plain.models.sql.query import Query
 
 if TYPE_CHECKING:
-    from plain.models.backends.schema import DatabaseSchemaEditor, Statement
     from plain.models.base import Model
+    from plain.models.postgres.schema import DatabaseSchemaEditor, Statement
 
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]
 

@@ -12,7 +12,10 @@ from typing import TYPE_CHECKING, Any, Protocol, Self, runtime_checkable
 from uuid import UUID
 
 from plain.models import fields
-from plain.models.backends.sql import (
+from plain.models.constants import LOOKUP_SEP
+from plain.models.db import NotSupportedError
+from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
+from plain.models.postgres.sql import (
     CURRENT_ROW,
     FOLLOWING,
     PRECEDING,
@@ -24,9 +27,6 @@ from plain.models.backends.sql import (
     window_frame_range_start_end,
     window_frame_rows_start_end,
 )
-from plain.models.constants import LOOKUP_SEP
-from plain.models.db import NotSupportedError
-from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.query_utils import Q
 from plain.utils.deconstruct import deconstructible
 from plain.utils.hashable import make_hashable
@@ -34,9 +34,9 @@ from plain.utils.hashable import make_hashable
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
-    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.fields import Field
     from plain.models.lookups import Lookup, Transform
+    from plain.models.postgres.wrapper import DatabaseWrapper
     from plain.models.query import QuerySet
     from plain.models.sql.compiler import SQLCompilable, SQLCompiler
     from plain.models.sql.query import Query

@@ -3,18 +3,18 @@ from __future__ import annotations
 from types import NoneType
 from typing import TYPE_CHECKING, Any, Self
 
-from plain.models.backends.utils import names_digest, split_identifier
 from plain.models.expressions import Col, ExpressionList, F, Func, OrderBy
 from plain.models.functions import Collate
+from plain.models.postgres.utils import names_digest, split_identifier
 from plain.models.query_utils import Q
 from plain.models.sql import Query
 from plain.utils.functional import partition
 
 if TYPE_CHECKING:
-    from plain.models.backends.schema import DatabaseSchemaEditor, Statement
-    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.expressions import Expression
+    from plain.models.postgres.schema import DatabaseSchemaEditor, Statement
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 __all__ = ["Index"]
 

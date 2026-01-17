@@ -42,7 +42,7 @@ def get_git_commit() -> str | None:
 
 
 if TYPE_CHECKING:
-    from plain.models.backends.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 # Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
 db_connection = cast("DatabaseWrapper", _db_connection)

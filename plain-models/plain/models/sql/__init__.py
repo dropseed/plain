@@ -1,8 +1,19 @@
-from plain.models.sql.query import Query, RawQuery
-from plain.models.sql.subqueries import (
+from plain.models.sql.constants import (
+    CURSOR,
+    GET_ITERATOR_CHUNK_SIZE,
+    INNER,
+    LOUTER,
+    MULTI,
+    NO_RESULTS,
+    ORDER_DIR,
+    SINGLE,
+)
+from plain.models.sql.query import (
     AggregateQuery,
     DeleteQuery,
     InsertQuery,
+    Query,
+    RawQuery,
     UpdateQuery,
 )
 from plain.models.sql.where import AND, OR, XOR
@@ -17,4 +28,13 @@ __all__ = [
     "AND",
     "OR",
     "XOR",
+    # Constants
+    "GET_ITERATOR_CHUNK_SIZE",
+    "MULTI",
+    "SINGLE",
+    "CURSOR",
+    "NO_RESULTS",
+    "ORDER_DIR",
+    "INNER",
+    "LOUTER",
 ]

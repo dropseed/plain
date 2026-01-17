@@ -12,9 +12,9 @@ from plain.models.migrations.utils import field_references, resolve_relation
 from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameField
 
 if TYPE_CHECKING:
-    from plain.models.backends.schema import DatabaseSchemaEditor
     from plain.models.fields import Field
     from plain.models.migrations.state import ProjectState
+    from plain.models.postgres.schema import DatabaseSchemaEditor
 
 
 def _check_for_duplicates(arg_name: str, objs: Any) -> None:

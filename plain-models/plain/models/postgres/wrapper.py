@@ -29,11 +29,6 @@ from psycopg.types.range import BaseRangeDumper, Range, RangeDumper
 from psycopg.types.string import TextLoader
 
 from plain.exceptions import ImproperlyConfigured
-from plain.models.backends import utils
-from plain.models.backends.schema import DatabaseSchemaEditor
-from plain.models.backends.sql import MAX_NAME_LENGTH, quote_name
-from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
-from plain.models.backends.utils import CursorWrapper, debug_transaction
 from plain.models.db import (
     DatabaseError,
     DatabaseErrorWrapper,
@@ -42,6 +37,11 @@ from plain.models.db import (
 )
 from plain.models.db import DatabaseError as WrappedDatabaseError
 from plain.models.indexes import Index
+from plain.models.postgres import utils
+from plain.models.postgres.schema import DatabaseSchemaEditor
+from plain.models.postgres.sql import MAX_NAME_LENGTH, quote_name
+from plain.models.postgres.utils import CursorDebugWrapper as BaseCursorDebugWrapper
+from plain.models.postgres.utils import CursorWrapper, debug_transaction
 from plain.models.transaction import TransactionManagementError
 from plain.runtime import settings
 
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 
 RAN_DB_VERSION_CHECK = False
 
-logger = logging.getLogger("plain.models.backends")
+logger = logging.getLogger("plain.models.postgres")
 
 # The prefix to put on the default database name when creating
 # the test database.

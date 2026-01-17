@@ -14,14 +14,19 @@ if TYPE_CHECKING:
 
     from plain.models.sql.compiler import SQLCompiler
 
-from plain.models.backends.constants import DATA_TYPE_CHECK_CONSTRAINTS, DATA_TYPES
-from plain.models.backends.sql import DEFERRABLE_SQL, MAX_NAME_LENGTH, quote_name
-from plain.models.backends.utils import names_digest, split_identifier, strip_quotes
 from plain.models.constraints import Deferrable
 from plain.models.fields import DbParameters, Field
 from plain.models.fields.related import ForeignKeyField, RelatedField
 from plain.models.fields.reverse_related import ForeignObjectRel, ManyToManyRel
 from plain.models.indexes import Index
+from plain.models.postgres.sql import (
+    DATA_TYPE_CHECK_CONSTRAINTS,
+    DATA_TYPES,
+    DEFERRABLE_SQL,
+    MAX_NAME_LENGTH,
+    quote_name,
+)
+from plain.models.postgres.utils import names_digest, split_identifier, strip_quotes
 from plain.models.sql import Query
 from plain.models.transaction import atomic
 from plain.utils import timezone
@@ -29,56 +34,20 @@ from plain.utils import timezone
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
     from plain.models.fields.related import ForeignKeyField, ManyToManyField
     from plain.models.fields.reverse_related import ManyToManyRel
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
-logger = logging.getLogger("plain.models.backends.schema")
+logger = logging.getLogger("plain.models.postgres.schema")
 
 
 # ##### DDL Reference classes (for deferred DDL statement manipulation) #####
 
 
-class Reference:
-    """Base class that defines the reference interface."""
-
-    def references_table(self, table: str) -> bool:
-        """
-        Return whether or not this instance references the specified table.
-        """
-        return False
-
-    def references_column(self, table: str, column: str) -> bool:
-        """
-        Return whether or not this instance references the specified column.
-        """
-        return False
-
-    def rename_table_references(self, old_table: str, new_table: str) -> None:
-        """
-        Rename all references to the old_name to the new_table.
-        """
-        pass
-
-    def rename_column_references(
-        self, table: str, old_column: str, new_column: str
-    ) -> None:
-        """
-        Rename all references to the old_column to the new_column.
-        """
-        pass
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {str(self)!r}>"
-
-    def __str__(self) -> str:
-        raise NotImplementedError("Subclasses must implement __str__")
-
-
-class Table(Reference):
+class Table:
     """Hold a reference to a table."""
 
     def __init__(self, table: str) -> None:
@@ -87,9 +56,20 @@ class Table(Reference):
     def references_table(self, table: str) -> bool:
         return self.table == table
 
+    def references_column(self, table: str, column: str) -> bool:
+        return False
+
     def rename_table_references(self, old_table: str, new_table: str) -> None:
         if self.table == old_table:
             self.table = new_table
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        pass
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {str(self)!r}>"
 
     def __str__(self) -> str:
         return quote_name(self.table)
@@ -122,13 +102,18 @@ class Columns(TableColumns):
         table: str,
         columns: list[str],
         col_suffixes: tuple[str, ...] = (),
+        opclasses: tuple[str, ...] = (),
     ) -> None:
         self.col_suffixes = col_suffixes
+        self.opclasses = opclasses
         super().__init__(table, columns)
 
     def __str__(self) -> str:
         def col_str(column: str, idx: int) -> str:
             col = quote_name(column)
+            # If opclasses are provided, include them
+            if self.opclasses:
+                col = f"{col} {self.opclasses[idx]}"
             try:
                 suffix = self.col_suffixes[idx]
                 if suffix:
@@ -158,35 +143,6 @@ class IndexName(TableColumns):
 
     def __str__(self) -> str:
         return self.create_index_name(self.table, self.columns, self.suffix)
-
-
-class IndexColumns(Columns):
-    def __init__(
-        self,
-        table: str,
-        columns: list[str],
-        col_suffixes: tuple[str, ...] = (),
-        opclasses: tuple[str, ...] = (),
-    ) -> None:
-        self.opclasses = opclasses
-        super().__init__(table, columns, col_suffixes)
-
-    def __str__(self) -> str:
-        def col_str(column: str, idx: int) -> str:
-            # Index.__init__() guarantees that self.opclasses is the same
-            # length as self.columns.
-            col = f"{quote_name(column)} {self.opclasses[idx]}"
-            try:
-                suffix = self.col_suffixes[idx]
-                if suffix:
-                    col = f"{col} {suffix}"
-            except IndexError:
-                pass
-            return col
-
-        return ", ".join(
-            col_str(column, idx) for idx, column in enumerate(self.columns)
-        )
 
 
 class ForeignKeyName(TableColumns):
@@ -237,7 +193,7 @@ class ForeignKeyName(TableColumns):
         return self.create_fk_name(self.table, self.columns, suffix)
 
 
-class Statement(Reference):
+class Statement:
     """
     Statement template and formatting parameters container.
 
@@ -273,6 +229,9 @@ class Statement(Reference):
         for part in self.parts.values():
             if hasattr(part, "rename_column_references"):
                 part.rename_column_references(table, old_column, new_column)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {str(self)!r}>"
 
     def __str__(self) -> str:
         return self.template % self.parts
@@ -1734,15 +1693,13 @@ class DatabaseSchemaEditor:
         columns: list[str],
         col_suffixes: tuple[str, ...],
         opclasses: tuple[str, ...],
-    ) -> Columns | IndexColumns:
-        if opclasses:
-            return IndexColumns(
-                table,
-                columns,
-                col_suffixes=col_suffixes,
-                opclasses=opclasses,
-            )
-        return Columns(table, columns, col_suffixes=col_suffixes)
+    ) -> Columns:
+        return Columns(
+            table,
+            columns,
+            col_suffixes=col_suffixes,
+            opclasses=opclasses,
+        )
 
     def _model_indexes_sql(self, model: type[Model]) -> list[Statement | None]:
         """
@@ -1952,7 +1909,7 @@ class DatabaseSchemaEditor:
         else:
             sql = self.sql_create_unique
         if columns:
-            columns_obj: Columns | IndexColumns | Expressions = self._index_columns(
+            columns_obj: Columns | Expressions = self._index_columns(
                 table, columns, col_suffixes=(), opclasses=opclasses or ()
             )
         else:

@@ -13,7 +13,7 @@ from .recorder import MigrationRecorder
 from .state import ProjectState
 
 if TYPE_CHECKING:
-    from plain.models.backends.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 
 class MigrationExecutor:

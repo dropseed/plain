@@ -31,8 +31,8 @@ from ..migrations.writer import MigrationWriter
 from ..registry import models_registry
 
 if TYPE_CHECKING:
-    from ..backends.wrapper import DatabaseWrapper
     from ..migrations.operations.base import Operation
+    from ..postgres.wrapper import DatabaseWrapper
 
 # Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
 db_connection = cast("DatabaseWrapper", _db_connection)

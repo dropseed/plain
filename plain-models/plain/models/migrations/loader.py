@@ -18,8 +18,8 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
-    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.migrations.migration import Migration
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 MIGRATIONS_MODULE_NAME = "migrations"
 
