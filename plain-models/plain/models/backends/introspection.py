@@ -11,6 +11,20 @@ if TYPE_CHECKING:
     from plain.models.backends.wrapper import DatabaseWrapper
 
 
+def get_migratable_models() -> Generator[Any, None, None]:
+    """Return all models that should be included in migrations."""
+    from plain.models import models_registry
+    from plain.packages import packages_registry
+
+    return (
+        model
+        for package_config in packages_registry.get_package_configs()
+        for model in models_registry.get_models(
+            package_label=package_config.package_label
+        )
+    )
+
+
 class TableInfo(NamedTuple):
     """Structure returned by DatabaseIntrospection.get_table_list()."""
 
@@ -181,18 +195,6 @@ class DatabaseIntrospection:
             for line in cursor.description
         ]
 
-    def get_migratable_models(self) -> Generator[Any, None, None]:
-        from plain.models import models_registry
-        from plain.packages import packages_registry
-
-        return (
-            model
-            for package_config in packages_registry.get_package_configs()
-            for model in models_registry.get_models(
-                package_label=package_config.package_label
-            )
-        )
-
     def plain_table_names(
         self, only_existing: bool = False, include_views: bool = True
     ) -> list[str]:
@@ -203,7 +205,7 @@ class DatabaseIntrospection:
         If only_existing is True, include only the tables in the database.
         """
         tables = set()
-        for model in self.get_migratable_models():
+        for model in get_migratable_models():
             tables.add(model.model_options.db_table)
             tables.update(
                 f.m2m_db_table() for f in model._model_meta.local_many_to_many
@@ -221,7 +223,7 @@ class DatabaseIntrospection:
         """
         sequence_list = []
         with self.connection.cursor() as cursor:
-            for model in self.get_migratable_models():
+            for model in get_migratable_models():
                 sequence_list.extend(
                     self.get_sequences(
                         cursor,

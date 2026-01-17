@@ -9,6 +9,8 @@ from collections.abc import Callable
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
+from plain.models.backends.sql import quote_name
+
 if TYPE_CHECKING:
     from plain.models.sql.compiler import SQLCompiler
 
@@ -52,9 +54,8 @@ class Reference:
 class Table(Reference):
     """Hold a reference to a table."""
 
-    def __init__(self, table: str, quote_name: Callable[[str], str]) -> None:
+    def __init__(self, table: str) -> None:
         self.table = table
-        self.quote_name = quote_name
 
     def references_table(self, table: str) -> bool:
         return self.table == table
@@ -64,7 +65,7 @@ class Table(Reference):
             self.table = new_table
 
     def __str__(self) -> str:
-        return self.quote_name(self.table)
+        return quote_name(self.table)
 
 
 class TableColumns(Table):
@@ -93,16 +94,14 @@ class Columns(TableColumns):
         self,
         table: str,
         columns: list[str],
-        quote_name: Callable[[str], str],
         col_suffixes: tuple[str, ...] = (),
     ) -> None:
-        self.quote_name = quote_name
         self.col_suffixes = col_suffixes
         super().__init__(table, columns)
 
     def __str__(self) -> str:
         def col_str(column: str, idx: int) -> str:
-            col = self.quote_name(column)
+            col = quote_name(column)
             try:
                 suffix = self.col_suffixes[idx]
                 if suffix:
@@ -139,18 +138,17 @@ class IndexColumns(Columns):
         self,
         table: str,
         columns: list[str],
-        quote_name: Callable[[str], str],
         col_suffixes: tuple[str, ...] = (),
         opclasses: tuple[str, ...] = (),
     ) -> None:
         self.opclasses = opclasses
-        super().__init__(table, columns, quote_name, col_suffixes)
+        super().__init__(table, columns, col_suffixes)
 
     def __str__(self) -> str:
         def col_str(column: str, idx: int) -> str:
             # Index.__init__() guarantees that self.opclasses is the same
             # length as self.columns.
-            col = f"{self.quote_name(column)} {self.opclasses[idx]}"
+            col = f"{quote_name(column)} {self.opclasses[idx]}"
             try:
                 suffix = self.col_suffixes[idx]
                 if suffix:

@@ -4,15 +4,17 @@ Query subclasses which provide extra functionality beyond simple data retrieval.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from plain.models.constants import OnConflict
+from plain.models.db import db_connection
 from plain.models.exceptions import FieldError
 from plain.models.expressions import ResolvableExpression
 from plain.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE, NO_RESULTS
 from plain.models.sql.query import Query
 
 if TYPE_CHECKING:
+    from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.fields import Field
     from plain.models.sql.compiler import (
         SQLAggregateCompiler,
@@ -28,6 +30,12 @@ class DeleteQuery(Query):
     """A DELETE SQL query."""
 
     compiler_class: type[SQLDeleteCompiler]
+
+    def get_compiler(self, *, elide_empty: bool = True) -> SQLDeleteCompiler:
+        from plain.models.sql.compiler import SQLDeleteCompiler
+
+        connection = cast("DatabaseWrapper", db_connection)
+        return SQLDeleteCompiler(self, connection, elide_empty)
 
     def do_query(self, table: str, where: Any) -> int:
         self.alias_map = {table: self.alias_map[table]}
@@ -64,6 +72,12 @@ class UpdateQuery(Query):
     """An UPDATE SQL query."""
 
     compiler_class: type[SQLUpdateCompiler]
+
+    def get_compiler(self, *, elide_empty: bool = True) -> SQLUpdateCompiler:
+        from plain.models.sql.compiler import SQLUpdateCompiler
+
+        connection = cast("DatabaseWrapper", db_connection)
+        return SQLUpdateCompiler(self, connection, elide_empty)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -162,6 +176,12 @@ class UpdateQuery(Query):
 class InsertQuery(Query):
     compiler_class: type[SQLInsertCompiler]
 
+    def get_compiler(self, *, elide_empty: bool = True) -> SQLInsertCompiler:
+        from plain.models.sql.compiler import SQLInsertCompiler
+
+        connection = cast("DatabaseWrapper", db_connection)
+        return SQLInsertCompiler(self, connection, elide_empty)
+
     def __str__(self) -> str:
         raise NotImplementedError(
             "InsertQuery does not support __str__(). "
@@ -204,6 +224,12 @@ class AggregateQuery(Query):
     """
 
     compiler_class: type[SQLAggregateCompiler]
+
+    def get_compiler(self, *, elide_empty: bool = True) -> SQLAggregateCompiler:
+        from plain.models.sql.compiler import SQLAggregateCompiler
+
+        connection = cast("DatabaseWrapper", db_connection)
+        return SQLAggregateCompiler(self, connection, elide_empty)
 
     def __init__(self, model: Any, inner_query: Any) -> None:
         self.inner_query = inner_query

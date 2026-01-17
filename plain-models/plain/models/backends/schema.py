@@ -116,7 +116,6 @@ class DatabaseSchemaEditor:
     sql_alter_column_not_null = "ALTER COLUMN %(column)s SET NOT NULL"
     sql_alter_column_default = "ALTER COLUMN %(column)s SET DEFAULT %(default)s"
     sql_alter_column_no_default = "ALTER COLUMN %(column)s DROP DEFAULT"
-    sql_alter_column_no_default_null = sql_alter_column_no_default
     sql_delete_column = "ALTER TABLE %(table)s DROP COLUMN %(column)s CASCADE"
     sql_rename_column = (
         "ALTER TABLE %(table)s RENAME COLUMN %(old_column)s TO %(new_column)s"
@@ -314,8 +313,7 @@ class DatabaseSchemaEditor:
         if include_default:
             default_value = self.effective_default(field)
             if default_value is not None:
-                column_default = "DEFAULT " + self._column_default_sql(field)
-                yield column_default
+                yield "DEFAULT %s"
                 params.append(default_value)
 
         if not null:
@@ -354,13 +352,6 @@ class DatabaseSchemaEditor:
             ),
             params,
         )
-
-    def _column_default_sql(self, field: Field) -> str:
-        """
-        Return the SQL to use in a DEFAULT clause. The resulting string should
-        contain a '%s' placeholder for a default value.
-        """
-        return "%s"
 
     @staticmethod
     def _effective_default(field: Field) -> Any:
@@ -525,31 +516,25 @@ class DatabaseSchemaEditor:
         if db_params["check"]:
             definition += " " + self.sql_check_constraint % db_params
         if isinstance(field, ForeignKeyField) and field.db_constraint:
+            # Add FK constraint inline (PostgreSQL always supports this).
             constraint_suffix = "_fk_%(to_table)s_%(to_column)s"
-            # Add FK constraint inline.
-            if self.sql_create_column_inline_fk:
-                to_table = field.remote_field.model.model_options.db_table
-                field_name = field.remote_field.field_name
-                if field_name is None:
-                    raise ValueError("Foreign key field_name cannot be None")
-                to_field = field.remote_field.model._model_meta.get_forward_field(
-                    field_name
-                )
-                to_column = to_field.column
-                namespace, _ = split_identifier(model.model_options.db_table)
-                definition += " " + self.sql_create_column_inline_fk % {
-                    "name": self._fk_constraint_name(model, field, constraint_suffix),
-                    "namespace": f"{quote_name(namespace)}." if namespace else "",
-                    "column": quote_name(field.column),
-                    "to_table": quote_name(to_table),
-                    "to_column": quote_name(to_column),
-                    "deferrable": DEFERRABLE_SQL,
-                }
-            # Otherwise, add FK constraints later.
-            else:
-                self.deferred_sql.append(
-                    self._create_fk_sql(model, field, constraint_suffix)
-                )
+            to_table = field.remote_field.model.model_options.db_table
+            field_name = field.remote_field.field_name
+            if field_name is None:
+                raise ValueError("Foreign key field_name cannot be None")
+            to_field = field.remote_field.model._model_meta.get_forward_field(
+                field_name
+            )
+            to_column = to_field.column
+            namespace, _ = split_identifier(model.model_options.db_table)
+            definition += " " + self.sql_create_column_inline_fk % {
+                "name": self._fk_constraint_name(model, field, constraint_suffix),
+                "namespace": f"{quote_name(namespace)}." if namespace else "",
+                "column": quote_name(field.column),
+                "to_table": quote_name(to_table),
+                "to_column": quote_name(to_column),
+                "deferrable": DEFERRABLE_SQL,
+            }
         # Build the SQL and run it
         sql = self.sql_create_column % {
             "table": quote_name(model.model_options.db_table),
@@ -1089,15 +1074,12 @@ class DatabaseSchemaEditor:
         argument) a default to new_field's column.
         """
         new_default = self.effective_default(new_field)
-        default = self._column_default_sql(new_field)
         params: list[Any] = [] if drop else [new_default]
 
         new_db_params = new_field.db_parameters(connection=self.connection)
         if drop:
-            if new_field.allow_null:
-                sql = self.sql_alter_column_no_default_null
-            else:
-                sql = self.sql_alter_column_no_default
+            # PostgreSQL uses the same SQL for nullable and non-nullable columns
+            sql = self.sql_alter_column_no_default
         else:
             sql = self.sql_alter_column_default
         return (
@@ -1105,7 +1087,7 @@ class DatabaseSchemaEditor:
             % {
                 "column": quote_name(new_field.column),
                 "type": new_db_params["type"],
-                "default": default,
+                "default": "%s",
             },
             params,
         )
@@ -1382,7 +1364,7 @@ class DatabaseSchemaEditor:
             return ""
         return Statement(
             " INCLUDE (%(columns)s)",
-            columns=Columns(model.model_options.db_table, columns, quote_name),
+            columns=Columns(model.model_options.db_table, columns),
         )
 
     def _create_index_sql(
@@ -1426,7 +1408,7 @@ class DatabaseSchemaEditor:
 
         return Statement(
             sql,
-            table=Table(table, quote_name),
+            table=Table(table),
             name=IndexName(table, columns, suffix, create_index_name),
             using=using,
             columns=(
@@ -1454,7 +1436,7 @@ class DatabaseSchemaEditor:
             )
         return Statement(
             sql,
-            table=Table(model.model_options.db_table, quote_name),
+            table=Table(model.model_options.db_table),
             name=quote_name(name),
         )
 
@@ -1463,7 +1445,7 @@ class DatabaseSchemaEditor:
     ) -> Statement:
         return Statement(
             self.sql_rename_index,
-            table=Table(model.model_options.db_table, quote_name),
+            table=Table(model.model_options.db_table),
             old_name=quote_name(old_name),
             new_name=quote_name(new_name),
         )
@@ -1479,11 +1461,10 @@ class DatabaseSchemaEditor:
             return IndexColumns(
                 table,
                 columns,
-                quote_name,
                 col_suffixes=col_suffixes,
                 opclasses=opclasses,
             )
-        return Columns(table, columns, quote_name, col_suffixes=col_suffixes)
+        return Columns(table, columns, col_suffixes=col_suffixes)
 
     def _model_indexes_sql(self, model: type[Model]) -> list[Statement | None]:
         """
@@ -1591,14 +1572,13 @@ class DatabaseSchemaEditor:
     def _create_fk_sql(
         self, model: type[Model], field: ForeignKeyField, suffix: str
     ) -> Statement:
-        table = Table(model.model_options.db_table, quote_name)
+        table = Table(model.model_options.db_table)
         name = self._fk_constraint_name(model, field, suffix)
-        column = Columns(model.model_options.db_table, [field.column], quote_name)
-        to_table = Table(field.target_field.model.model_options.db_table, quote_name)
+        column = Columns(model.model_options.db_table, [field.column])
+        to_table = Table(field.target_field.model.model_options.db_table)
         to_column = Columns(
             field.target_field.model.model_options.db_table,
             [field.target_field.column],
-            quote_name,
         )
         deferrable = DEFERRABLE_SQL
         return Statement(
@@ -1701,7 +1681,7 @@ class DatabaseSchemaEditor:
             columns_obj = Expressions(table, expressions, compiler, self.quote_value)
         return Statement(
             sql,
-            table=Table(table, quote_name),
+            table=Table(table),
             name=constraint_name,
             columns=columns_obj,
             condition=(" WHERE " + condition if condition else ""),
@@ -1747,7 +1727,7 @@ class DatabaseSchemaEditor:
     def _create_check_sql(self, model: type[Model], name: str, check: str) -> Statement:
         return Statement(
             self.sql_create_check,
-            table=Table(model.model_options.db_table, quote_name),
+            table=Table(model.model_options.db_table),
             name=quote_name(name),
             check=check,
         )
@@ -1757,7 +1737,7 @@ class DatabaseSchemaEditor:
     ) -> Statement:
         return Statement(
             template,
-            table=Table(model.model_options.db_table, quote_name),
+            table=Table(model.model_options.db_table),
             name=quote_name(name),
         )
 
@@ -1809,13 +1789,13 @@ class DatabaseSchemaEditor:
     def _create_primary_key_sql(self, model: type[Model], field: Field) -> Statement:
         return Statement(
             self.sql_create_pk,
-            table=Table(model.model_options.db_table, quote_name),
+            table=Table(model.model_options.db_table),
             name=quote_name(
                 self._create_index_name(
                     model.model_options.db_table, [field.column], suffix="_pk"
                 )
             ),
-            columns=Columns(model.model_options.db_table, [field.column], quote_name),
+            columns=Columns(model.model_options.db_table, [field.column]),
         )
 
     def _delete_primary_key_sql(self, model: type[Model], name: str) -> Statement:

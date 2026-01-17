@@ -34,14 +34,14 @@ cli.add_command(backups_cli)
 def shell(parameters: tuple[str, ...]) -> None:
     """Open an interactive database shell"""
     try:
-        db_connection.client.runshell(list(parameters))
+        db_connection.runshell(list(parameters))
     except FileNotFoundError:
         # Note that we're assuming the FileNotFoundError relates to the
         # command missing. It could be raised for some other reason, in
         # which case this error message would be inaccurate. Still, this
         # message catches the common case.
         click.secho(
-            f"You appear not to have the {db_connection.client.executable_name!r} program installed or on your path.",
+            f"You appear not to have the {db_connection.executable_name!r} program installed or on your path.",
             fg="red",
             err=True,
         )

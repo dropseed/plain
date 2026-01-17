@@ -366,10 +366,6 @@ class OperatorLookup(Lookup):
         return f"{lhs} {self.operator} {rhs}", params
 
 
-# Backwards compatibility alias
-PostgresOperatorLookup = OperatorLookup
-
-
 @Field.register_lookup
 class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
     lookup_name: str = "exact"
