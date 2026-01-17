@@ -233,7 +233,7 @@ class RelatedField(FieldCacheMixin, Field):
 
         return errors
 
-    def db_type(self, connection: DatabaseWrapper) -> str | None:
+    def db_type(self) -> str | None:
         # By default related field will not have a column as it relates to
         # columns from another table.
         return None
@@ -643,20 +643,20 @@ class ForeignKeyField(RelatedField):
     def get_prep_value(self, value: Any) -> Any:
         return self.target_field.get_prep_value(value)
 
-    def db_check(self, connection: DatabaseWrapper) -> None:
+    def db_check(self) -> None:
         return None
 
-    def db_type(self, connection: DatabaseWrapper) -> str | None:
-        return self.target_field.rel_db_type(connection=connection)
+    def db_type(self) -> str | None:
+        return self.target_field.rel_db_type()
 
-    def cast_db_type(self, connection: DatabaseWrapper) -> str | None:
-        return self.target_field.cast_db_type(connection=connection)
+    def cast_db_type(self) -> str | None:
+        return self.target_field.cast_db_type()
 
-    def db_parameters(self, connection: DatabaseWrapper) -> DbParameters:
-        target_db_parameters = self.target_field.db_parameters(connection)
+    def db_parameters(self) -> DbParameters:
+        target_db_parameters = self.target_field.db_parameters()
         return {
-            "type": self.db_type(connection),
-            "check": self.db_check(connection),
+            "type": self.db_type(),
+            "check": self.db_check(),
             "collation": target_db_parameters.get("collation"),
         }
 
@@ -1196,13 +1196,13 @@ class ManyToManyField(RelatedField):
     def save_form_data(self, instance: Model, data: Any) -> None:
         getattr(instance, self.attname).set(data)
 
-    def db_check(self, connection: DatabaseWrapper) -> None:
+    def db_check(self) -> None:
         return None
 
-    def db_type(self, connection: DatabaseWrapper) -> None:
+    def db_type(self) -> None:
         # A ManyToManyField is not represented by a single column,
         # so return None.
         return None
 
-    def db_parameters(self, connection: DatabaseWrapper) -> DbParameters:
+    def db_parameters(self) -> DbParameters:
         return {"type": None, "check": None}

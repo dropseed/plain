@@ -655,25 +655,24 @@ class Field(RegisterLookupMixin, Generic[T]):
         self.run_validators(value)
         return value
 
-    def db_type_parameters(self, connection: DatabaseWrapper) -> DictWrapper:
+    def db_type_parameters(self) -> DictWrapper:
         return DictWrapper(self.__dict__, quote_name, "qn_")
 
-    def db_check(self, connection: DatabaseWrapper) -> str | None:
+    def db_check(self) -> str | None:
         """
-        Return the database column check constraint for this field, for the
-        provided connection. Works the same way as db_type() for the case that
+        Return the database column check constraint for this field.
+        Works the same way as db_type() for the case that
         get_internal_type() does not map to a preexisting model field.
         """
-        data = self.db_type_parameters(connection)
+        data = self.db_type_parameters()
         try:
             return DATA_TYPE_CHECK_CONSTRAINTS[self.get_internal_type()] % data
         except KeyError:
             return None
 
-    def db_type(self, connection: DatabaseWrapper) -> str | None:
+    def db_type(self) -> str | None:
         """
-        Return the database column data type for this field, for the provided
-        connection.
+        Return the database column data type for this field.
         """
         # The default implementation of this method looks at the
         # backend-specific data_types dictionary, looking up the field by its
@@ -690,7 +689,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         # mapped to one of the built-in Plain field types. In this case, you
         # can implement db_type() instead of get_internal_type() to specify
         # exactly which wacky database column type you want to use.
-        data = self.db_type_parameters(connection)
+        data = self.db_type_parameters()
         try:
             column_type = DATA_TYPES[self.get_internal_type()]
         except KeyError:
@@ -701,34 +700,34 @@ class Field(RegisterLookupMixin, Generic[T]):
                 return column_type(data)
             return column_type % data
 
-    def rel_db_type(self, connection: DatabaseWrapper) -> str | None:
+    def rel_db_type(self) -> str | None:
         """
         Return the data type that a related field pointing to this field should
         use. For example, this method is called by ForeignKeyField to determine its data type.
         """
-        return self.db_type(connection)
+        return self.db_type()
 
-    def cast_db_type(self, connection: DatabaseWrapper) -> str | None:
+    def cast_db_type(self) -> str | None:
         """Return the data type to use in the Cast() function."""
         db_type = CAST_DATA_TYPES.get(self.get_internal_type())
         if db_type:
-            return db_type % self.db_type_parameters(connection)
-        return self.db_type(connection)
+            return db_type % self.db_type_parameters()
+        return self.db_type()
 
-    def db_parameters(self, connection: DatabaseWrapper) -> DbParameters:
+    def db_parameters(self) -> DbParameters:
         """
         Extension of db_type(), providing a range of different return values
         (type, checks). This will look at db_type(), allowing custom model
         fields to override it.
         """
-        type_string = self.db_type(connection)
-        check_string = self.db_check(connection)
+        type_string = self.db_type()
+        check_string = self.db_check()
         return {
             "type": type_string,
             "check": check_string,
         }
 
-    def db_type_suffix(self, connection: DatabaseWrapper) -> str | None:
+    def db_type_suffix(self) -> str | None:
         return DATA_TYPES_SUFFIX.get(self.get_internal_type())
 
     def get_db_converters(
@@ -1046,13 +1045,13 @@ class CharField(Field[str]):
         else:
             return []
 
-    def cast_db_type(self, connection: DatabaseWrapper) -> str | None:
+    def cast_db_type(self) -> str | None:
         if self.max_length is None:
             return CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH
-        return super().cast_db_type(connection)
+        return super().cast_db_type()
 
-    def db_parameters(self, connection: DatabaseWrapper) -> DbParameters:
-        db_params = super().db_parameters(connection)
+    def db_parameters(self) -> DbParameters:
+        db_params = super().db_parameters()
         db_params["collation"] = self.db_collation
         return db_params
 
@@ -1826,7 +1825,7 @@ class _HasDbType(Protocol):
 
     integer_field_class: type[IntegerField]
 
-    def db_type(self, connection: DatabaseWrapper) -> str | None: ...
+    def db_type(self) -> str | None: ...
 
 
 class PositiveIntegerRelDbTypeMixin(IntegerField):
@@ -1847,12 +1846,12 @@ class PositiveIntegerRelDbTypeMixin(IntegerField):
             if integer_parent is not None:
                 cls.integer_field_class = integer_parent
 
-    def rel_db_type(self: _HasDbType, connection: DatabaseWrapper) -> str | None:
+    def rel_db_type(self: _HasDbType) -> str | None:
         """
         Return the data type that a related field pointing to this field should
         use. PostgreSQL uses standard integer types for foreign keys.
         """
-        return self.integer_field_class().db_type(connection=connection)
+        return self.integer_field_class().db_type()
 
 
 class PositiveBigIntegerField(PositiveIntegerRelDbTypeMixin, BigIntegerField):
@@ -1883,8 +1882,8 @@ class TextField(Field[str]):
         super().__init__(**kwargs)
         self.db_collation = db_collation
 
-    def db_parameters(self, connection: DatabaseWrapper) -> DbParameters:
-        db_params = super().db_parameters(connection)
+    def db_parameters(self) -> DbParameters:
+        db_params = super().db_parameters()
         db_params["collation"] = self.db_collation
         return db_params
 
@@ -2169,5 +2168,5 @@ class PrimaryKeyField(BigIntegerField):
     def get_internal_type(self) -> str:
         return "PrimaryKeyField"
 
-    def rel_db_type(self, connection: DatabaseWrapper) -> str | None:
-        return BigIntegerField().db_type(connection=connection)
+    def rel_db_type(self) -> str | None:
+        return BigIntegerField().db_type()

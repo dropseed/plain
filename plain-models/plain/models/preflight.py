@@ -217,8 +217,8 @@ class CheckDatabaseTables(PreflightCheck):
     def run(self) -> list[PreflightResult]:
         errors = []
 
-        db_tables = db_connection.introspection.table_names()
-        model_tables = db_connection.introspection.plain_table_names()
+        db_tables = db_connection.table_names()
+        model_tables = db_connection.plain_table_names()
         unknown_tables = set(db_tables) - set(model_tables)
         unknown_tables.discard("plainmigrations")  # Know this could be there
         if unknown_tables:

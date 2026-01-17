@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import operator
 from collections.abc import Callable, Generator
+from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -11,16 +12,9 @@ from psycopg import sql as psycopg_sql
 if TYPE_CHECKING:
     from typing import Self
 
+    from plain.models.sql.compiler import SQLCompiler
+
 from plain.models.backends.constants import DATA_TYPE_CHECK_CONSTRAINTS, DATA_TYPES
-from plain.models.backends.ddl_references import (
-    Columns,
-    Expressions,
-    ForeignKeyName,
-    IndexColumns,
-    IndexName,
-    Statement,
-    Table,
-)
 from plain.models.backends.sql import DEFERRABLE_SQL, MAX_NAME_LENGTH, quote_name
 from plain.models.backends.utils import names_digest, split_identifier, strip_quotes
 from plain.models.constraints import Deferrable
@@ -43,6 +37,290 @@ if TYPE_CHECKING:
     from plain.models.fields.reverse_related import ManyToManyRel
 
 logger = logging.getLogger("plain.models.backends.schema")
+
+
+# ##### DDL Reference classes (for deferred DDL statement manipulation) #####
+
+
+class Reference:
+    """Base class that defines the reference interface."""
+
+    def references_table(self, table: str) -> bool:
+        """
+        Return whether or not this instance references the specified table.
+        """
+        return False
+
+    def references_column(self, table: str, column: str) -> bool:
+        """
+        Return whether or not this instance references the specified column.
+        """
+        return False
+
+    def rename_table_references(self, old_table: str, new_table: str) -> None:
+        """
+        Rename all references to the old_name to the new_table.
+        """
+        pass
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        """
+        Rename all references to the old_column to the new_column.
+        """
+        pass
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {str(self)!r}>"
+
+    def __str__(self) -> str:
+        raise NotImplementedError("Subclasses must implement __str__")
+
+
+class Table(Reference):
+    """Hold a reference to a table."""
+
+    def __init__(self, table: str) -> None:
+        self.table = table
+
+    def references_table(self, table: str) -> bool:
+        return self.table == table
+
+    def rename_table_references(self, old_table: str, new_table: str) -> None:
+        if self.table == old_table:
+            self.table = new_table
+
+    def __str__(self) -> str:
+        return quote_name(self.table)
+
+
+class TableColumns(Table):
+    """Base class for references to multiple columns of a table."""
+
+    def __init__(self, table: str, columns: list[str]) -> None:
+        self.table = table
+        self.columns = columns
+
+    def references_column(self, table: str, column: str) -> bool:
+        return self.table == table and column in self.columns
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        if self.table == table:
+            for index, column in enumerate(self.columns):
+                if column == old_column:
+                    self.columns[index] = new_column
+
+
+class Columns(TableColumns):
+    """Hold a reference to one or many columns."""
+
+    def __init__(
+        self,
+        table: str,
+        columns: list[str],
+        col_suffixes: tuple[str, ...] = (),
+    ) -> None:
+        self.col_suffixes = col_suffixes
+        super().__init__(table, columns)
+
+    def __str__(self) -> str:
+        def col_str(column: str, idx: int) -> str:
+            col = quote_name(column)
+            try:
+                suffix = self.col_suffixes[idx]
+                if suffix:
+                    col = f"{col} {suffix}"
+            except IndexError:
+                pass
+            return col
+
+        return ", ".join(
+            col_str(column, idx) for idx, column in enumerate(self.columns)
+        )
+
+
+class IndexName(TableColumns):
+    """Hold a reference to an index name."""
+
+    def __init__(
+        self,
+        table: str,
+        columns: list[str],
+        suffix: str,
+        create_index_name: Callable[[str, list[str], str], str],
+    ) -> None:
+        self.suffix = suffix
+        self.create_index_name = create_index_name
+        super().__init__(table, columns)
+
+    def __str__(self) -> str:
+        return self.create_index_name(self.table, self.columns, self.suffix)
+
+
+class IndexColumns(Columns):
+    def __init__(
+        self,
+        table: str,
+        columns: list[str],
+        col_suffixes: tuple[str, ...] = (),
+        opclasses: tuple[str, ...] = (),
+    ) -> None:
+        self.opclasses = opclasses
+        super().__init__(table, columns, col_suffixes)
+
+    def __str__(self) -> str:
+        def col_str(column: str, idx: int) -> str:
+            # Index.__init__() guarantees that self.opclasses is the same
+            # length as self.columns.
+            col = f"{quote_name(column)} {self.opclasses[idx]}"
+            try:
+                suffix = self.col_suffixes[idx]
+                if suffix:
+                    col = f"{col} {suffix}"
+            except IndexError:
+                pass
+            return col
+
+        return ", ".join(
+            col_str(column, idx) for idx, column in enumerate(self.columns)
+        )
+
+
+class ForeignKeyName(TableColumns):
+    """Hold a reference to a foreign key name."""
+
+    def __init__(
+        self,
+        from_table: str,
+        from_columns: list[str],
+        to_table: str,
+        to_columns: list[str],
+        suffix_template: str,
+        create_fk_name: Callable[[str, list[str], str], str],
+    ) -> None:
+        self.to_reference = TableColumns(to_table, to_columns)
+        self.suffix_template = suffix_template
+        self.create_fk_name = create_fk_name
+        super().__init__(
+            from_table,
+            from_columns,
+        )
+
+    def references_table(self, table: str) -> bool:
+        return super().references_table(table) or self.to_reference.references_table(
+            table
+        )
+
+    def references_column(self, table: str, column: str) -> bool:
+        return super().references_column(
+            table, column
+        ) or self.to_reference.references_column(table, column)
+
+    def rename_table_references(self, old_table: str, new_table: str) -> None:
+        super().rename_table_references(old_table, new_table)
+        self.to_reference.rename_table_references(old_table, new_table)
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        super().rename_column_references(table, old_column, new_column)
+        self.to_reference.rename_column_references(table, old_column, new_column)
+
+    def __str__(self) -> str:
+        suffix = self.suffix_template % {
+            "to_table": self.to_reference.table,
+            "to_column": self.to_reference.columns[0],
+        }
+        return self.create_fk_name(self.table, self.columns, suffix)
+
+
+class Statement(Reference):
+    """
+    Statement template and formatting parameters container.
+
+    Allows keeping a reference to a statement without interpolating identifiers
+    that might have to be adjusted if they're referencing a table or column
+    that is removed
+    """
+
+    def __init__(self, template: str, **parts: Any) -> None:
+        self.template = template
+        self.parts = parts
+
+    def references_table(self, table: str) -> bool:
+        return any(
+            hasattr(part, "references_table") and part.references_table(table)
+            for part in self.parts.values()
+        )
+
+    def references_column(self, table: str, column: str) -> bool:
+        return any(
+            hasattr(part, "references_column") and part.references_column(table, column)
+            for part in self.parts.values()
+        )
+
+    def rename_table_references(self, old_table: str, new_table: str) -> None:
+        for part in self.parts.values():
+            if hasattr(part, "rename_table_references"):
+                part.rename_table_references(old_table, new_table)
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        for part in self.parts.values():
+            if hasattr(part, "rename_column_references"):
+                part.rename_column_references(table, old_column, new_column)
+
+    def __str__(self) -> str:
+        return self.template % self.parts
+
+
+class Expressions(TableColumns):
+    def __init__(
+        self,
+        table: str,
+        expressions: Any,
+        compiler: SQLCompiler,
+        quote_value: Callable[[Any], str],
+    ) -> None:
+        self.compiler = compiler
+        self.expressions = expressions
+        self.quote_value = quote_value
+        columns = [
+            col.target.column
+            for col in self.compiler.query._gen_cols(iter([self.expressions]))
+        ]
+        super().__init__(table, columns)
+
+    def rename_table_references(self, old_table: str, new_table: str) -> None:
+        if self.table != old_table:
+            return
+        self.expressions = self.expressions.relabeled_clone({old_table: new_table})
+        super().rename_table_references(old_table, new_table)
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        if self.table != table:
+            return
+        expressions = deepcopy(self.expressions)
+        self.columns = []
+        for col in self.compiler.query._gen_cols(iter([expressions])):
+            if col.target.column == old_column:
+                col.target.column = new_column
+            self.columns.append(col.target.column)
+        self.expressions = expressions
+
+    def __str__(self) -> str:
+        sql, params = self.compiler.compile(self.expressions)
+        params = map(self.quote_value, params)
+        return sql % tuple(params)
+
+
+# ##### Schema helper functions #####
 
 
 def _is_relevant_relation(relation: ForeignObjectRel, altered_field: Field) -> bool:
@@ -263,11 +541,11 @@ class DatabaseSchemaEditor:
             if definition is None:
                 continue
             # Check constraints can go on the column SQL here.
-            db_params = field.db_parameters(connection=self.connection)
+            db_params = field.db_parameters()
             if db_params["check"]:
                 definition += " " + self.sql_check_constraint % db_params
             # Autoincrement SQL (e.g. GENERATED BY DEFAULT AS IDENTITY).
-            col_type_suffix = field.db_type_suffix(connection=self.connection)
+            col_type_suffix = field.db_type_suffix()
             if col_type_suffix:
                 definition += f" {col_type_suffix}"
             if extra_params:
@@ -332,7 +610,7 @@ class DatabaseSchemaEditor:
         had set_attributes_from_name() called.
         """
         # Get the column's type and use that as the basis of the SQL.
-        field_db_params = field.db_parameters(connection=self.connection)
+        field_db_params = field.db_parameters()
         column_db_type = field_db_params["type"]
         # Check for fields that aren't actually columns (e.g. M2M).
         if column_db_type is None:
@@ -403,7 +681,7 @@ class DatabaseSchemaEditor:
         # Add column comments.
         for field in model._model_meta.local_fields:
             if field.db_comment:
-                field_db_params = field.db_parameters(connection=self.connection)
+                field_db_params = field.db_parameters()
                 field_type = field_db_params["type"]
                 assert field_type is not None
                 self.execute(
@@ -509,10 +787,10 @@ class DatabaseSchemaEditor:
         # It might not actually have a column behind it
         if definition is None:
             return
-        if col_type_suffix := field.db_type_suffix(connection=self.connection):
+        if col_type_suffix := field.db_type_suffix():
             definition += f" {col_type_suffix}"
         # Check constraints can go on the column SQL here
-        db_params = field.db_parameters(connection=self.connection)
+        db_params = field.db_parameters()
         if db_params["check"]:
             definition += " " + self.sql_check_constraint % db_params
         if isinstance(field, ForeignKeyField) and field.db_constraint:
@@ -571,7 +849,7 @@ class DatabaseSchemaEditor:
         but for M2Ms may involve deleting a table.
         """
         # It might not actually have a column behind it
-        if field.db_parameters(connection=self.connection)["type"] is None:
+        if field.db_parameters()["type"] is None:
             return
         # Drop any FK constraints
         if isinstance(field, RelatedField):
@@ -610,9 +888,9 @@ class DatabaseSchemaEditor:
         if not self._field_should_be_altered(old_field, new_field):
             return
         # Ensure this field is even column-based
-        old_db_params = old_field.db_parameters(connection=self.connection)
+        old_db_params = old_field.db_parameters()
         old_type = old_db_params["type"]
-        new_db_params = new_field.db_parameters(connection=self.connection)
+        new_db_params = new_field.db_parameters()
         new_type = new_db_params["type"]
         if (old_type is None and not isinstance(old_field, RelatedField)) or (
             new_type is None and not isinstance(new_field, RelatedField)
@@ -654,7 +932,7 @@ class DatabaseSchemaEditor:
     ) -> str | None:
         # Always check constraints with the same mocked column name to avoid
         # recreating constrains when the column is renamed.
-        data = field.db_type_parameters(self.connection)
+        data = field.db_type_parameters()
         data["column"] = "__column_name__"
         try:
             return DATA_TYPE_CHECK_CONSTRAINTS[field.get_internal_type()] % data
@@ -665,15 +943,15 @@ class DatabaseSchemaEditor:
         self, field: Field
     ) -> str | None | Callable[[dict[str, Any]], str]:
         if isinstance(field, RelatedField):
-            return field.rel_db_type(self.connection)
+            return field.rel_db_type()
         return DATA_TYPES.get(
             field.get_internal_type(),
-            field.db_type(self.connection),
+            field.db_type(),
         )
 
     def _get_sequence_name(self, table: str, column: str) -> str | None:
         with self.connection.cursor() as cursor:
-            for sequence in self.connection.introspection.get_sequences(cursor, table):
+            for sequence in self.connection.get_sequences(cursor, table):
                 if sequence["column"] == column:
                     return sequence["name"]
         return None
@@ -833,8 +1111,8 @@ class DatabaseSchemaEditor:
         null_actions = []
         post_actions = []
         # Type suffix change? (e.g. auto increment).
-        old_type_suffix = old_field.db_type_suffix(connection=self.connection)
-        new_type_suffix = new_field.db_type_suffix(connection=self.connection)
+        old_type_suffix = old_field.db_type_suffix()
+        new_type_suffix = new_field.db_type_suffix()
         # Type, collation, or comment change?
         if (
             old_type != new_type
@@ -952,10 +1230,10 @@ class DatabaseSchemaEditor:
             rels_to_update.extend(_related_non_m2m_objects(old_field, new_field))
         # Handle our type alters on the other end of rels from the PK stuff above
         for old_rel, new_rel in rels_to_update:
-            rel_db_params = new_rel.field.db_parameters(connection=self.connection)
+            rel_db_params = new_rel.field.db_parameters()
             rel_type = rel_db_params["type"]
             rel_collation = rel_db_params.get("collation")
-            old_rel_db_params = old_rel.field.db_parameters(connection=self.connection)
+            old_rel_db_params = old_rel.field.db_parameters()
             old_rel_collation = old_rel_db_params.get("collation")
             fragment, other_actions = self._alter_column_type_sql(
                 new_rel.related_model,
@@ -1047,7 +1325,7 @@ class DatabaseSchemaEditor:
         Return a (sql, params) fragment to set a column to null or non-null
         as required by new_field.
         """
-        new_db_params = new_field.db_parameters(connection=self.connection)
+        new_db_params = new_field.db_parameters()
         sql = (
             self.sql_alter_column_null
             if new_field.allow_null
@@ -1076,7 +1354,7 @@ class DatabaseSchemaEditor:
         new_default = self.effective_default(new_field)
         params: list[Any] = [] if drop else [new_default]
 
-        new_db_params = new_field.db_parameters(connection=self.connection)
+        new_db_params = new_field.db_parameters()
         if drop:
             # PostgreSQL uses the same SQL for nullable and non-nullable columns
             sql = self.sql_alter_column_no_default
@@ -1108,7 +1386,7 @@ class DatabaseSchemaEditor:
         """
         # Drop indexes on varchar/text/citext columns that are changing to a
         # different type.
-        old_db_params = old_field.db_parameters(connection=self.connection)
+        old_db_params = old_field.db_parameters()
         old_type = old_db_params["type"]
         assert old_type is not None, "old_type cannot be None for primary key field"
         if old_field.primary_key and (
@@ -1499,7 +1777,7 @@ class DatabaseSchemaEditor:
         Return the statement to create an index with varchar operator pattern
         when the column type is 'varchar' or 'text', otherwise return None.
         """
-        db_type = field.db_type(connection=self.connection)
+        db_type = field.db_type()
         if db_type is not None and field.primary_key:
             # Fields with database column types of `varchar` and `text` need
             # a second index that specifies their operator class, which is
@@ -1755,7 +2033,7 @@ class DatabaseSchemaEditor:
     ) -> list[str]:
         """Return all constraint names matching the columns and conditions."""
         with self.connection.cursor() as cursor:
-            constraints = self.connection.introspection.get_constraints(
+            constraints = self.connection.get_constraints(
                 cursor, model.model_options.db_table
             )
         result: list[str] = []

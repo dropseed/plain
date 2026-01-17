@@ -70,7 +70,7 @@ class MigrationRecorder:
     def has_table(self) -> bool:
         """Return True if the plainmigrations table exists."""
         with self.connection.cursor() as cursor:
-            tables = self.connection.introspection.table_names(cursor)
+            tables = self.connection.table_names(cursor)
         return self.Migration.model_options.db_table in tables
 
     def ensure_schema(self) -> None:

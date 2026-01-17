@@ -11,8 +11,7 @@ from plain.models.sql import Query
 from plain.utils.functional import partition
 
 if TYPE_CHECKING:
-    from plain.models.backends.ddl_references import Statement
-    from plain.models.backends.schema import DatabaseSchemaEditor
+    from plain.models.backends.schema import DatabaseSchemaEditor, Statement
     from plain.models.backends.wrapper import DatabaseWrapper
     from plain.models.base import Model
     from plain.models.expressions import Expression

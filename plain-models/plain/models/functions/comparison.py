@@ -34,7 +34,7 @@ class Cast(Func):
         arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
-        extra_context["db_type"] = self.output_field.cast_db_type(connection)
+        extra_context["db_type"] = self.output_field.cast_db_type()
         return super().as_sql(
             compiler, connection, function, template, arg_joiner, **extra_context
         )

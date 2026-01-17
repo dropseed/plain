@@ -59,6 +59,5 @@ __all__ = [
     "NotSupportedError",
     "ConnectionDoesNotExist",
     "DatabaseErrorWrapper",
-    "reset_queries",
     "close_old_connections",
 ]

@@ -439,13 +439,6 @@ class FilteredRelation:
         clone.path = self.path[:]
         return clone
 
-    def resolve_expression(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        QuerySet.annotate() only accepts expression-like arguments
-        (with a resolve_expression() method).
-        """
-        raise NotImplementedError("FilteredRelation.resolve_expression() is unused.")
-
     def as_sql(self, compiler: SQLCompiler, connection: DatabaseWrapper) -> Any:
         # Resolve the condition in Join.filtered_relation.
         query = compiler.query
