@@ -247,9 +247,7 @@ For more patterns like rate limiting and global limits, see [`should_enqueue()`]
 
 #### How are race conditions prevented?
 
-On **PostgreSQL**, plain-jobs uses [advisory locks](https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS) to ensure `should_enqueue()` checks are atomic with job creation. The lock is acquired during the transaction and automatically released when the transaction completes. This eliminates race conditions where multiple threads might simultaneously pass the `should_enqueue()` check.
-
-On **SQLite and MySQL**, advisory locks are not available, so a small race condition window exists between checking and creating jobs. For production deployments requiring strict concurrency guarantees, **we recommend PostgreSQL**.
+Plain uses PostgreSQL's [advisory locks](https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS) to ensure `should_enqueue()` checks are atomic with job creation. The lock is acquired during the transaction and automatically released when the transaction completes. This eliminates race conditions where multiple threads might simultaneously pass the `should_enqueue()` check.
 
 For custom locking behavior (Redis, etc.), override [`get_enqueue_lock()`](./locks.py#get_enqueue_lock).
 
