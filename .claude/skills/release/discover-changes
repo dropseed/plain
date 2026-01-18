@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""
+Discover Plain packages with changes since their last version bump.
+
+Outputs JSON with package info for packages that have unreleased changes.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from pathlib import Path
+
+
+def run(cmd: list[str], cwd: Path | None = None) -> str:
+    """Run a command and return stdout."""
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    return result.stdout.strip()
+
+
+def get_packages() -> list[Path]:
+    """Get all package directories."""
+    root = Path.cwd()
+    packages = []
+    for p in root.iterdir():
+        if p.is_dir() and p.name.startswith("plain") and not p.name.endswith(".egg-info"):
+            if (p / "pyproject.toml").exists():
+                packages.append(p)
+    return sorted(packages)
+
+
+def get_current_version(package: Path) -> str:
+    """Get the current version from pyproject.toml."""
+    return run(["uv", "version", "--short"], cwd=package)
+
+
+def find_last_version_commit(package: Path) -> str | None:
+    """Find the commit that last changed the version in pyproject.toml."""
+    pyproject = f"{package.name}/pyproject.toml"
+    commits = run(["git", "log", "--format=%H", "--", pyproject]).split("\n")
+
+    for commit in commits[:30]:  # Check up to 30 commits back
+        if not commit:
+            continue
+
+        # Get version at this commit and parent
+        try:
+            current = run(["git", "show", f"{commit}:{pyproject}"])
+            parent = run(["git", "show", f"{commit}^:{pyproject}"])
+        except Exception:
+            continue
+
+        # Extract version lines
+        current_version = None
+        parent_version = None
+
+        for line in current.split("\n"):
+            if line.startswith("version = "):
+                current_version = line
+                break
+
+        for line in parent.split("\n"):
+            if line.startswith("version = "):
+                parent_version = line
+                break
+
+        # If versions differ, this is the last version bump
+        if current_version and parent_version and current_version != parent_version:
+            return commit
+
+    return None
+
+
+def get_commits_since(package: Path, since_commit: str) -> list[dict]:
+    """Get commits since a given commit, excluding tests."""
+    output = run([
+        "git", "log", "--format=%H|%s",
+        f"{since_commit}..HEAD",
+        "--", package.name,
+        f":(exclude){package.name}/tests"
+    ])
+
+    commits = []
+    for line in output.split("\n"):
+        if "|" in line:
+            hash_, subject = line.split("|", 1)
+            commits.append({
+                "hash": hash_[:12],
+                "subject": subject
+            })
+
+    return commits
+
+
+def get_changelog_path(package: Path) -> str:
+    """Get the path to the CHANGELOG.md file for a package."""
+    # Pattern: plain-{name}/plain/{name}/CHANGELOG.md
+    # For main plain package: plain/plain/CHANGELOG.md
+    if package.name == "plain":
+        return "plain/plain/CHANGELOG.md"
+    else:
+        subpackage = package.name.replace("plain-", "")
+        return f"{package.name}/plain/{subpackage}/CHANGELOG.md"
+
+
+def get_last_release_tag(package: Path) -> str | None:
+    """Get the most recent release tag for a package."""
+    output = run(["git", "tag", "-l", f"{package.name}@*", "--sort=-v:refname"])
+    tags = output.split("\n")
+    return tags[0] if tags and tags[0] else None
+
+
+def main():
+    packages_with_changes = []
+
+    for package in get_packages():
+        last_version_commit = find_last_version_commit(package)
+
+        if not last_version_commit:
+            continue
+
+        commits = get_commits_since(package, last_version_commit)
+
+        if not commits:
+            continue
+
+        current_version = get_current_version(package)
+        changelog_path = get_changelog_path(package)
+        last_tag = get_last_release_tag(package)
+
+        packages_with_changes.append({
+            "name": package.name,
+            "path": str(package),
+            "current_version": current_version,
+            "changelog_path": changelog_path,
+            "last_tag": last_tag,
+            "last_version_commit": last_version_commit[:12],
+            "commits": commits
+        })
+
+    print(json.dumps(packages_with_changes, indent=2))
+
+
+if __name__ == "__main__":
+    main()

@@ -70,6 +70,7 @@ class DevProcess(ProcessManager):
             "PYTHONUNBUFFERED": "true",
             "PLAIN_DEV": "true",
             "FORCE_COLOR": "1",
+            "PYTHONWARNINGS": "default::DeprecationWarning,default::PendingDeprecationWarning",
             **os.environ,
         }
 

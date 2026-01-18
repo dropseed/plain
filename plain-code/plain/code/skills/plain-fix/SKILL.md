@@ -15,6 +15,7 @@ Automatically fixes formatting and linting issues using ruff and biome.
 
 - Add `from __future__ import annotations` at the top of Python files
 - Keep imports at the top of the file unless avoiding circular imports
+- Don't include args/returns in docstrings if already type annotated
 
 Options:
 
