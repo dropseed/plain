@@ -648,11 +648,9 @@ class ForeignKeyField(RelatedField):
         return self.target_field.cast_db_type(connection=connection)
 
     def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
-        target_db_parameters = self.target_field.db_parameters(connection)
         return {
             "type": self.db_type(connection),
             "check": self.db_check(connection),
-            "collation": target_db_parameters.get("collation"),
         }
 
     def get_col(self, alias: str | None, output_field: Field | None = None) -> Any:

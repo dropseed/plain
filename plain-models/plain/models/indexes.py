@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Self
 
 from plain.models.backends.utils import names_digest, split_identifier
 from plain.models.expressions import Col, ExpressionList, F, Func, OrderBy
-from plain.models.functions import Collate
 from plain.models.query_utils import Q
 from plain.models.sql import Query
 from plain.utils.functional import partition
@@ -115,7 +114,6 @@ class Index:
             index_expressions = []
             for expression in self.expressions:
                 index_expression = IndexExpression(expression)
-                index_expression.set_wrapper_classes(schema_editor.connection)
                 index_expressions.append(index_expression)
             expressions = ExpressionList(*index_expressions).resolve_expression(
                 Query(model, alias_cols=False),
@@ -224,20 +222,7 @@ class IndexExpression(Func):
     """Order and wrap expressions for CREATE INDEX statements."""
 
     template = "%(expressions)s"
-    wrapper_classes = (OrderBy, Collate)
-
-    def set_wrapper_classes(
-        self, connection: BaseDatabaseWrapper | None = None
-    ) -> None:
-        # Some databases (e.g. MySQL) treats COLLATE as an indexed expression.
-        if connection and connection.features.collate_as_index_expression:
-            self.wrapper_classes = tuple(
-                [
-                    wrapper_cls
-                    for wrapper_cls in self.wrapper_classes
-                    if wrapper_cls is not Collate
-                ]
-            )
+    wrapper_classes = (OrderBy,)
 
     def resolve_expression(
         self,

@@ -31,7 +31,6 @@ class FieldInfoProtocol(Protocol):
     scale: int | None
     null_ok: bool | None
     default: Any
-    collation: str | None
 
 
 class TableInfo(NamedTuple):
@@ -52,7 +51,6 @@ class FieldInfo(NamedTuple):
     scale: int | None
     null_ok: bool | None
     default: Any
-    collation: str | None
 
 
 class BaseDatabaseIntrospection(ABC):

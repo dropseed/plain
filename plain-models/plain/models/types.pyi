@@ -42,7 +42,6 @@ def CharField(
     allow_null: Literal[True],
     default: Any = ...,
     choices: Any = None,
-    db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> str | None: ...
@@ -54,7 +53,6 @@ def CharField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     choices: Any = None,
-    db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> str: ...
@@ -66,7 +64,6 @@ def TextField(
     allow_null: Literal[True],
     default: Any = ...,
     choices: Any = None,
-    db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> str | None: ...
@@ -78,7 +75,6 @@ def TextField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     choices: Any = None,
-    db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> str: ...
@@ -90,7 +86,6 @@ def EmailField(
     allow_null: Literal[True],
     default: Any = ...,
     choices: Any = None,
-    db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> str | None: ...
@@ -102,7 +97,6 @@ def EmailField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     choices: Any = None,
-    db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> str: ...
@@ -114,7 +108,6 @@ def URLField(
     allow_null: Literal[True],
     default: Any = ...,
     choices: Any = None,
-    db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> str | None: ...
@@ -126,7 +119,6 @@ def URLField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     choices: Any = None,
-    db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> str: ...

@@ -23,9 +23,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
 
     # Neither MySQL nor MariaDB support partial indexes.
     supports_partial_indexes = False
-    # COLLATE must be wrapped in parentheses because MySQL treats COLLATE as an
-    # indexed expression.
-    collate_as_index_expression = True
 
     supports_order_by_nulls_modifier = False
     order_by_nulls_first = True

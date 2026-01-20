@@ -23,7 +23,6 @@ def PasswordField(
     allow_null: Literal[True],
     default: Any = ...,
     choices: Any = None,
-    db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> str | None: ...
@@ -34,7 +33,6 @@ def PasswordField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     choices: Any = None,
-    db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> str: ...

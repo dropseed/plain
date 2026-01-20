@@ -455,11 +455,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Alter by remaking table
         self._remake_table(model, alter_fields=[(old_field, new_field)])
         # Rebuild tables with FKs pointing to this field.
-        old_collation = old_db_params.get("collation")
-        new_collation = new_db_params.get("collation")
-        if new_field.primary_key and (
-            old_type != new_type or old_collation != new_collation
-        ):
+        if new_field.primary_key and old_type != new_type:
             from plain.models.fields.reverse_related import ManyToManyRel
 
             related_models = set()
@@ -573,11 +569,3 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             super().remove_constraint(model, constraint)
         else:
             self._remake_table(model)
-
-    def _collate_sql(
-        self,
-        collation: str | None,
-        old_collation: str | None = None,
-        table_name: str | None = None,
-    ) -> str:
-        return "COLLATE " + collation if collation else ""

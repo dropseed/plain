@@ -27,7 +27,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     sql_alter_column_null = "MODIFY %(column)s %(type)s NULL"
     sql_alter_column_not_null = "MODIFY %(column)s %(type)s NOT NULL"
-    sql_alter_column_type = "MODIFY %(column)s %(type)s%(collation)s"
+    sql_alter_column_type = "MODIFY %(column)s %(type)s"
     sql_alter_column_no_default_null = "ALTER COLUMN %(column)s SET DEFAULT NULL"
 
     # No 'CASCADE' which works as a no-op in MySQL but is undocumented
@@ -236,13 +236,9 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         old_field: Field,
         new_field: Field,
         new_type: str,
-        old_collation: str | None,
-        new_collation: str | None,
     ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         new_type = self._set_field_new_type_null_status(old_field, new_type)
-        return super()._alter_column_type_sql(
-            model, old_field, new_field, new_type, old_collation, new_collation
-        )
+        return super()._alter_column_type_sql(model, old_field, new_field, new_type)
 
     def _field_db_check(
         self, field: Field, field_db_params: DbParameters

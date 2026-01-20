@@ -134,8 +134,6 @@ class BaseDatabaseFeatures:
     supports_covering_indexes = False
     # Does the backend support indexes on expressions?
     supports_expression_indexes = True
-    # Does the backend treat COLLATE as an indexed expression?
-    collate_as_index_expression = False
 
     # Does the backend support boolean expressions in SELECT and GROUP BY
     # clauses?
@@ -155,10 +153,6 @@ class BaseDatabaseFeatures:
     supports_json_field_contains = True
     # Does the backend support JSONObject() database function?
     has_json_object_function = True
-
-    # Does the backend support column collations?
-    supports_collation_on_charfield = True
-    supports_collation_on_textfield = True
 
     # Does the backend support the logical XOR operator?
     supports_logical_xor = False

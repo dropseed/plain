@@ -29,7 +29,6 @@ class FieldInfo(NamedTuple):
     scale: int | None
     null_ok: bool | None
     default: Any
-    collation: str | None
     # SQLite-specific extensions
     pk: bool
     has_json_constraint: bool
@@ -114,7 +113,6 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         table_info = cursor.fetchall()
         if not table_info:
             raise DatabaseError(f"Table {table_name} does not exist (empty pragma).")
-        collations = self._get_column_collations(cursor, table_name)
         json_columns = set()
         if self.connection.features.can_introspect_json_field:
             for line in table_info:
@@ -143,7 +141,6 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 None,
                 not notnull,
                 default,
-                collations.get(name),
                 pk == 1,
                 name in json_columns,
             )
@@ -431,32 +428,3 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 columns = str(token).strip("()").split(", ")
                 return ["DESC" if info.endswith("DESC") else "ASC" for info in columns]
         return None
-
-    def _get_column_collations(
-        self, cursor: CursorWrapper, table_name: str
-    ) -> dict[str, str | None]:
-        row = cursor.execute(
-            """
-            SELECT sql
-            FROM sqlite_master
-            WHERE type = 'table' AND name = %s
-        """,
-            [table_name],
-        ).fetchone()
-        if not row:
-            return {}
-
-        sql = row[0]
-        columns = str(sqlparse.parse(sql)[0][-1]).strip("()").split(", ")
-        collations: dict[str, str | None] = {}
-        for column in columns:
-            tokens = column[1:].split()
-            column_name = tokens[0].strip('"')
-            for index, token in enumerate(tokens):
-                if token == "COLLATE":
-                    collation = tokens[index + 1]
-                    break
-            else:
-                collation = None
-            collations[column_name] = collation
-        return collations

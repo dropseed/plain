@@ -113,10 +113,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             # and text[size], so skip them.
             if "[" in db_type:
                 return None
-            # Non-deterministic collations on Postgresql don't support indexes
-            # for operator classes varchar_pattern_ops/text_pattern_ops.
-            if getattr(field, "db_collation", None):
-                return None
             if db_type.startswith("varchar"):
                 return self._create_index_sql(
                     model,
@@ -152,8 +148,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         old_field: Field,
         new_field: Field,
         new_type: str,
-        old_collation: str | None,
-        new_collation: str | None,
     ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         # Drop indexes on varchar/text/citext columns that are changing to a
         # different type.
@@ -170,9 +164,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             )
             self.execute(self._delete_index_sql(model, index_name))
 
-        self.sql_alter_column_type = (
-            "ALTER COLUMN %(column)s TYPE %(type)s%(collation)s"
-        )
+        self.sql_alter_column_type = "ALTER COLUMN %(column)s TYPE %(type)s"
         # Cast when data type changed.
         if using_sql := self._using_sql(new_field, old_field):
             self.sql_alter_column_type += using_sql
@@ -191,7 +183,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                     % {
                         "column": self.quote_name(column),
                         "type": new_type,
-                        "collation": "",
                     },
                     [],
                 ),
@@ -218,7 +209,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             )
             column = strip_quotes(new_field.column)
             fragment, _ = super()._alter_column_type_sql(
-                model, old_field, new_field, new_type, old_collation, new_collation
+                model, old_field, new_field, new_type
             )
             # Drop the sequence if exists (Plain 4.1+ identity columns don't
             # have it).
@@ -236,7 +227,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return fragment, other_actions
         elif new_is_auto and old_is_auto and old_internal_type != new_internal_type:
             fragment, _ = super()._alter_column_type_sql(
-                model, old_field, new_field, new_type, old_collation, new_collation
+                model, old_field, new_field, new_type
             )
             column = strip_quotes(new_field.column)
             db_types = {"PrimaryKeyField": "bigint"}
@@ -256,9 +247,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 ]
             return fragment, other_actions
         else:
-            return super()._alter_column_type_sql(
-                model, old_field, new_field, new_type, old_collation, new_collation
-            )
+            return super()._alter_column_type_sql(model, old_field, new_field, new_type)
 
     def _alter_field(
         self,

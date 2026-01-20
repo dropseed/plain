@@ -57,7 +57,6 @@ class DbParameters(TypedDict, total=False):
 
     type: str | None
     check: str | None
-    collation: str | None
 
 
 __all__ = [
@@ -989,9 +988,8 @@ class BooleanField(Field[bool]):
 
 
 class CharField(Field[str]):
-    def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
+    def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
-        self.db_collation = db_collation
         if self.max_length is not None:
             self.validators.append(validators.MaxLengthValidator(self.max_length))
 
@@ -1005,7 +1003,6 @@ class CharField(Field[str]):
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *super().preflight(**kwargs),
-            *self._check_db_collation(),
             *self._check_max_length_attribute(),
         ]
 
@@ -1039,33 +1036,10 @@ class CharField(Field[str]):
         else:
             return []
 
-    def _check_db_collation(self) -> list[PreflightResult]:
-        errors = []
-        if not (
-            self.db_collation is None
-            or "supports_collation_on_charfield"
-            in self.model.model_options.required_db_features
-            or db_connection.features.supports_collation_on_charfield
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support a database collation on "
-                    "CharFields.",
-                    obj=self,
-                    id="fields.db_collation_unsupported",
-                ),
-            )
-        return errors
-
     def cast_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
         if self.max_length is None:
             return connection.ops.cast_char_field_without_max_length
         return super().cast_db_type(connection)
-
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
-        db_params = super().db_parameters(connection)
-        db_params["collation"] = self.db_collation
-        return db_params
 
     def get_internal_type(self) -> str:
         return "CharField"
@@ -1078,12 +1052,6 @@ class CharField(Field[str]):
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
-
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        if self.db_collation:
-            kwargs["db_collation"] = self.db_collation
-        return name, path, args, kwargs
 
 
 def _to_naive(value: datetime.datetime) -> datetime.datetime:
@@ -1913,39 +1881,6 @@ class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField
 class TextField(Field[str]):
     description = "Text"
 
-    def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
-        super().__init__(**kwargs)
-        self.db_collation = db_collation
-
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        return [
-            *super().preflight(**kwargs),
-            *self._check_db_collation(),
-        ]
-
-    def _check_db_collation(self) -> list[PreflightResult]:
-        errors = []
-        if not (
-            self.db_collation is None
-            or "supports_collation_on_textfield"
-            in self.model.model_options.required_db_features
-            or db_connection.features.supports_collation_on_textfield
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support a database collation on "
-                    "TextFields.",
-                    obj=self,
-                    id="fields.db_collation_unsupported",
-                ),
-            )
-        return errors
-
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
-        db_params = super().db_parameters(connection)
-        db_params["collation"] = self.db_collation
-        return db_params
-
     def get_internal_type(self) -> str:
         return "TextField"
 
@@ -1957,12 +1892,6 @@ class TextField(Field[str]):
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
-
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        if self.db_collation:
-            kwargs["db_collation"] = self.db_collation
-        return name, path, args, kwargs
 
 
 class TimeField(DateTimeCheckMixin, Field[datetime.time]):

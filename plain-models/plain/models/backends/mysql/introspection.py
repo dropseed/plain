@@ -29,7 +29,6 @@ class FieldInfo(NamedTuple):
     scale: int | None
     null_ok: bool | None
     default: Any
-    collation: str | None
     # MySQL-specific extensions
     extra: str
     is_unsigned: bool
@@ -46,7 +45,6 @@ class InfoLine(NamedTuple):
     num_scale: int | None
     extra: str
     column_default: Any
-    collation: str | None
     is_unsigned: bool
 
 
@@ -147,18 +145,6 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 [table_name],
             )
             json_constraints = {row[0] for row in cursor.fetchall()}
-        # A default collation for the given table.
-        cursor.execute(
-            """
-            SELECT  table_collation
-            FROM    information_schema.tables
-            WHERE   table_schema = DATABASE()
-            AND     table_name = %s
-            """,
-            [table_name],
-        )
-        row = cursor.fetchone()
-        default_column_collation = row[0] if row else ""
         # information_schema database gives more accurate results for some figures:
         # - varchar length returned by cursor.description is an internal length,
         #   not visible length (#5725)
@@ -170,17 +156,13 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 column_name, data_type, character_maximum_length,
                 numeric_precision, numeric_scale, extra, column_default,
                 CASE
-                    WHEN collation_name = %s THEN NULL
-                    ELSE collation_name
-                END AS collation_name,
-                CASE
                     WHEN column_type LIKE '%% unsigned' THEN 1
                     ELSE 0
                 END AS is_unsigned
             FROM information_schema.columns
             WHERE table_name = %s AND table_schema = DATABASE()
             """,
-            [default_column_collation, table_name],
+            [table_name],
         )
         field_info = {line[0]: InfoLine(*line) for line in cursor.fetchall()}
 
@@ -204,7 +186,6 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                     scale=to_int(info.num_scale) or line[5],
                     null_ok=line[6],
                     default=info.column_default,
-                    collation=info.collation,
                     extra=info.extra,
                     is_unsigned=info.is_unsigned,
                     has_json_constraint=line[0] in json_constraints,

@@ -8,7 +8,6 @@ from plain.models.db import NotSupportedError
 from plain.models.expressions import Func, Value
 from plain.models.fields import Field, TextField
 from plain.models.fields.json import JSONField
-from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper
@@ -115,34 +114,6 @@ class Coalesce(Func):
             if result is NotImplemented or result is not None:
                 return result
         return None
-
-
-class Collate(Func):
-    function = "COLLATE"
-    template = "%(expressions)s %(function)s %(collation)s"
-    # Inspired from
-    # https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
-    collation_re = _lazy_re_compile(r"^[\w\-]+$")
-
-    def __init__(self, expression: Any, collation: str) -> None:
-        if not (collation and self.collation_re.match(collation)):
-            raise ValueError(f"Invalid collation name: {collation!r}.")
-        self.collation = collation
-        super().__init__(expression)
-
-    def as_sql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        function: str | None = None,
-        template: str | None = None,
-        arg_joiner: str | None = None,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        extra_context.setdefault("collation", connection.ops.quote_name(self.collation))
-        return super().as_sql(
-            compiler, connection, function, template, arg_joiner, **extra_context
-        )
 
 
 class Greatest(Func):
