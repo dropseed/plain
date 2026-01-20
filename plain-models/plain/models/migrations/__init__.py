@@ -7,7 +7,6 @@ from .operations import (
     AlterField,
     AlterModelOptions,
     AlterModelTable,
-    AlterModelTableComment,
     CreateModel,
     DeleteModel,
     RemoveConstraint,
@@ -30,7 +29,6 @@ __all__ = [
     "CreateModel",
     "DeleteModel",
     "AlterModelTable",
-    "AlterModelTableComment",
     "RenameModel",
     "AlterModelOptions",
     # Field operations

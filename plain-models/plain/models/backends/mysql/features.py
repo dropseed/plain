@@ -18,8 +18,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     allows_group_by_selected_pks = True
     related_fields_match_type = True
     has_select_for_update = True
-    supports_comments = True
-    supports_comments_inline = True
     supports_temporal_subtraction = True
     supports_update_conflicts = True
 

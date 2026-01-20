@@ -25,7 +25,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     has_select_for_update_of = True
     has_select_for_update_skip_locked = True
     has_select_for_no_key_update = True
-    supports_comments = True
     supports_transactions = True
     can_rollback_ddl = True
     supports_combined_alters = True

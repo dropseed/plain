@@ -181,7 +181,6 @@ class MigrationAutodetector:
         self.generate_deleted_models()
         self.generate_created_models()
         self.generate_altered_options()
-        self.generate_altered_db_table_comment()
 
         # Create the renamed fields and store them in self.renamed_fields.
         # They are used by create_altered_indexes(), generate_altered_fields(),
@@ -1255,25 +1254,6 @@ class MigrationAutodetector:
                     operations.AlterModelTable(
                         name=model_name,
                         table=new_db_table_name,
-                    ),
-                )
-
-    def generate_altered_db_table_comment(self) -> None:
-        for package_label, model_name in sorted(self.kept_model_keys):
-            old_model_name = self.renamed_models.get(
-                (package_label, model_name), model_name
-            )
-            old_model_state = self.from_state.models[package_label, old_model_name]
-            new_model_state = self.to_state.models[package_label, model_name]
-
-            old_db_table_comment = old_model_state.options.get("db_table_comment")
-            new_db_table_comment = new_model_state.options.get("db_table_comment")
-            if old_db_table_comment != new_db_table_comment:
-                self.add_operation(
-                    package_label,
-                    operations.AlterModelTableComment(
-                        name=model_name,
-                        table_comment=new_db_table_comment,
                     ),
                 )
 

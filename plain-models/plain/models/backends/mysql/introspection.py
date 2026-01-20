@@ -34,7 +34,6 @@ class FieldInfo(NamedTuple):
     extra: str
     is_unsigned: bool
     has_json_constraint: bool
-    comment: str | None
 
 
 class InfoLine(NamedTuple):
@@ -49,17 +48,14 @@ class InfoLine(NamedTuple):
     column_default: Any
     collation: str | None
     is_unsigned: bool
-    comment: str | None
 
 
 class TableInfo(NamedTuple):
-    """MySQL-specific TableInfo extending base with comment support."""
+    """MySQL-specific TableInfo."""
 
     # Fields from BaseTableInfo
     name: str
     type: str
-    # MySQL-specific extension
-    comment: str | None
 
 
 class DatabaseIntrospection(BaseDatabaseIntrospection):
@@ -114,14 +110,13 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             """
             SELECT
                 table_name,
-                table_type,
-                table_comment
+                table_type
             FROM information_schema.tables
             WHERE table_schema = DATABASE()
             """
         )
         return [
-            TableInfo(row[0], {"BASE TABLE": "t", "VIEW": "v"}.get(row[1], "t"), row[2])
+            TableInfo(row[0], {"BASE TABLE": "t", "VIEW": "v"}.get(row[1], "t"))
             for row in cursor.fetchall()
         ]
 
@@ -181,8 +176,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 CASE
                     WHEN column_type LIKE '%% unsigned' THEN 1
                     ELSE 0
-                END AS is_unsigned,
-                column_comment
+                END AS is_unsigned
             FROM information_schema.columns
             WHERE table_name = %s AND table_schema = DATABASE()
             """,
@@ -214,7 +208,6 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                     extra=info.extra,
                     is_unsigned=info.is_unsigned,
                     has_json_constraint=line[0] in json_constraints,
-                    comment=info.comment,
                 )
             )
         return fields

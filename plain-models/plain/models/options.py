@@ -26,7 +26,6 @@ class Options:
     model: type[Model]
     package_label: str
     db_table: str
-    db_table_comment: str
     ordering: Sequence[str]
     indexes: Sequence[Index]
     constraints: Sequence[BaseConstraint]
@@ -38,7 +37,6 @@ class Options:
         self,
         *,
         db_table: str | None = None,
-        db_table_comment: str | None = None,
         ordering: Sequence[str] | None = None,
         indexes: Sequence[Index] | None = None,
         constraints: Sequence[BaseConstraint] | None = None,
@@ -55,7 +53,6 @@ class Options:
         """
         self._config = {
             "db_table": db_table,
-            "db_table_comment": db_table_comment,
             "ordering": ordering,
             "indexes": indexes,
             "constraints": constraints,
@@ -127,7 +124,6 @@ class Options:
         else:
             instance.db_table = db_table
 
-        instance.db_table_comment = self._config.get("db_table_comment") or ""
         instance.ordering = self._config.get("ordering") or []
         instance.indexes = self._config.get("indexes") or []
         instance.constraints = self._config.get("constraints") or []

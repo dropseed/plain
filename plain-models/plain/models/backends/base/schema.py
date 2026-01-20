@@ -161,9 +161,6 @@ class BaseDatabaseSchemaEditor(ABC):
     )
     sql_delete_pk = sql_delete_constraint
 
-    sql_alter_table_comment = "COMMENT ON TABLE %(table)s IS %(comment)s"
-    sql_alter_column_comment = "COMMENT ON COLUMN %(table)s.%(column)s IS %(comment)s"
-
     def __init__(
         self,
         connection: BaseDatabaseWrapper,
@@ -294,8 +291,6 @@ class BaseDatabaseSchemaEditor(ABC):
         yield column_db_type
         if collation := field_db_params.get("collation"):
             yield self._collate_sql(collation)
-        if self.connection.features.supports_comments_inline and field.db_comment:
-            yield self._comment_sql(field.db_comment)
         # Work out nullability.
         null = field.allow_null
         # Include a default value, if requested.
@@ -441,26 +436,6 @@ class BaseDatabaseSchemaEditor(ABC):
         # definition.
         self.execute(sql, params or None)
 
-        if self.connection.features.supports_comments:
-            # Add table comment.
-            if model.model_options.db_table_comment:
-                self.alter_db_table_comment(
-                    model, None, model.model_options.db_table_comment
-                )
-            # Add column comments.
-            if not self.connection.features.supports_comments_inline:
-                for field in model._model_meta.local_fields:
-                    if field.db_comment:
-                        field_db_params = field.db_parameters(
-                            connection=self.connection
-                        )
-                        field_type = field_db_params["type"]
-                        assert field_type is not None
-                        self.execute(
-                            *self._alter_column_comment_sql(
-                                model, field, field_type, field.db_comment
-                            )
-                        )
         # Add any field index (deferred as SQLite _remake_table needs it).
         self.deferred_sql.extend(self._model_indexes_sql(model))
 
@@ -548,20 +523,6 @@ class BaseDatabaseSchemaEditor(ABC):
             if isinstance(sql, Statement):
                 sql.rename_table_references(old_db_table, new_db_table)
 
-    def alter_db_table_comment(
-        self,
-        model: type[Model],
-        old_db_table_comment: str | None,
-        new_db_table_comment: str | None,
-    ) -> None:
-        self.execute(
-            self.sql_alter_table_comment
-            % {
-                "table": self.quote_name(model.model_options.db_table),
-                "comment": self.quote_value(new_db_table_comment or ""),
-            }
-        )
-
     def add_field(self, model: type[Model], field: Field) -> None:
         """
         Create a field on a model. Usually involves adding a column, but may
@@ -629,19 +590,6 @@ class BaseDatabaseSchemaEditor(ABC):
                 "changes": changes_sql,
             }
             self.execute(sql, params)
-        # Add field comment, if required.
-        if (
-            field.db_comment
-            and self.connection.features.supports_comments
-            and not self.connection.features.supports_comments_inline
-        ):
-            field_type = db_params["type"]
-            assert field_type is not None
-            self.execute(
-                *self._alter_column_comment_sql(
-                    model, field, field_type, field.db_comment
-                )
-            )
         # Add an index, if required
         self.deferred_sql.extend(self._field_indexes_sql(model, field))
 
@@ -761,7 +709,6 @@ class BaseDatabaseSchemaEditor(ABC):
             and self._field_should_be_altered(
                 old_field,
                 new_field,
-                ignore={"db_comment"},
             )
         ):
             fk_names = self._constraint_names(
@@ -892,15 +839,11 @@ class BaseDatabaseSchemaEditor(ABC):
         # Type suffix change? (e.g. auto increment).
         old_type_suffix = old_field.db_type_suffix(connection=self.connection)
         new_type_suffix = new_field.db_type_suffix(connection=self.connection)
-        # Type, collation, or comment change?
+        # Type or collation change?
         if (
             old_type != new_type
             or old_type_suffix != new_type_suffix
             or old_collation != new_collation
-            or (
-                self.connection.features.supports_comments
-                and old_field.db_comment != new_field.db_comment
-            )
         ):
             fragment, other_actions = self._alter_column_type_sql(
                 model, old_field, new_field, new_type, old_collation, new_collation
@@ -1170,30 +1113,13 @@ class BaseDatabaseSchemaEditor(ABC):
         an ALTER TABLE statement and a list of extra (sql, params) tuples to
         run once the field is altered.
         """
-        other_actions = []
+        other_actions: list[tuple[str, list[Any]]] = []
         if collate_sql := self._collate_sql(
             new_collation, old_collation, model.model_options.db_table
         ):
             collate_sql = f" {collate_sql}"
         else:
             collate_sql = ""
-        # Comment change?
-        from plain.models.fields.related import ManyToManyField
-
-        comment_sql = ""
-        if self.connection.features.supports_comments and not isinstance(
-            new_field, ManyToManyField
-        ):
-            if old_field.db_comment != new_field.db_comment:
-                # PostgreSQL and Oracle can't execute 'ALTER COLUMN ...' and
-                # 'COMMENT ON ...' at the same time.
-                sql, params = self._alter_column_comment_sql(
-                    model, new_field, new_type, new_field.db_comment
-                )
-                if sql:
-                    other_actions.append((sql, params))
-            if new_field.db_comment:
-                comment_sql = self._comment_sql(new_field.db_comment)
         return (
             (
                 self.sql_alter_column_type
@@ -1201,32 +1127,11 @@ class BaseDatabaseSchemaEditor(ABC):
                     "column": self.quote_name(new_field.column),
                     "type": new_type,
                     "collation": collate_sql,
-                    "comment": comment_sql,
                 },
                 [],
             ),
             other_actions,
         )
-
-    def _alter_column_comment_sql(
-        self,
-        model: type[Model],
-        new_field: Field,
-        new_type: str,
-        new_db_comment: str | None,
-    ) -> tuple[str, list[Any]]:
-        return (
-            self.sql_alter_column_comment
-            % {
-                "table": self.quote_name(model.model_options.db_table),
-                "column": self.quote_name(new_field.column),
-                "comment": self._comment_sql(new_db_comment),
-            },
-            [],
-        )
-
-    def _comment_sql(self, comment: str | None) -> str:
-        return self.quote_value(comment or "")
 
     def _alter_many_to_many(
         self,

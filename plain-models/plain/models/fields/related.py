@@ -768,15 +768,6 @@ class ManyToManyField(RelatedField):
                     warning=True,
                 )
             )
-        if self.db_comment:
-            warnings.append(
-                PreflightResult(
-                    fix="The 'db_comment' option has no effect on ManyToManyField. Remove the 'db_comment' argument.",
-                    obj=self,
-                    id="fields.m2m_db_comment_has_no_effect",
-                    warning=True,
-                )
-            )
 
         return warnings
 

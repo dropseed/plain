@@ -198,7 +198,6 @@ class Field(RegisterLookupMixin, Generic[T]):
         db_column: str | None = None,
         validators: Sequence[Callable[..., Any]] = (),
         error_messages: dict[str, str] | None = None,
-        db_comment: str | None = None,
     ):
         self.name = None  # Set by set_attributes_from_name
         self.max_length = max_length
@@ -212,7 +211,6 @@ class Field(RegisterLookupMixin, Generic[T]):
             choices = list(choices)
         self.choices = choices
         self.db_column = db_column
-        self.db_comment = db_comment
 
         self.primary_key = False
         self.auto_created = False
@@ -243,7 +241,6 @@ class Field(RegisterLookupMixin, Generic[T]):
         return [
             *self._check_field_name(),
             *self._check_choices(),
-            *self._check_db_comment(),
             *self._check_null_allowed_for_primary_keys(),
             *self._check_backend_specific_checks(),
             *self._check_validators(),
@@ -358,25 +355,6 @@ class Field(RegisterLookupMixin, Generic[T]):
             )
         ]
 
-    def _check_db_comment(self) -> list[PreflightResult]:
-        if not self.db_comment:
-            return []
-        errors = []
-        if not (
-            db_connection.features.supports_comments
-            or "supports_comments" in self.model.model_options.required_db_features
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support comments on "
-                    f"columns (db_comment).",
-                    obj=self,
-                    id="fields.db_comment_unsupported",
-                    warning=True,
-                )
-            )
-        return errors
-
     def _check_null_allowed_for_primary_keys(self) -> list[PreflightResult]:
         if self.primary_key and self.allow_null:
             # We cannot reliably check this for backends like Oracle which
@@ -482,7 +460,6 @@ class Field(RegisterLookupMixin, Generic[T]):
             "default": NOT_PROVIDED,
             "choices": None,
             "db_column": None,
-            "db_comment": None,
             "validators": [],
             "error_messages": None,
         }

@@ -903,29 +903,8 @@ class Model(metaclass=ModelBase):
             *cls._check_indexes(),
             *cls._check_ordering(),
             *cls._check_constraints(),
-            *cls._check_db_table_comment(),
         ]
 
-        return errors
-
-    @classmethod
-    def _check_db_table_comment(cls) -> list[PreflightResult]:
-        if not cls.model_options.db_table_comment:
-            return []
-        errors: list[PreflightResult] = []
-        if not (
-            db_connection.features.supports_comments
-            or "supports_comments" in cls.model_options.required_db_features
-        ):
-            errors.append(
-                PreflightResult(
-                    fix=f"{db_connection.display_name} does not support comments on "
-                    f"tables (db_table_comment).",
-                    obj=cls,
-                    id="models.db_table_comment_unsupported",
-                    warning=True,
-                )
-            )
         return errors
 
     @classmethod

@@ -160,11 +160,6 @@ class BaseDatabaseFeatures:
     supports_collation_on_charfield = True
     supports_collation_on_textfield = True
 
-    # Does the backend support column and table comments?
-    supports_comments = False
-    # Does the backend support column comments in ADD COLUMN statements?
-    supports_comments_inline = False
-
     # Does the backend support the logical XOR operator?
     supports_logical_xor = False
 

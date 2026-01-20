@@ -429,47 +429,6 @@ class AlterModelTable(ModelOptionOperation):
         return f"alter_{self.name_lower}_table"
 
 
-class AlterModelTableComment(ModelOptionOperation):
-    def __init__(self, name: str, table_comment: str | None) -> None:
-        self.table_comment = table_comment
-        super().__init__(name)
-
-    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
-        kwargs: dict[str, Any] = {
-            "name": self.name,
-            "table_comment": self.table_comment,
-        }
-        return (self.__class__.__qualname__, (), kwargs)
-
-    def state_forwards(self, package_label: str, state: ProjectState) -> None:
-        state.alter_model_options(
-            package_label, self.name_lower, {"db_table_comment": self.table_comment}
-        )
-
-    def database_forwards(
-        self,
-        package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
-        from_state: ProjectState,
-        to_state: ProjectState,
-    ) -> None:
-        new_model = to_state.models_registry.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection, new_model):
-            old_model = from_state.models_registry.get_model(package_label, self.name)
-            schema_editor.alter_db_table_comment(
-                new_model,
-                old_model.model_options.db_table_comment,
-                new_model.model_options.db_table_comment,
-            )
-
-    def describe(self) -> str:
-        return f"Alter {self.name} table comment"
-
-    @property
-    def migration_name_fragment(self) -> str:
-        return f"alter_{self.name_lower}_table_comment"
-
-
 class AlterModelOptions(ModelOptionOperation):
     """
     Set new model options that don't directly affect the database schema

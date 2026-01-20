@@ -46,7 +46,6 @@ def CharField(
     db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> str | None: ...
 @overload
 def CharField(
@@ -60,7 +59,6 @@ def CharField(
     db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> str: ...
 @overload
 def TextField(
@@ -74,7 +72,6 @@ def TextField(
     db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> str | None: ...
 @overload
 def TextField(
@@ -88,7 +85,6 @@ def TextField(
     db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> str: ...
 @overload
 def EmailField(
@@ -102,7 +98,6 @@ def EmailField(
     db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> str | None: ...
 @overload
 def EmailField(
@@ -116,7 +111,6 @@ def EmailField(
     db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> str: ...
 @overload
 def URLField(
@@ -130,7 +124,6 @@ def URLField(
     db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> str | None: ...
 @overload
 def URLField(
@@ -144,7 +137,6 @@ def URLField(
     db_collation: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> str: ...
 
 # Integer fields
@@ -159,7 +151,6 @@ def IntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int | None: ...
 @overload
 def IntegerField(
@@ -172,7 +163,6 @@ def IntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int: ...
 @overload
 def BigIntegerField(
@@ -185,7 +175,6 @@ def BigIntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int | None: ...
 @overload
 def BigIntegerField(
@@ -198,7 +187,6 @@ def BigIntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int: ...
 @overload
 def SmallIntegerField(
@@ -211,7 +199,6 @@ def SmallIntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int | None: ...
 @overload
 def SmallIntegerField(
@@ -224,7 +211,6 @@ def SmallIntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int: ...
 @overload
 def PositiveIntegerField(
@@ -237,7 +223,6 @@ def PositiveIntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int | None: ...
 @overload
 def PositiveIntegerField(
@@ -250,7 +235,6 @@ def PositiveIntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int: ...
 @overload
 def PositiveBigIntegerField(
@@ -263,7 +247,6 @@ def PositiveBigIntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int | None: ...
 @overload
 def PositiveBigIntegerField(
@@ -276,7 +259,6 @@ def PositiveBigIntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int: ...
 @overload
 def PositiveSmallIntegerField(
@@ -289,7 +271,6 @@ def PositiveSmallIntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int | None: ...
 @overload
 def PositiveSmallIntegerField(
@@ -302,7 +283,6 @@ def PositiveSmallIntegerField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int: ...
 @overload
 def PrimaryKeyField(
@@ -315,7 +295,6 @@ def PrimaryKeyField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int | None: ...
 @overload
 def PrimaryKeyField(
@@ -328,7 +307,6 @@ def PrimaryKeyField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> int: ...
 
 # Numeric fields
@@ -343,7 +321,6 @@ def FloatField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> float | None: ...
 @overload
 def FloatField(
@@ -356,7 +333,6 @@ def FloatField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> float: ...
 @overload
 def DecimalField(
@@ -371,7 +347,6 @@ def DecimalField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> Decimal | None: ...
 @overload
 def DecimalField(
@@ -386,7 +361,6 @@ def DecimalField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> Decimal: ...
 
 # Boolean field
@@ -401,7 +375,6 @@ def BooleanField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> bool | None: ...
 @overload
 def BooleanField(
@@ -414,7 +387,6 @@ def BooleanField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> bool: ...
 
 # Date/time fields
@@ -431,7 +403,6 @@ def DateField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> date | None: ...
 @overload
 def DateField(
@@ -446,7 +417,6 @@ def DateField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> date: ...
 @overload
 def DateTimeField(
@@ -461,7 +431,6 @@ def DateTimeField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> datetime | None: ...
 @overload
 def DateTimeField(
@@ -476,7 +445,6 @@ def DateTimeField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> datetime: ...
 @overload
 def TimeField(
@@ -491,7 +459,6 @@ def TimeField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> time | None: ...
 @overload
 def TimeField(
@@ -506,7 +473,6 @@ def TimeField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> time: ...
 @overload
 def DurationField(
@@ -519,7 +485,6 @@ def DurationField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> timedelta | None: ...
 @overload
 def DurationField(
@@ -532,7 +497,6 @@ def DurationField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> timedelta: ...
 @overload
 def TimeZoneField(
@@ -545,7 +509,6 @@ def TimeZoneField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> ZoneInfo | None: ...
 @overload
 def TimeZoneField(
@@ -558,7 +521,6 @@ def TimeZoneField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> ZoneInfo: ...
 
 # Other fields
@@ -573,7 +535,6 @@ def UUIDField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> UUID | None: ...
 @overload
 def UUIDField(
@@ -586,7 +547,6 @@ def UUIDField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> UUID: ...
 @overload
 def BinaryField(
@@ -599,7 +559,6 @@ def BinaryField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> bytes | None: ...
 @overload
 def BinaryField(
@@ -612,7 +571,6 @@ def BinaryField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> bytes: ...
 @overload
 def GenericIPAddressField(
@@ -627,7 +585,6 @@ def GenericIPAddressField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> str | None: ...
 @overload
 def GenericIPAddressField(
@@ -642,7 +599,6 @@ def GenericIPAddressField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> str: ...
 @overload
 def JSONField(
@@ -657,7 +613,6 @@ def JSONField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> Any: ...
 @overload
 def JSONField(
@@ -672,7 +627,6 @@ def JSONField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> Any: ...
 
 # Related fields
@@ -693,7 +647,6 @@ def ForeignKeyField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> _T | None: ...
 @overload
 def ForeignKeyField(
@@ -712,7 +665,6 @@ def ForeignKeyField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> _T: ...
 def ManyToManyField(
     to: type[_T] | str,
@@ -730,7 +682,6 @@ def ManyToManyField(
     db_column: str | None = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-    db_comment: str | None = None,
 ) -> ManyToManyManager[_T]: ...
 
 # Reverse relation descriptors
