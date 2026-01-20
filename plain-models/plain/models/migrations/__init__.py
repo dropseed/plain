@@ -1,3 +1,4 @@
+from ..backends.base.schema import BaseDatabaseSchemaEditor
 from .migration import Migration, settings_dependency
 from .operations import (
     AddConstraint,
@@ -19,6 +20,7 @@ from .operations import (
     RunSQL,
     SeparateDatabaseAndState,
 )
+from .state import StateModelsRegistry
 
 __all__ = [
     "Migration",
@@ -41,4 +43,7 @@ __all__ = [
     "SeparateDatabaseAndState",
     "RunSQL",
     "RunPython",
+    # Re-exported for type hints in RunPython functions
+    "BaseDatabaseSchemaEditor",
+    "StateModelsRegistry",
 ]
