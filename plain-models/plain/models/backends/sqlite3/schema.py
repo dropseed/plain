@@ -148,7 +148,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return
         old_field_name = old_field.name
         table_name = model.model_options.db_table
-        _, old_column_name = old_field.get_attname_column()
+        old_column_name = old_field.column
         if (
             new_field.name != old_field_name
             and not self.connection.features.supports_atomic_references_rename
@@ -173,7 +173,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                     schema_version = row[0]
                     cursor.execute("PRAGMA writable_schema = 1")
                     references_template = f' REFERENCES "{table_name}" ("%s") '
-                    new_column_name = new_field.get_attname_column()[1]
+                    new_column_name = new_field.column
                     search = references_template % old_column_name
                     replacement = references_template % new_column_name
                     cursor.execute(

@@ -615,11 +615,6 @@ class ForeignKeyField(RelatedField):
     def get_attname(self) -> str:
         return f"{self.name}_id"
 
-    def get_attname_column(self) -> tuple[str, str]:
-        attname = self.get_attname()
-        column = self.db_column or attname
-        return attname, column
-
     def get_default(self) -> Any:
         """Return the to_field if the default value is an object."""
         field_default = super().get_default()

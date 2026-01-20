@@ -1344,7 +1344,6 @@ class BaseDatabaseSchemaEditor(ABC):
         # - changing only a field name
         # - changing an attribute that doesn't affect the schema
         # - changing an attribute in the provided set of ignored attributes
-        # - adding only a db_column and the column name is not changed
         for attr in ignore.union(old_field.non_db_attrs):
             old_kwargs.pop(attr, None)
         for attr in ignore.union(new_field.non_db_attrs):

@@ -1797,8 +1797,7 @@ class RawQuerySet:
         model = self.model
         assert model is not None
         for field in model._model_meta.fields:
-            name, column = field.get_attname_column()
-            model_fields[converter(column)] = field
+            model_fields[converter(field.column)] = field
         return model_fields
 
 

@@ -117,9 +117,8 @@ def _load_field(
 #   * attname:   The attribute to use on the model object. This is the same as
 #                "name", except in the case of ForeignKeys, where "_id" is
 #                appended.
-#   * db_column: The db_column specified in the model (or None).
 #   * column:    The database column for this field. This is the same as
-#                "attname", except if db_column is specified.
+#                "attname".
 #
 # Code that introspects values, or does other dynamic things, should use
 # attname.
@@ -146,7 +145,6 @@ class Field(RegisterLookupMixin, Generic[T]):
     # Set by __init__
     name: str | None
     max_length: int | None
-    db_column: str | None
     # Set by set_attributes_from_name (called by contribute_to_class)
     attname: str
     column: str
@@ -172,7 +170,6 @@ class Field(RegisterLookupMixin, Generic[T]):
     non_db_attrs = (
         "required",
         "choices",
-        "db_column",
         "error_messages",
         "limit_choices_to",
         # Database-level options are not supported, see #21961.
@@ -195,7 +192,6 @@ class Field(RegisterLookupMixin, Generic[T]):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         choices: Any = None,
-        db_column: str | None = None,
         validators: Sequence[Callable[..., Any]] = (),
         error_messages: dict[str, str] | None = None,
     ):
@@ -210,7 +206,6 @@ class Field(RegisterLookupMixin, Generic[T]):
         if isinstance(choices, collections.abc.Iterator):
             choices = list(choices)
         self.choices = choices
-        self.db_column = db_column
 
         self.primary_key = False
         self.auto_created = False
@@ -459,7 +454,6 @@ class Field(RegisterLookupMixin, Generic[T]):
             "allow_null": False,
             "default": NOT_PROVIDED,
             "choices": None,
-            "db_column": None,
             "validators": [],
             "error_messages": None,
         }
@@ -739,7 +733,8 @@ class Field(RegisterLookupMixin, Generic[T]):
 
     def set_attributes_from_name(self, name: str) -> None:
         self.name = self.name or name
-        self.attname, self.column = self.get_attname_column()
+        self.attname = self.get_attname()
+        self.column = self.attname
         self.concrete = self.column is not None
 
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
@@ -831,11 +826,6 @@ class Field(RegisterLookupMixin, Generic[T]):
     def get_attname(self) -> str:
         assert self.name is not None  # Field name must be set
         return self.name
-
-    def get_attname_column(self) -> tuple[str, str]:
-        attname = self.get_attname()
-        column = self.db_column or attname
-        return attname, column
 
     def get_internal_type(self) -> str:
         return self.__class__.__name__
