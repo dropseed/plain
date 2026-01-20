@@ -23,27 +23,33 @@ from .operations import (
 from .state import StateModelsRegistry
 
 __all__ = [
+    # Migration class
     "Migration",
     "settings_dependency",
+    # Model operations
     "CreateModel",
     "DeleteModel",
     "AlterModelTable",
     "AlterModelTableComment",
     "RenameModel",
     "AlterModelOptions",
-    "AddIndex",
-    "RemoveIndex",
-    "RenameIndex",
+    # Field operations
     "AddField",
     "RemoveField",
     "AlterField",
     "RenameField",
+    # Index operations
+    "AddIndex",
+    "RemoveIndex",
+    "RenameIndex",
+    # Constraint operations
     "AddConstraint",
     "RemoveConstraint",
+    # Special operations
     "SeparateDatabaseAndState",
     "RunSQL",
     "RunPython",
-    # Re-exported for type hints in RunPython functions
+    # Type hints for RunPython functions
     "BaseDatabaseSchemaEditor",
     "StateModelsRegistry",
 ]
