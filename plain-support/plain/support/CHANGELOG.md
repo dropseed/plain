@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.31.1](https://github.com/dropseed/plain/releases/plain-support@0.31.1) (2026-01-22)
+
+### What's changed
+
+- Migration now uses `settings.AUTH_USER_MODEL` instead of hardcoded `"users.user"`, enabling support for projects with custom user models ([76e28f6](https://github.com/dropseed/plain/commit/76e28f6))
+
+### Upgrade instructions
+
+- No changes required
+
 ## [0.31.0](https://github.com/dropseed/plain/releases/plain-support@0.31.0) (2026-01-15)
 
 ### What's changed
