@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
                         allow_null=True,
                         on_delete=plain.models.deletion.SET_NULL,
                         required=False,
-                        to="users.user",
+                        to=settings.AUTH_USER_MODEL,
                     ),
                 ),
             ],

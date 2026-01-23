@@ -3,13 +3,14 @@
 import plain.models.deletion
 from plain import models
 from plain.models import migrations
+from plain.runtime import settings
 
 
 class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("users", "0001_initial"),
+        migrations.settings_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
@@ -23,7 +24,8 @@ class Migration(migrations.Migration):
                 (
                     "user",
                     models.ForeignKeyField(
-                        on_delete=plain.models.deletion.CASCADE, to="users.user"
+                        on_delete=plain.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
                     ),
                 ),
             ],
