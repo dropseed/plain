@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.43.2](https://github.com/dropseed/plain/releases/plain-jobs@0.43.2) (2026-01-22)
+
+### What's changed
+
+- Fixed `JobProcess.defer()` to use `self.id` instead of the deprecated `self.pk` attribute when restoring the job process ID after a failed re-enqueue attempt. This aligns with the change made in v0.25.0 where the `pk` alias was removed. ([08863e0fb0](https://github.com/dropseed/plain/commit/08863e0fb0))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.43.1](https://github.com/dropseed/plain/releases/plain-jobs@0.43.1) (2026-01-22)
 
 ### What's changed
