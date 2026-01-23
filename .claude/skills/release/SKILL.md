@@ -117,20 +117,14 @@ uv sync
 
 For each package to release:
 
-1. Show the diff of pyproject.toml and CHANGELOG.md:
+```
+git add <package>/pyproject.toml <package>/**/CHANGELOG.md
+git add-hunks uv.lock --grep "<package-with-dot>" --context
+git commit -m "Release <package> <version>" -n
+git tag -a "<package>@<version>" -m "Release <package> <version>"
+```
 
-    ```
-    git diff --color=always <package>/pyproject.toml <package>/**/CHANGELOG.md
-    ```
-
-2. Ask user to confirm commit
-
-3. If confirmed:
-    ```
-    git add <package>/pyproject.toml <package>/**/CHANGELOG.md uv.lock
-    git commit -m "Release <package> <version>" -n
-    git tag -a "<package>@<version>" -m "Release <package> <version>"
-    ```
+Note: `<package-with-dot>` uses dot notation (e.g., "plain.dev" for plain-dev).
 
 ### Phase 8: Push
 
