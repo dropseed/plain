@@ -128,7 +128,7 @@ Note: `<package-with-dot>` uses dot notation (e.g., "plain.dev" for plain-dev).
 
 ### Phase 8: Push
 
-Ask user if they want to push all changes:
+Push all commits and tags:
 
 ```
 git push --follow-tags
