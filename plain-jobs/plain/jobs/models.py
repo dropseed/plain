@@ -308,7 +308,7 @@ class JobProcess(models.Model):
 
         with transaction.atomic():
             # 1. Save JobProcess state and delete (releases concurrency slot)
-            saved_pk = self.pk
+            saved_id = self.id
             job_process_uuid = self.uuid
             job_request_uuid = self.job_request_uuid
             started_at = self.started_at
@@ -326,8 +326,8 @@ class JobProcess(models.Model):
 
             # Check if re-enqueue failed
             if new_job_request is None:
-                # Restore pk since transaction will roll back and object still exists
-                self.pk = saved_pk
+                # Restore id since transaction will roll back and object still exists
+                self.id = saved_id
                 raise DeferError(
                     f"Failed to re-enqueue deferred job {self.job_class}: "
                     f"concurrency limit reached for key '{self.concurrency_key}'"
