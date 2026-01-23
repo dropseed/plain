@@ -1,5 +1,27 @@
 # plain-models changelog
 
+## [0.76.0](https://github.com/dropseed/plain/releases/plain-models@0.76.0) (2026-01-22)
+
+### What's changed
+
+- Removed the `db_column` field parameter - column names are now always derived from the field name ([eed1bb6](https://github.com/dropseed/plain/commit/eed1bb6811))
+- Removed the `db_collation` field parameter from `CharField` and `TextField` - use raw SQL or database-level collation settings instead ([49b362d](https://github.com/dropseed/plain/commit/49b362d3d3))
+- Removed the `Collate` database function from `plain.models.functions` ([49b362d](https://github.com/dropseed/plain/commit/49b362d3d3))
+- Removed the `db_comment` field parameter and `db_table_comment` model option - database comments are no longer supported ([eb5aabb](https://github.com/dropseed/plain/commit/eb5aabb5ca))
+- Removed the `AlterModelTableComment` migration operation ([eb5aabb](https://github.com/dropseed/plain/commit/eb5aabb5ca))
+- Added `BaseDatabaseSchemaEditor` and `StateModelsRegistry` exports from `plain.models.migrations` for use in type annotations in `RunPython` functions ([672aa88](https://github.com/dropseed/plain/commit/672aa8861a))
+
+### Upgrade instructions
+
+- Remove any `db_column` arguments from field definitions - the column name will always match the field's attribute name (with `_id` suffix for foreign keys)
+- Remove `db_column` from all migrations
+- Remove any `db_collation` arguments from `CharField` and `TextField` definitions
+- Replace any usage of `Collate()` function with raw SQL queries or configure collation at the database level
+- Remove any `db_comment` arguments from field definitions
+- Remove `db_comment` from all migrations
+- Remove any `db_table_comment` from `model_options` definitions
+- Replace `AlterModelTableComment` migration operations with `RunSQL` if database comments are still needed
+
 ## [0.75.0](https://github.com/dropseed/plain/releases/plain-models@0.75.0) (2026-01-15)
 
 ### What's changed
