@@ -21,19 +21,19 @@ See /admin/style/ for the full style guide.
 
   /* Semantic */
   --plain-success: #3d7a5a;
-  --plain-success-light: #3d7a5a20;
+  --plain-success-light: #3d7a5a40;
   --plain-success-text: #2d5a42;
   --plain-success-border: #326349;
   --plain-warning: #c27c3e;
-  --plain-warning-light: #c27c3e20;
+  --plain-warning-light: #c27c3e40;
   --plain-warning-text: #8a5a2c;
   --plain-warning-border: #a66a35;
   --plain-danger: #a64b4b;
-  --plain-danger-light: #a64b4b20;
+  --plain-danger-light: #a64b4b40;
   --plain-danger-text: #7a3636;
   --plain-danger-border: #8c3f3f;
   --plain-info: #5c7a99;
-  --plain-info-light: #5c7a9920;
+  --plain-info-light: #5c7a9940;
   --plain-info-text: #4a5d73;
 
   /* Status badge colors - derived from semantic */
