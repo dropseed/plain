@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.62.1](https://github.com/dropseed/plain/releases/plain-admin@0.62.1) (2026-01-22)
+
+### What's changed
+
+- Admin migrations now use the swappable `AUTH_USER_MODEL` setting instead of hardcoding `users.user`, allowing projects with custom user models to properly reference their user model in the `PinnedNavItem` migration ([76e28f6](https://github.com/dropseed/plain/commit/76e28f6197))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.62.0](https://github.com/dropseed/plain/releases/plain-admin@0.62.0) (2026-01-15)
 
 ### What's changed
