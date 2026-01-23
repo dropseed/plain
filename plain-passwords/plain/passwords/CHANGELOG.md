@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-passwords@0.23.0) (2026-01-22)
+
+### What's changed
+
+- Removed `db_column`, `db_collation`, and `db_comment` parameters from `PasswordField` type stubs to match upstream plain-models changes ([eed1bb6](https://github.com/dropseed/plain/commit/eed1bb6811), [49b362d](https://github.com/dropseed/plain/commit/49b362d3d3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-passwords@0.22.0) (2026-01-13)
 
 ### What's changed
