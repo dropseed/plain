@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.43.1](https://github.com/dropseed/plain/releases/plain-jobs@0.43.1) (2026-01-22)
+
+### What's changed
+
+- Fixed handling of `DeferError` when a job re-enqueue fails due to concurrency limits. Previously, if a deferred job couldn't be re-enqueued because the concurrency limit was already reached, the transaction would roll back but leave the `JobProcess` in an inconsistent state. Now the job is properly marked as errored with a descriptive error message, and the `pk` is restored so the job can be found again. ([10ecfc6dd7](https://github.com/dropseed/plain/commit/10ecfc6dd7))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.43.0](https://github.com/dropseed/plain/releases/plain-jobs@0.43.0) (2026-01-15)
 
 ### What's changed
