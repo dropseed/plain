@@ -539,7 +539,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-dev"
-version = "0.53.0"
+version = "0.54.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
@@ -643,7 +643,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.43.0"
+version = "0.43.1"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
@@ -681,7 +681,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.75.0"
+version = "0.76.0"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -790,7 +790,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-passwords"
-version = "0.22.0"
+version = "0.23.0"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },

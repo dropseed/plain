@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.54.0](https://github.com/dropseed/plain/releases/plain-dev@0.54.0) (2026-01-22)
+
+### What's changed
+
+- The development server now shows `DeprecationWarning` and `PendingDeprecationWarning` messages by default, helping you catch deprecated code before it breaks in future versions. You can override this by setting your own `PYTHONWARNINGS` environment variable. ([2ca42c6f96](https://github.com/dropseed/plain/commit/2ca42c6f96))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.53.0](https://github.com/dropseed/plain/releases/plain-dev@0.53.0) (2026-01-15)
 
 ### What's changed
