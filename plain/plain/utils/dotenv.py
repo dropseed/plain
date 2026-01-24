@@ -46,7 +46,9 @@ def load_dotenv(
     if not path.exists():
         return False
 
-    env_vars = parse_dotenv(path)
+    # Skip command execution for keys that already exist (unless override)
+    skip_commands_for = None if override else set(os.environ.keys())
+    env_vars = _parse_dotenv_internal(path, skip_commands_for=skip_commands_for)
     for key, value in env_vars.items():
         if override or key not in os.environ:
             os.environ[key] = value
@@ -60,12 +62,28 @@ def parse_dotenv(filepath: str | Path) -> dict[str, str]:
 
     Does not modify os.environ. Supports multiline values in quoted strings.
     """
+    return _parse_dotenv_internal(filepath, skip_commands_for=None)
+
+
+def _parse_dotenv_internal(
+    filepath: str | Path, skip_commands_for: set[str] | None = None
+) -> dict[str, str]:
+    """
+    Internal parser that can skip command execution for certain keys.
+
+    Args:
+        filepath: Path to the .env file
+        skip_commands_for: If provided, skip command substitution for keys in this set
+                          and use os.environ value instead
+    """
     path = Path(filepath)
     content = path.read_text(encoding="utf-8")
-    return _parse_content(content)
+    return _parse_content(content, skip_commands_for=skip_commands_for)
 
 
-def _parse_content(content: str) -> dict[str, str]:
+def _parse_content(
+    content: str, skip_commands_for: set[str] | None = None
+) -> dict[str, str]:
     """Parse .env file content and return key-value pairs."""
     result: dict[str, str] = {}
     pos = 0
@@ -85,7 +103,7 @@ def _parse_content(content: str) -> dict[str, str]:
             continue
 
         # Try to parse a binding
-        parsed = _parse_binding(content, pos, result)
+        parsed = _parse_binding(content, pos, result, skip_commands_for)
         if parsed:
             key, value, new_pos = parsed
             result[key] = value
@@ -109,7 +127,10 @@ def _skip_to_eol(content: str, pos: int) -> int:
 
 
 def _parse_binding(
-    content: str, pos: int, context: dict[str, str]
+    content: str,
+    pos: int,
+    context: dict[str, str],
+    skip_commands_for: set[str] | None = None,
 ) -> tuple[str, str, int] | None:
     """Parse a KEY=value binding, return (key, value, new_pos) or None."""
     length = len(content)
@@ -147,7 +168,13 @@ def _parse_binding(
     while pos < length and content[pos] in " \t":
         pos += 1
 
-    # Parse value
+    # If key already exists in env and we should skip commands, use existing value
+    if skip_commands_for and key in skip_commands_for:
+        # Skip to end of line without executing commands
+        new_pos = _skip_to_eol(content, pos)
+        return key, os.environ[key], new_pos
+
+    # Parse value (with command expansion)
     value, pos = _parse_value(content, pos, context)
 
     return key, value, pos
@@ -337,7 +364,7 @@ def _execute_command(command: str, timeout: float = 5.0) -> str:
         result = subprocess.run(
             command,
             shell=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
             text=True,
             timeout=timeout,
         )
