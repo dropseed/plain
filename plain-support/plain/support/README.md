@@ -3,9 +3,8 @@
 **Provides support forms for your application.**
 
 - [Overview](#overview)
-- [Configuration](#configuration)
-    - [Settings](#settings)
-    - [Custom forms](#custom-forms)
+- [Settings](#settings)
+- [Custom forms](#custom-forms)
 - [Views](#views)
     - [Embedded forms](#embedded-forms)
 - [Security considerations](#security-considerations)
@@ -37,14 +36,16 @@ SUPPORT_EMAIL = "support@example.com"
 
 This creates a support form at `/support/form/default/` that users can fill out. When submitted, an email is sent to your `SUPPORT_EMAIL` address with the user's name, email, and message.
 
-## Configuration
+## Settings
 
-### Settings
+| Setting         | Default              | Env var               |
+| --------------- | -------------------- | --------------------- |
+| `SUPPORT_EMAIL` | Required             | `PLAIN_SUPPORT_EMAIL` |
+| `SUPPORT_FORMS` | `{"default": "..."}` | -                     |
 
-- `SUPPORT_EMAIL` (required): The email address where support requests are sent
-- `SUPPORT_FORMS`: A dictionary mapping form slugs to form classes (defaults to `{"default": "plain.support.forms.SupportForm"}`)
+See [`default_settings.py`](./default_settings.py) for more details.
 
-### Custom forms
+## Custom forms
 
 You can create custom support forms by extending [`SupportForm`](./forms.py#SupportForm). The form uses [ModelForm](/plain/plain/models/README.md#modelform) from `plain.models.forms`.
 

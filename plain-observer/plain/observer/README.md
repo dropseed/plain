@@ -131,23 +131,12 @@ The admin views let you:
 
 ## Settings
 
-Observer uses these settings with sensible defaults.
+| Setting                        | Default | Env var                                     |
+| ------------------------------ | ------- | ------------------------------------------- |
+| `OBSERVER_IGNORE_URL_PATTERNS` | `[...]` | `PLAIN_OBSERVER_IGNORE_URL_PATTERNS` (JSON) |
+| `OBSERVER_TRACE_LIMIT`         | `100`   | `PLAIN_OBSERVER_TRACE_LIMIT`                |
 
-```python
-# app/settings.py
-
-# URL patterns to ignore (regex patterns)
-OBSERVER_IGNORE_URL_PATTERNS = [
-    "/assets/.*",
-    "/observer/.*",
-    "/pageviews/.*",
-    "/favicon.ico",
-    "/.well-known/.*",
-]
-
-# Maximum number of traces to keep in the database (oldest are deleted)
-OBSERVER_TRACE_LIMIT = 100
-```
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

@@ -13,6 +13,7 @@
     - [Linking to markdown URLs](#linking-to-markdown-urls)
 - [Frontmatter](#frontmatter)
 - [Custom views](#custom-views)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -199,6 +200,14 @@ The main view classes are:
 - [`PageRedirectView`](./views.py#PageRedirectView): Handles redirects
 - [`PageAssetView`](./views.py#PageAssetView): Serves static assets
 - [`PageMarkdownView`](./views.py#PageMarkdownView): Serves raw markdown content
+
+## Settings
+
+| Setting                | Default | Env var |
+| ---------------------- | ------- | ------- |
+| `PAGES_SERVE_MARKDOWN` | `False` | -       |
+
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

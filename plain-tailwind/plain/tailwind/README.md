@@ -8,9 +8,8 @@
     - [`plain tailwind build`](#plain-tailwind-build)
     - [`plain tailwind update`](#plain-tailwind-update)
 - [Template tag](#template-tag)
-- [Configuration](#configuration)
-    - [Custom source and output paths](#custom-source-and-output-paths)
-    - [Adding custom CSS](#adding-custom-css)
+- [Settings](#settings)
+- [Adding custom CSS](#adding-custom-css)
 - [Deployment](#deployment)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -109,22 +108,14 @@ The `tailwind_css` template tag includes the compiled CSS file in your templates
 
 The tag renders a `<link>` element pointing to your compiled CSS file.
 
-## Configuration
+## Settings
 
-### Custom source and output paths
+| Setting              | Default                       | Env var |
+| -------------------- | ----------------------------- | ------- |
+| `TAILWIND_SRC_PATH`  | `<project>/tailwind.css`      | -       |
+| `TAILWIND_DIST_PATH` | `app/assets/tailwind.min.css` | -       |
 
-You can customize where the source and compiled CSS files are located by setting these in your `app/settings.py`:
-
-```python
-# app/settings.py
-from pathlib import Path
-
-# Source CSS file (default: project_root/tailwind.css)
-TAILWIND_SRC_PATH = Path("/path/to/your/tailwind.css")
-
-# Compiled CSS output (default: app/assets/tailwind.min.css)
-TAILWIND_DIST_PATH = Path("/path/to/output/tailwind.min.css")
-```
+See [`default_settings.py`](./default_settings.py) for more details.
 
 The Tailwind version is tracked in your `pyproject.toml`:
 
@@ -135,7 +126,7 @@ version = "4.0.0"
 
 When you run `plain tailwind build`, it automatically checks if your local installation matches this version and updates if needed.
 
-### Adding custom CSS
+## Adding custom CSS
 
 Add custom CSS to your source file (by default `tailwind.css` at the project root):
 

@@ -10,6 +10,7 @@
 - [Admin interface](#admin-interface)
 - [Job history](#job-history)
 - [Monitoring](#monitoring)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -166,19 +167,7 @@ Job execution history is stored in the [`JobResult`](./models.py#JobResult) mode
 - Error messages and tracebacks for failed jobs
 - Worker information
 
-History retention is controlled by the `JOBS_RESULTS_RETENTION` setting (defaults to 7 days):
-
-```python
-# app/settings.py
-JOBS_RESULTS_RETENTION = 60 * 60 * 24 * 30  # 30 days (in seconds)
-```
-
-Job timeout can be configured with `JOBS_TIMEOUT` (defaults to 1 day):
-
-```python
-# app/settings.py
-JOBS_TIMEOUT = 60 * 60 * 24  # 1 day (in seconds)
-```
+See [Settings](#settings) for configuring job retention and timeouts.
 
 ## Monitoring
 
@@ -196,6 +185,17 @@ The worker integrates with OpenTelemetry for distributed tracing. Spans are crea
 - Job completion/failure
 
 Jobs can be linked to the originating trace context, allowing you to track jobs initiated from web requests.
+
+## Settings
+
+| Setting                  | Default           | Env var                        |
+| ------------------------ | ----------------- | ------------------------------ |
+| `JOBS_RESULTS_RETENTION` | `604800` (7 days) | `PLAIN_JOBS_RESULTS_RETENTION` |
+| `JOBS_TIMEOUT`           | `86400` (1 day)   | `PLAIN_JOBS_TIMEOUT`           |
+| `JOBS_MIDDLEWARE`        | `[...]`           | `PLAIN_JOBS_MIDDLEWARE`        |
+| `JOBS_SCHEDULE`          | `[]`              | `PLAIN_JOBS_SCHEDULE`          |
+
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

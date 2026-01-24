@@ -12,6 +12,7 @@
     - [`plain dev services`](#plain-dev-services)
     - [`plain dev logs`](#plain-dev-logs)
     - [`plain pre-commit`](#plain-pre-commit)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -101,6 +102,15 @@ Runs:
 - `plain makemigrations --dry-run --check`
 - `plain build`
 - `plain test`
+
+## Settings
+
+| Setting                     | Default            | Env var |
+| --------------------------- | ------------------ | ------- |
+| `DEV_REQUESTS_IGNORE_PATHS` | `["/favicon.ico"]` | -       |
+| `DEV_REQUESTS_MAX`          | `50`               | -       |
+
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

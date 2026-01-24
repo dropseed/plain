@@ -4,7 +4,7 @@
 
 - [Overview](#overview)
 - [Basic usage](#basic-usage)
-- [Session configuration](#session-configuration)
+- [Settings](#settings)
 - [Session expiration](#session-expiration)
 - [Session management](#session-management)
     - [Flushing sessions](#flushing-sessions)
@@ -55,40 +55,21 @@ session['key'] = 'value'
 
 The session data is automatically saved when you set or delete values. Sessions are stored in the database using the [`Session`](./models.py#Session) model.
 
-## Session configuration
+## Settings
 
-You can configure sessions through various settings:
+| Setting                           | Default             | Env var |
+| --------------------------------- | ------------------- | ------- |
+| `SESSION_COOKIE_NAME`             | `"sessionid"`       | -       |
+| `SESSION_COOKIE_AGE`              | `1209600` (2 weeks) | -       |
+| `SESSION_COOKIE_DOMAIN`           | `None`              | -       |
+| `SESSION_COOKIE_SECURE`           | `True`              | -       |
+| `SESSION_COOKIE_PATH`             | `"/"`               | -       |
+| `SESSION_COOKIE_HTTPONLY`         | `True`              | -       |
+| `SESSION_COOKIE_SAMESITE`         | `"Lax"`             | -       |
+| `SESSION_SAVE_EVERY_REQUEST`      | `False`             | -       |
+| `SESSION_EXPIRE_AT_BROWSER_CLOSE` | `False`             | -       |
 
-```python
-# Cookie name (default: "sessionid")
-SESSION_COOKIE_NAME = "sessionid"
-
-# Age of cookie in seconds (default: 2 weeks)
-SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 * 2
-
-# Domain for session cookie (None for standard domain cookie)
-SESSION_COOKIE_DOMAIN = None
-
-# Whether the session cookie should be secure (https:// only)
-SESSION_COOKIE_SECURE = True
-
-# The path of the session cookie
-SESSION_COOKIE_PATH = "/"
-
-# Whether to use the HttpOnly flag
-SESSION_COOKIE_HTTPONLY = True
-
-# Whether to set the flag restricting cookie leaks on cross-site requests
-# Can be 'Lax', 'Strict', 'None', or False
-SESSION_COOKIE_SAMESITE = "Lax"
-
-# Whether to save the session data on every request
-# False (default) = save only when modified, True = save on every access
-SESSION_SAVE_EVERY_REQUEST = False
-
-# Whether a user's session cookie expires when the browser is closed
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-```
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## Session expiration
 

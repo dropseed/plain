@@ -12,6 +12,7 @@
     - [Password change](#password-change)
     - [Password reset](#password-reset)
 - [Forms](#forms)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -217,6 +218,14 @@ Several forms are available for building custom authentication flows:
 - [`PasswordSetForm`](./forms.py#PasswordSetForm) - Set a new password without the old one
 - [`PasswordChangeForm`](./forms.py#PasswordChangeForm) - Change password with current password verification
 - [`PasswordResetForm`](./forms.py#PasswordResetForm) - Request a password reset email
+
+## Settings
+
+| Setting            | Default | Env var                         |
+| ------------------ | ------- | ------------------------------- |
+| `PASSWORD_HASHERS` | `[...]` | `PLAIN_PASSWORD_HASHERS` (JSON) |
+
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

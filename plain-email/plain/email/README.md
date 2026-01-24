@@ -7,8 +7,7 @@
     - [Sending HTML emails](#sending-html-emails)
     - [Template-based emails](#template-based-emails)
     - [Attachments](#attachments)
-- [Configuration](#configuration)
-    - [SMTP settings](#smtp-settings)
+- [Settings](#settings)
 - [Email backends](#email-backends)
     - [SMTP backend](#smtp-backend)
     - [Console backend](#console-backend)
@@ -120,43 +119,25 @@ email.attach_file("/path/to/report.pdf")
 email.send()
 ```
 
-## Configuration
+## Settings
 
-Configure email settings in your `settings.py`:
+| Setting                  | Default       | Env var                        |
+| ------------------------ | ------------- | ------------------------------ |
+| `EMAIL_BACKEND`          | Required      | `PLAIN_EMAIL_BACKEND`          |
+| `EMAIL_DEFAULT_FROM`     | Required      | `PLAIN_EMAIL_DEFAULT_FROM`     |
+| `EMAIL_DEFAULT_REPLY_TO` | `None`        | `PLAIN_EMAIL_DEFAULT_REPLY_TO` |
+| `EMAIL_HOST`             | `"localhost"` | `PLAIN_EMAIL_HOST`             |
+| `EMAIL_PORT`             | `587`         | `PLAIN_EMAIL_PORT`             |
+| `EMAIL_HOST_USER`        | `""`          | `PLAIN_EMAIL_HOST_USER`        |
+| `EMAIL_HOST_PASSWORD`    | `""`          | `PLAIN_EMAIL_HOST_PASSWORD`    |
+| `EMAIL_USE_TLS`          | `True`        | `PLAIN_EMAIL_USE_TLS`          |
+| `EMAIL_USE_SSL`          | `False`       | `PLAIN_EMAIL_USE_SSL`          |
+| `EMAIL_TIMEOUT`          | `None`        | `PLAIN_EMAIL_TIMEOUT`          |
+| `EMAIL_SSL_CERTFILE`     | `None`        | `PLAIN_EMAIL_SSL_CERTFILE`     |
+| `EMAIL_SSL_KEYFILE`      | `None`        | `PLAIN_EMAIL_SSL_KEYFILE`      |
+| `EMAIL_USE_LOCALTIME`    | `False`       | `PLAIN_EMAIL_USE_LOCALTIME`    |
 
-```python
-# settings.py
-
-# Required: The backend to use for sending emails
-EMAIL_BACKEND = "plain.email.backends.smtp.EmailBackend"
-
-# Required: Default "From" address for outgoing emails
-EMAIL_DEFAULT_FROM = "noreply@example.com"
-
-# Optional: Default "Reply-To" addresses
-EMAIL_DEFAULT_REPLY_TO = ["support@example.com"]
-```
-
-### SMTP settings
-
-When using the SMTP backend, configure your mail server:
-
-```python
-# settings.py
-
-EMAIL_HOST = "smtp.example.com"
-EMAIL_PORT = 587
-EMAIL_HOST_USER = "your-username"
-EMAIL_HOST_PASSWORD = "your-password"
-EMAIL_USE_TLS = True  # Use STARTTLS
-EMAIL_USE_SSL = False  # Use implicit SSL (mutually exclusive with TLS)
-
-# Optional settings
-EMAIL_TIMEOUT = 10  # Connection timeout in seconds
-EMAIL_SSL_CERTFILE = None  # Path to SSL certificate file
-EMAIL_SSL_KEYFILE = None  # Path to SSL key file
-EMAIL_USE_LOCALTIME = False  # Use local time in Date header (default: UTC)
-```
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## Email backends
 
