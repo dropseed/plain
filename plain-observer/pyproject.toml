@@ -12,6 +12,11 @@ dependencies = [
     "opentelemetry-sdk>=1.34.1",
 ]
 
+[project.optional-dependencies]
+otlp = [
+    "opentelemetry-exporter-otlp-proto-http>=1.34.1",
+]
+
 [dependency-groups]
 dev = [
     "plain.pytest<1.0.0",

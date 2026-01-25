@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import re
 import threading
 from collections import defaultdict
@@ -15,6 +16,7 @@ from opentelemetry.semconv.attributes import url_attributes
 from opentelemetry.trace import (
     Link,
     SpanKind,
+    StatusCode,
     TraceState,
     format_span_id,
     format_trace_id,
@@ -31,6 +33,7 @@ if TYPE_CHECKING:
     from plain.observer.models import Span as ObserverSpanModel
     from plain.observer.models import Trace as TraceModel
 
+    from .export import BackgroundTraceExporter
     from .logging import ObserverLogEntry
 
 logger = logging.getLogger(__name__)
@@ -198,6 +201,10 @@ class ObserverSpanProcessor(SpanProcessor):
     cookie set. These spans can be accessed via get_current_trace_summary() for
     real-time debugging. Spans with 'persist' cookie will also be persisted to the
     database.
+
+    If OBSERVER_OTLP_ENDPOINT is configured, traces can also be exported to an
+    OTLP-compatible backend. Tail-based sampling is applied to determine which
+    traces to export (e.g., errors, slow requests).
     """
 
     def __init__(self) -> None:
@@ -216,6 +223,34 @@ class ObserverSpanProcessor(SpanProcessor):
         self._ignore_url_paths: list[re.Pattern[str]] = [
             re.compile(p) for p in settings.OBSERVER_IGNORE_URL_PATTERNS
         ]
+
+        # Initialize OTLP exporter if configured
+        self._otlp_exporter: BackgroundTraceExporter | None = None
+        if otlp_endpoint := settings.OBSERVER_OTLP_ENDPOINT:
+            self._init_otlp_exporter(otlp_endpoint)
+
+    def _init_otlp_exporter(self, endpoint: str) -> None:
+        """Initialize the OTLP exporter for remote trace export."""
+        try:
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                OTLPSpanExporter,
+            )
+
+            from .export import BackgroundTraceExporter
+
+            otlp = OTLPSpanExporter(
+                endpoint=endpoint,
+                headers=settings.OBSERVER_OTLP_HEADERS,
+            )
+            self._otlp_exporter = BackgroundTraceExporter(otlp)
+            logger.info("OTLP exporter initialized: %s", endpoint)
+        except ImportError:
+            logger.warning(
+                "OTLP exporter not available. Install with: "
+                "uv add 'plain-observer[otlp]'"
+            )
+        except Exception:
+            logger.exception("Failed to initialize OTLP exporter")
 
     def on_start(self, span: Any, parent_context: Context | None = None) -> None:
         """Called when a span starts."""
@@ -305,6 +340,7 @@ class ObserverSpanProcessor(SpanProcessor):
                         trace=trace_info["trace"],
                         spans=trace_info["span_models"],
                         logs=logs,
+                        otel_spans=all_spans,
                     )
 
                 # Clean up trace
@@ -353,8 +389,17 @@ class ObserverSpanProcessor(SpanProcessor):
         trace: TraceModel,
         spans: Sequence[ObserverSpanModel],
         logs: Sequence[ObserverLogEntry],
+        otel_spans: Sequence[ReadableSpan],
     ) -> None:
-        """Export trace, spans, and logs to the database."""
+        """Export trace to local database and/or OTLP backend."""
+        # Export to OTLP backend if configured and trace passes sampling
+        if self._otlp_exporter and self._should_export_to_otlp(otel_spans):
+            self._otlp_exporter.export(list(otel_spans))
+
+        # Export to local database if enabled
+        if not settings.OBSERVER_LOCAL_STORAGE:
+            return
+
         from .models import Log, Span, Trace
 
         with suppress_db_tracing():
@@ -412,6 +457,43 @@ class ObserverSpanProcessor(SpanProcessor):
                         "Failed to clean up old observer traces: %s", e, exc_info=True
                     )
 
+    def _should_export_to_otlp(self, spans: Sequence[ReadableSpan]) -> bool:
+        """
+        Tail-based sampling: decide whether to export this trace to OTLP.
+
+        This is called after the trace is complete, allowing decisions based on
+        the full trace context (e.g., whether any span errored).
+        """
+        # Always export traces with errors
+        if settings.OBSERVER_EXPORT_ERRORS:
+            for span in spans:
+                if span.status and span.status.status_code == StatusCode.ERROR:
+                    return True
+
+        # Export slow requests (based on root span duration)
+        if slow_threshold := settings.OBSERVER_EXPORT_SLOW_THRESHOLD_MS:
+            for span in spans:
+                if span.parent is None:  # Root span
+                    duration_ms = (span.end_time - span.start_time) / 1_000_000
+                    if duration_ms > slow_threshold:
+                        return True
+                    break
+
+        # Export traces with slow database queries
+        if slow_query_threshold := settings.OBSERVER_EXPORT_SLOW_QUERY_MS:
+            for span in spans:
+                if span.attributes and span.attributes.get("db.system"):
+                    duration_ms = (span.end_time - span.start_time) / 1_000_000
+                    if duration_ms > slow_query_threshold:
+                        return True
+
+        # Random sampling for remaining traces
+        if sample_rate := settings.OBSERVER_EXPORT_SAMPLE_RATE:
+            if random.random() < sample_rate:
+                return True
+
+        return False
+
     def _get_recording_mode(
         self, span: Any, parent_context: Context | None
     ) -> str | None:
@@ -449,6 +531,10 @@ class ObserverSpanProcessor(SpanProcessor):
         """Cleanup when shutting down."""
         with self._traces_lock:
             self._traces.clear()
+
+        # Shutdown OTLP exporter (flushes remaining traces)
+        if self._otlp_exporter:
+            self._otlp_exporter.shutdown()
 
     def force_flush(self, timeout_millis: int | None = None) -> bool:
         """Required by SpanProcessor interface."""
