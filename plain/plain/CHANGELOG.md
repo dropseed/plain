@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.101.2](https://github.com/dropseed/plain/releases/plain@0.101.2) (2026-01-28)
+
+### What's changed
+
+- When `load_dotenv()` is called with `override=False` (the default), command substitution is now skipped for keys that already exist in `os.environ`. This prevents redundant command execution in child processes that re-load the `.env` file after inheriting resolved values from the parent, avoiding multiple auth prompts with tools like the 1Password CLI ([2f6ff93499](https://github.com/dropseed/plain/commit/2f6ff93499))
+- The `_execute_command` helper now uses `stdout=subprocess.PIPE` instead of `capture_output=True`, allowing stderr/tty to pass through for interactive prompts ([2f6ff93499](https://github.com/dropseed/plain/commit/2f6ff93499))
+- Updated templates README examples to use `id` instead of `pk` ([837d345d23](https://github.com/dropseed/plain/commit/837d345d23))
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.101.1](https://github.com/dropseed/plain/releases/plain@0.101.1) (2026-01-17)
 
 ### What's changed

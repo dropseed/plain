@@ -10,7 +10,7 @@ Release Plain packages with version bumping, changelog generation, and git taggi
 ## Arguments
 
 ```
-/release [packages...] [--minor|--patch] [--force] [--no-verify]
+/release [packages...] [--minor|--patch] [--force]
 ```
 
 - No args: discover all packages with changes, prompt for each
@@ -18,7 +18,6 @@ Release Plain packages with version bumping, changelog generation, and git taggi
 - `--minor`: auto-select minor release for all packages with changes
 - `--patch`: auto-select patch release for all packages with changes
 - `--force`: ignore dirty git status
-- `--no-verify`: skip pre-commit checks
 
 ## Workflow
 
@@ -31,11 +30,6 @@ Release Plain packages with version bumping, changelog generation, and git taggi
     ```
 
     If not clean, stop and ask user to commit or stash changes.
-
-2. Run pre-commit checks (unless `--no-verify`):
-    ```
-    ./scripts/pre-commit
-    ```
 
 ### Phase 2: Discover Packages with Changes
 
@@ -62,32 +56,28 @@ For each package with changes:
 
 ### Phase 4: Bump Versions
 
-For each package to release (using `current_version` from discover-changes output):
+Run all version bumps in a single bash command to minimize context usage:
 
 ```
-cd <path> && uv version --bump <minor|patch>
+cd <path1> && uv version --bump <minor|patch> && cd <path2> && uv version --bump <minor|patch> && ...
 ```
 
-Display the version change (e.g., "plain-code: 0.19.0 → 0.20.0").
+Display the version changes (e.g., "plain-code: 0.19.0 → 0.20.0").
 
-### Phase 5: Generate Release Notes in Parallel
+### Phase 5: Generate Release Notes
 
-**IMPORTANT**: Use the Task tool to spawn one agent per package for parallel release notes generation.
+For each package to release, sequentially:
 
-For each package to release, spawn a Task agent with this prompt (using values from the discover-changes output):
-
-```
-Generate release notes for <name> version <new_version>.
-
-1. Get the actual file changes since the last release:
+1. Get the file changes since the last release:
+   ```
    git diff <last_tag>..HEAD -- <name> ":(exclude)<name>/tests"
+   ```
 
-2. Read the diff output carefully to understand what actually changed.
+2. Read the existing `<changelog_path>` file.
 
-3. Write release notes to <changelog_path>, prepending to the existing content.
+3. Prepend a new release entry to the changelog with this format:
 
-Format:
-
+```
 ## [<new_version>](https://github.com/dropseed/plain/releases/<name>@<new_version>) (<today's date>)
 
 ### What's changed
@@ -101,8 +91,6 @@ Format:
 - Specific steps if any API changed
 - If no changes required: "- No changes required."
 ```
-
-Wait for all agents to complete.
 
 ### Phase 6: Format and Sync
 
