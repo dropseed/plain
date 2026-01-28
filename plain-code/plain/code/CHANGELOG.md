@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.20.1](https://github.com/dropseed/plain/releases/plain-code@0.20.1) (2026-01-28)
+
+### What's changed
+
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-code@0.20.0) (2026-01-17)
 
 ### What's changed
