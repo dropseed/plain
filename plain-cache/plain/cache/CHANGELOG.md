@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.25.1](https://github.com/dropseed/plain/releases/plain-cache@0.25.1) (2026-01-28)
+
+### What's changed
+
+- Updated admin views to use the new `get_initial_queryset` hook instead of `get_objects` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+
+### Upgrade instructions
+
+- If you have customized the cache admin views, rename `get_objects()` to `get_initial_queryset()`.
+
 ## [0.25.0](https://github.com/dropseed/plain/releases/plain-cache@0.25.0) (2026-01-15)
 
 ### What's changed
