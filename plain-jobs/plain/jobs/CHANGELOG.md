@@ -1,5 +1,17 @@
 # plain-jobs changelog
 
+## [0.43.3](https://github.com/dropseed/plain/releases/plain-jobs@0.43.3) (2026-01-28)
+
+### What's changed
+
+- Updated admin views to use the new `filter_queryset` hook for filtering by job result status instead of doing it inside `get_initial_queryset` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Renamed `self.preset` to `self.filter` in admin views ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.43.2](https://github.com/dropseed/plain/releases/plain-jobs@0.43.2) (2026-01-22)
 
 ### What's changed

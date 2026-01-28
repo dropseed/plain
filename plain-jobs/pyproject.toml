@@ -1,6 +1,6 @@
 [project]
 name = "plain.jobs"
-version = "0.43.2"
+version = "0.43.3"
 description = "Process background jobs with a database-driven job queue."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
