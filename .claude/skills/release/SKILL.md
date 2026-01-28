@@ -69,9 +69,10 @@ Display the version changes (e.g., "plain-code: 0.19.0 → 0.20.0").
 For each package to release, sequentially:
 
 1. Get the file changes since the last release:
-   ```
-   git diff <last_tag>..HEAD -- <name> ":(exclude)<name>/tests"
-   ```
+
+    ```
+    git diff <last_tag>..HEAD -- <name> ":(exclude)<name>/tests"
+    ```
 
 2. Read the existing `<changelog_path>` file.
 
@@ -103,7 +104,9 @@ uv sync
 
 ### Phase 7: Commit Each Package
 
-For each package to release:
+Commit sub-packages first (plain-admin, plain-dev, etc.), then the core `plain` package last.
+
+For each sub-package:
 
 ```
 git add <package>/pyproject.toml <package>/**/CHANGELOG.md
@@ -113,6 +116,14 @@ git tag -a "<package>@<version>" -m "Release <package> <version>"
 ```
 
 Note: `<package-with-dot>` uses dot notation (e.g., "plain.dev" for plain-dev).
+
+For the core `plain` package (last), `git add uv.lock` directly since the grep pattern can't uniquely match it:
+
+```
+git add plain/pyproject.toml plain/**/CHANGELOG.md uv.lock
+git commit -m "Release plain <version>" -n
+git tag -a "plain@<version>" -m "Release plain <version>"
+```
 
 ### Phase 8: Push
 
