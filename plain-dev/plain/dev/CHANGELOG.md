@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.54.1](https://github.com/dropseed/plain/releases/plain-dev@0.54.1) (2026-01-28)
+
+### What's changed
+
+- Added `dev` to the service auto-start allow-list so that database services start automatically when running `plain dev`, which runs preflight checks internally ([4b146a0ae2](https://github.com/dropseed/plain/commit/4b146a0ae2))
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.54.0](https://github.com/dropseed/plain/releases/plain-dev@0.54.0) (2026-01-22)
 
 ### What's changed
