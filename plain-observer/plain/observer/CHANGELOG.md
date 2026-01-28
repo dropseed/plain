@@ -1,5 +1,18 @@
 # plain-observer changelog
 
+## [0.27.1](https://github.com/dropseed/plain/releases/plain-observer@0.27.1) (2026-01-28)
+
+### What's changed
+
+- Updated admin views to use the new `get_initial_queryset` and `filter_queryset` hooks instead of `get_objects` and `get_initial_queryset` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Renamed `presets` to `filters` and `self.preset` to `self.filter` in admin views ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Removed unused `filters` attribute from `LogViewset.ListView` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-observer@0.27.0) (2026-01-15)
 
 ### What's changed
