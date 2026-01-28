@@ -1,5 +1,27 @@
 # plain-admin changelog
 
+## [0.63.0](https://github.com/dropseed/plain/releases/plain-admin@0.63.0) (2026-01-28)
+
+### What's changed
+
+- Renamed "presets" to "filters" across list views, templates, and cards. The `presets` attribute is now `filters`, `self.preset` is now `self.filter`, and the `get_presets()` method is now `get_filters()` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Renamed `get_objects()` to `get_initial_objects()` as the user-facing hook for providing data, and the internal pipeline method to `process_objects()` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Added `filter_objects`/`filter_queryset`, `search_objects`/`search_queryset`, and `order_objects`/`order_queryset` hooks for cleaner overrides in list views ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Sorting logic moved to base `AdminListView` with smart fallback to in-memory sorting for method/property fields that aren't database columns ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Non-sortable fields now show a dimmed sort indicator on hover instead of no indicator ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- GET form submissions now exclude empty URL params for cleaner URLs ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Removed the `show_search` attribute; search is now automatically enabled when `search_fields` is set ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Boolean values (`True`/`False`) now display with green/red label colors for better visual distinction ([9fc78d26e7](https://github.com/dropseed/plain/commit/9fc78d26e7))
+- Increased label background opacity from 12% to 25% for better visibility ([9fc78d26e7](https://github.com/dropseed/plain/commit/9fc78d26e7))
+
+### Upgrade instructions
+
+- Rename `presets` to `filters` in your admin viewsets
+- Rename `self.preset` to `self.filter` in view methods
+- Rename `get_objects()` to `get_initial_objects()` (or use the new `filter_queryset`/`search_queryset`/`order_queryset` hooks for cleaner separation)
+- Replace `show_search = True` with `search_fields = [...]`
+- Card subclasses: rename `presets` to `filters`, `default_preset` to `default_filter`, `get_current_preset` to `get_current_filter`
+
 ## [0.62.1](https://github.com/dropseed/plain/releases/plain-admin@0.62.1) (2026-01-22)
 
 ### What's changed
