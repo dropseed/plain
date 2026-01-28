@@ -1,6 +1,29 @@
 jQuery(($) => {
+  // Submit forms via GET, excluding empty params from the URL
+  function submitFormClean(form) {
+    const formData = new FormData(form);
+    const params = new URLSearchParams();
+    for (const [key, value] of formData.entries()) {
+      if (value) {
+        params.append(key, value);
+      }
+    }
+    // Use form action if set, otherwise current path
+    const basePath = form.getAttribute("action") || window.location.pathname;
+    const url = params.toString()
+      ? `${basePath}?${params.toString()}`
+      : basePath;
+    window.location.href = url;
+  }
+
   $(document).on("change", "[data-autosubmit]", function (_e) {
-    $(this).closest("form").submit();
+    submitFormClean($(this).closest("form")[0]);
+  });
+
+  // Also handle regular form submissions in the list header
+  $(document).on("submit", "form[method='GET']", function (e) {
+    e.preventDefault();
+    submitFormClean(this);
   });
 
   function createDropdowns(target) {

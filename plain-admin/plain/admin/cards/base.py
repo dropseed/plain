@@ -31,7 +31,7 @@ class Card:
     text: str = ""
     link: str = ""
     metric: int | float | Decimal | None = None
-    presets: list[str] | Enum | None = None
+    filters: list[str] | Enum | None = None
 
     # These will be accessible at render time
     view: AdminView
@@ -57,8 +57,8 @@ class Card:
         context["metric"] = self.format_metric()
         context["text"] = self.get_text()
         context["link"] = self.get_link()
-        context["presets"] = self.get_presets()
-        context["current_preset"] = self.get_current_preset()
+        context["filters"] = self.get_filters()
+        context["current_filter"] = self.get_current_filter()
 
         return context
 
@@ -87,12 +87,12 @@ class Card:
     def get_link(self) -> str:
         return self.link
 
-    def get_current_preset(self) -> str:
-        return self.request.query_params.get(f"{self.get_slug()}.preset", "")
+    def get_current_filter(self) -> str:
+        return self.request.query_params.get(f"{self.get_slug()}.filter", "")
 
-    def get_presets(self) -> list[str] | Enum | None:
-        if isinstance(self.presets, list):
+    def get_filters(self) -> list[str] | Enum | None:
+        if isinstance(self.filters, list):
             # Avoid mutating the class attribute
-            return self.presets.copy()  # type: ignore
+            return self.filters.copy()  # type: ignore
         else:
-            return self.presets
+            return self.filters

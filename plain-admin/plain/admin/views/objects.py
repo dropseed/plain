@@ -43,23 +43,23 @@ def get_field_label(field: str) -> str:
 
 class AdminListView(HTMXView, AdminView):
     template_name = "admin/list.html"
-    fields: list[str]
+    fields: list[str] = []
+    search_fields: list[str] = []
     actions: list[str] = []
-    presets: list[str] = []
+    filters: list[str] = []
     page_size = 20
-    show_search = False
     allow_global_search = False
 
     @cached_property
-    def preset(self) -> str:
-        """Get the current preset parameter from the request."""
-        return self.request.query_params.get("preset", "")
+    def filter(self) -> str:
+        """Get the current filter parameter from the request."""
+        return self.request.query_params.get("filter", "")
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
 
-        # Make this available to get_presets and stuff
-        self.objects = self.get_objects()
+        # Make this available to get_filters and stuff
+        self.objects = self.process_objects()
 
         page_size = self.request.query_params.get("page_size", self.page_size)
         paginator = Paginator(self.objects, int(page_size))
@@ -70,13 +70,12 @@ class AdminListView(HTMXView, AdminView):
         context["objects"] = self._page  # alias
         context["fields"] = self.get_fields()
         context["actions"] = self.get_actions()
-        context["presets"] = self.get_presets()
+        context["filters"] = self.get_filters()
 
-        context["current_preset"] = self.preset
+        context["current_filter"] = self.filter
 
-        # Implement search yourself in get_objects
         context["search_query"] = self.request.query_params.get("search", "")
-        context["show_search"] = self.show_search
+        context["search_fields"] = self.search_fields
 
         context["table_style"] = getattr(self, "_table_style", "default")
 
@@ -87,6 +86,15 @@ class AdminListView(HTMXView, AdminView):
 
         context["get_object_url"] = self.get_object_url
         context["get_object_links"] = self.get_object_links
+
+        # Sorting
+        order_by = self.request.query_params.get("order_by", "")
+        if order_by.startswith("-"):
+            context["order_by_field"] = order_by[1:]
+            context["order_by_direction"] = "-"
+        else:
+            context["order_by_field"] = order_by
+            context["order_by_direction"] = ""
 
         return context
 
@@ -113,7 +121,7 @@ class AdminListView(HTMXView, AdminView):
         if action_name and action_name in actions:
             action_ids_param = self.request.form_data["action_ids"]
             if action_ids_param == "__all__":
-                target_ids = [self.get_object_id(obj) for obj in self.get_objects()]
+                target_ids = [self.get_object_id(obj) for obj in self.process_objects()]
             else:
                 target_ids = action_ids_param.split(",") if action_ids_param else []
             response = self.perform_action(action_name, target_ids)
@@ -128,8 +136,52 @@ class AdminListView(HTMXView, AdminView):
     def perform_action(self, action: str, target_ids: list) -> Response | None:
         raise NotImplementedError
 
-    def get_objects(self) -> list[Any] | QuerySet[Any]:
+    def process_objects(self) -> list[Any] | QuerySet[Any]:
+        objects = self.get_initial_objects()
+        objects = self.filter_objects(objects)
+        objects = self.search_objects(objects)
+        objects = self.order_objects(objects)
+        return objects
+
+    def get_initial_objects(self) -> list[Any] | QuerySet[Any]:
         return []
+
+    def filter_objects(
+        self, objects: list[Any] | QuerySet[Any]
+    ) -> list[Any] | QuerySet[Any]:
+        """Filter objects by the current scope. Override to implement scope logic."""
+        return objects
+
+    def search_objects(
+        self, objects: list[Any] | QuerySet[Any]
+    ) -> list[Any] | QuerySet[Any]:
+        """Filter a list of objects by the search query param."""
+        if search := self.request.query_params.get("search"):
+            search = search.lower()
+            objects = [
+                obj
+                for obj in objects
+                if any(
+                    search in str(self.get_field_value(obj, f)).lower()
+                    for f in self.search_fields
+                )
+            ]
+        return objects
+
+    def order_objects(
+        self, objects: list[Any] | QuerySet[Any]
+    ) -> list[Any] | QuerySet[Any]:
+        """Sort a list of objects by the order_by query param."""
+        if order_by := self.request.query_params.get("order_by"):
+            reverse = order_by.startswith("-")
+            field_name = order_by.lstrip("-")
+            if field_name in self.get_fields():
+                objects = sorted(
+                    objects,
+                    key=lambda obj: self.get_field_value(obj, field_name) or "",
+                    reverse=reverse,
+                )
+        return objects
 
     def get_fields(self) -> list:
         return (
@@ -139,8 +191,8 @@ class AdminListView(HTMXView, AdminView):
     def get_actions(self) -> list[str]:
         return self.actions.copy()  # Avoid mutating the class attribute itself
 
-    def get_presets(self) -> list[str]:
-        return self.presets.copy()  # Avoid mutating the class attribute itself
+    def get_filters(self) -> list[str]:
+        return self.filters.copy()  # Avoid mutating the class attribute itself
 
     def get_field_value(self, obj: Any, field: str) -> Any:
         try:

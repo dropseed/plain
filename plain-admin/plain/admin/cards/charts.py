@@ -32,20 +32,20 @@ class TrendCard(ChartCard):
 
     model = None
     datetime_field = None
-    default_preset = DatetimeRangeAliases.SINCE_30_DAYS_AGO
+    default_filter = DatetimeRangeAliases.SINCE_30_DAYS_AGO
 
-    presets = DatetimeRangeAliases
+    filters = DatetimeRangeAliases
 
     def get_description(self) -> str:
-        datetime_range = DatetimeRangeAliases.to_range(self.get_current_preset())
+        datetime_range = DatetimeRangeAliases.to_range(self.get_current_filter())
         start = datetime_range.start.strftime("%b %d, %Y")
         end = datetime_range.end.strftime("%b %d, %Y")
         return f"{start} to {end}"
 
-    def get_current_preset(self) -> str:
-        if s := super().get_current_preset():
+    def get_current_filter(self) -> str:
+        if s := super().get_current_filter():
             return s
-        return self.default_preset.value
+        return self.default_filter.value
 
     def get_trend_data(self) -> dict[str, int]:
         if not self.model or not self.datetime_field:
@@ -53,7 +53,7 @@ class TrendCard(ChartCard):
                 "model and datetime_field must be set, or get_values must be overridden"
             )
 
-        datetime_range = DatetimeRangeAliases.to_range(self.get_current_preset())
+        datetime_range = DatetimeRangeAliases.to_range(self.get_current_filter())
 
         filter_kwargs = {f"{self.datetime_field}__range": datetime_range.as_tuple()}
 

@@ -12,7 +12,7 @@
     - [Trend cards](#trend-cards)
     - [Table cards](#table-cards)
 - [Admin forms](#admin-forms)
-- [List presets](#list-presets)
+- [List filters](#list-filters)
 - [Actions](#actions)
 - [Toolbar](#toolbar)
 - [Impersonate](#impersonate)
@@ -113,7 +113,7 @@ The `fields` attribute on list and detail views supports the `__` syntax for acc
 
 ### Object views
 
-For working with non-model data (API responses, files, etc.), use the base object views. These require you to implement `get_objects()` or `get_object()` methods.
+For working with non-model data (API responses, files, etc.), use the base object views. These require you to implement `get_initial_objects()` or `get_object()` methods.
 
 - [`AdminListView`](./views/objects.py#AdminListView) - Base list view for any iterable
 - [`AdminDetailView`](./views/objects.py#AdminDetailView) - Base detail view for any object
@@ -133,7 +133,7 @@ class ExternalAPIAdmin(AdminViewset):
         path = "external-items/"
         fields = ["id", "name", "status"]
 
-        def get_objects(self):
+        def get_initial_objects(self):
             # Fetch from an external API, file, or any data source
             return external_api.get_items()
 ```
@@ -271,9 +271,9 @@ The form template should extend the admin base and use the form rendering helper
 {% endblock %}
 ```
 
-## List presets
+## List filters
 
-On [`AdminListView`](./views/objects.py#AdminListView) and [`AdminModelListView`](./views/models.py#AdminModelListView), you can define different `presets` to build predefined views of your data. The preset choices will be shown in the UI, and you can use the current `self.preset` in your view logic.
+On [`AdminListView`](./views/objects.py#AdminListView) and [`AdminModelListView`](./views/models.py#AdminModelListView), you can define different `filters` to build predefined views of your data. The filter choices will be shown in the UI, and you can use the current `self.filter` in your view logic.
 
 ```python
 @register_viewset
@@ -285,17 +285,14 @@ class UserAdmin(AdminViewset):
             "email",
             "created_at__date",
         ]
-        presets = ["Active users", "Inactive users"]
+        filters = ["Active users", "Inactive users"]
 
-        def get_objects(self):
-            objects = super().get_objects()
-
-            if self.preset == "Active users":
-                objects = objects.filter(is_active=True)
-            elif self.preset == "Inactive users":
-                objects = objects.filter(is_active=False)
-
-            return objects
+        def filter_queryset(self, queryset):
+            if self.filter == "Active users":
+                return queryset.filter(is_active=True)
+            elif self.filter == "Inactive users":
+                return queryset.filter(is_active=False)
+            return queryset
 ```
 
 ## Actions

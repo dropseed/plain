@@ -57,7 +57,7 @@ class SpanViewset(AdminViewset):
         ]
         queryset_order = ["-id"]
         allow_global_search = False
-        presets = ["Parents only"]
+        filters = ["Parents only"]
         search_fields = ["name", "span_id", "parent_id"]
         actions = ["Delete"]
 
@@ -65,10 +65,10 @@ class SpanViewset(AdminViewset):
             if action == "Delete":
                 Span.query.filter(id__in=target_ids).delete()
 
-        def get_objects(self) -> models.QuerySet:
+        def get_initial_queryset(self) -> models.QuerySet:
             return (
                 super()
-                .get_objects()
+                .get_initial_queryset()
                 .only(
                     "name",
                     "kind",
@@ -78,10 +78,9 @@ class SpanViewset(AdminViewset):
                 )
             )
 
-        def get_initial_queryset(self) -> models.QuerySet:
-            queryset = super().get_initial_queryset()
-            if self.preset == "Parents only":
-                queryset = queryset.filter(parent_id="")
+        def filter_queryset(self, queryset: models.QuerySet) -> models.QuerySet:
+            if self.filter == "Parents only":
+                return queryset.filter(parent_id="")
             return queryset
 
     class DetailView(AdminModelDetailView):
@@ -105,7 +104,6 @@ class LogViewset(AdminViewset):
         queryset_order = ["-timestamp"]
         allow_global_search = False
         search_fields = ["message", "level"]
-        filters = ["level"]
         actions = ["Delete selected", "Delete all"]
 
         def perform_action(self, action: str, target_ids: Sequence[int]) -> None:
@@ -114,10 +112,10 @@ class LogViewset(AdminViewset):
             elif action == "Delete all":
                 Log.query.all().delete()
 
-        def get_objects(self) -> models.QuerySet:
+        def get_initial_queryset(self) -> models.QuerySet:
             return (
                 super()
-                .get_objects()
+                .get_initial_queryset()
                 .select_related("trace", "span")
                 .only(
                     "timestamp",

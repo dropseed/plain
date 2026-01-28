@@ -24,7 +24,7 @@
         {% else %}
         {% if actions %}
         <form method="POST" data-actions-form>
-            <select name="action_name" class="text-sm py-1 pl-3 pr-8">
+            <select name="action_name" class="w-auto text-sm py-1 pl-3 pr-8">
                 <option value="">Actions...</option>
                 {% for action in actions %}
                 <option>{{ action }}</option>
@@ -35,16 +35,16 @@
         {% endif %}
 
         <form method="GET" class="inline-flex space-x-2">
-            {% if presets %}
-            <select data-autosubmit name="preset" class="text-sm py-1 pl-3 pr-8">
-                <option value="">Presets...</option>
-                {% for preset in presets %}
-                <option {% if preset == current_preset %}selected{% endif %}>{{ preset }}</option>
+            {% if filters %}
+            <select data-autosubmit name="filter" class="w-auto text-sm py-1 pl-3 pr-8">
+                <option value="">Filter...</option>
+                {% for filter in filters %}
+                <option {% if filter == current_filter %}selected{% endif %}>{{ filter }}</option>
                 {% endfor %}
             </select>
             {% endif %}
 
-            {% if show_search %}
+            {% if search_fields %}
             <div class="relative">
                 <label for="search" class="sr-only">Search</label>
                 <input
@@ -90,21 +90,23 @@
                         {% else %}
                         <a
                             data-merge-params
-                            class="text-xs font-normal flex space-x-1 items-center"
+                            class="text-xs font-normal flex items-center gap-1 hover:text-black group"
                             href="?page=1&order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
                             <span>{{ get_field_label(field) }}</span>
                             {% if field == order_by_field %}
-                            {% if order_by_direction == "-" %}
-                            <span class="text-xs">▼</span>
+                                {% if order_by_direction == "-" %}
+                                <span class="text-[10px]">▼</span>
+                                {% else %}
+                                <span class="text-[10px]">▲</span>
+                                {% endif %}
                             {% else %}
-                            <span class="text-xs">▲</span>
-                            {% endif %}
+                            <span class="text-[10px] text-black/30 opacity-0 group-hover:opacity-100">▼</span>
                             {% endif %}
                         </a>
                         {% endif %}
                     </th>
                     {% else %}
-                    <th class="text-xs font-normal text-black/60">{{ get_field_label(field) }}</th>
+                    <th class="text-xs font-normal text-black/40">{{ get_field_label(field) }}</th>
                     {% endif %}
                 {% endfor %}
 
@@ -181,9 +183,9 @@
             <a data-merge-params href="?page={{ page.previous_page_number() }}" class="px-2 py-1 text-xs border border-stone-200 rounded hover:bg-stone-50">&lt;</a>
             {% endif %}
             <form data-autosubmit method="GET">
-                {% if show_search and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
-                {% if presets and current_preset %}<input type="hidden" name="preset" value="{{ current_preset }}" />{% endif %}
-                <select name="page" class="text-xs py-1 pl-2 pr-6 border-stone-200 rounded">
+                {% if search_fields and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
+                {% if filters and current_filter %}<input type="hidden" name="filter" value="{{ current_filter }}" />{% endif %}
+                <select name="page" class="w-auto text-xs py-1 pl-2 pr-6 border-stone-200 rounded">
                 {% for page_num in page.paginator.page_range %}
                     <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>
                 {% endfor %}
