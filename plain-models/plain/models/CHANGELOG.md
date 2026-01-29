@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.76.2](https://github.com/dropseed/plain/releases/plain-models@0.76.2) (2026-01-28)
+
+### What's changed
+
+- Converted the `plain-models` skill to a passive `.claude/rules/` file ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory.
+
 ## [0.76.1](https://github.com/dropseed/plain/releases/plain-models@0.76.1) (2026-01-28)
 
 ### What's changed
