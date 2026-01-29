@@ -11,7 +11,7 @@
             <div class="flex gap-8 py-1.5">
                 <dt class="w-40 flex-shrink-0">{{ get_field_label(field) }}</dt>
                 <dd class="min-w-0">
-                    {% with value=get_field_value(object, field) %}
+                    {% with value=format_field_value(object, field) %}
                     {% include get_field_value_template(object, field, value) with context %}
                     {% endwith %}
                 </dd>

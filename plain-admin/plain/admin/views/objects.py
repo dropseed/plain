@@ -81,6 +81,7 @@ class AdminListView(HTMXView, AdminView):
 
         context["get_object_id"] = self.get_object_id
         context["get_field_value"] = self.get_field_value
+        context["format_field_value"] = self.format_field_value
         context["get_field_value_template"] = self.get_field_value_template
         context["get_field_label"] = get_field_label
 
@@ -176,9 +177,17 @@ class AdminListView(HTMXView, AdminView):
             reverse = order_by.startswith("-")
             field_name = order_by.lstrip("-")
             if field_name in self.get_fields():
+
+                def _sort_key(obj: Any) -> tuple[int, Any]:
+                    value = self.get_field_value(obj, field_name)
+                    if value is None:
+                        # Always sort None last, regardless of direction
+                        return (0, "") if reverse else (1, "")
+                    return (1, value) if reverse else (0, value)
+
                 objects = sorted(
                     objects,
-                    key=lambda obj: self.get_field_value(obj, field_name) or "",
+                    key=_sort_key,
                     reverse=reverse,
                 )
         return objects
@@ -215,6 +224,12 @@ class AdminListView(HTMXView, AdminView):
             return attr()
         else:
             return attr
+
+    def format_field_value(self, obj: Any, field: str) -> Any:
+        """Format a field value for display. Override this for display formatting
+        like currency symbols, percentages, etc. Sorting and searching use
+        get_field_value directly, so formatting here won't affect sort order."""
+        return self.get_field_value(obj, field)
 
     def get_object_id(self, obj: Any) -> Any:
         return self.get_field_value(obj, "id")
@@ -305,6 +320,7 @@ class AdminDetailView(AdminView, DetailView):
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
         context["get_field_value"] = self.get_field_value
+        context["format_field_value"] = self.format_field_value
         context["get_field_value_template"] = self.get_field_value_template
         context["get_field_label"] = get_field_label
         context["fields"] = self.get_fields()
@@ -336,6 +352,10 @@ class AdminDetailView(AdminView, DetailView):
             return attr()
         else:
             return attr
+
+    def format_field_value(self, obj: Any, field: str) -> Any:
+        """Format a field value for display. Override this for display formatting."""
+        return self.get_field_value(obj, field)
 
     def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
         templates = []
