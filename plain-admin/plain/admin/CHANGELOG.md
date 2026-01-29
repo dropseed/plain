@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.64.0](https://github.com/dropseed/plain/releases/plain-admin@0.64.0) (2026-01-28)
+
+### What's changed
+
+- Added `format_field_value()` method to `AdminListView` and `AdminDetailView` for display-only formatting (e.g. currency symbols, percentages) without affecting sort order or search ([895e94a1b2](https://github.com/dropseed/plain/commit/895e94a1b2))
+- Fixed `None` values in column sorting — `None` now always sorts last regardless of sort direction, instead of being coerced to an empty string ([895e94a1b2](https://github.com/dropseed/plain/commit/895e94a1b2))
+- Templates now use `format_field_value()` instead of `get_field_value()` for rendering field values in list and detail views ([895e94a1b2](https://github.com/dropseed/plain/commit/895e94a1b2))
+
+### Upgrade instructions
+
+- If you override `get_field_value()` for display formatting, consider moving that logic to `format_field_value()` instead so it doesn't affect sort order.
+
 ## [0.63.0](https://github.com/dropseed/plain/releases/plain-admin@0.63.0) (2026-01-28)
 
 ### What's changed
