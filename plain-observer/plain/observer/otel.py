@@ -202,9 +202,9 @@ class ObserverSpanProcessor(SpanProcessor):
     real-time debugging. Spans with 'persist' cookie will also be persisted to the
     database.
 
-    If OBSERVER_OTLP_ENDPOINT is configured, traces can also be exported to an
-    OTLP-compatible backend. Tail-based sampling is applied to determine which
-    traces to export (e.g., errors, slow requests).
+    If OBSERVER_DSN or OBSERVER_OTLP_ENDPOINT is configured, traces are also
+    exported to an OTLP-compatible backend. Tail-based sampling is applied to
+    determine which traces to export (e.g., errors, slow requests).
     """
 
     def __init__(self) -> None:
@@ -224,12 +224,12 @@ class ObserverSpanProcessor(SpanProcessor):
             re.compile(p) for p in settings.OBSERVER_IGNORE_URL_PATTERNS
         ]
 
-        # Initialize OTLP exporter if configured
+        # Initialize OTLP exporter if configured (DSN takes precedence)
         self._otlp_exporter: BackgroundTraceExporter | None = None
-        if otlp_endpoint := settings.OBSERVER_OTLP_ENDPOINT:
-            self._init_otlp_exporter(otlp_endpoint)
+        if settings.OBSERVER_DSN or settings.OBSERVER_OTLP_ENDPOINT:
+            self._init_otlp_exporter()
 
-    def _init_otlp_exporter(self, endpoint: str) -> None:
+    def _init_otlp_exporter(self) -> None:
         """Initialize the OTLP exporter for remote trace export."""
         try:
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
@@ -238,9 +238,11 @@ class ObserverSpanProcessor(SpanProcessor):
 
             from .export import BackgroundTraceExporter
 
+            endpoint, headers = self._resolve_otlp_config()
+
             otlp = OTLPSpanExporter(
                 endpoint=endpoint,
-                headers=settings.OBSERVER_OTLP_HEADERS,
+                headers=headers,
             )
             self._otlp_exporter = BackgroundTraceExporter(otlp)
             logger.info("OTLP exporter initialized: %s", endpoint)
@@ -251,6 +253,42 @@ class ObserverSpanProcessor(SpanProcessor):
             )
         except Exception:
             logger.exception("Failed to initialize OTLP exporter")
+
+    @staticmethod
+    def _resolve_otlp_config() -> tuple[str, dict[str, str]]:
+        """
+        Resolve OTLP endpoint and headers from settings.
+
+        If OBSERVER_DSN is set, parse it into endpoint + auth headers.
+        DSN format: https://<api_key>@<host>/<project_id>
+        Example: https://pk_abc123@observatory.plain.com/42
+
+        Otherwise, fall back to explicit OBSERVER_OTLP_ENDPOINT and
+        OBSERVER_OTLP_HEADERS settings.
+        """
+        if dsn := settings.OBSERVER_DSN:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(dsn)
+
+            if not parsed.hostname:
+                raise ValueError(f"Invalid OBSERVER_DSN: missing hostname in {dsn!r}")
+
+            if not parsed.username:
+                raise ValueError(f"Invalid OBSERVER_DSN: missing API key in {dsn!r}")
+
+            api_key = parsed.username
+            scheme = parsed.scheme or "https"
+            host = parsed.hostname
+            port = f":{parsed.port}" if parsed.port else ""
+            project_path = parsed.path.rstrip("/")
+
+            endpoint = f"{scheme}://{host}{port}{project_path}/v1/traces"
+            headers = {"Authorization": f"Bearer {api_key}"}
+
+            return endpoint, headers
+
+        return settings.OBSERVER_OTLP_ENDPOINT, dict(settings.OBSERVER_OTLP_HEADERS)
 
     def on_start(self, span: Any, parent_context: Context | None = None) -> None:
         """Called when a span starts."""
