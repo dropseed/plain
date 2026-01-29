@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.20.2](https://github.com/dropseed/plain/releases/plain-code@0.20.2) (2026-01-28)
+
+### What's changed
+
+- Converted the `plain-fix` skill to a passive `.claude/rules/` file with path-based activation on `**/*.py` files ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory.
+
 ## [0.20.1](https://github.com/dropseed/plain/releases/plain-code@0.20.1) (2026-01-28)
 
 ### What's changed
