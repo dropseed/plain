@@ -17,5 +17,6 @@ plain*/tests/.plain
 .plain
 
 .vscode
-/.claude/skills/plain-*
+/.claude/skills/plain*
+/.claude/rules/plain*
 /.benchmarks

@@ -1,10 +1,9 @@
 ---
-name: plain-tailwind
-description: Provides Tailwind CSS patterns for Plain templates. Use when styling templates or working with conditional CSS classes.
-user-invocable: false
+paths:
+  - "**/*.html"
 ---
 
-# Tailwind CSS Patterns
+# Tailwind CSS
 
 ## Conditional Styling
 
@@ -21,7 +20,5 @@ Use `data-` attributes with Tailwind's `data-` selectors instead of `{% if %}` i
 ```html
 <div class="{% if is_active %}bg-blue-500{% endif %}">
 ```
-
-## Getting Package Docs
 
 Run `uv run plain docs tailwind --source` for detailed Tailwind integration documentation.
