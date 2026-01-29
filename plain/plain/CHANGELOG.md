@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.102.0](https://github.com/dropseed/plain/releases/plain@0.102.0) (2026-01-28)
+
+### What's changed
+
+- Refactored agent integration from skills-based to rules-based: packages now provide `agents/.claude/rules/` files and `agents/.claude/skills/` directories instead of `skills/` directories ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+- The `plain agent install` command now copies both rules (`.md` files) and skills to the project's `.claude/` directory, and cleans up orphaned `plain*` items ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+- Removed standalone skills (`plain-docs`, `plain-shell`, `plain-request`) that are now provided as passive rules instead ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory with the new rules-based structure.
+
 ## [0.101.2](https://github.com/dropseed/plain/releases/plain@0.101.2) (2026-01-28)
 
 ### What's changed
