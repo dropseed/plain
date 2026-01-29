@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.54.2](https://github.com/dropseed/plain/releases/plain-dev@0.54.2) (2026-01-28)
+
+### What's changed
+
+- Converted `plain-dev` and `plain-pre-commit` skills to a single passive `.claude/rules/` file ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory.
+
 ## [0.54.1](https://github.com/dropseed/plain/releases/plain-dev@0.54.1) (2026-01-28)
 
 ### What's changed
