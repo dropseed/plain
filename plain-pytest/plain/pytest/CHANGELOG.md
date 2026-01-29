@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.16.1](https://github.com/dropseed/plain/releases/plain-pytest@0.16.1) (2026-01-28)
+
+### What's changed
+
+- Converted the `plain-test` skill to a passive `.claude/rules/` file ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory.
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-pytest@0.16.0) (2026-01-15)
 
 ### What's changed

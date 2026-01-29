@@ -1,6 +1,6 @@
 [project]
 name = "plain.pytest"
-version = "0.16.0"
+version = "0.16.1"
 description = "Test with pytest."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"
