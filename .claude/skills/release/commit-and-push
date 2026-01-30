@@ -65,19 +65,13 @@ def main():
         if name == "plain":
             # Core package: add uv.lock directly (grep can't uniquely match "plain")
             run(["git", "add", "plain/pyproject.toml"], cwd=root)
-            # Use glob to find CHANGELOG.md files
-            import glob
-            changelogs = glob.glob("plain/**/CHANGELOG.md", root_dir=root, recursive=True)
-            for cl in changelogs:
-                run(["git", "add", cl], cwd=root)
+            for cl in root.glob("plain/**/CHANGELOG.md"):
+                run(["git", "add", str(cl.relative_to(root))], cwd=root)
             run(["git", "add", "uv.lock"], cwd=root)
         else:
             run(["git", "add", f"{name}/pyproject.toml"], cwd=root)
-            # Use glob to find CHANGELOG.md files
-            import glob
-            changelogs = glob.glob(f"{name}/**/CHANGELOG.md", root_dir=root, recursive=True)
-            for cl in changelogs:
-                run(["git", "add", cl], cwd=root)
+            for cl in root.glob(f"{name}/**/CHANGELOG.md"):
+                run(["git", "add", str(cl.relative_to(root))], cwd=root)
             # Stage matching uv.lock hunks
             dot_name = name.replace("plain-", "plain.")
             run(
