@@ -140,40 +140,36 @@ def _cleanup_orphans(dest_dir: Path, agent_dirs: list[Path]) -> int:
     return removed_count
 
 
-def _setup_session_hook(dest_dir: Path) -> None:
-    """Create or update settings.json with SessionStart hook."""
+def _cleanup_session_hook(dest_dir: Path) -> None:
+    """Remove the old plain agent context SessionStart hook from settings.json."""
     settings_file = dest_dir / "settings.json"
 
-    # Load existing settings or start fresh
-    if settings_file.exists():
-        settings = json.loads(settings_file.read_text())
-    else:
-        settings = {}
+    if not settings_file.exists():
+        return
 
-    # Ensure hooks structure exists
-    if "hooks" not in settings:
-        settings["hooks"] = {}
+    settings = json.loads(settings_file.read_text())
 
-    # Define the Plain hook - calls the agent context command directly
-    plain_hook = {
-        "matcher": "startup|resume",
-        "hooks": [
-            {
-                "type": "command",
-                "command": "uv run plain agent context 2>/dev/null || true",
-            }
-        ],
-    }
+    hooks = settings.get("hooks", {})
+    session_hooks = hooks.get("SessionStart", [])
 
-    # Get existing SessionStart hooks, remove any existing plain hook
-    session_hooks = settings["hooks"].get("SessionStart", [])
+    # Remove any plain agent or plain-context.md hooks
     session_hooks = [h for h in session_hooks if "plain agent" not in str(h)]
-    # Also remove old plain-context.md hooks for migration
     session_hooks = [h for h in session_hooks if "plain-context.md" not in str(h)]
-    session_hooks.append(plain_hook)
-    settings["hooks"]["SessionStart"] = session_hooks
 
-    settings_file.write_text(json.dumps(settings, indent=2) + "\n")
+    if session_hooks:
+        hooks["SessionStart"] = session_hooks
+    else:
+        hooks.pop("SessionStart", None)
+
+    if hooks:
+        settings["hooks"] = hooks
+    else:
+        settings.pop("hooks", None)
+
+    if settings:
+        settings_file.write_text(json.dumps(settings, indent=2) + "\n")
+    else:
+        settings_file.unlink()
 
 
 @click.group()
@@ -183,14 +179,8 @@ def agent() -> None:
 
 
 @agent.command()
-def context() -> None:
-    """Output Plain framework context for AI agents"""
-    click.echo("This is a Plain project.")
-
-
-@agent.command()
 def install() -> None:
-    """Install skills, rules, and hooks to agent directories"""
+    """Install skills and rules to agent directories"""
     cwd = Path.cwd()
     claude_dir = cwd / ".claude"
 
@@ -209,16 +199,17 @@ def install() -> None:
         installed, _ = _install_agent_dir(source_dir, claude_dir)
         total_installed += installed
 
-    # Setup session hook
-    _setup_session_hook(claude_dir)
+    # Clean up old session hook
+    _cleanup_session_hook(claude_dir)
 
     parts = []
     if total_installed > 0:
         parts.append(f"installed {total_installed}")
     if removed_count > 0:
         parts.append(f"removed {removed_count}")
-    parts.append("updated hooks")
-    click.echo(f"Agent: {', '.join(parts)} in .claude/")
+    click.echo(f"Agent: {', '.join(parts)} in .claude/") if parts else click.echo(
+        "Agent: up to date"
+    )
 
 
 @agent.command()
