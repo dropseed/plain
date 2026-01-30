@@ -1,5 +1,17 @@
+{% if value is none %}
+<span class="text-stone-400 font-mono text-sm">None</span>
+{% elif value == "" %}
+<span class="text-stone-300">—</span>
+{% elif value is string %}
+<img
+    src="{{ value }}"
+    alt=""
+    class="rounded-full w-6 h-6 min-w-6 min-h-6 object-cover"
+    >
+{% else %}
 <img
     src="{{ value.src }}"
     alt="{{ value.alt }}"
     class="rounded-full w-6 h-6 min-w-6 min-h-6 object-cover"
     >
+{% endif %}
