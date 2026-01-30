@@ -436,7 +436,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.64.0"
+version = "0.65.0"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },

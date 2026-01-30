@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.65.0](https://github.com/dropseed/plain/releases/plain-admin@0.65.0) (2026-01-30)
+
+### What's changed
+
+- `format_field_value()` now receives the raw `value` as a third parameter, separating the value retrieval from formatting. Templates now call `get_field_value()` first, then pass the result to `format_field_value()` ([b9b6343f87](https://github.com/dropseed/plain/commit/b9b6343f87))
+
+### Upgrade instructions
+
+- If you override `format_field_value()`, update the method signature to accept the new `value` parameter: `def format_field_value(self, obj, field, value)`. The method should now format and return the provided `value` instead of calling `self.get_field_value()` internally.
+
 ## [0.64.0](https://github.com/dropseed/plain/releases/plain-admin@0.64.0) (2026-01-28)
 
 ### What's changed
