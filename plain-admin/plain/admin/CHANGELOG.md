@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.65.1](https://github.com/dropseed/plain/releases/plain-admin@0.65.1) (2026-01-30)
+
+### What's changed
+
+- Fixed `avatar.html` and `img.html` value templates crashing when the field value is `None`, an empty string, or a plain URL string instead of an `Avatar`/`Img` object ([4afb06a6b4](https://github.com/dropseed/plain/commit/4afb06a6b4))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.65.0](https://github.com/dropseed/plain/releases/plain-admin@0.65.0) (2026-01-30)
 
 ### What's changed
