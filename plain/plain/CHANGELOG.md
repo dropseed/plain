@@ -1,5 +1,21 @@
 # plain changelog
 
+## [0.103.0](https://github.com/dropseed/plain/releases/plain@0.103.0) (2026-01-30)
+
+### What's changed
+
+- `plain docs` now shows markdown documentation by default (previously required `--source`), with a new `--symbols` flag to show only the symbolicated API surface ([b71dab9d5d](https://github.com/dropseed/plain/commit/b71dab9d5d))
+- `plain docs --list` now shows all official Plain packages (installed and uninstalled) with descriptions and install status ([9cba705d62](https://github.com/dropseed/plain/commit/9cba705d62))
+- `plain docs` for uninstalled packages now shows the install command and an online docs URL instead of a generic error ([9cba705d62](https://github.com/dropseed/plain/commit/9cba705d62))
+- Removed the `plain agent context` command and the `SessionStart` hook setup — agent rules now provide context directly without needing a startup hook ([88d9424643](https://github.com/dropseed/plain/commit/88d9424643))
+- `plain agent install` now cleans up old SessionStart hooks from `.claude/settings.json` ([88d9424643](https://github.com/dropseed/plain/commit/88d9424643))
+
+### Upgrade instructions
+
+- The `--source` flag for `plain docs` has been removed. Use `--symbols` instead to see the symbolicated API surface.
+- The `--open` flag for `plain docs` has been removed.
+- Run `plain agent install` to clean up the old SessionStart hook from your `.claude/settings.json`.
+
 ## [0.102.0](https://github.com/dropseed/plain/releases/plain@0.102.0) (2026-01-28)
 
 ### What's changed
