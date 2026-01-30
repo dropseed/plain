@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.103.1](https://github.com/dropseed/plain/releases/plain@0.103.1) (2026-01-30)
+
+### What's changed
+
+- `load_dotenv()` now sets each environment variable immediately as it is parsed, so command substitutions like `$(echo $TOKEN)` can reference variables defined earlier in the same `.env` file ([cecb71a016](https://github.com/dropseed/plain/commit/cecb71a016))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.103.0](https://github.com/dropseed/plain/releases/plain@0.103.0) (2026-01-30)
 
 ### What's changed
