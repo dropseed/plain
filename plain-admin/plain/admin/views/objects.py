@@ -225,11 +225,11 @@ class AdminListView(HTMXView, AdminView):
         else:
             return attr
 
-    def format_field_value(self, obj: Any, field: str) -> Any:
+    def format_field_value(self, obj: Any, field: str, value: Any) -> Any:
         """Format a field value for display. Override this for display formatting
         like currency symbols, percentages, etc. Sorting and searching use
         get_field_value directly, so formatting here won't affect sort order."""
-        return self.get_field_value(obj, field)
+        return value
 
     def get_object_id(self, obj: Any) -> Any:
         return self.get_field_value(obj, "id")
@@ -353,9 +353,9 @@ class AdminDetailView(AdminView, DetailView):
         else:
             return attr
 
-    def format_field_value(self, obj: Any, field: str) -> Any:
+    def format_field_value(self, obj: Any, field: str, value: Any) -> Any:
         """Format a field value for display. Override this for display formatting."""
-        return self.get_field_value(obj, field)
+        return value
 
     def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
         templates = []

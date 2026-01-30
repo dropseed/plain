@@ -130,7 +130,8 @@
                 {# Make every column clickable if it doesn't contain a link already #}
                 <td data-column-autolink="{{ row_url }}">
                     <div class="max-w-prose truncate">
-                        {% set value = format_field_value(object, field) %}
+                        {% set value = get_field_value(object, field) %}
+                        {% set value = format_field_value(object, field, value) %}
                         {% include get_field_value_template(object, field, value) with context %}
                     </div>
                 </td>
