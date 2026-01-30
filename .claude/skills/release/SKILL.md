@@ -19,6 +19,17 @@ Release Plain packages with version bumping, changelog generation, and git taggi
 - `--patch`: auto-select patch release for all packages with changes
 - `--force`: ignore dirty git status
 
+## Scripts
+
+All mechanical operations are handled by scripts in this skill directory:
+
+| Script             | Purpose                                                         |
+| ------------------ | --------------------------------------------------------------- |
+| `discover-changes` | Find packages with unreleased commits (outputs JSON)            |
+| `bump-versions`    | Bump package versions (`<package>:<type> ...`)                  |
+| `commit-and-push`  | Format, sync, commit, tag, and push (`<package>:<version> ...`) |
+| `add-hunks`        | Stage specific uv.lock hunks by grep pattern (used internally)  |
+
 ## Workflow
 
 ### Phase 1: Check Preconditions
@@ -32,8 +43,6 @@ Release Plain packages with version bumping, changelog generation, and git taggi
     If not clean, stop and ask user to commit or stash changes.
 
 ### Phase 2: Discover Packages with Changes
-
-Run the discover-changes script to find packages with unreleased changes:
 
 ```
 ./.claude/skills/release/discover-changes
@@ -56,13 +65,11 @@ For each package with changes:
 
 ### Phase 4: Bump Versions
 
-Run all version bumps in a single bash command to minimize context usage:
-
 ```
-cd <path1> && uv version --bump <minor|patch> && cd <path2> && uv version --bump <minor|patch> && ...
+./.claude/skills/release/bump-versions <package>:<type> [<package>:<type> ...]
 ```
 
-Display the version changes (e.g., "plain-code: 0.19.0 → 0.20.0").
+Example: `./.claude/skills/release/bump-versions plain-admin:patch plain-dev:minor`
 
 ### Phase 5: Generate Release Notes
 
@@ -93,45 +100,15 @@ For each package to release, sequentially:
 - If no changes required: "- No changes required."
 ```
 
-### Phase 6: Format and Sync
-
-Run once after all changes:
+### Phase 6: Commit, Tag, and Push
 
 ```
-uv sync
-./scripts/fix
+./.claude/skills/release/commit-and-push <package>:<version> [<package>:<version> ...]
 ```
 
-### Phase 7: Commit Each Package
+This script handles everything: `uv sync`, `./scripts/fix`, staging files, committing each package separately, tagging, and pushing. Sub-packages are committed first, core `plain` last.
 
-Commit sub-packages first (plain-admin, plain-dev, etc.), then the core `plain` package last.
-
-For each sub-package:
-
-```
-git add <package>/pyproject.toml <package>/**/CHANGELOG.md
-git add-hunks uv.lock --grep "<package-with-dot>" --context
-git commit -m "Release <package> <version>" -n
-git tag -a "<package>@<version>" -m "Release <package> <version>"
-```
-
-Note: `<package-with-dot>` uses dot notation (e.g., "plain.dev" for plain-dev).
-
-For the core `plain` package (last), `git add uv.lock` directly since the grep pattern can't uniquely match it:
-
-```
-git add plain/pyproject.toml plain/**/CHANGELOG.md uv.lock
-git commit -m "Release plain <version>" -n
-git tag -a "plain@<version>" -m "Release plain <version>"
-```
-
-### Phase 8: Push
-
-Push all commits and tags:
-
-```
-git push --follow-tags
-```
+Example: `./.claude/skills/release/commit-and-push plain-admin:0.65.1 plain:0.103.0`
 
 ## Release Type Guidelines
 

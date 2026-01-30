@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""
+Bump versions for one or more packages.
+
+Usage:
+  bump-versions <package>:<type> [<package>:<type> ...]
+
+Examples:
+  bump-versions plain-admin:patch
+  bump-versions plain-admin:patch plain-dev:minor plain:minor
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: bump-versions <package>:<type> [<package>:<type> ...]")
+        print("  type: minor or patch")
+        sys.exit(1)
+
+    root = Path(__file__).resolve().parent.parent.parent.parent
+
+    bumps: list[tuple[str, str]] = []
+    for arg in sys.argv[1:]:
+        if ':' not in arg:
+            print(f"Error: Invalid format '{arg}', expected <package>:<type>")
+            sys.exit(1)
+        name, bump_type = arg.split(':', 1)
+        if bump_type not in ('minor', 'patch'):
+            print(f"Error: Invalid bump type '{bump_type}', expected minor or patch")
+            sys.exit(1)
+        package_path = root / name
+        if not package_path.is_dir():
+            print(f"Error: Package directory not found: {package_path}")
+            sys.exit(1)
+        bumps.append((name, bump_type))
+
+    for name, bump_type in bumps:
+        package_path = root / name
+        result = subprocess.run(
+            ["uv", "version", "--bump", bump_type],
+            cwd=package_path,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(f"Error bumping {name}: {result.stderr}")
+            sys.exit(1)
+        print(f"{name}: {result.stdout.strip()}")
+
+
+if __name__ == "__main__":
+    main()
