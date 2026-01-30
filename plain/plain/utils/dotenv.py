@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 __all__ = ["load_dotenv", "parse_dotenv"]
@@ -46,13 +47,16 @@ def load_dotenv(
     if not path.exists():
         return False
 
+    content = path.read_text(encoding="utf-8")
+
     # Skip command execution for keys that already exist (unless override)
     skip_commands_for = None if override else set(os.environ.keys())
-    env_vars = _parse_dotenv_internal(path, skip_commands_for=skip_commands_for)
-    for key, value in env_vars.items():
+
+    def on_bind(key: str, value: str) -> None:
         if override or key not in os.environ:
             os.environ[key] = value
 
+    _parse_content(content, skip_commands_for=skip_commands_for, on_bind=on_bind)
     return True
 
 
@@ -62,27 +66,14 @@ def parse_dotenv(filepath: str | Path) -> dict[str, str]:
 
     Does not modify os.environ. Supports multiline values in quoted strings.
     """
-    return _parse_dotenv_internal(filepath, skip_commands_for=None)
-
-
-def _parse_dotenv_internal(
-    filepath: str | Path, skip_commands_for: set[str] | None = None
-) -> dict[str, str]:
-    """
-    Internal parser that can skip command execution for certain keys.
-
-    Args:
-        filepath: Path to the .env file
-        skip_commands_for: If provided, skip command substitution for keys in this set
-                          and use os.environ value instead
-    """
-    path = Path(filepath)
-    content = path.read_text(encoding="utf-8")
-    return _parse_content(content, skip_commands_for=skip_commands_for)
+    content = Path(filepath).read_text(encoding="utf-8")
+    return _parse_content(content)
 
 
 def _parse_content(
-    content: str, skip_commands_for: set[str] | None = None
+    content: str,
+    skip_commands_for: set[str] | None = None,
+    on_bind: Callable[[str, str], None] | None = None,
 ) -> dict[str, str]:
     """Parse .env file content and return key-value pairs."""
     result: dict[str, str] = {}
@@ -107,6 +98,8 @@ def _parse_content(
         if parsed:
             key, value, new_pos = parsed
             result[key] = value
+            if on_bind:
+                on_bind(key, value)
             pos = new_pos
         else:
             # Skip to next line on parse failure
@@ -136,7 +129,7 @@ def _parse_binding(
     length = len(content)
 
     # Skip optional 'export ' prefix
-    if content[pos:].startswith("export "):
+    if content[pos : pos + 7] == "export ":
         pos += 7
         while pos < length and content[pos] in " \t":
             pos += 1
