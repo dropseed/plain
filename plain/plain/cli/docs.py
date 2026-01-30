@@ -6,7 +6,6 @@ from pathlib import Path
 import click
 
 from .llmdocs import LLMDocs
-from .output import iterate_markdown
 
 # All known official Plain packages: pip name -> short description
 KNOWN_PACKAGES = {
@@ -71,11 +70,10 @@ def _online_docs_url(pip_name: str) -> str:
 
 
 @click.command()
-@click.option("--open", is_flag=True, help="Open the README in your default editor")
-@click.option("--source", is_flag=True, help="Include symbolicated source code")
+@click.option("--symbols", is_flag=True, help="Show symbolicated API surface only")
 @click.option("--list", "show_list", is_flag=True, help="List available packages")
 @click.argument("module", default="")
-def docs(module: str, open: bool, source: bool, show_list: bool) -> None:
+def docs(module: str, symbols: bool, show_list: bool) -> None:
     """Show documentation for a package"""
     if show_list:
         for pip_name in sorted(KNOWN_PACKAGES):
@@ -108,18 +106,10 @@ def docs(module: str, open: bool, source: bool, show_list: bool) -> None:
 
     module_path = Path(spec.origin).parent
 
-    if source:
-        # Output with symbolicated source
-        source_docs = LLMDocs([module_path])
-        source_docs.load()
-        source_docs.print(relative_to=module_path.parent)
-    else:
-        # Human-readable README output
-        readme_path = module_path / "README.md"
-        if not readme_path.exists():
-            raise click.UsageError(f"README.md not found for {module}")
-
-        if open:
-            click.launch(str(readme_path))
-        else:
-            click.echo_via_pager(iterate_markdown(readme_path.read_text()))
+    llm_docs = LLMDocs([module_path])
+    llm_docs.load()
+    llm_docs.print(
+        relative_to=module_path.parent,
+        include_docs=not symbols,
+        include_symbols=symbols,
+    )

@@ -1,14 +1,18 @@
 # Plain Framework
 
-Plain is a Python web framework. Use `uv run plain ...` for all framework commands.
+Plain is a Python web framework.
 
-Use the `/plain-install` skill to add new Plain packages.
-Use the `/plain-upgrade` skill to upgrade Plain packages.
+- Always use `uv run` to execute commands — never use bare `python` or `plain` directly.
+- Plain is a Django fork but has different APIs — never assume Django patterns will work.
+- When unsure about an API or something doesn't work, run `uv run plain docs <package>` first. Add `--symbols` if you need the full API surface.
+- Use the `/plain-install` skill to add new Plain packages.
+- Use the `/plain-upgrade` skill to upgrade Plain packages.
 
 ## Documentation
 
 Run `uv run plain docs --list` to see all official packages (installed and uninstalled) with descriptions.
-Run `uv run plain docs <package> --source` for detailed API documentation (installed packages only).
+Run `uv run plain docs <package>` for markdown documentation (installed packages only).
+Run `uv run plain docs <package> --symbols` for the symbolicated API surface.
 For uninstalled packages, the CLI shows the install command and an online docs URL.
 
 Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/path>/README.md`
@@ -16,9 +20,10 @@ Example: `https://plainframework.com/docs/plain-models/plain/models/README.md`
 
 Examples:
 
-- `uv run plain docs models --source` - Models and database
-- `uv run plain docs templates --source` - Jinja2 templates
-- `uv run plain docs assets --source` - Static assets
+- `uv run plain docs models` - Models and database docs
+- `uv run plain docs models --symbols` - Models API surface
+- `uv run plain docs templates` - Jinja2 templates
+- `uv run plain docs assets` - Static assets
 
 ### All official packages
 

@@ -62,27 +62,34 @@ class LLMDocs:
         plain_root = Path(*path.parts[: root_index + 1])
         return path.relative_to(plain_root.parent)
 
-    def print(self, relative_to: Path | None = None) -> None:
-        for doc in self.docs:
-            if relative_to:
-                display_path = doc.relative_to(relative_to)
-            else:
-                display_path = self.display_path(doc)
-            click.secho(f"<Docs: {display_path}>", fg="yellow")
-            click.echo(doc.read_text())
-            click.secho(f"</Docs: {display_path}>", fg="yellow")
-            click.echo()
-
-        for source in self.sources:
-            if symbolicated := self.symbolicate(source):
+    def print(
+        self,
+        relative_to: Path | None = None,
+        include_docs: bool = True,
+        include_symbols: bool = True,
+    ) -> None:
+        if include_docs:
+            for doc in self.docs:
                 if relative_to:
-                    display_path = source.relative_to(relative_to)
+                    display_path = doc.relative_to(relative_to)
                 else:
-                    display_path = self.display_path(source)
-                click.secho(f"<Source: {display_path}>", fg="yellow")
-                click.echo(symbolicated)
-                click.secho(f"</Source: {display_path}>", fg="yellow")
+                    display_path = self.display_path(doc)
+                click.secho(f"<Docs: {display_path}>", fg="yellow")
+                click.echo(doc.read_text())
+                click.secho(f"</Docs: {display_path}>", fg="yellow")
                 click.echo()
+
+        if include_symbols:
+            for source in self.sources:
+                if symbolicated := self.symbolicate(source):
+                    if relative_to:
+                        display_path = source.relative_to(relative_to)
+                    else:
+                        display_path = self.display_path(source)
+                    click.secho(f"<Source: {display_path}>", fg="yellow")
+                    click.echo(symbolicated)
+                    click.secho(f"</Source: {display_path}>", fg="yellow")
+                    click.echo()
 
     @staticmethod
     def symbolicate(file_path: Path) -> str:
