@@ -1,14 +1,13 @@
 {% if toolbar.should_render() %}
 {% set items=toolbar.get_items() %}
 <script defer src="{{ asset('toolbar/toolbar.js') }}" nonce="{{ request.csp_nonce }}"></script>
-<style nonce="{{ request.csp_nonce }}">#plaintoolbar-tabs::-webkit-scrollbar { display: none; }</style>
 <div id="plaintoolbar" class="print:hidden text-stone-300 fixed bottom-0 w-full z-50 flex flex-col">
 
     <div id="plaintoolbar-details" class="hidden relative text-sm border-white/5 shadow-xl border-t inset-shadow-xs inset-shadow-stone-800 rounded-t-xl bg-stone-950/95 backdrop-blur-sm">
 
         <div class="flex border-b border-white/5 px-2">
             {# Mobile: scrollable tabs #}
-            <div id="plaintoolbar-tabs" class="flex flex-grow overflow-x-auto" style="-ms-overflow-style: none; scrollbar-width: none;">
+            <div id="plaintoolbar-tabs" class="flex flex-grow overflow-x-auto scrollbar-none">
                 {% for item in items %}
                 {% if item.name and item.panel_template_name %}
                 <button {% if loop.first %}data-active{% endif %} data-toolbar-tab="{{ item.name }}" class="data-active:border-yellow-500 px-3 sm:px-4 py-3 sm:py-2.5 -mb-px cursor-pointer border-b-2 border-transparent hover:border-yellow-600 whitespace-nowrap text-sm" type="button">{{ item.name }}</button>
