@@ -8,6 +8,19 @@ Plain is a Python web framework.
 - Use the `/plain-install` skill to add new Plain packages.
 - Use the `/plain-upgrade` skill to upgrade Plain packages.
 
+## Key Differences from Django
+
+Claude's training data contains a lot of Django code. These are the most common patterns that differ in Plain:
+
+- **Querysets**: Use `Model.query` not `Model.objects` (e.g., `User.query.filter(is_active=True)`)
+- **Field types**: Import from `plain.models.types` not `plain.models.fields`
+- **Templates**: Plain uses Jinja2, not Django's template engine. Most syntax is similar but filters use `|` with function call syntax (e.g., `{{ name|title }}` works, but custom filters differ)
+- **URLs**: Use `Router` with `urls` list, not Django's `urlpatterns`
+- **Tests**: Use `plain.test.Client`, not `django.test.Client`
+- **Settings**: Use `plain.runtime.settings`, not `django.conf.settings`
+
+When in doubt, run `uv run plain docs <package> --symbols` to check the actual API.
+
 ## Documentation
 
 Run `uv run plain docs --list` to see all official packages (installed and uninstalled) with descriptions.
