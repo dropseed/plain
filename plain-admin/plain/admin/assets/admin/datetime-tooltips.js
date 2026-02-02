@@ -71,6 +71,9 @@ jQuery(($) => {
         const relativeRow = createTooltipRow("Relative", relativeTime(date));
         tooltip.appendChild(relativeRow);
         tooltip.appendChild(createTooltipRow("Unix", String(unix)));
+        tooltip.appendChild(
+          createTooltipRow("ISO", this.getAttribute("datetime")),
+        );
 
         document.body.appendChild(tooltip);
         this._datetimeTooltip = tooltip;
