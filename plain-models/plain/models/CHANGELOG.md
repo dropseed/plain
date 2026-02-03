@@ -1,5 +1,17 @@
 # plain-models changelog
 
+## [0.76.3](https://github.com/dropseed/plain/releases/plain-models@0.76.3) (2026-02-02)
+
+### What's changed
+
+- Fixed observer query summaries for SQL statements starting with parentheses (e.g., UNION queries) by stripping leading `(` before extracting the operation ([bfbcb5a256f2](https://github.com/dropseed/plain/commit/bfbcb5a256f2))
+- UNION queries now display with a "UNION" suffix in query summaries for better identification ([bfbcb5a256f2](https://github.com/dropseed/plain/commit/bfbcb5a256f2))
+- Agent rules now include query examples showing the `Model.query` pattern ([02e11328dbf5](https://github.com/dropseed/plain/commit/02e11328dbf5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.76.2](https://github.com/dropseed/plain/releases/plain-models@0.76.2) (2026-01-28)
 
 ### What's changed
