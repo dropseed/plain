@@ -124,7 +124,7 @@ def compile_asset(
     if compress and extension.lower() not in _SKIP_COMPRESS_EXTENSIONS:
         for path in compiled_paths.copy():
             gzip_path = f"{path}.gz"
-            with gzip.GzipFile(gzip_path, "wb") as f:
+            with gzip.GzipFile(gzip_path, "wb", mtime=0) as f:
                 with open(path, "rb") as f2:
                     f.write(f2.read())
             compiled_paths.append(gzip_path)
