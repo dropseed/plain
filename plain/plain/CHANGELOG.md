@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.103.2](https://github.com/dropseed/plain/releases/plain@0.103.2) (2026-02-02)
+
+### What's changed
+
+- Compiled assets now use deterministic gzip output by setting `mtime=0`, ensuring consistent file hashes across builds ([dc76e03879fc](https://github.com/dropseed/plain/commit/dc76e03879fc))
+- Agent rules now include a "Key Differences from Django" section to help Claude avoid common mistakes when working with Plain ([02e11328dbf5](https://github.com/dropseed/plain/commit/02e11328dbf5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.103.1](https://github.com/dropseed/plain/releases/plain@0.103.1) (2026-01-30)
 
 ### What's changed
