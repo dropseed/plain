@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.66.0](https://github.com/dropseed/plain/releases/plain-admin@0.66.0) (2026-02-02)
+
+### What's changed
+
+- Datetime values now display with smarter formatting: same-day times show only the time, dates within 6 days show the weekday, and older dates show the full date ([48a27f08287c](https://github.com/dropseed/plain/commit/48a27f08287c))
+- Rich datetime tooltips now appear on hover, showing the value in both UTC and local timezone with relative time and click-to-copy functionality ([dccfdf2459ef](https://github.com/dropseed/plain/commit/dccfdf2459ef))
+- Updated jQuery from 3.7.1 to 4.0.0 ([6ec9047ac337](https://github.com/dropseed/plain/commit/6ec9047ac337))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.65.1](https://github.com/dropseed/plain/releases/plain-admin@0.65.1) (2026-01-30)
 
 ### What's changed
