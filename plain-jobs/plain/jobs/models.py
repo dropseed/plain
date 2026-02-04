@@ -34,6 +34,8 @@ from .registry import jobs_registry
 if TYPE_CHECKING:
     from .jobs import Job
 
+__all__ = ["JobRequest", "JobProcess", "JobResult", "JobResultStatuses"]
+
 logger = logging.getLogger("plain.jobs")
 tracer = trace.get_tracer("plain.jobs")
 

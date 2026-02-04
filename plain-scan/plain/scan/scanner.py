@@ -25,6 +25,8 @@ if TYPE_CHECKING:
     from .audits.base import Audit
     from .results import ScanResult
 
+__all__ = ["Scanner"]
+
 
 class Scanner:
     """Main scanner that runs security checks against a URL."""

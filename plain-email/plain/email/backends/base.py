@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 
     from ..message import EmailMessage
 
+__all__ = ["BaseEmailBackend"]
+
 
 class BaseEmailBackend(ABC):
     """

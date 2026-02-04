@@ -11,6 +11,8 @@ from .builtin_views import (
 from .impersonate.urls import ImpersonateRouter
 from .views.registry import registry
 
+__all__ = ["AdminRouter"]
+
 
 class AdminRouter(Router):
     namespace = "admin"

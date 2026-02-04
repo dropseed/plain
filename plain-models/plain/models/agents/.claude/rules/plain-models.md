@@ -27,4 +27,4 @@ Use `Model.query` to build querysets:
 - `User.query.get(pk=1)`
 - `User.query.exclude(role="admin")`
 
-Run `uv run plain docs models --symbols` for the full query API.
+Run `uv run plain docs models --api` for the full query API.

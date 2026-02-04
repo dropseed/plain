@@ -18,7 +18,7 @@ from .registry import (
     register_view,
     register_viewset,
 )
-from .types import Img
+from .types import Avatar, Img
 from .viewsets import AdminViewset
 
 __all__ = [
@@ -38,4 +38,5 @@ __all__ = [
     "register_view",
     "get_model_detail_url",
     "Img",
+    "Avatar",
 ]

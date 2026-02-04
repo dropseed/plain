@@ -24,7 +24,7 @@ from plain.models.fields import DbParameters, Field
 from plain.models.fields.related import ForeignKeyField, RelatedField
 from plain.models.fields.reverse_related import ForeignObjectRel, ManyToManyRel
 from plain.models.indexes import Index
-from plain.models.sql import Query
+from plain.models.sql.query import Query
 from plain.models.transaction import TransactionManagementError, atomic
 from plain.utils import timezone
 

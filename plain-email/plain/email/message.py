@@ -20,7 +20,6 @@ from io import BytesIO, StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from plain.internal import internalcode
 from plain.runtime import settings
 from plain.templates import Template, TemplateFileMissing
 from plain.utils.encoding import force_str, punycode
@@ -136,7 +135,6 @@ def _sanitize_address(addr: str | tuple[str, str], encoding: str) -> str:
     return formataddr((nm, parsed_address.addr_spec))
 
 
-@internalcode
 class MIMEMixin:
     def as_string(self, unixfrom: bool = False, linesep: str = "\n") -> str:
         """Return the entire formatted message as a string.
@@ -165,7 +163,6 @@ class MIMEMixin:
         return fp.getvalue()
 
 
-@internalcode
 class SafeMIMEMessage(MIMEMixin, MIMEMessage):
     def __setitem__(self, name: str, val: str) -> None:
         # message/rfc822 attachments must be ASCII
@@ -173,7 +170,6 @@ class SafeMIMEMessage(MIMEMixin, MIMEMessage):
         MIMEMessage.__setitem__(self, name, val)
 
 
-@internalcode
 class SafeMIMEText(MIMEMixin, MIMEText):
     def __init__(
         self, _text: str, _subtype: str = "plain", _charset: str | None = None
@@ -199,7 +195,6 @@ class SafeMIMEText(MIMEMixin, MIMEText):
         MIMEText.set_payload(self, payload, charset=charset)
 
 
-@internalcode
 class SafeMIMEMultipart(MIMEMixin, MIMEMultipart):
     def __init__(
         self,

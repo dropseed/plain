@@ -4,7 +4,7 @@ Plain is a Python web framework.
 
 - Always use `uv run` to execute commands — never use bare `python` or `plain` directly.
 - Plain is a Django fork but has different APIs — never assume Django patterns will work.
-- When unsure about an API or something doesn't work, run `uv run plain docs <package>` first. Add `--symbols` if you need the full API surface.
+- When unsure about an API or something doesn't work, run `uv run plain docs <package>` first. Add `--api` if you need the full API surface.
 - Use the `/plain-install` skill to add new Plain packages.
 - Use the `/plain-upgrade` skill to upgrade Plain packages.
 
@@ -19,18 +19,18 @@ Claude's training data contains a lot of Django code. These are the most common 
 - **Tests**: Use `plain.test.Client`, not `django.test.Client`
 - **Settings**: Use `plain.runtime.settings`, not `django.conf.settings`
 
-When in doubt, run `uv run plain docs <package> --symbols` to check the actual API.
+When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
 ## Documentation
 
 Run `uv run plain docs --list` to see available packages.
 Run `uv run plain docs <package>` for markdown documentation.
-Run `uv run plain docs <package> --symbols` for the symbolicated API surface.
+Run `uv run plain docs <package> --api` for the symbolicated API surface.
 
 Examples:
 
 - `uv run plain docs models` - Models and database docs
-- `uv run plain docs models --symbols` - Models API surface
+- `uv run plain docs models --api` - Models API surface
 - `uv run plain docs templates` - Jinja2 templates
 - `uv run plain docs assets` - Static assets
 

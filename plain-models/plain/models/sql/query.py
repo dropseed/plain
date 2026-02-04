@@ -68,8 +68,6 @@ if TYPE_CHECKING:
     from plain.models.meta import Meta
     from plain.models.sql.compiler import SQLCompiler, SqlWithParams
 
-__all__ = ["Query", "RawQuery"]
-
 # Quotation marks ('"`[]), whitespace characters, semicolons, or inline
 # SQL comments are forbidden in column aliases.
 FORBIDDEN_ALIAS_PATTERN = _lazy_re_compile(r"['`\"\]\[;\s]|--|/\*|\*/")

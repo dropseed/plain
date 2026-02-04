@@ -70,10 +70,10 @@ def _online_docs_url(pip_name: str) -> str:
 
 
 @click.command()
-@click.option("--symbols", is_flag=True, help="Show symbolicated API surface only")
+@click.option("--api", is_flag=True, help="Show public API surface only")
 @click.option("--list", "show_list", is_flag=True, help="List available packages")
 @click.argument("module", default="")
-def docs(module: str, symbols: bool, show_list: bool) -> None:
+def docs(module: str, api: bool, show_list: bool) -> None:
     """Show documentation for a package"""
     if show_list:
         for pip_name in sorted(KNOWN_PACKAGES):
@@ -110,6 +110,6 @@ def docs(module: str, symbols: bool, show_list: bool) -> None:
     llm_docs.load()
     llm_docs.print(
         relative_to=module_path.parent,
-        include_docs=not symbols,
-        include_symbols=symbols,
+        include_docs=not api,
+        include_api=api,
     )

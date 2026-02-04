@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Self
 from plain.models.backends.utils import names_digest, split_identifier
 from plain.models.expressions import Col, ExpressionList, F, Func, OrderBy
 from plain.models.query_utils import Q
-from plain.models.sql import Query
+from plain.models.sql.query import Query
 from plain.utils.functional import partition
 
 if TYPE_CHECKING:

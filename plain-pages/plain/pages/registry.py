@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import os
 
-from plain.internal import internalcode
 from plain.urls import URLPattern
 
 from .exceptions import PageNotFoundError
 from .pages import Page
 
 
-@internalcode
 class PagesRegistry:
     """
     The registry loads up all the pages at once, so we only have to do a

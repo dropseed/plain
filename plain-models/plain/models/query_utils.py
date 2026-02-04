@@ -153,8 +153,8 @@ class Q(tree.Node):
         from plain.models.expressions import ResolvableExpression, Value
         from plain.models.fields import BooleanField
         from plain.models.functions import Coalesce
-        from plain.models.sql import Query
         from plain.models.sql.constants import SINGLE
+        from plain.models.sql.query import Query
 
         query = Query(None)
         for name, value in against.items():

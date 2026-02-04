@@ -13,6 +13,8 @@ from plain.utils.http import http_date
 from .core import SessionStore
 from .requests import get_request_session, set_request_session
 
+__all__ = ["SessionMiddleware"]
+
 
 class SessionMiddleware(HttpMiddleware):
     def process_request(self, request: Request) -> Response:

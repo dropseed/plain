@@ -4,13 +4,11 @@ import hashlib
 import json
 from functools import cache
 
-from plain.internal import internalcode
 from plain.runtime import PLAIN_TEMP_PATH
 
 _FINGERPRINT_LENGTH = 7
 
 
-@internalcode
 class AssetsManifest(dict[str, str | None]):
     """
     A manifest of compiled assets.
@@ -69,7 +67,6 @@ class AssetsManifest(dict[str, str | None]):
         return self[url_path] or url_path
 
 
-@internalcode
 @cache
 def get_manifest() -> AssetsManifest:
     """
@@ -81,7 +78,6 @@ def get_manifest() -> AssetsManifest:
     return manifest
 
 
-@internalcode
 def compute_fingerprint(file_path: str) -> str:
     """Compute an MD5-based fingerprint hash for a file."""
     with open(file_path, "rb") as f:
