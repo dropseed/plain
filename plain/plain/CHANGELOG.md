@@ -1,5 +1,22 @@
 # plain changelog
 
+## [0.104.0](https://github.com/dropseed/plain/releases/plain@0.104.0) (2026-02-04)
+
+### What's changed
+
+- Refactored the assets manifest system with a clearer API: `AssetsManifest` replaces `AssetsFingerprintsManifest`, with explicit methods `add_fingerprinted()`, `add_non_fingerprinted()`, `is_fingerprinted()`, and `resolve()` ([9cb84010b5fb](https://github.com/dropseed/plain/commit/9cb84010b5fb))
+- Renamed `ASSETS_BASE_URL` setting to `ASSETS_CDN_URL` for clarity ([9cb84010b5fb](https://github.com/dropseed/plain/commit/9cb84010b5fb))
+- When `ASSETS_CDN_URL` is configured, `AssetsRouter` now redirects compiled assets to the CDN: original paths use 302 (temporary), fingerprinted paths use 301 (permanent) with immutable caching ([9cb84010b5fb](https://github.com/dropseed/plain/commit/9cb84010b5fb))
+- The `is_immutable()` check now uses the manifest to determine if a path is fingerprinted, rather than pattern-matching the filename ([9cb84010b5fb](https://github.com/dropseed/plain/commit/9cb84010b5fb))
+
+### Upgrade instructions
+
+- Rename `ASSETS_BASE_URL` to `ASSETS_CDN_URL` in your settings if you use a CDN for assets.
+- If you were importing from `plain.assets.fingerprints`, update imports to use `plain.assets.manifest` instead:
+    - `AssetsFingerprintsManifest` → `AssetsManifest`
+    - `get_fingerprinted_url_path()` → `get_manifest().resolve()`
+    - `_get_file_fingerprint()` → `compute_fingerprint()`
+
 ## [0.103.2](https://github.com/dropseed/plain/releases/plain@0.103.2) (2026-02-02)
 
 ### What's changed
