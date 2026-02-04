@@ -21,7 +21,7 @@ from plain.views import View
 
 from .compile import get_compiled_path
 from .finders import _iter_assets
-from .fingerprints import _FINGERPRINT_LENGTH, get_fingerprinted_url_path
+from .manifest import AssetsManifest, get_manifest
 
 
 class AssetView(View):
@@ -35,6 +35,10 @@ class AssetView(View):
         # Allow a path to be passed in AssetView.as_view(path="...")
         self.asset_path = asset_path
 
+    def get_manifest(self) -> AssetsManifest:
+        """Get the assets manifest. Override in tests to provide a custom manifest."""
+        return get_manifest()
+
     def get_url_path(self) -> str | None:
         return self.asset_path or self.url_kwargs["path"]
 
@@ -46,6 +50,11 @@ class AssetView(View):
 
         # Make a trailing slash work, but we don't expect it
         url_path = url_path.rstrip("/")
+
+        # If a CDN is configured, redirect compiled assets there
+        if settings.ASSETS_CDN_URL:
+            if cdn_response := self.get_cdn_redirect_response(url_path):
+                return cdn_response
 
         if settings.DEBUG:
             absolute_path = self.get_debug_asset_path(url_path)
@@ -86,7 +95,7 @@ class AssetView(View):
         compiled_path = os.path.abspath(get_compiled_path())
         asset_path = os.path.join(compiled_path, path)
 
-        # Make sure we don't try to escape the compiled assests path
+        # Make sure we don't try to escape the compiled assets path
         if not os.path.commonpath([compiled_path, asset_path]) == compiled_path:
             raise NotFoundError404("Asset not found")
 
@@ -142,9 +151,7 @@ class AssetView(View):
         vary = headers.get("Vary")
         if not vary:
             headers["Vary"] = "Accept-Encoding"
-        elif vary == "*":
-            pass
-        elif "Accept-Encoding" not in vary:
+        elif vary != "*" and "Accept-Encoding" not in vary:
             headers["Vary"] = vary + ", Accept-Encoding"
 
         # If the file is compressed, tell the browser
@@ -179,19 +186,25 @@ class AssetView(View):
 
     def is_immutable(self, path: str) -> bool:
         """
-        Determine whether an asset looks like it is immutable.
+        Determine whether an asset is immutable (fingerprinted).
 
-        Pattern matching based on fingerprinted filenames:
-        - main.{fingerprint}.css
-        - main.{fingerprint}.css.gz
+        Checks if the path is a fingerprinted path in the manifest.
+        Also handles compressed variants (e.g., main.abc1234.css.gz).
         """
-        base = os.path.basename(path)
-        extension = None
-        while extension != "":
-            base, extension = os.path.splitext(base)
-            if len(extension) == _FINGERPRINT_LENGTH + 1 and extension[1:].isalnum():
-                return True
+        # Convert absolute path to URL-relative path for manifest lookup
+        compiled_path = os.path.abspath(get_compiled_path())
+        if path.startswith(compiled_path):
+            url_path = os.path.relpath(path, compiled_path)
+        else:
+            url_path = path
 
+        manifest = self.get_manifest()
+
+        # Check the path directly, then without compression extension
+        if manifest.is_fingerprinted(url_path):
+            return True
+        if url_path.endswith((".gz", ".br")):
+            return manifest.is_fingerprinted(url_path[:-3])
         return False
 
     def get_encoded_path(self, path: str) -> str | None:
@@ -216,22 +229,50 @@ class AssetView(View):
 
     def get_redirect_response(self, path: str) -> RedirectResponse | None:
         """If the asset is not found, try to redirect to the fingerprinted path"""
-        fingerprinted_url_path = get_fingerprinted_url_path(path)
+        compiled_url_path = self.get_manifest().resolve(path)
 
-        if not fingerprinted_url_path or fingerprinted_url_path == path:
-            # Don't need to redirect if there is no fingerprinted path,
-            # or we're already looking at it.
+        if not compiled_url_path or compiled_url_path == path:
+            # Don't need to redirect if there is no compiled path,
+            # or we're already looking at it (not fingerprinted).
             return None
 
+        # Import here to avoid circular import (urls.py imports AssetView)
         from .urls import AssetsRouter
 
-        namespace = AssetsRouter.namespace
-
         return RedirectResponse(
-            redirect_to=reverse(f"{namespace}:asset", fingerprinted_url_path),
+            redirect_to=reverse(f"{AssetsRouter.namespace}:asset", compiled_url_path),
             headers={
                 "Cache-Control": "max-age=60",  # Can cache this for a short time, but the fingerprinted path can change
             },
+        )
+
+    def get_cdn_redirect_response(self, path: str) -> RedirectResponse | None:
+        """Redirect to CDN URL for compiled assets.
+
+        Assets not in the manifest (e.g., page assets) are not redirected
+        and will be served locally.
+        """
+        manifest = self.get_manifest()
+
+        if path not in manifest:
+            return None
+
+        redirect_target = manifest[path]
+        final_path = redirect_target or path
+        is_immutable = redirect_target is None and manifest.is_fingerprinted(path)
+
+        if is_immutable:
+            status_code = 301
+            cache_control = "max-age=31536000, immutable"
+        else:
+            status_code = 302
+            cache_control = "max-age=60"
+
+        cdn_url = f"{settings.ASSETS_CDN_URL.rstrip('/')}/{final_path.lstrip('/')}"
+        return RedirectResponse(
+            redirect_to=cdn_url,
+            status_code=status_code,
+            headers={"Cache-Control": cache_control},
         )
 
     def get_conditional_response(self, path: str) -> NotModifiedResponse | None:

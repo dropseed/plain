@@ -1,7 +1,7 @@
 from plain.runtime import settings
 from plain.urls import Router, path, reverse
 
-from .fingerprints import get_fingerprinted_url_path
+from .manifest import get_manifest
 from .views import AssetView
 
 
@@ -19,22 +19,15 @@ class AssetsRouter(Router):
 
 
 def get_asset_url(url_path: str) -> str:
-    """
-    Get the full URL to a given asset path.
-    """
+    """Get the full URL to a given asset path."""
+    # In debug mode, always use the original URL path.
+    # In production, use compiled URL path if available (may be fingerprinted).
     if settings.DEBUG:
-        # In debug, we only ever use the original URL path.
         resolved_url_path = url_path
     else:
-        # If a fingerprinted URL path is available, use that.
-        if fingerprinted_url_path := get_fingerprinted_url_path(url_path):
-            resolved_url_path = fingerprinted_url_path
-        else:
-            resolved_url_path = url_path
+        resolved_url_path = get_manifest().resolve(url_path) or url_path
 
-    # If a base url is set (i.e. a CDN),
-    # then do a simple join to get the full URL.
-    if settings.ASSETS_BASE_URL:
-        return settings.ASSETS_BASE_URL + resolved_url_path
+    if settings.ASSETS_CDN_URL:
+        return f"{settings.ASSETS_CDN_URL.rstrip('/')}/{resolved_url_path.lstrip('/')}"
 
-    return reverse(AssetsRouter.namespace + ":asset", path=resolved_url_path)
+    return reverse(f"{AssetsRouter.namespace}:asset", path=resolved_url_path)

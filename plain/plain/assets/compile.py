@@ -9,7 +9,7 @@ from pathlib import Path
 from plain.runtime import PLAIN_TEMP_PATH
 
 from .finders import Asset, _iter_assets
-from .fingerprints import AssetsFingerprintsManifest, _get_file_fingerprint
+from .manifest import AssetsManifest, compute_fingerprint
 
 _SKIP_COMPRESS_EXTENSIONS = (
     # Images
@@ -57,22 +57,31 @@ def compile_assets(
     *, target_dir: str, keep_original: bool, fingerprint: bool, compress: bool
 ) -> Iterator[tuple[str, str, list[str]]]:
     """
-    Compile all assets to the target directory and save a JSON manifest
-    mapping the original filenames to the compiled filenames.
+    Compile all assets to the target directory and save a JSON manifest.
+
+    Manifest format:
+    - original path → fingerprinted path (if fingerprinting enabled)
+    - fingerprinted path → None (terminal, no redirect)
+    - original path → None (if no fingerprinting, terminal)
     """
-    manifest = AssetsFingerprintsManifest()
+    manifest = AssetsManifest()
 
     for asset in _iter_assets():
         url_path = asset.url_path
-        resolved_path, compiled_paths = compile_asset(
+        fingerprinted_path, compiled_paths = compile_asset(
             asset=asset,
             target_dir=target_dir,
             keep_original=keep_original,
             fingerprint=fingerprint,
             compress=compress,
         )
-        if resolved_path != url_path:
-            manifest[url_path] = resolved_path
+
+        if fingerprinted_path:
+            manifest.add_fingerprinted(url_path, fingerprinted_path)
+            resolved_path = fingerprinted_path
+        else:
+            manifest.add_non_fingerprinted(url_path)
+            resolved_path = url_path
 
         yield url_path, resolved_path, compiled_paths
 
@@ -86,40 +95,38 @@ def compile_asset(
     keep_original: bool,
     fingerprint: bool,
     compress: bool,
-) -> tuple[str, list[str]]:
+) -> tuple[str | None, list[str]]:
     """
     Compile an asset to multiple output paths.
+
+    Returns the fingerprinted URL path (or None) and the list of compiled file paths.
     """
     compiled_paths: list[str] = []
+    fingerprinted_url_path: str | None = None
 
     # The expected destination for the original asset
     target_path = os.path.join(target_dir, asset.url_path)
-
-    # Keep track of where the final, resolved asset ends up
-    resolved_url_path: str = asset.url_path
 
     # Make sure all the expected directories exist
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
     base, extension = os.path.splitext(asset.url_path)
 
-    # First, copy the original asset over
+    # Copy the original asset if requested
     if keep_original:
         shutil.copy(asset.absolute_path, target_path)
         compiled_paths.append(target_path)
 
+    # Create fingerprinted version if requested
     if fingerprint:
-        # Fingerprint it with an md5 hash
-        # (maybe need a setting with fnmatch patterns for files to NOT fingerprint?
-        # that would allow pre-fingerprinted files to be used as-is, and keep source maps etc in tact)
-        fingerprint_hash = _get_file_fingerprint(asset.absolute_path)
+        fingerprint_hash = compute_fingerprint(asset.absolute_path)
 
         fingerprinted_basename = f"{base}.{fingerprint_hash}{extension}"
         fingerprinted_path = os.path.join(target_dir, fingerprinted_basename)
         shutil.copy(asset.absolute_path, fingerprinted_path)
         compiled_paths.append(fingerprinted_path)
 
-        resolved_url_path = str(os.path.relpath(fingerprinted_path, target_dir))
+        fingerprinted_url_path = str(os.path.relpath(fingerprinted_path, target_dir))
 
     if compress and extension.lower() not in _SKIP_COMPRESS_EXTENSIONS:
         for path in compiled_paths.copy():
@@ -129,4 +136,4 @@ def compile_asset(
                     f.write(f2.read())
             compiled_paths.append(gzip_path)
 
-    return resolved_url_path, compiled_paths
+    return fingerprinted_url_path, compiled_paths
