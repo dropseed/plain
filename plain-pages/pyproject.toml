@@ -1,6 +1,6 @@
 [project]
 name = "plain.pages"
-version = "0.18.1"
+version = "0.18.2"
 description = "Serve static pages, markdown, and assets from templates/pages directories."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 readme = "README.md"
