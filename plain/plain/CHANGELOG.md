@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.105.0](https://github.com/dropseed/plain/releases/plain@0.105.0) (2026-02-05)
+
+### What's changed
+
+- `plain agent install` now discovers and installs rules and skills from `plainx.*` namespace packages in addition to `plain.*` packages ([bd568db924f7](https://github.com/dropseed/plain/commit/bd568db924f7))
+- Orphan cleanup during `plain agent install` now correctly handles both `plain` and `plainx` prefixed items ([bd568db924f7](https://github.com/dropseed/plain/commit/bd568db924f7))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.104.1](https://github.com/dropseed/plain/releases/plain@0.104.1) (2026-02-04)
 
 ### What's changed
