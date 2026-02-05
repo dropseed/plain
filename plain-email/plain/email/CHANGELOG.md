@@ -1,5 +1,16 @@
 # plain-email changelog
 
+## [0.15.2](https://github.com/dropseed/plain/releases/plain-email@0.15.2) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` export to `backends/base` module ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+- Removed `@internalcode` decorator from internal MIME helper classes ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.15.1](https://github.com/dropseed/plain/releases/plain-email@0.15.1) (2026-01-28)
 
 ### What's changed
