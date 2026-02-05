@@ -10,9 +10,10 @@ import click
 
 
 def _get_agent_dirs() -> list[Path]:
-    """Get list of agents/.claude/ directories from installed plain.* packages."""
+    """Get list of agents/.claude/ directories from installed plain.* and plainx.* packages."""
     agent_dirs: list[Path] = []
 
+    # Search plain.* packages
     try:
         import plain
 
@@ -29,6 +30,27 @@ def _get_agent_dirs() -> list[Path]:
         if hasattr(plain, "__path__"):
             for importer, modname, ispkg in pkgutil.iter_modules(
                 plain.__path__, "plain."
+            ):
+                if ispkg:
+                    try:
+                        spec = importlib.util.find_spec(modname)
+                        if spec and spec.origin:
+                            agent_dir = Path(spec.origin).parent / "agents" / ".claude"
+                            if agent_dir.exists() and agent_dir.is_dir():
+                                agent_dirs.append(agent_dir)
+                    except Exception:
+                        continue
+    except Exception:
+        pass
+
+    # Search plainx.* packages
+    try:
+        import plainx  # type: ignore[import-not-found]
+
+        # Check plainx.* subpackages
+        if hasattr(plainx, "__path__"):
+            for importer, modname, ispkg in pkgutil.iter_modules(
+                plainx.__path__, "plainx."
             ):
                 if ispkg:
                     try:
@@ -93,8 +115,13 @@ def _install_agent_dir(source_dir: Path, dest_dir: Path) -> tuple[int, int]:
     return installed_count, 0
 
 
+def _is_plain_item(name: str) -> bool:
+    """Check if a name is from plain or plainx namespace."""
+    return name.startswith("plain")  # Matches both 'plain' and 'plainx'
+
+
 def _cleanup_orphans(dest_dir: Path, agent_dirs: list[Path]) -> int:
-    """Remove plain* items from .claude/ that no longer exist in any source package."""
+    """Remove plain* and plainx* items from .claude/ that no longer exist in any source package."""
     removed_count = 0
 
     # Collect all source skill and rule names
@@ -118,7 +145,7 @@ def _cleanup_orphans(dest_dir: Path, agent_dirs: list[Path]) -> int:
         for dest in dest_skills.iterdir():
             if (
                 dest.is_dir()
-                and dest.name.startswith("plain")
+                and _is_plain_item(dest.name)
                 and dest.name not in source_skills
             ):
                 shutil.rmtree(dest)
@@ -130,7 +157,7 @@ def _cleanup_orphans(dest_dir: Path, agent_dirs: list[Path]) -> int:
         for dest in dest_rules.iterdir():
             if (
                 dest.is_file()
-                and dest.name.startswith("plain")
+                and _is_plain_item(dest.name)
                 and dest.suffix == ".md"
                 and dest.name not in source_rules
             ):
