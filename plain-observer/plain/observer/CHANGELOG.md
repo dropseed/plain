@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.27.3](https://github.com/dropseed/plain/releases/plain-observer@0.27.3) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `__init__`, `core`, and `models` modules for explicit public API boundaries ([f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+- `Observer` and `ObserverMode` are now exported from the top-level `plain.observer` module ([f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.2](https://github.com/dropseed/plain/releases/plain-observer@0.27.2) (2026-01-28)
 
 ### What's changed
