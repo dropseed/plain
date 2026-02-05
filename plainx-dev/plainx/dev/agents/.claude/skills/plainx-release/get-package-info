@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""
+Get package metadata and commits since last release.
+
+Outputs JSON with package info for the current directory's pyproject.toml.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
+
+
+def run(cmd: list[str], cwd: Path | None = None) -> str:
+    """Run a command and return stdout."""
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    return result.stdout.strip()
+
+
+def get_package_name(pyproject: dict) -> str:
+    """Get the package name from pyproject.toml."""
+    return pyproject.get("project", {}).get("name", "")
+
+
+def get_current_version() -> str:
+    """Get the current version using uv."""
+    return run(["uv", "version", "--short"])
+
+
+def get_repo_url(pyproject: dict) -> str | None:
+    """Extract GitHub repo URL from pyproject.toml."""
+    project = pyproject.get("project", {})
+
+    # Check project.urls
+    urls = project.get("urls", {})
+    for key in ["Repository", "repository", "Source", "source", "GitHub", "github"]:
+        if key in urls:
+            url = urls[key]
+            # Normalize to https://github.com/owner/repo format
+            if "github.com" in url:
+                return url.rstrip("/").rstrip(".git")
+
+    # Check project.homepage
+    homepage = project.get("homepage", "")
+    if "github.com" in homepage:
+        return homepage.rstrip("/").rstrip(".git")
+
+    return None
+
+
+def get_changelog_path() -> str:
+    """Find the CHANGELOG.md file."""
+    root = Path.cwd()
+
+    # Common locations
+    candidates = [
+        root / "CHANGELOG.md",
+        root / "changelog.md",
+    ]
+
+    # Check for package-specific changelog (src layout or namespace package)
+    for pyproject_path in [root / "pyproject.toml"]:
+        if pyproject_path.exists():
+            with open(pyproject_path, "rb") as f:
+                pyproject = tomllib.load(f)
+            name = get_package_name(pyproject)
+            if name:
+                # Handle namespace packages like plainx.sentry -> plainx/sentry
+                parts = name.replace(".", "/").replace("-", "/")
+                candidates.extend([
+                    root / parts / "CHANGELOG.md",
+                    root / "src" / parts / "CHANGELOG.md",
+                ])
+
+    for path in candidates:
+        if path.exists():
+            return str(path.relative_to(root))
+
+    # Default to root CHANGELOG.md even if it doesn't exist yet
+    return "CHANGELOG.md"
+
+
+def get_last_tag(name: str) -> str | None:
+    """Get the most recent release tag for this package."""
+    # Try v-prefixed tags first (most common for single-package repos)
+    output = run(["git", "tag", "-l", "v*", "--sort=-v:refname"])
+    tags = [t for t in output.split("\n") if t]
+    if tags:
+        return tags[0]
+
+    # Fall back to name@version format (monorepo style)
+    output = run(["git", "tag", "-l", f"{name}@*", "--sort=-v:refname"])
+    tags = [t for t in output.split("\n") if t]
+    if tags:
+        return tags[0]
+
+    return None
+
+
+def get_commits_since(since_ref: str | None) -> list[dict]:
+    """Get commits since a given ref, excluding tests."""
+    if since_ref:
+        cmd = [
+            "git", "log", "--format=%H|%s",
+            f"{since_ref}..HEAD",
+            "--", ".",
+            ":(exclude)tests",
+            ":(exclude)**/tests",
+        ]
+    else:
+        # No previous tag, get recent commits
+        cmd = [
+            "git", "log", "--format=%H|%s",
+            "-n", "50",
+            "--", ".",
+            ":(exclude)tests",
+            ":(exclude)**/tests",
+        ]
+
+    output = run(cmd)
+
+    commits = []
+    for line in output.split("\n"):
+        if "|" in line:
+            hash_, subject = line.split("|", 1)
+            commits.append({
+                "hash": hash_[:12],
+                "subject": subject
+            })
+
+    return commits
+
+
+def main():
+    root = Path.cwd()
+    pyproject_path = root / "pyproject.toml"
+
+    if not pyproject_path.exists():
+        print(json.dumps({"error": "No pyproject.toml found in current directory"}))
+        sys.exit(1)
+
+    with open(pyproject_path, "rb") as f:
+        pyproject = tomllib.load(f)
+
+    name = get_package_name(pyproject)
+    if not name:
+        print(json.dumps({"error": "No project.name found in pyproject.toml"}))
+        sys.exit(1)
+
+    current_version = get_current_version()
+    changelog_path = get_changelog_path()
+    last_tag = get_last_tag(name)
+    repo_url = get_repo_url(pyproject)
+    commits = get_commits_since(last_tag)
+
+    result = {
+        "name": name,
+        "current_version": current_version,
+        "changelog_path": changelog_path,
+        "last_tag": last_tag,
+        "repo_url": repo_url,
+        "commits": commits,
+    }
+
+    print(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()

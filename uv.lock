@@ -36,6 +36,7 @@ members = [
     "plain-tunnel",
     "plain-vendor",
     "plain-workspace",
+    "plainx-dev",
 ]
 
 [[package]]
@@ -1049,6 +1050,11 @@ dev = [
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.12" },
     { name = "ty", specifier = ">=0.0.11" },
 ]
+
+[[package]]
+name = "plainx-dev"
+version = "0.0.0"
+source = { editable = "plainx-dev" }
 
 [[package]]
 name = "pluggy"

@@ -1,0 +1,16 @@
+[project]
+name = "plainx.dev"
+version = "0.0.0"
+description = "Development tools for plainx package developers, including release automation."
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+license = "BSD-3-Clause"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["plainx"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
