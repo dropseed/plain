@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.104.1](https://github.com/dropseed/plain/releases/plain@0.104.1) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to public modules for improved IDE autocompletion and explicit public API boundaries ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2), [f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+- Removed `@internalcode` decorator from internal classes in favor of `__all__` exports ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+- Renamed `plain docs --symbols` option to `--api` for clarity ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- If using `plain docs --symbols`, update to `plain docs --api`.
+
 ## [0.104.0](https://github.com/dropseed/plain/releases/plain@0.104.0) (2026-02-04)
 
 ### What's changed
