@@ -10,11 +10,12 @@ Release Plain packages with version bumping, changelog generation, and git taggi
 ## Arguments
 
 ```
-/release [packages...] [--minor|--patch] [--force]
+/release [packages...] [--major|--minor|--patch] [--force]
 ```
 
 - No args: discover all packages with changes, prompt for each
 - Package names: only release specified packages
+- `--major`: auto-select major release for all packages with changes
 - `--minor`: auto-select minor release for all packages with changes
 - `--patch`: auto-select patch release for all packages with changes
 - `--force`: ignore dirty git status
@@ -50,6 +51,16 @@ All mechanical operations are handled by scripts in this skill directory:
 
 This outputs JSON with each package's name, current version, and commits since last release.
 If specific packages were requested, filter the results to only those packages.
+
+### Phase 2b: First Release Detection
+
+For any package with `current_version` of `0.0.0`:
+
+1. Inform the user: "Package X has never been released (version 0.0.0)."
+2. Ask what version to release:
+    - **0.1.0** - First development release (recommended)
+    - **1.0.0** - First stable release
+3. Use `uv version <version>` in the package directory to set the version directly (instead of bump)
 
 ### Phase 3: Collect Release Decisions
 
@@ -112,12 +123,26 @@ Example: `./.claude/skills/release/commit-and-push plain-admin:0.65.1 plain:0.10
 
 ## Release Type Guidelines
 
-Since all packages are pre-1.0, use:
+Consider the current version when suggesting release types:
+
+### Pre-1.0 packages (0.x.y)
+
+Most Plain packages are pre-1.0. For these:
 
 - **Minor (0.x.0)**: New features, breaking changes, new APIs, significant additions
 - **Patch (0.0.x)**: Bugfixes, minor tweaks, documentation, refactors
+- **Major (1.0.0)**: Only suggest if explicitly requested for stability milestone
 
-Analyze commit messages for keywords:
+### Post-1.0 packages (x.y.z where x >= 1)
 
-- Minor indicators: "add", "new", "feature", "breaking", "remove", "rename API"
-- Patch indicators: "fix", "bugfix", "typo", "docs", "refactor", "update"
+Follow semver strictly:
+
+- **Major (x.0.0)**: Breaking changes, API removals, incompatible changes
+- **Minor (x.y.0)**: New features, new APIs, backwards-compatible additions
+- **Patch (x.y.z)**: Bugfixes, minor tweaks, documentation, refactors
+
+### Commit message indicators
+
+- Breaking/major indicators: "breaking", "remove", "rename API", "redesign", "incompatible"
+- Feature/minor indicators: "add", "new", "feature", "implement"
+- Fix/patch indicators: "fix", "bugfix", "typo", "docs", "refactor", "update"
