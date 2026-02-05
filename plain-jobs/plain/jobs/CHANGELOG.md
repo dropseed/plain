@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.43.4](https://github.com/dropseed/plain/releases/plain-jobs@0.43.4) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `models` and `scheduling` modules for explicit public API boundaries ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.43.3](https://github.com/dropseed/plain/releases/plain-jobs@0.43.3) (2026-01-28)
 
 ### What's changed
