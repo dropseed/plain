@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.66.1](https://github.com/dropseed/plain/releases/plain-admin@0.66.1) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `dates`, `urls`, and `views` modules for explicit public API boundaries ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+- Added `Avatar` to the `views` module exports ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.66.0](https://github.com/dropseed/plain/releases/plain-admin@0.66.0) (2026-02-02)
 
 ### What's changed
