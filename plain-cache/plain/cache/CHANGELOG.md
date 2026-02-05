@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.25.2](https://github.com/dropseed/plain/releases/plain-cache@0.25.2) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `models` module for explicit public API boundaries ([f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.25.1](https://github.com/dropseed/plain/releases/plain-cache@0.25.1) (2026-01-28)
 
 ### What's changed
