@@ -601,7 +601,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-flags"
-version = "0.33.1"
+version = "0.33.2"
 source = { editable = "plain-flags" }
 dependencies = [
     { name = "plain" },
