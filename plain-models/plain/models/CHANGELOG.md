@@ -1,5 +1,17 @@
 # plain-models changelog
 
+## [0.76.4](https://github.com/dropseed/plain/releases/plain-models@0.76.4) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `expressions` module for explicit public API boundaries ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+- Refactored internal imports to use explicit module paths instead of the `sql` namespace ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+- Updated agent rules to use `--api` instead of `--symbols` for `plain docs` command ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.76.3](https://github.com/dropseed/plain/releases/plain-models@0.76.3) (2026-02-02)
 
 ### What's changed
