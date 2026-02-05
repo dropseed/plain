@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.23.2](https://github.com/dropseed/plain/releases/plain-passwords@0.23.2) (2026-02-04)
+
+### What's changed
+
+- Removed `@internalcode` decorator from utility functions (`urlsafe_base64_encode`, `urlsafe_base64_decode`, `unicode_ci_compare`) ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.23.1](https://github.com/dropseed/plain/releases/plain-passwords@0.23.1) (2026-01-28)
 
 ### What's changed
