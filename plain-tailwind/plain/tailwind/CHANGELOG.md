@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.20.3](https://github.com/dropseed/plain/releases/plain-tailwind@0.20.3) (2026-02-04)
+
+### What's changed
+
+- Removed `@internalcode` decorator from `Tailwind`, `TailwindCSSExtension`, and entrypoint functions ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.20.2](https://github.com/dropseed/plain/releases/plain-tailwind@0.20.2) (2026-01-28)
 
 ### What's changed
