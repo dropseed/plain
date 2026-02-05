@@ -6,6 +6,11 @@ from plain.http import Request, Response, ResponseBase
 from plain.views import View
 from plain.views.exceptions import ResponseException
 
+__all__ = [
+    "APIVersionChange",
+    "VersionedAPIView",
+]
+
 
 class APIVersionChange:
     description: str = ""

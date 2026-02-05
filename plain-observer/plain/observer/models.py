@@ -35,6 +35,8 @@ from plain.models import types
 from plain.runtime import settings
 from plain.urls import reverse
 
+__all__ = ["Log", "Span", "Trace"]
+
 
 @models.register_model
 class Trace(models.Model):

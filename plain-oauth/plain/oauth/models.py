@@ -16,6 +16,8 @@ from .exceptions import OAuthUserAlreadyExistsError
 if TYPE_CHECKING:
     from .providers import OAuthToken, OAuthUser
 
+__all__ = ["OAuthConnection"]
+
 
 @models.register_model
 class OAuthConnection(models.Model):

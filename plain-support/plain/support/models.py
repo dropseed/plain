@@ -6,6 +6,8 @@ from plain import models
 from plain.models import types
 from plain.runtime import SettingsReference
 
+__all__ = ["SupportFormEntry"]
+
 
 @models.register_model
 class SupportFormEntry(models.Model):

@@ -7,6 +7,8 @@ from plain import models
 from plain.exceptions import ValidationError
 from plain.models import types
 
+__all__ = ["Flag", "FlagResult"]
+
 
 def validate_flag_name(value: str) -> None:
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", value):

@@ -14,6 +14,8 @@ from plain.runtime import settings
 if TYPE_CHECKING:
     from plain.http import Request
 
+__all__ = ["Observer", "ObserverMode"]
+
 logger = logging.getLogger(__name__)
 
 

@@ -89,10 +89,13 @@ class SettingsReference(str):
 
 
 __all__ = [
-    "setup",
-    "settings",
-    "Secret",
-    "SettingsReference",
     "APP_PATH",
+    "AppPathNotFound",
+    "PLAIN_TEMP_PATH",
+    "Secret",
+    "SetupError",
+    "SettingsReference",
     "__version__",
+    "settings",
+    "setup",
 ]

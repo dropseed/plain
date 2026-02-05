@@ -16,6 +16,8 @@ from .exceptions import PageNotFoundError, RedirectPageError
 from .pages import Page
 from .registry import pages_registry
 
+__all__ = ["PageView"]
+
 
 class PageViewMixin:
     @cached_property

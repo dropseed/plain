@@ -28,6 +28,8 @@ try:
 except ImportError:
     get_request_impersonator: Any = None
 
+__all__ = ["Pageview"]
+
 
 @models.register_model
 class Pageview(models.Model):

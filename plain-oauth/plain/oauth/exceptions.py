@@ -1,3 +1,11 @@
+__all__ = [
+    "OAuthError",
+    "OAuthStateMismatchError",
+    "OAuthStateMissingError",
+    "OAuthUserAlreadyExistsError",
+]
+
+
 class OAuthError(Exception):
     """Base class for OAuth errors"""
 

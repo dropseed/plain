@@ -10,6 +10,8 @@ from plain.models import types
 if TYPE_CHECKING:
     from plain.http import Request
 
+__all__ = ["NotFoundLog", "Redirect", "RedirectLog"]
+
 
 @models.register_model
 class Redirect(models.Model):
