@@ -40,6 +40,7 @@ def get_request_user(request: Request) -> User | None:
 ## PII Consideration
 
 OTEL semantic conventions also define:
+
 - `user.email` (USER_EMAIL)
 - `user.name` (USER_NAME)
 
@@ -72,6 +73,7 @@ This adds complexity and a new setting. PII handling is probably better left to 
 ## Recommendation
 
 Go with Option A - only set `user.id`. This:
+
 - Restores what was accidentally removed
 - Keeps plain-auth simple
 - Avoids new settings
