@@ -13,7 +13,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { createRoot, hydrateRoot } from "react-dom/client";
+import { createRoot } from "react-dom/client";
 
 // ============================================================================
 // Page Context
@@ -472,7 +472,7 @@ function PlainReactApp({ initialPage, resolveComponent }) {
  *     },
  *   });
  */
-export function createPlainApp({ resolve, rootId = "app", setup } = {}) {
+export function createPlainApp({ resolve, rootId = "app" } = {}) {
   const el = document.getElementById(rootId);
   if (!el) {
     throw new Error(`Root element #${rootId} not found`);
@@ -490,15 +490,45 @@ export function createPlainApp({ resolve, rootId = "app", setup } = {}) {
     resolveComponent: resolve,
   });
 
-  if (setup) {
-    setup({ el, app });
-  } else if (el.innerHTML.trim()) {
-    // SSR content present — hydrate instead of full render.
-    // This attaches event handlers to the server-rendered HTML
-    // without re-rendering (faster initial interactivity).
-    hydrateRoot(el, app);
-  } else {
-    // No SSR content — do a full client-side render.
-    createRoot(el).render(app);
+  createRoot(el).render(app);
+}
+
+// ============================================================================
+// React Islands - Mount individual components in Jinja2 templates
+// ============================================================================
+
+/**
+ * Mount React components on all elements with [data-react-component].
+ *
+ * Used by the {% react %} template tag to embed individual React components
+ * inside server-rendered Jinja2 templates.
+ *
+ *   import { mountIslands } from "./plain-react";
+ *
+ *   mountIslands({
+ *     resolve: (name) => {
+ *       const components = import.meta.glob("./components/**\/*.jsx", { eager: true });
+ *       return components[`./components/${name}.jsx`];
+ *     },
+ *   });
+ */
+export function mountIslands({ resolve } = {}) {
+  if (!resolve) {
+    throw new Error("mountIslands() requires a resolve function");
+  }
+
+  const elements = document.querySelectorAll("[data-react-component]");
+
+  for (const el of elements) {
+    const name = el.getAttribute("data-react-component");
+    if (!name) continue;
+
+    const propsAttr = el.getAttribute("data-react-props");
+    const props = propsAttr ? JSON.parse(propsAttr) : {};
+
+    const mod = resolve(name);
+    const Component = mod.default || mod;
+
+    createRoot(el).render(React.createElement(Component, props));
   }
 }
