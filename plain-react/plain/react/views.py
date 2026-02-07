@@ -27,18 +27,6 @@ class ReactView(View):
                 return {
                     "users": list(User.query.values("id", "name", "email")),
                 }
-
-    SSR (server-side rendering):
-        Set ssr = True to render the initial HTML on the server using an
-        embedded V8 engine (PyMiniRacer). This eliminates the blank flash
-        on initial load — the browser gets fully-rendered HTML that React
-        then hydrates.
-
-        Requires: `uv add mini-racer` and a Vite SSR build.
-
-        class UsersView(ReactView):
-            component = "Users/Index"
-            ssr = True
     """
 
     # The React component to render (e.g., "Users/Index" resolves to pages/Users/Index.jsx)
@@ -46,10 +34,6 @@ class ReactView(View):
 
     # Optional layout component that wraps the page
     layout: str = ""
-
-    # Enable server-side rendering for initial page loads.
-    # Requires mini-racer and a built SSR bundle.
-    ssr: bool = False
 
     def get_props(self) -> dict[str, Any]:
         """Override to provide props to the React component."""
@@ -111,14 +95,8 @@ class ReactView(View):
         react_settings = get_react_settings()
         page_json = json.dumps(page_data, cls=PlainJSONEncoder)
 
-        # Server-side render the component if SSR is enabled
-        ssr_html = ""
-        if self.ssr:
-            ssr_html = self._ssr_render(page_data)
-
         html = _build_html_shell(
             page_json=page_json,
-            ssr_html=ssr_html,
             vite_dev_url=react_settings.get("vite_dev_url", ""),
             title=react_settings.get("title", ""),
             head_content=react_settings.get("head", ""),
@@ -128,15 +106,6 @@ class ReactView(View):
         response = Response(html)
         response.headers["Vary"] = "X-Plain-React"
         return response
-
-    def _ssr_render(self, page_data: dict[str, Any]) -> str:
-        """Render the component to HTML using the embedded V8 engine."""
-        from .ssr import render_to_string
-
-        return render_to_string(
-            component=page_data["component"],
-            props=page_data["props"],
-        )
 
     def get(self) -> ResponseBase:
         return self.render()
@@ -150,7 +119,6 @@ class ReactView(View):
 def _build_html_shell(
     *,
     page_json: str,
-    ssr_html: str,
     vite_dev_url: str,
     title: str,
     head_content: str,
@@ -191,7 +159,7 @@ def _build_html_shell(
 {head_content}
 </head>
 <body>
-<div id="{root_id}" data-page="{escaped_json}">{ssr_html}</div>
+<div id="{root_id}" data-page="{escaped_json}"></div>
 {scripts}
 </body>
 </html>"""
