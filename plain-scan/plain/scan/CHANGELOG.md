@@ -1,5 +1,15 @@
 # plain-scan changelog
 
+## [0.6.1](https://github.com/dropseed/plain/releases/plain-scan@0.6.1) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `audits/base`, `results`, and `scanner` modules for explicit public API boundaries ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.6.0](https://github.com/dropseed/plain/releases/plain-scan@0.6.0) (2026-01-13)
 
 ### What's changed

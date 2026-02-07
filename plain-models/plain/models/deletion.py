@@ -9,12 +9,12 @@ from typing import TYPE_CHECKING, Any
 
 from plain.models import (
     query_utils,
-    sql,
     transaction,
 )
 from plain.models.db import IntegrityError
 from plain.models.meta import Meta
 from plain.models.query import QuerySet
+from plain.models.sql import DeleteQuery, UpdateQuery
 
 if TYPE_CHECKING:
     from plain.models.fields import Field
@@ -424,7 +424,7 @@ class Collector:
             instance = list(instances)[0]
             if self.can_fast_delete(instance):
                 with transaction.mark_for_rollback_on_error():
-                    count = sql.DeleteQuery(model).delete_batch([instance.id])
+                    count = DeleteQuery(model).delete_batch([instance.id])
                 setattr(
                     instance, model._model_meta.get_forward_field("id").attname, None
                 )
@@ -455,7 +455,7 @@ class Collector:
                     combined_updates.update(**{field.name: value})
                 if objs:
                     model = objs[0].__class__
-                    query = sql.UpdateQuery(model)
+                    query = UpdateQuery(model)
                     query.update_batch(
                         list({obj.id for obj in objs}), {field.name: value}
                     )
@@ -466,7 +466,7 @@ class Collector:
 
             # delete instances
             for model, instances in self.data.items():
-                query = sql.DeleteQuery(model)
+                query = DeleteQuery(model)
                 id_list = [obj.id for obj in instances]
                 count = query.delete_batch(id_list)
                 if count:

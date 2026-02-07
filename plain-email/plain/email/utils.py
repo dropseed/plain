@@ -6,13 +6,11 @@ from __future__ import annotations
 
 import socket
 
-from plain.internal import internalcode
 from plain.utils.encoding import punycode
 
 
 # Cache the hostname, but do it lazily: socket.getfqdn() can take a couple of
 # seconds, which slows down the restart of the server.
-@internalcode
 class CachedDnsName:
     def __str__(self) -> str:
         return self.get_fqdn()

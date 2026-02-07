@@ -12,6 +12,8 @@ from plain.urls import URLPattern, path, reverse
 
 from .markdown import render_markdown
 
+__all__ = ["Page"]
+
 
 class PageRenderError(Exception):
     pass

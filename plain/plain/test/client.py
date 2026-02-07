@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
 from plain.http import QueryDict, RequestHeaders
-from plain.internal import internalcode
 from plain.internal.handlers.base import BaseHandler
 from plain.internal.handlers.wsgi import WSGIRequest
 from plain.json import PlainJSONEncoder
@@ -112,7 +111,6 @@ class ClientResponse:
         return repr(object.__getattribute__(self, "_response"))
 
 
-@internalcode
 class FakePayload(IOBase):
     """
     A wrapper around BytesIO that restricts what can be read since data from
@@ -186,7 +184,6 @@ def _conditional_content_removal(
     return response
 
 
-@internalcode
 class ClientHandler(BaseHandler):
     """
     An HTTP Handler that can be used for testing purposes. Use the WSGI

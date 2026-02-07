@@ -181,7 +181,6 @@ class MigrationAutodetector:
         self.generate_deleted_models()
         self.generate_created_models()
         self.generate_altered_options()
-        self.generate_altered_db_table_comment()
 
         # Create the renamed fields and store them in self.renamed_fields.
         # They are used by create_altered_indexes(), generate_altered_fields(),
@@ -793,14 +792,7 @@ class MigrationAutodetector:
                         if old_rel_to in self.renamed_models_rel:
                             old_field_dec[2]["to"] = self.renamed_models_rel[old_rel_to]
                     old_field.set_attributes_from_name(rem_field_name)
-                    old_db_column = old_field.get_attname_column()[1]
-                    if old_field_dec == field_dec or (
-                        # Was the field renamed and db_column equal to the
-                        # old field's column added?
-                        old_field_dec[0:2] == field_dec[0:2]
-                        and dict(old_field_dec[2], db_column=old_db_column)
-                        == field_dec[2]
-                    ):
+                    if old_field_dec == field_dec:
                         if self.questioner.ask_rename(
                             model_name, rem_field_name, field_name, field
                         ):
@@ -808,7 +800,6 @@ class MigrationAutodetector:
                                 (
                                     rem_package_label,
                                     rem_model_name,
-                                    old_field.db_column,
                                     rem_field_name,
                                     package_label,
                                     model_name,
@@ -830,27 +821,12 @@ class MigrationAutodetector:
         for (
             rem_package_label,
             rem_model_name,
-            rem_db_column,
             rem_field_name,
             package_label,
             model_name,
             field,
             field_name,
         ) in self.renamed_operations:
-            # A db_column mismatch requires a prior noop AlterField for the
-            # subsequent RenameField to be a noop on attempts at preserving the
-            # old name.
-            if rem_db_column != field.db_column:
-                altered_field = field.clone()
-                altered_field.name = rem_field_name
-                self.add_operation(
-                    package_label,
-                    operations.AlterField(
-                        model_name=model_name,
-                        name=rem_field_name,
-                        field=altered_field,
-                    ),
-                )
             self.add_operation(
                 package_label,
                 operations.RenameField(
@@ -999,9 +975,6 @@ class MigrationAutodetector:
                     new_field.remote_field.through = old_field.remote_field.through
             old_field_dec = self.deep_deconstruct(old_field)
             new_field_dec = self.deep_deconstruct(new_field)
-            # If the field was confirmed to be renamed it means that only
-            # db_column was allowed to change which generate_renamed_fields()
-            # already accounts for by adding an AlterField operation.
             if old_field_dec != new_field_dec and old_field_name == field_name:
                 both_m2m = isinstance(old_field, ManyToManyField) and isinstance(
                     new_field, ManyToManyField
@@ -1255,25 +1228,6 @@ class MigrationAutodetector:
                     operations.AlterModelTable(
                         name=model_name,
                         table=new_db_table_name,
-                    ),
-                )
-
-    def generate_altered_db_table_comment(self) -> None:
-        for package_label, model_name in sorted(self.kept_model_keys):
-            old_model_name = self.renamed_models.get(
-                (package_label, model_name), model_name
-            )
-            old_model_state = self.from_state.models[package_label, old_model_name]
-            new_model_state = self.to_state.models[package_label, model_name]
-
-            old_db_table_comment = old_model_state.options.get("db_table_comment")
-            new_db_table_comment = new_model_state.options.get("db_table_comment")
-            if old_db_table_comment != new_db_table_comment:
-                self.add_operation(
-                    package_label,
-                    operations.AlterModelTableComment(
-                        name=model_name,
-                        table_comment=new_db_table_comment,
                     ),
                 )
 

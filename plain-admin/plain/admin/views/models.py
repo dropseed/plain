@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain import models
 from plain.models import Q
+from plain.models.exceptions import FieldDoesNotExist
 from plain.models.fields.related_managers import BaseRelatedManager
 
 from ..utils import camelcase_to_title
@@ -41,7 +42,6 @@ def get_model_field(instance: models.Model, field: str) -> Any:
 
 
 class AdminModelListView(AdminListView):
-    show_search = True
     allow_global_search = True
 
     model: type[models.Model]
@@ -73,51 +73,75 @@ class AdminModelListView(AdminListView):
 
         return f"{cls.model.model_options.model_name}/"
 
-    def get_template_context(self) -> dict[str, Any]:
-        context = super().get_template_context()
-
-        order_by = self.request.query_params.get("order_by", "")
-        if order_by.startswith("-"):
-            order_by_field = order_by[1:]
-            order_by_direction = "-"
-        else:
-            order_by_field = order_by
-            order_by_direction = ""
-
-        context["order_by_field"] = order_by_field
-        context["order_by_direction"] = order_by_direction
-
-        return context
-
-    def get_objects(self) -> models.QuerySet:
-        queryset = self.get_initial_queryset()
-        queryset = self.search_queryset(queryset)
-        queryset = self.order_queryset(queryset)
-        return queryset
+    def get_initial_objects(self) -> models.QuerySet:
+        return self.get_initial_queryset()
 
     def get_initial_queryset(self) -> models.QuerySet:
-        # Separate override for the initial queryset
-        # so that annotations can be added BEFORE order_by, etc.
+        """Override this to customize the base queryset (e.g., add annotations)."""
         return self.model.query.all()
 
-    def order_queryset(self, queryset: models.QuerySet) -> models.QuerySet:
-        result = queryset
-        if order_by := self.request.query_params.get("order_by"):
-            # Let FieldError propagate - invalid fields should error
-            # TODO: disable sorting on non-fields in the UI to prevent this
-            result = queryset.order_by(order_by)
-        elif self.queryset_order:
-            result = queryset.order_by(*self.queryset_order)
+    def filter_objects(
+        self, objects: models.QuerySet | list[Any]
+    ) -> models.QuerySet | list[Any]:
+        if isinstance(objects, list):
+            return super().filter_objects(objects)
+        return self.filter_queryset(objects)
 
-        return result
+    def filter_queryset(self, queryset: Any) -> Any:
+        """Override this to filter the queryset based on self.filter."""
+        return queryset
 
-    def search_queryset(self, queryset: models.QuerySet) -> models.QuerySet:
+    def search_objects(
+        self, objects: models.QuerySet | list[Any]
+    ) -> models.QuerySet | list[Any]:
+        if isinstance(objects, list):
+            return super().search_objects(objects)
+        return self.search_queryset(objects)
+
+    def search_queryset(self, queryset: Any) -> Any:
+        """Override this to customize search behavior."""
         if search := self.request.query_params.get("search"):
             filters = Q()
             for field in self.search_fields:
                 filters |= Q(**{f"{field}__icontains": search})  # type: ignore[arg-type]
+            return queryset.filter(filters)
+        return queryset
 
-            queryset = queryset.filter(filters)
+    def order_objects(
+        self, objects: models.QuerySet | list[Any]
+    ) -> models.QuerySet | list[Any]:
+        if isinstance(objects, list):
+            return super().order_objects(objects)
+        return self.order_queryset(objects)
+
+    def order_queryset(self, queryset: Any) -> Any:
+        """Override this to customize ordering behavior."""
+        if order_by := self.request.query_params.get("order_by"):
+            field_name = order_by.lstrip("-")
+
+            # Check if this is a database field
+            try:
+                self.model._model_meta.get_field(field_name.split("__")[0])
+                return queryset.order_by(order_by)
+            except FieldDoesNotExist:
+                pass
+
+            # Check if it's an annotation on the queryset
+            if field_name in queryset.sql_query.annotations:
+                return queryset.order_by(order_by)
+
+            # Method/property - sort in memory (limit to 1000 records)
+            if field_name in self.get_fields():
+                records = list(queryset[:1001])
+                if len(records) > 1000:
+                    raise ValueError(
+                        f"Cannot sort by '{field_name}' - too many records for in-memory sorting. "
+                        f"Use a database field or add an annotation."
+                    )
+                return super().order_objects(records)
+
+        if self.queryset_order:
+            return queryset.order_by(*self.queryset_order)
 
         return queryset
 

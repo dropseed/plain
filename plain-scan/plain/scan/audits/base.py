@@ -7,6 +7,8 @@ if TYPE_CHECKING:
     from ..results import AuditResult
     from ..scanner import Scanner
 
+__all__ = ["Audit"]
+
 
 class Audit(ABC):
     """Base class for security check audits."""

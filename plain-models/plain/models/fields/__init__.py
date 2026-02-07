@@ -69,7 +69,6 @@ class DbParameters(TypedDict, total=False):
 
     type: str | None
     check: str | None
-    collation: str | None
 
 
 __all__ = [
@@ -129,9 +128,8 @@ def _load_field(
 #   * attname:   The attribute to use on the model object. This is the same as
 #                "name", except in the case of ForeignKeys, where "_id" is
 #                appended.
-#   * db_column: The db_column specified in the model (or None).
 #   * column:    The database column for this field. This is the same as
-#                "attname", except if db_column is specified.
+#                "attname".
 #
 # Code that introspects values, or does other dynamic things, should use
 # attname.
@@ -158,7 +156,6 @@ class Field(RegisterLookupMixin, Generic[T]):
     # Set by __init__
     name: str | None
     max_length: int | None
-    db_column: str | None
     # Set by set_attributes_from_name (called by contribute_to_class)
     attname: str
     column: str
@@ -184,7 +181,6 @@ class Field(RegisterLookupMixin, Generic[T]):
     non_db_attrs = (
         "required",
         "choices",
-        "db_column",
         "error_messages",
         "limit_choices_to",
         # Database-level options are not supported, see #21961.
@@ -207,10 +203,8 @@ class Field(RegisterLookupMixin, Generic[T]):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         choices: Any = None,
-        db_column: str | None = None,
         validators: Sequence[Callable[..., Any]] = (),
         error_messages: dict[str, str] | None = None,
-        db_comment: str | None = None,
     ):
         self.name = None  # Set by set_attributes_from_name
         self.max_length = max_length
@@ -223,8 +217,6 @@ class Field(RegisterLookupMixin, Generic[T]):
         if isinstance(choices, collections.abc.Iterator):
             choices = list(choices)
         self.choices = choices
-        self.db_column = db_column
-        self.db_comment = db_comment
 
         self.primary_key = False
         self.auto_created = False
@@ -467,8 +459,6 @@ class Field(RegisterLookupMixin, Generic[T]):
             "allow_null": False,
             "default": NOT_PROVIDED,
             "choices": None,
-            "db_column": None,
-            "db_comment": None,
             "validators": [],
             "error_messages": None,
         }
@@ -745,7 +735,8 @@ class Field(RegisterLookupMixin, Generic[T]):
 
     def set_attributes_from_name(self, name: str) -> None:
         self.name = self.name or name
-        self.attname, self.column = self.get_attname_column()
+        self.attname = self.get_attname()
+        self.column = self.attname
         self.concrete = self.column is not None
 
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
@@ -837,11 +828,6 @@ class Field(RegisterLookupMixin, Generic[T]):
     def get_attname(self) -> str:
         assert self.name is not None  # Field name must be set
         return self.name
-
-    def get_attname_column(self) -> tuple[str, str]:
-        attname = self.get_attname()
-        column = self.db_column or attname
-        return attname, column
 
     def get_internal_type(self) -> str:
         return self.__class__.__name__
@@ -1005,9 +991,8 @@ class BooleanField(Field[bool]):
 
 
 class CharField(Field[str]):
-    def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
+    def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
-        self.db_collation = db_collation
         if self.max_length is not None:
             self.validators.append(validators.MaxLengthValidator(self.max_length))
 
@@ -1048,11 +1033,6 @@ class CharField(Field[str]):
             return CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH
         return super().cast_db_type()
 
-    def db_parameters(self) -> DbParameters:
-        db_params = super().db_parameters()
-        db_params["collation"] = self.db_collation
-        return db_params
-
     def get_internal_type(self) -> str:
         return "CharField"
 
@@ -1064,12 +1044,6 @@ class CharField(Field[str]):
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
-
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        if self.db_collation:
-            kwargs["db_collation"] = self.db_collation
-        return name, path, args, kwargs
 
 
 def _to_naive(value: datetime.datetime) -> datetime.datetime:
@@ -1876,15 +1850,6 @@ class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField
 class TextField(Field[str]):
     description = "Text"
 
-    def __init__(self, *, db_collation: str | None = None, **kwargs: Any):
-        super().__init__(**kwargs)
-        self.db_collation = db_collation
-
-    def db_parameters(self) -> DbParameters:
-        db_params = super().db_parameters()
-        db_params["collation"] = self.db_collation
-        return db_params
-
     def get_internal_type(self) -> str:
         return "TextField"
 
@@ -1896,12 +1861,6 @@ class TextField(Field[str]):
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
         return self.to_python(value)
-
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        if self.db_collation:
-            kwargs["db_collation"] = self.db_collation
-        return name, path, args, kwargs
 
 
 class TimeField(DateTimeCheckMixin, Field[datetime.time]):

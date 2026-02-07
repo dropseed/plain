@@ -9,6 +9,8 @@ from plain.utils import timezone
 from .jobs import Job
 from .registry import jobs_registry, register_job
 
+__all__ = ["Schedule", "ScheduledCommand"]
+
 _MONTH_NAMES = {
     "JAN": 1,
     "FEB": 2,

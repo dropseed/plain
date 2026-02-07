@@ -9,6 +9,8 @@ from plain.views import TemplateView
 
 from .templates import render_template_fragment
 
+__all__ = ["HTMXView"]
+
 
 class HTMXView(TemplateView):
     """View with HTMX-specific functionality."""

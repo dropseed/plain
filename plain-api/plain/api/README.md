@@ -9,6 +9,7 @@
 - [API keys](#api-keys)
 - [OpenAPI](#openapi)
     - [Deploying](#deploying)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -423,6 +424,14 @@ class APIRouter(Router):
         path("openapi.json", AssetView.as_view(asset_path="openapi.json")),
     ]
 ```
+
+## Settings
+
+| Setting              | Default | Env var                    |
+| -------------------- | ------- | -------------------------- |
+| `API_OPENAPI_ROUTER` | `""`    | `PLAIN_API_OPENAPI_ROUTER` |
+
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

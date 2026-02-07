@@ -4,10 +4,7 @@ import base64
 import unicodedata
 from binascii import Error as BinasciiError
 
-from plain.internal import internalcode
 
-
-@internalcode
 def urlsafe_base64_encode(s: bytes) -> str:
     """
     Encode a bytestring to a base64 string for use in URLs. Strip any trailing
@@ -16,7 +13,6 @@ def urlsafe_base64_encode(s: bytes) -> str:
     return base64.urlsafe_b64encode(s).rstrip(b"\n=").decode("ascii")
 
 
-@internalcode
 def urlsafe_base64_decode(s: str) -> bytes:
     """
     Decode a base64 encoded string. Add back any trailing equal signs that
@@ -31,7 +27,6 @@ def urlsafe_base64_decode(s: str) -> bytes:
         raise ValueError(e)
 
 
-@internalcode
 def unicode_ci_compare(s1: str, s2: str) -> bool:
     """
     Perform case-insensitive comparison of two identifiers, using the

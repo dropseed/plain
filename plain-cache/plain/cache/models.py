@@ -7,6 +7,8 @@ from plain import models
 from plain.models import types
 from plain.utils import timezone
 
+__all__ = ["CachedItem", "CachedItemQuerySet"]
+
 
 class CachedItemQuerySet(models.QuerySet["CachedItem"]):
     def expired(self) -> Self:

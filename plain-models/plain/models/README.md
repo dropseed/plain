@@ -22,6 +22,7 @@
     - [Database cursor](#database-cursor)
     - [SQL operations (UNION, etc.)](#sql-operations-union-etc)
 - [Architecture](#architecture)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -597,6 +598,22 @@ graph TB
 - [`Query`](./sql/query.py#Query) - Internal representation of a query's logical structure (tables, joins, filters)
 - [`SQLCompiler`](./sql/compiler.py#SQLCompiler) - Transforms a Query into executable SQL
 - [`DatabaseWrapper`](./backends/wrapper.py#DatabaseWrapper) - PostgreSQL connection and query execution
+
+## Settings
+
+| Setting    | Default  | Env var            |
+| ---------- | -------- | ------------------ |
+| `DATABASE` | Required | Via `DATABASE_URL` |
+
+When `DATABASE_URL` is set, the `DATABASE` setting is automatically configured:
+
+| Environment Variable          | Description                      | Default  |
+| ----------------------------- | -------------------------------- | -------- |
+| `DATABASE_URL`                | Database connection URL          | Required |
+| `DATABASE_CONN_MAX_AGE`       | Connection persistence (seconds) | `600`    |
+| `DATABASE_CONN_HEALTH_CHECKS` | Enable health checks             | `true`   |
+
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

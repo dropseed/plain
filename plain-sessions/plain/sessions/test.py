@@ -6,6 +6,8 @@ from plain.runtime import settings
 
 from .core import SessionStore
 
+__all__ = ["get_client_session"]
+
 
 def get_client_session(client: Any) -> SessionStore:
     """Return the current session variables for a test client."""

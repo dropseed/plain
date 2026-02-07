@@ -12,8 +12,6 @@ from shutil import copymode, copystat
 
 from plain.internal.files import locks
 
-__all__ = ["file_move_safe"]
-
 
 def _samefile(src: str, dst: str) -> bool:
     # Macintosh, Unix.

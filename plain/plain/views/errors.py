@@ -8,6 +8,8 @@ from plain.templates import TemplateFileMissing
 
 from .templates import TemplateView
 
+__all__ = ["ErrorView"]
+
 
 class ErrorView(TemplateView):
     status_code: int

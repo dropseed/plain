@@ -615,11 +615,6 @@ class ForeignKeyField(RelatedField):
     def get_attname(self) -> str:
         return f"{self.name}_id"
 
-    def get_attname_column(self) -> tuple[str, str]:
-        attname = self.get_attname()
-        column = self.db_column or attname
-        return attname, column
-
     def get_default(self) -> Any:
         """Return the to_field if the default value is an object."""
         field_default = super().get_default()
@@ -653,11 +648,9 @@ class ForeignKeyField(RelatedField):
         return self.target_field.cast_db_type()
 
     def db_parameters(self) -> DbParameters:
-        target_db_parameters = self.target_field.db_parameters()
         return {
             "type": self.db_type(),
             "check": self.db_check(),
-            "collation": target_db_parameters.get("collation"),
         }
 
     def get_col(self, alias: str | None, output_field: Field | None = None) -> Any:
@@ -765,15 +758,6 @@ class ManyToManyField(RelatedField):
                     fix="ManyToManyField does not support validators. Remove validators from this field.",
                     obj=self,
                     id="fields.m2m_validators_not_supported",
-                    warning=True,
-                )
-            )
-        if self.db_comment:
-            warnings.append(
-                PreflightResult(
-                    fix="The 'db_comment' option has no effect on ManyToManyField. Remove the 'db_comment' argument.",
-                    obj=self,
-                    id="fields.m2m_db_comment_has_no_effect",
                     warning=True,
                 )
             )

@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""
+Stage specific hunks from a git diff by grep pattern.
+
+Usage:
+  add-hunks <file> --grep <pattern> [--context]
+
+This is a vendored version of git-add-hunks for use in the release skill.
+"""
+
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+
+class Hunk:
+    def __init__(self, lines: list[str]):
+        self.lines = lines
+
+    @property
+    def change_lines(self) -> list[str]:
+        return [
+            line for line in self.lines
+            if (line.startswith('+') or line.startswith('-'))
+            and not line.startswith('---')
+            and not line.startswith('+++')
+        ]
+
+    def matches(self, pattern: str, include_context: bool = False) -> bool:
+        search_text = '\n'.join(self.lines if include_context else self.change_lines)
+        return bool(re.search(pattern, search_text))
+
+    def to_patch(self) -> str:
+        return '\n'.join(self.lines)
+
+
+class Diff:
+    def __init__(self, content: str):
+        self.header = ""
+        self.hunks: list[Hunk] = []
+        self._parse(content)
+
+    def _parse(self, content: str):
+        lines = content.split('\n')
+        header_lines = []
+        current_hunk_lines = []
+        in_header = True
+
+        for line in lines:
+            if in_header:
+                if line.startswith('@@'):
+                    in_header = False
+                    current_hunk_lines = [line]
+                else:
+                    header_lines.append(line)
+            elif line.startswith('@@'):
+                if current_hunk_lines:
+                    self.hunks.append(Hunk(current_hunk_lines))
+                current_hunk_lines = [line]
+            else:
+                current_hunk_lines.append(line)
+
+        if current_hunk_lines:
+            self.hunks.append(Hunk(current_hunk_lines))
+
+        self.header = '\n'.join(header_lines)
+
+    def __len__(self) -> int:
+        return len(self.hunks)
+
+    def find_matching(self, pattern: str, include_context: bool = False) -> list[int]:
+        return [
+            i for i, hunk in enumerate(self.hunks, 1)
+            if hunk.matches(pattern, include_context)
+        ]
+
+    def build_patch(self, selected: set[int]) -> str:
+        selected_content = [
+            hunk.to_patch()
+            for i, hunk in enumerate(self.hunks, 1)
+            if i in selected
+        ]
+        if not selected_content:
+            return ""
+        return self.header + '\n' + '\n'.join(selected_content) + '\n'
+
+
+def main():
+    if len(sys.argv) < 4 or sys.argv[2] != '--grep':
+        print("Usage: add-hunks <file> --grep <pattern> [--context]")
+        sys.exit(1)
+
+    file_path = sys.argv[1]
+    grep_pattern = sys.argv[3]
+    grep_context = '--context' in sys.argv[4:]
+
+    if not os.path.isfile(file_path):
+        print(f"Error: File '{file_path}' does not exist")
+        sys.exit(1)
+
+    result = subprocess.run(
+        ['git', 'diff', '--no-color', '--', file_path],
+        capture_output=True, text=True
+    )
+    if not result.stdout:
+        print(f"No changes in '{file_path}'")
+        sys.exit(0)
+
+    diff = Diff(result.stdout)
+    matching = diff.find_matching(grep_pattern, grep_context)
+    if not matching:
+        print(f"No hunks matching '{grep_pattern}'")
+        sys.exit(0)
+
+    selection = ','.join(str(h) for h in matching)
+    print(f"Hunks matching '{grep_pattern}': {len(matching)}")
+
+    patch = diff.build_patch(set(matching))
+    if not patch or '@@' not in patch:
+        print("No hunks selected")
+        sys.exit(0)
+
+    with tempfile.NamedTemporaryFile(
+        mode='w', suffix='.patch', prefix='add-hunks.', delete=False
+    ) as f:
+        f.write(patch)
+        patch_file = f.name
+
+    try:
+        print(f"Staging hunks: {selection}")
+        result = subprocess.run(
+            ['git', 'apply', '--cached', patch_file],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            print("Successfully staged selected hunks")
+        else:
+            print("Error: Failed to apply patch")
+            print(result.stderr)
+            sys.exit(1)
+    finally:
+        os.unlink(patch_file)
+
+
+if __name__ == '__main__':
+    main()

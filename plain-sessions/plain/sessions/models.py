@@ -5,6 +5,8 @@ from datetime import datetime
 from plain import models
 from plain.models import types
 
+__all__ = ["Session"]
+
 
 @models.register_model
 class Session(models.Model):

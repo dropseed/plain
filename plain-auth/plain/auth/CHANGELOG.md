@@ -1,5 +1,25 @@
 # plain-auth changelog
 
+## [0.25.2](https://github.com/dropseed/plain/releases/plain-auth@0.25.2) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `views` module for explicit public API boundaries ([f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.25.1](https://github.com/dropseed/plain/releases/plain-auth@0.25.1) (2026-01-28)
+
+### What's changed
+
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.25.0](https://github.com/dropseed/plain/releases/plain-auth@0.25.0) (2026-01-13)
 
 ### What's changed

@@ -279,7 +279,6 @@ class AlterField(FieldOperation):
             isinstance(operation, RenameField)
             and self.is_same_field_operation(operation)
             and self.field is not None
-            and self.field.db_column is None
         ):
             return [
                 operation,
@@ -293,7 +292,7 @@ class AlterField(FieldOperation):
 
 
 class RenameField(FieldOperation):
-    """Rename a field on the model. Might affect db_column too."""
+    """Rename a field on the model."""
 
     def __init__(self, model_name: str, old_name: str, new_name: str) -> None:
         self.old_name = old_name

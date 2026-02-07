@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Generator
 from typing import Any
 
 import pytest
 from plain.runtime import settings as plain_settings
 from plain.runtime import setup
+from plain.utils.dotenv import load_dotenv
 
 from .browser import TestBrowser
 
 
 def pytest_configure(config: Any) -> None:
+    # Load .env.test if it exists
+    if os.path.exists(".env.test"):
+        # ANSI codes: \033[2;3m = dim + italic, \033[0m = reset
+        print("\033[2;3mLoading environment variables from .env.test...\033[0m")
+        load_dotenv(".env.test", override=True)
+
     # Run Plain setup before anything else
     setup()
 

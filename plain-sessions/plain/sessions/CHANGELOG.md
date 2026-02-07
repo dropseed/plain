@@ -1,5 +1,25 @@
 # plain-sessions changelog
 
+## [0.42.2](https://github.com/dropseed/plain/releases/plain-sessions@0.42.2) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `middleware`, `models`, `test`, and `views` modules for explicit public API boundaries ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.42.1](https://github.com/dropseed/plain/releases/plain-sessions@0.42.1) (2026-01-28)
+
+### What's changed
+
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.42.0](https://github.com/dropseed/plain/releases/plain-sessions@0.42.0) (2026-01-15)
 
 ### What's changed

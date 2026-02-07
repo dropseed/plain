@@ -46,7 +46,7 @@ In production, one of your deployment steps should be to compile the assets.
 plain build
 ```
 
-By default, this [generates "fingerprinted" and compressed versions of the assets](./fingerprints.py#get_file_fingerprint), which are then served by your app. This means that a file like `main.css` will result in two new files, like `main.d0db67b.css` and `main.d0db67b.css.gz`.
+By default, this [generates "fingerprinted" and compressed versions of the assets](./manifest.py#compute_fingerprint), which are then served by your app. This means that a file like `main.css` will result in two new files, like `main.d0db67b.css` and `main.d0db67b.css.gz`.
 
 The purpose of fingerprinting the assets is to allow the browser to cache them indefinitely. When the content of the file changes, the fingerprint will change, and the browser will use the newer file. This cuts down on the number of requests that your app has to handle related to assets.
 
@@ -102,12 +102,21 @@ ls .plain/assets/compiled
 ./example-upload-to-cdn-script
 ```
 
-Use the [`ASSETS_BASE_URL`](../runtime/global_settings.py#ASSETS_BASE_URL) setting to tell the `{{ asset() }}` template function where to point.
+Use the [`ASSETS_CDN_URL`](../runtime/global_settings.py#ASSETS_CDN_URL) setting to tell the `{{ asset() }}` template function where to point.
 
 ```python
 # app/settings.py
-ASSETS_BASE_URL = "https://cdn.example.com/"
+ASSETS_CDN_URL = "https://cdn.example.com/"
 ```
+
+When `ASSETS_CDN_URL` is set, the `{{ asset() }}` function returns full CDN URLs directly (e.g., `https://cdn.example.com/css/style.d0db67b.css`).
+
+If you also have `AssetsRouter` included in your URLs, requests to local asset paths will redirect to the CDN:
+
+- **Original paths** (e.g., `/assets/css/style.css`) use a **302 temporary redirect** to the fingerprinted CDN URL. The mapping can change on rebuild.
+- **Terminal paths** (fingerprinted or non-fingerprinted final paths) use a **301 permanent redirect**. The path itself is stable.
+
+Only assets in the manifest are redirected. Other assets (like page assets from `plain-pages`) are served directly by your app.
 
 #### Why aren't the originals copied to the compiled directory?
 

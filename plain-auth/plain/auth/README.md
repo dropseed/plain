@@ -10,6 +10,7 @@
 - [Checking if a user is logged in](#checking-if-a-user-is-logged-in)
 - [Restricting views](#restricting-views)
 - [Testing with authenticated users](#testing-with-authenticated-users)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -193,6 +194,16 @@ from plain.auth.test import login_client, logout_client
 # ... after logging in
 logout_client(client)
 ```
+
+## Settings
+
+| Setting                        | Default              | Env var                              |
+| ------------------------------ | -------------------- | ------------------------------------ |
+| `AUTH_USER_MODEL`              | Required             | `PLAIN_AUTH_USER_MODEL`              |
+| `AUTH_LOGIN_URL`               | Required             | `PLAIN_AUTH_LOGIN_URL`               |
+| `AUTH_USER_SESSION_HASH_FIELD` | `"password"` or `""` | `PLAIN_AUTH_USER_SESSION_HASH_FIELD` |
+
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

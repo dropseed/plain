@@ -9,6 +9,7 @@
 - [Logs](#logs)
     - [Automatic cleanup](#automatic-cleanup)
 - [Admin interface](#admin-interface)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -117,14 +118,7 @@ broken_links = NotFoundLog.query.filter(referrer__contains="external-site.com")
 
 ### Automatic cleanup
 
-Logs are automatically cleaned up by the [`DeleteLogs`](./chores.py#DeleteLogs) chore. By default, logs older than 30 days are deleted. You can customize this in your settings:
-
-```python
-# app/settings.py
-from datetime import timedelta
-
-REDIRECTION_LOG_RETENTION_TIMEDELTA = timedelta(days=90)
-```
+Logs are automatically cleaned up by the [`DeleteLogs`](./chores.py#DeleteLogs) chore. See [Settings](#settings) for configuring retention.
 
 ## Admin interface
 
@@ -135,6 +129,14 @@ The package includes admin views for managing redirects and viewing logs. Once i
 - **404 logs** - Monitor URLs that resulted in 404s
 
 The 404 logs are useful for discovering broken links on your site. You can search the logs to find patterns and create redirects to fix them.
+
+## Settings
+
+| Setting                               | Default              | Env var |
+| ------------------------------------- | -------------------- | ------- |
+| `REDIRECTION_LOG_RETENTION_TIMEDELTA` | `timedelta(days=30)` | -       |
+
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

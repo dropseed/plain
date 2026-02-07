@@ -7,6 +7,7 @@
 - [Connecting and disconnecting accounts](#connecting-and-disconnecting-accounts)
 - [Using saved access tokens](#using-saved-access-tokens)
 - [Customizing the provider](#customizing-the-provider)
+- [Settings](#settings)
 - [FAQs](#faqs)
     - [How is this different from other OAuth libraries?](#how-is-this-different-from-other-oauth-libraries)
     - [Why are providers not included in the library?](#why-are-providers-not-included-in-the-library)
@@ -205,6 +206,14 @@ The [`OAuthProvider`](./providers.py#OAuthProvider) class has several methods yo
 - `get_login_redirect_url` - change where users are redirected after login
 - `get_disconnect_redirect_url` - change where users are redirected after disconnecting
 - `login` - customize the login process (uses [plain.auth](/plain-auth/plain/auth/README.md) by default)
+
+## Settings
+
+| Setting                 | Default  | Env var                              |
+| ----------------------- | -------- | ------------------------------------ |
+| `OAUTH_LOGIN_PROVIDERS` | Required | `PLAIN_OAUTH_LOGIN_PROVIDERS` (JSON) |
+
+This setting is marked as `Secret`, so its values are masked in logs. See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

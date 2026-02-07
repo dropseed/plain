@@ -28,11 +28,6 @@ from plain.internal.files.utils import FileProxyMixin
 if TYPE_CHECKING:
     from typing import Any
 
-__all__ = (
-    "NamedTemporaryFile",
-    "gettempdir",
-)
-
 
 if os.name == "nt":
 

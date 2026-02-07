@@ -14,10 +14,7 @@ from typing import TYPE_CHECKING, Any, Generic, Never, Self, TypeVar, overload
 
 import plain.runtime
 from plain.exceptions import ValidationError
-from plain.models import (
-    sql,
-    transaction,
-)
+from plain.models import transaction
 from plain.models.constants import LOOKUP_SEP, OnConflict
 from plain.models.db import (
     PLAIN_VERSION_PICKLE_KEY,
@@ -36,7 +33,18 @@ from plain.models.fields import (
 )
 from plain.models.functions import Cast
 from plain.models.query_utils import FilteredRelation, Q
-from plain.models.sql import CURSOR, GET_ITERATOR_CHUNK_SIZE
+from plain.models.sql import (
+    AND,
+    CURSOR,
+    GET_ITERATOR_CHUNK_SIZE,
+    OR,
+    XOR,
+    DeleteQuery,
+    InsertQuery,
+    Query,
+    RawQuery,
+    UpdateQuery,
+)
 from plain.models.utils import resolve_callables
 from plain.utils.functional import partition
 
@@ -284,7 +292,7 @@ class QuerySet(Generic[T]):
 
     # Instance attributes (set in from_model())
     model: type[T]
-    _query: sql.Query
+    _query: Query
     _result_cache: list[T] | None
     _sticky_filter: bool
     _for_write: bool
@@ -301,11 +309,11 @@ class QuerySet(Generic[T]):
         pass
 
     @classmethod
-    def from_model(cls, model: type[T], query: sql.Query | None = None) -> Self:
+    def from_model(cls, model: type[T], query: Query | None = None) -> Self:
         """Create a QuerySet instance bound to a model."""
         instance = cls()
         instance.model = model
-        instance._query = query or sql.Query(model)
+        instance._query = query or Query(model)
         instance._result_cache = None
         instance._sticky_filter = False
         instance._for_write = False
@@ -334,7 +342,7 @@ class QuerySet(Generic[T]):
         return self.from_model(owner)
 
     @property
-    def sql_query(self) -> sql.Query:
+    def sql_query(self) -> Query:
         if self._deferred_filter:
             negate, args, kwargs = self._deferred_filter
             self._filter_or_exclude_inplace(negate, args, kwargs)
@@ -342,7 +350,7 @@ class QuerySet(Generic[T]):
         return self._query
 
     @sql_query.setter
-    def sql_query(self, value: sql.Query) -> None:
+    def sql_query(self, value: Query) -> None:
         if value.values_select:
             self._iterable_class = ValuesIterable
         self._query = value
@@ -472,7 +480,7 @@ class QuerySet(Generic[T]):
             return self
         combined = self._chain()
         combined._merge_known_related_objects(other)
-        combined.sql_query.combine(other.sql_query, sql.AND)
+        combined.sql_query.combine(other.sql_query, AND)
         return combined
 
     def __or__(self, other: QuerySet[T]) -> QuerySet[T]:
@@ -492,7 +500,7 @@ class QuerySet(Generic[T]):
             other = other.model._model_meta.base_queryset.filter(
                 id__in=other.values("id")
             )
-        combined.sql_query.combine(other.sql_query, sql.OR)
+        combined.sql_query.combine(other.sql_query, OR)
         return combined
 
     def __xor__(self, other: QuerySet[T]) -> QuerySet[T]:
@@ -512,7 +520,7 @@ class QuerySet(Generic[T]):
             other = other.model._model_meta.base_queryset.filter(
                 id__in=other.values("id")
             )
-        combined.sql_query.combine(other.sql_query, sql.XOR)
+        combined.sql_query.combine(other.sql_query, XOR)
         return combined
 
     ####################################
@@ -982,7 +990,7 @@ class QuerySet(Generic[T]):
         query. No signals are sent and there is no protection for cascades.
         """
         query = self.sql_query.clone()
-        query.__class__ = sql.DeleteQuery
+        query.__class__ = DeleteQuery
         cursor = query.get_compiler().execute_sql(CURSOR)
         if cursor:
             with cursor:
@@ -997,7 +1005,7 @@ class QuerySet(Generic[T]):
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
         self._for_write = True
-        query = self.sql_query.chain(sql.UpdateQuery)
+        query = self.sql_query.chain(UpdateQuery)
         query.add_update_values(kwargs)
 
         # Inline annotations in order_by(), if possible.
@@ -1036,7 +1044,7 @@ class QuerySet(Generic[T]):
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
-        query = self.sql_query.chain(sql.UpdateQuery)
+        query = self.sql_query.chain(UpdateQuery)
         query.add_update_fields(values)
         # Clear any annotations so that they won't be present in subqueries.
         query.annotations = {}
@@ -1475,7 +1483,7 @@ class QuerySet(Generic[T]):
         the InsertQuery class and is how Model.save() is implemented.
         """
         self._for_write = True
-        query = sql.InsertQuery(
+        query = InsertQuery(
             self.model,
             on_conflict=on_conflict.value if on_conflict else None,
             update_fields=update_fields,
@@ -1483,7 +1491,7 @@ class QuerySet(Generic[T]):
         )
         query.insert_values(fields, objs, raw=raw)
         # InsertQuery returns SQLInsertCompiler which has different execute_sql signature
-        return query.get_compiler().execute_sql(returning_fields)  # type: ignore[arg-type]
+        return query.get_compiler().execute_sql(returning_fields)
 
     def _batched_insert(
         self,
@@ -1586,7 +1594,7 @@ class QuerySet(Generic[T]):
         for field, objects in other._known_related_objects.items():
             self._known_related_objects.setdefault(field, {}).update(objects)
 
-    def resolve_expression(self, *args: Any, **kwargs: Any) -> sql.Query:
+    def resolve_expression(self, *args: Any, **kwargs: Any) -> Query:
         if self._fields and len(self._fields) > 1:
             # values() queryset can only be used as nested queries
             # if they are set up to select only a single field.
@@ -1643,13 +1651,13 @@ class RawQuerySet:
         self,
         raw_query: str,
         model: type[Model] | None = None,
-        query: sql.RawQuery | None = None,
+        query: RawQuery | None = None,
         params: tuple[Any, ...] = (),
         translations: dict[str, str] | None = None,
     ):
         self.raw_query = raw_query
         self.model = model
-        self.sql_query = query or sql.RawQuery(sql=raw_query, params=params)
+        self.sql_query = query or RawQuery(sql=raw_query, params=params)
         self.params = params
         self.translations = translations or {}
         self._result_cache: list[Model] | None = None
@@ -1754,8 +1762,7 @@ class RawQuerySet:
         model = self.model
         assert model is not None
         for field in model._model_meta.fields:
-            name, column = field.get_attname_column()
-            model_fields[column] = field
+            model_fields[field.column] = field
         return model_fields
 
 

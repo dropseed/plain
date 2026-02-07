@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.10.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.10.1) (2026-02-02)
+
+### What's changed
+
+- Replaced inline scrollbar-hiding styles with Tailwind's `scrollbar-none` utility class for cleaner markup ([25c085ada9c6](https://github.com/dropseed/plain/commit/25c085ada9c6))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.10.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.10.0) (2026-01-15)
 
 ### What's changed

@@ -6,6 +6,7 @@
 - [Usage in templates](#usage-in-templates)
 - [Usage in Python](#usage-in-python)
 - [Advanced usage](#advanced-usage)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -124,6 +125,14 @@ class AIEnabled(OrganizationFeature):
     pass
 ```
 
+## Settings
+
+| Setting        | Default       | Env var              |
+| -------------- | ------------- | -------------------- |
+| `FLAGS_MODULE` | `"app.flags"` | `PLAIN_FLAGS_MODULE` |
+
+See [`default_settings.py`](./default_settings.py) for more details.
+
 ## FAQs
 
 #### How do flags get stored in the database?
@@ -159,4 +168,4 @@ INSTALLED_PACKAGES = [
 ]
 ```
 
-Create a `flags.py` at the top of your `app` (or point `settings.FLAGS_MODULE` to a different location).
+Create a `flags.py` at the top of your `app` (or configure `FLAGS_MODULE` to point to a different location).

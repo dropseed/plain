@@ -14,10 +14,11 @@
     {% tailwind_css %}
     {% htmx_js %}
     <link href="{{ asset('admin/admin.css') }}" rel="stylesheet">
-    <script src="{{ asset('admin/vendor/jquery-3.7.1.min.js') }}" nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/vendor/jquery-4.0.0.min.js') }}" nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/vendor/chart.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/charts.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/admin.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/datetime-tooltips.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/menu.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/vendor/popper.min.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <link href="{{ asset('admin/vendor/tippy.css') }}" rel="stylesheet">

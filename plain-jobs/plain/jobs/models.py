@@ -34,6 +34,8 @@ from .registry import jobs_registry
 if TYPE_CHECKING:
     from .jobs import Job
 
+__all__ = ["JobRequest", "JobProcess", "JobResult", "JobResultStatuses"]
+
 logger = logging.getLogger("plain.jobs")
 tracer = trace.get_tracer("plain.jobs")
 
@@ -265,6 +267,19 @@ class JobProcess(models.Model):
                 span.set_status(trace.StatusCode.OK)
                 return self.convert_to_result(status=JobResultStatuses.SUCCESSFUL)
 
+            except DeferError as e:
+                # Defer failed (e.g., concurrency limit reached during re-enqueue)
+                # The transaction was rolled back, so the JobProcess still exists in DB.
+                # The pk was restored in defer() before raising, so we can proceed normally.
+                logger.warning("Defer failed for %s: %s", self.job_class, e)
+                span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                span.set_attribute(ERROR_TYPE, type(e).__name__)
+                return self.convert_to_result(
+                    status=JobResultStatuses.ERRORED,
+                    error=str(e),
+                )
+
             except Exception as e:
                 logger.exception(e)
                 span.record_exception(e)
@@ -294,7 +309,8 @@ class JobProcess(models.Model):
         )
 
         with transaction.atomic():
-            # 1. Save JobProcess UUID and delete (releases concurrency slot)
+            # 1. Save JobProcess state and delete (releases concurrency slot)
+            saved_id = self.id
             job_process_uuid = self.uuid
             job_request_uuid = self.job_request_uuid
             started_at = self.started_at
@@ -312,6 +328,8 @@ class JobProcess(models.Model):
 
             # Check if re-enqueue failed
             if new_job_request is None:
+                # Restore id since transaction will roll back and object still exists
+                self.id = saved_id
                 raise DeferError(
                     f"Failed to re-enqueue deferred job {self.job_class}: "
                     f"concurrency limit reached for key '{self.concurrency_key}'"

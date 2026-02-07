@@ -7,7 +7,6 @@ import json
 from html.parser import HTMLParser
 from typing import Any
 
-from plain.internal import internalcode
 from plain.utils.functional import Promise, keep_lazy, keep_lazy_text
 from plain.utils.safestring import SafeString, mark_safe
 
@@ -87,7 +86,6 @@ def format_html(format_string: str, *args: Any, **kwargs: Any) -> SafeString:
     return mark_safe(format_string.format(*args_safe, **kwargs_safe))
 
 
-@internalcode
 class MLStripper(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=False)

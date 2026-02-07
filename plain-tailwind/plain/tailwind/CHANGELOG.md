@@ -1,5 +1,35 @@
 # plain-tailwind changelog
 
+## [0.20.3](https://github.com/dropseed/plain/releases/plain-tailwind@0.20.3) (2026-02-04)
+
+### What's changed
+
+- Removed `@internalcode` decorator from `Tailwind`, `TailwindCSSExtension`, and entrypoint functions ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.20.2](https://github.com/dropseed/plain/releases/plain-tailwind@0.20.2) (2026-01-28)
+
+### What's changed
+
+- Converted the `plain-tailwind` skill to a passive `.claude/rules/` file with path-based activation on `**/*.html` files ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory.
+
+## [0.20.1](https://github.com/dropseed/plain/releases/plain-tailwind@0.20.1) (2026-01-28)
+
+### What's changed
+
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.20.0) (2026-01-15)
 
 ### What's changed

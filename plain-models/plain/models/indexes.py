@@ -4,17 +4,15 @@ from types import NoneType
 from typing import TYPE_CHECKING, Any, Self
 
 from plain.models.expressions import Col, ExpressionList, F, Func, OrderBy
-from plain.models.functions import Collate
 from plain.models.postgres.utils import names_digest, split_identifier
 from plain.models.query_utils import Q
-from plain.models.sql import Query
+from plain.models.sql.query import Query
 from plain.utils.functional import partition
 
 if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.expressions import Expression
     from plain.models.postgres.schema import DatabaseSchemaEditor, Statement
-    from plain.models.postgres.wrapper import DatabaseWrapper
 
 __all__ = ["Index"]
 
@@ -111,7 +109,6 @@ class Index:
             index_expressions = []
             for expression in self.expressions:
                 index_expression = IndexExpression(expression)
-                index_expression.set_wrapper_classes(schema_editor.connection)
                 index_expressions.append(index_expression)
             expressions = ExpressionList(*index_expressions).resolve_expression(
                 Query(model, alias_cols=False),
@@ -217,12 +214,7 @@ class IndexExpression(Func):
     """Order and wrap expressions for CREATE INDEX statements."""
 
     template = "%(expressions)s"
-    wrapper_classes = (OrderBy, Collate)
-
-    def set_wrapper_classes(self, connection: DatabaseWrapper | None = None) -> None:
-        # PostgreSQL does not treat COLLATE as an indexed expression,
-        # so no modification needed.
-        pass
+    wrapper_classes = (OrderBy,)
 
     def resolve_expression(
         self,

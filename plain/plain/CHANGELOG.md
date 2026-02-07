@@ -1,5 +1,107 @@
 # plain changelog
 
+## [0.105.0](https://github.com/dropseed/plain/releases/plain@0.105.0) (2026-02-05)
+
+### What's changed
+
+- `plain agent install` now discovers and installs rules and skills from `plainx.*` namespace packages in addition to `plain.*` packages ([bd568db924f7](https://github.com/dropseed/plain/commit/bd568db924f7))
+- Orphan cleanup during `plain agent install` now correctly handles both `plain` and `plainx` prefixed items ([bd568db924f7](https://github.com/dropseed/plain/commit/bd568db924f7))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.104.1](https://github.com/dropseed/plain/releases/plain@0.104.1) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to public modules for improved IDE autocompletion and explicit public API boundaries ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2), [f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+- Removed `@internalcode` decorator from internal classes in favor of `__all__` exports ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+- Renamed `plain docs --symbols` option to `--api` for clarity ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- If using `plain docs --symbols`, update to `plain docs --api`.
+
+## [0.104.0](https://github.com/dropseed/plain/releases/plain@0.104.0) (2026-02-04)
+
+### What's changed
+
+- Refactored the assets manifest system with a clearer API: `AssetsManifest` replaces `AssetsFingerprintsManifest`, with explicit methods `add_fingerprinted()`, `add_non_fingerprinted()`, `is_fingerprinted()`, and `resolve()` ([9cb84010b5fb](https://github.com/dropseed/plain/commit/9cb84010b5fb))
+- Renamed `ASSETS_BASE_URL` setting to `ASSETS_CDN_URL` for clarity ([9cb84010b5fb](https://github.com/dropseed/plain/commit/9cb84010b5fb))
+- When `ASSETS_CDN_URL` is configured, `AssetsRouter` now redirects compiled assets to the CDN: original paths use 302 (temporary), fingerprinted paths use 301 (permanent) with immutable caching ([9cb84010b5fb](https://github.com/dropseed/plain/commit/9cb84010b5fb))
+- The `is_immutable()` check now uses the manifest to determine if a path is fingerprinted, rather than pattern-matching the filename ([9cb84010b5fb](https://github.com/dropseed/plain/commit/9cb84010b5fb))
+
+### Upgrade instructions
+
+- Rename `ASSETS_BASE_URL` to `ASSETS_CDN_URL` in your settings if you use a CDN for assets.
+- If you were importing from `plain.assets.fingerprints`, update imports to use `plain.assets.manifest` instead:
+    - `AssetsFingerprintsManifest` → `AssetsManifest`
+    - `get_fingerprinted_url_path()` → `get_manifest().resolve()`
+    - `_get_file_fingerprint()` → `compute_fingerprint()`
+
+## [0.103.2](https://github.com/dropseed/plain/releases/plain@0.103.2) (2026-02-02)
+
+### What's changed
+
+- Compiled assets now use deterministic gzip output by setting `mtime=0`, ensuring consistent file hashes across builds ([dc76e03879fc](https://github.com/dropseed/plain/commit/dc76e03879fc))
+- Agent rules now include a "Key Differences from Django" section to help Claude avoid common mistakes when working with Plain ([02e11328dbf5](https://github.com/dropseed/plain/commit/02e11328dbf5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.103.1](https://github.com/dropseed/plain/releases/plain@0.103.1) (2026-01-30)
+
+### What's changed
+
+- `load_dotenv()` now sets each environment variable immediately as it is parsed, so command substitutions like `$(echo $TOKEN)` can reference variables defined earlier in the same `.env` file ([cecb71a016](https://github.com/dropseed/plain/commit/cecb71a016))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.103.0](https://github.com/dropseed/plain/releases/plain@0.103.0) (2026-01-30)
+
+### What's changed
+
+- `plain docs` now shows markdown documentation by default (previously required `--source`), with a new `--symbols` flag to show only the symbolicated API surface ([b71dab9d5d](https://github.com/dropseed/plain/commit/b71dab9d5d))
+- `plain docs --list` now shows all official Plain packages (installed and uninstalled) with descriptions and install status ([9cba705d62](https://github.com/dropseed/plain/commit/9cba705d62))
+- `plain docs` for uninstalled packages now shows the install command and an online docs URL instead of a generic error ([9cba705d62](https://github.com/dropseed/plain/commit/9cba705d62))
+- Removed the `plain agent context` command and the `SessionStart` hook setup — agent rules now provide context directly without needing a startup hook ([88d9424643](https://github.com/dropseed/plain/commit/88d9424643))
+- `plain agent install` now cleans up old SessionStart hooks from `.claude/settings.json` ([88d9424643](https://github.com/dropseed/plain/commit/88d9424643))
+
+### Upgrade instructions
+
+- The `--source` flag for `plain docs` has been removed. Use `--symbols` instead to see the symbolicated API surface.
+- The `--open` flag for `plain docs` has been removed.
+- Run `plain agent install` to clean up the old SessionStart hook from your `.claude/settings.json`.
+
+## [0.102.0](https://github.com/dropseed/plain/releases/plain@0.102.0) (2026-01-28)
+
+### What's changed
+
+- Refactored agent integration from skills-based to rules-based: packages now provide `agents/.claude/rules/` files and `agents/.claude/skills/` directories instead of `skills/` directories ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+- The `plain agent install` command now copies both rules (`.md` files) and skills to the project's `.claude/` directory, and cleans up orphaned `plain*` items ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+- Removed standalone skills (`plain-docs`, `plain-shell`, `plain-request`) that are now provided as passive rules instead ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory with the new rules-based structure.
+
+## [0.101.2](https://github.com/dropseed/plain/releases/plain@0.101.2) (2026-01-28)
+
+### What's changed
+
+- When `load_dotenv()` is called with `override=False` (the default), command substitution is now skipped for keys that already exist in `os.environ`. This prevents redundant command execution in child processes that re-load the `.env` file after inheriting resolved values from the parent, avoiding multiple auth prompts with tools like the 1Password CLI ([2f6ff93499](https://github.com/dropseed/plain/commit/2f6ff93499))
+- The `_execute_command` helper now uses `stdout=subprocess.PIPE` instead of `capture_output=True`, allowing stderr/tty to pass through for interactive prompts ([2f6ff93499](https://github.com/dropseed/plain/commit/2f6ff93499))
+- Updated templates README examples to use `id` instead of `pk` ([837d345d23](https://github.com/dropseed/plain/commit/837d345d23))
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.101.1](https://github.com/dropseed/plain/releases/plain@0.101.1) (2026-01-17)
 
 ### What's changed

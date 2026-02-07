@@ -25,8 +25,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import IO
 
-__all__ = ("LOCK_EX", "LOCK_SH", "LOCK_NB", "lock", "unlock")
-
 
 def _fd(f: IO[bytes] | int) -> int:
     """Get a filedescriptor from something which could be a file or an fd."""

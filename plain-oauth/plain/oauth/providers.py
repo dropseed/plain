@@ -17,6 +17,14 @@ from plain.utils.module_loading import import_string
 from .exceptions import OAuthError, OAuthStateMismatchError, OAuthStateMissingError
 from .models import OAuthConnection
 
+__all__ = [
+    "OAuthProvider",
+    "OAuthToken",
+    "OAuthUser",
+    "get_oauth_provider_instance",
+    "get_provider_keys",
+]
+
 SESSION_STATE_KEY = "plainoauth_state"
 SESSION_NEXT_KEY = "plainoauth_next"
 

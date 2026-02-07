@@ -157,7 +157,7 @@ ASSETS_REDIRECT_ORIGINAL = True
 
 # If assets are served by a CDN, use this URL to prefix asset paths.
 # Ex. "https://cdn.example.com/assets/"
-ASSETS_BASE_URL: str = ""
+ASSETS_CDN_URL: str = ""
 
 # MARK: Preflight Checks
 

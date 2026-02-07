@@ -1,5 +1,92 @@
 # plain-admin changelog
 
+## [0.66.1](https://github.com/dropseed/plain/releases/plain-admin@0.66.1) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `dates`, `urls`, and `views` modules for explicit public API boundaries ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+- Added `Avatar` to the `views` module exports ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.66.0](https://github.com/dropseed/plain/releases/plain-admin@0.66.0) (2026-02-02)
+
+### What's changed
+
+- Datetime values now display with smarter formatting: same-day times show only the time, dates within 6 days show the weekday, and older dates show the full date ([48a27f08287c](https://github.com/dropseed/plain/commit/48a27f08287c))
+- Rich datetime tooltips now appear on hover, showing the value in both UTC and local timezone with relative time and click-to-copy functionality ([dccfdf2459ef](https://github.com/dropseed/plain/commit/dccfdf2459ef))
+- Updated jQuery from 3.7.1 to 4.0.0 ([6ec9047ac337](https://github.com/dropseed/plain/commit/6ec9047ac337))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.65.1](https://github.com/dropseed/plain/releases/plain-admin@0.65.1) (2026-01-30)
+
+### What's changed
+
+- Fixed `avatar.html` and `img.html` value templates crashing when the field value is `None`, an empty string, or a plain URL string instead of an `Avatar`/`Img` object ([4afb06a6b4](https://github.com/dropseed/plain/commit/4afb06a6b4))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.65.0](https://github.com/dropseed/plain/releases/plain-admin@0.65.0) (2026-01-30)
+
+### What's changed
+
+- `format_field_value()` now receives the raw `value` as a third parameter, separating the value retrieval from formatting. Templates now call `get_field_value()` first, then pass the result to `format_field_value()` ([b9b6343f87](https://github.com/dropseed/plain/commit/b9b6343f87))
+
+### Upgrade instructions
+
+- If you override `format_field_value()`, update the method signature to accept the new `value` parameter: `def format_field_value(self, obj, field, value)`. The method should now format and return the provided `value` instead of calling `self.get_field_value()` internally.
+
+## [0.64.0](https://github.com/dropseed/plain/releases/plain-admin@0.64.0) (2026-01-28)
+
+### What's changed
+
+- Added `format_field_value()` method to `AdminListView` and `AdminDetailView` for display-only formatting (e.g. currency symbols, percentages) without affecting sort order or search ([895e94a1b2](https://github.com/dropseed/plain/commit/895e94a1b2))
+- Fixed `None` values in column sorting — `None` now always sorts last regardless of sort direction, instead of being coerced to an empty string ([895e94a1b2](https://github.com/dropseed/plain/commit/895e94a1b2))
+- Templates now use `format_field_value()` instead of `get_field_value()` for rendering field values in list and detail views ([895e94a1b2](https://github.com/dropseed/plain/commit/895e94a1b2))
+
+### Upgrade instructions
+
+- If you override `get_field_value()` for display formatting, consider moving that logic to `format_field_value()` instead so it doesn't affect sort order.
+
+## [0.63.0](https://github.com/dropseed/plain/releases/plain-admin@0.63.0) (2026-01-28)
+
+### What's changed
+
+- Renamed "presets" to "filters" across list views, templates, and cards. The `presets` attribute is now `filters`, `self.preset` is now `self.filter`, and the `get_presets()` method is now `get_filters()` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Renamed `get_objects()` to `get_initial_objects()` as the user-facing hook for providing data, and the internal pipeline method to `process_objects()` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Added `filter_objects`/`filter_queryset`, `search_objects`/`search_queryset`, and `order_objects`/`order_queryset` hooks for cleaner overrides in list views ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Sorting logic moved to base `AdminListView` with smart fallback to in-memory sorting for method/property fields that aren't database columns ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Non-sortable fields now show a dimmed sort indicator on hover instead of no indicator ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- GET form submissions now exclude empty URL params for cleaner URLs ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Removed the `show_search` attribute; search is now automatically enabled when `search_fields` is set ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Boolean values (`True`/`False`) now display with green/red label colors for better visual distinction ([9fc78d26e7](https://github.com/dropseed/plain/commit/9fc78d26e7))
+- Increased label background opacity from 12% to 25% for better visibility ([9fc78d26e7](https://github.com/dropseed/plain/commit/9fc78d26e7))
+
+### Upgrade instructions
+
+- Rename `presets` to `filters` in your admin viewsets
+- Rename `self.preset` to `self.filter` in view methods
+- Rename `get_objects()` to `get_initial_objects()` (or use the new `filter_queryset`/`search_queryset`/`order_queryset` hooks for cleaner separation)
+- Replace `show_search = True` with `search_fields = [...]`
+- Card subclasses: rename `presets` to `filters`, `default_preset` to `default_filter`, `get_current_preset` to `get_current_filter`
+
+## [0.62.1](https://github.com/dropseed/plain/releases/plain-admin@0.62.1) (2026-01-22)
+
+### What's changed
+
+- Admin migrations now use the swappable `AUTH_USER_MODEL` setting instead of hardcoding `users.user`, allowing projects with custom user models to properly reference their user model in the `PinnedNavItem` migration ([76e28f6](https://github.com/dropseed/plain/commit/76e28f6197))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.62.0](https://github.com/dropseed/plain/releases/plain-admin@0.62.0) (2026-01-15)
 
 ### What's changed

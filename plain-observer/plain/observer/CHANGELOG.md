@@ -1,5 +1,39 @@
 # plain-observer changelog
 
+## [0.27.3](https://github.com/dropseed/plain/releases/plain-observer@0.27.3) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `__init__`, `core`, and `models` modules for explicit public API boundaries ([f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+- `Observer` and `ObserverMode` are now exported from the top-level `plain.observer` module ([f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.27.2](https://github.com/dropseed/plain/releases/plain-observer@0.27.2) (2026-01-28)
+
+### What's changed
+
+- Converted the `plain-optimize` skill location from `skills/` to `agents/.claude/skills/` and added a passive `.claude/rules/` file for observer commands ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory.
+
+## [0.27.1](https://github.com/dropseed/plain/releases/plain-observer@0.27.1) (2026-01-28)
+
+### What's changed
+
+- Updated admin views to use the new `get_initial_queryset` and `filter_queryset` hooks instead of `get_objects` and `get_initial_queryset` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Renamed `presets` to `filters` and `self.preset` to `self.filter` in admin views ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Removed unused `filters` attribute from `LogViewset.ListView` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-observer@0.27.0) (2026-01-15)
 
 ### What's changed

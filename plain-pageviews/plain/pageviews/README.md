@@ -160,21 +160,13 @@ The package includes a chore that automatically cleans up old pageviews. The [`C
 
 ## Settings
 
-You can configure the following settings in your Plain settings:
+| Setting                                       | Default               | Env var                                        |
+| --------------------------------------------- | --------------------- | ---------------------------------------------- |
+| `PAGEVIEWS_ASSOCIATE_ANONYMOUS_SESSIONS`      | `True`                | `PLAIN_PAGEVIEWS_ASSOCIATE_ANONYMOUS_SESSIONS` |
+| `PAGEVIEWS_ANONYMOUS_RETENTION_TIMEDELTA`     | `timedelta(days=90)`  | -                                              |
+| `PAGEVIEWS_AUTHENTICATED_RETENTION_TIMEDELTA` | `timedelta(days=365)` | -                                              |
 
-| Setting                                       | Default               | Description                                                                          |
-| --------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------ |
-| `PAGEVIEWS_ASSOCIATE_ANONYMOUS_SESSIONS`      | `True`                | When a user logs in, associate their previous anonymous pageviews with their account |
-| `PAGEVIEWS_ANONYMOUS_RETENTION_TIMEDELTA`     | `timedelta(days=90)`  | How long to keep anonymous pageviews                                                 |
-| `PAGEVIEWS_AUTHENTICATED_RETENTION_TIMEDELTA` | `timedelta(days=365)` | How long to keep authenticated pageviews                                             |
-
-```python
-from datetime import timedelta
-
-PAGEVIEWS_ASSOCIATE_ANONYMOUS_SESSIONS = True
-PAGEVIEWS_ANONYMOUS_RETENTION_TIMEDELTA = timedelta(days=30)
-PAGEVIEWS_AUTHENTICATED_RETENTION_TIMEDELTA = timedelta(days=180)
-```
+See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 

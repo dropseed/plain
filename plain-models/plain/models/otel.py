@@ -56,7 +56,9 @@ def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]
     Returns: (operation, summary, collection_name)
     """
     sql_upper = sql.upper().strip()
-    operation = sql_upper.split()[0] if sql_upper else "UNKNOWN"
+
+    # Strip leading parentheses (e.g. UNION queries: "(SELECT ... UNION ...)")
+    operation = sql_upper.lstrip("(").split()[0] if sql_upper else "UNKNOWN"
 
     # Pattern to match quoted and unquoted identifiers
     # Matches: "quoted" (PostgreSQL), unquoted.name
@@ -83,6 +85,10 @@ def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]
         if match:
             collection_name = _clean_identifier(match.group(1))
             summary = f"{operation} {collection_name}"
+
+    # Detect UNION queries
+    if " UNION " in sql_upper and summary:
+        summary = f"{summary} UNION"
 
     return operation, summary, collection_name
 

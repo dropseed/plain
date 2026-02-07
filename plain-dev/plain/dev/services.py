@@ -31,6 +31,7 @@ def auto_start_services() -> None:
     # Only auto-start services for commands that need the database/runtime
     service_commands = {
         "db",
+        "dev",
         "makemigrations",
         "migrate",
         "migrations",

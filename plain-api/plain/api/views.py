@@ -20,6 +20,11 @@ try:
 except ImportError:
     APIKey = None  # type: ignore[misc, assignment]
 
+__all__ = [
+    "APIKeyView",
+    "APIView",
+]
+
 logger = logging.getLogger("plain.api")
 
 

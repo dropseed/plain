@@ -10,11 +10,9 @@ import click
 import requests
 import tomlkit
 
-from plain.internal import internalcode
 from plain.runtime import PLAIN_TEMP_PATH
 
 
-@internalcode
 class Biome:
     """Download, install, and invoke the Biome CLI standalone binary."""
 

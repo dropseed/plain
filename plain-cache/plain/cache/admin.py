@@ -27,10 +27,10 @@ class CachedItemViewset(AdminViewset):
         queryset_order = ["-id"]
         allow_global_search = False
 
-        def get_objects(self) -> QuerySet[CachedItem]:
+        def get_initial_queryset(self) -> QuerySet[CachedItem]:
             return (
                 super()
-                .get_objects()
+                .get_initial_queryset()
                 .only("key", "created_at", "expires_at", "updated_at")
             )
 

@@ -62,7 +62,7 @@ class ProductView(TemplateView):
 
     def get_template_context(self):
         context = super().get_template_context()
-        context["product"] = Product.objects.get(pk=self.url_kwargs["pk"])
+        context["product"] = Product.objects.get(id=self.url_kwargs["id"])
         context["related_products"] = Product.objects.filter(category=context["product"].category)[:5]
         return context
 ```
@@ -93,7 +93,7 @@ Plain provides several [global functions](./jinja/globals.py) available in all t
 
 ```html
 <link rel="stylesheet" href="{{ asset('css/style.css') }}">
-<a href="{{ url('product_detail', pk=product.pk) }}">View</a>
+<a href="{{ url('product_detail', id=product.id) }}">View</a>
 <p>Generated at {{ now() }}</p>
 ```
 

@@ -10,15 +10,26 @@ Release Plain packages with version bumping, changelog generation, and git taggi
 ## Arguments
 
 ```
-/release [packages...] [--minor|--patch] [--force] [--no-verify]
+/release [packages...] [--major|--minor|--patch] [--force]
 ```
 
 - No args: discover all packages with changes, prompt for each
 - Package names: only release specified packages
+- `--major`: auto-select major release for all packages with changes
 - `--minor`: auto-select minor release for all packages with changes
 - `--patch`: auto-select patch release for all packages with changes
 - `--force`: ignore dirty git status
-- `--no-verify`: skip pre-commit checks
+
+## Scripts
+
+All mechanical operations are handled by scripts in this skill directory:
+
+| Script             | Purpose                                                         |
+| ------------------ | --------------------------------------------------------------- |
+| `discover-changes` | Find packages with unreleased commits (outputs JSON)            |
+| `bump-versions`    | Bump package versions (`<package>:<type> ...`)                  |
+| `commit-and-push`  | Format, sync, commit, tag, and push (`<package>:<version> ...`) |
+| `add-hunks`        | Stage specific uv.lock hunks by grep pattern (used internally)  |
 
 ## Workflow
 
@@ -32,14 +43,7 @@ Release Plain packages with version bumping, changelog generation, and git taggi
 
     If not clean, stop and ask user to commit or stash changes.
 
-2. Run pre-commit checks (unless `--no-verify`):
-    ```
-    ./scripts/pre-commit
-    ```
-
 ### Phase 2: Discover Packages with Changes
-
-Run the discover-changes script to find packages with unreleased changes:
 
 ```
 ./.claude/skills/release/discover-changes
@@ -47,6 +51,16 @@ Run the discover-changes script to find packages with unreleased changes:
 
 This outputs JSON with each package's name, current version, and commits since last release.
 If specific packages were requested, filter the results to only those packages.
+
+### Phase 2b: First Release Detection
+
+For any package with `current_version` of `0.0.0`:
+
+1. Inform the user: "Package X has never been released (version 0.0.0)."
+2. Ask what version to release:
+    - **0.1.0** - First development release (recommended)
+    - **1.0.0** - First stable release
+3. Use `uv version <version>` in the package directory to set the version directly (instead of bump)
 
 ### Phase 3: Collect Release Decisions
 
@@ -62,32 +76,27 @@ For each package with changes:
 
 ### Phase 4: Bump Versions
 
-For each package to release (using `current_version` from discover-changes output):
-
 ```
-cd <path> && uv version --bump <minor|patch>
+./.claude/skills/release/bump-versions <package>:<type> [<package>:<type> ...]
 ```
 
-Display the version change (e.g., "plain-code: 0.19.0 → 0.20.0").
+Example: `./.claude/skills/release/bump-versions plain-admin:patch plain-dev:minor`
 
-### Phase 5: Generate Release Notes in Parallel
+### Phase 5: Generate Release Notes
 
-**IMPORTANT**: Use the Task tool to spawn one agent per package for parallel release notes generation.
+For each package to release, sequentially:
 
-For each package to release, spawn a Task agent with this prompt (using values from the discover-changes output):
+1. Get the file changes since the last release:
+
+    ```
+    git diff <last_tag>..HEAD -- <name> ":(exclude)<name>/tests"
+    ```
+
+2. Read the existing `<changelog_path>` file.
+
+3. Prepend a new release entry to the changelog with this format:
 
 ```
-Generate release notes for <name> version <new_version>.
-
-1. Get the actual file changes since the last release:
-   git diff <last_tag>..HEAD -- <name> ":(exclude)<name>/tests"
-
-2. Read the diff output carefully to understand what actually changed.
-
-3. Write release notes to <changelog_path>, prepending to the existing content.
-
-Format:
-
 ## [<new_version>](https://github.com/dropseed/plain/releases/<name>@<new_version>) (<today's date>)
 
 ### What's changed
@@ -102,52 +111,38 @@ Format:
 - If no changes required: "- No changes required."
 ```
 
-Wait for all agents to complete.
-
-### Phase 6: Format and Sync
-
-Run once after all changes:
+### Phase 6: Commit, Tag, and Push
 
 ```
-uv sync
-./scripts/fix
+./.claude/skills/release/commit-and-push <package>:<version> [<package>:<version> ...]
 ```
 
-### Phase 7: Commit Each Package
+This script handles everything: `uv sync`, `./scripts/fix`, staging files, committing each package separately, tagging, and pushing. Sub-packages are committed first, core `plain` last.
 
-For each package to release:
-
-1. Show the diff of pyproject.toml and CHANGELOG.md:
-
-    ```
-    git diff --color=always <package>/pyproject.toml <package>/**/CHANGELOG.md
-    ```
-
-2. Ask user to confirm commit
-
-3. If confirmed:
-    ```
-    git add <package>/pyproject.toml <package>/**/CHANGELOG.md uv.lock
-    git commit -m "Release <package> <version>" -n
-    git tag -a "<package>@<version>" -m "Release <package> <version>"
-    ```
-
-### Phase 8: Push
-
-Ask user if they want to push all changes:
-
-```
-git push --follow-tags
-```
+Example: `./.claude/skills/release/commit-and-push plain-admin:0.65.1 plain:0.103.0`
 
 ## Release Type Guidelines
 
-Since all packages are pre-1.0, use:
+Consider the current version when suggesting release types:
+
+### Pre-1.0 packages (0.x.y)
+
+Most Plain packages are pre-1.0. For these:
 
 - **Minor (0.x.0)**: New features, breaking changes, new APIs, significant additions
 - **Patch (0.0.x)**: Bugfixes, minor tweaks, documentation, refactors
+- **Major (1.0.0)**: Only suggest if explicitly requested for stability milestone
 
-Analyze commit messages for keywords:
+### Post-1.0 packages (x.y.z where x >= 1)
 
-- Minor indicators: "add", "new", "feature", "breaking", "remove", "rename API"
-- Patch indicators: "fix", "bugfix", "typo", "docs", "refactor", "update"
+Follow semver strictly:
+
+- **Major (x.0.0)**: Breaking changes, API removals, incompatible changes
+- **Minor (x.y.0)**: New features, new APIs, backwards-compatible additions
+- **Patch (x.y.z)**: Bugfixes, minor tweaks, documentation, refactors
+
+### Commit message indicators
+
+- Breaking/major indicators: "breaking", "remove", "rename API", "redesign", "incompatible"
+- Feature/minor indicators: "add", "new", "feature", "implement"
+- Fix/patch indicators: "fix", "bugfix", "typo", "docs", "refactor", "update"

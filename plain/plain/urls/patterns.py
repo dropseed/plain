@@ -5,7 +5,6 @@ import string
 from typing import Any
 
 from plain.exceptions import ImproperlyConfigured
-from plain.internal import internalcode
 from plain.preflight import PreflightResult
 from plain.runtime import settings
 from plain.utils.regex_helper import _lazy_re_compile
@@ -13,7 +12,6 @@ from plain.utils.regex_helper import _lazy_re_compile
 from .converters import _get_converter
 
 
-@internalcode
 class CheckURLMixin:
     # Expected to be set by subclasses
     regex: re.Pattern[str]

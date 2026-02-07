@@ -1,6 +1,6 @@
 [project]
 name = "plain.observer"
-version = "0.27.0"
+version = "0.27.3"
 description = "On-page telemetry and observability tools for Plain."
 authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
 license = "BSD-3-Clause"

@@ -14,7 +14,6 @@ import html
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
-from plain.internal import internalcode
 from plain.internal.files.uploadhandler import SkipFile, StopFutureHandlers, StopUpload
 from plain.runtime import settings
 from plain.utils.datastructures import MultiValueDict
@@ -413,7 +412,6 @@ class MultiPartParser:
                 handler.file.close()  # type: ignore[union-attr]
 
 
-@internalcode
 class LazyStream:
     """
     The LazyStream wrapper allows one to get and "unget" bytes from a stream.
@@ -533,7 +531,6 @@ class LazyStream:
             )
 
 
-@internalcode
 class ChunkIter:
     """
     An iterable that will yield chunks of data. Given a file-like object as the
@@ -558,7 +555,6 @@ class ChunkIter:
         return self
 
 
-@internalcode
 class InterBoundaryIter:
     """
     A Producer that will iterate over boundaries.
@@ -578,7 +574,6 @@ class InterBoundaryIter:
             raise StopIteration()
 
 
-@internalcode
 class BoundaryIter:
     """
     A Producer that is sensitive to boundaries.
@@ -739,7 +734,6 @@ def _parse_boundary_stream(
     return (TYPE, outdict, stream)
 
 
-@internalcode
 class Parser:
     def __init__(self, stream: LazyStream, boundary: bytes):
         self._stream = stream

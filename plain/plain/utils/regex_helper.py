@@ -12,7 +12,6 @@ import re
 from collections.abc import Iterator
 from typing import Any
 
-from plain.internal import internalcode
 from plain.utils.functional import SimpleLazyObject
 
 # Mapping of an escape character to a representative of that class. So, e.g.,
@@ -32,17 +31,14 @@ _ESCAPE_MAPPINGS = {
 }
 
 
-@internalcode
 class Choice(list):
     """Represent multiple possibilities at this point in a pattern string."""
 
 
-@internalcode
 class Group(list):
     """Represent a capturing group in the pattern string."""
 
 
-@internalcode
 class NonCapture(list):
     """Represent a non-capturing group in the pattern string."""
 

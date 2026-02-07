@@ -1,13 +1,11 @@
 import os
 
-from plain.internal import internalcode
 from plain.packages import PackageConfig, packages_registry, register_config
 from plain.runtime import APP_PATH
 
 from .registry import pages_registry
 
 
-@internalcode
 @register_config
 class Config(PackageConfig):
     package_label = "plainpages"

@@ -1,5 +1,47 @@
 # plain-jobs changelog
 
+## [0.43.4](https://github.com/dropseed/plain/releases/plain-jobs@0.43.4) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `models` and `scheduling` modules for explicit public API boundaries ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.43.3](https://github.com/dropseed/plain/releases/plain-jobs@0.43.3) (2026-01-28)
+
+### What's changed
+
+- Updated admin views to use the new `filter_queryset` hook for filtering by job result status instead of doing it inside `get_initial_queryset` ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Renamed `self.preset` to `self.filter` in admin views ([99d6f042b8](https://github.com/dropseed/plain/commit/99d6f042b8))
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.43.2](https://github.com/dropseed/plain/releases/plain-jobs@0.43.2) (2026-01-22)
+
+### What's changed
+
+- Fixed `JobProcess.defer()` to use `self.id` instead of the deprecated `self.pk` attribute when restoring the job process ID after a failed re-enqueue attempt. This aligns with the change made in v0.25.0 where the `pk` alias was removed. ([08863e0fb0](https://github.com/dropseed/plain/commit/08863e0fb0))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.43.1](https://github.com/dropseed/plain/releases/plain-jobs@0.43.1) (2026-01-22)
+
+### What's changed
+
+- Fixed handling of `DeferError` when a job re-enqueue fails due to concurrency limits. Previously, if a deferred job couldn't be re-enqueued because the concurrency limit was already reached, the transaction would roll back but leave the `JobProcess` in an inconsistent state. Now the job is properly marked as errored with a descriptive error message, and the `pk` is restored so the job can be found again. ([10ecfc6dd7](https://github.com/dropseed/plain/commit/10ecfc6dd7))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.43.0](https://github.com/dropseed/plain/releases/plain-jobs@0.43.0) (2026-01-15)
 
 ### What's changed

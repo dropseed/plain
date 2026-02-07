@@ -1,5 +1,26 @@
 # plain-pytest changelog
 
+## [0.16.2](https://github.com/dropseed/plain/releases/plain-pytest@0.16.2) (2026-02-04)
+
+### What's changed
+
+- Moved `.env.test` loading from the CLI command to the pytest plugin, ensuring environment variables are loaded even when running pytest directly without the `plain test` wrapper ([9c7100bd4ec9](https://github.com/dropseed/plain/commit/9c7100bd4ec9))
+- The CLI now uses `os.execvp()` to replace the process with pytest instead of spawning a subprocess, improving signal handling and process management ([9c7100bd4ec9](https://github.com/dropseed/plain/commit/9c7100bd4ec9))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.16.1](https://github.com/dropseed/plain/releases/plain-pytest@0.16.1) (2026-01-28)
+
+### What's changed
+
+- Converted the `plain-test` skill to a passive `.claude/rules/` file ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory.
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-pytest@0.16.0) (2026-01-15)
 
 ### What's changed

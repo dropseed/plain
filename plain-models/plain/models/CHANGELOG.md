@@ -1,5 +1,71 @@
 # plain-models changelog
 
+## [0.76.4](https://github.com/dropseed/plain/releases/plain-models@0.76.4) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `expressions` module for explicit public API boundaries ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+- Refactored internal imports to use explicit module paths instead of the `sql` namespace ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+- Updated agent rules to use `--api` instead of `--symbols` for `plain docs` command ([e7164d3891b2](https://github.com/dropseed/plain/commit/e7164d3891b2))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.76.3](https://github.com/dropseed/plain/releases/plain-models@0.76.3) (2026-02-02)
+
+### What's changed
+
+- Fixed observer query summaries for SQL statements starting with parentheses (e.g., UNION queries) by stripping leading `(` before extracting the operation ([bfbcb5a256f2](https://github.com/dropseed/plain/commit/bfbcb5a256f2))
+- UNION queries now display with a "UNION" suffix in query summaries for better identification ([bfbcb5a256f2](https://github.com/dropseed/plain/commit/bfbcb5a256f2))
+- Agent rules now include query examples showing the `Model.query` pattern ([02e11328dbf5](https://github.com/dropseed/plain/commit/02e11328dbf5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.76.2](https://github.com/dropseed/plain/releases/plain-models@0.76.2) (2026-01-28)
+
+### What's changed
+
+- Converted the `plain-models` skill to a passive `.claude/rules/` file ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory.
+
+## [0.76.1](https://github.com/dropseed/plain/releases/plain-models@0.76.1) (2026-01-28)
+
+### What's changed
+
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.76.0](https://github.com/dropseed/plain/releases/plain-models@0.76.0) (2026-01-22)
+
+### What's changed
+
+- Removed the `db_column` field parameter - column names are now always derived from the field name ([eed1bb6](https://github.com/dropseed/plain/commit/eed1bb6811))
+- Removed the `db_collation` field parameter from `CharField` and `TextField` - use raw SQL or database-level collation settings instead ([49b362d](https://github.com/dropseed/plain/commit/49b362d3d3))
+- Removed the `Collate` database function from `plain.models.functions` ([49b362d](https://github.com/dropseed/plain/commit/49b362d3d3))
+- Removed the `db_comment` field parameter and `db_table_comment` model option - database comments are no longer supported ([eb5aabb](https://github.com/dropseed/plain/commit/eb5aabb5ca))
+- Removed the `AlterModelTableComment` migration operation ([eb5aabb](https://github.com/dropseed/plain/commit/eb5aabb5ca))
+- Added `BaseDatabaseSchemaEditor` and `StateModelsRegistry` exports from `plain.models.migrations` for use in type annotations in `RunPython` functions ([672aa88](https://github.com/dropseed/plain/commit/672aa8861a))
+
+### Upgrade instructions
+
+- Remove any `db_column` arguments from field definitions - the column name will always match the field's attribute name (with `_id` suffix for foreign keys)
+- Remove `db_column` from all migrations
+- Remove any `db_collation` arguments from `CharField` and `TextField` definitions
+- Replace any usage of `Collate()` function with raw SQL queries or configure collation at the database level
+- Remove any `db_comment` arguments from field definitions
+- Remove `db_comment` from all migrations
+- Remove any `db_table_comment` from `model_options` definitions
+- Replace `AlterModelTableComment` migration operations with `RunSQL` if database comments are still needed
+
 ## [0.75.0](https://github.com/dropseed/plain/releases/plain-models@0.75.0) (2026-01-15)
 
 ### What's changed

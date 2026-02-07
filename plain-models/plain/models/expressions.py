@@ -41,6 +41,28 @@ if TYPE_CHECKING:
     from plain.models.sql.compiler import SQLCompilable, SQLCompiler
     from plain.models.sql.query import Query
 
+__all__ = [
+    # Core expression classes
+    "F",
+    "Value",
+    "Case",
+    "When",
+    "Subquery",
+    "Exists",
+    "OuterRef",
+    "Window",
+    "ExpressionWrapper",
+    "RawSQL",
+    "OrderBy",
+    # Base classes (for extension)
+    "Func",
+    "Expression",
+    "Combinable",
+    # Window frame specs
+    "RowRange",
+    "ValueRange",
+]
+
 
 @runtime_checkable
 class ResolvableExpression(Protocol):

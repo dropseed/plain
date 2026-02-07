@@ -2,6 +2,8 @@ from plain.urls import Router, include, path
 
 from . import views
 
+__all__ = ["OAuthRouter"]
+
 
 class OAuthRouter(Router):
     namespace = "oauth"

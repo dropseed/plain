@@ -7,7 +7,7 @@
     - [`plain fix`](#plain-fix)
     - [`plain code check`](#plain-code-check)
     - [`plain code annotations`](#plain-code-annotations)
-- [Configuration](#configuration)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -91,7 +91,7 @@ You can also output the results as JSON for use in CI or other tools:
 plain code annotations --json
 ```
 
-## Configuration
+## Settings
 
 Default configuration is provided by [`ruff_defaults.toml`](./ruff_defaults.toml) and [`biome_defaults.json`](./biome_defaults.json).
 

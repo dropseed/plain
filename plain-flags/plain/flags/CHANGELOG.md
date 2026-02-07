@@ -1,5 +1,25 @@
 # plain-flags changelog
 
+## [0.33.2](https://github.com/dropseed/plain/releases/plain-flags@0.33.2) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `exceptions` and `models` modules for explicit public API boundaries ([f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.33.1](https://github.com/dropseed/plain/releases/plain-flags@0.33.1) (2026-01-28)
+
+### What's changed
+
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.33.0](https://github.com/dropseed/plain/releases/plain-flags@0.33.0) (2026-01-15)
 
 ### What's changed

@@ -9,6 +9,8 @@ from uuid import UUID
 from plain import models
 from plain.models import types
 
+__all__ = ["APIKey"]
+
 
 def generate_token() -> str:
     return binascii.hexlify(os.urandom(20)).decode()

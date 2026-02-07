@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.16.1](https://github.com/dropseed/plain/releases/plain-htmx@0.16.1) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` export to `views` module for explicit public API boundaries ([f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-htmx@0.16.0) (2026-01-13)
 
 ### What's changed

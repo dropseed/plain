@@ -69,12 +69,14 @@ dev = [
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }
 "plain-vendor" = { workspace = true }
+"plainx-dev" = { workspace = true }
 
 [tool.uv.workspace]
 members = [
     # By package name, or paths
     "plain",
     "plain-*",
+    "plainx-*",
     "example",
 ]
 

@@ -19,15 +19,15 @@
             {% if description %}<p class="mt-1 text-xs text-black/50">{{ description }}</p>{% endif %}
         </div>
 
-        {% if presets %}
+        {% if filters %}
         <div>
             <select
                 hx-get
-                name="{{ slug }}.preset"
+                name="{{ slug }}.filter"
                 class="text-xs py-1.5">
                 <option value="">(Reset to default)</option>
-                {% for preset in presets %}
-                <option value="{{ preset.value }}" {% if preset.value == current_preset %}selected{% endif %}>{{ preset }}</option>
+                {% for filter in filters %}
+                <option value="{{ filter.value }}" {% if filter.value == current_filter %}selected{% endif %}>{{ filter }}</option>
                 {% endfor %}
             </select>
         </div>

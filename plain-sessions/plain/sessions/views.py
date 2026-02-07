@@ -10,6 +10,8 @@ from .requests import get_request_session
 if TYPE_CHECKING:
     from .core import SessionStore
 
+__all__ = ["SessionView"]
+
 
 class SessionView(View):
     """View with session access."""

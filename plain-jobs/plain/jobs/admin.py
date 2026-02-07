@@ -202,7 +202,7 @@ class JobResultViewset(AdminViewset):
 
         def get_initial_queryset(self) -> JobResultQuerySet:
             queryset: JobResultQuerySet = super().get_initial_queryset()  # type: ignore[assignment]
-            queryset = queryset.annotate(
+            return queryset.annotate(
                 retried=Case(
                     When(retry_job_request_uuid__isnull=False, then=True),
                     default=False,
@@ -214,21 +214,23 @@ class JobResultViewset(AdminViewset):
                     output_field=models.BooleanField(),
                 ),
             )
-            if self.preset == "Successful":
+
+        def filter_queryset(self, queryset: JobResultQuerySet) -> JobResultQuerySet:
+            if self.filter == "Successful":
                 return queryset.successful()
-            if self.preset == "Errored":
+            if self.filter == "Errored":
                 return queryset.errored()
-            if self.preset == "Cancelled":
+            if self.filter == "Cancelled":
                 return queryset.cancelled()
-            if self.preset == "Lost":
+            if self.filter == "Lost":
                 return queryset.lost()
-            if self.preset == "Retried":
+            if self.filter == "Retried":
                 return queryset.retried()
             return queryset
 
         def get_fields(self) -> list[str]:
             fields = super().get_fields()
-            if self.preset == "Retried":
+            if self.filter == "Retried":
                 fields.append("retries")
                 fields.append("retry_attempt")
             return fields

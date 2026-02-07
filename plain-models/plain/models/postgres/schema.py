@@ -348,7 +348,7 @@ class DatabaseSchemaEditor:
 
     sql_create_column = "ALTER TABLE %(table)s ADD COLUMN %(column)s %(definition)s"
     sql_alter_column = "ALTER TABLE %(table)s %(changes)s"
-    sql_alter_column_type = "ALTER COLUMN %(column)s TYPE %(type)s%(collation)s"
+    sql_alter_column_type = "ALTER COLUMN %(column)s TYPE %(type)s"
     sql_alter_column_null = "ALTER COLUMN %(column)s DROP NOT NULL"
     sql_alter_column_not_null = "ALTER COLUMN %(column)s SET NOT NULL"
     sql_alter_column_default = "ALTER COLUMN %(column)s SET DEFAULT %(default)s"
@@ -413,9 +413,6 @@ class DatabaseSchemaEditor:
         "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s PRIMARY KEY (%(columns)s)"
     )
     sql_delete_pk = sql_delete_constraint
-
-    sql_alter_table_comment = "COMMENT ON TABLE %(table)s IS %(comment)s"
-    sql_alter_column_comment = "COMMENT ON COLUMN %(table)s.%(column)s IS %(comment)s"
 
     # PostgreSQL IDENTITY column support
     sql_add_identity = (
@@ -542,8 +539,6 @@ class DatabaseSchemaEditor:
         include_default: bool,
     ) -> Generator[str, None, None]:
         yield column_db_type
-        if collation := field_db_params.get("collation"):
-            yield "COLLATE " + quote_name(collation)
         # Work out nullability.
         null = field.allow_null
         # Include a default value, if requested.
@@ -632,22 +627,6 @@ class DatabaseSchemaEditor:
         # definition.
         self.execute(sql, params or None)
 
-        # Add table comment.
-        if model.model_options.db_table_comment:
-            self.alter_db_table_comment(
-                model, None, model.model_options.db_table_comment
-            )
-        # Add column comments.
-        for field in model._model_meta.local_fields:
-            if field.db_comment:
-                field_db_params = field.db_parameters()
-                field_type = field_db_params["type"]
-                assert field_type is not None
-                self.execute(
-                    *self._alter_column_comment_sql(
-                        model, field, field_type, field.db_comment
-                    )
-                )
         # Add any field indexes.
         self.deferred_sql.extend(self._model_indexes_sql(model))
 
@@ -722,20 +701,6 @@ class DatabaseSchemaEditor:
             if isinstance(sql, Statement):
                 sql.rename_table_references(old_db_table, new_db_table)
 
-    def alter_db_table_comment(
-        self,
-        model: type[Model],
-        old_db_table_comment: str | None,
-        new_db_table_comment: str | None,
-    ) -> None:
-        self.execute(
-            self.sql_alter_table_comment
-            % {
-                "table": quote_name(model.model_options.db_table),
-                "comment": self.quote_value(new_db_table_comment or ""),
-            }
-        )
-
     def add_field(self, model: type[Model], field: Field) -> None:
         """
         Create a field on a model. Usually involves adding a column, but may
@@ -790,15 +755,6 @@ class DatabaseSchemaEditor:
                 "changes": changes_sql,
             }
             self.execute(sql, params)
-        # Add field comment, if required.
-        if field.db_comment:
-            field_type = db_params["type"]
-            assert field_type is not None
-            self.execute(
-                *self._alter_column_comment_sql(
-                    model, field, field_type, field.db_comment
-                )
-            )
         # Add an index, if required
         self.deferred_sql.extend(self._field_indexes_sql(model, field))
 
@@ -935,7 +891,6 @@ class DatabaseSchemaEditor:
             and self._field_should_be_altered(
                 old_field,
                 new_field,
-                ignore={"db_comment"},
             )
         ):
             fk_names = self._constraint_names(
@@ -976,10 +931,8 @@ class DatabaseSchemaEditor:
                     self.execute(sql)
         # Drop incoming FK constraints if the field is a primary key or unique,
         # which might be a to_field target, and things are going to change.
-        old_collation = old_db_params.get("collation")
-        new_collation = new_db_params.get("collation")
         drop_foreign_keys = (old_field.primary_key and new_field.primary_key) and (
-            (old_type != new_type) or (old_collation != new_collation)
+            old_type != new_type
         )
         if drop_foreign_keys:
             # '_model_meta.related_field' also contains M2M reverse fields, these
@@ -1072,15 +1025,10 @@ class DatabaseSchemaEditor:
         # Type suffix change? (e.g. auto increment).
         old_type_suffix = old_field.db_type_suffix()
         new_type_suffix = new_field.db_type_suffix()
-        # Type, collation, or comment change?
-        if (
-            old_type != new_type
-            or old_type_suffix != new_type_suffix
-            or old_collation != new_collation
-            or old_field.db_comment != new_field.db_comment
-        ):
+        # Type change?
+        if old_type != new_type or old_type_suffix != new_type_suffix:
             fragment, other_actions = self._alter_column_type_sql(
-                model, old_field, new_field, new_type, old_collation, new_collation
+                model, old_field, new_field, new_type
             )
             actions.append(fragment)
             post_actions.extend(other_actions)
@@ -1191,16 +1139,11 @@ class DatabaseSchemaEditor:
         for old_rel, new_rel in rels_to_update:
             rel_db_params = new_rel.field.db_parameters()
             rel_type = rel_db_params["type"]
-            rel_collation = rel_db_params.get("collation")
-            old_rel_db_params = old_rel.field.db_parameters()
-            old_rel_collation = old_rel_db_params.get("collation")
             fragment, other_actions = self._alter_column_type_sql(
                 new_rel.related_model,
                 old_rel.field,
                 new_rel.field,
                 rel_type,
-                old_rel_collation,
-                rel_collation,
             )
             self.execute(
                 self.sql_alter_column
@@ -1335,8 +1278,6 @@ class DatabaseSchemaEditor:
         old_field: Field,
         new_field: Field,
         new_type: str,
-        old_collation: str | None,
-        new_collation: str | None,
     ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         """
         Return a two-tuple of: an SQL fragment of (sql, params) to insert into
@@ -1358,9 +1299,7 @@ class DatabaseSchemaEditor:
             )
             self.execute(self._delete_index_sql(model, index_name))
 
-        self.sql_alter_column_type = (
-            "ALTER COLUMN %(column)s TYPE %(type)s%(collation)s"
-        )
+        self.sql_alter_column_type = "ALTER COLUMN %(column)s TYPE %(type)s"
         # Cast when data type changed.
         if self._field_data_type(old_field) != self._field_data_type(new_field):
             self.sql_alter_column_type += " USING %(column)s::%(type)s"
@@ -1379,7 +1318,6 @@ class DatabaseSchemaEditor:
                     % {
                         "column": quote_name(column),
                         "type": new_type,
-                        "collation": "",
                     },
                     [],
                 ),
@@ -1406,7 +1344,7 @@ class DatabaseSchemaEditor:
             )
             column = strip_quotes(new_field.column)
             fragment, _ = self._alter_column_type_sql_base(
-                model, old_field, new_field, new_type, old_collation, new_collation
+                model, old_field, new_field, new_type
             )
             # Drop the sequence if exists (Plain 4.1+ identity columns don't
             # have it).
@@ -1424,7 +1362,7 @@ class DatabaseSchemaEditor:
             return fragment, other_actions
         elif new_is_auto and old_is_auto and old_internal_type != new_internal_type:
             fragment, _ = self._alter_column_type_sql_base(
-                model, old_field, new_field, new_type, old_collation, new_collation
+                model, old_field, new_field, new_type
             )
             column = strip_quotes(new_field.column)
             db_types = {"PrimaryKeyField": "bigint"}
@@ -1445,7 +1383,7 @@ class DatabaseSchemaEditor:
             return fragment, other_actions
         else:
             return self._alter_column_type_sql_base(
-                model, old_field, new_field, new_type, old_collation, new_collation
+                model, old_field, new_field, new_type
             )
 
     def _alter_column_type_sql_base(
@@ -1454,58 +1392,17 @@ class DatabaseSchemaEditor:
         old_field: Field,
         new_field: Field,
         new_type: str,
-        old_collation: str | None,
-        new_collation: str | None,
     ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         """Base implementation of _alter_column_type_sql without IDENTITY handling."""
-        other_actions = []
-        if new_collation:
-            collate_sql = " COLLATE " + quote_name(new_collation)
-        else:
-            collate_sql = ""
-        # Comment change?
-        from plain.models.fields.related import ManyToManyField
-
-        comment_sql = ""
-        if not isinstance(new_field, ManyToManyField):
-            if old_field.db_comment != new_field.db_comment:
-                # PostgreSQL can't execute 'ALTER COLUMN ...' and
-                # 'COMMENT ON ...' at the same time.
-                sql, params = self._alter_column_comment_sql(
-                    model, new_field, new_type, new_field.db_comment
-                )
-                if sql:
-                    other_actions.append((sql, params))
-            if new_field.db_comment:
-                comment_sql = self.quote_value(new_field.db_comment)
         return (
             (
                 self.sql_alter_column_type
                 % {
                     "column": quote_name(new_field.column),
                     "type": new_type,
-                    "collation": collate_sql,
-                    "comment": comment_sql,
                 },
                 [],
             ),
-            other_actions,
-        )
-
-    def _alter_column_comment_sql(
-        self,
-        model: type[Model],
-        new_field: Field,
-        new_type: str,
-        new_db_comment: str | None,
-    ) -> tuple[str, list[Any]]:
-        return (
-            self.sql_alter_column_comment
-            % {
-                "table": quote_name(model.model_options.db_table),
-                "column": quote_name(new_field.column),
-                "comment": self.quote_value(new_db_comment or ""),
-            },
             [],
         )
 
@@ -1745,10 +1642,6 @@ class DatabaseSchemaEditor:
             # and text[size], so skip them.
             if "[" in db_type:
                 return None
-            # Non-deterministic collations on Postgresql don't support indexes
-            # for operator classes varchar_pattern_ops/text_pattern_ops.
-            if getattr(field, "db_collation", None):
-                return None
             if db_type.startswith("varchar"):
                 return self._create_index_sql(
                     model,
@@ -1775,7 +1668,6 @@ class DatabaseSchemaEditor:
         # - changing only a field name
         # - changing an attribute that doesn't affect the schema
         # - changing an attribute in the provided set of ignored attributes
-        # - adding only a db_column and the column name is not changed
         for attr in ignore.union(old_field.non_db_attrs):
             old_kwargs.pop(attr, None)
         for attr in ignore.union(new_field.non_db_attrs):

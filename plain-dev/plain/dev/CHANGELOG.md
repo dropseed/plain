@@ -1,5 +1,36 @@
 # plain-dev changelog
 
+## [0.54.2](https://github.com/dropseed/plain/releases/plain-dev@0.54.2) (2026-01-28)
+
+### What's changed
+
+- Converted `plain-dev` and `plain-pre-commit` skills to a single passive `.claude/rules/` file ([512040ac51](https://github.com/dropseed/plain/commit/512040ac51))
+
+### Upgrade instructions
+
+- Run `plain agent install` to update your `.claude/` directory.
+
+## [0.54.1](https://github.com/dropseed/plain/releases/plain-dev@0.54.1) (2026-01-28)
+
+### What's changed
+
+- Added `dev` to the service auto-start allow-list so that database services start automatically when running `plain dev`, which runs preflight checks internally ([4b146a0ae2](https://github.com/dropseed/plain/commit/4b146a0ae2))
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.54.0](https://github.com/dropseed/plain/releases/plain-dev@0.54.0) (2026-01-22)
+
+### What's changed
+
+- The development server now shows `DeprecationWarning` and `PendingDeprecationWarning` messages by default, helping you catch deprecated code before it breaks in future versions. You can override this by setting your own `PYTHONWARNINGS` environment variable. ([2ca42c6f96](https://github.com/dropseed/plain/commit/2ca42c6f96))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.53.0](https://github.com/dropseed/plain/releases/plain-dev@0.53.0) (2026-01-15)
 
 ### What's changed

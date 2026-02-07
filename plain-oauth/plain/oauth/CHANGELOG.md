@@ -1,5 +1,35 @@
 # plain-oauth changelog
 
+## [0.42.3](https://github.com/dropseed/plain/releases/plain-oauth@0.42.3) (2026-02-04)
+
+### What's changed
+
+- Added `__all__` exports to `exceptions`, `models`, `providers`, and `urls` modules for explicit public API boundaries ([f26a63a5c941](https://github.com/dropseed/plain/commit/f26a63a5c941))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.42.2](https://github.com/dropseed/plain/releases/plain-oauth@0.42.2) (2026-01-28)
+
+### What's changed
+
+- Added Settings section to README ([803fee1ad5](https://github.com/dropseed/plain/commit/803fee1ad5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.42.1](https://github.com/dropseed/plain/releases/plain-oauth@0.42.1) (2026-01-22)
+
+### What's changed
+
+- Migration now uses `settings.AUTH_USER_MODEL` instead of hardcoded `"users.user"`, enabling support for custom user models ([76e28f6](https://github.com/dropseed/plain/commit/76e28f6))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.42.0](https://github.com/dropseed/plain/releases/plain-oauth@0.42.0) (2026-01-15)
 
 ### What's changed
