@@ -1,5 +1,4 @@
 from click.testing import CliRunner
-
 from plain.cli.core import cli
 
 

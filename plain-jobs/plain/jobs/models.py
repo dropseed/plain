@@ -21,12 +21,12 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind
-
-from plain import models
 from plain.models import transaction, types
 from plain.models.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
+
+from plain import models
 
 from .exceptions import DeferError, DeferJob
 from .registry import jobs_registry

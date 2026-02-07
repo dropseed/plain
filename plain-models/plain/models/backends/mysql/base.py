@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, cast
 import MySQLdb as Database
 from MySQLdb.constants import CLIENT, FIELD_TYPE
 from MySQLdb.converters import conversions
-
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends import utils as backend_utils
 from plain.models.backends.base.base import BaseDatabaseWrapper

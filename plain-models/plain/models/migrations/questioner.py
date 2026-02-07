@@ -8,7 +8,6 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import click
-
 from plain.models.fields import NOT_PROVIDED
 from plain.packages import packages_registry
 from plain.utils import timezone

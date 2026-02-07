@@ -3,9 +3,10 @@
 import uuid
 
 import plain.models.deletion
-from plain import models
 from plain.models import migrations
 from plain.runtime import settings
+
+from plain import models
 
 
 class Migration(migrations.Migration):

@@ -7,7 +7,6 @@ from app.examples.models import (
     ChildSetNull,
     DeleteParent,
 )
-
 from plain.models.deletion import ProtectedError, RestrictedError
 
 

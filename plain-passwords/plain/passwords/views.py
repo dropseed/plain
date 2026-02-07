@@ -4,7 +4,6 @@ import hmac
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain import signing
 from plain.auth import get_user_model
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
@@ -18,6 +17,8 @@ from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
 from plain.utils.encoding import force_bytes
 from plain.views import CreateView, FormView
+
+from plain import signing
 
 from .forms import (
     PasswordChangeForm,

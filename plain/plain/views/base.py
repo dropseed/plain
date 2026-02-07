@@ -10,7 +10,6 @@ from opentelemetry.semconv._incubating.attributes.code_attributes import (
     CODE_FUNCTION_NAME,
     CODE_NAMESPACE,
 )
-
 from plain.http import (
     JsonResponse,
     NotAllowedResponse,

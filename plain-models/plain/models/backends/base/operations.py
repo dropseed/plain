@@ -10,7 +10,6 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 import sqlparse
-
 from plain.models.backends import utils
 from plain.models.backends.utils import CursorWrapper
 from plain.models.db import NotSupportedError

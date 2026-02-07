@@ -2,13 +2,14 @@
   "name": "plaintunnel",
   "version": "0.0.0",
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
+    "oxlint": "^1.43.0",
+    "oxfmt": "^0.28.0",
     "wrangler": "3.84.0"
   },
   "private": true,
   "scripts": {
     "dev": "wrangler dev --var LOCALHOST_DEV:true",
     "deploy": "wrangler deploy",
-    "fix": "npx @biomejs/biome check --fix --unsafe worker.js"
+    "fix": "npx oxlint --fix-dangerously worker.js && npx oxfmt worker.js"
   }
 }

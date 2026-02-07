@@ -11,7 +11,7 @@ paths:
 uv run plain fix [path]
 ```
 
-Automatically fixes formatting and linting issues using ruff and biome.
+Automatically fixes formatting and linting issues using ruff and oxlint/oxfmt.
 
 Options:
 
@@ -24,7 +24,7 @@ Options:
 uv run plain code check [path]
 ```
 
-Runs ruff, ty (type checking), biome, and annotation coverage checks without auto-fixing.
+Runs ruff, ty (type checking), oxlint/oxfmt, and annotation coverage checks without auto-fixing.
 
 ## Code Style
 

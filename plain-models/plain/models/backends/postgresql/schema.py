@@ -3,13 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from psycopg import sql
-
 from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
 from plain.models.backends.ddl_references import Columns, IndexColumns, Statement
 from plain.models.backends.utils import strip_quotes
 from plain.models.fields import DbParameters
 from plain.models.fields.related import ForeignKeyField, RelatedField
+from psycopg import sql
 
 if TYPE_CHECKING:
     from plain.models.backends.postgresql.base import PostgreSQLDatabaseWrapper

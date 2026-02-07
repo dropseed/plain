@@ -6,7 +6,6 @@ from app.examples.models import (
     ChildCascade,
     DeleteParent,
 )
-
 from plain.models import QuerySet
 
 

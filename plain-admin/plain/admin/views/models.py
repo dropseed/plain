@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from plain import models
 from plain.models import Q
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.fields.related_managers import BaseRelatedManager
+
+from plain import models
 
 from ..utils import camelcase_to_title
 from .objects import (
@@ -17,8 +18,9 @@ from .objects import (
 )
 
 if TYPE_CHECKING:
-    from plain import models
     from plain.forms import BaseForm
+
+    from plain import models
 
 
 def get_model_field(instance: models.Model, field: str) -> Any:

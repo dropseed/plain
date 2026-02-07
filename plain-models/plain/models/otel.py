@@ -11,7 +11,6 @@ from opentelemetry import trace
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Span
-
     from plain.models.backends.base.base import BaseDatabaseWrapper
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,
@@ -38,7 +37,6 @@ from opentelemetry.semconv.attributes.network_attributes import (
 )
 from opentelemetry.semconv.trace import DbSystemValues
 from opentelemetry.trace import SpanKind
-
 from plain.runtime import settings
 
 # Use a stable string key so OpenTelemetry context APIs receive the expected type.

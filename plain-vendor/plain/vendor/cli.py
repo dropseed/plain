@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import click
-
 from plain.assets.finders import _APP_ASSETS_DIR
 from plain.cli import register_cli
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 
 import click
-
 from plain.cli import register_cli
 from plain.runtime import APP_PATH
 

@@ -6,7 +6,6 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
 
 from opentelemetry import baggage
-
 from plain.http import Response
 from plain.http.cookie import unsign_cookie_value
 from plain.runtime import settings

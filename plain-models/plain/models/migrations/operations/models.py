@@ -3,11 +3,12 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain import models
 from plain.models.base import ModelBase
 from plain.models.migrations.operations.base import Operation
 from plain.models.migrations.state import ModelState
 from plain.models.migrations.utils import field_references, resolve_relation
+
+from plain import models
 
 from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameField
 

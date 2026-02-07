@@ -14,7 +14,6 @@ from http.client import responses
 from http.cookies import SimpleCookie
 from typing import IO, Any
 
-from plain import signals
 from plain.http.cookie import sign_cookie_value
 from plain.json import PlainJSONEncoder
 from plain.runtime import settings
@@ -23,6 +22,8 @@ from plain.utils.datastructures import CaseInsensitiveMapping
 from plain.utils.encoding import iri_to_uri
 from plain.utils.http import content_disposition_header, http_date
 from plain.utils.regex_helper import _lazy_re_compile
+
+from plain import signals
 
 _charset_from_content_type_re = _lazy_re_compile(
     r";\s*charset=(?P<charset>[^\s;]+)", re.I

@@ -4,7 +4,6 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 from jinja2.runtime import Context
-
 from plain.runtime import settings
 from plain.templates import Template
 from plain.utils.safestring import SafeString, mark_safe

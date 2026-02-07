@@ -6,7 +6,6 @@ from app.examples.models import (
     Feature,
     MixinTestModel,
 )
-
 from plain.exceptions import ValidationError
 
 

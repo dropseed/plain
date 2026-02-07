@@ -3,13 +3,14 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain import models
 from plain.auth import get_user_model
 from plain.exceptions import ValidationError
 from plain.models import transaction, types
 from plain.models.db import IntegrityError
 from plain.runtime import SettingsReference
 from plain.utils import timezone
+
+from plain import models
 
 from .exceptions import OAuthUserAlreadyExistsError
 

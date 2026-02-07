@@ -1,7 +1,6 @@
-from tests.providers.github import GitHubOAuthProvider
-
 from plain.oauth.providers import OAuthToken, OAuthUser
 from plain.test import Client
+from tests.providers.github import GitHubOAuthProvider
 
 
 class DummyGitHubOAuthProvider(GitHubOAuthProvider):

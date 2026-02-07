@@ -6,15 +6,14 @@ from collections.abc import Callable, Iterable
 from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any, LiteralString, cast
 
-from psycopg import ClientCursor, errors, sql
-from psycopg.types import numeric
-from psycopg.types.json import Jsonb
-
 from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.backends.utils import CursorWrapper, split_tzname_delta
 from plain.models.constants import OnConflict
 from plain.models.expressions import ResolvableExpression
 from plain.utils.regex_helper import _lazy_re_compile
+from psycopg import ClientCursor, errors, sql
+from psycopg.types import numeric
+from psycopg.types.json import Jsonb
 
 if TYPE_CHECKING:
     from plain.models.backends.postgresql.base import PostgreSQLDatabaseWrapper

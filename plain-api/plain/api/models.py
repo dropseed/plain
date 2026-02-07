@@ -6,8 +6,9 @@ import uuid
 from datetime import datetime
 from uuid import UUID
 
-from plain import models
 from plain.models import types
+
+from plain import models
 
 __all__ = ["APIKey"]
 

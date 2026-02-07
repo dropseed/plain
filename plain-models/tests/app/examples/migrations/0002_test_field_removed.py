@@ -1,7 +1,8 @@
 import uuid
 
-from plain import models
 from plain.models import migrations
+
+from plain import models
 
 
 def set_uuids(models, schema_editor):

@@ -4,8 +4,9 @@ import re
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from plain import models
 from plain.models import types
+
+from plain import models
 
 if TYPE_CHECKING:
     from plain.http import Request

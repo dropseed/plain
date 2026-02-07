@@ -21,11 +21,11 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
-
-from plain import models
 from plain.models import transaction
 from plain.models.db import db_connection
 from plain.utils import timezone
+
+from plain import models
 
 from .locks import postgres_advisory_lock
 from .registry import JobParameters, jobs_registry

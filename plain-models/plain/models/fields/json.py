@@ -4,7 +4,6 @@ import json
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-from plain import exceptions, preflight
 from plain.models import expressions, lookups
 from plain.models.backends.guards import is_mysql_connection, is_sqlite_connection
 from plain.models.constants import LOOKUP_SEP
@@ -16,6 +15,8 @@ from plain.models.lookups import (
     PostgresOperatorLookup,
     Transform,
 )
+
+from plain import exceptions, preflight
 
 from . import Field
 

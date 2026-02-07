@@ -23,7 +23,6 @@ from typing import (
     overload,
 )
 
-from plain import exceptions, validators
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import db_connection
 from plain.models.enums import ChoicesMeta
@@ -41,6 +40,8 @@ from plain.utils.duration import duration_microseconds, duration_string
 from plain.utils.functional import Promise
 from plain.utils.ipv6 import clean_ipv6_address
 from plain.utils.itercompat import is_iterable
+
+from plain import exceptions, validators
 
 from ..registry import models_registry
 

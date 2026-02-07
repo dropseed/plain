@@ -3,9 +3,10 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from plain import models
 from plain.exceptions import ValidationError
 from plain.models import types
+
+from plain import models
 
 __all__ = ["Flag", "FlagResult"]
 

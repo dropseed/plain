@@ -4,7 +4,6 @@ from app.examples.models import (
     CustomSpecialQuerySetModel,
     DefaultQuerySetModel,
 )
-
 from plain.models.query import QuerySet
 
 

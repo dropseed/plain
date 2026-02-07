@@ -29,11 +29,11 @@ from opentelemetry.semconv.attributes.code_attributes import (
     CODE_STACKTRACE,
 )
 from opentelemetry.trace import format_trace_id
-
-from plain import models
 from plain.models import types
 from plain.runtime import settings
 from plain.urls import reverse
+
+from plain import models
 
 __all__ = ["Log", "Span", "Trace"]
 

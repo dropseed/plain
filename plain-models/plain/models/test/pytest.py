@@ -5,7 +5,6 @@ from collections.abc import Generator
 from typing import Any
 
 import pytest
-
 from plain.models.otel import suppress_db_tracing
 from plain.signals import request_finished, request_started
 

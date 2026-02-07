@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from plain import models
 from plain.models import types
+
+from plain import models
 
 
 @models.register_model

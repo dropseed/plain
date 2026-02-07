@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from plain import models
 from plain.models.connections import DatabaseConnection
 from plain.models.db import DatabaseError
 from plain.models.meta import Meta
 from plain.models.registry import ModelsRegistry
 from plain.utils.functional import classproperty
 from plain.utils.timezone import now
+
+from plain import models
 
 from .exceptions import MigrationSchemaMissing
 

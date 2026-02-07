@@ -7,7 +7,6 @@ from collections.abc import Callable, Iterable
 from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, Any
 
-from plain import models
 from plain.models.aggregates import Aggregate, Avg, StdDev, Sum, Variance
 from plain.models.backends.base.operations import BaseDatabaseOperations
 from plain.models.backends.utils import CursorWrapper
@@ -17,6 +16,8 @@ from plain.models.exceptions import FieldError
 from plain.models.expressions import Col, ResolvableExpression
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
+
+from plain import models
 
 if TYPE_CHECKING:
     from plain.models.backends.base.base import BaseDatabaseWrapper

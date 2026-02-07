@@ -6,12 +6,11 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse, urlunparse
 
 import mistune
+from plain.urls import reverse
+from plain.utils.text import slugify
 from pygments import highlight
 from pygments.formatters import html
 from pygments.lexers import get_lexer_by_name
-
-from plain.urls import reverse
-from plain.utils.text import slugify
 
 if TYPE_CHECKING:
     from .registry import PagesRegistry

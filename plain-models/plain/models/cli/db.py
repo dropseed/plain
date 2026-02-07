@@ -6,7 +6,6 @@ import time
 from typing import TYPE_CHECKING, cast
 
 import click
-
 from plain.cli import register_cli
 
 from ..backups.cli import cli as backups_cli

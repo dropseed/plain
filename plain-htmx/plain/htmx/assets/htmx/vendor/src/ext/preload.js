@@ -1,151 +1,161 @@
 if (htmx.version && !htmx.version.startsWith("1.")) {
-	console.warn("WARNING: You are using an htmx 1 extension with htmx " + htmx.version +
-		".  It is recommended that you move to the version of this extension found on https://htmx.org/extensions")
+  console.warn(
+    "WARNING: You are using an htmx 1 extension with htmx " +
+      htmx.version +
+      ".  It is recommended that you move to the version of this extension found on https://htmx.org/extensions",
+  );
 }
 // This adds the "preload" extension to htmx.  By default, this will
 // preload the targets of any tags with `href` or `hx-get` attributes
 // if they also have a `preload` attribute as well.  See documentation
 // for more details
 htmx.defineExtension("preload", {
+  onEvent: function (name, event) {
+    // Only take actions on "htmx:afterProcessNode"
+    if (name !== "htmx:afterProcessNode") {
+      return;
+    }
 
-	onEvent: function(name, event) {
+    // SOME HELPER FUNCTIONS WE'LL NEED ALONG THE WAY
 
-		// Only take actions on "htmx:afterProcessNode"
-		if (name !== "htmx:afterProcessNode") {
-			return;
-		}
+    // attr gets the closest non-empty value from the attribute.
+    var attr = function (node, property) {
+      if (node == undefined) {
+        return undefined;
+      }
+      return (
+        node.getAttribute(property) ||
+        node.getAttribute("data-" + property) ||
+        attr(node.parentElement, property)
+      );
+    };
 
-		// SOME HELPER FUNCTIONS WE'LL NEED ALONG THE WAY
+    // load handles the actual HTTP fetch, and uses htmx.ajax in cases where we're
+    // preloading an htmx resource (this sends the same HTTP headers as a regular htmx request)
+    var load = function (node) {
+      // Called after a successful AJAX request, to mark the
+      // content as loaded (and prevent additional AJAX calls.)
+      var done = function (html) {
+        if (!node.preloadAlways) {
+          node.preloadState = "DONE";
+        }
 
-		// attr gets the closest non-empty value from the attribute.
-		var attr = function(node, property) {
-			if (node == undefined) {return undefined;}
-			return node.getAttribute(property) || node.getAttribute("data-" + property) || attr(node.parentElement, property)
-		}
+        if (attr(node, "preload-images") == "true") {
+          document.createElement("div").innerHTML = html; // create and populate a node to load linked resources, too.
+        }
+      };
 
-		// load handles the actual HTTP fetch, and uses htmx.ajax in cases where we're
-		// preloading an htmx resource (this sends the same HTTP headers as a regular htmx request)
-		var load = function(node) {
+      return function () {
+        // If this value has already been loaded, then do not try again.
+        if (node.preloadState !== "READY") {
+          return;
+        }
 
-			// Called after a successful AJAX request, to mark the
-			// content as loaded (and prevent additional AJAX calls.)
-			var done = function(html) {
-				if (!node.preloadAlways) {
-					node.preloadState = "DONE"
-				}
+        // Special handling for HX-GET - use built-in htmx.ajax function
+        // so that headers match other htmx requests, then set
+        // node.preloadState = TRUE so that requests are not duplicated
+        // in the future
+        var hxGet = node.getAttribute("hx-get") || node.getAttribute("data-hx-get");
+        if (hxGet) {
+          htmx.ajax("GET", hxGet, {
+            source: node,
+            handler: function (elt, info) {
+              done(info.xhr.responseText);
+            },
+          });
+          return;
+        }
 
-				if (attr(node, "preload-images") == "true") {
-					document.createElement("div").innerHTML = html // create and populate a node to load linked resources, too.
-				}
-			}
+        // Otherwise, perform a standard xhr request, then set
+        // node.preloadState = TRUE so that requests are not duplicated
+        // in the future.
+        if (node.getAttribute("href")) {
+          var r = new XMLHttpRequest();
+          r.open("GET", node.getAttribute("href"));
+          r.onload = function () {
+            done(r.responseText);
+          };
+          r.send();
+          return;
+        }
+      };
+    };
 
-			return function() {
+    // This function processes a specific node and sets up event handlers.
+    // We'll search for nodes and use it below.
+    var init = function (node) {
+      // If this node DOES NOT include a "GET" transaction, then there's nothing to do here.
+      if (
+        node.getAttribute("href") +
+          node.getAttribute("hx-get") +
+          node.getAttribute("data-hx-get") ==
+        ""
+      ) {
+        return;
+      }
 
-				// If this value has already been loaded, then do not try again.
-				if (node.preloadState !== "READY") {
-					return;
-				}
+      // Guarantee that we only initialize each node once.
+      if (node.preloadState !== undefined) {
+        return;
+      }
 
-				// Special handling for HX-GET - use built-in htmx.ajax function
-				// so that headers match other htmx requests, then set
-				// node.preloadState = TRUE so that requests are not duplicated
-				// in the future
-				var hxGet = node.getAttribute("hx-get") || node.getAttribute("data-hx-get")
-				if (hxGet) {
-					htmx.ajax("GET", hxGet, {
-						source: node,
-						handler:function(elt, info) {
-							done(info.xhr.responseText);
-						}
-					});
-					return;
-				}
+      // Get event name from config.
+      var on = attr(node, "preload") || "mousedown";
+      const always = on.indexOf("always") !== -1;
+      if (always) {
+        on = on.replace("always", "").trim();
+      }
 
-				// Otherwise, perform a standard xhr request, then set
-				// node.preloadState = TRUE so that requests are not duplicated
-				// in the future.
-				if (node.getAttribute("href")) {
-					var r = new XMLHttpRequest();
-					r.open("GET", node.getAttribute("href"));
-					r.onload = function() {done(r.responseText);};
-					r.send();
-					return;
-				}
-			}
-		}
+      // FALL THROUGH to here means we need to add an EventListener
 
-		// This function processes a specific node and sets up event handlers.
-		// We'll search for nodes and use it below.
-		var init = function(node) {
+      // Apply the listener to the node
+      node.addEventListener(on, function (evt) {
+        if (node.preloadState === "PAUSE") {
+          // Only add one event listener
+          node.preloadState = "READY"; // Required for the `load` function to trigger
 
-			// If this node DOES NOT include a "GET" transaction, then there's nothing to do here.
-			if (node.getAttribute("href") + node.getAttribute("hx-get") + node.getAttribute("data-hx-get") == "") {
-				return;
-			}
+          // Special handling for "mouseover" events.  Wait 100ms before triggering load.
+          if (on === "mouseover") {
+            window.setTimeout(load(node), 100);
+          } else {
+            load(node)(); // all other events trigger immediately.
+          }
+        }
+      });
 
-			// Guarantee that we only initialize each node once.
-			if (node.preloadState !== undefined) {
-				return;
-			}
+      // Special handling for certain built-in event handlers
+      switch (on) {
+        case "mouseover":
+          // Mirror `touchstart` events (fires immediately)
+          node.addEventListener("touchstart", load(node));
 
-			// Get event name from config.
-			var on = attr(node, "preload") || "mousedown"
-			const always = on.indexOf("always") !== -1
-			if (always) {
-				on = on.replace('always', '').trim()
-			}
+          // WHhen the mouse leaves, immediately disable the preload
+          node.addEventListener("mouseout", function (evt) {
+            if (evt.target === node && node.preloadState === "READY") {
+              node.preloadState = "PAUSE";
+            }
+          });
+          break;
 
-			// FALL THROUGH to here means we need to add an EventListener
+        case "mousedown":
+          // Mirror `touchstart` events (fires immediately)
+          node.addEventListener("touchstart", load(node));
+          break;
+      }
 
-			// Apply the listener to the node
-			node.addEventListener(on, function(evt) {
-				if (node.preloadState === "PAUSE") { // Only add one event listener
-					node.preloadState = "READY"; // Required for the `load` function to trigger
+      // Mark the node as ready to run.
+      node.preloadState = "PAUSE";
+      node.preloadAlways = always;
+      htmx.trigger(node, "preload:init"); // This event can be used to load content immediately.
+    };
 
-					// Special handling for "mouseover" events.  Wait 100ms before triggering load.
-					if (on === "mouseover") {
-						window.setTimeout(load(node), 100);
-					} else {
-						load(node)() // all other events trigger immediately.
-					}
-				}
-			})
+    // Search for all child nodes that have a "preload" attribute
+    event.target.querySelectorAll("[preload]").forEach(function (node) {
+      // Initialize the node with the "preload" attribute
+      init(node);
 
-			// Special handling for certain built-in event handlers
-			switch (on) {
-
-				case "mouseover":
-					// Mirror `touchstart` events (fires immediately)
-					node.addEventListener("touchstart", load(node));
-
-					// WHhen the mouse leaves, immediately disable the preload
-					node.addEventListener("mouseout", function(evt) {
-						if ((evt.target === node) && (node.preloadState === "READY")) {
-							node.preloadState = "PAUSE";
-						}
-					})
-					break;
-
-				case "mousedown":
-					 // Mirror `touchstart` events (fires immediately)
-					node.addEventListener("touchstart", load(node));
-					break;
-			}
-
-			// Mark the node as ready to run.
-			node.preloadState = "PAUSE";
-			node.preloadAlways = always;
-			htmx.trigger(node, "preload:init") // This event can be used to load content immediately.
-		}
-
-		// Search for all child nodes that have a "preload" attribute
-		event.target.querySelectorAll("[preload]").forEach(function(node) {
-
-			// Initialize the node with the "preload" attribute
-			init(node)
-
-			// Initialize all child elements that are anchors or have `hx-get` (use with care)
-			node.querySelectorAll("a,[hx-get],[data-hx-get]").forEach(init)
-		})
-	}
-})
+      // Initialize all child elements that are anchors or have `hx-get` (use with care)
+      node.querySelectorAll("a,[hx-get],[data-hx-get]").forEach(init);
+    });
+  },
+});

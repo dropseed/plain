@@ -8,7 +8,6 @@ from jinja2.ext import Extension
 from jinja2.nodes import CallBlock, Node
 from jinja2.parser import Parser
 from jinja2.runtime import Context
-
 from plain.runtime import settings
 from plain.templates import register_template_extension
 from plain.templates.jinja.extensions import InclusionTagExtension

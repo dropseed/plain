@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 import click
-
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .process import ProcessManager

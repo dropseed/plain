@@ -6,7 +6,6 @@ from importlib.metadata import entry_points
 from pathlib import Path
 
 import click
-
 import plain.runtime
 from plain.assets.compile import compile_assets, get_compiled_path
 from plain.cli.print import print_event

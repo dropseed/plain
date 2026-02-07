@@ -2,14 +2,11 @@
 name = "plain.loginlink"
 version = "0.18.0"
 description = "Link-based authentication for Plain."
-authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
-dependencies = [
-    "plain<1.0.0",
-    "plain-email<1.0.0",
-]
+dependencies = ["plain<1.0.0", "plain-email<1.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

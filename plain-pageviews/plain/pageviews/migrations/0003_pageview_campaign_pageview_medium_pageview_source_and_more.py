@@ -2,8 +2,9 @@
 
 from typing import Any
 
-from plain import models
 from plain.models import migrations
+
+from plain import models
 
 
 def extract_tracking_params_migration(url: str) -> tuple[str, str, str]:

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from plain import models
 from plain.models import types
 from plain.runtime import SettingsReference
+
+from plain import models
 
 __all__ = ["SupportFormEntry"]
 

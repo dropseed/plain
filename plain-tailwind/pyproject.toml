@@ -2,15 +2,11 @@
 name = "plain.tailwind"
 version = "0.20.3"
 description = "Integrate Tailwind CSS without JavaScript or npm."
-authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-    "plain<1.0.0",
-    "requests>=2.0.0",
-    "tomlkit>=0.12.1",
-]
+dependencies = ["plain<1.0.0", "requests>=2.0.0", "tomlkit>=0.12.1"]
 
 [project.scripts]
 # Make this directly available without loading Plain,

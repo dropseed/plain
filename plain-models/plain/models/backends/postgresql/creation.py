@@ -3,10 +3,9 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from psycopg import errors
-
 from plain.exceptions import ImproperlyConfigured
 from plain.models.backends.base.creation import BaseDatabaseCreation
+from psycopg import errors
 
 
 class DatabaseCreation(BaseDatabaseCreation):

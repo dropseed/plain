@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import datetime
 
-from plain import models
 from plain.models import types
 from plain.passwords.types import PasswordField
+
+from plain import models
 
 
 @models.register_model

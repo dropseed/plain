@@ -1,5 +1,4 @@
 import requests
-
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 
 

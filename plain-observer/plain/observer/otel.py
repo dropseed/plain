@@ -20,7 +20,6 @@ from opentelemetry.trace import (
     format_trace_id,
 )
 from opentelemetry.util.types import Attributes
-
 from plain.logs import app_logger
 from plain.models.otel import suppress_db_tracing
 from plain.runtime import settings

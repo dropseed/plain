@@ -4,7 +4,6 @@ import datetime
 from typing import TYPE_CHECKING, Any
 
 import requests
-
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.utils import timezone
 

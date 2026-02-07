@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain import models
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import Response, ResponseBase
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.views import DetailView, ListView
+
+from plain import models
 
 from .core import Observer
 from .models import Trace

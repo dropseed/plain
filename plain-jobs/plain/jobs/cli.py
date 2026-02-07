@@ -6,7 +6,6 @@ import signal
 from typing import Any
 
 import click
-
 from plain.cli import register_cli
 from plain.runtime import settings
 from plain.utils import timezone

@@ -6,11 +6,12 @@ from io import IOBase
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
-from plain import signals
 from plain.http import FileResponse, QueryDict, Request, parse_cookie
 from plain.internal.handlers import base
 from plain.utils.http import parse_header_parameters
 from plain.utils.regex_helper import _lazy_re_compile
+
+from plain import signals
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable

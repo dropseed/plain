@@ -1,5 +1,4 @@
 import pytest
-
 from plain.sessions import SessionNotAvailable, get_request_session
 from plain.sessions.core import SessionStore
 from plain.sessions.models import Session

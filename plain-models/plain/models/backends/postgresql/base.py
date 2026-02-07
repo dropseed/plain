@@ -9,6 +9,11 @@ from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, Any
 
 import psycopg as Database
+from plain.exceptions import ImproperlyConfigured
+from plain.models.backends.base.base import BaseDatabaseWrapper
+from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
+from plain.models.db import DatabaseError as WrappedDatabaseError
+from plain.models.db import db_connection
 from psycopg import IsolationLevel, adapt, adapters, sql
 from psycopg.abc import Buffer, PyFormat
 from psycopg.postgres import types as pg_types
@@ -16,12 +21,6 @@ from psycopg.pq import Format
 from psycopg.types.datetime import TimestamptzLoader
 from psycopg.types.range import BaseRangeDumper, Range, RangeDumper
 from psycopg.types.string import TextLoader
-
-from plain.exceptions import ImproperlyConfigured
-from plain.models.backends.base.base import BaseDatabaseWrapper
-from plain.models.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
-from plain.models.db import DatabaseError as WrappedDatabaseError
-from plain.models.db import db_connection
 
 # Type checkers always see the proper type; runtime falls back to Any if needed
 if TYPE_CHECKING:

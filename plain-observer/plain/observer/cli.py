@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 import click
-
 from plain.cli import register_cli
 from plain.observer.models import Span, Trace
 

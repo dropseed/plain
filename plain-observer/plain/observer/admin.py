@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from plain import models
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
     AdminViewset,
     register_viewset,
 )
+
+from plain import models
 
 from .models import Log, Span, Trace
 

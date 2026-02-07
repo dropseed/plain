@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from plain import forms
 from plain.auth import get_user_model
 from plain.email import TemplateEmail
+
+from plain import forms
 
 from .links import generate_link_url
 

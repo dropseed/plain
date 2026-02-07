@@ -17,13 +17,14 @@ from io import BytesIO
 from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import urlsplit, urlunsplit
 
-from plain import validators as validators_
 from plain.exceptions import ValidationError
 from plain.utils import timezone
 from plain.utils.dateparse import parse_datetime, parse_duration
 from plain.utils.duration import duration_string
 from plain.utils.regex_helper import _lazy_re_compile
 from plain.utils.text import pluralize_lazy
+
+from plain import validators as validators_
 
 from .boundfield import BoundField
 from .exceptions import FormFieldMissingError

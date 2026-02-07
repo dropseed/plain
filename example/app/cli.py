@@ -1,7 +1,6 @@
 import sys
 
 import click
-
 from plain.cli import register_cli
 
 from .users.models import User

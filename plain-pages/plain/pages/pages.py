@@ -5,7 +5,6 @@ from functools import cached_property
 from typing import Any
 
 import frontmatter
-
 from plain.runtime import settings
 from plain.templates import Template
 from plain.urls import URLPattern, path, reverse

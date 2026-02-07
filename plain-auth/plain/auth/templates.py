@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from jinja2 import pass_context
-
 from plain.sessions.exceptions import SessionNotAvailable
 from plain.templates import register_template_global
 

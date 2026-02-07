@@ -9,12 +9,11 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
+from plain.cli.print import print_event
+from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 from rich.columns import Columns
 from rich.console import Console
 from rich.text import Text
-
-from plain.cli.print import print_event
-from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .mkcert import MkcertManager
 from .process import ProcessManager

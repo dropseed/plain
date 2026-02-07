@@ -2,7 +2,6 @@
 
 import pytest
 from app.examples.models import Car, DeleteParent
-
 from plain.models.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 
 

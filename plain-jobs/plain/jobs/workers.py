@@ -9,12 +9,13 @@ from concurrent.futures import Future, ProcessPoolExecutor
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from plain import models
 from plain.models import transaction
 from plain.runtime import settings
 from plain.signals import request_finished, request_started
 from plain.utils import timezone
 from plain.utils.module_loading import import_string
+
+from plain import models
 
 from .registry import jobs_registry
 

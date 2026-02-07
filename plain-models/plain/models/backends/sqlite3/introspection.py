@@ -6,7 +6,6 @@ from typing import Any, NamedTuple
 import sqlparse
 import sqlparse.sql
 import sqlparse.tokens
-
 from plain.models import Index
 from plain.models.backends.base.introspection import (
     BaseDatabaseIntrospection,

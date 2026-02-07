@@ -6,7 +6,6 @@ import time
 from typing import TYPE_CHECKING, Any, cast
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.runtime import common_command
 from plain.packages import packages_registry

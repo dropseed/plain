@@ -1,8 +1,9 @@
 # Step 2: Rename constraints and indexes from plainworker_* to plainjobs_*
 # (Tables were renamed to plainjobs_* in migration 0004)
 
-from plain import models
 from plain.models import migrations
+
+from plain import models
 
 
 class Migration(migrations.Migration):

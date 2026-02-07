@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Self
 
-from plain import models
 from plain.models import types
 from plain.utils import timezone
+
+from plain import models
 
 __all__ = ["CachedItem", "CachedItemQuerySet"]
 

@@ -6,7 +6,6 @@ from contextlib import contextmanager
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any, cast
 
-from plain import models
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.fields import NOT_PROVIDED
 from plain.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT, RelatedField
@@ -15,6 +14,8 @@ from plain.models.migrations.utils import field_is_referenced, get_references
 from plain.models.registry import ModelsRegistry
 from plain.models.registry import models_registry as global_models
 from plain.packages import packages_registry
+
+from plain import models
 
 from .exceptions import InvalidBasesError
 from .utils import resolve_relation

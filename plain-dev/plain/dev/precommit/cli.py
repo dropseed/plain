@@ -6,7 +6,6 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.print import print_event
 from plain.cli.runtime import without_runtime_setup

@@ -11,7 +11,6 @@ from opentelemetry.semconv.attributes.db_attributes import (
     DB_SYSTEM_NAME,
 )
 from opentelemetry.trace import SpanKind
-
 from plain.models import IntegrityError
 from plain.utils import timezone
 

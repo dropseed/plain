@@ -8,13 +8,12 @@ from pathlib import Path
 from typing import Any
 
 import click
-
 from plain.cli import register_cli
 from plain.cli.print import print_event
 from plain.cli.runtime import common_command, without_runtime_setup
 
 from .annotations import AnnotationResult, check_annotations
-from .biome import Biome
+from .oxc import OxcTool, install_oxc
 
 DEFAULT_RUFF_CONFIG = Path(__file__).parent / "ruff_defaults.toml"
 
@@ -32,45 +31,44 @@ def cli() -> None:
 @click.option("--force", is_flag=True, help="Reinstall even if up to date")
 @click.pass_context
 def install(ctx: click.Context, force: bool) -> None:
-    """Install or update Biome binary"""
+    """Install or update oxlint and oxfmt binaries"""
     config = get_code_config()
 
-    if not config.get("biome", {}).get("enabled", True):
-        click.secho("Biome is disabled in configuration", fg="yellow")
+    if not config.get("oxc", {}).get("enabled", True):
+        click.secho("Oxc is disabled in configuration", fg="yellow")
         return
 
-    biome = Biome()
+    oxlint = OxcTool("oxlint")
 
-    if force or not biome.is_installed() or biome.needs_update():
-        version_to_install = config.get("biome", {}).get("version", "")
+    if force or not oxlint.is_installed() or oxlint.needs_update():
+        version_to_install = config.get("oxc", {}).get("version", "")
         if version_to_install:
             click.secho(
-                f"Installing Biome standalone version {version_to_install}...",
+                f"Installing oxlint and oxfmt {version_to_install}...",
                 bold=True,
                 nl=False,
             )
-            installed = biome.install(version_to_install)
-            click.secho(f"Biome {installed} installed", fg="green")
+            installed = install_oxc(version_to_install)
+            click.secho(f"oxlint and oxfmt {installed} installed", fg="green")
         else:
             ctx.invoke(update)
     else:
-        click.secho("Biome already installed", fg="green")
+        click.secho("oxlint and oxfmt already installed", fg="green")
 
 
 @without_runtime_setup
 @cli.command()
 def update() -> None:
-    """Update Biome to latest version"""
+    """Update oxlint and oxfmt to latest version"""
     config = get_code_config()
 
-    if not config.get("biome", {}).get("enabled", True):
-        click.secho("Biome is disabled in configuration", fg="yellow")
+    if not config.get("oxc", {}).get("enabled", True):
+        click.secho("Oxc is disabled in configuration", fg="yellow")
         return
 
-    biome = Biome()
-    click.secho("Updating Biome standalone...", bold=True)
-    version = biome.install()
-    click.secho(f"Biome {version} installed", fg="green")
+    click.secho("Updating oxlint and oxfmt...", bold=True)
+    version = install_oxc()
+    click.secho(f"oxlint and oxfmt {version} installed", fg="green")
 
 
 @without_runtime_setup
@@ -79,14 +77,14 @@ def update() -> None:
 @click.argument("path", default=".")
 @click.option("--skip-ruff", is_flag=True, help="Skip Ruff checks")
 @click.option("--skip-ty", is_flag=True, help="Skip ty type checks")
-@click.option("--skip-biome", is_flag=True, help="Skip Biome checks")
+@click.option("--skip-oxc", is_flag=True, help="Skip oxlint and oxfmt checks")
 @click.option("--skip-annotations", is_flag=True, help="Skip type annotation checks")
 def check(
     ctx: click.Context,
     path: str,
     skip_ruff: bool,
     skip_ty: bool,
-    skip_biome: bool,
+    skip_oxc: bool,
     skip_annotations: bool,
 ) -> None:
     """Check for formatting and linting issues"""
@@ -122,14 +120,19 @@ def check(
         result = subprocess.run(ty_args)
         maybe_exit(result.returncode)
 
-    if not skip_biome and config.get("biome", {}).get("enabled", True):
-        biome = Biome()
+    if not skip_oxc and config.get("oxc", {}).get("enabled", True):
+        oxlint = OxcTool("oxlint")
+        oxfmt = OxcTool("oxfmt")
 
-        if biome.needs_update():
+        if oxlint.needs_update():
             ctx.invoke(install)
 
-        print_event("biome check...", newline=False)
-        result = biome.invoke("check", path)
+        print_event("oxlint...", newline=False)
+        result = oxlint.invoke(path)
+        maybe_exit(result.returncode)
+
+        print_event("oxfmt --check...", newline=False)
+        result = oxfmt.invoke("--check", path)
         maybe_exit(result.returncode)
 
     if not skip_annotations and config.get("annotations", {}).get("enabled", True):
@@ -276,21 +279,25 @@ def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> No
     if result.returncode != 0:
         sys.exit(result.returncode)
 
-    if config.get("biome", {}).get("enabled", True):
-        biome = Biome()
+    if config.get("oxc", {}).get("enabled", True):
+        oxlint = OxcTool("oxlint")
+        oxfmt = OxcTool("oxfmt")
 
-        if biome.needs_update():
+        if oxlint.needs_update():
             ctx.invoke(install)
 
-        args = ["check", path, "--write"]
-
         if unsafe_fixes:
-            args.append("--unsafe")
-            print_event("biome check --write --unsafe...", newline=False)
+            print_event("oxlint --fix-dangerously...", newline=False)
+            result = oxlint.invoke(path, "--fix-dangerously")
         else:
-            print_event("biome check --write...", newline=False)
+            print_event("oxlint --fix...", newline=False)
+            result = oxlint.invoke(path, "--fix")
 
-        result = biome.invoke(*args)
+        if result.returncode != 0:
+            sys.exit(result.returncode)
+
+        print_event("oxfmt...", newline=False)
+        result = oxfmt.invoke(path)
 
         if result.returncode != 0:
             sys.exit(result.returncode)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from plain import models
 from plain.admin.cards import Card
 from plain.admin.views import (
     AdminModelDetailView,
@@ -13,6 +12,8 @@ from plain.admin.views import (
 from plain.http import RedirectResponse
 from plain.models.expressions import Case, When
 from plain.runtime import settings
+
+from plain import models
 
 from .models import JobProcess, JobRequest, JobResult, JobResultQuerySet
 

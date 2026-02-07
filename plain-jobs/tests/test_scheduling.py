@@ -1,7 +1,6 @@
 import datetime
 
 import pytest
-
 from plain.jobs.scheduling import Schedule
 
 

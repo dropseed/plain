@@ -1,10 +1,9 @@
 import os
 
 import click
-from watchfiles import Change, DefaultFilter, watch
-
 from plain.assets.finders import _iter_asset_dirs, _iter_assets
 from plain.cli import register_cli
+from watchfiles import Change, DefaultFilter, watch
 
 from .core import esbuild, get_esbuilt_path
 

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 import sqlparse
 from MySQLdb.constants import FIELD_TYPE
-
 from plain.models.backends.base.introspection import (
     BaseDatabaseIntrospection,
 )

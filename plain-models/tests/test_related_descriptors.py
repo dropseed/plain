@@ -4,7 +4,6 @@ from app.examples.models import (
     ChildSetNull,
     DeleteParent,
 )
-
 from plain.models import QuerySet
 
 

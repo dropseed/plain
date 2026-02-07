@@ -4,10 +4,11 @@ import os
 from collections.abc import Generator
 from typing import Any
 
-import pytest
 from plain.runtime import settings as plain_settings
 from plain.runtime import setup
 from plain.utils.dotenv import load_dotenv
+
+import pytest
 
 from .browser import TestBrowser
 

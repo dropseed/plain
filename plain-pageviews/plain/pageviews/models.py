@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain import models
 from plain.models import types
 from plain.runtime import settings
 from plain.utils import timezone
+
+from plain import models
 
 from .params import extract_tracking_params
 

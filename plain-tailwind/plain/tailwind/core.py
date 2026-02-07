@@ -10,10 +10,9 @@ from typing import Any
 import click
 import requests
 import tomlkit
-from requests.adapters import HTTPAdapter
-
 from plain.packages import packages_registry
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH, settings
+from requests.adapters import HTTPAdapter
 
 
 class Tailwind:

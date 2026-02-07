@@ -4,7 +4,6 @@ import copy
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any, Self, cast
 
-from plain import exceptions
 from plain.models.constants import LOOKUP_SEP
 from plain.models.deletion import SET_DEFAULT, SET_NULL
 from plain.models.exceptions import FieldDoesNotExist, FieldError
@@ -12,6 +11,8 @@ from plain.models.query_utils import PathInfo, Q
 from plain.models.utils import make_model_tuple
 from plain.preflight import PreflightResult
 from plain.runtime import SettingsReference
+
+from plain import exceptions
 
 from ..registry import models_registry
 from . import DbParameters, Field

@@ -1,5 +1,4 @@
 import click
-
 from plain.cli import register_cli
 
 from .models import CachedItem

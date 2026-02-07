@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plain import models
 from plain.models import types
+
+from plain import models
 
 if TYPE_CHECKING:
     from plain.oauth.models import OAuthConnection
