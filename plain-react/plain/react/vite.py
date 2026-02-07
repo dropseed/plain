@@ -59,7 +59,8 @@ def run_vite_build() -> None:
         print("npx not found. Install Node.js to build React assets.")
         return
 
-    print("Building React assets...")
+    # Client build (the main app bundle)
+    print("Building React client assets...")
     result = subprocess.run(
         ["npx", "vite", "build"],
         cwd=root,
@@ -67,17 +68,34 @@ def run_vite_build() -> None:
     )
 
     if result.returncode != 0:
-        print("Vite build failed!")
+        print("Vite client build failed!")
         exit(result.returncode)
 
-    # Copy the built manifest so we can resolve asset paths
-    manifest_path = os.path.join(
-        root, "app", "assets", "react", ".vite", "manifest.json"
-    )
-    if os.path.exists(manifest_path):
-        print(f"Build manifest: {manifest_path}")
+    print("React client build complete.")
 
-    print("React build complete.")
+    # SSR build (optional — only if ssr.jsx exists)
+    ssr_entry = os.path.join(root, "app", "react", "ssr.jsx")
+    if os.path.exists(ssr_entry):
+        print("Building SSR bundle...")
+        result = subprocess.run(
+            [
+                "npx",
+                "vite",
+                "build",
+                "--ssr",
+                "app/react/ssr.jsx",
+                "--outDir",
+                "app/assets/react",
+            ],
+            cwd=root,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            print("SSR build failed!")
+            exit(result.returncode)
+
+        print("SSR build complete.")
 
 
 def create_vite_config(root: str) -> None:
@@ -138,7 +156,7 @@ def create_react_entrypoint(root: str) -> None:
     pages_dir = os.path.join(react_dir, "pages")
     os.makedirs(pages_dir, exist_ok=True)
 
-    # Main entry point
+    # Main entry point (client-side)
     main_jsx = """\
 import { createPlainApp } from "./plain-react";
 
@@ -174,3 +192,37 @@ export default function Index({ greeting }) {
     with open(index_path, "w") as f:
         f.write(index_jsx)
     print(f"Created {os.path.relpath(index_path)}")
+
+
+def create_ssr_entrypoint(root: str) -> None:
+    """Create the SSR entry point that V8 will execute."""
+    react_dir = os.path.join(root, "app", "react")
+    os.makedirs(react_dir, exist_ok=True)
+
+    ssr_jsx = """\
+import React from "react";
+import { renderToString } from "react-dom/server";
+
+// Import all page components eagerly for SSR
+const pages = import.meta.glob("./pages/**/*.jsx", { eager: true });
+
+/**
+ * Server-side render function called by Plain's embedded V8 engine.
+ *
+ * @param {string} componentName - The component name (e.g., "Users/Index")
+ * @param {object} props - The props to pass to the component
+ * @returns {string} The rendered HTML string
+ */
+globalThis.__plainReactSSR = function (componentName, props) {
+  const pageModule = pages[`./pages/${componentName}.jsx`];
+  if (!pageModule) {
+    throw new Error(`SSR: Page component "${componentName}" not found.`);
+  }
+  const Component = pageModule.default || pageModule;
+  return renderToString(React.createElement(Component, props));
+};
+"""
+    ssr_path = os.path.join(react_dir, "ssr.jsx")
+    with open(ssr_path, "w") as f:
+        f.write(ssr_jsx)
+    print(f"Created {os.path.relpath(ssr_path)}")

@@ -13,7 +13,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, hydrateRoot } from "react-dom/client";
 
 // ============================================================================
 // Page Context
@@ -492,7 +492,13 @@ export function createPlainApp({ resolve, rootId = "app", setup } = {}) {
 
   if (setup) {
     setup({ el, app });
+  } else if (el.innerHTML.trim()) {
+    // SSR content present — hydrate instead of full render.
+    // This attaches event handlers to the server-rendered HTML
+    // without re-rendering (faster initial interactivity).
+    hydrateRoot(el, app);
   } else {
+    // No SSR content — do a full client-side render.
     createRoot(el).render(app);
   }
 }
