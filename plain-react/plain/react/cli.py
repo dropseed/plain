@@ -11,6 +11,7 @@ from plain.cli import register_cli
 from .vite import (
     create_package_json,
     create_react_entrypoint,
+    create_ssr_entrypoint,
     create_vite_config,
     get_package_json_path,
     get_react_root,
@@ -25,7 +26,8 @@ def cli() -> None:
 
 
 @cli.command()
-def init() -> None:
+@click.option("--ssr", is_flag=True, help="Include SSR support (requires mini-racer)")
+def init(ssr: bool) -> None:
     """Initialize a Plain React project with Vite, React, and example files."""
     root = get_react_root()
 
@@ -44,7 +46,6 @@ def init() -> None:
     # Create React entry point and example page
     react_dir = os.path.join(root, "app", "react")
     if not os.path.exists(react_dir):
-        # Copy the client runtime into the project
         create_react_entrypoint(root)
 
         # Copy the plain-react client library
@@ -56,6 +57,14 @@ def init() -> None:
         click.secho(f"Created {os.path.relpath(client_dst)}", fg="green")
     else:
         click.secho("app/react/ already exists, skipping.", fg="yellow")
+
+    # Create SSR entry point if requested
+    if ssr:
+        ssr_path = os.path.join(root, "app", "react", "ssr.jsx")
+        if not os.path.exists(ssr_path):
+            create_ssr_entrypoint(root)
+        else:
+            click.secho("app/react/ssr.jsx already exists, skipping.", fg="yellow")
 
     # Install npm dependencies
     if shutil.which("npm"):
@@ -81,11 +90,17 @@ def init() -> None:
     click.echo()
     click.echo("     class IndexView(ReactView):")
     click.echo('         component = "Index"')
+    if ssr:
+        click.echo("         ssr = True")
     click.echo()
     click.echo("         def get_props(self):")
     click.echo('             return {"greeting": "Hello from Plain!"}')
     click.echo()
     click.echo("  4. Run 'plain dev' to start developing")
+    if ssr:
+        click.echo()
+        click.echo("  SSR: Install mini-racer for server-side rendering:")
+        click.echo("    uv add mini-racer")
 
 
 @cli.command()
