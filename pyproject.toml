@@ -28,6 +28,7 @@ dev = [
   "plain-pageviews",
   "plain-passwords",
   "plain-pytest",
+  "plain-react",
   "plain-redirection",
   "plain-scan",
   "plain-sessions",
@@ -65,6 +66,7 @@ dev = [
 "plain-pageviews" = { workspace = true }
 "plain-passwords" = { workspace = true }
 "plain-pytest" = { workspace = true }
+"plain-react" = { workspace = true }
 "plain-redirection" = { workspace = true }
 "plain-scan" = { workspace = true }
 "plain-sessions" = { workspace = true }

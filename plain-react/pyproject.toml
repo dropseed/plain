@@ -1,0 +1,24 @@
+[project]
+name = "plain.react"
+version = "0.1.0"
+description = "React integration for Plain views."
+authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+license = "BSD-3-Clause"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "plain<1.0.0",
+]
+
+[project.entry-points."plain.dev"]
+"react" = "plain.react.entrypoints:run_dev"
+
+[project.entry-points."plain.build"]
+"react" = "plain.react.entrypoints:run_build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

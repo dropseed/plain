@@ -28,6 +28,7 @@ members = [
     "plain-portal",
     "plain-postgres",
     "plain-pytest",
+    "plain-react",
     "plain-redirection",
     "plain-scan",
     "plain-sessions",
@@ -1030,6 +1031,17 @@ requires-dist = [
 ]
 
 [[package]]
+name = "plain-react"
+version = "0.1.0"
+source = { editable = "plain-react" }
+dependencies = [
+    { name = "plain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "plain", editable = "plain" }]
+
+[[package]]
 name = "plain-redirection"
 version = "0.35.1"
 source = { editable = "plain-redirection" }
@@ -1214,6 +1226,7 @@ dev = [
     { name = "plain-portal" },
     { name = "plain-postgres" },
     { name = "plain-pytest" },
+    { name = "plain-react" },
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
@@ -1253,6 +1266,7 @@ dev = [
     { name = "plain-portal", editable = "plain-portal" },
     { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-react", editable = "plain-react" },
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
