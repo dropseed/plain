@@ -26,6 +26,7 @@ members = [
     "plain-pageviews",
     "plain-passwords",
     "plain-pytest",
+    "plain-react",
     "plain-redirection",
     "plain-scan",
     "plain-sessions",
@@ -820,6 +821,17 @@ requires-dist = [
 ]
 
 [[package]]
+name = "plain-react"
+version = "0.1.0"
+source = { editable = "plain-react" }
+dependencies = [
+    { name = "plain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "plain", editable = "plain" }]
+
+[[package]]
 name = "plain-redirection"
 version = "0.31.2"
 source = { editable = "plain-redirection" }
@@ -1001,6 +1013,7 @@ dev = [
     { name = "plain-pageviews" },
     { name = "plain-passwords" },
     { name = "plain-pytest" },
+    { name = "plain-react" },
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
@@ -1039,6 +1052,7 @@ dev = [
     { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-react", editable = "plain-react" },
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },

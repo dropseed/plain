@@ -33,6 +33,7 @@ dev = [
     "plain-tailwind",
     "plain-toolbar",
     "plain-tunnel",
+    "plain-react",
     "plain-vendor",
     # Type checking and better dev experience
     "ty>=0.0.11",
@@ -69,6 +70,7 @@ dev = [
 "plain-tailwind" = { workspace = true }
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }
+"plain-react" = { workspace = true }
 "plain-vendor" = { workspace = true }
 "plainx-dev" = { workspace = true }
 
