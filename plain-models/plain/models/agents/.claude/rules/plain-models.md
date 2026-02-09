@@ -1,5 +1,18 @@
 # Database & Models
 
+## Schema Changes
+
+When creating new models or modifying existing model fields/relationships, always enter plan mode first. Database schema is hard to change after the fact, so get the design right before writing code.
+
+In your plan, present:
+
+- Proposed schema as a table (model, field, type, constraints)
+- Relationship cardinality (1:1, 1:N, M:N)
+- Key decisions: nullable vs default, indexing, cascade behavior
+- Whether the data could live on an existing model instead of a new one
+
+Get approval before writing any model code or generating migrations.
+
 ## Creating Migrations
 
 ```
