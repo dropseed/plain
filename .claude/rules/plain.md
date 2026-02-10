@@ -89,7 +89,7 @@ uv run plain run script.py
 
 ## HTTP Requests
 
-Use `uv run plain request` to make test HTTP requests against the dev database.
+Use `uv run plain request` to make test HTTP requests against the dev database. Exits non-zero on server errors (5xx) and assertion failures.
 
 ```
 uv run plain request /path
@@ -99,3 +99,13 @@ uv run plain request /path --method POST --data '{"key": "value"}'
 uv run plain request /path --no-body    # Headers only
 uv run plain request /path --no-headers # Body only
 ```
+
+Assertions (exit 1 on failure, full response is always displayed first):
+
+```
+uv run plain request /path --status 200          # Assert status code
+uv run plain request /path --contains "success"  # Assert body contains text
+uv run plain request /path --not-contains "error" # Assert body does not contain text
+```
+
+`--contains` and `--not-contains` can be repeated. `--status` overrides the default 5xx check (e.g. `--status 500` won't fail on a 500).
