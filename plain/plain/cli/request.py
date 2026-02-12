@@ -174,7 +174,7 @@ def request(
         click.echo(f"  Request ID: {response.wsgi_request.unique_id}")
 
         # User
-        if response.user:
+        if getattr(response, "user", None):
             click.echo(f"  Authenticated user: {response.user}")
 
         # URL pattern
