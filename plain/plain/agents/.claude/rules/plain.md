@@ -71,6 +71,17 @@ Examples:
 - **plain-tunnel** — Remote access to local dev server
 - **plain-vendor** — Vendor CDN scripts and styles
 
+## Checks
+
+`uv run plain check` runs core validation checks: code linting, preflight, migration state, and tests. Stops on first failure.
+
+```
+uv run plain check              # Run all checks
+uv run plain check --skip-test  # Skip tests (faster iteration)
+```
+
+`uv run plain pre-commit` wraps `plain check` with additional commit-specific steps (custom commands, uv lock, build).
+
 ## Shell
 
 `uv run plain shell` opens an interactive Python shell with Plain configured and database access.

@@ -12,6 +12,7 @@ from plain.exceptions import ImproperlyConfigured
 from .agent import agent
 from .build import build
 from .changelog import changelog
+from .check import check
 from .chores import chores
 from .docs import docs
 from .formatting import PlainContext
@@ -33,6 +34,7 @@ def plain_cli() -> None:
     pass
 
 
+plain_cli.add_command(check)
 plain_cli.add_command(docs)
 plain_cli.add_command(request)
 plain_cli.add_command(agent)

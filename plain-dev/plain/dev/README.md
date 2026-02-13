@@ -94,14 +94,16 @@ A built-in pre-commit hook that you can install with `plain pre-commit --install
 
 Runs:
 
-- Custom commands defined in `pyproject.toml` at `tool.plain.pre-commit.run`
-- `plain code check`, if [`plain.code`](../../plain-code/plain/code/README.md) is installed
-- `uv lock --locked`, if using uv
-- `plain preflight`
-- `plain migrate --check`
-- `plain makemigrations --dry-run --check`
+- `uv lock --check`, if using uv
+- `plain check` (custom commands, code linting, preflight, migrations, tests)
 - `plain build`
-- `plain test`
+
+Custom commands can be defined in `pyproject.toml` at `tool.plain.check.run` and will run as part of `plain check`:
+
+```toml
+[tool.plain.check.run]
+my-check = {cmd = "echo 'running my check'"}
+```
 
 ## Settings
 
