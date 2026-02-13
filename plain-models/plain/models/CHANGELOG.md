@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.77.1](https://github.com/dropseed/plain/releases/plain-models@0.77.1) (2026-02-13)
+
+### What's changed
+
+- Added migration development workflow documentation covering how to consolidate uncommitted and committed migrations ([0b30f98b5346](https://github.com/dropseed/plain/commit/0b30f98b5346))
+- Added migration cleanup guidance to agent rules: consolidate before committing, use squash only for deployed migrations ([0b30f98b5346](https://github.com/dropseed/plain/commit/0b30f98b5346))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.77.0](https://github.com/dropseed/plain/releases/plain-models@0.77.0) (2026-02-13)
 
 ### What's changed
