@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 
 import click
@@ -69,11 +70,51 @@ def _online_docs_url(pip_name: str) -> str:
     return f"https://plainframework.com/docs/{pip_name}/{module.replace('.', '/')}/"
 
 
+def _slugify(text: str) -> str:
+    """Convert heading text to a URL-style slug."""
+    text = text.lower().strip()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"\s+", "-", text)
+    return text
+
+
+def _extract_section(content: str, target_slug: str) -> str | None:
+    """Extract a ## section from markdown content by its slugified heading."""
+    lines = content.split("\n")
+    capturing = False
+    captured: list[str] = []
+
+    for line in lines:
+        if line.startswith("## "):
+            if capturing:
+                break
+            if _slugify(line[3:].strip()) == target_slug:
+                capturing = True
+                captured.append(line)
+        elif capturing:
+            captured.append(line)
+
+    if captured:
+        return "\n".join(captured).rstrip()
+
+    return None
+
+
+def _get_section_slugs(content: str) -> list[str]:
+    """Get slugified names of all ## sections in markdown content."""
+    return [
+        _slugify(line[3:].strip())
+        for line in content.split("\n")
+        if line.startswith("## ")
+    ]
+
+
 @click.command()
 @click.option("--api", is_flag=True, help="Show public API surface only")
 @click.option("--list", "show_list", is_flag=True, help="List available packages")
+@click.option("--section", default="", help="Show only a specific ## section by name")
 @click.argument("module", default="")
-def docs(module: str, api: bool, show_list: bool) -> None:
+def docs(module: str, api: bool, show_list: bool, section: str) -> None:
     """Show documentation for a package"""
     if show_list:
         for pip_name in sorted(KNOWN_PACKAGES):
@@ -108,6 +149,23 @@ def docs(module: str, api: bool, show_list: bool) -> None:
 
     llm_docs = LLMDocs([module_path])
     llm_docs.load()
+
+    if section:
+        target_slug = _slugify(section)
+        available: list[str] = []
+        for doc in llm_docs.docs:
+            content = doc.read_text()
+            section_content = _extract_section(content, target_slug)
+            if section_content is not None:
+                click.echo(section_content)
+                return
+            available.extend(_get_section_slugs(content))
+
+        raise click.UsageError(
+            f"No section matching '{section}'."
+            + (f" Available: {', '.join(available)}" if available else "")
+        )
+
     llm_docs.print(
         relative_to=module_path.parent,
         include_docs=not api,
