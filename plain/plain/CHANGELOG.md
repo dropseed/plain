@@ -1,5 +1,20 @@
 # plain changelog
 
+## [0.106.1](https://github.com/dropseed/plain/releases/plain@0.106.1) (2026-02-13)
+
+### What's changed
+
+- Added `--section` flag to `plain docs` for loading a specific `##` section by name (e.g., `plain docs models --section querying`) ([f2ce0243e6ea](https://github.com/dropseed/plain/commit/f2ce0243e6ea))
+- Simplified `plain docs` output by removing XML-style wrapper tags around documentation content ([f2ce0243e6ea](https://github.com/dropseed/plain/commit/f2ce0243e6ea))
+- Added `/plain-bug` skill for submitting bug reports to plainframework.com ([a9efc4383233](https://github.com/dropseed/plain/commit/a9efc4383233))
+- Slimmed agent rules to concise bullet-point reminders and moved detailed code examples into README docs ([f5d2731ebda0](https://github.com/dropseed/plain/commit/f5d2731ebda0))
+- Added Forms section to templates README and View patterns section to views README ([8c2189a896d2](https://github.com/dropseed/plain/commit/8c2189a896d2))
+- Fixed agents exclusion in LLM docs to only exclude `.claude/` content, allowing `agents/README.md` to appear in docs output ([f2ce0243e6ea](https://github.com/dropseed/plain/commit/f2ce0243e6ea))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.106.0](https://github.com/dropseed/plain/releases/plain@0.106.0) (2026-02-12)
 
 ### What's changed
