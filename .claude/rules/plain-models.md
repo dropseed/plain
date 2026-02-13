@@ -29,7 +29,7 @@ Only write migrations by hand for custom data migrations. Run `uv run plain docs
 
 ## Querying
 
-Use `Model.query` not `Model.objects` (e.g., `User.query.filter(is_active=True)`).
+Use `Model.query` to build querysets (e.g., `User.query.filter(is_active=True)`).
 
 - Use `select_related()` for FK access in loops, `prefetch_related()` for reverse/M2N
 - Use `.annotate(Count(...))` instead of calling `.count()` per row

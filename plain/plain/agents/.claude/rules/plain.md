@@ -27,187 +27,30 @@ When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
 ## Documentation
 
-Run `uv run plain docs --list` to see all official packages (installed and uninstalled) with descriptions.
-Run `uv run plain docs <package>` for markdown documentation (installed packages only).
-Run `uv run plain docs <package> --api` for the symbolicated API surface.
-For uninstalled packages, the CLI shows the install command and an online docs URL.
+- `uv run plain docs <package>` — markdown docs for an installed package
+- `uv run plain docs <package> --api` — symbolicated API surface
+- `uv run plain docs <package> --section <name>` — show a specific `##` section
+- `uv run plain docs --list` — all official packages (installed and uninstalled) with descriptions
 
 Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/path>/README.md`
-Example: `https://plainframework.com/docs/plain-models/plain/models/README.md`
 
-Examples:
+## CLI Quick Reference
 
-- `uv run plain docs models` - Models and database docs
-- `uv run plain docs models --api` - Models API surface
-- `uv run plain docs templates` - Jinja2 templates
-- `uv run plain docs assets` - Static assets
+- `uv run plain check` — run linting, preflight, migration, and test checks (add `--skip-test` for faster iteration)
+- `uv run plain pre-commit` — `check` plus commit-specific steps (custom commands, uv lock, build)
+- `uv run plain shell` — interactive Python shell with Plain configured (`-c "..."` for one-off commands)
+- `uv run plain run script.py` — run a script with Plain configured
+- `uv run plain request /path` — test HTTP request against dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`)
 
-### All official packages
+## Views
 
-- **plain** — Web framework core
-- **plain-admin** — Backend admin interface
-- **plain-api** — Class-based API views
-- **plain-auth** — User authentication and authorization
-- **plain-cache** — Database-backed cache with optional expiration
-- **plain-code** — Preconfigured code formatting and linting
-- **plain-dev** — Local development server with auto-reload
-- **plain-elements** — HTML template components
-- **plain-email** — Send email
-- **plain-esbuild** — Build JavaScript with esbuild
-- **plain-flags** — Feature flags via database models
-- **plain-htmx** — HTMX integration for templates and views
-- **plain-jobs** — Background jobs with a database-driven queue
-- **plain-loginlink** — Link-based authentication
-- **plain-models** — Model data and store it in a database
-- **plain-oauth** — OAuth provider login
-- **plain-observer** — On-page telemetry and observability
-- **plain-pages** — Serve static pages, markdown, and assets
-- **plain-pageviews** — Client-side pageview tracking
-- **plain-passwords** — Password authentication
-- **plain-pytest** — Test with pytest
-- **plain-redirection** — URL redirection with admin and logging
-- **plain-scan** — Test for production best practices
-- **plain-sessions** — Database-backed sessions
-- **plain-start** — Bootstrap a new project from templates
-- **plain-support** — Support forms for your application
-- **plain-tailwind** — Tailwind CSS without JavaScript or npm
-- **plain-toolbar** — Debug toolbar
-- **plain-tunnel** — Remote access to local dev server
-- **plain-vendor** — Vendor CDN scripts and styles
+- Don't evaluate querysets at class level — queries belong in view methods
+- Always paginate list views — unbounded queries get slower as data grows
+- Wrap multi-step writes in `transaction.atomic()`
 
-## Checks
+Run `uv run plain docs views --section "view-patterns"` for full patterns with code examples.
 
-`uv run plain check` runs core validation checks: code linting, preflight, migration state, and tests. Stops on first failure.
+## Security
 
-```
-uv run plain check              # Run all checks
-uv run plain check --skip-test  # Skip tests (faster iteration)
-```
-
-`uv run plain pre-commit` wraps `plain check` with additional commit-specific steps (custom commands, uv lock, build).
-
-## Shell
-
-`uv run plain shell` opens an interactive Python shell with Plain configured and database access.
-
-Run a one-off command:
-
-```
-uv run plain shell -c "from app.users.models import User; print(User.query.count())"
-```
-
-Run a script:
-
-```
-uv run plain run script.py
-```
-
-## HTTP Requests
-
-Use `uv run plain request` to make test HTTP requests against the dev database. Exits non-zero on server errors (5xx) and assertion failures.
-
-```
-uv run plain request /path
-uv run plain request /path --user 1
-uv run plain request /path --header "Accept: application/json"
-uv run plain request /path --method POST --data '{"key": "value"}'
-uv run plain request /path --no-body    # Headers only
-uv run plain request /path --no-headers # Body only
-```
-
-Assertions (exit 1 on failure, full response is always displayed first):
-
-```
-uv run plain request /path --status 200          # Assert status code
-uv run plain request /path --contains "success"  # Assert body contains text
-uv run plain request /path --not-contains "error" # Assert body does not contain text
-```
-
-`--contains` and `--not-contains` can be repeated. `--status` overrides the default 5xx check (e.g. `--status 500` won't fail on a 500).
-
-## Best Practices
-
-### HIGH — View Patterns
-
-### Don't evaluate querysets at class level
-
-Class attributes execute at import time, not per request. Queries belong in methods.
-
-```python
-# Bad — runs once at import, stale forever
-class DashboardView(View):
-    recent_users = User.query.order_by("-created_at")[:5]
-
-# Good — fresh per request
-class DashboardView(View):
-    def get_template_context(self):
-        return {"recent_users": User.query.order_by("-created_at")[:5]}
-```
-
-### Paginate list views
-
-Always paginate querysets in list views. Unbounded queries get slower as data grows.
-
-```python
-# Bad — returns every row
-def get_template_context(self):
-    return {"items": Item.query.all()}
-
-# Good — paginated
-from plain.paginator import Paginator
-
-def get_template_context(self):
-    paginator = Paginator(Item.query.all(), per_page=25)
-    page = paginator.get_page(self.request.query_params.get("page"))
-    return {"page": page}
-```
-
-### Wrap multi-step writes in transactions
-
-Use `transaction.atomic()` when creating or updating related objects together.
-
-```python
-# Bad — partial write if second save fails
-order = Order(user=user)
-order.save()
-payment = Payment(order=order, amount=total)
-payment.save()
-
-# Good — all or nothing
-from plain.models import transaction
-
-with transaction.atomic():
-    order = Order(user=user)
-    order.save()
-    payment = Payment(order=order, amount=total)
-    payment.save()
-```
-
-### MEDIUM — Security
-
-### Validate at form/model level, not just in views
-
-Don't rely on template-only or view-only checks for data integrity.
-
-```python
-# Bad — validation only in the view
-def post(self):
-    if not self.request.POST.get("email"):
-        ...
-
-# Good — form-level validation
-class SignupForm(forms.Form):
-    email = forms.EmailField()
-```
-
-### Never format raw SQL strings
-
-Always use parameterized queries to prevent SQL injection.
-
-```python
-# Bad — SQL injection risk
-User.query.raw(f"SELECT * FROM users WHERE email = '{email}'")
-
-# Good — parameterized
-User.query.raw("SELECT * FROM users WHERE email = %s", [email])
-```
+- Validate at form/model level, not just in views
+- Never format raw SQL strings — always use parameterized queries

@@ -14,8 +14,8 @@ def _is_excluded_path(path: Path, is_source: bool = False) -> bool:
     if "/migrations/" in path_str and "/plain/models/migrations/" not in path_str:
         return True
 
-    # Exclude agents directory
-    if "/agents/" in path_str:
+    # Exclude agents/.claude/ content (rules, skills shipped with packages)
+    if "/agents/.claude/" in path_str:
         return True
 
     if is_source:
@@ -258,10 +258,7 @@ class LLMDocs:
 
         if include_docs:
             for doc in self.docs:
-                display = get_display_path(doc)
-                click.secho(f"<Docs: {display}>", fg="yellow")
                 click.echo(doc.read_text())
-                click.secho(f"</Docs: {display}>", fg="yellow")
                 click.echo()
 
         if include_api:
