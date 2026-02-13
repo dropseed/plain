@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.66.2](https://github.com/dropseed/plain/releases/plain-admin@0.66.2) (2026-02-12)
+
+### What's changed
+
+- Fixed logout form in admin header to use the `admin:logout` URL instead of a global `logout` route ([9db8e0aa5d43](https://github.com/dropseed/plain/commit/9db8e0aa5d43))
+- Added dedicated logout route within the admin URL namespace ([9db8e0aa5d43](https://github.com/dropseed/plain/commit/9db8e0aa5d43))
+- Replaced `{% toolbar %}` tag with `{% include "toolbar/inject.html" ignore missing %}` for looser toolbar coupling ([9db8e0aa5d43](https://github.com/dropseed/plain/commit/9db8e0aa5d43))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.66.1](https://github.com/dropseed/plain/releases/plain-admin@0.66.1) (2026-02-04)
 
 ### What's changed
