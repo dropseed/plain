@@ -1,5 +1,19 @@
 # plain changelog
 
+## [0.106.0](https://github.com/dropseed/plain/releases/plain@0.106.0) (2026-02-12)
+
+### What's changed
+
+- Added `plain check` command that runs core validation checks in sequence: custom commands, code linting, preflight, migration state, and tests ([430268a12ae2](https://github.com/dropseed/plain/commit/430268a12ae2))
+- Added assertion flags to `plain request`: `--status`, `--contains`, and `--not-contains` for automated response testing ([6b66bfd05b9e](https://github.com/dropseed/plain/commit/6b66bfd05b9e))
+- Fixed `plain request` crash when no user model exists ([8ef8a3813bff](https://github.com/dropseed/plain/commit/8ef8a3813bff))
+- `plain request` now exits non-zero on server errors (5xx) and all failure paths ([6b66bfd05b9e](https://github.com/dropseed/plain/commit/6b66bfd05b9e))
+- Updated agent rules with additional Django-to-Plain differences (model options, CSRF, forms, middleware) ([9db8e0aa5d43](https://github.com/dropseed/plain/commit/9db8e0aa5d43))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.105.0](https://github.com/dropseed/plain/releases/plain@0.105.0) (2026-02-05)
 
 ### What's changed
