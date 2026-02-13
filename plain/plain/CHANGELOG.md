@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.106.2](https://github.com/dropseed/plain/releases/plain@0.106.2) (2026-02-13)
+
+### What's changed
+
+- Added `--version` flag to the `plain` CLI to display the installed version ([e76fd7070302](https://github.com/dropseed/plain/commit/e76fd7070302))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.106.1](https://github.com/dropseed/plain/releases/plain@0.106.1) (2026-02-13)
 
 ### What's changed
