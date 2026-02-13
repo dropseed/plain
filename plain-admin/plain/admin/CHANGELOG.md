@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.67.0](https://github.com/dropseed/plain/releases/plain-admin@0.67.0) (2026-02-13)
+
+### What's changed
+
+- Switched admin icons from an SVG sprite to Bootstrap Icons web font, replacing `<svg><use>` elements with `<i class="bi bi-...">` ([83bfc566e273](https://github.com/dropseed/plain/commit/83bfc566e273))
+- Removed the bundled `bootstrap-icons.svg` sprite file and added woff/woff2 font files with minified CSS ([83bfc566e273](https://github.com/dropseed/plain/commit/83bfc566e273))
+- Icon sizing now uses CSS font-size classes instead of width/height utilities ([83bfc566e273](https://github.com/dropseed/plain/commit/83bfc566e273))
+
+### Upgrade instructions
+
+- If you have custom admin templates using `<admin.Icon>`, the component now renders an `<i>` tag instead of `<svg>`. Size icons with font-size classes (e.g., `text-sm`) instead of `w-4 h-4`.
+
 ## [0.66.2](https://github.com/dropseed/plain/releases/plain-admin@0.66.2) (2026-02-12)
 
 ### What's changed
