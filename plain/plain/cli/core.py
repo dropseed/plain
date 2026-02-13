@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import traceback
+from importlib.metadata import version
 from typing import Any
 
 import click
@@ -206,4 +207,20 @@ class PlainCommandCollection(click.CommandCollection):
                 formatter.write_dl(sorted(package_commands))
 
 
-cli = PlainCommandCollection()
+def _print_version(ctx: Context, param: click.Parameter, value: bool) -> None:
+    if value:
+        click.echo(version("plain"))
+        ctx.exit()
+
+
+cli = PlainCommandCollection(
+    params=[
+        click.Option(
+            ["--version"],
+            is_flag=True,
+            expose_value=False,
+            is_eager=True,
+            callback=_print_version,
+        )
+    ]
+)

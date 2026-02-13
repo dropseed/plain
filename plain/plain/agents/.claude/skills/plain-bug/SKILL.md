@@ -21,7 +21,7 @@ uv run plain --version
 ```
 
 ```bash
-python --version
+uv run python --version
 ```
 
 ```bash
