@@ -124,3 +124,90 @@ uv run plain request /path --not-contains "error" # Assert body does not contain
 ```
 
 `--contains` and `--not-contains` can be repeated. `--status` overrides the default 5xx check (e.g. `--status 500` won't fail on a 500).
+
+## Best Practices
+
+### HIGH — View Patterns
+
+### Don't evaluate querysets at class level
+
+Class attributes execute at import time, not per request. Queries belong in methods.
+
+```python
+# Bad — runs once at import, stale forever
+class DashboardView(View):
+    recent_users = User.query.order_by("-created_at")[:5]
+
+# Good — fresh per request
+class DashboardView(View):
+    def get_template_context(self):
+        return {"recent_users": User.query.order_by("-created_at")[:5]}
+```
+
+### Paginate list views
+
+Always paginate querysets in list views. Unbounded queries get slower as data grows.
+
+```python
+# Bad — returns every row
+def get_template_context(self):
+    return {"items": Item.query.all()}
+
+# Good — paginated
+from plain.paginator import Paginator
+
+def get_template_context(self):
+    paginator = Paginator(Item.query.all(), per_page=25)
+    page = paginator.get_page(self.request.query_params.get("page"))
+    return {"page": page}
+```
+
+### Wrap multi-step writes in transactions
+
+Use `transaction.atomic()` when creating or updating related objects together.
+
+```python
+# Bad — partial write if second save fails
+order = Order(user=user)
+order.save()
+payment = Payment(order=order, amount=total)
+payment.save()
+
+# Good — all or nothing
+from plain.models import transaction
+
+with transaction.atomic():
+    order = Order(user=user)
+    order.save()
+    payment = Payment(order=order, amount=total)
+    payment.save()
+```
+
+### MEDIUM — Security
+
+### Validate at form/model level, not just in views
+
+Don't rely on template-only or view-only checks for data integrity.
+
+```python
+# Bad — validation only in the view
+def post(self):
+    if not self.request.POST.get("email"):
+        ...
+
+# Good — form-level validation
+class SignupForm(forms.Form):
+    email = forms.EmailField()
+```
+
+### Never format raw SQL strings
+
+Always use parameterized queries to prevent SQL injection.
+
+```python
+# Bad — SQL injection risk
+User.query.raw(f"SELECT * FROM users WHERE email = '{email}'")
+
+# Good — parameterized
+User.query.raw("SELECT * FROM users WHERE email = %s", [email])
+```

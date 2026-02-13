@@ -53,3 +53,21 @@ Each bound field provides: `html_name`, `html_id`, `value`, `errors`, `field`, `
 ## CSRF
 
 Plain uses automatic header-based CSRF protection (Sec-Fetch-Site). No tokens are needed in templates.
+
+## Template Query Safety
+
+### Never call `.query` in templates
+
+All data should come from the view context. If you see `.query.all()` or `.query.filter()` in a template, move it to the view.
+
+```html
+{# Bad — triggers queries in the template #}
+{% for post in user.posts.query.all() %}
+    {{ post.title }}
+{% endfor %}
+
+{# Good — data prepared in the view #}
+{% for post in user_posts %}
+    {{ post.title }}
+{% endfor %}
+```
