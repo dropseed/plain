@@ -1,3 +1,4 @@
+from plain.auth.views import LogoutView
 from plain.urls import Router, include, path
 
 from .builtin_views import (
@@ -19,6 +20,7 @@ class AdminRouter(Router):
     urls = [
         path("search/", AdminSearchView, name="search"),
         path("style/", StyleGuideView, name="style"),
+        path("logout/", LogoutView, name="logout"),
         path("_/pin/", PinNavView, name="pin"),
         path("_/unpin/", UnpinNavView, name="unpin"),
         path("_/reorder/", ReorderPinnedView, name="reorder"),

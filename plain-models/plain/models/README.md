@@ -339,9 +339,16 @@ With this annotation, type checkers will know that `User.query.get()` returns a 
 You can validate models before saving:
 
 ```python
+@models.register_model
 class User(models.Model):
-    email = models.EmailField(unique=True)
+    email = models.EmailField()
     age = models.IntegerField()
+
+    model_options = models.Options(
+        constraints=[
+            models.UniqueConstraint(fields=["email"], name="unique_email"),
+        ],
+    )
 
     def clean(self):
         if self.age < 18:

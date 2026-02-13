@@ -18,6 +18,10 @@ Claude's training data contains a lot of Django code. These are the most common 
 - **URLs**: Use `Router` with `urls` list, not Django's `urlpatterns`
 - **Tests**: Use `plain.test.Client`, not `django.test.Client`
 - **Settings**: Use `plain.runtime.settings`, not `django.conf.settings`
+- **Model options**: Use `model_options = models.Options(...)` not `class Meta`. Fields don't accept `unique=True` — use `UniqueConstraint` in constraints.
+- **CSRF**: Automatic header-based (Sec-Fetch-Site). No tokens in templates — no `{{ csrf_input }}` or `{% csrf_token %}`.
+- **Forms**: Headless — no `as_p()`, `as_table()`, or `as_elements()`. Render fields manually with `form.field.html_name`, `form.field.html_id`, `form.field.value()`, `form.field.errors`.
+- **Middleware**: No `AuthMiddleware` exists. Auth works through sessions + view-level checks (`AuthViewMixin`). Middleware uses short imports (`plain.admin.AdminMiddleware` not `plain.admin.middleware.AdminMiddleware`).
 
 When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 

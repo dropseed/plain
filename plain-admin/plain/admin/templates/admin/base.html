@@ -119,8 +119,6 @@
 
     </div><!-- /.plain-admin -->
 
-    {% if is_package_installed('plaintoolbar') %}
-        {% toolbar %}
-    {% endif %}
+    {% include "toolbar/inject.html" ignore missing %}
 </body>
 </html>

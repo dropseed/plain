@@ -118,8 +118,14 @@ from plain.passwords.models import PasswordField
 
 @models.register_model
 class User(models.Model):
-    email = models.EmailField(unique=True)
+    email = models.EmailField()
     password = PasswordField()
+
+    model_options = models.Options(
+        constraints=[
+            models.UniqueConstraint(fields=["email"], name="unique_email"),
+        ],
+    )
 ```
 
 When you assign a raw password, it gets hashed automatically on save:
@@ -295,8 +301,14 @@ from plain.passwords.models import PasswordField
 
 @models.register_model
 class User(models.Model):
-    email = models.EmailField(unique=True)
+    email = models.EmailField()
     password = PasswordField()
+
+    model_options = models.Options(
+        constraints=[
+            models.UniqueConstraint(fields=["email"], name="unique_email"),
+        ],
+    )
 ```
 
 Add login and logout views to your URLs:
@@ -320,8 +332,31 @@ Create templates for your views. For the login view, create `templates/passwords
 
 {% block content %}
 <form method="post">
-    {{ csrf_input }}
-    {{ form.as_elements }}
+    <div>
+        <label for="{{ form.email.html_id }}">Email</label>
+        <input
+            type="email"
+            name="{{ form.email.html_name }}"
+            id="{{ form.email.html_id }}"
+            value="{{ form.email.value }}"
+        >
+        {% for error in form.email.errors %}
+        <p>{{ error }}</p>
+        {% endfor %}
+    </div>
+
+    <div>
+        <label for="{{ form.password.html_id }}">Password</label>
+        <input
+            type="password"
+            name="{{ form.password.html_name }}"
+            id="{{ form.password.html_id }}"
+        >
+        {% for error in form.password.errors %}
+        <p>{{ error }}</p>
+        {% endfor %}
+    </div>
+
     <button type="submit">Log in</button>
 </form>
 {% endblock %}
