@@ -24,8 +24,13 @@ Get approval before writing any model code or generating migrations.
 - `uv run plain makemigrations` — create migrations (`--dry-run` to preview, `--check` for CI)
 - `uv run plain migrate --backup` — apply migrations
 - `uv run plain migrations list` — view status (not `migrate --list`)
+- Before committing, consolidate multiple uncommitted migrations into one:
+  delete the intermediate files, run `migrations prune --yes` to clean stale DB records,
+  run `makemigrations` fresh, then `migrate --fake` to mark it applied
+- Use `migrations squash` only for already-committed/deployed migrations — never for dev cleanup
+- Only write migrations by hand for custom data migrations
 
-Only write migrations by hand for custom data migrations. Run `uv run plain docs models --section migrations` for full details.
+Run `uv run plain docs models --section migrations` for full workflow details.
 
 ## Querying
 

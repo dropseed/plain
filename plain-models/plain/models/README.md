@@ -405,6 +405,33 @@ plain migrations list
 
 - `--format plan` — Show in dependency order instead of grouped by package
 
+### Development workflow
+
+During development, iterating on models often produces multiple small migrations (0002, 0003, 0004...). Clean these up before committing.
+
+**Consolidating uncommitted migrations (delete-and-recreate):**
+
+Use this when migrations exist only in your local dev environment and haven't been committed or deployed.
+
+1. Delete the intermediate migration files (keep the initial 0001 and any previously committed migrations)
+2. `plain migrations prune --yes` — removes stale DB records for the deleted files
+3. `plain makemigrations` — creates a single fresh migration with all the changes
+4. `plain migrate --fake` — marks the new migration as applied (the schema is already correct from the old migrations)
+
+**Consolidating committed migrations (squash):**
+
+Use this when migrations have already been committed or deployed to other environments.
+
+`plain migrations squash <package> <migration>` creates a replacement migration with a `replaces` list. Keep the original files until all environments have migrated past the squash point, then delete them and run `migrations prune`.
+
+**Which method to use:**
+
+| Scenario                                  | Method                                                  |
+| ----------------------------------------- | ------------------------------------------------------- |
+| Migrations are local only (not committed) | Delete-and-recreate                                     |
+| Migrations are committed but not deployed | Delete-and-recreate (if all developers reset) or squash |
+| Migrations are deployed to production     | Squash                                                  |
+
 ### Other migration commands
 
 - `plain migrations squash <package> <migration>` — Squash migrations into one
