@@ -94,12 +94,23 @@ def make(
         if verbosity >= level:
             click.echo(msg)
 
+    def collect_sql_for_migration(
+        migration: Migration,
+        project_state: ProjectState,
+    ) -> tuple[list[str], ProjectState]:
+        """Apply a migration in collect mode and return the SQL statements."""
+        with db_connection.schema_editor(collect_sql=True) as editor:
+            new_state = migration.apply(project_state, editor)
+            return list(editor.executed_sql), new_state
+
     def write_migration_files(
         changes: dict[str, list[Migration]],
         update_previous_migration_paths: dict[str, str] | None = None,
     ) -> None:
         """Take a changes dict and write them out as migration files."""
         directory_created = {}
+        # Track state for SQL collection in dry-run mode.
+        sql_state = loader.project_state() if dry_run else None
         for package_label, package_migrations in changes.items():
             log(
                 click.style(f"Migrations for '{package_label}':", fg="cyan", bold=True),
@@ -141,16 +152,31 @@ def make(
                         else:
                             os.remove(prev_path)
                             log(f"Deleted {os.path.relpath(prev_path)}", level=1)
-                elif verbosity >= 3:
-                    log(
-                        click.style(
-                            f"Full migrations file '{writer.filename}':",
-                            fg="cyan",
-                            bold=True,
-                        ),
-                        level=3,
+                else:
+                    # dry_run is True — show SQL preview and optionally the full file.
+                    assert sql_state is not None
+                    sql_statements, sql_state = collect_sql_for_migration(
+                        migration, sql_state
                     )
-                    log(writer.as_string(), level=3)
+                    if sql_statements:
+                        log("", level=1)
+                        log(
+                            click.style("    SQL:", fg="green", bold=True),
+                            level=1,
+                        )
+                        for sql in sql_statements:
+                            log(f"      {sql};", level=1)
+
+                    if verbosity >= 3:
+                        log(
+                            click.style(
+                                f"\n    Full migrations file '{writer.filename}':",
+                                fg="cyan",
+                                bold=True,
+                            ),
+                            level=3,
+                        )
+                        log(writer.as_string(), level=3)
 
     # Validate package labels
     package_labels_set = set(package_labels)
@@ -248,6 +274,35 @@ def make(
             sys.exit(1)
 
         write_migration_files(changes)
+
+    # Warn about packages that have models but no migrations directory.
+    # These are silently skipped by the autodetector, which can be confusing
+    # when setting up a new app (makemigrations says "No changes detected").
+    unmigrated_with_models = []
+    for package_label in sorted(loader.unmigrated_packages):
+        module_name, _explicit = MigrationLoader.migrations_module(package_label)
+        # Skip packages that explicitly opt out of migrations (module_name is None).
+        if module_name is not None and models_registry.all_models.get(package_label):
+            unmigrated_with_models.append((package_label, module_name))
+    if unmigrated_with_models:
+        click.echo()
+        click.echo(
+            click.style(
+                "Warning: The following packages have models but no migrations directory:",
+                fg="yellow",
+            )
+        )
+        for package_label, module_name in unmigrated_with_models:
+            module_path = module_name.replace(".", "/")
+            click.echo(
+                f"  - {package_label} (create {module_path}/ to enable migrations)"
+            )
+        click.echo()
+        click.echo(
+            "To create initial migrations, add the directory and run "
+            + click.style("plain makemigrations", bold=True)
+            + " again."
+        )
 
 
 @common_command

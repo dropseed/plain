@@ -165,9 +165,13 @@ class BaseDatabaseSchemaEditor(ABC):
         self,
         connection: BaseDatabaseWrapper,
         atomic: bool = True,
+        collect_sql: bool = False,
     ):
         self.connection = connection
-        self.atomic_migration = self.connection.features.can_rollback_ddl and atomic
+        self.collect_sql = collect_sql
+        self.atomic_migration = (
+            self.connection.features.can_rollback_ddl and atomic and not collect_sql
+        )
 
     # State-managing methods
 
@@ -185,6 +189,7 @@ class BaseDatabaseSchemaEditor(ABC):
                 self.execute(sql)
         if self.atomic_migration:
             self.atomic.__exit__(exc_type, exc_value, traceback)
+        self.deferred_sql.clear()
 
     # Core utility functions
 
@@ -202,17 +207,18 @@ class BaseDatabaseSchemaEditor(ABC):
             )
         # Account for non-string statement objects.
         sql = str(sql)
-        # Log the command we're running, then run it
         logger.debug(
             "%s; (params %r)", sql, params, extra={"params": params, "sql": sql}
         )
 
-        # Track executed SQL for display in migration output
-        # Store the SQL for display (interpolate params for readability)
+        # Track executed SQL (interpolate params for readability in migration output).
         if params:
             self.executed_sql.append(sql % tuple(map(self.quote_value, params)))
         else:
             self.executed_sql.append(sql)
+
+        if self.collect_sql:
+            return
 
         with self.connection.cursor() as cursor:
             cursor.execute(sql, params)
