@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.76.5](https://github.com/dropseed/plain/releases/plain-models@0.76.5) (2026-02-12)
+
+### What's changed
+
+- Updated README model validation example to use `@models.register_model`, `UniqueConstraint`, and `model_options` ([9db8e0aa5d43](https://github.com/dropseed/plain/commit/9db8e0aa5d43))
+- Added schema planning guidance to agent rules ([eaf55cb1b893](https://github.com/dropseed/plain/commit/eaf55cb1b893))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.76.4](https://github.com/dropseed/plain/releases/plain-models@0.76.4) (2026-02-04)
 
 ### What's changed
