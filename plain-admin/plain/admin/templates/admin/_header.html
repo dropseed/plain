@@ -25,7 +25,7 @@
                         value="{{ global_search_query|default('') }}"
                     >
                     <div class="absolute inset-y-0 left-2.5 flex items-center pointer-events-none">
-                        <admin.Icon name="search" class="w-3.5 h-3.5 text-stone-400" />
+                        <admin.Icon name="search" class="text-sm text-stone-400" />
                     </div>
                     <div class="absolute inset-y-0 right-2 flex items-center pointer-events-none">
                         <kbd class="text-[10px] font-sans text-stone-400 bg-stone-200/80 px-1.5 py-0.5 rounded">/</kbd>
@@ -38,7 +38,7 @@
                 href="{{ url('admin:search') }}"
                 class="sm:hidden flex items-center justify-center w-7 h-7 text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100"
             >
-                <admin.Icon name="search" class="w-4 h-4" />
+                <admin.Icon name="search" />
             </a>
 
             <button type="button" data-dropdown class="flex items-center cursor-pointer">
@@ -61,7 +61,7 @@
                     <div class="py-1">
                         <form method="POST" action="{{ url('admin:logout') }}">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
-                                <admin.Icon name="box-arrow-right" class="w-4 h-4" />
+                                <admin.Icon name="box-arrow-right" />
                                 Log out
                             </button>
                         </form>
@@ -74,7 +74,7 @@
                 type="button"
                 class="menu-toggle sm:hidden flex items-center justify-center w-7 h-7 text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100"
             >
-                <admin.Icon name="grid-3x3-gap" class="w-4 h-4" />
+                <admin.Icon name="grid-3x3-gap" />
             </button>
         </div>
     </div>
@@ -91,7 +91,7 @@
                 {% if is_current %}data-active{% endif %}
                 {% if tab.pinned %}draggable="true" data-slug="{{ view_slug }}"{% else %}data-recent{% endif %}
                 class="nav-tab flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap text-stone-600 hover:text-stone-900 border-b-2 hover:border-stone-300 data-[active]:text-stone-900 data-[active]:font-medium data-[recent]:text-stone-500 data-[recent]:font-normal data-[recent]:italic {% if is_current %}border-[var(--plain-olive)]{% else %}border-transparent{% endif %}"
-            >{% if tab.view.nav_icon %}<admin.Icon name={tab.view.nav_icon} class="w-4 h-4 opacity-60" />{% endif %}{{ tab.view.get_nav_title() }}</a>
+            >{% if tab.view.nav_icon %}<admin.Icon name={tab.view.nav_icon} class="opacity-60" />{% endif %}{{ tab.view.get_nav_title() }}</a>
             {% endfor %}
         </div>
 
@@ -100,7 +100,7 @@
             type="button"
             class="menu-toggle hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100 ml-auto"
         >
-            <admin.Icon name="grid-3x3-gap" class="w-4 h-4" />
+            <admin.Icon name="grid-3x3-gap" />
             <span>Menu</span>
         </button>
     </nav>
@@ -115,7 +115,7 @@
                 <div class="p-3 bg-gradient-to-b from-stone-50 to-stone-50/80 border-b border-stone-200/60">
                     <div class="flex items-center gap-2">
                         <div class="relative flex-1">
-                            <admin.Icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
+                            <admin.Icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-stone-400 pointer-events-none" />
                             <input
                                 type="text"
                                 id="menu-filter-input"
@@ -128,7 +128,7 @@
                             class="menu-toggle flex items-center justify-center w-8 h-8 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
                             aria-label="Close menu"
                         >
-                            <admin.Icon name="x-lg" class="w-4 h-4" />
+                            <admin.Icon name="x-lg" />
                         </button>
                     </div>
                 </div>
