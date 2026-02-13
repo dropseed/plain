@@ -44,10 +44,12 @@ class RedirectAdmin(AdminViewset):
     class CreateView(AdminModelCreateView):
         model = Redirect
         form_class = RedirectForm
+        template_name = "admin/plainredirection/redirect_form.html"
 
     class UpdateView(AdminModelUpdateView):
         model = Redirect
         form_class = RedirectForm
+        template_name = "admin/plainredirection/redirect_form.html"
 
     class DeleteView(AdminModelDeleteView):
         model = Redirect
