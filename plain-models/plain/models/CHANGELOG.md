@@ -1,5 +1,18 @@
 # plain-models changelog
 
+## [0.77.0](https://github.com/dropseed/plain/releases/plain-models@0.77.0) (2026-02-13)
+
+### What's changed
+
+- `makemigrations --dry-run` now shows a SQL preview of the statements each migration would execute, making it easier to review schema changes before writing migration files ([c994703f9a28](https://github.com/dropseed/plain/commit/c994703f9a28))
+- `makemigrations` now warns when packages have models but no `migrations/` directory, which can cause "No changes detected" confusion for new apps ([c994703f9a28](https://github.com/dropseed/plain/commit/c994703f9a28))
+- Restructured README documentation: consolidated Querying section with Custom QuerySets, Typing, and Raw SQL; added N+1 avoidance and query efficiency subsections; reorganized Relationships and Constraints into clearer sections with schema design guidance ([f5d2731ebda0](https://github.com/dropseed/plain/commit/f5d2731ebda0), [8c2189a896d2](https://github.com/dropseed/plain/commit/8c2189a896d2))
+- Slimmed agent rules to concise bullet reminders with `paths:` scoping for `**/models.py` files ([f5d2731ebda0](https://github.com/dropseed/plain/commit/f5d2731ebda0))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.76.5](https://github.com/dropseed/plain/releases/plain-models@0.76.5) (2026-02-12)
 
 ### What's changed
