@@ -1,3 +1,10 @@
+---
+paths:
+  - "**/test_*.py"
+  - "**/tests/**"
+  - "**/conftest.py"
+---
+
 # Testing
 
 ```

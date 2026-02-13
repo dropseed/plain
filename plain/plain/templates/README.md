@@ -12,6 +12,10 @@
 - [Rendering templates manually](#rendering-templates-manually)
 - [Custom Jinja environment](#custom-jinja-environment)
 - [FAQs](#faqs)
+- [Formatting](#formatting)
+- [Forms](#forms)
+- [CSRF](#csrf)
+- [Query safety](#query-safety)
 - [Installation](#installation)
 
 ## Overview
@@ -271,6 +275,71 @@ Plain enables the `loopcontrols` extension by default, so you can use `break` an
 #### Where can I learn more about Jinja2?
 
 The [Jinja2 documentation](https://jinja.palletsprojects.com/en/stable/) covers all the template syntax, including conditionals, loops, macros, and inheritance.
+
+## Formatting
+
+When an HTML tag has many attributes or a long class list, break it into multiple lines with each attribute indented. The closing `>` goes on its own line.
+
+**Good:**
+
+```html
+<div
+    class="flex items-center justify-between gap-4 rounded-lg border bg-white p-4 shadow-sm"
+    data-active="{{ is_active }}"
+>
+    ...
+</div>
+```
+
+**Avoid:**
+
+```html
+<div class="flex items-center justify-between gap-4 rounded-lg border bg-white p-4 shadow-sm" data-active="{{ is_active }}">...</div>
+```
+
+## Forms
+
+Forms in Plain are headless. There are no `as_p()`, `as_table()`, or `as_elements()` methods. You render each field by name using the bound field attributes:
+
+```html
+<form method="post">
+    <div>
+        <label for="{{ form.email.html_id }}">Email</label>
+        <input
+            type="email"
+            name="{{ form.email.html_name }}"
+            id="{{ form.email.html_id }}"
+            value="{{ form.email.value }}"
+        >
+        {% for error in form.email.errors %}
+        <p>{{ error }}</p>
+        {% endfor %}
+    </div>
+    <button type="submit">Submit</button>
+</form>
+```
+
+Each bound field provides: `html_name`, `html_id`, `value`, `errors`, `field`, `initial`.
+
+## CSRF
+
+Plain uses automatic header-based CSRF protection via the `Sec-Fetch-Site` header. No tokens are needed in templates — do not add `{{ csrf_input }}` or `{% csrf_token %}`.
+
+## Query safety
+
+All data should come from the view context. Never call `.query` in templates.
+
+```html
+{# Bad — triggers queries in the template #}
+{% for post in user.posts.query.all() %}
+    {{ post.title }}
+{% endfor %}
+
+{# Good — data prepared in the view #}
+{% for post in user_posts %}
+    {{ post.title }}
+{% endfor %}
+```
 
 ## Installation
 
