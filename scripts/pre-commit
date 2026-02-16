@@ -15,6 +15,6 @@ echo "${BOLD}Running tests${NORMAL}"
 
 echo ""
 echo "${BOLD}Running preflight in example${NORMAL}"
-# Ensure the example database exists (tests already started PostgreSQL via Docker)
+source scripts/start-postgres plain_example
 PGPASSWORD=postgres createdb -h localhost -U postgres plain_example 2>/dev/null || true
-cd example && DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@localhost/plain_example}" uv run plain preflight
+cd example && uv run plain preflight

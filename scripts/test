@@ -36,39 +36,7 @@ bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 # ---------------------------------------------------------------------------
 # Database URL (PostgreSQL required)
 # ---------------------------------------------------------------------------
-# Default to local Docker PostgreSQL if DATABASE_URL not set
-if [ -z "$DATABASE_URL" ]; then
-  export DATABASE_URL="postgres://postgres:postgres@localhost:5432/plain_tests"
-
-  # Check if PostgreSQL is accessible
-  if ! pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
-    bold "Starting PostgreSQL via Docker..."
-    # Try starting an existing stopped container first, otherwise create a new one
-    if docker start plain-postgres-tests >/dev/null 2>&1; then
-      true
-    else
-      docker run -d --name plain-postgres-tests \
-        -e POSTGRES_PASSWORD=postgres \
-        -e POSTGRES_DB=plain_tests \
-        -p 5432:5432 \
-        postgres:16 >/dev/null 2>&1
-    fi
-
-    # Wait for PostgreSQL to be ready
-    echo "Waiting for PostgreSQL to be ready..."
-    for i in {1..30}; do
-      if pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
-        break
-      fi
-      sleep 1
-    done
-
-    if ! pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
-      echo "ERROR: PostgreSQL failed to start. Check Docker."
-      exit 1
-    fi
-  fi
-fi
+source scripts/start-postgres plain_tests
 
 echo "Using DATABASE_URL: $DATABASE_URL"
 

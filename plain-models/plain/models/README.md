@@ -84,7 +84,13 @@ DATABASE = {
 }
 ```
 
-**PostgreSQL is the only supported database.**
+**PostgreSQL is the only supported database.** You need to install a PostgreSQL driver separately — [psycopg](https://www.psycopg.org/) is recommended:
+
+```bash
+uv add psycopg[binary]  # Pre-built wheels, easiest for local development
+# or
+uv add psycopg[c]       # Compiled against your system's libpq, recommended for production
+```
 
 ## Querying
 
@@ -886,7 +892,7 @@ Currently, Plain supports a single database connection per application. For appl
 Install the `plain.models` package from [PyPI](https://pypi.org/project/plain.models/):
 
 ```bash
-uv add plain.models
+uv add plain.models psycopg[binary]
 ```
 
 Then add to your `INSTALLED_PACKAGES`:
