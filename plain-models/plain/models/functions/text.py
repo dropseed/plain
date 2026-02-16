@@ -81,9 +81,8 @@ class ConcatPair(Func):
 
 class Concat(Func):
     """
-    Concatenate text fields together. Backends that result in an entire
-    null expression when any arguments are null will wrap each argument in
-    coalesce functions to ensure a non-null result.
+    Concatenate text fields together. Wraps each argument in coalesce
+    functions to ensure a non-null result.
     """
 
     function = None

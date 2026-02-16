@@ -890,9 +890,8 @@ class DatabaseWrapper:
     def validate_thread_sharing(self) -> None:
         """
         Validate that the connection isn't accessed by another thread than the
-        one which originally created it, unless the connection was explicitly
-        authorized to be shared between threads (via the `inc_thread_sharing()`
-        method). Raise an exception if the validation fails.
+        one which originally created it. Raise an exception if the validation
+        fails.
         """
         if not (self.allow_thread_sharing or self._thread_ident == _thread.get_ident()):
             raise DatabaseError(

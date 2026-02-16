@@ -2,9 +2,8 @@
 Create SQL statements for QuerySets.
 
 The code in here encapsulates all of the SQL construction so that QuerySets
-themselves do not have to (and could be backed by things other than SQL
-databases). The abstraction barrier only works one way: this module has to know
-all about the internals of models in order to get the information it needs.
+themselves do not have to. This module has to know all about the internals of
+models in order to get the information it needs.
 """
 
 from __future__ import annotations

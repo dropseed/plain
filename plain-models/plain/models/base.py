@@ -364,8 +364,8 @@ class Model(metaclass=ModelBase):
         control the saving process.
 
         The 'force_insert' and 'force_update' parameters can be used to insist
-        that the "save" must be an SQL insert or update (or equivalent for
-        non-SQL backends), respectively. Normally, they should not be set.
+        that the "save" must be an SQL INSERT or UPDATE, respectively.
+        Normally, they should not be set.
         """
         self._prepare_related_fields_for_save(operation_name="save")
 

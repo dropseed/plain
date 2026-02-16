@@ -126,10 +126,9 @@ class Collector:
         # fetching the objects into memory.
         self.fast_deletes: list[Any] = []
 
-        # Tracks deletion-order dependency for databases without transactions
-        # or ability to defer constraint checks. Only concrete model classes
-        # should be included, as the dependencies exist only between actual
-        # database tables.
+        # Tracks deletion-order dependency for constraint checks. Only
+        # concrete model classes should be included, as the dependencies
+        # exist only between actual database tables.
         self.dependencies: defaultdict[Any, set[Any]] = defaultdict(
             set
         )  # {model: {models}}
@@ -245,15 +244,9 @@ class Collector:
     def get_del_batches(self, objs: list[Any], fields: list[Field]) -> list[list[Any]]:
         """
         Return the objs in suitably sized batches for the used db_connection.
+        PostgreSQL has no parameter limit, so all objects are returned in a single batch.
         """
-        conn_batch_size = max(len(objs), 1)
-        if len(objs) > conn_batch_size:
-            return [
-                objs[i : i + conn_batch_size]
-                for i in range(0, len(objs), conn_batch_size)
-            ]
-        else:
-            return [objs]
+        return [objs]
 
     def collect(
         self,

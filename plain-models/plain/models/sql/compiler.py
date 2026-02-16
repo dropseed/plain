@@ -1354,10 +1354,7 @@ class SQLCompiler:
         return rows
 
     def has_results(self) -> bool:
-        """
-        Backends (e.g. NoSQL) can override this in order to use optimized
-        versions of "query has any results."
-        """
+        """Check if the query returns any results."""
         return bool(self.execute_sql(SINGLE))
 
     def execute_sql(
@@ -1449,8 +1446,8 @@ class SQLCompiler:
     def explain_query(self) -> Generator[str, None, None]:
         result = list(self.execute_sql())
         explain_info = self.query.explain_info
-        # Some backends return 1 item tuples with strings, and others return
-        # tuples with integers and strings. Flatten them out into strings.
+        # PostgreSQL may return tuples with integers and strings depending on
+        # the EXPLAIN format. Flatten them out into strings.
         format_ = explain_info.format if explain_info is not None else None
         output_formatter = json.dumps if format_ and format_.lower() == "json" else str
         for row in result[0]:
@@ -1610,8 +1607,7 @@ class SQLInsertCompiler(SQLCompiler):
             params = param_rows
             if conflict_suffix_sql:
                 result.append(conflict_suffix_sql)
-            # Skip empty r_sql to allow subclasses to customize behavior for
-            # 3rd party backends. Refs #19096.
+            # Skip empty r_sql in case returning_cols returns an empty string.
             returning_cols = return_insert_columns(self.returning_fields)
             if returning_cols:
                 r_sql, self.returning_params = returning_cols

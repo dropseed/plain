@@ -76,7 +76,6 @@ Or you can manually define the `DATABASE` setting:
 ```python
 # app/settings.py
 DATABASE = {
-    "ENGINE": "plain.models.backends.postgresql",
     "NAME": "dbname",
     "USER": "user",
     "PASSWORD": "password",
@@ -814,7 +813,7 @@ graph TB
 2. **QuerySet** methods like `.filter()` modify the internal [`Query`](./sql/query.py#Query) object
 3. When results are needed, **Query.get_compiler()** creates the appropriate [`SQLCompiler`](./sql/compiler.py#SQLCompiler)
 4. **SQLCompiler.as_sql()** renders the Query to SQL
-5. **SQLCompiler.execute_sql()** runs the SQL via [`DatabaseWrapper`](./backends/wrapper.py#DatabaseWrapper) and returns results
+5. **SQLCompiler.execute_sql()** runs the SQL via [`DatabaseWrapper`](./postgres/wrapper.py#DatabaseWrapper) and returns results
 
 **Key components:**
 
@@ -822,7 +821,7 @@ graph TB
 - [`QuerySet`](./query.py#QuerySet) - Chainable API (`.filter()`, `.exclude()`, `.order_by()`) that builds a Query
 - [`Query`](./sql/query.py#Query) - Internal representation of a query's logical structure (tables, joins, filters)
 - [`SQLCompiler`](./sql/compiler.py#SQLCompiler) - Transforms a Query into executable SQL
-- [`DatabaseWrapper`](./backends/wrapper.py#DatabaseWrapper) - PostgreSQL connection and query execution
+- [`DatabaseWrapper`](./postgres/wrapper.py#DatabaseWrapper) - PostgreSQL connection and query execution
 
 ## Settings
 
