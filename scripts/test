@@ -43,11 +43,16 @@ if [ -z "$DATABASE_URL" ]; then
   # Check if PostgreSQL is accessible
   if ! pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
     bold "Starting PostgreSQL via Docker..."
-    docker run -d --name plain-postgres-tests \
-      -e POSTGRES_PASSWORD=postgres \
-      -e POSTGRES_DB=plain_tests \
-      -p 5432:5432 \
-      postgres:16 >/dev/null 2>&1 || true
+    # Try starting an existing stopped container first, otherwise create a new one
+    if docker start plain-postgres-tests >/dev/null 2>&1; then
+      true
+    else
+      docker run -d --name plain-postgres-tests \
+        -e POSTGRES_PASSWORD=postgres \
+        -e POSTGRES_DB=plain_tests \
+        -p 5432:5432 \
+        postgres:16 >/dev/null 2>&1
+    fi
 
     # Wait for PostgreSQL to be ready
     echo "Waiting for PostgreSQL to be ready..."

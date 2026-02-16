@@ -50,6 +50,25 @@ from plain.test import Client
     is_flag=True,
     help="Hide response body from output",
 )
+@click.option(
+    "--status",
+    "assert_status",
+    type=int,
+    default=None,
+    help="Assert response status code equals this value",
+)
+@click.option(
+    "--contains",
+    "assert_contains",
+    multiple=True,
+    help="Assert response body contains this text (repeatable)",
+)
+@click.option(
+    "--not-contains",
+    "assert_not_contains",
+    multiple=True,
+    help="Assert response body does not contain this text (repeatable)",
+)
 def request(
     path: str,
     method: str,
@@ -60,6 +79,9 @@ def request(
     headers: tuple[str, ...],
     no_headers: bool,
     no_body: bool,
+    assert_status: int | None,
+    assert_contains: tuple[str, ...],
+    assert_not_contains: tuple[str, ...],
 ) -> None:
     """Make HTTP requests against the dev database"""
 
@@ -67,7 +89,7 @@ def request(
         # Only allow in DEBUG mode for security
         if not settings.DEBUG:
             click.secho("This command only works when DEBUG=True", fg="red", err=True)
-            return
+            raise SystemExit(1)
 
         # Create test client
         client = Client()
@@ -86,11 +108,11 @@ def request(
                     client.force_login(user)
                 except User.DoesNotExist:
                     click.secho(f"User {user_id} not found", fg="red", err=True)
-                    return
+                    raise SystemExit(1)
 
             except Exception as e:
                 click.secho(f"Authentication error: {e}", fg="red", err=True)
-                return
+                raise SystemExit(1)
 
         # Parse additional headers
         header_dict = {}
@@ -106,7 +128,7 @@ def request(
                 json.loads(data)
             except json.JSONDecodeError as e:
                 click.secho(f"Invalid JSON data: {e}", fg="red", err=True)
-                return
+                raise SystemExit(1)
 
         # Make the request
         method = method.upper()
@@ -140,7 +162,7 @@ def request(
             response = client.trace(path, **kwargs)
         else:
             click.secho(f"Unsupported HTTP method: {method}", fg="red", err=True)
-            return
+            raise SystemExit(1)
 
         # Display response information
         click.secho("Response:", fg="yellow", bold=True)
@@ -152,7 +174,7 @@ def request(
         click.echo(f"  Request ID: {response.wsgi_request.unique_id}")
 
         # User
-        if response.user:
+        if getattr(response, "user", None):
             click.echo(f"  Authenticated user: {response.user}")
 
         # URL pattern
@@ -202,5 +224,40 @@ def request(
         elif not no_body:
             click.secho("(No response body)", fg="yellow", dim=True)
 
+        # Run assertions
+        failed = []
+
+        if assert_status is not None:
+            if response.status_code != assert_status:
+                failed.append(
+                    f"Expected status {assert_status}, got {response.status_code}"
+                )
+        elif response.status_code >= 500:
+            failed.append(f"Server error: {response.status_code}")
+
+        body_text = (
+            response.content.decode("utf-8", errors="replace")
+            if response.content
+            else ""
+        )
+
+        for text in assert_contains:
+            if text not in body_text:
+                failed.append(f"Response body does not contain: {text}")
+
+        for text in assert_not_contains:
+            if text in body_text:
+                failed.append(f"Response body contains: {text}")
+
+        if failed:
+            click.echo()
+            click.secho("Assertions failed:", fg="red", bold=True)
+            for msg in failed:
+                click.secho(f"  ✗ {msg}", fg="red")
+            raise SystemExit(1)
+
+    except SystemExit:
+        raise
     except Exception as e:
         click.secho(f"Request failed: {e}", fg="red", err=True)
+        raise SystemExit(1)

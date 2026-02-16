@@ -12,6 +12,7 @@
 - [Rendering templates manually](#rendering-templates-manually)
 - [Custom Jinja environment](#custom-jinja-environment)
 - [FAQs](#faqs)
+- [Forms](#forms)
 - [Installation](#installation)
 
 ## Overview
@@ -271,6 +272,30 @@ Plain enables the `loopcontrols` extension by default, so you can use `break` an
 #### Where can I learn more about Jinja2?
 
 The [Jinja2 documentation](https://jinja.palletsprojects.com/en/stable/) covers all the template syntax, including conditionals, loops, macros, and inheritance.
+
+## Forms
+
+Forms are rendered manually using the bound field attributes:
+
+```html
+<form method="post">
+    <div>
+        <label for="{{ form.email.html_id }}">Email</label>
+        <input
+            type="email"
+            name="{{ form.email.html_name }}"
+            id="{{ form.email.html_id }}"
+            value="{{ form.email.value }}"
+        >
+        {% for error in form.email.errors %}
+        <p>{{ error }}</p>
+        {% endfor %}
+    </div>
+    <button type="submit">Submit</button>
+</form>
+```
+
+Each bound field provides: `html_name`, `html_id`, `value`, `errors`, `field`, `initial`.
 
 ## Installation
 

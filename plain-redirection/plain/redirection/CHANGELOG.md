@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.31.3](https://github.com/dropseed/plain/releases/plain-redirection@0.31.3) (2026-02-12)
+
+### What's changed
+
+- Fixed missing `template_name` on Redirect admin CreateView and UpdateView ([ee27ad10c407](https://github.com/dropseed/plain/commit/ee27ad10c407))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.31.2](https://github.com/dropseed/plain/releases/plain-redirection@0.31.2) (2026-02-04)
 
 ### What's changed

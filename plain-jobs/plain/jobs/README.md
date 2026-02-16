@@ -12,6 +12,7 @@
 - [Monitoring](#monitoring)
 - [Settings](#settings)
 - [FAQs](#faqs)
+- [Idempotency](#idempotency)
 - [Installation](#installation)
 
 ## Overview
@@ -277,6 +278,33 @@ class MyJob(Job):
     def calculate_retry_delay(self, attempt):
         # Exponential backoff: 1s, 2s, 4s
         return 2 ** (attempt - 1)
+```
+
+## Idempotency
+
+Jobs may retry on failure, so design them so re-execution is safe.
+
+```python
+# Bad — sends duplicate emails on retry
+@register_job
+class WelcomeUserJob(Job):
+    def __init__(self, user):
+        self.user = user
+
+    def run(self):
+        send_welcome_email(self.user)
+
+# Good — check before acting
+@register_job
+class WelcomeUserJob(Job):
+    def __init__(self, user):
+        self.user = user
+
+    def run(self):
+        if not self.user.welcome_email_sent:
+            send_welcome_email(self.user)
+            self.user.welcome_email_sent = True
+            self.user.save()
 ```
 
 ## Installation

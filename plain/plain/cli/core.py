@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import traceback
+from importlib.metadata import version
 from typing import Any
 
 import click
@@ -12,6 +13,7 @@ from plain.exceptions import ImproperlyConfigured
 from .agent import agent
 from .build import build
 from .changelog import changelog
+from .check import check
 from .chores import chores
 from .docs import docs
 from .formatting import PlainContext
@@ -33,6 +35,7 @@ def plain_cli() -> None:
     pass
 
 
+plain_cli.add_command(check)
 plain_cli.add_command(docs)
 plain_cli.add_command(request)
 plain_cli.add_command(agent)
@@ -204,4 +207,20 @@ class PlainCommandCollection(click.CommandCollection):
                 formatter.write_dl(sorted(package_commands))
 
 
-cli = PlainCommandCollection()
+def _print_version(ctx: Context, param: click.Parameter, value: bool) -> None:
+    if value:
+        click.echo(version("plain"))
+        ctx.exit()
+
+
+cli = PlainCommandCollection(
+    params=[
+        click.Option(
+            ["--version"],
+            is_flag=True,
+            expose_value=False,
+            is_eager=True,
+            callback=_print_version,
+        )
+    ]
+)

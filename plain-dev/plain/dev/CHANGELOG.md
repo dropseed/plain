@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.55.0](https://github.com/dropseed/plain/releases/plain-dev@0.55.0) (2026-02-12)
+
+### What's changed
+
+- Refactored pre-commit to use the new `plain check` command, removing duplicated check logic ([430268a12ae2](https://github.com/dropseed/plain/commit/430268a12ae2))
+- Custom pre-commit commands configuration moved from `tool.plain.pre-commit.run` to `tool.plain.check.run` in pyproject.toml ([430268a12ae2](https://github.com/dropseed/plain/commit/430268a12ae2))
+
+### Upgrade instructions
+
+- If you have custom commands in `[tool.plain.pre-commit.run]`, move them to `[tool.plain.check.run]`.
+
 ## [0.54.2](https://github.com/dropseed/plain/releases/plain-dev@0.54.2) (2026-01-28)
 
 ### What's changed

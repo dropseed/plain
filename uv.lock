@@ -399,7 +399,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.105.0"
+version = "0.106.2"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -428,7 +428,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.66.1"
+version = "0.67.0"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
@@ -474,7 +474,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-auth"
-version = "0.25.2"
+version = "0.25.3"
 source = { editable = "plain-auth" }
 dependencies = [
     { name = "plain" },
@@ -531,7 +531,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-dev"
-version = "0.54.2"
+version = "0.55.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
@@ -593,7 +593,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-flags"
-version = "0.33.2"
+version = "0.33.3"
 source = { editable = "plain-flags" }
 dependencies = [
     { name = "plain" },
@@ -635,7 +635,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-jobs"
-version = "0.43.4"
+version = "0.43.5"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
@@ -673,7 +673,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-models"
-version = "0.76.4"
+version = "0.77.1"
 source = { editable = "plain-models" }
 dependencies = [
     { name = "plain" },
@@ -782,7 +782,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-passwords"
-version = "0.23.2"
+version = "0.23.3"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
@@ -812,7 +812,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-redirection"
-version = "0.31.2"
+version = "0.31.3"
 source = { editable = "plain-redirection" }
 dependencies = [
     { name = "plain" },
@@ -873,7 +873,7 @@ dev = [
 
 [[package]]
 name = "plain-start"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "plain-start" }
 dependencies = [
     { name = "click" },
@@ -918,7 +918,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-toolbar"
-version = "0.10.1"
+version = "0.10.2"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },

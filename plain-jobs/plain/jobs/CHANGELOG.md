@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.43.5](https://github.com/dropseed/plain/releases/plain-jobs@0.43.5) (2026-02-13)
+
+### What's changed
+
+- Added Idempotency section to README with guidance and code examples for designing retry-safe jobs ([8c2189a896d2](https://github.com/dropseed/plain/commit/8c2189a896d2))
+- Added scoped agent rules file with best practices for background jobs (idempotency, offloading slow work, concurrency keys) ([8c2189a896d2](https://github.com/dropseed/plain/commit/8c2189a896d2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.43.4](https://github.com/dropseed/plain/releases/plain-jobs@0.43.4) (2026-02-04)
 
 ### What's changed

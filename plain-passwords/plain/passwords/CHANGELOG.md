@@ -1,5 +1,16 @@
 # plain-passwords changelog
 
+## [0.23.3](https://github.com/dropseed/plain/releases/plain-passwords@0.23.3) (2026-02-12)
+
+### What's changed
+
+- Updated README examples to use `UniqueConstraint` instead of `unique=True` on email fields ([9db8e0aa5d43](https://github.com/dropseed/plain/commit/9db8e0aa5d43))
+- Updated login form template example to use headless form rendering instead of `csrf_input` and `as_elements()` ([9db8e0aa5d43](https://github.com/dropseed/plain/commit/9db8e0aa5d43))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.23.2](https://github.com/dropseed/plain/releases/plain-passwords@0.23.2) (2026-02-04)
 
 ### What's changed

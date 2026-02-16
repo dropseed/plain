@@ -429,9 +429,11 @@ class DatabaseSchemaEditor:
         self,
         connection: DatabaseWrapper,
         atomic: bool = True,
+        collect_sql: bool = False,
     ):
         self.connection = connection
-        self.atomic_migration = atomic
+        self.collect_sql = collect_sql
+        self.atomic_migration = atomic and not collect_sql
 
     # State-managing methods
 
@@ -449,6 +451,7 @@ class DatabaseSchemaEditor:
                 self.execute(sql)
         if self.atomic_migration:
             self.atomic.__exit__(exc_type, exc_value, traceback)
+        self.deferred_sql.clear()
 
     # Core utility functions
 
@@ -471,6 +474,9 @@ class DatabaseSchemaEditor:
 
         # Track executed SQL for display in migration output
         self.executed_sql.append(sql_str)
+
+        if self.collect_sql:
+            return
 
         with self.connection.cursor() as cursor:
             cursor.execute(sql_str, params)

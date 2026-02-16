@@ -84,6 +84,7 @@ __all__ = [
     "AggregateQuery",
 ]
 
+
 # Quotation marks ('"`[]), whitespace characters, semicolons, or inline
 # SQL comments are forbidden in column aliases.
 FORBIDDEN_ALIAS_PATTERN = _lazy_re_compile(r"['`\"\]\[;\s]|--|/\*|\*/")

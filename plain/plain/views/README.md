@@ -16,6 +16,7 @@
 - [RedirectView](#redirectview)
 - [ResponseException](#responseexception)
 - [Error views](#error-views)
+- [View patterns](#view-patterns)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -332,6 +333,50 @@ Plain looks for `{status_code}.html` templates, then returns a plain HTTP respon
 Templates receive `status_code` and `exception` in context.
 
 Your `500.html` template should be self-contained. Avoid extending base templates or accessing the database/session, since server errors can occur during middleware or template rendering. `404.html` and `403.html` can safely extend base templates since they occur during view execution after middleware runs.
+
+## View patterns
+
+### Don't evaluate querysets at class level
+
+Class attributes execute at import time, not per request. Queries belong in methods.
+
+```python
+# Bad — runs once at import, stale forever
+class DashboardView(View):
+    recent_users = User.query.order_by("-created_at")[:5]
+
+# Good — fresh per request
+class DashboardView(View):
+    def get_template_context(self):
+        return {"recent_users": User.query.order_by("-created_at")[:5]}
+```
+
+### Paginate list views
+
+Always paginate querysets in list views. Unbounded queries get slower as data grows.
+
+```python
+from plain.paginator import Paginator
+
+def get_template_context(self):
+    paginator = Paginator(Item.query.all(), per_page=25)
+    page = paginator.get_page(self.request.query_params.get("page"))
+    return {"page": page}
+```
+
+### Wrap multi-step writes in transactions
+
+Use `transaction.atomic()` when creating or updating related objects together.
+
+```python
+from plain.models import transaction
+
+with transaction.atomic():
+    order = Order(user=user)
+    order.save()
+    payment = Payment(order=order, amount=total)
+    payment.save()
+```
 
 ## FAQs
 

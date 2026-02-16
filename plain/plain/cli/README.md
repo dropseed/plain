@@ -165,6 +165,7 @@ Plain includes several built-in commands:
 
 | Command               | Description                              |
 | --------------------- | ---------------------------------------- |
+| `plain check`         | Run core validation checks               |
 | `plain shell`         | Interactive Python shell                 |
 | `plain run <script>`  | Execute a Python script with app context |
 | `plain server`        | Production-ready WSGI server             |
@@ -178,6 +179,30 @@ Plain includes several built-in commands:
 | `plain upgrade`       | Upgrade Plain packages                   |
 
 Additional commands are added by installed packages (like `plain models migrate` from plain.models).
+
+### `plain check`
+
+Runs core validation checks in order, stopping on first failure:
+
+1. Custom commands (see below)
+2. `plain code check` (if `plain.code` is installed)
+3. `plain preflight --quiet`
+4. `plain migrate --check` (if DB connected)
+5. `plain makemigrations --dry-run --check` (if DB connected)
+6. `plain test` (if `plain.pytest` is installed)
+
+Use `--skip-test` to skip tests for faster iteration.
+
+#### Custom check commands
+
+Add custom commands to `plain check` by defining them in `pyproject.toml`:
+
+```toml
+[tool.plain.check.run]
+my-check = {cmd = "echo 'running my check'"}
+```
+
+Custom commands run first, before any built-in checks.
 
 ## FAQs
 

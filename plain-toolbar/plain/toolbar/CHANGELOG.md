@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.10.2](https://github.com/dropseed/plain/releases/plain-toolbar@0.10.2) (2026-02-12)
+
+### What's changed
+
+- Added `toolbar/inject.html` template for easier toolbar integration from other packages ([9db8e0aa5d43](https://github.com/dropseed/plain/commit/9db8e0aa5d43))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.10.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.10.1) (2026-02-02)
 
 ### What's changed

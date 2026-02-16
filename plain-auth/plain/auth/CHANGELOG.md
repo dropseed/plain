@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.25.3](https://github.com/dropseed/plain/releases/plain-auth@0.25.3) (2026-02-12)
+
+### What's changed
+
+- Updated README User model example to include `@models.register_model` decorator ([9db8e0aa5d43](https://github.com/dropseed/plain/commit/9db8e0aa5d43))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.25.2](https://github.com/dropseed/plain/releases/plain-auth@0.25.2) (2026-02-04)
 
 ### What's changed

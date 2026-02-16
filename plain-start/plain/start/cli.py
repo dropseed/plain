@@ -1,3 +1,4 @@
+import random
 import re
 import shutil
 import subprocess
@@ -9,6 +10,10 @@ STARTER_REPOS = {
     "app": "https://github.com/dropseed/plain-starter-app",
     "bare": "https://github.com/dropseed/plain-starter-bare",
 }
+
+# Placeholder values used in the starter templates
+TEMPLATE_CONTAINER_NAME = "app-postgres"
+TEMPLATE_DB_PORT = "54321"
 
 
 @click.command()
@@ -64,14 +69,13 @@ def cli(project_name: str, starter_type: str, no_install: bool) -> None:
         capture_output=True,
     )
 
-    # Replace project name in pyproject.toml
+    # Configure project-specific names and ports
     click.secho("Configuring project...", dim=True)
-    pyproject_path = project_path / "pyproject.toml"
+    db_port = str(random.randint(50000, 59999))
 
+    pyproject_path = project_path / "pyproject.toml"
     if pyproject_path.exists():
         content = pyproject_path.read_text()
-        # Replace the name field in pyproject.toml
-        # Matches: name = "anything" or name = 'anything'
         content = re.sub(
             r'^name\s*=\s*["\'].*?["\']',
             f'name = "{project_name}"',
@@ -79,7 +83,15 @@ def cli(project_name: str, starter_type: str, no_install: bool) -> None:
             count=1,
             flags=re.MULTILINE,
         )
+        content = content.replace(TEMPLATE_CONTAINER_NAME, f"{project_name}-postgres")
+        content = content.replace(TEMPLATE_DB_PORT, db_port)
         pyproject_path.write_text(content)
+
+    for env_file in [project_path / ".env", project_path / ".env.example"]:
+        if env_file.exists():
+            content = env_file.read_text()
+            content = content.replace(TEMPLATE_DB_PORT, db_port)
+            env_file.write_text(content)
 
     # Run install script unless --no-install
     if not no_install:

@@ -18,84 +18,39 @@ Claude's training data contains a lot of Django code. These are the most common 
 - **URLs**: Use `Router` with `urls` list, not Django's `urlpatterns`
 - **Tests**: Use `plain.test.Client`, not `django.test.Client`
 - **Settings**: Use `plain.runtime.settings`, not `django.conf.settings`
+- **Model options**: Use `model_options = models.Options(...)` not `class Meta`. Fields don't accept `unique=True` — use `UniqueConstraint` in constraints.
+- **CSRF**: Automatic header-based (Sec-Fetch-Site). No tokens in templates — no `{{ csrf_input }}` or `{% csrf_token %}`.
+- **Forms**: Headless — no `as_p()`, `as_table()`, or `as_elements()`. Render fields manually with `form.field.html_name`, `form.field.html_id`, `form.field.value()`, `form.field.errors`.
+- **Middleware**: No `AuthMiddleware` exists. Auth works through sessions + view-level checks (`AuthViewMixin`). Middleware uses short imports (`plain.admin.AdminMiddleware` not `plain.admin.middleware.AdminMiddleware`).
 
 When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
 ## Documentation
 
-Run `uv run plain docs --list` to see all official packages (installed and uninstalled) with descriptions.
-Run `uv run plain docs <package>` for markdown documentation (installed packages only).
-Run `uv run plain docs <package> --api` for the symbolicated API surface.
-For uninstalled packages, the CLI shows the install command and an online docs URL.
+- `uv run plain docs <package>` — markdown docs for an installed package
+- `uv run plain docs <package> --api` — symbolicated API surface
+- `uv run plain docs <package> --section <name>` — show a specific `##` section
+- `uv run plain docs --list` — all official packages (installed and uninstalled) with descriptions
 
 Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/path>/README.md`
-Example: `https://plainframework.com/docs/plain-models/plain/models/README.md`
 
-Examples:
+## CLI Quick Reference
 
-- `uv run plain docs models` - Models and database docs
-- `uv run plain docs models --api` - Models API surface
-- `uv run plain docs templates` - Jinja2 templates
-- `uv run plain docs assets` - Static assets
+- `uv run plain check` — run linting, preflight, migration, and test checks (add `--skip-test` for faster iteration)
+- `uv run plain pre-commit` — `check` plus commit-specific steps (custom commands, uv lock, build)
+- `uv run plain shell` — interactive Python shell with Plain configured (`-c "..."` for one-off commands)
+- `uv run plain run script.py` — run a script with Plain configured
+- `uv run plain request /path` — test HTTP request against dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`)
 
-### All official packages
+## Views
 
-- **plain** — Web framework core
-- **plain-admin** — Backend admin interface
-- **plain-api** — Class-based API views
-- **plain-auth** — User authentication and authorization
-- **plain-cache** — Database-backed cache with optional expiration
-- **plain-code** — Preconfigured code formatting and linting
-- **plain-dev** — Local development server with auto-reload
-- **plain-elements** — HTML template components
-- **plain-email** — Send email
-- **plain-esbuild** — Build JavaScript with esbuild
-- **plain-flags** — Feature flags via database models
-- **plain-htmx** — HTMX integration for templates and views
-- **plain-jobs** — Background jobs with a database-driven queue
-- **plain-loginlink** — Link-based authentication
-- **plain-models** — Model data and store it in a database
-- **plain-oauth** — OAuth provider login
-- **plain-observer** — On-page telemetry and observability
-- **plain-pages** — Serve static pages, markdown, and assets
-- **plain-pageviews** — Client-side pageview tracking
-- **plain-passwords** — Password authentication
-- **plain-pytest** — Test with pytest
-- **plain-redirection** — URL redirection with admin and logging
-- **plain-scan** — Test for production best practices
-- **plain-sessions** — Database-backed sessions
-- **plain-start** — Bootstrap a new project from templates
-- **plain-support** — Support forms for your application
-- **plain-tailwind** — Tailwind CSS without JavaScript or npm
-- **plain-toolbar** — Debug toolbar
-- **plain-tunnel** — Remote access to local dev server
-- **plain-vendor** — Vendor CDN scripts and styles
+- Don't evaluate querysets at class level — queries belong in view methods
+- Always paginate list views — unbounded queries get slower as data grows
+- Wrap multi-step writes in `transaction.atomic()`
 
-## Shell
+Run `uv run plain docs views --section "view-patterns"` for full patterns with code examples.
 
-`uv run plain shell` opens an interactive Python shell with Plain configured and database access.
+## Security
 
-Run a one-off command:
-
-```
-uv run plain shell -c "from app.users.models import User; print(User.query.count())"
-```
-
-Run a script:
-
-```
-uv run plain run script.py
-```
-
-## HTTP Requests
-
-Use `uv run plain request` to make test HTTP requests against the dev database.
-
-```
-uv run plain request /path
-uv run plain request /path --user 1
-uv run plain request /path --header "Accept: application/json"
-uv run plain request /path --method POST --data '{"key": "value"}'
-uv run plain request /path --no-body    # Headers only
-uv run plain request /path --no-headers # Body only
-```
+- Validate at form/model level, not just in views
+- Never format raw SQL strings — always use parameterized queries

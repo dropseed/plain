@@ -72,7 +72,28 @@ class DatabaseBackups:
         if backup.exists():
             raise Exception(f"Backup {name} already exists")
         backup_dir = backup.create(**create_kwargs)
+        try:
+            self.prune()
+        except Exception:
+            pass
         return backup_dir
+
+    def prune(self) -> list[str]:
+        """Delete oldest backups on the current branch (or with no branch), keeping the most recent 20."""
+        keep = 20
+        current_branch = get_git_branch()
+        backups = self.find_backups()  # sorted newest-first
+
+        # Only prune backups matching the current branch or with no branch metadata
+        prunable = [
+            b for b in backups if b.metadata.get("git_branch") in (current_branch, None)
+        ]
+
+        deleted = []
+        for backup in prunable[keep:]:
+            backup.delete()
+            deleted.append(backup.name)
+        return deleted
 
     def restore(self, name: str, **restore_kwargs: Any) -> None:
         backup = DatabaseBackup(name, backups_path=self.path)
@@ -146,10 +167,9 @@ class DatabaseBackup:
 
     def delete(self) -> None:
         backup_file = self.path / "default.backup"
-        backup_file.unlink()
+        backup_file.unlink(missing_ok=True)
         metadata_file = self.path / "metadata.json"
-        if metadata_file.exists():
-            metadata_file.unlink()
+        metadata_file.unlink(missing_ok=True)
         self.path.rmdir()
 
     def updated_at(self) -> datetime.datetime:

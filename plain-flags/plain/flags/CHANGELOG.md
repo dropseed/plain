@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.33.3](https://github.com/dropseed/plain/releases/plain-flags@0.33.3) (2026-02-12)
+
+### What's changed
+
+- Fixed missing `template_name` on FlagResult admin UpdateView ([ee27ad10c407](https://github.com/dropseed/plain/commit/ee27ad10c407))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.33.2](https://github.com/dropseed/plain/releases/plain-flags@0.33.2) (2026-02-04)
 
 ### What's changed

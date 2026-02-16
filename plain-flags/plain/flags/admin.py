@@ -78,3 +78,4 @@ class FlagResultAdmin(AdminViewset):
         model = FlagResult
         title = "Update flag result"
         form_class = FlagResultForm
+        template_name = "admin/plainflags/flagresult_form.html"
