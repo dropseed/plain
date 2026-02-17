@@ -1,4 +1,4 @@
-from ..postgres.schema import DatabaseSchemaEditor as BaseDatabaseSchemaEditor
+from ..postgres.schema import DatabaseSchemaEditor
 from .migration import Migration, settings_dependency
 from .operations import (
     AddConstraint,
@@ -48,6 +48,6 @@ __all__ = [
     "RunSQL",
     "RunPython",
     # Type hints for RunPython functions
-    "BaseDatabaseSchemaEditor",
+    "DatabaseSchemaEditor",
     "StateModelsRegistry",
 ]

@@ -759,14 +759,14 @@ class CombinedExpression(Expression):
         reuse: Any = None,
         summarize: bool = False,
         for_save: bool = False,
-    ) -> CombinedExpression | DurationExpression | TemporalSubtraction:
+    ) -> CombinedExpression | TemporalSubtraction:
         lhs = self.lhs.resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
         rhs = self.rhs.resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
-        if not isinstance(self, DurationExpression | TemporalSubtraction):
+        if not isinstance(self, TemporalSubtraction):
             try:
                 lhs_type = lhs.output_field.get_internal_type()
             except (AttributeError, FieldError):
@@ -775,16 +775,6 @@ class CombinedExpression(Expression):
                 rhs_type = rhs.output_field.get_internal_type()
             except (AttributeError, FieldError):
                 rhs_type = None
-            if "DurationField" in {lhs_type, rhs_type} and lhs_type != rhs_type:
-                return DurationExpression(
-                    self.lhs, self.connector, self.rhs
-                ).resolve_expression(
-                    query,
-                    allow_joins,
-                    reuse,
-                    summarize,
-                    for_save,
-                )
             datetime_fields = {"DateField", "DateTimeField", "TimeField"}
             if (
                 self.connector == self.SUB
@@ -803,20 +793,6 @@ class CombinedExpression(Expression):
         c.lhs = lhs
         c.rhs = rhs
         return c
-
-
-class DurationExpression(CombinedExpression):
-    def compile(
-        self, side: Any, compiler: SQLCompiler, connection: DatabaseWrapper
-    ) -> tuple[str, Sequence[Any]]:
-        # PostgreSQL has native interval (duration) type, no special formatting needed
-        return compiler.compile(side)
-
-    def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
-    ) -> tuple[str, list[Any]]:
-        # PostgreSQL has native duration field support
-        return super().as_sql(compiler, connection)
 
 
 class TemporalSubtraction(CombinedExpression):

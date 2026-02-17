@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
-    from plain.models.fields.related import ForeignKeyField, ManyToManyField
+    from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ManyToManyRel
     from plain.models.postgres.wrapper import DatabaseWrapper
 
@@ -1410,56 +1410,6 @@ class DatabaseSchemaEditor:
                 [],
             ),
             [],
-        )
-
-    def _alter_many_to_many(
-        self,
-        model: type[Model],
-        old_field: ManyToManyField,
-        new_field: ManyToManyField,
-        strict: bool,
-    ) -> None:
-        """Alter M2Ms to repoint their to= endpoints."""
-        # Type narrow for ManyToManyField.remote_field
-        old_rel: ManyToManyRel = old_field.remote_field
-        new_rel: ManyToManyRel = new_field.remote_field
-
-        # Rename the through table
-        if (
-            old_rel.through.model_options.db_table
-            != new_rel.through.model_options.db_table
-        ):
-            self.alter_db_table(
-                old_rel.through,
-                old_rel.through.model_options.db_table,
-                new_rel.through.model_options.db_table,
-            )
-        # Repoint the FK to the other side
-        old_reverse_field = old_rel.through._model_meta.get_forward_field(
-            old_field.m2m_reverse_field_name()
-        )
-        new_reverse_field = new_rel.through._model_meta.get_forward_field(
-            new_field.m2m_reverse_field_name()
-        )
-        self.alter_field(
-            new_rel.through,
-            # The field that points to the target model is needed, so we can
-            # tell alter_field to change it - this is m2m_reverse_field_name()
-            # (as opposed to m2m_field_name(), which points to our model).
-            old_reverse_field,
-            new_reverse_field,
-        )
-        old_m2m_field = old_rel.through._model_meta.get_forward_field(
-            old_field.m2m_field_name()
-        )
-        new_m2m_field = new_rel.through._model_meta.get_forward_field(
-            new_field.m2m_field_name()
-        )
-        self.alter_field(
-            new_rel.through,
-            # for self-referential models we need to alter field from the other end too
-            old_m2m_field,
-            new_m2m_field,
         )
 
     def _create_index_name(

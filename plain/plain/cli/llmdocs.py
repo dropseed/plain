@@ -258,10 +258,7 @@ class LLMDocs:
 
         if include_docs:
             for doc in self.docs:
-                display = get_display_path(doc)
-                click.secho(f"<Docs: {display}>", fg="yellow")
                 click.echo(doc.read_text())
-                click.secho(f"</Docs: {display}>", fg="yellow")
                 click.echo()
 
         if include_api:

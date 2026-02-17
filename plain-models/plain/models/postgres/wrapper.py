@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import _thread
-import copy
 import datetime
 import logging
 import os
@@ -79,22 +78,6 @@ class TableInfo(NamedTuple):
 
     name: str
     type: str
-    comment: str | None
-
-
-class FieldInfo(NamedTuple):
-    """Structure returned by the DB-API cursor.description interface (PEP 249)."""
-
-    name: str
-    type_code: Any
-    display_size: int | None
-    internal_size: int | None
-    precision: int | None
-    scale: int | None
-    null_ok: bool | None
-    default: Any
-    collation: str | None
-    is_autofield: bool
     comment: str | None
 
 
@@ -207,29 +190,6 @@ class DatabaseWrapper:
     queries_limit: int = 9000
     executable_name: str = "psql"
 
-    # Introspection attributes: Maps PostgreSQL type codes to Plain Field types.
-    data_types_reverse: dict[Any, str] = {
-        16: "BooleanField",
-        17: "BinaryField",
-        20: "BigIntegerField",
-        21: "SmallIntegerField",
-        23: "IntegerField",
-        25: "TextField",
-        700: "FloatField",
-        701: "FloatField",
-        869: "GenericIPAddressField",
-        1042: "CharField",  # blank-padded
-        1043: "CharField",
-        1082: "DateField",
-        1083: "TimeField",
-        1114: "DateTimeField",
-        1184: "DateTimeField",
-        1186: "DurationField",
-        1266: "TimeField",
-        1700: "DecimalField",
-        2950: "UUIDField",
-        3802: "JSONField",
-    }
     index_default_access_method = "btree"
     ignored_tables: list[str] = []
 
@@ -903,13 +863,6 @@ class DatabaseWrapper:
 
     # ##### Miscellaneous #####
 
-    def prepare_database(self) -> None:
-        """
-        Hook to do any database check or preparation, generally called before
-        migrating a project or an app.
-        """
-        pass
-
     @cached_property
     def wrap_database_errors(self) -> DatabaseErrorWrapper:
         """
@@ -1065,30 +1018,7 @@ class DatabaseWrapper:
                 return "CAST(%s AS {})".format(db_type.split("(")[0])
         return "%s"
 
-    def copy(self) -> DatabaseWrapper:
-        """
-        Return a copy of this connection.
-
-        For tests that require two connections to the same database.
-        """
-        settings_dict = copy.deepcopy(self.settings_dict)
-        return type(self)(settings_dict)
-
-    # ##### Introspection methods (merged from DatabaseIntrospection) #####
-
-    def get_field_type(self, data_type: Any, description: Any) -> str:
-        """
-        Hook for a database backend to use the cursor description to
-        match a Plain field type to a database column.
-        """
-        field_type = self.data_types_reverse[data_type]
-        if description.is_autofield or (
-            # Required for pre-Plain 4.1 serial columns.
-            description.default and "nextval" in description.default
-        ):
-            if field_type == "BigIntegerField":
-                return "PrimaryKeyField"
-        return field_type
+    # ##### Introspection methods #####
 
     def table_names(
         self, cursor: CursorWrapper | None = None, include_views: bool = False
@@ -1140,53 +1070,6 @@ class DatabaseWrapper:
             if row[0] not in self.ignored_tables
         ]
 
-    def get_table_description(
-        self, cursor: CursorWrapper, table_name: str
-    ) -> Sequence[FieldInfo]:
-        """
-        Return a description of the table with the DB-API cursor.description
-        interface.
-        """
-        # Query the pg_catalog tables as cursor.description does not reliably
-        # return the nullable property and information_schema.columns does not
-        # contain details of materialized views.
-        cursor.execute(
-            """
-            SELECT
-                a.attname AS column_name,
-                NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,
-                pg_get_expr(ad.adbin, ad.adrelid) AS column_default,
-                CASE WHEN collname = 'default' THEN NULL ELSE collname END AS collation,
-                a.attidentity != '' AS is_autofield,
-                col_description(a.attrelid, a.attnum) AS column_comment
-            FROM pg_attribute a
-            LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
-            LEFT JOIN pg_collation co ON a.attcollation = co.oid
-            JOIN pg_type t ON a.atttypid = t.oid
-            JOIN pg_class c ON a.attrelid = c.oid
-            JOIN pg_namespace n ON c.relnamespace = n.oid
-            WHERE c.relkind IN ('f', 'm', 'p', 'r', 'v')
-                AND c.relname = %s
-                AND n.nspname NOT IN ('pg_catalog', 'pg_toast')
-                AND pg_catalog.pg_table_is_visible(c.oid)
-        """,
-            [table_name],
-        )
-        field_map = {line[0]: line[1:] for line in cursor.fetchall()}
-        cursor.execute(f"SELECT * FROM {quote_name(table_name)} LIMIT 1")
-        return [
-            FieldInfo(
-                line.name,
-                line.type_code,
-                line.internal_size if line.display_size is None else line.display_size,
-                line.internal_size,
-                line.precision,
-                line.scale,
-                *field_map[line.name],
-            )
-            for line in cursor.description
-        ]
-
     def plain_table_names(
         self, only_existing: bool = False, include_views: bool = True
     ) -> list[str]:
@@ -1207,23 +1090,6 @@ class DatabaseWrapper:
             existing_tables = set(self.table_names(include_views=include_views))
             tables = [t for t in tables if t in existing_tables]
         return tables
-
-    def sequence_list(self) -> list[dict[str, Any]]:
-        """
-        Return a list of information about all DB sequences for all models in
-        all packages.
-        """
-        sequence_list = []
-        with self.cursor() as cursor:
-            for model in get_migratable_models():
-                sequence_list.extend(
-                    self.get_sequences(
-                        cursor,
-                        model.model_options.db_table,
-                        model._model_meta.local_fields,
-                    )
-                )
-        return sequence_list
 
     def get_sequences(
         self, cursor: CursorWrapper, table_name: str, table_fields: tuple[Any, ...] = ()
@@ -1256,51 +1122,6 @@ class DatabaseWrapper:
             {"name": row[0], "table": table_name, "column": row[1]}
             for row in cursor.fetchall()
         ]
-
-    def get_relations(
-        self, cursor: CursorWrapper, table_name: str
-    ) -> dict[str, tuple[str, str]]:
-        """
-        Return a dictionary of {field_name: (field_name_other_table, other_table)}
-        representing all foreign keys in the given table.
-        """
-        cursor.execute(
-            """
-            SELECT a1.attname, c2.relname, a2.attname
-            FROM pg_constraint con
-            LEFT JOIN pg_class c1 ON con.conrelid = c1.oid
-            LEFT JOIN pg_class c2 ON con.confrelid = c2.oid
-            LEFT JOIN
-                pg_attribute a1 ON c1.oid = a1.attrelid AND a1.attnum = con.conkey[1]
-            LEFT JOIN
-                pg_attribute a2 ON c2.oid = a2.attrelid AND a2.attnum = con.confkey[1]
-            WHERE
-                c1.relname = %s AND
-                con.contype = 'f' AND
-                c1.relnamespace = c2.relnamespace AND
-                pg_catalog.pg_table_is_visible(c1.oid)
-        """,
-            [table_name],
-        )
-        return {row[0]: (row[2], row[1]) for row in cursor.fetchall()}
-
-    def get_primary_key_column(
-        self, cursor: CursorWrapper, table_name: str
-    ) -> str | None:
-        """
-        Return the name of the primary key column for the given table.
-        """
-        columns = self.get_primary_key_columns(cursor, table_name)
-        return columns[0] if columns else None
-
-    def get_primary_key_columns(
-        self, cursor: CursorWrapper, table_name: str
-    ) -> list[str] | None:
-        """Return a list of primary key columns for the given table."""
-        for constraint in self.get_constraints(cursor, table_name).values():
-            if constraint["primary_key"]:
-                return constraint["columns"]
-        return None
 
     def get_constraints(
         self, cursor: CursorWrapper, table_name: str
@@ -1587,18 +1408,6 @@ class DatabaseWrapper:
         return self._get_database_create_suffix(
             encoding=test_settings.get("CHARSET"),
             template=test_settings.get("TEMPLATE"),
-        )
-
-    def test_db_signature(self, prefix: str = "") -> tuple[str | int, ...]:
-        """
-        Return a tuple with elements of self.settings_dict (a
-        DATABASE setting value) that uniquely identify a database
-        accordingly to the RDBMS particularities.
-        """
-        return (
-            self.settings_dict.get("HOST") or "",
-            self.settings_dict.get("PORT") or "",
-            self._get_test_db_name(prefix),
         )
 
 

@@ -412,9 +412,6 @@ def apply(
         truncated = Truncator(action)
         return prefix + operation.describe() + truncated.chars(40), is_error
 
-    # Hook for any database preparation before running migrations.
-    db_connection.prepare_database()
-
     # Work out which packages have migrations and which do not
     executor = MigrationExecutor(db_connection, migration_progress_callback)
 

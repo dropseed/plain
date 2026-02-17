@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import decimal
 import functools
 import logging
 import time
@@ -277,28 +276,6 @@ def names_digest(*args: str, length: int) -> str:
     for arg in args:
         h.update(arg.encode())
     return h.hexdigest()[:length]
-
-
-def format_number(
-    value: decimal.Decimal | None, max_digits: int | None, decimal_places: int | None
-) -> str | None:
-    """
-    Format a number into a string with the requisite number of digits and
-    decimal places.
-    """
-    if value is None:
-        return None
-    context = decimal.getcontext().copy()
-    if max_digits is not None:
-        context.prec = max_digits
-    if decimal_places is not None:
-        value = value.quantize(
-            decimal.Decimal(1).scaleb(-decimal_places), context=context
-        )
-    else:
-        context.traps[decimal.Rounded] = True
-        value = context.create_decimal(value)
-    return f"{value:f}"
 
 
 def strip_quotes(table_name: str) -> str:

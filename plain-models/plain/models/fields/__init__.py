@@ -248,7 +248,6 @@ class Field(RegisterLookupMixin, Generic[T]):
             *self._check_field_name(),
             *self._check_choices(),
             *self._check_null_allowed_for_primary_keys(),
-            *self._check_backend_specific_checks(),
             *self._check_validators(),
         ]
 
@@ -374,10 +373,6 @@ class Field(RegisterLookupMixin, Generic[T]):
             ]
         else:
             return []
-
-    def _check_backend_specific_checks(self) -> list[PreflightResult]:
-        # All field types are supported, nothing to check
-        return []
 
     def _check_validators(self) -> list[PreflightResult]:
         errors = []

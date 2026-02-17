@@ -160,10 +160,6 @@ class NotSupportedError(DatabaseError):
     pass
 
 
-class ConnectionDoesNotExist(Exception):
-    pass
-
-
 class DatabaseErrorWrapper:
     """
     Context manager and decorator that reraises backend-specific database
