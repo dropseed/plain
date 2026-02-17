@@ -1,5 +1,23 @@
 # plain-models changelog
 
+## [0.78.0](https://github.com/dropseed/plain/releases/plain-models@0.78.0) (2026-02-16)
+
+### What's changed
+
+- **PostgreSQL is now the only supported database** — MySQL and SQLite backends have been removed ([6f3a066bf80f](https://github.com/dropseed/plain/commit/6f3a066bf80f))
+- The `ENGINE` key has been removed from the `DATABASE` setting — it is no longer needed since PostgreSQL is implicit ([6f3a066bf80f](https://github.com/dropseed/plain/commit/6f3a066bf80f))
+- Database backends consolidated from `backends/base/`, `backends/postgresql/`, `backends/mysql/`, and `backends/sqlite3/` into a single `postgres/` module ([6f3a066bf80f](https://github.com/dropseed/plain/commit/6f3a066bf80f))
+- Removed `DatabaseOperations` indirection layer — compilers are now created directly by `Query.get_compiler()` ([6f3a066bf80f](https://github.com/dropseed/plain/commit/6f3a066bf80f))
+- Removed backend feature flags and multi-database conditional code throughout expressions, aggregates, schema editor, and migrations ([6f3a066bf80f](https://github.com/dropseed/plain/commit/6f3a066bf80f))
+- Installation now recommends `uv add plain.models psycopg[binary]` to include the PostgreSQL driver ([6f3a066bf80f](https://github.com/dropseed/plain/commit/6f3a066bf80f))
+
+### Upgrade instructions
+
+- Remove `"ENGINE"` from your `DATABASE` setting — it will be ignored
+- If you were using MySQL or SQLite, you must migrate to PostgreSQL
+- Update any imports from `plain.models.backends.base` or `plain.models.backends.postgresql` to `plain.models.postgres`
+- Install a PostgreSQL driver if you haven't already: `uv add psycopg[binary]`
+
 ## [0.77.1](https://github.com/dropseed/plain/releases/plain-models@0.77.1) (2026-02-13)
 
 ### What's changed
