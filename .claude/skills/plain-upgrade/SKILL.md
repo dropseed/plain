@@ -25,7 +25,7 @@ For each package that was upgraded:
 ## 3. Validate
 
 1. Run `uv run plain fix` to fix formatting
-2. Run `uv run plain preflight` to validate configuration
+2. Run `uv run plain check` to validate (linting, preflight, migrations, tests)
 
 ## Guidelines
 
