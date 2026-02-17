@@ -767,7 +767,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-pageviews"
-version = "0.32.2"
+version = "0.33.0"
 source = { editable = "plain-pageviews" }
 dependencies = [
     { name = "plain" },

@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.33.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.33.0) (2026-02-16)
+
+### What's changed
+
+- Increased `Pageview.url` max length from 768 to 2048 characters, now that MySQL index constraints no longer apply ([6f3a066bf80f](https://github.com/dropseed/plain/commit/6f3a066bf80f))
+
+### Upgrade instructions
+
+- Run `uv run plain migrate` to apply the migration that increases the URL field length.
+
 ## [0.32.2](https://github.com/dropseed/plain/releases/plain-pageviews@0.32.2) (2026-02-04)
 
 ### What's changed
