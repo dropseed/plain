@@ -7,11 +7,14 @@ from itertools import chain
 from operator import attrgetter, or_
 from typing import TYPE_CHECKING, Any
 
-from plain.models import query_utils, transaction
-from plain.models.db import IntegrityError, db_connection
+from plain.models import (
+    query_utils,
+    transaction,
+)
+from plain.models.db import IntegrityError
 from plain.models.meta import Meta
 from plain.models.query import QuerySet
-from plain.models.sql.subqueries import DeleteQuery, UpdateQuery
+from plain.models.sql import DeleteQuery, UpdateQuery
 
 if TYPE_CHECKING:
     from plain.models.fields import Field
@@ -38,8 +41,6 @@ def CASCADE(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
         nullable=field.allow_null,
         fail_on_restricted=False,
     )
-    if field.allow_null and not db_connection.features.can_defer_constraint_checks:
-        collector.add_field_update(field, None, sub_objs)
 
 
 def PROTECT(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
@@ -125,10 +126,9 @@ class Collector:
         # fetching the objects into memory.
         self.fast_deletes: list[Any] = []
 
-        # Tracks deletion-order dependency for databases without transactions
-        # or ability to defer constraint checks. Only concrete model classes
-        # should be included, as the dependencies exist only between actual
-        # database tables.
+        # Tracks deletion-order dependency for constraint checks. Only
+        # concrete model classes should be included, as the dependencies
+        # exist only between actual database tables.
         self.dependencies: defaultdict[Any, set[Any]] = defaultdict(
             set
         )  # {model: {models}}
@@ -241,23 +241,6 @@ class Collector:
             )
         )
 
-    def get_del_batches(self, objs: list[Any], fields: list[Field]) -> list[list[Any]]:
-        """
-        Return the objs in suitably sized batches for the used db_connection.
-        """
-        field_names = [field.name for field in fields]
-        conn_batch_size = max(
-            db_connection.ops.bulk_batch_size(field_names, objs),
-            1,
-        )
-        if len(objs) > conn_batch_size:
-            return [
-                objs[i : i + conn_batch_size]
-                for i in range(0, len(objs), conn_batch_size)
-            ]
-        else:
-            return [objs]
-
     def collect(
         self,
         objs: Iterable[Any],
@@ -313,31 +296,29 @@ class Collector:
             if self.can_fast_delete(related_model, from_field=field):
                 model_fast_deletes[related_model].append(field)
                 continue
-            batches = self.get_del_batches(new_objs, [field])
-            for batch in batches:
-                sub_objs = self.related_objects(related_model, [field], batch)
-                # Non-referenced fields can be deferred if no signal receivers
-                # are connected for the related model as they'll never be
-                # exposed to the user. Skip field deferring when some
-                # relationships are select_related as interactions between both
-                # features are hard to get right. This should only happen in
-                # the rare cases where .related_objects is overridden anyway.
-                if not sub_objs.sql_query.select_related:
-                    referenced_fields = set(
-                        chain.from_iterable(
-                            (rf.attname for rf in rel.field.foreign_related_fields)
-                            for rel in get_candidate_relations_to_delete(
-                                related_model._model_meta
-                            )
+            sub_objs = self.related_objects(related_model, [field], new_objs)
+            # Non-referenced fields can be deferred if no signal receivers
+            # are connected for the related model as they'll never be
+            # exposed to the user. Skip field deferring when some
+            # relationships are select_related as interactions between both
+            # features are hard to get right. This should only happen in
+            # the rare cases where .related_objects is overridden anyway.
+            if not sub_objs.sql_query.select_related:
+                referenced_fields = set(
+                    chain.from_iterable(
+                        (rf.attname for rf in rel.field.foreign_related_fields)
+                        for rel in get_candidate_relations_to_delete(
+                            related_model._model_meta
                         )
                     )
-                    sub_objs = sub_objs.only(*tuple(referenced_fields))
-                if getattr(on_delete, "lazy_sub_objs", False) or sub_objs:
-                    try:
-                        on_delete(self, field, sub_objs)
-                    except ProtectedError as error:
-                        key = f"'{field.model.__name__}.{field.name}'"
-                        protected_objects[key] += error.protected_objects
+                )
+                sub_objs = sub_objs.only(*tuple(referenced_fields))
+            if getattr(on_delete, "lazy_sub_objs", False) or sub_objs:
+                try:
+                    on_delete(self, field, sub_objs)
+                except ProtectedError as error:
+                    key = f"'{field.model.__name__}.{field.name}'"
+                    protected_objects[key] += error.protected_objects
         if protected_objects:
             raise ProtectedError(
                 "Cannot delete some instances of model {!r} because they are "
@@ -348,10 +329,8 @@ class Collector:
                 set(chain.from_iterable(protected_objects.values())),
             )
         for related_model, related_fields in model_fast_deletes.items():
-            batches = self.get_del_batches(new_objs, related_fields)
-            for batch in batches:
-                sub_objs = self.related_objects(related_model, related_fields, batch)
-                self.fast_deletes.append(sub_objs)
+            sub_objs = self.related_objects(related_model, related_fields, new_objs)
+            self.fast_deletes.append(sub_objs)
 
         if fail_on_restricted:
             # Raise an error if collected restricted objects (RESTRICT) aren't

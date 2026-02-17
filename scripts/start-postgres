@@ -1,0 +1,43 @@
+#!/bin/bash -e
+
+# Start a local PostgreSQL instance via Docker for development/testing.
+# Sets DATABASE_URL if not already set.
+#
+# Usage:
+#   source scripts/start-postgres [db_name]
+#
+# The optional db_name argument defaults to "plain_dev".
+
+DB_NAME="${1:-plain_dev}"
+
+if [ -z "$DATABASE_URL" ]; then
+  export DATABASE_URL="postgres://postgres:postgres@localhost:5432/$DB_NAME"
+
+  if ! pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+    echo "Starting PostgreSQL via Docker..."
+    # Try starting an existing stopped container first, otherwise create a new one
+    if docker start plain-postgres-dev >/dev/null 2>&1; then
+      true
+    else
+      docker run -d --name plain-postgres-dev \
+        -e POSTGRES_PASSWORD=postgres \
+        -e POSTGRES_DB="$DB_NAME" \
+        -p 5432:5432 \
+        postgres:16 >/dev/null 2>&1
+    fi
+
+    # Wait for PostgreSQL to be ready
+    echo "Waiting for PostgreSQL to be ready..."
+    for i in {1..30}; do
+      if pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+
+    if ! pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+      echo "ERROR: PostgreSQL failed to start. Check Docker."
+      exit 1
+    fi
+  fi
+fi

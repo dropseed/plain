@@ -8,23 +8,28 @@ from plain.models.fields import DecimalField, Field, FloatField, IntegerField
 from plain.models.functions import Cast
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 
 class FixDecimalInputMixin(Func):
-    """Mixin for Func subclasses that need to convert FloatField to DecimalField on PostgreSQL."""
+    """
+    Mixin for Func subclasses that need to convert FloatField to DecimalField.
 
-    def as_postgresql(
+    PostgreSQL doesn't support the following function signatures:
+    - LOG(double, double)
+    - MOD(double, double)
+    """
+
+    def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
+        function: str | None = None,
+        template: str | None = None,
+        arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
-        # Cast FloatField to DecimalField as PostgreSQL doesn't support the
-        # following function signatures:
-        # - LOG(double, double)
-        # - MOD(double, double)
         output_field = DecimalField(decimal_places=sys.float_info.dig, max_digits=1000)
 
         clone = self.copy()
@@ -36,20 +41,9 @@ class FixDecimalInputMixin(Func):
                 for expression in self.get_source_expressions()
             ]
         )
-        return clone.as_sql(compiler, connection, **extra_context)
-
-
-class FixDurationInputMixin(Func):
-    def as_mysql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        sql, params = super().as_sql(compiler, connection, **extra_context)
-        if self.output_field.get_internal_type() == "DurationField":
-            sql = f"CAST({sql} AS SIGNED)"
-        return sql, params
+        return super(FixDecimalInputMixin, clone).as_sql(
+            compiler, connection, **extra_context
+        )
 
 
 class NumericOutputFieldMixin(Func):

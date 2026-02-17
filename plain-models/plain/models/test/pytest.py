@@ -10,8 +10,8 @@ from plain.models.otel import suppress_db_tracing
 from plain.signals import request_finished, request_started
 
 from .. import transaction
-from ..backends.base.base import BaseDatabaseWrapper
 from ..db import close_old_connections, db_connection
+from ..postgres.wrapper import DatabaseWrapper
 from .utils import (
     setup_database,
     teardown_database,
@@ -29,13 +29,13 @@ def _db_disabled() -> Generator[None, None, None]:
         pytest.fail("Database access not allowed without the `db` fixture")
 
     # Save original cursor method and replace with disabled version
-    setattr(BaseDatabaseWrapper, "_enabled_cursor", BaseDatabaseWrapper.cursor)
-    BaseDatabaseWrapper.cursor = cursor_disabled  # type: ignore[assignment]
+    setattr(DatabaseWrapper, "_enabled_cursor", DatabaseWrapper.cursor)
+    DatabaseWrapper.cursor = cursor_disabled  # type: ignore[assignment]
 
     yield
 
     # Restore original cursor method
-    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")
+    DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
 
 
 @pytest.fixture(scope="session")
@@ -69,10 +69,7 @@ def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
 
     # Set .cursor() back to the original implementation to unblock it
-    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")
-
-    if not db_connection.features.supports_transactions:
-        pytest.fail("Database does not support transactions")
+    DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
 
     with suppress_db_tracing():
         atomic = transaction.atomic()
@@ -82,11 +79,8 @@ def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
     yield
 
     with suppress_db_tracing():
-        if (
-            db_connection.features.can_defer_constraint_checks
-            and not db_connection.needs_rollback
-            and db_connection.is_usable()
-        ):
+        # PostgreSQL can defer constraint checks
+        if not db_connection.needs_rollback and db_connection.is_usable():
             db_connection.check_constraints()
 
         db_connection.set_rollback(True)
@@ -105,7 +99,7 @@ def isolated_db(request: Any) -> Generator[None, None, None]:
     if "db" in request.fixturenames:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
     # Set .cursor() back to the original implementation to unblock it
-    BaseDatabaseWrapper.cursor = getattr(BaseDatabaseWrapper, "_enabled_cursor")
+    DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
 
     verbosity = 1
 

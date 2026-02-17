@@ -340,15 +340,6 @@ wheels = [
 ]
 
 [[package]]
-name = "mysqlclient"
-version = "2.2.7"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/61/68/810093cb579daae426794bbd9d88aa830fae296e85172d18cb0f0e5dd4bc/mysqlclient-2.2.7.tar.gz", hash = "sha256:24ae22b59416d5fcce7e99c9d37548350b4565baac82f95e149cac6ce4163845", size = 91383, upload-time = "2025-01-10T12:06:00.763Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/29/01/e80141f1cd0459e4c9a5dd309dee135bbae41d6c6c121252fdd853001a8a/mysqlclient-2.2.7-cp313-cp313-win_amd64.whl", hash = "sha256:201a6faa301011dd07bca6b651fe5aaa546d7c9a5426835a06c3172e1056a3c5", size = 208000, upload-time = "2025-01-10T11:56:32.293Z" },
-]
-
-[[package]]
 name = "nose"
 version = "1.3.7"
 source = { registry = "https://pypi.org/simple" }
@@ -979,7 +970,6 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
-    { name = "mysqlclient" },
     { name = "plain" },
     { name = "plain-admin" },
     { name = "plain-api" },
@@ -1017,7 +1007,6 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "mysqlclient", specifier = ">=2.2.7" },
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
     { name = "plain-api", editable = "plain-api" },

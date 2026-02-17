@@ -8,7 +8,6 @@ without relying on automatic related_name generation.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 if TYPE_CHECKING:
@@ -21,7 +20,7 @@ T = TypeVar("T", bound="Model")
 QS = TypeVar("QS", bound="QuerySet[Any]", default="QuerySet[Any]")
 
 
-class BaseReverseDescriptor(Generic[T, QS], ABC):
+class BaseReverseDescriptor(Generic[T, QS]):
     """
     Base class for reverse relation descriptors.
 
@@ -108,25 +107,21 @@ class BaseReverseDescriptor(Generic[T, QS], ABC):
             f"('{self.name}') is prohibited. Use {self.name}.set() instead."
         )
 
-    @abstractmethod
     def _get_descriptor_type(self) -> str:
         """Return the name of this descriptor type for error messages."""
-        ...
+        raise NotImplementedError("Subclasses must implement _get_descriptor_type()")
 
-    @abstractmethod
     def _get_field_type(self) -> str:
         """Return the name of the forward field type for error messages."""
-        ...
+        raise NotImplementedError("Subclasses must implement _get_field_type()")
 
-    @abstractmethod
     def _validate_field_type(self, related_model: type[Model]) -> None:
         """Validate that the resolved field is the correct type."""
-        ...
+        raise NotImplementedError("Subclasses must implement _validate_field_type()")
 
-    @abstractmethod
     def _create_manager(self, instance: Model) -> Any:
         """Create and return the appropriate manager for this instance."""
-        ...
+        raise NotImplementedError("Subclasses must implement _create_manager()")
 
 
 class ReverseForeignKey(BaseReverseDescriptor[T, QS]):

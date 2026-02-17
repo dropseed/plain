@@ -14,14 +14,6 @@ There are also plenty of things that don't warrant an entire package! Copy and p
 
 ## Development Setup
 
-### Database client dependencies
+### Database dependencies
 
-The easiest and best development experience involves installing the database client libraries.
-
-**MySQL**: The `mysqlclient` package requires system dependencies to compile:
-
-```bash
-brew install mysql pkg-config
-```
-
-**PostgreSQL**: Already included via `psycopg[binary]` in the dev dependencies.
+PostgreSQL is already included via `psycopg[binary]` in the dev dependencies.

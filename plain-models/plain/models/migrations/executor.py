@@ -13,7 +13,7 @@ from .recorder import MigrationRecorder
 from .state import ProjectState
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 
 class MigrationExecutor:
@@ -24,7 +24,7 @@ class MigrationExecutor:
 
     def __init__(
         self,
-        connection: BaseDatabaseWrapper | DatabaseConnection,
+        connection: DatabaseWrapper | DatabaseConnection,
         progress_callback: Callable[..., Any] | None = None,
     ) -> None:
         self.connection = connection

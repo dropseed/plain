@@ -1,3 +1,8 @@
-#!/bin/sh -e
+#!/bin/bash -e
+
+# Makemigrations requires a database connection to check migration history consistency.
+
+source scripts/start-postgres plain_example
+
 cd example
-DATABASE_URL=sqlite://:memory: uv run plain makemigrations "$@"
+uv run plain makemigrations "$@"

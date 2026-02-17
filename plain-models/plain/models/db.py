@@ -6,7 +6,6 @@ from plain import signals
 
 from .connections import DatabaseConnection
 from .exceptions import (
-    ConnectionDoesNotExist,
     DatabaseError,
     DatabaseErrorWrapper,
     DataError,
@@ -57,8 +56,6 @@ __all__ = [
     "InternalError",
     "ProgrammingError",
     "NotSupportedError",
-    "ConnectionDoesNotExist",
     "DatabaseErrorWrapper",
-    "reset_queries",
     "close_old_connections",
 ]

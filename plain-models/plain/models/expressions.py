@@ -4,7 +4,6 @@ import copy
 import datetime
 import functools
 import inspect
-from abc import ABC, abstractmethod
 from collections import defaultdict
 from decimal import Decimal
 from functools import cached_property
@@ -14,12 +13,20 @@ from uuid import UUID
 
 from plain.models import fields
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import (
-    DatabaseError,
-    NotSupportedError,
-    db_connection,
-)
+from plain.models.db import NotSupportedError
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
+from plain.models.postgres.sql import (
+    CURRENT_ROW,
+    FOLLOWING,
+    PRECEDING,
+    UNBOUNDED_FOLLOWING,
+    UNBOUNDED_PRECEDING,
+    combine_expression,
+    quote_name,
+    subtract_temporals,
+    window_frame_range_start_end,
+    window_frame_rows_start_end,
+)
 from plain.models.query_utils import Q
 from plain.utils.deconstruct import deconstructible
 from plain.utils.hashable import make_hashable
@@ -27,9 +34,9 @@ from plain.utils.hashable import make_hashable
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
-    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.fields import Field
     from plain.models.lookups import Lookup, Transform
+    from plain.models.postgres.wrapper import DatabaseWrapper
     from plain.models.query import QuerySet
     from plain.models.sql.compiler import SQLCompilable, SQLCompiler
     from plain.models.sql.query import Query
@@ -234,7 +241,7 @@ class BaseExpression:
         return state
 
     def get_db_converters(
-        self, connection: BaseDatabaseWrapper
+        self, connection: DatabaseWrapper
     ) -> list[Callable[..., Any]]:
         converters = []
         if self.convert_value is not self._convert_value_noop:
@@ -257,21 +264,10 @@ class BaseExpression:
         ]
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         """
-        Responsible for returning a (sql, [params]) tuple to be included
-        in the current query.
-
-        Different backends can provide their own implementation, by
-        providing an `as_{vendor}` method and patching the Expression:
-
-        ```
-        def override_as_sql(self, compiler, connection):
-            # custom logic
-            return super().as_sql(compiler, connection)
-        setattr(Expression, 'as_' + connection.vendor, override_as_sql)
-        ```
+        Return a (sql, params) tuple to be included in the current query.
 
         Arguments:
          * compiler: the query compiler responsible for generating the query.
@@ -399,7 +395,7 @@ class BaseExpression:
 
     @staticmethod
     def _convert_value_noop(
-        value: Any, expression: Any, connection: BaseDatabaseWrapper
+        value: Any, expression: Any, connection: DatabaseWrapper
     ) -> Any:
         return value
 
@@ -519,10 +515,7 @@ class BaseExpression:
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
-        """
-        Custom format for select clauses. For example, EXISTS expressions need
-        to be wrapped in CASE WHEN on Oracle.
-        """
+        """Custom format for select clauses."""
         if output_field := getattr(self, "output_field", None):
             if select_format := getattr(output_field, "select_format", None):
                 return select_format(compiler, sql, params)
@@ -583,8 +576,6 @@ _connector_combinations = [
             Combinable.ADD,
             Combinable.SUB,
             Combinable.MUL,
-            # Behavior for DIV with integer arguments follows Postgres/SQLite,
-            # not MySQL/Oracle.
             Combinable.DIV,
             Combinable.MOD,
             Combinable.POW,
@@ -707,28 +698,7 @@ def _resolve_combined_type(
     return None
 
 
-class SQLiteNumericMixin(Expression):
-    """
-    Some expressions with output_field=DecimalField() must be cast to
-    numeric to be properly filtered.
-    """
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        sql, params = self.as_sql(compiler, connection, **extra_context)
-        try:
-            if self.output_field.get_internal_type() == "DecimalField":
-                sql = f"CAST({sql} AS NUMERIC)"
-        except FieldError:
-            pass
-        return sql, params
-
-
-class CombinedExpression(SQLiteNumericMixin, Expression):
+class CombinedExpression(Expression):
     def __init__(
         self, lhs: Any, connector: str, rhs: Any, output_field: Field | None = None
     ):
@@ -767,7 +737,7 @@ class CombinedExpression(SQLiteNumericMixin, Expression):
         return combined_type()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         expressions = []
         expression_params = []
@@ -779,7 +749,7 @@ class CombinedExpression(SQLiteNumericMixin, Expression):
         expression_params.extend(params)
         # order of precedence
         expression_wrapper = "(%s)"
-        sql = connection.ops.combine_expression(self.connector, expressions)
+        sql = combine_expression(self.connector, expressions)
         return expression_wrapper % sql, expression_params
 
     def resolve_expression(
@@ -789,14 +759,14 @@ class CombinedExpression(SQLiteNumericMixin, Expression):
         reuse: Any = None,
         summarize: bool = False,
         for_save: bool = False,
-    ) -> CombinedExpression | DurationExpression | TemporalSubtraction:
+    ) -> CombinedExpression | TemporalSubtraction:
         lhs = self.lhs.resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
         rhs = self.rhs.resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
-        if not isinstance(self, DurationExpression | TemporalSubtraction):
+        if not isinstance(self, TemporalSubtraction):
             try:
                 lhs_type = lhs.output_field.get_internal_type()
             except (AttributeError, FieldError):
@@ -805,16 +775,6 @@ class CombinedExpression(SQLiteNumericMixin, Expression):
                 rhs_type = rhs.output_field.get_internal_type()
             except (AttributeError, FieldError):
                 rhs_type = None
-            if "DurationField" in {lhs_type, rhs_type} and lhs_type != rhs_type:
-                return DurationExpression(
-                    self.lhs, self.connector, self.rhs
-                ).resolve_expression(
-                    query,
-                    allow_joins,
-                    reuse,
-                    summarize,
-                    for_save,
-                )
             datetime_fields = {"DateField", "DateTimeField", "TimeField"}
             if (
                 self.connector == self.SUB
@@ -835,66 +795,6 @@ class CombinedExpression(SQLiteNumericMixin, Expression):
         return c
 
 
-class DurationExpression(CombinedExpression):
-    def compile(
-        self, side: Any, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, Sequence[Any]]:
-        try:
-            output = side.output_field
-        except FieldError:
-            pass
-        else:
-            if output.get_internal_type() == "DurationField":
-                sql, params = compiler.compile(side)
-                return connection.ops.format_for_duration_arithmetic(sql), params
-        return compiler.compile(side)
-
-    def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
-    ) -> tuple[str, list[Any]]:
-        if connection.features.has_native_duration_field:
-            return super().as_sql(compiler, connection)
-        connection.ops.check_expression_support(self)
-        expressions = []
-        expression_params = []
-        sql, params = self.compile(self.lhs, compiler, connection)
-        expressions.append(sql)
-        expression_params.extend(params)
-        sql, params = self.compile(self.rhs, compiler, connection)
-        expressions.append(sql)
-        expression_params.extend(params)
-        # order of precedence
-        expression_wrapper = "(%s)"
-        sql = connection.ops.combine_duration_expression(self.connector, expressions)
-        return expression_wrapper % sql, expression_params
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        sql, params = self.as_sql(compiler, connection, **extra_context)
-        if self.connector in {Combinable.MUL, Combinable.DIV}:
-            try:
-                lhs_type = self.lhs.output_field.get_internal_type()
-                rhs_type = self.rhs.output_field.get_internal_type()
-            except (AttributeError, FieldError):
-                pass
-            else:
-                allowed_fields = {
-                    "DecimalField",
-                    "DurationField",
-                    "FloatField",
-                    "IntegerField",
-                }
-                if lhs_type not in allowed_fields or rhs_type not in allowed_fields:
-                    raise DatabaseError(
-                        f"Invalid arguments for operator {self.connector}."
-                    )
-        return sql, params
-
-
 class TemporalSubtraction(CombinedExpression):
     output_field = fields.DurationField()
 
@@ -902,12 +802,11 @@ class TemporalSubtraction(CombinedExpression):
         super().__init__(lhs, self.SUB, rhs)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        connection.ops.check_expression_support(self)
         lhs = compiler.compile(self.lhs)
         rhs = compiler.compile(self.rhs)
-        sql, params = connection.ops.subtract_temporals(
+        sql, params = subtract_temporals(
             self.lhs.output_field.get_internal_type(), lhs, rhs
         )
         return sql, list(params)
@@ -1008,7 +907,7 @@ class OuterRef(F):
 
 
 @deconstructible(path="plain.models.Func")
-class Func(SQLiteNumericMixin, Expression):
+class Func(Expression):
     """An SQL function call."""
 
     function = None
@@ -1071,13 +970,12 @@ class Func(SQLiteNumericMixin, Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
-        connection.ops.check_expression_support(self)
         sql_parts = []
         params = []
         for arg in self.source_expressions:
@@ -1115,7 +1013,7 @@ class Func(SQLiteNumericMixin, Expression):
 
 
 @deconstructible(path="plain.models.Value")
-class Value(SQLiteNumericMixin, Expression):
+class Value(Expression):
     """Represent a wrapped value as a node within an expression."""
 
     # Provide a default value for `for_save` in order to allow unresolved
@@ -1138,9 +1036,8 @@ class Value(SQLiteNumericMixin, Expression):
         return f"{self.__class__.__name__}({self.value!r})"
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        connection.ops.check_expression_support(self)
         val = self.value
         output_field = self._output_field_or_none
         if output_field is not None:
@@ -1151,9 +1048,6 @@ class Value(SQLiteNumericMixin, Expression):
             if hasattr(output_field, "get_placeholder"):
                 return output_field.get_placeholder(val, compiler, connection), [val]
         if val is None:
-            # cx_Oracle does not always convert None to the appropriate
-            # NULL type (like in case expressions using numbers), so we
-            # use a literal SQL NULL
             return "NULL", []
         return "%s", [val]
 
@@ -1214,7 +1108,7 @@ class RawSQL(Expression):
         return f"{self.__class__.__name__}({self.sql}, {self.params})"
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         return f"({self.sql})", self.params
 
@@ -1227,7 +1121,7 @@ class Star(Expression):
         return "'*'"
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         return "*", []
 
@@ -1250,7 +1144,7 @@ class Col(Expression):
         return "{}({})".format(self.__class__.__name__, ", ".join(identifiers))
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         alias, column = self.alias, self.target.column
         identifiers = (alias, column) if alias else (column,)
@@ -1268,7 +1162,7 @@ class Col(Expression):
         return [self]
 
     def get_db_converters(
-        self, connection: BaseDatabaseWrapper
+        self, connection: DatabaseWrapper
     ) -> list[Callable[..., Any]]:
         if self.target == self.output_field:
             return self.output_field.get_db_converters(connection)
@@ -1315,9 +1209,9 @@ class Ref(Expression):
         return self
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        return connection.ops.quote_name(self.refs), []
+        return quote_name(self.refs), []
 
     def get_group_by_cols(self) -> list[BaseExpression]:
         return [self]
@@ -1341,15 +1235,6 @@ class ExpressionList(Func):
 
     def __str__(self) -> str:
         return self.arg_joiner.join(str(arg) for arg in self.source_expressions)
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        # Casting to numeric is unnecessary.
-        return self.as_sql(compiler, connection, **extra_context)
 
 
 class OrderByList(Func):
@@ -1380,7 +1265,7 @@ class OrderByList(Func):
 
 
 @deconstructible(path="plain.models.ExpressionWrapper")
-class ExpressionWrapper(SQLiteNumericMixin, Expression):
+class ExpressionWrapper(Expression):
     """
     An expression that can wrap another expression so that it can provide
     extra context to the inner expression, such as the output_field.
@@ -1406,7 +1291,7 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
         return super().get_group_by_cols()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         return compiler.compile(self.expression)
 
@@ -1424,21 +1309,12 @@ class NegatedExpression(ExpressionWrapper):
         return self.expression.copy()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, Sequence[Any]]:
         try:
             sql, params = super().as_sql(compiler, connection)
         except EmptyResultSet:
-            features = compiler.connection.features
-            if not features.supports_boolean_expr_in_select_clause:
-                return "1=1", ()
             return compiler.compile(Value(True))
-        ops = compiler.connection.ops
-        # Some database backends (e.g. Oracle) don't allow EXISTS() and filters
-        # to be compared to another expression unless they're wrapped in a CASE
-        # WHEN.
-        if not ops.conditional_expression_supported_in_where_clause(self.expression):
-            return f"CASE WHEN {sql} = 0 THEN 1 ELSE 0 END", params
         return f"NOT {sql}", params
 
     def resolve_expression(
@@ -1459,18 +1335,7 @@ class NegatedExpression(ExpressionWrapper):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
-        # Wrap boolean expressions with a CASE WHEN expression if a database
-        # backend (e.g. Oracle) doesn't support boolean expression in SELECT or
-        # GROUP BY list.
-        expression_supported_in_where_clause = (
-            compiler.connection.ops.conditional_expression_supported_in_where_clause
-        )
-        if (
-            not compiler.connection.features.supports_boolean_expr_in_select_clause
-            # Avoid double wrapping.
-            and expression_supported_in_where_clause(self.expression)
-        ):
-            sql = f"CASE WHEN {sql} THEN 1 ELSE 0 END"
+        # Boolean expressions work directly in SELECT
         return sql, params
 
 
@@ -1543,11 +1408,10 @@ class When(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
-        connection.ops.check_expression_support(self)
         template_params = extra_context
         sql_params = []
         # After resolve_expression, condition is WhereNode | resolved Expression (both SQLCompilable)
@@ -1571,7 +1435,7 @@ class When(Expression):
 
 
 @deconstructible(path="plain.models.Case")
-class Case(SQLiteNumericMixin, Expression):
+class Case(Expression):
     """
     An SQL searched CASE expression:
 
@@ -1643,12 +1507,11 @@ class Case(SQLiteNumericMixin, Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         template: str | None = None,
         case_joiner: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, list[Any]]:
-        connection.ops.check_expression_support(self)
         if not self.cases:
             sql, params = compiler.compile(self.default)
             return sql, list(params)
@@ -1675,7 +1538,7 @@ class Case(SQLiteNumericMixin, Expression):
         template = template or template_params.get("template", self.template)
         sql = template % template_params
         if self._output_field_or_none is not None:
-            sql = connection.ops.unification_cast_sql(self.output_field) % sql
+            sql = connection.unification_cast_sql(self.output_field) % sql
         return sql, sql_params
 
     def get_group_by_cols(self) -> list[Any]:
@@ -1739,11 +1602,10 @@ class Subquery(BaseExpression, Combinable):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
-        connection.ops.check_expression_support(self)
         template_params = {**self.extra, **extra_context}
         subquery_sql, sql_params = self.query.as_sql(compiler, connection)
         template_params["subquery"] = subquery_sql[1:-1]
@@ -1768,11 +1630,7 @@ class Exists(Subquery):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: Sequence[Any]
     ) -> tuple[str, Sequence[Any]]:
-        # Wrap EXISTS() with a CASE WHEN expression if a database backend
-        # (e.g. Oracle) doesn't support boolean expression in SELECT or GROUP
-        # BY list.
-        if not compiler.connection.features.supports_boolean_expr_in_select_clause:
-            sql = f"CASE WHEN {sql} THEN 1 ELSE 0 END"
+        # Boolean expressions work directly in SELECT
         return sql, params
 
 
@@ -1811,26 +1669,16 @@ class OrderBy(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
         template = template or self.template
-        if connection.features.supports_order_by_nulls_modifier:
-            if self.nulls_last:
-                template = f"{template} NULLS LAST"
-            elif self.nulls_first:
-                template = f"{template} NULLS FIRST"
-        else:
-            if self.nulls_last and not (
-                self.descending and connection.features.order_by_nulls_first
-            ):
-                template = f"%(expression)s IS NULL, {template}"
-            elif self.nulls_first and not (
-                not self.descending and connection.features.order_by_nulls_first
-            ):
-                template = f"%(expression)s IS NOT NULL, {template}"
-        connection.ops.check_expression_support(self)
+        # Handle NULLS FIRST/LAST modifiers
+        if self.nulls_last:
+            template = f"{template} NULLS LAST"
+        elif self.nulls_first:
+            template = f"{template} NULLS FIRST"
         expression_sql, params = compiler.compile(self.expression)
         placeholders = {
             "expression": expression_sql,
@@ -1863,7 +1711,7 @@ class OrderBy(Expression):
         self.descending = True
 
 
-class Window(SQLiteNumericMixin, Expression):
+class Window(Expression):
     template = "%(expression)s OVER (%(window)s)"
     # Although the main expression may either be an aggregate or an
     # expression with an aggregate function, the GROUP BY that will
@@ -1923,12 +1771,9 @@ class Window(SQLiteNumericMixin, Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         template: str | None = None,
     ) -> tuple[str, tuple[Any, ...]]:
-        connection.ops.check_expression_support(self)
-        if not connection.features.supports_over_clause:
-            raise NotSupportedError("This backend does not support window expressions.")
         expr_sql, params = compiler.compile(self.source_expression)
         window_sql, window_params = [], ()
 
@@ -1958,21 +1803,6 @@ class Window(SQLiteNumericMixin, Expression):
             (*params, *window_params),
         )
 
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        if isinstance(self.output_field, fields.DecimalField):
-            # Casting to numeric must be outside of the window expression.
-            copy = self.copy()
-            source_expressions = copy.get_source_expressions()
-            source_expressions[0].output_field = fields.FloatField()
-            copy.set_source_expressions(source_expressions)
-            return super(Window, copy).as_sqlite(compiler, connection, **extra_context)
-        return self.as_sql(compiler, connection, **extra_context)
-
     def __str__(self) -> str:
         return "{} OVER ({}{}{})".format(
             str(self.source_expression),
@@ -1993,7 +1823,7 @@ class Window(SQLiteNumericMixin, Expression):
         return group_by_cols
 
 
-class WindowFrame(Expression, ABC):
+class WindowFrame(Expression):
     """
     Model the frame clause in window expressions. There are two types of frame
     clauses which are subclasses, however, all processing and validation (by no
@@ -2016,9 +1846,8 @@ class WindowFrame(Expression, ABC):
         return [self.start, self.end]
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
-        connection.ops.check_expression_support(self)
         start, end = self.window_frame_start_end(
             connection, self.start.value, self.end.value
         )
@@ -2040,43 +1869,44 @@ class WindowFrame(Expression, ABC):
 
     def __str__(self) -> str:
         if self.start.value is not None and self.start.value < 0:
-            start = f"{abs(self.start.value)} {db_connection.ops.PRECEDING}"
+            start = f"{abs(self.start.value)} {PRECEDING}"
         elif self.start.value is not None and self.start.value == 0:
-            start = db_connection.ops.CURRENT_ROW
+            start = CURRENT_ROW
         else:
-            start = db_connection.ops.UNBOUNDED_PRECEDING
+            start = UNBOUNDED_PRECEDING
 
         if self.end.value is not None and self.end.value > 0:
-            end = f"{self.end.value} {db_connection.ops.FOLLOWING}"
+            end = f"{self.end.value} {FOLLOWING}"
         elif self.end.value is not None and self.end.value == 0:
-            end = db_connection.ops.CURRENT_ROW
+            end = CURRENT_ROW
         else:
-            end = db_connection.ops.UNBOUNDED_FOLLOWING
+            end = UNBOUNDED_FOLLOWING
         return self.template % {
             "frame_type": self.frame_type,
             "start": start,
             "end": end,
         }
 
-    @abstractmethod
     def window_frame_start_end(
-        self, connection: BaseDatabaseWrapper, start: int | None, end: int | None
-    ) -> tuple[str, str]: ...
+        self, connection: DatabaseWrapper, start: int | None, end: int | None
+    ) -> tuple[str, str]:
+        """Return the window frame start and end for the given connection."""
+        raise NotImplementedError("Subclasses must implement window_frame_start_end()")
 
 
 class RowRange(WindowFrame):
     frame_type = "ROWS"
 
     def window_frame_start_end(
-        self, connection: BaseDatabaseWrapper, start: int | None, end: int | None
+        self, connection: DatabaseWrapper, start: int | None, end: int | None
     ) -> tuple[str, str]:
-        return connection.ops.window_frame_rows_start_end(start, end)
+        return window_frame_rows_start_end(start, end)
 
 
 class ValueRange(WindowFrame):
     frame_type = "RANGE"
 
     def window_frame_start_end(
-        self, connection: BaseDatabaseWrapper, start: int | None, end: int | None
+        self, connection: DatabaseWrapper, start: int | None, end: int | None
     ) -> tuple[str, str]:
-        return connection.ops.window_frame_range_start_end(start, end)
+        return window_frame_range_start_end(start, end)
