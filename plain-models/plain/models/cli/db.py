@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import time
+from collections import defaultdict
 from typing import TYPE_CHECKING, cast
 
 import click
@@ -12,6 +13,8 @@ from plain.cli import register_cli
 from ..backups.cli import cli as backups_cli
 from ..db import OperationalError
 from ..db import db_connection as _db_connection
+from ..migrations.recorder import MIGRATION_TABLE_NAME
+from ..postgres.sql import quote_name
 
 if TYPE_CHECKING:
     from ..postgres.wrapper import DatabaseWrapper
@@ -56,6 +59,67 @@ def shell(parameters: tuple[str, ...]) -> None:
             err=True,
         )
         sys.exit(e.returncode)
+
+
+@cli.command("drop-unknown-tables")
+@click.option(
+    "--yes",
+    is_flag=True,
+    help="Skip confirmation prompt (for non-interactive use).",
+)
+def drop_unknown_tables(yes: bool) -> None:
+    """Drop all tables not associated with a Plain model"""
+    db_tables = set(db_connection.table_names())
+    model_tables = set(db_connection.plain_table_names())
+    unknown_tables = sorted(db_tables - model_tables - {MIGRATION_TABLE_NAME})
+
+    if not unknown_tables:
+        click.echo("No unknown tables found.")
+        return
+
+    unknown_set = set(unknown_tables)
+    table_count = len(unknown_tables)
+    tables_label = f"{table_count} table{'s' if table_count != 1 else ''}"
+
+    # Find foreign key constraints from kept tables that reference unknown tables
+    cascade_warnings: defaultdict[str, list[tuple[str, str]]] = defaultdict(list)
+    with db_connection.cursor() as cursor:
+        for table in unknown_tables:
+            cursor.execute(
+                """
+                SELECT conname, conrelid::regclass
+                FROM pg_constraint
+                WHERE confrelid = %s::regclass AND contype = 'f'
+                """,
+                [table],
+            )
+            for constraint_name, referencing_table in cursor.fetchall():
+                if str(referencing_table) not in unknown_set:
+                    cascade_warnings[table].append(
+                        (constraint_name, str(referencing_table))
+                    )
+
+    click.secho("Unknown tables:", fg="yellow", bold=True)
+    for table in unknown_tables:
+        click.echo(f"  - {table}")
+        for constraint_name, referencing_table in cascade_warnings[table]:
+            click.secho(
+                f"    ⚠ CASCADE will drop constraint {constraint_name} on {referencing_table}",
+                fg="red",
+            )
+    click.echo()
+
+    if not yes:
+        if not click.confirm(f"Drop {tables_label} (CASCADE)? This cannot be undone."):
+            return
+
+    with db_connection.cursor() as cursor:
+        for table in unknown_tables:
+            click.echo(f"  Dropping {table}...", nl=False)
+            cursor.execute(f"DROP TABLE IF EXISTS {quote_name(table)} CASCADE")
+            click.echo(" OK")
+
+    click.secho(f"✓ Dropped {tables_label}.", fg="green")
 
 
 @cli.command()

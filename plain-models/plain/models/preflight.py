@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from plain.models.db import db_connection
+from plain.models.migrations.recorder import MIGRATION_TABLE_NAME
 from plain.models.registry import ModelsRegistry, models_registry
 from plain.packages import packages_registry
 from plain.preflight import PreflightCheck, PreflightResult, register_check
@@ -215,29 +216,25 @@ class CheckDatabaseTables(PreflightCheck):
     """Checks for unknown tables in the database when plain.models is available."""
 
     def run(self) -> list[PreflightResult]:
-        errors = []
+        unknown_tables = (
+            set(db_connection.table_names())
+            - set(db_connection.plain_table_names())
+            - {MIGRATION_TABLE_NAME}
+        )
 
-        db_tables = db_connection.table_names()
-        model_tables = db_connection.plain_table_names()
-        unknown_tables = set(db_tables) - set(model_tables)
-        unknown_tables.discard("plainmigrations")  # Know this could be there
-        if unknown_tables:
-            table_names = ", ".join(unknown_tables)
-            specific_fix = (
-                f'echo "DROP TABLE IF EXISTS {unknown_tables.pop()}" | plain db shell'
-            )
-            errors.append(
-                PreflightResult(
-                    fix=f"Unknown tables in default database: {table_names}. "
-                    "Tables may be from packages/models that have been uninstalled. "
-                    "Make sure you have a backup and delete the tables manually "
-                    f"(ex. `{specific_fix}`).",
-                    id="models.unknown_database_tables",
-                    warning=True,
-                )
-            )
+        if not unknown_tables:
+            return []
 
-        return errors
+        table_names = ", ".join(sorted(unknown_tables))
+        return [
+            PreflightResult(
+                fix=f"Unknown tables in default database: {table_names}. "
+                "Tables may be from packages/models that have been uninstalled. "
+                "Make sure you have a backup, then run `plain db drop-unknown-tables` to remove them.",
+                id="models.unknown_database_tables",
+                warning=True,
+            )
+        ]
 
 
 @register_check("models.prunable_migrations")
