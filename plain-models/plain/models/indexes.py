@@ -1,30 +1,25 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from types import NoneType
 from typing import TYPE_CHECKING, Any, Self
 
-from plain.models.backends.utils import names_digest, split_identifier
 from plain.models.expressions import Col, ExpressionList, F, Func, OrderBy
+from plain.models.postgres.utils import names_digest, split_identifier
 from plain.models.query_utils import Q
 from plain.models.sql.query import Query
 from plain.utils.functional import partition
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
-    from plain.models.backends.ddl_references import Statement
     from plain.models.base import Model
     from plain.models.expressions import Expression
-    from plain.models.sql.compiler import SQLCompiler
+    from plain.models.postgres.schema import DatabaseSchemaEditor, Statement
 
 __all__ = ["Index"]
 
 
 class Index:
     suffix = "idx"
-    # The max length of the name of the index (restricted to 30 for
-    # cross-database compatibility with Oracle)
+    # The max length of the name of the index
     max_name_length = 30
 
     def __init__(
@@ -92,7 +87,7 @@ class Index:
         return bool(self.expressions)
 
     def _get_condition_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> str | None:
         if self.condition is None:
             return None
@@ -103,7 +98,7 @@ class Index:
         return sql % tuple(schema_editor.quote_value(p) for p in params)
 
     def create_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor, **kwargs: Any
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor, **kwargs: Any
     ) -> Statement:
         include = [
             model._model_meta.get_forward_field(field_name).column
@@ -125,10 +120,8 @@ class Index:
                 model._model_meta.get_forward_field(field_name)
                 for field_name, _ in self.fields_orders
             ]
-            if schema_editor.connection.features.supports_index_column_ordering:
-                col_suffixes = tuple(order[1] for order in self.fields_orders)
-            else:
-                col_suffixes = ("",) * len(self.fields_orders)
+            # Support index column ordering (ASC/DESC)
+            col_suffixes = tuple(order[1] for order in self.fields_orders)
             expressions = None
         return schema_editor._create_index_sql(
             model,
@@ -143,7 +136,7 @@ class Index:
         )
 
     def remove_sql(
-        self, model: type[Model], schema_editor: BaseDatabaseSchemaEditor, **kwargs: Any
+        self, model: type[Model], schema_editor: DatabaseSchemaEditor, **kwargs: Any
     ) -> Statement:
         return schema_editor._delete_index_sql(model, self.name, **kwargs)
 
@@ -195,8 +188,7 @@ class Index:
         )
         if len(self.name) > self.max_name_length:
             raise ValueError(
-                "Index too long for multiple database support. Is self.suffix "
-                "longer than 3 characters?"
+                "Index name too long. Is self.suffix longer than 3 characters?"
             )
         if self.name[0] == "_" or self.name[0].isdigit():
             self.name = f"D{self.name[1:]}"
@@ -292,12 +284,3 @@ class IndexExpression(Func):
         return super().resolve_expression(
             query, allow_joins, reuse, summarize, for_save
         )
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, Sequence[Any]]:
-        # Casting to numeric is unnecessary.
-        return self.as_sql(compiler, connection, **extra_context)

@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
-from plain.models.backends.utils import truncate_name
-from plain.models.db import db_connection
+from plain.models.postgres.sql import MAX_NAME_LENGTH
+from plain.models.postgres.utils import truncate_name
 from plain.packages import packages_registry
 
 if TYPE_CHECKING:
@@ -29,8 +29,6 @@ class Options:
     ordering: Sequence[str]
     indexes: Sequence[Index]
     constraints: Sequence[BaseConstraint]
-    required_db_features: Sequence[str]
-    required_db_vendor: str | None
     _provided_options: set[str]
 
     def __init__(
@@ -40,8 +38,6 @@ class Options:
         ordering: Sequence[str] | None = None,
         indexes: Sequence[Index] | None = None,
         constraints: Sequence[BaseConstraint] | None = None,
-        required_db_features: Sequence[str] | None = None,
-        required_db_vendor: str | None = None,
         package_label: str | None = None,
     ):
         """
@@ -56,8 +52,6 @@ class Options:
             "ordering": ordering,
             "indexes": indexes,
             "constraints": constraints,
-            "required_db_features": required_db_features,
-            "required_db_vendor": required_db_vendor,
             "package_label": package_label,
         }
         self._cache: dict[type[Model], Options] = {}
@@ -119,7 +113,7 @@ class Options:
         if db_table is None:
             instance.db_table = truncate_name(
                 f"{instance.package_label}_{model.__name__.lower()}",
-                db_connection.ops.max_name_length(),
+                MAX_NAME_LENGTH,
             )
         else:
             instance.db_table = db_table
@@ -127,8 +121,6 @@ class Options:
         instance.ordering = self._config.get("ordering") or []
         instance.indexes = self._config.get("indexes") or []
         instance.constraints = self._config.get("constraints") or []
-        instance.required_db_features = self._config.get("required_db_features") or []
-        instance.required_db_vendor = self._config.get("required_db_vendor")
 
         # Format names with class interpolation
         instance.constraints = instance._format_names_with_class(instance.constraints)
@@ -207,20 +199,6 @@ class Options:
                 and not constraint.contains_expressions
             )
         ]
-
-    def can_migrate(self, connection: Any) -> bool:
-        """
-        Return True if the model can/should be migrated on the given
-        `connection` object.
-        """
-        if self.required_db_vendor:
-            return self.required_db_vendor == connection.vendor
-        if self.required_db_features:
-            return all(
-                getattr(connection.features, feat, False)
-                for feat in self.required_db_features
-            )
-        return True
 
     def __repr__(self) -> str:
         return f"<Options for {self.model.__name__}>"

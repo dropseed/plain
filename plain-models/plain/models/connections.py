@@ -1,21 +1,18 @@
 from __future__ import annotations
 
-from importlib import import_module
 from threading import local
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from plain.runtime import settings as plain_settings
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 
 class DatabaseConfig(TypedDict, total=False):
     AUTOCOMMIT: bool
     CONN_MAX_AGE: int | None
     CONN_HEALTH_CHECKS: bool
-    DISABLE_SERVER_SIDE_CURSORS: bool
-    ENGINE: str
     HOST: str
     NAME: str | None
     OPTIONS: dict[str, Any]
@@ -47,32 +44,15 @@ class DatabaseConnection:
             database.setdefault(setting, "")
 
         test_settings = database.setdefault("TEST", {})
-        default_test_settings = [
-            ("CHARSET", None),
-            ("COLLATION", None),
-            ("MIRROR", None),
-            ("NAME", None),
-        ]
-        for key, value in default_test_settings:
-            test_settings.setdefault(key, value)
+        test_settings.setdefault("NAME", None)
 
         return database
 
-    def create_connection(self) -> BaseDatabaseWrapper:
-        database_config = self.configure_settings()
-        backend = import_module(f"{database_config['ENGINE']}.base")
+    def create_connection(self) -> DatabaseWrapper:
+        from plain.models.postgres.wrapper import DatabaseWrapper
 
-        # Map vendor to wrapper class name
-        vendor_map = {
-            "plain.models.backends.sqlite3": "SQLiteDatabaseWrapper",
-            "plain.models.backends.mysql": "MySQLDatabaseWrapper",
-            "plain.models.backends.postgresql": "PostgreSQLDatabaseWrapper",
-        }
-        wrapper_class_name = vendor_map.get(
-            database_config["ENGINE"], "DatabaseWrapper"
-        )
-        wrapper_class = getattr(backend, wrapper_class_name)
-        return wrapper_class(database_config)
+        database_config = self.configure_settings()
+        return DatabaseWrapper(database_config)
 
     def has_connection(self) -> bool:
         return hasattr(self._local, "conn")

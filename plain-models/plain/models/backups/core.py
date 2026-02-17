@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 from plain.runtime import PLAIN_TEMP_PATH
 
 from .. import db_connection as _db_connection
-from .clients import PostgresBackupClient, SQLiteBackupClient
+from .clients import PostgresBackupClient
 
 
 def get_git_branch() -> str | None:
@@ -42,10 +42,10 @@ def get_git_commit() -> str | None:
 
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 # Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
-db_connection = cast("BaseDatabaseWrapper", _db_connection)
+db_connection = cast("DatabaseWrapper", _db_connection)
 
 
 class DatabaseBackups:
@@ -67,11 +67,13 @@ class DatabaseBackups:
 
         return backups
 
-    def create(self, name: str, **create_kwargs: Any) -> Path:
+    def create(
+        self, name: str, *, source: str = "manual", pg_dump: str = "pg_dump"
+    ) -> Path:
         backup = DatabaseBackup(name, backups_path=self.path)
         if backup.exists():
             raise Exception(f"Backup {name} already exists")
-        backup_dir = backup.create(**create_kwargs)
+        backup_dir = backup.create(source=source, pg_dump=pg_dump)
         try:
             self.prune()
         except Exception:
@@ -95,11 +97,11 @@ class DatabaseBackups:
             deleted.append(backup.name)
         return deleted
 
-    def restore(self, name: str, **restore_kwargs: Any) -> None:
+    def restore(self, name: str, *, pg_restore: str = "pg_restore") -> None:
         backup = DatabaseBackup(name, backups_path=self.path)
         if not backup.exists():
             raise Exception(f"Backup {name} not found")
-        backup.restore(**restore_kwargs)
+        backup.restore(pg_restore=pg_restore)
 
     def delete(self, name: str) -> None:
         backup = DatabaseBackup(name, backups_path=self.path)
@@ -119,20 +121,15 @@ class DatabaseBackup:
     def exists(self) -> bool:
         return self.path.exists()
 
-    def create(self, *, source: str = "manual", **create_kwargs: Any) -> Path:
+    def create(self, *, source: str = "manual", pg_dump: str = "pg_dump") -> Path:
         self.path.mkdir(parents=True, exist_ok=True)
 
         backup_path = self.path / "default.backup"
 
-        if db_connection.vendor == "postgresql":
-            PostgresBackupClient(db_connection).create_backup(
-                backup_path,
-                pg_dump=create_kwargs.get("pg_dump", "pg_dump"),
-            )
-        elif db_connection.vendor == "sqlite":
-            SQLiteBackupClient(db_connection).create_backup(backup_path)
-        else:
-            raise Exception("Unsupported database vendor")
+        PostgresBackupClient(db_connection).create_backup(
+            backup_path,
+            pg_dump=pg_dump,
+        )
 
         # Write metadata
         metadata = {
@@ -147,18 +144,13 @@ class DatabaseBackup:
 
         return self.path
 
-    def restore(self, **restore_kwargs: Any) -> None:
+    def restore(self, *, pg_restore: str = "pg_restore") -> None:
         backup_file = self.path / "default.backup"
 
-        if db_connection.vendor == "postgresql":
-            PostgresBackupClient(db_connection).restore_backup(
-                backup_file,
-                pg_restore=restore_kwargs.get("pg_restore", "pg_restore"),
-            )
-        elif db_connection.vendor == "sqlite":
-            SQLiteBackupClient(db_connection).restore_backup(backup_file)
-        else:
-            raise Exception("Unsupported database vendor")
+        PostgresBackupClient(db_connection).restore_backup(
+            backup_file,
+            pg_restore=pg_restore,
+        )
 
     @property
     def metadata(self) -> dict[str, Any]:

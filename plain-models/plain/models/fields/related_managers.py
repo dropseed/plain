@@ -7,7 +7,6 @@ through foreign key and many-to-many relationships.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
@@ -19,10 +18,11 @@ if TYPE_CHECKING:
 import builtins
 
 from plain.models import transaction
-from plain.models.db import NotSupportedError, db_connection
+from plain.models.db import db_connection
 from plain.models.expressions import Window
 from plain.models.functions import RowNumber
 from plain.models.lookups import GreaterThan, LessThanOrEqual
+from plain.models.postgres.sql import quote_name
 from plain.models.query import QuerySet
 from plain.models.query_utils import Q
 from plain.models.utils import resolve_callables
@@ -39,11 +39,7 @@ def _filter_prefetch_queryset(
     filter_kwargs: dict[str, Any] = {f"{field_name}__in": instances}
     predicate = Q(**filter_kwargs)
     if queryset.sql_query.is_sliced:
-        if not db_connection.features.supports_over_clause:
-            raise NotSupportedError(
-                "Prefetching from a limited queryset is only supported on backends "
-                "that support window functions."
-            )
+        # Use window functions for limited queryset prefetching
         low_mark, high_mark = queryset.sql_query.low_mark, queryset.sql_query.high_mark
         order_by = [
             expr for expr, _ in queryset.sql_query.get_compiler().get_order_by()
@@ -56,7 +52,7 @@ def _filter_prefetch_queryset(
     return queryset.filter(predicate)
 
 
-class BaseRelatedManager(ABC, Generic[T, QS]):
+class BaseRelatedManager(Generic[T, QS]):
     """
     Base class for all related object managers.
 
@@ -68,10 +64,9 @@ class BaseRelatedManager(ABC, Generic[T, QS]):
         """Access the QuerySet for this relationship."""
         return self.get_queryset()
 
-    @abstractmethod
     def get_queryset(self) -> QS:
         """Return the QuerySet for this relationship."""
-        ...
+        raise NotImplementedError("Subclasses must implement get_queryset()")
 
 
 class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
@@ -428,7 +423,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
             self.through._model_meta.get_forward_field(self.source_field_name),
         )  # M2M through model fields are always ForeignKey
         join_table = fk.model.model_options.db_table
-        qn = db_connection.ops.quote_name
+        qn = quote_name
         queryset = queryset.extra(
             select={
                 f"_prefetch_related_val_{f.attname}": f"{qn(join_table)}.{qn(f.column)}"

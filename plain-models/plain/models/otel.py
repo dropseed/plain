@@ -12,7 +12,7 @@ from opentelemetry import trace
 if TYPE_CHECKING:
     from opentelemetry.trace import Span
 
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,
     DB_USER,
@@ -47,15 +47,7 @@ _SUPPRESS_KEY = "plain.models.suppress_db_tracing"
 tracer = trace.get_tracer("plain.models")
 
 
-def db_system_for(vendor: str) -> str:  # noqa: D401 – simple helper
-    """Return the canonical ``db.system.name`` value for a backend vendor."""
-
-    return {
-        "postgresql": DbSystemValues.POSTGRESQL.value,
-        "mysql": DbSystemValues.MYSQL.value,
-        "mariadb": DbSystemValues.MARIADB.value,
-        "sqlite": DbSystemValues.SQLITE.value,
-    }.get(vendor, vendor)
+DB_SYSTEM = DbSystemValues.POSTGRESQL.value
 
 
 def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]:
@@ -69,8 +61,8 @@ def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]
     operation = sql_upper.lstrip("(").split()[0] if sql_upper else "UNKNOWN"
 
     # Pattern to match quoted and unquoted identifiers
-    # Matches: "quoted", `quoted`, [quoted], unquoted.name
-    identifier_pattern = r'("([^"]+)"|`([^`]+)`|\[([^\]]+)\]|([\w.]+))'
+    # Matches: "quoted" (PostgreSQL), unquoted.name
+    identifier_pattern = r'("([^"]+)"|([\w.]+))'
 
     # Extract table/collection name based on operation
     collection_name = None
@@ -82,7 +74,7 @@ def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]
             collection_name = _clean_identifier(match.group(1))
             summary = f"{operation} {collection_name}"
 
-    elif operation in ("INSERT", "REPLACE"):
+    elif operation == "INSERT":
         match = re.search(rf"INTO\s+{identifier_pattern}", sql, re.IGNORECASE)
         if match:
             collection_name = _clean_identifier(match.group(1))
@@ -103,19 +95,14 @@ def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]
 
 def _clean_identifier(identifier: str) -> str:
     """Remove quotes from SQL identifiers."""
-    # Remove different types of SQL quotes
     if identifier.startswith('"') and identifier.endswith('"'):
-        return identifier[1:-1]
-    elif identifier.startswith("`") and identifier.endswith("`"):
-        return identifier[1:-1]
-    elif identifier.startswith("[") and identifier.endswith("]"):
         return identifier[1:-1]
     return identifier
 
 
 @contextmanager
 def db_span(
-    db: BaseDatabaseWrapper, sql: Any, *, many: bool = False, params: Any = None
+    db: DatabaseWrapper, sql: Any, *, many: bool = False, params: Any = None
 ) -> Generator[Span | None, None, None]:
     """Open an OpenTelemetry CLIENT span for a database query.
 
@@ -144,7 +131,7 @@ def db_span(
 
     # Build attribute set following semantic conventions
     attrs: dict[str, Any] = {
-        DB_SYSTEM_NAME: db_system_for(db.vendor),
+        DB_SYSTEM_NAME: DB_SYSTEM,
         DB_NAMESPACE: db.settings_dict.get("NAME"),
         DB_QUERY_TEXT: sql,  # Already parameterized from Django/Plain
         DB_QUERY_SUMMARY: summary,

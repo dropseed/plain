@@ -15,4 +15,6 @@ echo "${BOLD}Running tests${NORMAL}"
 
 echo ""
 echo "${BOLD}Running preflight in example${NORMAL}"
-cd example && DATABASE_URL=sqlite://:memory: uv run plain preflight
+source scripts/start-postgres plain_example
+PGPASSWORD=postgres createdb -h localhost -U postgres plain_example 2>/dev/null || true
+cd example && uv run plain preflight

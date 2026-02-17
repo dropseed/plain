@@ -23,10 +23,22 @@ from typing import (
     overload,
 )
 
+import psycopg
+
 from plain import exceptions, validators
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import db_connection
 from plain.models.enums import ChoicesMeta
+from plain.models.postgres.sql import (
+    CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH,
+    CAST_DATA_TYPES,
+    DATA_TYPE_CHECK_CONSTRAINTS,
+    DATA_TYPES,
+    DATA_TYPES_SUFFIX,
+    INTEGER_FIELD_RANGES,
+    adapt_integerfield_value,
+    adapt_ipaddressfield_value,
+    quote_name,
+)
 from plain.models.query_utils import RegisterLookupMixin
 from plain.preflight import PreflightResult
 from plain.utils import timezone
@@ -37,7 +49,7 @@ from plain.utils.dateparse import (
     parse_duration,
     parse_time,
 )
-from plain.utils.duration import duration_microseconds, duration_string
+from plain.utils.duration import duration_string
 from plain.utils.functional import Promise
 from plain.utils.ipv6 import clean_ipv6_address
 from plain.utils.itercompat import is_iterable
@@ -45,10 +57,10 @@ from plain.utils.itercompat import is_iterable
 from ..registry import models_registry
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
     from plain.models.expressions import Col
     from plain.models.fields.reverse_related import ForeignObjectRel
+    from plain.models.postgres.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -236,7 +248,6 @@ class Field(RegisterLookupMixin, Generic[T]):
             *self._check_field_name(),
             *self._check_choices(),
             *self._check_null_allowed_for_primary_keys(),
-            *self._check_backend_specific_checks(),
             *self._check_validators(),
         ]
 
@@ -351,9 +362,6 @@ class Field(RegisterLookupMixin, Generic[T]):
 
     def _check_null_allowed_for_primary_keys(self) -> list[PreflightResult]:
         if self.primary_key and self.allow_null:
-            # We cannot reliably check this for backends like Oracle which
-            # consider NULL and '' to be equal (and thus set up
-            # character-based fields a little differently).
             return [
                 PreflightResult(
                     fix="Primary keys must not have allow_null=True. "
@@ -365,11 +373,6 @@ class Field(RegisterLookupMixin, Generic[T]):
             ]
         else:
             return []
-
-    def _check_backend_specific_checks(self) -> list[PreflightResult]:
-        errors = []
-        errors.extend(db_connection.validation.check_field(self))
-        return errors
 
     def _check_validators(self) -> list[PreflightResult]:
         errors = []
@@ -407,9 +410,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         self, compiler: SQLCompiler, sql: str, params: Any
     ) -> tuple[str, Any]:
         """
-        Custom format for select clauses. For example, GIS columns need to be
-        selected as AsText(table.col) on MySQL as the table.col data can't be
-        used by Plain.
+        Custom format for select clauses.
         """
         return sql, params
 
@@ -637,27 +638,24 @@ class Field(RegisterLookupMixin, Generic[T]):
         self.run_validators(value)
         return value
 
-    def db_type_parameters(self, connection: BaseDatabaseWrapper) -> DictWrapper:
-        return DictWrapper(self.__dict__, connection.ops.quote_name, "qn_")
+    def db_type_parameters(self) -> DictWrapper:
+        return DictWrapper(self.__dict__, quote_name, "qn_")
 
-    def db_check(self, connection: BaseDatabaseWrapper) -> str | None:
+    def db_check(self) -> str | None:
         """
-        Return the database column check constraint for this field, for the
-        provided connection. Works the same way as db_type() for the case that
+        Return the database column check constraint for this field.
+        Works the same way as db_type() for the case that
         get_internal_type() does not map to a preexisting model field.
         """
-        data = self.db_type_parameters(connection)
+        data = self.db_type_parameters()
         try:
-            return (
-                connection.data_type_check_constraints[self.get_internal_type()] % data
-            )
+            return DATA_TYPE_CHECK_CONSTRAINTS[self.get_internal_type()] % data
         except KeyError:
             return None
 
-    def db_type(self, connection: BaseDatabaseWrapper) -> str | None:
+    def db_type(self) -> str | None:
         """
-        Return the database column data type for this field, for the provided
-        connection.
+        Return the database column data type for this field.
         """
         # The default implementation of this method looks at the
         # backend-specific data_types dictionary, looking up the field by its
@@ -674,9 +672,9 @@ class Field(RegisterLookupMixin, Generic[T]):
         # mapped to one of the built-in Plain field types. In this case, you
         # can implement db_type() instead of get_internal_type() to specify
         # exactly which wacky database column type you want to use.
-        data = self.db_type_parameters(connection)
+        data = self.db_type_parameters()
         try:
-            column_type = connection.data_types[self.get_internal_type()]
+            column_type = DATA_TYPES[self.get_internal_type()]
         except KeyError:
             return None
         else:
@@ -685,38 +683,38 @@ class Field(RegisterLookupMixin, Generic[T]):
                 return column_type(data)
             return column_type % data
 
-    def rel_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
+    def rel_db_type(self) -> str | None:
         """
         Return the data type that a related field pointing to this field should
         use. For example, this method is called by ForeignKeyField to determine its data type.
         """
-        return self.db_type(connection)
+        return self.db_type()
 
-    def cast_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
+    def cast_db_type(self) -> str | None:
         """Return the data type to use in the Cast() function."""
-        db_type = connection.ops.cast_data_types.get(self.get_internal_type())
+        db_type = CAST_DATA_TYPES.get(self.get_internal_type())
         if db_type:
-            return db_type % self.db_type_parameters(connection)
-        return self.db_type(connection)
+            return db_type % self.db_type_parameters()
+        return self.db_type()
 
-    def db_parameters(self, connection: BaseDatabaseWrapper) -> DbParameters:
+    def db_parameters(self) -> DbParameters:
         """
         Extension of db_type(), providing a range of different return values
         (type, checks). This will look at db_type(), allowing custom model
         fields to override it.
         """
-        type_string = self.db_type(connection)
-        check_string = self.db_check(connection)
+        type_string = self.db_type()
+        check_string = self.db_check()
         return {
             "type": type_string,
             "check": check_string,
         }
 
-    def db_type_suffix(self, connection: BaseDatabaseWrapper) -> str | None:
-        return connection.data_types_suffix.get(self.get_internal_type())
+    def db_type_suffix(self) -> str | None:
+        return DATA_TYPES_SUFFIX.get(self.get_internal_type())
 
     def get_db_converters(
-        self, connection: BaseDatabaseWrapper
+        self, connection: DatabaseWrapper
     ) -> list[Callable[..., Any]]:
         if from_db_value := getattr(self, "from_db_value", None):
             return [from_db_value]
@@ -840,7 +838,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         return value
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         """
         Return field's value prepared for interacting with the database backend.
@@ -851,7 +849,7 @@ class Field(RegisterLookupMixin, Generic[T]):
             value = self.get_prep_value(value)
         return value
 
-    def get_db_prep_save(self, value: Any, connection: BaseDatabaseWrapper) -> Any:
+    def get_db_prep_save(self, value: Any, connection: DatabaseWrapper) -> Any:
         """Return field's value prepared for saving into a database."""
         if hasattr(value, "as_sql"):
             return value
@@ -1007,20 +1005,9 @@ class CharField(Field[str]):
         ]
 
     def _check_max_length_attribute(self, **kwargs: Any) -> list[PreflightResult]:
+        # Unlimited VARCHAR is supported (no max_length required)
         if self.max_length is None:
-            if (
-                db_connection.features.supports_unlimited_charfield
-                or "supports_unlimited_charfield"
-                in self.model.model_options.required_db_features
-            ):
-                return []
-            return [
-                PreflightResult(
-                    fix="CharFields must define a 'max_length' attribute.",
-                    obj=self,
-                    id="fields.charfield_missing_max_length",
-                )
-            ]
+            return []
         elif (
             not isinstance(self.max_length, int)
             or isinstance(self.max_length, bool)
@@ -1036,10 +1023,10 @@ class CharField(Field[str]):
         else:
             return []
 
-    def cast_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
+    def cast_db_type(self) -> str | None:
         if self.max_length is None:
-            return connection.ops.cast_char_field_without_max_length
-        return super().cast_db_type(connection)
+            return CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH
+        return super().cast_db_type()
 
     def get_internal_type(self) -> str:
         return "CharField"
@@ -1234,12 +1221,11 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
         return self.to_python(value)
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
-        # Casts dates into the format expected by the backend
         if not prepared:
             value = self.get_prep_value(value)
-        return connection.ops.adapt_datefield_value(value)
+        return value
 
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
@@ -1353,12 +1339,11 @@ class DateTimeField(DateField):
         return value
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
-        # Casts datetimes into the format expected by the backend
         if not prepared:
             value = self.get_prep_value(value)
-        return connection.ops.adapt_datetimefield_value(value)
+        return value
 
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
@@ -1500,15 +1485,11 @@ class DecimalField(Field[decimal.Decimal]):
         return decimal_value
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
-        if hasattr(value, "as_sql"):
-            return value
-        return connection.ops.adapt_decimalfield_value(
-            value, self.max_digits, self.decimal_places
-        )
+        return value
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
@@ -1516,12 +1497,7 @@ class DecimalField(Field[decimal.Decimal]):
 
 
 class DurationField(Field[datetime.timedelta]):
-    """
-    Store timedelta objects.
-
-    Use interval on PostgreSQL, INTERVAL DAY TO SECOND on Oracle, and bigint
-    of microseconds on other databases.
-    """
+    """Store timedelta objects using PostgreSQL's interval type."""
 
     empty_strings_allowed = False
     default_error_messages = {
@@ -1552,21 +1528,16 @@ class DurationField(Field[datetime.timedelta]):
         )
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
-        if connection.features.has_native_duration_field:
-            return value
-        if value is None:
-            return None
-        return duration_microseconds(value)
+        # PostgreSQL has native interval (duration) type
+        return value
 
     def get_db_converters(
-        self, connection: BaseDatabaseWrapper
+        self, connection: DatabaseWrapper
     ) -> list[Callable[..., Any]]:
-        converters = []
-        if not connection.features.has_native_duration_field:
-            converters.append(connection.ops.convert_durationfield_value)
-        return converters + super().get_db_converters(connection)
+        # PostgreSQL has native duration field, no converters needed
+        return super().get_db_converters(connection)
 
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
@@ -1654,7 +1625,7 @@ class IntegerField(Field[int]):
         # they're based on values retrieved from the database connection.
         validators_ = super().validators
         internal_type = self.get_internal_type()
-        min_value, max_value = db_connection.ops.integer_field_range(internal_type)
+        min_value, max_value = INTEGER_FIELD_RANGES[internal_type]
         if min_value is not None and not any(
             (
                 isinstance(validator, validators.MinValueValidator)
@@ -1695,10 +1666,10 @@ class IntegerField(Field[int]):
             ) from e
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
-        return connection.ops.adapt_integerfield_value(value, self.get_internal_type())
+        return adapt_integerfield_value(value, self.get_internal_type())
 
     def get_internal_type(self) -> str:
         return "IntegerField"
@@ -1798,11 +1769,11 @@ class GenericIPAddressField(Field[str]):
         return value
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
-        return connection.ops.adapt_ipaddressfield_value(value)
+        return adapt_ipaddressfield_value(value)
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
@@ -1821,7 +1792,7 @@ class _HasDbType(Protocol):
 
     integer_field_class: type[IntegerField]
 
-    def db_type(self, connection: BaseDatabaseWrapper) -> str | None: ...
+    def db_type(self) -> str | None: ...
 
 
 class PositiveIntegerRelDbTypeMixin(IntegerField):
@@ -1842,19 +1813,12 @@ class PositiveIntegerRelDbTypeMixin(IntegerField):
             if integer_parent is not None:
                 cls.integer_field_class = integer_parent
 
-    def rel_db_type(self: _HasDbType, connection: BaseDatabaseWrapper) -> str | None:
+    def rel_db_type(self: _HasDbType) -> str | None:
         """
         Return the data type that a related field pointing to this field should
-        use. In most cases, a foreign key pointing to a positive integer
-        primary key will have an integer column data type but some databases
-        (e.g. MySQL) have an unsigned integer type. In that case
-        (related_fields_match_type=True), the primary key should return its
-        db_type.
+        use. PostgreSQL uses standard integer types for foreign keys.
         """
-        if connection.features.related_fields_match_type:
-            return self.db_type(connection)
-        else:
-            return self.integer_field_class().db_type(connection=connection)
+        return self.integer_field_class().db_type()
 
 
 class PositiveBigIntegerField(PositiveIntegerRelDbTypeMixin, BigIntegerField):
@@ -1952,8 +1916,7 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
             return value
         if isinstance(value, datetime.datetime):
             # Not usually a good idea to pass in a datetime here (it loses
-            # information), but this can be a side-effect of interacting with a
-            # database backend (e.g. Oracle), so we'll be accommodating.
+            # information), but we'll be accommodating.
             return value.time()
 
         try:
@@ -1986,12 +1949,11 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
         return self.to_python(value)
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
-        # Casts times into the format expected by the backend
         if not prepared:
             value = self.get_prep_value(value)
-        return connection.ops.adapt_timefield_value(value)
+        return value
 
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
@@ -2041,9 +2003,9 @@ class BinaryField(Field[bytes | memoryview]):
         return "BinaryField"
 
     def get_placeholder(
-        self, value: Any, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, value: Any, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> Any:
-        return connection.ops.binary_placeholder_sql(value)
+        return "%s"
 
     def get_default(self) -> bytes | memoryview | None:
         if self.has_default() and not callable(self.default):
@@ -2054,11 +2016,11 @@ class BinaryField(Field[bytes | memoryview]):
         return default
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
         if value is not None:
-            return connection.Database.Binary(value)
+            return psycopg.Binary(value)
         return value
 
     def value_to_string(self, obj: Model) -> str:
@@ -2099,18 +2061,14 @@ class UUIDField(Field[uuid.UUID]):
         return self.to_python(value)
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
-    ) -> str | uuid.UUID | None:
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+    ) -> uuid.UUID | None:
+        # PostgreSQL has native UUID type
         if value is None:
             return None
         if not isinstance(value, uuid.UUID):
             value = self.to_python(value)
-            if value is None:
-                return None
-
-        if connection.features.has_native_uuid_field:
-            return value
-        return value.hex
+        return value
 
     def to_python(self, value: Any) -> uuid.UUID | None:
         if value is not None and not isinstance(value, uuid.UUID):
@@ -2153,15 +2111,14 @@ class PrimaryKeyField(BigIntegerField):
         pass
 
     def get_db_prep_value(
-        self, value: Any, connection: BaseDatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
-            value = connection.ops.validate_autopk_value(value)
         return value
 
     def get_internal_type(self) -> str:
         return "PrimaryKeyField"
 
-    def rel_db_type(self, connection: BaseDatabaseWrapper) -> str | None:
-        return BigIntegerField().db_type(connection=connection)
+    def rel_db_type(self) -> str | None:
+        return BigIntegerField().db_type()

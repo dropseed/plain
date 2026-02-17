@@ -2,8 +2,7 @@
 
 # Run the test-suite for each first-party package as well as the demo projects.
 #
-#  • Installs database driver wheels on-demand based on the current
-#    $DATABASE_URL scheme (postgres → psycopg, mysql → mysqlclient).
+#  • Installs psycopg database driver wheel on-demand.
 
 # ---------------------------------------------------------------------------
 # CLI option parsing
@@ -35,21 +34,14 @@ fi
 bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 
 # ---------------------------------------------------------------------------
-# Database URL / optional client wheels
+# Database URL (PostgreSQL required)
 # ---------------------------------------------------------------------------
-if [ -z "$DATABASE_URL" ]; then
-  echo "DATABASE_URL is not set, using sqlite://:memory:"
-  export DATABASE_URL="sqlite://:memory:"
-else
-  echo "Using DATABASE_URL: $DATABASE_URL"
-fi
+source scripts/start-postgres plain_tests
 
-WITH=""
-case "$DATABASE_URL" in
-  postgres:*|postgresql:*) WITH="--with psycopg[binary]" ;;
-  mysql:*)                 WITH="--with mysqlclient"    ;;
-  sqlite:*|sqlite3:*)     WITH=""         ;;
-esac
+echo "Using DATABASE_URL: $DATABASE_URL"
+
+# PostgreSQL driver
+WITH="--with psycopg[binary]"
 
 bold "Packages to test: $packages"
 

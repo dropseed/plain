@@ -12,7 +12,6 @@ import pathlib
 import re
 import types
 import uuid
-from abc import ABC, abstractmethod
 from typing import Any
 
 from plain.models.base import Model
@@ -24,17 +23,21 @@ from plain.runtime import SettingsReference
 from plain.utils.functional import LazyObject, Promise
 
 
-class BaseSerializer(ABC):
+class BaseSerializer:
     def __init__(self, value: Any) -> None:
         self.value = value
 
-    @abstractmethod
-    def serialize(self) -> tuple[str, set[str]]: ...
+    def serialize(self) -> tuple[str, set[str]]:
+        raise NotImplementedError(
+            "subclasses of BaseSerializer must provide a serialize() method"
+        )
 
 
-class BaseSequenceSerializer(BaseSerializer, ABC):
-    @abstractmethod
-    def _format(self) -> str: ...
+class BaseSequenceSerializer(BaseSerializer):
+    def _format(self) -> str:
+        raise NotImplementedError(
+            "subclasses of BaseSequenceSerializer must provide a _format() method"
+        )
 
     def serialize(self) -> tuple[str, set[str]]:
         imports: set[str] = set()

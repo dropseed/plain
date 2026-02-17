@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import gzip
 import os
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 
 class PostgresBackupClient:
-    def __init__(self, connection: BaseDatabaseWrapper) -> None:
+    def __init__(self, connection: DatabaseWrapper) -> None:
         self.connection = connection
 
     def get_env(self) -> dict[str, str]:
@@ -125,29 +124,3 @@ class PostgresBackupClient:
         subprocess.run(
             cmd, env={**os.environ, **self.get_env()}, check=True, shell=True
         )
-
-
-class SQLiteBackupClient:
-    def __init__(self, connection: BaseDatabaseWrapper) -> None:
-        self.connection = connection
-
-    def create_backup(self, backup_path: Path) -> None:
-        self.connection.ensure_connection()
-        src_conn = self.connection.connection
-        dump = "\n".join(src_conn.iterdump())
-        with gzip.open(backup_path, "wt") as f:
-            f.write(dump)
-
-    def restore_backup(self, backup_path: Path) -> None:
-        with gzip.open(backup_path, "rt") as f:
-            sql = f.read()
-
-        self.connection.close()
-        self.connection.connect()
-        dest_conn = self.connection.connection
-        cur = dest_conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        for (name,) in cur.fetchall():
-            if not name.startswith("sqlite_"):
-                dest_conn.execute(f'DROP TABLE IF EXISTS "{name}"')
-        dest_conn.executescript(sql)
-        dest_conn.commit()

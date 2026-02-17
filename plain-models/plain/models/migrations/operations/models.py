@@ -12,9 +12,9 @@ from plain.models.migrations.utils import field_references, resolve_relation
 from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameField
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
     from plain.models.fields import Field
     from plain.models.migrations.state import ProjectState
+    from plain.models.postgres.schema import DatabaseSchemaEditor
 
 
 def _check_for_duplicates(arg_name: str, objs: Any) -> None:
@@ -106,13 +106,12 @@ class CreateModel(ModelOperation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
         model = to_state.models_registry.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection, model):
-            schema_editor.create_model(model)
+        schema_editor.create_model(model)
 
     def describe(self) -> str:
         return f"Create model {self.name}"
@@ -254,13 +253,12 @@ class DeleteModel(ModelOperation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
         model = from_state.models_registry.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection, model):
-            schema_editor.delete_model(model)
+        schema_editor.delete_model(model)
 
     def references_model(self, name: str, package_label: str) -> bool:
         # The deleted model could be referencing the specified model through
@@ -304,40 +302,37 @@ class RenameModel(ModelOperation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
         new_model = to_state.models_registry.get_model(package_label, self.new_name)
-        if self.allow_migrate_model(schema_editor.connection, new_model):
-            old_model = from_state.models_registry.get_model(
-                package_label, self.old_name
-            )
-            # Move the main table
-            schema_editor.alter_db_table(
-                new_model,
-                old_model.model_options.db_table,
-                new_model.model_options.db_table,
-            )
-            # Alter the fields pointing to us
-            for related_object in old_model._model_meta.related_objects:
-                if related_object.related_model == old_model:
-                    model = new_model
-                    related_key = (package_label, self.new_name_lower)
-                else:
-                    model = related_object.related_model
-                    related_key = (
-                        related_object.related_model.model_options.package_label,
-                        related_object.related_model.model_options.model_name,
-                    )
-                to_field = to_state.models_registry.get_model(
-                    *related_key
-                )._model_meta.get_field(related_object.field.name)
-                schema_editor.alter_field(
-                    model,
-                    related_object.field,
-                    to_field,
+        old_model = from_state.models_registry.get_model(package_label, self.old_name)
+        # Move the main table
+        schema_editor.alter_db_table(
+            new_model,
+            old_model.model_options.db_table,
+            new_model.model_options.db_table,
+        )
+        # Alter the fields pointing to us
+        for related_object in old_model._model_meta.related_objects:
+            if related_object.related_model == old_model:
+                model = new_model
+                related_key = (package_label, self.new_name_lower)
+            else:
+                model = related_object.related_model
+                related_key = (
+                    related_object.related_model.model_options.package_label,
+                    related_object.related_model.model_options.model_name,
                 )
+            to_field = to_state.models_registry.get_model(
+                *related_key
+            )._model_meta.get_field(related_object.field.name)
+            schema_editor.alter_field(
+                model,
+                related_object.field,
+                to_field,
+            )
 
     def references_model(self, name: str, package_label: str) -> bool:
         return (
@@ -405,18 +400,17 @@ class AlterModelTable(ModelOptionOperation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
         new_model = to_state.models_registry.get_model(package_label, self.name)
-        if self.allow_migrate_model(schema_editor.connection, new_model):
-            old_model = from_state.models_registry.get_model(package_label, self.name)
-            schema_editor.alter_db_table(
-                new_model,
-                old_model.model_options.db_table,
-                new_model.model_options.db_table,
-            )
+        old_model = from_state.models_registry.get_model(package_label, self.name)
+        schema_editor.alter_db_table(
+            new_model,
+            old_model.model_options.db_table,
+            new_model.model_options.db_table,
+        )
 
     def describe(self) -> str:
         return "Rename table for {} to {}".format(
@@ -463,7 +457,7 @@ class AlterModelOptions(ModelOptionOperation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
@@ -504,13 +498,12 @@ class AddIndex(IndexOperation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
         model = to_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection, model):
-            schema_editor.add_index(model, self.index)
+        schema_editor.add_index(model, self.index)
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
@@ -554,15 +547,14 @@ class RemoveIndex(IndexOperation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
         model = from_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection, model):
-            from_model_state = from_state.models[package_label, self.model_name_lower]
-            index = from_model_state.get_index_by_name(self.name)
-            schema_editor.remove_index(model, index)
+        from_model_state = from_state.models[package_label, self.model_name_lower]
+        index = from_model_state.get_index_by_name(self.name)
+        schema_editor.remove_index(model, index)
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
@@ -646,14 +638,11 @@ class RenameIndex(IndexOperation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
         model = to_state.models_registry.get_model(package_label, self.model_name)
-        if not self.allow_migrate_model(schema_editor.connection, model):
-            return None
-
         if self.old_fields:
             from_model = from_state.models_registry.get_model(
                 package_label, self.model_name
@@ -744,13 +733,12 @@ class AddConstraint(IndexOperation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
         model = to_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection, model):
-            schema_editor.add_constraint(model, self.constraint)
+        schema_editor.add_constraint(model, self.constraint)
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         return (
@@ -783,15 +771,14 @@ class RemoveConstraint(IndexOperation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
         model = to_state.models_registry.get_model(package_label, self.model_name)
-        if self.allow_migrate_model(schema_editor.connection, model):
-            from_model_state = from_state.models[package_label, self.model_name_lower]
-            constraint = from_model_state.get_constraint_by_name(self.name)
-            schema_editor.remove_constraint(model, constraint)
+        from_model_state = from_state.models[package_label, self.model_name_lower]
+        constraint = from_model_state.get_constraint_by_name(self.name)
+        schema_editor.remove_constraint(model, constraint)
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         return (

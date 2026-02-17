@@ -15,18 +15,18 @@ from collections.abc import Callable, Generator
 from typing import TYPE_CHECKING, Any, NamedTuple, Self
 
 from plain.models.constants import LOOKUP_SEP
-from plain.models.db import DatabaseError, db_connection
+from plain.models.db import DatabaseError
 from plain.models.exceptions import FieldError
 from plain.utils import tree
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
     from plain.models.fields import Field
     from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.lookups import Lookup, Transform
     from plain.models.meta import Meta
+    from plain.models.postgres.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
     from plain.models.sql.where import WhereNode
 
@@ -153,8 +153,7 @@ class Q(tree.Node):
         from plain.models.expressions import ResolvableExpression, Value
         from plain.models.fields import BooleanField
         from plain.models.functions import Coalesce
-        from plain.models.sql.constants import SINGLE
-        from plain.models.sql.query import Query
+        from plain.models.sql import SINGLE, Query
 
         query = Query(None)
         for name, value in against.items():
@@ -163,10 +162,7 @@ class Q(tree.Node):
             query.add_annotation(value, name, select=False)
         query.add_annotation(Value(1), "_check")
         # This will raise a FieldError if a field is missing in "against".
-        if db_connection.features.supports_comparing_boolean_expr:
-            query.add_q(Q(Coalesce(self, True, output_field=BooleanField())))
-        else:
-            query.add_q(self)
+        query.add_q(Q(Coalesce(self, True, output_field=BooleanField())))
         compiler = query.get_compiler()
         try:
             return compiler.execute_sql(SINGLE) is not None
@@ -442,14 +438,7 @@ class FilteredRelation:
         clone.path = self.path[:]
         return clone
 
-    def resolve_expression(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        QuerySet.annotate() only accepts expression-like arguments
-        (with a resolve_expression() method).
-        """
-        raise NotImplementedError("FilteredRelation.resolve_expression() is unused.")
-
-    def as_sql(self, compiler: SQLCompiler, connection: BaseDatabaseWrapper) -> Any:
+    def as_sql(self, compiler: SQLCompiler, connection: DatabaseWrapper) -> Any:
         # Resolve the condition in Join.filtered_relation.
         query = compiler.query
         where = query.build_filtered_relation_q(self.condition, reuse=set(self.path))

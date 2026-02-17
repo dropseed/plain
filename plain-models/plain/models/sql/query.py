@@ -2,9 +2,8 @@
 Create SQL statements for QuerySets.
 
 The code in here encapsulates all of the SQL construction so that QuerySets
-themselves do not have to (and could be backed by things other than SQL
-databases). The abstraction barrier only works one way: this module has to know
-all about the internals of models in order to get the information it needs.
+themselves do not have to. This module has to know all about the internals of
+models in order to get the information it needs.
 """
 
 from __future__ import annotations
@@ -31,7 +30,7 @@ from typing import (
 )
 
 from plain.models.aggregates import Count
-from plain.models.constants import LOOKUP_SEP
+from plain.models.constants import LOOKUP_SEP, OnConflict
 from plain.models.db import NotSupportedError, db_connection
 from plain.models.exceptions import FieldDoesNotExist, FieldError
 from plain.models.expressions import (
@@ -62,11 +61,28 @@ from plain.utils.tree import Node
 
 if TYPE_CHECKING:
     from plain.models import Model
-    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.fields.related import RelatedField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.meta import Meta
-    from plain.models.sql.compiler import SQLCompiler, SqlWithParams
+    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.sql.compiler import (
+        SQLAggregateCompiler,
+        SQLCompiler,
+        SQLDeleteCompiler,
+        SQLInsertCompiler,
+        SQLUpdateCompiler,
+        SqlWithParams,
+    )
+
+__all__ = [
+    "Query",
+    "RawQuery",
+    "DeleteQuery",
+    "UpdateQuery",
+    "InsertQuery",
+    "AggregateQuery",
+]
+
 
 # Quotation marks ('"`[]), whitespace characters, semicolons, or inline
 # SQL comments are forbidden in column aliases.
@@ -129,23 +145,13 @@ class RawQuery:
     def get_columns(self) -> list[str]:
         if self.cursor is None:
             self._execute_query()
-        converter = db_connection.introspection.identifier_converter
-        return [
-            converter(column_model_meta[0])
-            for column_model_meta in self.cursor.description
-        ]
+        return [column_meta[0] for column_meta in self.cursor.description]
 
     def __iter__(self) -> TypingIterator[Any]:
         # Always execute a new query for a new iterator.
         # This could be optimized with a cache at the expense of RAM.
         self._execute_query()
-        if not db_connection.features.can_use_chunked_reads:
-            # If the database can't use chunked reads we need to make sure we
-            # evaluate the entire query up front.
-            result = list(self.cursor)
-        else:
-            result = self.cursor
-        return iter(result)
+        return iter(self.cursor)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"
@@ -162,23 +168,8 @@ class RawQuery:
         return self.sql % self.params_type(self.params)
 
     def _execute_query(self) -> None:
-        # Adapt parameters to the database, as much as possible considering
-        # that the target type isn't known. See #17755.
-        params_type = self.params_type
-        adapter = db_connection.ops.adapt_unknown_value
-        if params_type is tuple:
-            assert isinstance(self.params, tuple)
-            params = tuple(adapter(val) for val in self.params)
-        elif params_type is dict:
-            assert isinstance(self.params, dict)
-            params = {key: adapter(val) for key, val in self.params.items()}
-        elif params_type is None:
-            params = None
-        else:
-            raise RuntimeError(f"Unexpected params type: {params_type}")
-
         self.cursor = db_connection.cursor()
-        self.cursor.execute(self.sql, params)
+        self.cursor.execute(self.sql, self.params)
 
 
 class ExplainInfo(NamedTuple):
@@ -343,7 +334,12 @@ class Query(BaseExpression):
 
     def get_compiler(self, *, elide_empty: bool = True) -> SQLCompiler:
         """Return a compiler instance for this query."""
-        return db_connection.ops.get_compiler_for(self, elide_empty)
+        # Import compilers here to avoid circular imports at module load time
+        from plain.models.sql.compiler import SQLCompiler as Compiler
+
+        # db_connection is a proxy that acts as DatabaseWrapper
+        connection = cast("DatabaseWrapper", db_connection)
+        return Compiler(self, connection, elide_empty)
 
     def clone(self) -> Self:
         """
@@ -460,8 +456,6 @@ class Query(BaseExpression):
             or qualify
             or self.distinct
         ):
-            from plain.models.sql.subqueries import AggregateQuery
-
             inner_query = self.clone()
             inner_query.subquery = True
             outer_query = AggregateQuery(self.model, inner_query)
@@ -1176,15 +1170,8 @@ class Query(BaseExpression):
         return cast(list[BaseExpression], external_cols)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> SqlWithParams:
-        # Some backends (e.g. Oracle) raise an error when a subquery contains
-        # unnecessary ORDER BY clause.
-        if (
-            self.subquery
-            and not db_connection.features.ignores_unnecessary_order_by_in_subqueries
-        ):
-            self.clear_ordering(force=False)
         sql, params = self.get_compiler().as_sql()
         if self.subquery:
             sql = f"({sql})"
@@ -2749,3 +2736,214 @@ class JoinPromoter:
         query.promote_joins(to_promote)
         query.demote_joins(to_demote)
         return to_demote
+
+
+# ##### Query subclasses (merged from subqueries.py) #####
+
+
+class DeleteQuery(Query):
+    """A DELETE SQL query."""
+
+    def get_compiler(self, *, elide_empty: bool = True) -> SQLDeleteCompiler:
+        from plain.models.sql.compiler import SQLDeleteCompiler
+
+        connection = cast("DatabaseWrapper", db_connection)
+        return SQLDeleteCompiler(self, connection, elide_empty)
+
+    def do_query(self, table: str, where: Any) -> int:
+        from plain.models.sql.constants import CURSOR
+
+        self.alias_map = {table: self.alias_map[table]}
+        self.where = where
+        cursor = self.get_compiler().execute_sql(CURSOR)
+        if cursor:
+            with cursor:
+                return cursor.rowcount
+        return 0
+
+    def delete_batch(self, id_list: list[Any]) -> int:
+        """
+        Set up and execute delete queries for all the objects in id_list.
+
+        More than one physical query may be executed if there are a
+        lot of values in id_list.
+        """
+        from plain.models.sql.constants import GET_ITERATOR_CHUNK_SIZE
+
+        # number of objects deleted
+        num_deleted = 0
+        assert self.model is not None, "DELETE requires a model"
+        meta = self.model._model_meta
+        field = meta.get_forward_field("id")
+        for offset in range(0, len(id_list), GET_ITERATOR_CHUNK_SIZE):
+            self.clear_where()
+            self.add_filter(
+                f"{field.attname}__in",
+                id_list[offset : offset + GET_ITERATOR_CHUNK_SIZE],
+            )
+            num_deleted += self.do_query(self.model.model_options.db_table, self.where)
+        return num_deleted
+
+
+class UpdateQuery(Query):
+    """An UPDATE SQL query."""
+
+    def get_compiler(self, *, elide_empty: bool = True) -> SQLUpdateCompiler:
+        from plain.models.sql.compiler import SQLUpdateCompiler
+
+        connection = cast("DatabaseWrapper", db_connection)
+        return SQLUpdateCompiler(self, connection, elide_empty)
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._setup_query()
+
+    def _setup_query(self) -> None:
+        """
+        Run on initialization and at the end of chaining. Any attributes that
+        would normally be set in __init__() should go here instead.
+        """
+        self.values: list[tuple[Any, Any, Any]] = []
+        self.related_ids: dict[Any, list[Any]] | None = None
+        self.related_updates: dict[Any, list[tuple[Any, Any, Any]]] = {}
+
+    def clone(self) -> UpdateQuery:
+        obj = super().clone()
+        obj.related_updates = self.related_updates.copy()
+        return obj
+
+    def update_batch(self, id_list: list[Any], values: dict[str, Any]) -> None:
+        from plain.models.sql.constants import GET_ITERATOR_CHUNK_SIZE, NO_RESULTS
+
+        self.add_update_values(values)
+        for offset in range(0, len(id_list), GET_ITERATOR_CHUNK_SIZE):
+            self.clear_where()
+            self.add_filter(
+                "id__in", id_list[offset : offset + GET_ITERATOR_CHUNK_SIZE]
+            )
+            self.get_compiler().execute_sql(NO_RESULTS)
+
+    def add_update_values(self, values: dict[str, Any]) -> None:
+        """
+        Convert a dictionary of field name to value mappings into an update
+        query. This is the entry point for the public update() method on
+        querysets.
+        """
+
+        assert self.model is not None, "UPDATE requires model metadata"
+        meta = self.model._model_meta
+        values_seq = []
+        for name, val in values.items():
+            field = meta.get_field(name)
+            direct = (
+                not (field.auto_created and not field.concrete) or not field.concrete
+            )
+            model = field.model
+            from plain.models.fields.related import ManyToManyField
+
+            if not direct or isinstance(field, ManyToManyField):
+                raise FieldError(
+                    f"Cannot update model field {field!r} (only non-relations and "
+                    "foreign keys permitted)."
+                )
+            if model is not meta.model:
+                self.add_related_update(model, field, val)
+                continue
+            values_seq.append((field, model, val))
+        return self.add_update_fields(values_seq)
+
+    def add_update_fields(self, values_seq: list[tuple[Any, Any, Any]]) -> None:
+        """
+        Append a sequence of (field, model, value) triples to the internal list
+        that will be used to generate the UPDATE query. Might be more usefully
+        called add_update_targets() to hint at the extra information here.
+        """
+        for field, model, val in values_seq:
+            if isinstance(val, ResolvableExpression):
+                # Resolve expressions here so that annotations are no longer needed
+                val = val.resolve_expression(self, allow_joins=False, for_save=True)
+            self.values.append((field, model, val))
+
+    def add_related_update(self, model: Any, field: Any, value: Any) -> None:
+        """
+        Add (name, value) to an update query for an ancestor model.
+
+        Update are coalesced so that only one update query per ancestor is run.
+        """
+        self.related_updates.setdefault(model, []).append((field, None, value))
+
+    def get_related_updates(self) -> list[UpdateQuery]:
+        """
+        Return a list of query objects: one for each update required to an
+        ancestor model. Each query will have the same filtering conditions as
+        the current query but will only update a single table.
+        """
+        if not self.related_updates:
+            return []
+        result = []
+        for model, values in self.related_updates.items():
+            query = UpdateQuery(model)
+            query.values = values
+            if self.related_ids is not None:
+                query.add_filter("id__in", self.related_ids[model])
+            result.append(query)
+        return result
+
+
+class InsertQuery(Query):
+    def get_compiler(self, *, elide_empty: bool = True) -> SQLInsertCompiler:
+        from plain.models.sql.compiler import SQLInsertCompiler
+
+        connection = cast("DatabaseWrapper", db_connection)
+        return SQLInsertCompiler(self, connection, elide_empty)
+
+    def __str__(self) -> str:
+        raise NotImplementedError(
+            "InsertQuery does not support __str__(). "
+            "Use get_compiler().as_sql() which returns a list of SQL statements."
+        )
+
+    def sql_with_params(self) -> Any:
+        raise NotImplementedError(
+            "InsertQuery does not support sql_with_params(). "
+            "Use get_compiler().as_sql() which returns a list of SQL statements."
+        )
+
+    def __init__(
+        self,
+        *args: Any,
+        on_conflict: OnConflict | None = None,
+        update_fields: list[Field] | None = None,
+        unique_fields: list[Field] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields: list[Field] = []
+        self.objs: list[Any] = []
+        self.on_conflict = on_conflict
+        self.update_fields: list[Field] = update_fields or []
+        self.unique_fields: list[Field] = unique_fields or []
+
+    def insert_values(
+        self, fields: list[Any], objs: list[Any], raw: bool = False
+    ) -> None:
+        self.fields = fields
+        self.objs = objs
+        self.raw = raw
+
+
+class AggregateQuery(Query):
+    """
+    Take another query as a parameter to the FROM clause and only select the
+    elements in the provided list.
+    """
+
+    def get_compiler(self, *, elide_empty: bool = True) -> SQLAggregateCompiler:
+        from plain.models.sql.compiler import SQLAggregateCompiler
+
+        connection = cast("DatabaseWrapper", db_connection)
+        return SQLAggregateCompiler(self, connection, elide_empty)
+
+    def __init__(self, model: Any, inner_query: Any) -> None:
+        self.inner_query = inner_query
+        super().__init__(model)

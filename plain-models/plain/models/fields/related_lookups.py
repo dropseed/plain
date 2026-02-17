@@ -14,7 +14,7 @@ from plain.models.lookups import (
 )
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -110,7 +110,7 @@ class RelatedIn(In):
         return super().get_prep_lookup()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         if isinstance(self.lhs, MultiColSource):
             # For multicolumn lookups we need to build a multicolumn where clause.
@@ -178,7 +178,7 @@ class RelatedLookupMixin(Lookup):
         return super().get_prep_lookup()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         if isinstance(self.lhs, MultiColSource):
             assert self.rhs_is_direct_value()

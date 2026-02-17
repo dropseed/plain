@@ -14,8 +14,8 @@ from plain.models.lookups import Exact
 from plain.utils import tree
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.lookups import Lookup
+    from plain.models.postgres.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 # Connection types
@@ -122,7 +122,7 @@ class WhereNode(tree.Node):
         return where_node, having_node, qualify_node
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         """
         Return the SQL version of the where clause and the value to be
@@ -137,8 +137,8 @@ class WhereNode(tree.Node):
         else:
             full_needed, empty_needed = 1, len(self.children)
 
-        if self.connector == XOR and not connection.features.supports_logical_xor:
-            # Convert if the database doesn't support XOR:
+        if self.connector == XOR:
+            # PostgreSQL doesn't have a native XOR operator, so convert:
             #   a XOR b XOR c XOR ...
             # to:
             #   (a OR b OR c OR ...) AND (a + b + c + ...) == 1
@@ -185,9 +185,6 @@ class WhereNode(tree.Node):
         if not sql_string:
             raise FullResultSet
         if self.negated:
-            # Some backends (Oracle at least) need parentheses around the inner
-            # SQL in the negated case, even if the inner SQL contains just a
-            # single expression.
             sql_string = f"NOT ({sql_string})"
         elif len(result) > 1 or self.resolved:
             sql_string = f"({sql_string})"
@@ -304,14 +301,10 @@ class WhereNode(tree.Node):
     def select_format(
         self, compiler: SQLCompiler, sql: str, params: list[Any]
     ) -> tuple[str, list[Any]]:
-        # Wrap filters with a CASE WHEN expression if a database backend
-        # (e.g. Oracle) doesn't support boolean expression in SELECT or GROUP
-        # BY list.
-        if not compiler.connection.features.supports_boolean_expr_in_select_clause:
-            sql = f"CASE WHEN {sql} THEN 1 ELSE 0 END"
+        # Boolean expressions work directly in SELECT
         return sql, params
 
-    def get_db_converters(self, connection: BaseDatabaseWrapper) -> list[Any]:
+    def get_db_converters(self, connection: DatabaseWrapper) -> list[Any]:
         return self.output_field.get_db_converters(connection)
 
     def get_lookup(self, lookup: str) -> type[Lookup] | None:
@@ -334,7 +327,7 @@ class NothingNode:
     def as_sql(
         self,
         compiler: SQLCompiler | None = None,
-        connection: BaseDatabaseWrapper | None = None,
+        connection: DatabaseWrapper | None = None,
     ) -> tuple[str, list[Any]]:
         raise EmptyResultSet
 
@@ -351,7 +344,7 @@ class ExtraWhere:
     def as_sql(
         self,
         compiler: SQLCompiler | None = None,
-        connection: BaseDatabaseWrapper | None = None,
+        connection: DatabaseWrapper | None = None,
     ) -> tuple[str, list[Any]]:
         sqls = [f"({sql})" for sql in self.sqls]
         return " AND ".join(sqls), list(self.params or ())
@@ -373,7 +366,7 @@ class SubqueryConstraint:
         self.query_object = query_object
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: BaseDatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseWrapper
     ) -> tuple[str, list[Any]]:
         query = self.query_object
         query.set_values(self.targets)

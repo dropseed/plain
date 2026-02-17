@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
-    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
     from plain.models.migrations.state import ProjectState
+    from plain.models.postgres.schema import DatabaseSchemaEditor
 
 
-class Operation(ABC):
+class Operation:
     """
     Base class for migration operations.
 
@@ -34,8 +32,7 @@ class Operation(ABC):
     # Can this migration be represented as SQL? (things like RunPython cannot)
     reduces_to_sql = True
 
-    # Should this operation be forced as atomic even on backends with no
-    # DDL transaction support (i.e., does it have no DDL, like RunPython)
+    # Should this operation be forced as atomic (i.e., does it have no DDL, like RunPython)
     atomic = False
 
     # Should this operation be considered safe to elide and optimize across?
@@ -61,19 +58,19 @@ class Operation(ABC):
             self._constructor_args[1],
         )
 
-    @abstractmethod
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
         """
         Take the state from the previous migration, and mutate it
         so that it matches what this migration would perform.
         """
-        ...
+        raise NotImplementedError(
+            "subclasses of Operation must provide a state_forwards() method"
+        )
 
-    @abstractmethod
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
@@ -81,7 +78,9 @@ class Operation(ABC):
         Perform the mutation on the database schema in the normal
         (forwards) direction.
         """
-        ...
+        raise NotImplementedError(
+            "subclasses of Operation must provide a database_forwards() method"
+        )
 
     def describe(self) -> str:
         """
@@ -117,13 +116,6 @@ class Operation(ABC):
         Used for optimization. If in doubt, return True.
         """
         return self.references_model(model_name, package_label)
-
-    def allow_migrate_model(self, connection: BaseDatabaseWrapper, model: Any) -> bool:
-        """Return whether or not a model may be migrated."""
-        if not model.model_options.can_migrate(connection):
-            return False
-
-        return True
 
     def reduce(
         self, operation: Operation, package_label: str

@@ -20,10 +20,20 @@ from plain.models.lookups import (
     YearLt,
     YearLte,
 )
+from plain.models.postgres.sql import (
+    date_extract_sql,
+    date_trunc_sql,
+    datetime_cast_date_sql,
+    datetime_cast_time_sql,
+    datetime_extract_sql,
+    datetime_trunc_sql,
+    time_extract_sql,
+    time_trunc_sql,
+)
 from plain.utils import timezone
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -62,7 +72,7 @@ class Extract(TimezoneMixin, Transform):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -74,27 +84,18 @@ class Extract(TimezoneMixin, Transform):
         lhs_output_field = self.lhs.output_field
         if isinstance(lhs_output_field, DateTimeField):
             tzname = self.get_tzname()
-            sql, params = connection.ops.datetime_extract_sql(
+            sql, params = datetime_extract_sql(
                 self.lookup_name, sql, tuple(params), tzname
             )
         elif self.tzinfo is not None:
             raise ValueError("tzinfo can only be used with DateTimeField.")
         elif isinstance(lhs_output_field, DateField):
-            sql, params = connection.ops.date_extract_sql(
-                self.lookup_name, sql, tuple(params)
-            )
+            sql, params = date_extract_sql(self.lookup_name, sql, tuple(params))
         elif isinstance(lhs_output_field, TimeField):
-            sql, params = connection.ops.time_extract_sql(
-                self.lookup_name, sql, tuple(params)
-            )
+            sql, params = time_extract_sql(self.lookup_name, sql, tuple(params))
         elif isinstance(lhs_output_field, DurationField):
-            if not connection.features.has_native_duration_field:
-                raise ValueError(
-                    "Extract requires native DurationField database support."
-                )
-            sql, params = connection.ops.time_extract_sql(
-                self.lookup_name, sql, tuple(params)
-            )
+            # PostgreSQL has native duration (interval) type
+            sql, params = time_extract_sql(self.lookup_name, sql, tuple(params))
         else:
             # resolve_expression has already validated the output_field so this
             # assert should never be hit.
@@ -234,44 +235,11 @@ ExtractIsoYear.register_lookup(YearLte)
 
 
 class Now(Func):
-    template = "CURRENT_TIMESTAMP"
+    # STATEMENT_TIMESTAMP() returns the time at the start of the current statement,
+    # as opposed to CURRENT_TIMESTAMP which returns the time at the start of the
+    # transaction.
+    template = "STATEMENT_TIMESTAMP()"
     output_field = DateTimeField()
-
-    def as_postgresql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        # PostgreSQL's CURRENT_TIMESTAMP means "the time at the start of the
-        # transaction". Use STATEMENT_TIMESTAMP to be cross-compatible with
-        # other databases.
-        return self.as_sql(
-            compiler, connection, template="STATEMENT_TIMESTAMP()", **extra_context
-        )
-
-    def as_mysql(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        return self.as_sql(
-            compiler, connection, template="CURRENT_TIMESTAMP(6)", **extra_context
-        )
-
-    def as_sqlite(
-        self,
-        compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
-        **extra_context: Any,
-    ) -> tuple[str, list[Any]]:
-        return self.as_sql(
-            compiler,
-            connection,
-            template="STRFTIME('%%%%Y-%%%%m-%%%%d %%%%H:%%%%M:%%%%f', 'NOW')",
-            **extra_context,
-        )
 
 
 class TruncBase(TimezoneMixin, Transform):
@@ -290,7 +258,7 @@ class TruncBase(TimezoneMixin, Transform):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -305,17 +273,11 @@ class TruncBase(TimezoneMixin, Transform):
         elif self.tzinfo is not None:
             raise ValueError("tzinfo can only be used with DateTimeField.")
         if isinstance(self.output_field, DateTimeField):
-            sql, params = connection.ops.datetime_trunc_sql(
-                self.kind, sql, tuple(params), tzname
-            )
+            sql, params = datetime_trunc_sql(self.kind, sql, tuple(params), tzname)
         elif isinstance(self.output_field, DateField):
-            sql, params = connection.ops.date_trunc_sql(
-                self.kind, sql, tuple(params), tzname
-            )
+            sql, params = date_trunc_sql(self.kind, sql, tuple(params), tzname)
         elif isinstance(self.output_field, TimeField):
-            sql, params = connection.ops.time_trunc_sql(
-                self.kind, sql, tuple(params), tzname
-            )
+            sql, params = time_trunc_sql(self.kind, sql, tuple(params), tzname)
         else:
             raise ValueError(
                 "Trunc only valid on DateField, TimeField, or DateTimeField."
@@ -383,17 +345,12 @@ class TruncBase(TimezoneMixin, Transform):
         return copy
 
     def convert_value(
-        self, value: Any, expression: Any, connection: BaseDatabaseWrapper
+        self, value: Any, expression: Any, connection: DatabaseWrapper
     ) -> Any:
         if isinstance(self.output_field, DateTimeField):
             if value is not None:
                 value = value.replace(tzinfo=None)
                 value = timezone.make_aware(value, self.tzinfo)
-            elif not connection.features.has_zoneinfo_database:
-                raise ValueError(
-                    "Database returned an invalid datetime value. Are time "
-                    "zone definitions for your database installed?"
-                )
         elif isinstance(value, datetime):
             if value is None:
                 pass
@@ -447,7 +404,7 @@ class TruncDate(TruncBase):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -456,7 +413,7 @@ class TruncDate(TruncBase):
         # Cast to date rather than truncate to date.
         sql, params = compiler.compile(self.lhs)
         tzname = self.get_tzname()
-        sql, params = connection.ops.datetime_cast_date_sql(sql, tuple(params), tzname)
+        sql, params = datetime_cast_date_sql(sql, tuple(params), tzname)
         return sql, list(params)
 
 
@@ -468,7 +425,7 @@ class TruncTime(TruncBase):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -477,7 +434,7 @@ class TruncTime(TruncBase):
         # Cast to time rather than truncate to time.
         sql, params = compiler.compile(self.lhs)
         tzname = self.get_tzname()
-        sql, params = connection.ops.datetime_cast_time_sql(sql, tuple(params), tzname)
+        sql, params = datetime_cast_time_sql(sql, tuple(params), tzname)
         return sql, list(params)
 
 

@@ -7,7 +7,6 @@ from __future__ import annotations
 import copy
 import operator
 import warnings
-from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Sequence
 from functools import cached_property
 from itertools import chain, islice
@@ -20,7 +19,6 @@ from plain.models.constants import LOOKUP_SEP, OnConflict
 from plain.models.db import (
     PLAIN_VERSION_PICKLE_KEY,
     IntegrityError,
-    NotSupportedError,
     db_connection,
 )
 from plain.models.exceptions import (
@@ -35,10 +33,18 @@ from plain.models.fields import (
 )
 from plain.models.functions import Cast
 from plain.models.query_utils import FilteredRelation, Q
-from plain.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE
-from plain.models.sql.query import Query, RawQuery
-from plain.models.sql.subqueries import DeleteQuery, InsertQuery, UpdateQuery
-from plain.models.sql.where import AND, OR, XOR
+from plain.models.sql import (
+    AND,
+    CURSOR,
+    GET_ITERATOR_CHUNK_SIZE,
+    OR,
+    XOR,
+    DeleteQuery,
+    InsertQuery,
+    Query,
+    RawQuery,
+    UpdateQuery,
+)
 from plain.models.utils import resolve_callables
 from plain.utils.functional import partition
 
@@ -58,7 +64,7 @@ MAX_GET_RESULTS = 21
 REPR_OUTPUT_SIZE = 20
 
 
-class BaseIterable(ABC):
+class BaseIterable:
     def __init__(
         self,
         queryset: QuerySet[Any],
@@ -69,8 +75,10 @@ class BaseIterable(ABC):
         self.chunked_fetch = chunked_fetch
         self.chunk_size = chunk_size
 
-    @abstractmethod
-    def __iter__(self) -> Iterator[Any]: ...
+    def __iter__(self) -> Iterator[Any]:
+        raise NotImplementedError(
+            "subclasses of BaseIterable must provide an __iter__() method"
+        )
 
 
 class ModelIterable(BaseIterable):
@@ -141,8 +149,10 @@ class RawModelIterable(BaseIterable):
     def __iter__(self) -> Iterator[Model]:
         # Cache some things for performance reasons outside the loop.
         # RawQuery is not a Query subclass, so we directly get SQLCompiler
+        from plain.models.sql.compiler import SQLCompiler
+
         query = self.queryset.sql_query
-        compiler = db_connection.ops.compilers[Query](query, db_connection, True)
+        compiler = SQLCompiler(query, db_connection, True)  # type: ignore[arg-type]
         query_iterator = iter(query)
 
         try:
@@ -546,10 +556,8 @@ class QuerySet(Generic[T]):
                 )
         elif chunk_size <= 0:
             raise ValueError("Chunk size must be strictly positive.")
-        use_chunked_fetch = not db_connection.settings_dict.get(
-            "DISABLE_SERVER_SIDE_CURSORS"
-        )
-        return self._iterator(use_chunked_fetch, chunk_size)
+        # PostgreSQL always supports server-side cursors for chunked fetches
+        return self._iterator(use_chunked_fetch=True, chunk_size=chunk_size)
 
     def aggregate(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """
@@ -597,13 +605,8 @@ class QuerySet(Generic[T]):
         clone = self.filter(*args, **kwargs)
         if self.sql_query.can_filter() and not self.sql_query.distinct_fields:
             clone = clone.order_by()
-        limit = None
-        if (
-            not clone.sql_query.select_for_update
-            or db_connection.features.supports_select_for_update_with_limit
-        ):
-            limit = MAX_GET_RESULTS
-            clone.sql_query.set_limits(high=limit)
+        limit = MAX_GET_RESULTS
+        clone.sql_query.set_limits(high=limit)
         num = len(clone)
         if num == 1:
             assert clone._result_cache is not None  # len() fetches results
@@ -653,24 +656,13 @@ class QuerySet(Generic[T]):
         update_fields: list[Field] | None,
         unique_fields: list[Field] | None,
     ) -> OnConflict | None:
-        db_features = db_connection.features
         if update_conflicts:
-            if not db_features.supports_update_conflicts:
-                raise NotSupportedError(
-                    "This database backend does not support updating conflicts."
-                )
             if not update_fields:
                 raise ValueError(
                     "Fields that will be updated when a row insertion fails "
                     "on conflicts must be provided."
                 )
-            if unique_fields and not db_features.supports_update_conflicts_with_target:
-                raise NotSupportedError(
-                    "This database backend does not support updating "
-                    "conflicts with specifying unique fields that can trigger "
-                    "the upsert."
-                )
-            if not unique_fields and db_features.supports_update_conflicts_with_target:
+            if not unique_fields:
                 raise ValueError(
                     "Unique fields that can trigger the upsert must be provided."
                 )
@@ -712,22 +704,9 @@ class QuerySet(Generic[T]):
     ) -> list[T]:
         """
         Insert each of the instances into the database. Do *not* call
-        save() on each of the instances, and do not set the primary key attribute if it is an
-        autoincrement field (except if features.can_return_rows_from_bulk_insert=True).
-        Multi-table models are not supported.
+        save() on each of the instances. Primary keys are set on the objects
+        via the PostgreSQL RETURNING clause. Multi-table models are not supported.
         """
-        # When you bulk insert you don't get the primary keys back (if it's an
-        # autoincrement, except if can_return_rows_from_bulk_insert=True), so
-        # you can't insert into the child tables which references this. There
-        # are two workarounds:
-        # 1) This could be implemented if you didn't have an autoincrement pk
-        # 2) You could do it by doing O(n) normal inserts into the parent
-        #    tables to get the primary keys back and then doing a single bulk
-        #    insert into the childmost table.
-        # We currently set the primary keys on the objects when using
-        # PostgreSQL via the RETURNING ID clause. It should be possible for
-        # Oracle as well, but the semantics for extracting the primary keys is
-        # trickier so it's not done yet.
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
 
@@ -781,10 +760,7 @@ class QuerySet(Generic[T]):
                     update_fields=update_fields_objs,
                     unique_fields=unique_fields_objs,
                 )
-                if (
-                    db_connection.features.can_return_rows_from_bulk_insert
-                    and on_conflict is None
-                ):
+                if on_conflict is None:
                     assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
@@ -824,11 +800,8 @@ class QuerySet(Generic[T]):
         # PK is used twice in the resulting update query, once in the filter
         # and once in the WHEN. Each field will also have one CAST.
         self._for_write = True
-        max_batch_size = db_connection.ops.bulk_batch_size(
-            ["id", "id"] + fields_list, objs_tuple
-        )
+        max_batch_size = len(objs_tuple)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
-        requires_casting = db_connection.features.requires_casted_case_in_updates
         batches = (
             objs_tuple[i : i + batch_size]
             for i in range(0, len(objs_tuple), batch_size)
@@ -844,8 +817,8 @@ class QuerySet(Generic[T]):
                         attr = Value(attr, output_field=field)
                     when_statements.append(When(id=obj.id, then=attr))
                 case_statement = Case(*when_statements, output_field=field)
-                if requires_casting:
-                    case_statement = Cast(case_statement, output_field=field)
+                # PostgreSQL requires casted CASE in updates
+                case_statement = Cast(case_statement, output_field=field)
                 update_kwargs[field.attname] = case_statement
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
@@ -1518,7 +1491,7 @@ class QuerySet(Generic[T]):
         )
         query.insert_values(fields, objs, raw=raw)
         # InsertQuery returns SQLInsertCompiler which has different execute_sql signature
-        return query.get_compiler().execute_sql(returning_fields)  # type: ignore[arg-type]
+        return query.get_compiler().execute_sql(returning_fields)
 
     def _batched_insert(
         self,
@@ -1532,13 +1505,11 @@ class QuerySet(Generic[T]):
         """
         Helper method for bulk_create() to insert objs one batch at a time.
         """
-        ops = db_connection.ops
-        max_batch_size = max(ops.bulk_batch_size(fields, objs), 1)
+        max_batch_size = max(len(objs), 1)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         inserted_rows = []
-        bulk_return = db_connection.features.can_return_rows_from_bulk_insert
         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
-            if bulk_return and on_conflict is None:
+            if on_conflict is None:
                 inserted_rows.extend(
                     self._insert(  # type: ignore[arg-type]
                         item,
@@ -1697,20 +1668,17 @@ class RawQuerySet:
         self,
     ) -> tuple[list[str], list[int], list[tuple[str, int]]]:
         """Resolve the init field names and value positions."""
-        converter = db_connection.introspection.identifier_converter
         model = self.model
         assert model is not None
         model_init_fields = [
-            f for f in model._model_meta.fields if converter(f.column) in self.columns
+            f for f in model._model_meta.fields if f.column in self.columns
         ]
         annotation_fields = [
             (column, pos)
             for pos, column in enumerate(self.columns)
             if column not in self.model_fields
         ]
-        model_init_order = [
-            self.columns.index(converter(f.column)) for f in model_init_fields
-        ]
+        model_init_order = [self.columns.index(f.column) for f in model_init_fields]
         model_init_names = [f.attname for f in model_init_fields]
         return model_init_names, model_init_order, annotation_fields
 
@@ -1790,12 +1758,11 @@ class RawQuerySet:
     @cached_property
     def model_fields(self) -> dict[str, Field]:
         """A dict mapping column names to model field names."""
-        converter = db_connection.introspection.identifier_converter
         model_fields = {}
         model = self.model
         assert model is not None
         for field in model._model_meta.fields:
-            model_fields[converter(field.column)] = field
+            model_fields[field.column] = field
         return model_fields
 
 

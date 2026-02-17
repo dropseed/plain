@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any
 from .base import Operation
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.schema import BaseDatabaseSchemaEditor
     from plain.models.migrations.state import ProjectState
+    from plain.models.postgres.schema import DatabaseSchemaEditor
 
 
 class SeparateDatabaseAndState(Operation):
@@ -43,7 +43,7 @@ class SeparateDatabaseAndState(Operation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
@@ -96,7 +96,7 @@ class RunSQL(Operation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:
@@ -107,7 +107,7 @@ class RunSQL(Operation):
 
     def _run_sql(
         self,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         sqls: str
         | list[str | tuple[str, list[Any]]]
         | tuple[str | tuple[str, list[Any]], ...],
@@ -126,10 +126,8 @@ class RunSQL(Operation):
                     sql = sql_item
                 schema_editor.execute(sql, params=params)
         else:
-            # sqls is a str in this branch
-            statements = schema_editor.connection.ops.prepare_sql_script(sqls)
-            for statement in statements:
-                schema_editor.execute(statement, params=None)
+            # PostgreSQL can handle multi-statement scripts in a single execute call
+            schema_editor.execute(sqls, params=None)
 
 
 class RunPython(Operation):
@@ -169,7 +167,7 @@ class RunPython(Operation):
     def database_forwards(
         self,
         package_label: str,
-        schema_editor: BaseDatabaseSchemaEditor,
+        schema_editor: DatabaseSchemaEditor,
         from_state: ProjectState,
         to_state: ProjectState,
     ) -> None:

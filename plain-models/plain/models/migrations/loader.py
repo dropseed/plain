@@ -18,8 +18,8 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.migrations.migration import Migration
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 MIGRATIONS_MODULE_NAME = "migrations"
 
@@ -51,7 +51,7 @@ class MigrationLoader:
 
     def __init__(
         self,
-        connection: BaseDatabaseWrapper | DatabaseConnection | None,
+        connection: DatabaseWrapper | DatabaseConnection | None,
         load: bool = True,
         ignore_no_migrations: bool = False,
         replace_migrations: bool = True,
@@ -322,7 +322,7 @@ class MigrationLoader:
         self.graph.ensure_not_cyclic()
 
     def check_consistent_history(
-        self, connection: BaseDatabaseWrapper | DatabaseConnection
+        self, connection: DatabaseWrapper | DatabaseConnection
     ) -> None:
         """
         Raise InconsistentMigrationHistory if any applied migrations have

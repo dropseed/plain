@@ -3,8 +3,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
+import psycopg
+
 if TYPE_CHECKING:
-    from plain.models.backends.base.base import BaseDatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -158,17 +160,13 @@ class NotSupportedError(DatabaseError):
     pass
 
 
-class ConnectionDoesNotExist(Exception):
-    pass
-
-
 class DatabaseErrorWrapper:
     """
     Context manager and decorator that reraises backend-specific database
     exceptions using Plain's common wrappers.
     """
 
-    def __init__(self, wrapper: BaseDatabaseWrapper) -> None:
+    def __init__(self, wrapper: DatabaseWrapper) -> None:
         """
         wrapper is a database wrapper.
 
@@ -198,7 +196,7 @@ class DatabaseErrorWrapper:
             InterfaceError,
             Error,
         ):
-            db_exc_type = getattr(self.wrapper.Database, plain_exc_type.__name__)
+            db_exc_type = getattr(psycopg, plain_exc_type.__name__)
             if issubclass(exc_type, db_exc_type):
                 plain_exc_value = (
                     plain_exc_type(*exc_value.args) if exc_value else plain_exc_type()

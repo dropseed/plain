@@ -37,7 +37,6 @@ dev = [
     # Type checking and better dev experience
     "ty>=0.0.11",
     "psycopg[binary]>=3.2.12",
-    "mysqlclient>=2.2.7",
 ]
 
 [tool.uv.sources]

@@ -2,43 +2,284 @@ from __future__ import annotations
 
 import logging
 import operator
-from abc import ABC, abstractmethod
-from collections.abc import Generator
+from collections.abc import Callable, Generator
+from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
+
+from psycopg import sql as psycopg_sql
 
 if TYPE_CHECKING:
     from typing import Self
 
-from plain.models.backends.ddl_references import (
-    Columns,
-    Expressions,
-    ForeignKeyName,
-    IndexName,
-    Statement,
-    Table,
-)
-from plain.models.backends.utils import names_digest, split_identifier, truncate_name
+    from plain.models.sql.compiler import SQLCompiler
+
 from plain.models.constraints import Deferrable
 from plain.models.fields import DbParameters, Field
 from plain.models.fields.related import ForeignKeyField, RelatedField
 from plain.models.fields.reverse_related import ForeignObjectRel, ManyToManyRel
 from plain.models.indexes import Index
-from plain.models.sql.query import Query
-from plain.models.transaction import TransactionManagementError, atomic
+from plain.models.postgres.sql import (
+    DATA_TYPE_CHECK_CONSTRAINTS,
+    DATA_TYPES,
+    DEFERRABLE_SQL,
+    MAX_NAME_LENGTH,
+    quote_name,
+)
+from plain.models.postgres.utils import names_digest, split_identifier, strip_quotes
+from plain.models.sql import Query
+from plain.models.transaction import atomic
 from plain.utils import timezone
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from plain.models.backends.base.base import BaseDatabaseWrapper
     from plain.models.base import Model
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
-    from plain.models.fields.related import ForeignKeyField, ManyToManyField
+    from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ManyToManyRel
+    from plain.models.postgres.wrapper import DatabaseWrapper
 
-logger = logging.getLogger("plain.models.backends.schema")
+logger = logging.getLogger("plain.models.postgres.schema")
+
+
+# ##### DDL Reference classes (for deferred DDL statement manipulation) #####
+
+
+class Table:
+    """Hold a reference to a table."""
+
+    def __init__(self, table: str) -> None:
+        self.table = table
+
+    def references_table(self, table: str) -> bool:
+        return self.table == table
+
+    def references_column(self, table: str, column: str) -> bool:
+        return False
+
+    def rename_table_references(self, old_table: str, new_table: str) -> None:
+        if self.table == old_table:
+            self.table = new_table
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        pass
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {str(self)!r}>"
+
+    def __str__(self) -> str:
+        return quote_name(self.table)
+
+
+class TableColumns(Table):
+    """Base class for references to multiple columns of a table."""
+
+    def __init__(self, table: str, columns: list[str]) -> None:
+        self.table = table
+        self.columns = columns
+
+    def references_column(self, table: str, column: str) -> bool:
+        return self.table == table and column in self.columns
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        if self.table == table:
+            for index, column in enumerate(self.columns):
+                if column == old_column:
+                    self.columns[index] = new_column
+
+
+class Columns(TableColumns):
+    """Hold a reference to one or many columns."""
+
+    def __init__(
+        self,
+        table: str,
+        columns: list[str],
+        col_suffixes: tuple[str, ...] = (),
+        opclasses: tuple[str, ...] = (),
+    ) -> None:
+        self.col_suffixes = col_suffixes
+        self.opclasses = opclasses
+        super().__init__(table, columns)
+
+    def __str__(self) -> str:
+        def col_str(column: str, idx: int) -> str:
+            col = quote_name(column)
+            # If opclasses are provided, include them
+            if self.opclasses:
+                col = f"{col} {self.opclasses[idx]}"
+            try:
+                suffix = self.col_suffixes[idx]
+                if suffix:
+                    col = f"{col} {suffix}"
+            except IndexError:
+                pass
+            return col
+
+        return ", ".join(
+            col_str(column, idx) for idx, column in enumerate(self.columns)
+        )
+
+
+class IndexName(TableColumns):
+    """Hold a reference to an index name."""
+
+    def __init__(
+        self,
+        table: str,
+        columns: list[str],
+        suffix: str,
+        create_index_name: Callable[[str, list[str], str], str],
+    ) -> None:
+        self.suffix = suffix
+        self.create_index_name = create_index_name
+        super().__init__(table, columns)
+
+    def __str__(self) -> str:
+        return self.create_index_name(self.table, self.columns, self.suffix)
+
+
+class ForeignKeyName(TableColumns):
+    """Hold a reference to a foreign key name."""
+
+    def __init__(
+        self,
+        from_table: str,
+        from_columns: list[str],
+        to_table: str,
+        to_columns: list[str],
+        suffix_template: str,
+        create_fk_name: Callable[[str, list[str], str], str],
+    ) -> None:
+        self.to_reference = TableColumns(to_table, to_columns)
+        self.suffix_template = suffix_template
+        self.create_fk_name = create_fk_name
+        super().__init__(
+            from_table,
+            from_columns,
+        )
+
+    def references_table(self, table: str) -> bool:
+        return super().references_table(table) or self.to_reference.references_table(
+            table
+        )
+
+    def references_column(self, table: str, column: str) -> bool:
+        return super().references_column(
+            table, column
+        ) or self.to_reference.references_column(table, column)
+
+    def rename_table_references(self, old_table: str, new_table: str) -> None:
+        super().rename_table_references(old_table, new_table)
+        self.to_reference.rename_table_references(old_table, new_table)
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        super().rename_column_references(table, old_column, new_column)
+        self.to_reference.rename_column_references(table, old_column, new_column)
+
+    def __str__(self) -> str:
+        suffix = self.suffix_template % {
+            "to_table": self.to_reference.table,
+            "to_column": self.to_reference.columns[0],
+        }
+        return self.create_fk_name(self.table, self.columns, suffix)
+
+
+class Statement:
+    """
+    Statement template and formatting parameters container.
+
+    Allows keeping a reference to a statement without interpolating identifiers
+    that might have to be adjusted if they're referencing a table or column
+    that is removed
+    """
+
+    def __init__(self, template: str, **parts: Any) -> None:
+        self.template = template
+        self.parts = parts
+
+    def references_table(self, table: str) -> bool:
+        return any(
+            hasattr(part, "references_table") and part.references_table(table)
+            for part in self.parts.values()
+        )
+
+    def references_column(self, table: str, column: str) -> bool:
+        return any(
+            hasattr(part, "references_column") and part.references_column(table, column)
+            for part in self.parts.values()
+        )
+
+    def rename_table_references(self, old_table: str, new_table: str) -> None:
+        for part in self.parts.values():
+            if hasattr(part, "rename_table_references"):
+                part.rename_table_references(old_table, new_table)
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        for part in self.parts.values():
+            if hasattr(part, "rename_column_references"):
+                part.rename_column_references(table, old_column, new_column)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {str(self)!r}>"
+
+    def __str__(self) -> str:
+        return self.template % self.parts
+
+
+class Expressions(TableColumns):
+    def __init__(
+        self,
+        table: str,
+        expressions: Any,
+        compiler: SQLCompiler,
+        quote_value: Callable[[Any], str],
+    ) -> None:
+        self.compiler = compiler
+        self.expressions = expressions
+        self.quote_value = quote_value
+        columns = [
+            col.target.column
+            for col in self.compiler.query._gen_cols(iter([self.expressions]))
+        ]
+        super().__init__(table, columns)
+
+    def rename_table_references(self, old_table: str, new_table: str) -> None:
+        if self.table != old_table:
+            return
+        self.expressions = self.expressions.relabeled_clone({old_table: new_table})
+        super().rename_table_references(old_table, new_table)
+
+    def rename_column_references(
+        self, table: str, old_column: str, new_column: str
+    ) -> None:
+        if self.table != table:
+            return
+        expressions = deepcopy(self.expressions)
+        self.columns = []
+        for col in self.compiler.query._gen_cols(iter([expressions])):
+            if col.target.column == old_column:
+                col.target.column = new_column
+            self.columns.append(col.target.column)
+        self.expressions = expressions
+
+    def __str__(self) -> str:
+        sql, params = self.compiler.compile(self.expressions)
+        params = map(self.quote_value, params)
+        return sql % tuple(params)
+
+
+# ##### Schema helper functions #####
 
 
 def _is_relevant_relation(relation: ForeignObjectRel, altered_field: Field) -> bool:
@@ -95,14 +336,12 @@ def _related_non_m2m_objects(
         )
 
 
-class BaseDatabaseSchemaEditor(ABC):
+class DatabaseSchemaEditor:
     """
-    This class and its subclasses are responsible for emitting schema-changing
-    statements to the databases - model creation/removal/alteration, field
-    renaming, index fiddling, and so on.
+    Responsible for emitting schema-changing statements to PostgreSQL - model
+    creation/removal/alteration, field renaming, index management, and so on.
     """
 
-    # Overrideable SQL templates
     sql_create_table = "CREATE TABLE %(table)s (%(definition)s)"
     sql_rename_table = "ALTER TABLE %(old_table)s RENAME TO %(new_table)s"
     sql_delete_table = "DROP TABLE %(table)s CASCADE"
@@ -114,13 +353,14 @@ class BaseDatabaseSchemaEditor(ABC):
     sql_alter_column_not_null = "ALTER COLUMN %(column)s SET NOT NULL"
     sql_alter_column_default = "ALTER COLUMN %(column)s SET DEFAULT %(default)s"
     sql_alter_column_no_default = "ALTER COLUMN %(column)s DROP DEFAULT"
-    sql_alter_column_no_default_null = sql_alter_column_no_default
     sql_delete_column = "ALTER TABLE %(table)s DROP COLUMN %(column)s CASCADE"
     sql_rename_column = (
         "ALTER TABLE %(table)s RENAME COLUMN %(old_column)s TO %(new_column)s"
     )
+    # Setting all constraints to IMMEDIATE to allow changing data in the same transaction.
     sql_update_with_default = (
         "UPDATE %(table)s SET %(column)s = %(default)s WHERE %(column)s IS NULL"
+        "; SET CONSTRAINTS ALL IMMEDIATE"
     )
 
     sql_unique_constraint = "UNIQUE (%(columns)s)%(deferrable)s"
@@ -141,12 +381,24 @@ class BaseDatabaseSchemaEditor(ABC):
         "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s FOREIGN KEY (%(column)s) "
         "REFERENCES %(to_table)s (%(to_column)s)%(deferrable)s"
     )
-    sql_create_inline_fk = None
-    sql_create_column_inline_fk = None
-    sql_delete_fk = sql_delete_constraint
+    # Setting the constraint to IMMEDIATE to allow changing data in the same transaction.
+    sql_create_column_inline_fk = (
+        "CONSTRAINT %(name)s REFERENCES %(to_table)s(%(to_column)s)%(deferrable)s"
+        "; SET CONSTRAINTS %(namespace)s%(name)s IMMEDIATE"
+    )
+    # Setting the constraint to IMMEDIATE runs any deferred checks to allow
+    # dropping it in the same transaction.
+    sql_delete_fk = (
+        "SET CONSTRAINTS %(name)s IMMEDIATE; "
+        "ALTER TABLE %(table)s DROP CONSTRAINT %(name)s"
+    )
 
     sql_create_index = (
-        "CREATE INDEX %(name)s ON %(table)s "
+        "CREATE INDEX %(name)s ON %(table)s%(using)s "
+        "(%(columns)s)%(include)s%(extra)s%(condition)s"
+    )
+    sql_create_index_concurrently = (
+        "CREATE INDEX CONCURRENTLY %(name)s ON %(table)s%(using)s "
         "(%(columns)s)%(include)s%(extra)s%(condition)s"
     )
     sql_create_unique_index = (
@@ -154,24 +406,34 @@ class BaseDatabaseSchemaEditor(ABC):
         "(%(columns)s)%(include)s%(condition)s"
     )
     sql_rename_index = "ALTER INDEX %(old_name)s RENAME TO %(new_name)s"
-    sql_delete_index = "DROP INDEX %(name)s"
+    sql_delete_index = "DROP INDEX IF EXISTS %(name)s"
+    sql_delete_index_concurrently = "DROP INDEX CONCURRENTLY IF EXISTS %(name)s"
 
     sql_create_pk = (
         "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s PRIMARY KEY (%(columns)s)"
     )
     sql_delete_pk = sql_delete_constraint
 
+    # PostgreSQL IDENTITY column support
+    sql_add_identity = (
+        "ALTER TABLE %(table)s ALTER COLUMN %(column)s ADD "
+        "GENERATED BY DEFAULT AS IDENTITY"
+    )
+    sql_drop_identity = (
+        "ALTER TABLE %(table)s ALTER COLUMN %(column)s DROP IDENTITY IF EXISTS"
+    )
+    sql_alter_sequence_type = "ALTER SEQUENCE IF EXISTS %(sequence)s AS %(type)s"
+    sql_delete_sequence = "DROP SEQUENCE IF EXISTS %(sequence)s CASCADE"
+
     def __init__(
         self,
-        connection: BaseDatabaseWrapper,
+        connection: DatabaseWrapper,
         atomic: bool = True,
         collect_sql: bool = False,
     ):
         self.connection = connection
         self.collect_sql = collect_sql
-        self.atomic_migration = (
-            self.connection.features.can_rollback_ddl and atomic and not collect_sql
-        )
+        self.atomic_migration = atomic and not collect_sql
 
     # State-managing methods
 
@@ -197,34 +459,38 @@ class BaseDatabaseSchemaEditor(ABC):
         self, sql: str | Statement, params: tuple[Any, ...] | list[Any] | None = ()
     ) -> None:
         """Execute the given SQL statement, with optional parameters."""
-        if (
-            self.connection.in_atomic_block
-            and not self.connection.features.can_rollback_ddl
-        ):
-            raise TransactionManagementError(
-                "Executing DDL statements while in a transaction on databases "
-                "that can't perform a rollback is prohibited."
-            )
         # Account for non-string statement objects.
-        sql = str(sql)
+        sql_str = str(sql)
+
+        # Merge the query client-side, as PostgreSQL won't do it server-side.
+        if params is not None:
+            sql_str = self.connection.compose_sql(sql_str, params)
+            params = None
+
+        # Log the command we're running, then run it
         logger.debug(
-            "%s; (params %r)", sql, params, extra={"params": params, "sql": sql}
+            "%s; (params %r)", sql_str, params, extra={"params": params, "sql": sql_str}
         )
 
-        # Track executed SQL (interpolate params for readability in migration output).
-        if params:
-            self.executed_sql.append(sql % tuple(map(self.quote_value, params)))
-        else:
-            self.executed_sql.append(sql)
+        # Track executed SQL for display in migration output
+        self.executed_sql.append(sql_str)
 
         if self.collect_sql:
             return
 
         with self.connection.cursor() as cursor:
-            cursor.execute(sql, params)
+            cursor.execute(sql_str, params)
 
-    def quote_name(self, name: str) -> str:
-        return self.connection.ops.quote_name(name)
+    def quote_value(self, value: Any) -> str:
+        """
+        Return a quoted version of the value so it's safe to use in an SQL
+        string. This is not safe against injection from user code; it is
+        intended only for use in making SQL scripts or preparing default values
+        (which are not user-defined, so this is safe).
+        """
+        if isinstance(value, str):
+            value = value.replace("%", "%%")
+        return psycopg_sql.quote(value, self.connection.connection)
 
     def table_sql(self, model: type[Model]) -> tuple[str, list[Any]]:
         """Take a model and return its table definition."""
@@ -237,44 +503,28 @@ class BaseDatabaseSchemaEditor(ABC):
             if definition is None:
                 continue
             # Check constraints can go on the column SQL here.
-            db_params = field.db_parameters(connection=self.connection)
+            db_params = field.db_parameters()
             if db_params["check"]:
                 definition += " " + self.sql_check_constraint % db_params
-            # Autoincrement SQL (for backends with inline variant).
-            col_type_suffix = field.db_type_suffix(connection=self.connection)
+            # Autoincrement SQL (e.g. GENERATED BY DEFAULT AS IDENTITY).
+            col_type_suffix = field.db_type_suffix()
             if col_type_suffix:
                 definition += f" {col_type_suffix}"
             if extra_params:
                 params.extend(extra_params)
-            # FK.
+            # PostgreSQL creates FK constraints via deferred ALTER TABLE
             if isinstance(field, ForeignKeyField) and field.db_constraint:
-                to_table = field.remote_field.model.model_options.db_table
-                field_name = field.remote_field.field_name
-                if field_name is None:
-                    raise ValueError("Foreign key field_name cannot be None")
-                to_field = field.remote_field.model._model_meta.get_forward_field(
-                    field_name
+                self.deferred_sql.append(
+                    self._create_fk_sql(model, field, "_fk_%(to_table)s_%(to_column)s")
                 )
-                to_column = to_field.column
-                if self.sql_create_inline_fk:
-                    definition += " " + self.sql_create_inline_fk % {
-                        "to_table": self.quote_name(to_table),
-                        "to_column": self.quote_name(to_column),
-                    }
-                elif self.connection.features.supports_foreign_keys:
-                    self.deferred_sql.append(
-                        self._create_fk_sql(
-                            model, field, "_fk_%(to_table)s_%(to_column)s"
-                        )
-                    )
             # Add the SQL to our big list.
-            column_sqls.append(f"{self.quote_name(field.column)} {definition}")
+            column_sqls.append(f"{quote_name(field.column)} {definition}")
         constraints = [
             constraint.constraint_sql(model, self)
             for constraint in model.model_options.constraints
         ]
         sql = self.sql_create_table % {
-            "table": self.quote_name(model.model_options.db_table),
+            "table": quote_name(model.model_options.db_table),
             "definition": ", ".join(
                 str(constraint)
                 for constraint in (*column_sqls, *constraints)
@@ -298,27 +548,11 @@ class BaseDatabaseSchemaEditor(ABC):
         # Work out nullability.
         null = field.allow_null
         # Include a default value, if requested.
-        include_default = (
-            include_default
-            and not self.skip_default(field)
-            and
-            # Don't include a default value if it's a nullable field and the
-            # default cannot be dropped in the ALTER COLUMN statement (e.g.
-            # MySQL longtext and longblob).
-            not (null and self.skip_default_on_alter(field))
-        )
         if include_default:
             default_value = self.effective_default(field)
             if default_value is not None:
-                column_default = "DEFAULT " + self._column_default_sql(field)
-                if self.connection.features.requires_literal_defaults:
-                    # Some databases can't take defaults as a parameter (Oracle).
-                    # If this is the case, the individual schema backend should
-                    # implement prepare_default().
-                    yield column_default % self.prepare_default(default_value)
-                else:
-                    yield column_default
-                    params.append(default_value)
+                yield "DEFAULT %s"
+                params.append(default_value)
 
         if not null:
             yield "NOT NULL"
@@ -336,7 +570,7 @@ class BaseDatabaseSchemaEditor(ABC):
         had set_attributes_from_name() called.
         """
         # Get the column's type and use that as the basis of the SQL.
-        field_db_params = field.db_parameters(connection=self.connection)
+        field_db_params = field.db_parameters()
         column_db_type = field_db_params["type"]
         # Check for fields that aren't actually columns (e.g. M2M).
         if column_db_type is None:
@@ -356,36 +590,6 @@ class BaseDatabaseSchemaEditor(ABC):
             ),
             params,
         )
-
-    def skip_default(self, field: Field) -> bool:
-        """
-        Some backends don't accept default values for certain columns types
-        (i.e. MySQL longtext and longblob).
-        """
-        return False
-
-    def skip_default_on_alter(self, field: Field) -> bool:
-        """
-        Some backends don't accept default values for certain columns types
-        (i.e. MySQL longtext and longblob) in the ALTER COLUMN statement.
-        """
-        return False
-
-    def prepare_default(self, value: Any) -> str:
-        """
-        Only used for backends which have requires_literal_defaults feature
-        """
-        raise NotImplementedError(
-            "subclasses of BaseDatabaseSchemaEditor for backends which have "
-            "requires_literal_defaults must provide a prepare_default() method"
-        )
-
-    def _column_default_sql(self, field: Field) -> str:
-        """
-        Return the SQL to use in a DEFAULT clause. The resulting string should
-        contain a '%s' placeholder for a default value.
-        """
-        return "%s"
 
     @staticmethod
     def _effective_default(field: Field) -> Any:
@@ -417,17 +621,6 @@ class BaseDatabaseSchemaEditor(ABC):
         """Return a field's effective database default value."""
         return field.get_db_prep_save(self._effective_default(field), self.connection)
 
-    @abstractmethod
-    def quote_value(self, value: Any) -> str:
-        """
-        Return a quoted version of the value so it's safe to use in an SQL
-        string. This is not safe against injection from user code; it is
-        intended only for use in making SQL scripts or preparing default values
-        for particularly tricky backends (defaults are not user-defined, though,
-        so this is safe).
-        """
-        ...
-
     # Actions
 
     def create_model(self, model: type[Model]) -> None:
@@ -440,7 +633,7 @@ class BaseDatabaseSchemaEditor(ABC):
         # definition.
         self.execute(sql, params or None)
 
-        # Add any field index (deferred as SQLite _remake_table needs it).
+        # Add any field indexes.
         self.deferred_sql.extend(self._model_indexes_sql(model))
 
     def delete_model(self, model: type[Model]) -> None:
@@ -450,7 +643,7 @@ class BaseDatabaseSchemaEditor(ABC):
         self.execute(
             self.sql_delete_table
             % {
-                "table": self.quote_name(model.model_options.db_table),
+                "table": quote_name(model.model_options.db_table),
             }
         )
         # Remove all deferred statements referencing the deleted table.
@@ -460,37 +653,27 @@ class BaseDatabaseSchemaEditor(ABC):
             ):
                 self.deferred_sql.remove(sql)
 
-    def add_index(self, model: type[Model], index: Index) -> None:
+    def add_index(
+        self, model: type[Model], index: Index, concurrently: bool = False
+    ) -> None:
         """Add an index on a model."""
-        if (
-            index.contains_expressions
-            and not self.connection.features.supports_expression_indexes
-        ):
-            return None
-        # Index.create_sql returns interpolated SQL which makes params=None a
-        # necessity to avoid escaping attempts on execution.
-        self.execute(index.create_sql(model, self), params=None)
+        self.execute(
+            index.create_sql(model, self, concurrently=concurrently), params=None
+        )
 
-    def remove_index(self, model: type[Model], index: Index) -> None:
+    def remove_index(
+        self, model: type[Model], index: Index, concurrently: bool = False
+    ) -> None:
         """Remove an index from a model."""
-        if (
-            index.contains_expressions
-            and not self.connection.features.supports_expression_indexes
-        ):
-            return None
-        self.execute(index.remove_sql(model, self))
+        self.execute(index.remove_sql(model, self, concurrently=concurrently))
 
     def rename_index(
         self, model: type[Model], old_index: Index, new_index: Index
     ) -> None:
-        if self.connection.features.can_rename_index:
-            self.execute(
-                self._rename_index_sql(model, old_index.name, new_index.name),
-                params=None,
-            )
-        else:
-            self.remove_index(model, old_index)
-            self.add_index(model, new_index)
+        self.execute(
+            self._rename_index_sql(model, old_index.name, new_index.name),
+            params=None,
+        )
 
     def add_constraint(self, model: type[Model], constraint: BaseConstraint) -> None:
         """Add a constraint to a model."""
@@ -510,16 +693,13 @@ class BaseDatabaseSchemaEditor(ABC):
         self, model: type[Model], old_db_table: str, new_db_table: str
     ) -> None:
         """Rename the table a model points to."""
-        if old_db_table == new_db_table or (
-            self.connection.features.ignores_table_name_case
-            and old_db_table.lower() == new_db_table.lower()
-        ):
+        if old_db_table == new_db_table:
             return
         self.execute(
             self.sql_rename_table
             % {
-                "old_table": self.quote_name(old_db_table),
-                "new_table": self.quote_name(new_db_table),
+                "old_table": quote_name(old_db_table),
+                "new_table": quote_name(new_db_table),
             }
         )
         # Rename all references to the old table name.
@@ -537,60 +717,47 @@ class BaseDatabaseSchemaEditor(ABC):
         # It might not actually have a column behind it
         if definition is None:
             return
-        if col_type_suffix := field.db_type_suffix(connection=self.connection):
+        if col_type_suffix := field.db_type_suffix():
             definition += f" {col_type_suffix}"
         # Check constraints can go on the column SQL here
-        db_params = field.db_parameters(connection=self.connection)
+        db_params = field.db_parameters()
         if db_params["check"]:
             definition += " " + self.sql_check_constraint % db_params
-        if (
-            isinstance(field, ForeignKeyField)
-            and self.connection.features.supports_foreign_keys
-            and field.db_constraint
-        ):
+        if isinstance(field, ForeignKeyField) and field.db_constraint:
+            # Add FK constraint inline (PostgreSQL always supports this).
             constraint_suffix = "_fk_%(to_table)s_%(to_column)s"
-            # Add FK constraint inline, if supported.
-            if self.sql_create_column_inline_fk:
-                to_table = field.remote_field.model.model_options.db_table
-                field_name = field.remote_field.field_name
-                if field_name is None:
-                    raise ValueError("Foreign key field_name cannot be None")
-                to_field = field.remote_field.model._model_meta.get_forward_field(
-                    field_name
-                )
-                to_column = to_field.column
-                namespace, _ = split_identifier(model.model_options.db_table)
-                definition += " " + self.sql_create_column_inline_fk % {
-                    "name": self._fk_constraint_name(model, field, constraint_suffix),
-                    "namespace": f"{self.quote_name(namespace)}." if namespace else "",
-                    "column": self.quote_name(field.column),
-                    "to_table": self.quote_name(to_table),
-                    "to_column": self.quote_name(to_column),
-                    "deferrable": self.connection.ops.deferrable_sql(),
-                }
-            # Otherwise, add FK constraints later.
-            else:
-                self.deferred_sql.append(
-                    self._create_fk_sql(model, field, constraint_suffix)
-                )
+            to_table = field.remote_field.model.model_options.db_table
+            field_name = field.remote_field.field_name
+            if field_name is None:
+                raise ValueError("Foreign key field_name cannot be None")
+            to_field = field.remote_field.model._model_meta.get_forward_field(
+                field_name
+            )
+            to_column = to_field.column
+            namespace, _ = split_identifier(model.model_options.db_table)
+            definition += " " + self.sql_create_column_inline_fk % {
+                "name": self._fk_constraint_name(model, field, constraint_suffix),
+                "namespace": f"{quote_name(namespace)}." if namespace else "",
+                "column": quote_name(field.column),
+                "to_table": quote_name(to_table),
+                "to_column": quote_name(to_column),
+                "deferrable": DEFERRABLE_SQL,
+            }
         # Build the SQL and run it
         sql = self.sql_create_column % {
-            "table": self.quote_name(model.model_options.db_table),
-            "column": self.quote_name(field.column),
+            "table": quote_name(model.model_options.db_table),
+            "column": quote_name(field.column),
             "definition": definition,
         }
         self.execute(sql, params)
         # Drop the default if we need to
         # (Plain usually does not use in-database defaults)
-        if (
-            not self.skip_default_on_alter(field)
-            and self.effective_default(field) is not None
-        ):
+        if self.effective_default(field) is not None:
             changes_sql, params = self._alter_column_default_sql(
                 model, None, field, drop=True
             )
             sql = self.sql_alter_column % {
-                "table": self.quote_name(model.model_options.db_table),
+                "table": quote_name(model.model_options.db_table),
                 "changes": changes_sql,
             }
             self.execute(sql, params)
@@ -603,17 +770,19 @@ class BaseDatabaseSchemaEditor(ABC):
         but for M2Ms may involve deleting a table.
         """
         # It might not actually have a column behind it
-        if field.db_parameters(connection=self.connection)["type"] is None:
+        if field.db_parameters()["type"] is None:
             return
-        # Drop any FK constraints, MySQL requires explicit deletion
+        # Drop any FK constraints
         if isinstance(field, RelatedField):
             fk_names = self._constraint_names(model, [field.column], foreign_key=True)
             for fk_name in fk_names:
-                self.execute(self._delete_fk_sql(model, fk_name))
+                self.execute(
+                    self._delete_constraint_sql(self.sql_delete_fk, model, fk_name)
+                )
         # Delete the column
         sql = self.sql_delete_column % {
-            "table": self.quote_name(model.model_options.db_table),
-            "column": self.quote_name(field.column),
+            "table": quote_name(model.model_options.db_table),
+            "column": quote_name(field.column),
         }
         self.execute(sql)
         # Remove all deferred statements referencing the deleted column.
@@ -640,9 +809,9 @@ class BaseDatabaseSchemaEditor(ABC):
         if not self._field_should_be_altered(old_field, new_field):
             return
         # Ensure this field is even column-based
-        old_db_params = old_field.db_parameters(connection=self.connection)
+        old_db_params = old_field.db_parameters()
         old_type = old_db_params["type"]
-        new_db_params = new_field.db_parameters(connection=self.connection)
+        new_db_params = new_field.db_parameters()
         new_type = new_db_params["type"]
         if (old_type is None and not isinstance(old_field, RelatedField)) or (
             new_type is None and not isinstance(new_field, RelatedField)
@@ -684,13 +853,29 @@ class BaseDatabaseSchemaEditor(ABC):
     ) -> str | None:
         # Always check constraints with the same mocked column name to avoid
         # recreating constrains when the column is renamed.
-        check_constraints = self.connection.data_type_check_constraints
-        data = field.db_type_parameters(self.connection)
+        data = field.db_type_parameters()
         data["column"] = "__column_name__"
         try:
-            return check_constraints[field.get_internal_type()] % data
+            return DATA_TYPE_CHECK_CONSTRAINTS[field.get_internal_type()] % data
         except KeyError:
             return None
+
+    def _field_data_type(
+        self, field: Field
+    ) -> str | None | Callable[[dict[str, Any]], str]:
+        if isinstance(field, RelatedField):
+            return field.rel_db_type()
+        return DATA_TYPES.get(
+            field.get_internal_type(),
+            field.db_type(),
+        )
+
+    def _get_sequence_name(self, table: str, column: str) -> str | None:
+        with self.connection.cursor() as cursor:
+            for sequence in self.connection.get_sequences(cursor, table):
+                if sequence["column"] == column:
+                    return sequence["name"]
+        return None
 
     def _alter_field(
         self,
@@ -707,8 +892,7 @@ class BaseDatabaseSchemaEditor(ABC):
         # Drop any FK constraints, we'll remake them later
         fks_dropped = set()
         if (
-            self.connection.features.supports_foreign_keys
-            and isinstance(old_field, ForeignKeyField)
+            isinstance(old_field, ForeignKeyField)
             and old_field.db_constraint
             and self._field_should_be_altered(
                 old_field,
@@ -724,7 +908,9 @@ class BaseDatabaseSchemaEditor(ABC):
                 )
             for fk_name in fk_names:
                 fks_dropped.add((old_field.column,))
-                self.execute(self._delete_fk_sql(model, fk_name))
+                self.execute(
+                    self._delete_constraint_sql(self.sql_delete_fk, model, fk_name)
+                )
         # Has unique been removed?
         if old_field.primary_key and (
             not new_field.primary_key
@@ -751,10 +937,8 @@ class BaseDatabaseSchemaEditor(ABC):
                     self.execute(sql)
         # Drop incoming FK constraints if the field is a primary key or unique,
         # which might be a to_field target, and things are going to change.
-        drop_foreign_keys = (
-            self.connection.features.supports_foreign_keys
-            and (old_field.primary_key and new_field.primary_key)
-            and old_type != new_type
+        drop_foreign_keys = (old_field.primary_key and new_field.primary_key) and (
+            old_type != new_type
         )
         if drop_foreign_keys:
             # '_model_meta.related_field' also contains M2M reverse fields, these
@@ -764,7 +948,11 @@ class BaseDatabaseSchemaEditor(ABC):
                     new_rel.related_model, [new_rel.field.column], foreign_key=True
                 )
                 for fk_name in rel_fk_names:
-                    self.execute(self._delete_fk_sql(new_rel.related_model, fk_name))
+                    self.execute(
+                        self._delete_constraint_sql(
+                            self.sql_delete_fk, new_rel.related_model, fk_name
+                        )
+                    )
         # Removed an index? (no strict check, as multiple indexes are possible)
         # Remove indexes if db_index switched to False or a unique constraint
         # will now be used in lieu of an index. The following lines from the
@@ -818,7 +1006,9 @@ class BaseDatabaseSchemaEditor(ABC):
                     f"Found wrong number ({len(constraint_names)}) of check constraints for {model.model_options.db_table}.{old_field.column}"
                 )
             for constraint_name in constraint_names:
-                sql = self._delete_check_sql(model, constraint_name)
+                sql = self._delete_constraint_sql(
+                    self.sql_delete_check, model, constraint_name
+                )
                 if sql is not None:
                     self.execute(sql)
         # Have they renamed the column?
@@ -839,8 +1029,8 @@ class BaseDatabaseSchemaEditor(ABC):
         null_actions = []
         post_actions = []
         # Type suffix change? (e.g. auto increment).
-        old_type_suffix = old_field.db_type_suffix(connection=self.connection)
-        new_type_suffix = new_field.db_type_suffix(connection=self.connection)
+        old_type_suffix = old_field.db_type_suffix()
+        new_type_suffix = new_field.db_type_suffix()
         # Type change?
         if old_type != new_type or old_type_suffix != new_type_suffix:
             fragment, other_actions = self._alter_column_type_sql(
@@ -859,11 +1049,7 @@ class BaseDatabaseSchemaEditor(ABC):
         if old_field.allow_null and not new_field.allow_null:
             old_default = self.effective_default(old_field)
             new_default = self.effective_default(new_field)
-            if (
-                not self.skip_default_on_alter(new_field)
-                and old_default != new_default
-                and new_default is not None
-            ):
+            if old_default != new_default and new_default is not None:
                 needs_database_default = True
                 actions.append(
                     self._alter_column_default_sql(model, old_field, new_field)
@@ -882,8 +1068,8 @@ class BaseDatabaseSchemaEditor(ABC):
                 # If we don't have to do a 4-way default alteration we can
                 # directly run a (NOT) NULL alteration
                 actions += null_actions
-            # Combine actions together if we can (e.g. postgres)
-            if self.connection.features.supports_combined_alters and actions:
+            # Combine actions together
+            if actions:
                 sql, params = tuple(zip(*actions))
                 actions = [(", ".join(sql), sum(params, []))]
             # Apply those actions
@@ -891,7 +1077,7 @@ class BaseDatabaseSchemaEditor(ABC):
                 self.execute(
                     self.sql_alter_column
                     % {
-                        "table": self.quote_name(model.model_options.db_table),
+                        "table": quote_name(model.model_options.db_table),
                         "changes": sql,
                     },
                     params,
@@ -901,8 +1087,8 @@ class BaseDatabaseSchemaEditor(ABC):
                 self.execute(
                     self.sql_update_with_default
                     % {
-                        "table": self.quote_name(model.model_options.db_table),
-                        "column": self.quote_name(new_field.column),
+                        "table": quote_name(model.model_options.db_table),
+                        "column": quote_name(new_field.column),
                         "default": "%s",
                     },
                     [new_default],
@@ -913,7 +1099,7 @@ class BaseDatabaseSchemaEditor(ABC):
                     self.execute(
                         self.sql_alter_column
                         % {
-                            "table": self.quote_name(model.model_options.db_table),
+                            "table": quote_name(model.model_options.db_table),
                             "changes": sql,
                         },
                         params,
@@ -957,7 +1143,7 @@ class BaseDatabaseSchemaEditor(ABC):
             rels_to_update.extend(_related_non_m2m_objects(old_field, new_field))
         # Handle our type alters on the other end of rels from the PK stuff above
         for old_rel, new_rel in rels_to_update:
-            rel_db_params = new_rel.field.db_parameters(connection=self.connection)
+            rel_db_params = new_rel.field.db_parameters()
             rel_type = rel_db_params["type"]
             fragment, other_actions = self._alter_column_type_sql(
                 new_rel.related_model,
@@ -968,9 +1154,7 @@ class BaseDatabaseSchemaEditor(ABC):
             self.execute(
                 self.sql_alter_column
                 % {
-                    "table": self.quote_name(
-                        new_rel.related_model.model_options.db_table
-                    ),
+                    "table": quote_name(new_rel.related_model.model_options.db_table),
                     "changes": fragment[0],
                 },
                 fragment[1],
@@ -979,8 +1163,7 @@ class BaseDatabaseSchemaEditor(ABC):
                 self.execute(sql, params)
         # Does it have a foreign key?
         if (
-            self.connection.features.supports_foreign_keys
-            and isinstance(new_field, ForeignKeyField)
+            isinstance(new_field, ForeignKeyField)
             and (
                 fks_dropped
                 or not isinstance(old_field, ForeignKeyField)
@@ -1015,21 +1198,42 @@ class BaseDatabaseSchemaEditor(ABC):
                 model, old_field, new_field, drop=True
             )
             sql = self.sql_alter_column % {
-                "table": self.quote_name(model.model_options.db_table),
+                "table": quote_name(model.model_options.db_table),
                 "changes": changes_sql,
             }
             self.execute(sql, params)
+
+        # Added an index? Create any PostgreSQL-specific indexes.
+        if (
+            not (
+                (isinstance(old_field, ForeignKeyField) and old_field.db_index)
+                or old_field.primary_key
+            )
+            and isinstance(new_field, ForeignKeyField)
+            and new_field.db_index
+        ) or (not old_field.primary_key and new_field.primary_key):
+            like_index_statement = self._create_like_index_sql(model, new_field)
+            if like_index_statement is not None:
+                self.execute(like_index_statement)
+
+        # Removed an index? Drop any PostgreSQL-specific indexes.
+        if old_field.primary_key and not (
+            (isinstance(new_field, ForeignKeyField) and new_field.db_index)
+            or new_field.primary_key
+        ):
+            index_to_remove = self._create_index_name(
+                model.model_options.db_table, [old_field.column], suffix="_like"
+            )
+            self.execute(self._delete_index_sql(model, index_to_remove))
 
     def _alter_column_null_sql(
         self, model: type[Model], old_field: Field, new_field: Field
     ) -> tuple[str, list[Any]]:
         """
-        Hook to specialize column null alteration.
-
         Return a (sql, params) fragment to set a column to null or non-null
-        as required by new_field, or None if no changes are required.
+        as required by new_field.
         """
-        new_db_params = new_field.db_parameters(connection=self.connection)
+        new_db_params = new_field.db_parameters()
         sql = (
             self.sql_alter_column_null
             if new_field.allow_null
@@ -1038,7 +1242,7 @@ class BaseDatabaseSchemaEditor(ABC):
         return (
             sql
             % {
-                "column": self.quote_name(new_field.column),
+                "column": quote_name(new_field.column),
                 "type": new_db_params["type"],
             },
             [],
@@ -1052,38 +1256,24 @@ class BaseDatabaseSchemaEditor(ABC):
         drop: bool = False,
     ) -> tuple[str, list[Any]]:
         """
-        Hook to specialize column default alteration.
-
         Return a (sql, params) fragment to add or drop (depending on the drop
         argument) a default to new_field's column.
         """
         new_default = self.effective_default(new_field)
-        default = self._column_default_sql(new_field)
-        params = [new_default]
+        params: list[Any] = [] if drop else [new_default]
 
+        new_db_params = new_field.db_parameters()
         if drop:
-            params = []
-        elif self.connection.features.requires_literal_defaults:
-            # Some databases (Oracle) can't take defaults as a parameter
-            # If this is the case, the SchemaEditor for that database should
-            # implement prepare_default().
-            default = self.prepare_default(new_default)
-            params = []
-
-        new_db_params = new_field.db_parameters(connection=self.connection)
-        if drop:
-            if new_field.allow_null:
-                sql = self.sql_alter_column_no_default_null
-            else:
-                sql = self.sql_alter_column_no_default
+            # PostgreSQL uses the same SQL for nullable and non-nullable columns
+            sql = self.sql_alter_column_no_default
         else:
             sql = self.sql_alter_column_default
         return (
             sql
             % {
-                "column": self.quote_name(new_field.column),
+                "column": quote_name(new_field.column),
                 "type": new_db_params["type"],
-                "default": default,
+                "default": "%s",
             },
             params,
         )
@@ -1096,75 +1286,130 @@ class BaseDatabaseSchemaEditor(ABC):
         new_type: str,
     ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
         """
-        Hook to specialize column type alteration for different backends,
-        for cases when a creation type is different to an alteration type
-        (e.g. SERIAL in PostgreSQL, PostGIS fields).
-
         Return a two-tuple of: an SQL fragment of (sql, params) to insert into
         an ALTER TABLE statement and a list of extra (sql, params) tuples to
-        run once the field is altered.
+        run once the field is altered. Handles IDENTITY column transitions.
         """
-        other_actions: list[tuple[str, list[Any]]] = []
+        # Drop indexes on varchar/text/citext columns that are changing to a
+        # different type.
+        old_db_params = old_field.db_parameters()
+        old_type = old_db_params["type"]
+        assert old_type is not None, "old_type cannot be None for primary key field"
+        if old_field.primary_key and (
+            (old_type.startswith("varchar") and not new_type.startswith("varchar"))
+            or (old_type.startswith("text") and not new_type.startswith("text"))
+            or (old_type.startswith("citext") and not new_type.startswith("citext"))
+        ):
+            index_name = self._create_index_name(
+                model.model_options.db_table, [old_field.column], suffix="_like"
+            )
+            self.execute(self._delete_index_sql(model, index_name))
+
+        self.sql_alter_column_type = "ALTER COLUMN %(column)s TYPE %(type)s"
+        # Cast when data type changed.
+        if self._field_data_type(old_field) != self._field_data_type(new_field):
+            self.sql_alter_column_type += " USING %(column)s::%(type)s"
+        new_internal_type = new_field.get_internal_type()
+        old_internal_type = old_field.get_internal_type()
+        # Make ALTER TYPE with IDENTITY make sense.
+        table = strip_quotes(model.model_options.db_table)
+        auto_field_types = {"PrimaryKeyField"}
+        old_is_auto = old_internal_type in auto_field_types
+        new_is_auto = new_internal_type in auto_field_types
+        if new_is_auto and not old_is_auto:
+            column = strip_quotes(new_field.column)
+            return (
+                (
+                    self.sql_alter_column_type
+                    % {
+                        "column": quote_name(column),
+                        "type": new_type,
+                    },
+                    [],
+                ),
+                [
+                    (
+                        self.sql_add_identity
+                        % {
+                            "table": quote_name(table),
+                            "column": quote_name(column),
+                        },
+                        [],
+                    ),
+                ],
+            )
+        elif old_is_auto and not new_is_auto:
+            # Drop IDENTITY if exists (pre-Plain 4.1 serial columns don't have
+            # it).
+            self.execute(
+                self.sql_drop_identity
+                % {
+                    "table": quote_name(table),
+                    "column": quote_name(strip_quotes(new_field.column)),
+                }
+            )
+            column = strip_quotes(new_field.column)
+            fragment, _ = self._alter_column_type_sql_base(
+                model, old_field, new_field, new_type
+            )
+            # Drop the sequence if exists (Plain 4.1+ identity columns don't
+            # have it).
+            other_actions: list[tuple[str, list[Any]]] = []
+            if sequence_name := self._get_sequence_name(table, column):
+                other_actions = [
+                    (
+                        self.sql_delete_sequence
+                        % {
+                            "sequence": quote_name(sequence_name),
+                        },
+                        [],
+                    )
+                ]
+            return fragment, other_actions
+        elif new_is_auto and old_is_auto and old_internal_type != new_internal_type:
+            fragment, _ = self._alter_column_type_sql_base(
+                model, old_field, new_field, new_type
+            )
+            column = strip_quotes(new_field.column)
+            db_types = {"PrimaryKeyField": "bigint"}
+            # Alter the sequence type if exists (Plain 4.1+ identity columns
+            # don't have it).
+            other_actions: list[tuple[str, list[Any]]] = []
+            if sequence_name := self._get_sequence_name(table, column):
+                other_actions = [
+                    (
+                        self.sql_alter_sequence_type
+                        % {
+                            "sequence": quote_name(sequence_name),
+                            "type": db_types[new_internal_type],
+                        },
+                        [],
+                    ),
+                ]
+            return fragment, other_actions
+        else:
+            return self._alter_column_type_sql_base(
+                model, old_field, new_field, new_type
+            )
+
+    def _alter_column_type_sql_base(
+        self,
+        model: type[Model],
+        old_field: Field,
+        new_field: Field,
+        new_type: str,
+    ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
+        """Base implementation of _alter_column_type_sql without IDENTITY handling."""
         return (
             (
                 self.sql_alter_column_type
                 % {
-                    "column": self.quote_name(new_field.column),
+                    "column": quote_name(new_field.column),
                     "type": new_type,
                 },
                 [],
             ),
-            other_actions,
-        )
-
-    def _alter_many_to_many(
-        self,
-        model: type[Model],
-        old_field: ManyToManyField,
-        new_field: ManyToManyField,
-        strict: bool,
-    ) -> None:
-        """Alter M2Ms to repoint their to= endpoints."""
-        # Type narrow for ManyToManyField.remote_field
-        old_rel: ManyToManyRel = old_field.remote_field
-        new_rel: ManyToManyRel = new_field.remote_field
-
-        # Rename the through table
-        if (
-            old_rel.through.model_options.db_table
-            != new_rel.through.model_options.db_table
-        ):
-            self.alter_db_table(
-                old_rel.through,
-                old_rel.through.model_options.db_table,
-                new_rel.through.model_options.db_table,
-            )
-        # Repoint the FK to the other side
-        old_reverse_field = old_rel.through._model_meta.get_forward_field(
-            old_field.m2m_reverse_field_name()
-        )
-        new_reverse_field = new_rel.through._model_meta.get_forward_field(
-            new_field.m2m_reverse_field_name()
-        )
-        self.alter_field(
-            new_rel.through,
-            # The field that points to the target model is needed, so we can
-            # tell alter_field to change it - this is m2m_reverse_field_name()
-            # (as opposed to m2m_field_name(), which points to our model).
-            old_reverse_field,
-            new_reverse_field,
-        )
-        old_m2m_field = old_rel.through._model_meta.get_forward_field(
-            old_field.m2m_field_name()
-        )
-        new_m2m_field = new_rel.through._model_meta.get_forward_field(
-            new_field.m2m_field_name()
-        )
-        self.alter_field(
-            new_rel.through,
-            # for self-referential models we need to alter field from the other end too
-            old_m2m_field,
-            new_m2m_field,
+            [],
         )
 
     def _create_index_name(
@@ -1180,7 +1425,7 @@ class BaseDatabaseSchemaEditor(ABC):
         hash_suffix_part = (
             f"{names_digest(table_name, *column_names, length=8)}{suffix}"
         )
-        max_length = self.connection.ops.max_name_length() or 200
+        max_length = MAX_NAME_LENGTH
         # If everything fits into max_length, use that name.
         index_name = "{}_{}_{}".format(
             table_name, "_".join(column_names), hash_suffix_part
@@ -1197,24 +1442,19 @@ class BaseDatabaseSchemaEditor(ABC):
             hash_suffix_part,
         )
         # Prepend D if needed to prevent the name from starting with an
-        # underscore or a number (not permitted on Oracle).
+        # underscore or a number.
         if index_name[0] == "_" or index_name[0].isdigit():
             index_name = f"D{index_name[:-1]}"
         return index_name
 
-    def _index_condition_sql(self, condition: str | None) -> str:
-        if condition:
-            return " WHERE " + condition
-        return ""
-
     def _index_include_sql(
         self, model: type[Model], columns: list[str] | None
     ) -> str | Statement:
-        if not columns or not self.connection.features.supports_covering_indexes:
+        if not columns:
             return ""
         return Statement(
             " INCLUDE (%(columns)s)",
-            columns=Columns(model.model_options.db_table, columns, self.quote_name),
+            columns=Columns(model.model_options.db_table, columns),
         )
 
     def _create_index_sql(
@@ -1229,6 +1469,7 @@ class BaseDatabaseSchemaEditor(ABC):
         sql: str | None = None,
         opclasses: tuple[str, ...] = (),
         condition: str | None = None,
+        concurrently: bool = False,
         include: list[str] | None = None,
         expressions: Any = None,
     ) -> Statement:
@@ -1241,18 +1482,23 @@ class BaseDatabaseSchemaEditor(ABC):
         expressions = expressions or []
         compiler = Query(model, alias_cols=False).get_compiler()
         columns = [field.column for field in fields]
-        sql_create_index = sql or self.sql_create_index
+        if sql is None:
+            sql = (
+                self.sql_create_index
+                if not concurrently
+                else self.sql_create_index_concurrently
+            )
         table = model.model_options.db_table
 
         def create_index_name(*args: Any, **kwargs: Any) -> str:
             nonlocal name
             if name is None:
                 name = self._create_index_name(*args, **kwargs)
-            return self.quote_name(name)
+            return quote_name(name)
 
         return Statement(
-            sql_create_index,
-            table=Table(table, self.quote_name),
+            sql,
+            table=Table(table),
             name=IndexName(table, columns, suffix, create_index_name),
             using=using,
             columns=(
@@ -1261,17 +1507,27 @@ class BaseDatabaseSchemaEditor(ABC):
                 else Expressions(table, expressions, compiler, self.quote_value)
             ),
             extra="",
-            condition=self._index_condition_sql(condition),
+            condition=(" WHERE " + condition if condition else ""),
             include=self._index_include_sql(model, include),
         )
 
     def _delete_index_sql(
-        self, model: type[Model], name: str, sql: str | None = None
+        self,
+        model: type[Model],
+        name: str,
+        sql: str | None = None,
+        concurrently: bool = False,
     ) -> Statement:
+        if sql is None:
+            sql = (
+                self.sql_delete_index_concurrently
+                if concurrently
+                else self.sql_delete_index
+            )
         return Statement(
-            sql or self.sql_delete_index,
-            table=Table(model.model_options.db_table, self.quote_name),
-            name=self.quote_name(name),
+            sql,
+            table=Table(model.model_options.db_table),
+            name=quote_name(name),
         )
 
     def _rename_index_sql(
@@ -1279,9 +1535,9 @@ class BaseDatabaseSchemaEditor(ABC):
     ) -> Statement:
         return Statement(
             self.sql_rename_index,
-            table=Table(model.model_options.db_table, self.quote_name),
-            old_name=self.quote_name(old_name),
-            new_name=self.quote_name(new_name),
+            table=Table(model.model_options.db_table),
+            old_name=quote_name(old_name),
+            new_name=quote_name(new_name),
         )
 
     def _index_columns(
@@ -1291,7 +1547,12 @@ class BaseDatabaseSchemaEditor(ABC):
         col_suffixes: tuple[str, ...],
         opclasses: tuple[str, ...],
     ) -> Columns:
-        return Columns(table, columns, self.quote_name, col_suffixes=col_suffixes)
+        return Columns(
+            table,
+            columns,
+            col_suffixes=col_suffixes,
+            opclasses=opclasses,
+        )
 
     def _model_indexes_sql(self, model: type[Model]) -> list[Statement | None]:
         """
@@ -1302,10 +1563,7 @@ class BaseDatabaseSchemaEditor(ABC):
             output.extend(self._field_indexes_sql(model, field))
 
         for index in model.model_options.indexes:
-            if (
-                not index.contains_expressions
-                or self.connection.features.supports_expression_indexes
-            ):
+            if not index.contains_expressions:
                 output.append(index.create_sql(model, self))
         return output
 
@@ -1316,7 +1574,45 @@ class BaseDatabaseSchemaEditor(ABC):
         output: list[Statement] = []
         if self._field_should_be_indexed(model, field):
             output.append(self._create_index_sql(model, fields=[field]))
+        # Add LIKE index for varchar/text primary keys
+        like_index_statement = self._create_like_index_sql(model, field)
+        if like_index_statement is not None:
+            output.append(like_index_statement)
         return output
+
+    def _create_like_index_sql(
+        self, model: type[Model], field: Field
+    ) -> Statement | None:
+        """
+        Return the statement to create an index with varchar operator pattern
+        when the column type is 'varchar' or 'text', otherwise return None.
+        """
+        db_type = field.db_type()
+        if db_type is not None and field.primary_key:
+            # Fields with database column types of `varchar` and `text` need
+            # a second index that specifies their operator class, which is
+            # needed when performing correct LIKE queries outside the
+            # C locale. See #12234.
+            #
+            # The same doesn't apply to array fields such as varchar[size]
+            # and text[size], so skip them.
+            if "[" in db_type:
+                return None
+            if db_type.startswith("varchar"):
+                return self._create_index_sql(
+                    model,
+                    fields=[field],
+                    suffix="_like",
+                    opclasses=("varchar_pattern_ops",),
+                )
+            elif db_type.startswith("text"):
+                return self._create_index_sql(
+                    model,
+                    fields=[field],
+                    suffix="_like",
+                    opclasses=("text_pattern_ops",),
+                )
+        return None
 
     def _field_should_be_altered(
         self, old_field: Field, new_field: Field, ignore: set[str] | None = None
@@ -1332,9 +1628,11 @@ class BaseDatabaseSchemaEditor(ABC):
             old_kwargs.pop(attr, None)
         for attr in ignore.union(new_field.non_db_attrs):
             new_kwargs.pop(attr, None)
-        return self.quote_name(old_field.column) != self.quote_name(
-            new_field.column
-        ) or (old_path, old_args, old_kwargs) != (new_path, new_args, new_kwargs)
+        return quote_name(old_field.column) != quote_name(new_field.column) or (
+            old_path,
+            old_args,
+            old_kwargs,
+        ) != (new_path, new_args, new_kwargs)
 
     def _field_should_be_indexed(self, model: type[Model], field: Field) -> bool:
         if isinstance(field, ForeignKeyField):
@@ -1348,27 +1646,24 @@ class BaseDatabaseSchemaEditor(ABC):
         self, table: str, old_field: Field, new_field: Field, new_type: str
     ) -> str:
         return self.sql_rename_column % {
-            "table": self.quote_name(table),
-            "old_column": self.quote_name(old_field.column),
-            "new_column": self.quote_name(new_field.column),
+            "table": quote_name(table),
+            "old_column": quote_name(old_field.column),
+            "new_column": quote_name(new_field.column),
             "type": new_type,
         }
 
     def _create_fk_sql(
         self, model: type[Model], field: ForeignKeyField, suffix: str
     ) -> Statement:
-        table = Table(model.model_options.db_table, self.quote_name)
+        table = Table(model.model_options.db_table)
         name = self._fk_constraint_name(model, field, suffix)
-        column = Columns(model.model_options.db_table, [field.column], self.quote_name)
-        to_table = Table(
-            field.target_field.model.model_options.db_table, self.quote_name
-        )
+        column = Columns(model.model_options.db_table, [field.column])
+        to_table = Table(field.target_field.model.model_options.db_table)
         to_column = Columns(
             field.target_field.model.model_options.db_table,
             [field.target_field.column],
-            self.quote_name,
         )
-        deferrable = self.connection.ops.deferrable_sql()
+        deferrable = DEFERRABLE_SQL
         return Statement(
             self.sql_create_fk,
             table=table,
@@ -1383,7 +1678,7 @@ class BaseDatabaseSchemaEditor(ABC):
         self, model: type[Model], field: ForeignKeyField, suffix: str
     ) -> ForeignKeyName:
         def create_fk_name(*args: Any, **kwargs: Any) -> str:
-            return self.quote_name(self._create_index_name(*args, **kwargs))
+            return quote_name(self._create_index_name(*args, **kwargs))
 
         return ForeignKeyName(
             model.model_options.db_table,
@@ -1393,9 +1688,6 @@ class BaseDatabaseSchemaEditor(ABC):
             suffix,
             create_fk_name,
         )
-
-    def _delete_fk_sql(self, model: type[Model], name: str) -> Statement:
-        return self._delete_constraint_sql(self.sql_delete_fk, model, name)
 
     def _deferrable_constraint_sql(self, deferrable: Deferrable | None) -> str:
         if deferrable is None:
@@ -1417,11 +1709,6 @@ class BaseDatabaseSchemaEditor(ABC):
         opclasses: tuple[str, ...] | None = None,
         expressions: Any = None,
     ) -> str | None:
-        if (
-            deferrable
-            and not self.connection.features.supports_deferrable_unique_constraints
-        ):
-            return None
         if condition or include or opclasses or expressions:
             # Databases support conditional, covering, and functional unique
             # constraints via a unique index.
@@ -1438,11 +1725,11 @@ class BaseDatabaseSchemaEditor(ABC):
                 self.deferred_sql.append(sql)
             return None
         constraint = self.sql_unique_constraint % {
-            "columns": ", ".join([self.quote_name(field.column) for field in fields]),
+            "columns": ", ".join([quote_name(field.column) for field in fields]),
             "deferrable": self._deferrable_constraint_sql(deferrable),
         }
         return self.sql_constraint % {
-            "name": self.quote_name(name),
+            "name": quote_name(name),
             "constraint": constraint,
         }
 
@@ -1457,19 +1744,6 @@ class BaseDatabaseSchemaEditor(ABC):
         opclasses: tuple[str, ...] | None = None,
         expressions: Any = None,
     ) -> Statement | None:
-        if (
-            (
-                deferrable
-                and not self.connection.features.supports_deferrable_unique_constraints
-            )
-            or (condition and not self.connection.features.supports_partial_indexes)
-            or (include and not self.connection.features.supports_covering_indexes)
-            or (
-                expressions and not self.connection.features.supports_expression_indexes
-            )
-        ):
-            return None
-
         compiler = Query(model, alias_cols=False).get_compiler()
         table = model.model_options.db_table
         columns = [field.column for field in fields]
@@ -1477,7 +1751,7 @@ class BaseDatabaseSchemaEditor(ABC):
         if name is None:
             constraint_name = self._unique_constraint_name(table, columns, quote=True)
         else:
-            constraint_name = self.quote_name(name)
+            constraint_name = quote_name(name)
         if condition or include or opclasses or expressions:
             sql = self.sql_create_unique_index
         else:
@@ -1490,10 +1764,10 @@ class BaseDatabaseSchemaEditor(ABC):
             columns_obj = Expressions(table, expressions, compiler, self.quote_value)
         return Statement(
             sql,
-            table=Table(table, self.quote_name),
+            table=Table(table),
             name=constraint_name,
             columns=columns_obj,
-            condition=self._index_condition_sql(condition),
+            condition=(" WHERE " + condition if condition else ""),
             deferrable=self._deferrable_constraint_sql(deferrable),
             include=self._index_include_sql(model, include),
         )
@@ -1504,7 +1778,7 @@ class BaseDatabaseSchemaEditor(ABC):
         if quote:
 
             def create_unique_name(*args: Any, **kwargs: Any) -> str:
-                return self.quote_name(self._create_index_name(*args, **kwargs))
+                return quote_name(self._create_index_name(*args, **kwargs))
 
         else:
             create_unique_name = self._create_index_name
@@ -1520,19 +1794,7 @@ class BaseDatabaseSchemaEditor(ABC):
         include: list[str] | None = None,
         opclasses: tuple[str, ...] | None = None,
         expressions: Any = None,
-    ) -> Statement | None:
-        if (
-            (
-                deferrable
-                and not self.connection.features.supports_deferrable_unique_constraints
-            )
-            or (condition and not self.connection.features.supports_partial_indexes)
-            or (include and not self.connection.features.supports_covering_indexes)
-            or (
-                expressions and not self.connection.features.supports_expression_indexes
-            )
-        ):
-            return None
+    ) -> Statement:
         if condition or include or opclasses or expressions:
             sql = self.sql_delete_index
         else:
@@ -1541,34 +1803,25 @@ class BaseDatabaseSchemaEditor(ABC):
 
     def _check_sql(self, name: str, check: str) -> str:
         return self.sql_constraint % {
-            "name": self.quote_name(name),
+            "name": quote_name(name),
             "constraint": self.sql_check_constraint % {"check": check},
         }
 
-    def _create_check_sql(
-        self, model: type[Model], name: str, check: str
-    ) -> Statement | None:
-        if not self.connection.features.supports_table_check_constraints:
-            return None
+    def _create_check_sql(self, model: type[Model], name: str, check: str) -> Statement:
         return Statement(
             self.sql_create_check,
-            table=Table(model.model_options.db_table, self.quote_name),
-            name=self.quote_name(name),
+            table=Table(model.model_options.db_table),
+            name=quote_name(name),
             check=check,
         )
-
-    def _delete_check_sql(self, model: type[Model], name: str) -> Statement | None:
-        if not self.connection.features.supports_table_check_constraints:
-            return None
-        return self._delete_constraint_sql(self.sql_delete_check, model, name)
 
     def _delete_constraint_sql(
         self, template: str, model: type[Model], name: str
     ) -> Statement:
         return Statement(
             template,
-            table=Table(model.model_options.db_table, self.quote_name),
-            name=self.quote_name(name),
+            table=Table(model.model_options.db_table),
+            name=quote_name(name),
         )
 
     def _constraint_names(
@@ -1584,17 +1837,8 @@ class BaseDatabaseSchemaEditor(ABC):
         exclude: set[str] | None = None,
     ) -> list[str]:
         """Return all constraint names matching the columns and conditions."""
-        if column_names is not None:
-            column_names = [
-                self.connection.introspection.identifier_converter(
-                    truncate_name(name, self.connection.ops.max_name_length())
-                )
-                if self.connection.features.truncates_names
-                else self.connection.introspection.identifier_converter(name)
-                for name in column_names
-            ]
         with self.connection.cursor() as cursor:
-            constraints = self.connection.introspection.get_constraints(
+            constraints = self.connection.get_constraints(
                 cursor, model.model_options.db_table
             )
         result: list[str] = []
@@ -1628,15 +1872,13 @@ class BaseDatabaseSchemaEditor(ABC):
     def _create_primary_key_sql(self, model: type[Model], field: Field) -> Statement:
         return Statement(
             self.sql_create_pk,
-            table=Table(model.model_options.db_table, self.quote_name),
-            name=self.quote_name(
+            table=Table(model.model_options.db_table),
+            name=quote_name(
                 self._create_index_name(
                     model.model_options.db_table, [field.column], suffix="_pk"
                 )
             ),
-            columns=Columns(
-                model.model_options.db_table, [field.column], self.quote_name
-            ),
+            columns=Columns(model.model_options.db_table, [field.column]),
         )
 
     def _delete_primary_key_sql(self, model: type[Model], name: str) -> Statement:
