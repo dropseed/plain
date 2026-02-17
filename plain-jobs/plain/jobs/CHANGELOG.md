@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.44.0](https://github.com/dropseed/plain/releases/plain-jobs@0.44.0) (2026-02-16)
+
+### What's changed
+
+- Removed database vendor check from `get_enqueue_lock()` — advisory locks are now always used since PostgreSQL is the only supported database ([6f3a066bf80f](https://github.com/dropseed/plain/commit/6f3a066bf80f))
+- Simplified README race condition documentation to reflect PostgreSQL-only support ([6f3a066bf80f](https://github.com/dropseed/plain/commit/6f3a066bf80f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.43.5](https://github.com/dropseed/plain/releases/plain-jobs@0.43.5) (2026-02-13)
 
 ### What's changed
