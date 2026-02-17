@@ -114,15 +114,6 @@ my-check = {cmd = "echo 'running my check'"}
 
 See [`default_settings.py`](./default_settings.py) for more details.
 
-## Settings
-
-| Setting                     | Default            | Env var |
-| --------------------------- | ------------------ | ------- |
-| `DEV_REQUESTS_IGNORE_PATHS` | `["/favicon.ico"]` | -       |
-| `DEV_REQUESTS_MAX`          | `50`               | -       |
-
-See [`default_settings.py`](./default_settings.py) for more details.
-
 ## FAQs
 
 #### How do I stop the development server?
