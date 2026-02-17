@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.68.0](https://github.com/dropseed/plain/releases/plain-admin@0.68.0) (2026-02-16)
+
+### What's changed
+
+- Updated the style guide page to replace the database selector example (PostgreSQL/SQLite/MySQL) with a framework selector (Plain/Django/Flask) ([6f3a066bf80f](https://github.com/dropseed/plain/commit/6f3a066bf80f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.67.0](https://github.com/dropseed/plain/releases/plain-admin@0.67.0) (2026-02-13)
 
 ### What's changed
