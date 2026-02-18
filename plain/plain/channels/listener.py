@@ -35,13 +35,19 @@ class PostgresListener:
     connect and disconnect.
     """
 
+    # How often (seconds) the listen loop checks for shutdown.
+    # Short in tests, longer in production to avoid busy-waiting.
+    poll_timeout: float = 5.0
+
     def __init__(
         self,
         loop: asyncio.AbstractEventLoop,
         connection_manager: AsyncConnectionManager,
+        conninfo: str | None = None,
     ) -> None:
         self._loop = loop
         self._manager = connection_manager
+        self._conninfo = conninfo
         self._conn: psycopg.AsyncConnection | None = None
         self._listening: set[str] = set()
         self._listener_task: asyncio.Task | None = None
@@ -50,7 +56,7 @@ class PostgresListener:
     async def start(self) -> None:
         """Connect to Postgres and start the listener loop."""
         try:
-            conninfo = _get_connection_string()
+            conninfo = self._conninfo or _get_connection_string()
             self._conn = await psycopg.AsyncConnection.connect(
                 conninfo, autocommit=True
             )
@@ -65,10 +71,15 @@ class PostgresListener:
             return
 
         try:
-            async for notify in self._conn.notifies():
-                if self._stopped:
-                    break
-                await self._manager.dispatch_event(notify.channel, notify.payload or "")
+            while not self._stopped:
+                # Use a timeout so we periodically check _stopped
+                async for notify in self._conn.notifies(timeout=self.poll_timeout):
+                    if self._stopped:
+                        return
+                    await self._manager.dispatch_event(
+                        notify.channel, notify.payload or ""
+                    )
+                # Generator exhausted due to timeout — loop and check _stopped
         except psycopg.OperationalError:
             if not self._stopped:
                 log.warning("Postgres LISTEN connection lost, reconnecting...")
@@ -85,7 +96,7 @@ class PostgresListener:
         delay = 1.0
         while not self._stopped:
             try:
-                conninfo = _get_connection_string()
+                conninfo = self._conninfo or _get_connection_string()
                 self._conn = await psycopg.AsyncConnection.connect(
                     conninfo, autocommit=True
                 )
@@ -141,12 +152,19 @@ class PostgresListener:
     async def stop(self) -> None:
         """Stop the listener and close the connection."""
         self._stopped = True
+        # Wait for the listen loop to exit (it checks _stopped every timeout period)
         if self._listener_task and not self._listener_task.done():
-            self._listener_task.cancel()
+            # Give it a moment to notice _stopped, then force-cancel
             try:
-                await self._listener_task
-            except asyncio.CancelledError:
-                pass
+                await asyncio.wait_for(
+                    self._listener_task, timeout=self.poll_timeout + 1.0
+                )
+            except (asyncio.CancelledError, TimeoutError):
+                self._listener_task.cancel()
+                try:
+                    await self._listener_task
+                except asyncio.CancelledError:
+                    pass
         await self._close_connection()
         log.debug("Postgres listener stopped")
 
