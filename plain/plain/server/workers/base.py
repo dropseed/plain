@@ -210,6 +210,10 @@ class Worker(ABC):
         worker shutdown. Use `schedule_async()` to run coroutines on it.
         """
         from plain.channels.handler import AsyncConnectionManager
+        from plain.channels.registry import channel_registry
+
+        # Auto-discover channel modules from installed packages
+        channel_registry.import_modules()
 
         self._async_loop = asyncio.new_event_loop()
         self._async_thread = threading.Thread(
@@ -219,8 +223,9 @@ class Worker(ABC):
         )
         self._async_thread.start()
 
-        # Create the connection manager for SSE connections
+        # Create the connection manager and start heartbeats + Postgres listener
         self.connection_manager = AsyncConnectionManager(self._async_loop)
+        self._async_loop.call_soon_threadsafe(self.connection_manager.start)
 
         self.log.debug("Async event loop started in background thread")
 
@@ -232,7 +237,18 @@ class Worker(ABC):
     def stop_async_loop(self) -> None:
         """Gracefully stop the async event loop and wait for the thread to finish."""
         if hasattr(self, "connection_manager") and self.connection_manager is not None:
-            self.connection_manager.close_all()
+            # Schedule graceful shutdown (stops Postgres listener, closes SSE connections)
+            if self._async_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self.connection_manager.stop(), self._async_loop
+                )
+                try:
+                    future.result(timeout=3.0)
+                except Exception:
+                    # Fall back to immediate close
+                    self.connection_manager.close_all()
+            else:
+                self.connection_manager.close_all()
         if hasattr(self, "_async_loop") and self._async_loop.is_running():
             self._async_loop.call_soon_threadsafe(self._async_loop.stop)
             self._async_thread.join(timeout=5.0)

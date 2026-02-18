@@ -16,6 +16,8 @@ import sys
 from datetime import datetime
 from typing import Any
 
+from plain.signals import request_finished, request_started
+
 from .. import http, sock, util
 from ..http import wsgi
 from . import base
@@ -252,8 +254,8 @@ class SyncWorker(base.Worker):
     ) -> bool:
         """Handle a regular HTTP request. Always returns False (no handoff)."""
         resp = None
+        request_start = datetime.now()
         try:
-            request_start = datetime.now()
             resp = wsgi.Response(req, client, self.cfg)
             # Force the connection closed until someone shows
             # a buffering proxy that supports Keep-Alive to
@@ -273,6 +275,8 @@ class SyncWorker(base.Worker):
             plain_request = wsgi.create_plain_request(
                 req, addr, listener.getsockname(), self.cfg
             )
+
+            request_started.send(sender=self.__class__)
 
             # Get response from Plain handler
             response = self.handler.get_response(plain_request)
@@ -310,6 +314,7 @@ class SyncWorker(base.Worker):
                 raise StopIteration()
             raise
         finally:
+            request_finished.send(sender=self.__class__)
             request_time = datetime.now() - request_start
             environ = wsgi.default_environ(req, client, self.cfg)
             if addr:

@@ -28,6 +28,8 @@ from threading import RLock
 from types import FrameType
 from typing import TYPE_CHECKING, Any
 
+from plain.signals import request_finished, request_started
+
 from .. import http, sock, util
 from ..http import wsgi
 from . import base
@@ -345,8 +347,8 @@ class ThreadWorker(base.Worker):
 
     def handle_request(self, req: Any, conn: TConn) -> bool:
         resp: wsgi.Response | None = None
+        request_start = datetime.now()
         try:
-            request_start = datetime.now()
             resp = wsgi.Response(req, conn.sock, self.cfg)
             self.nr += 1
             if self.nr >= self.max_requests:
@@ -369,6 +371,8 @@ class ThreadWorker(base.Worker):
             plain_request = wsgi.create_plain_request(
                 req, conn.client, conn.server, self.cfg
             )
+
+            request_started.send(sender=self.__class__)
 
             # Get response from Plain handler
             response = self.handler.get_response(plain_request)
@@ -410,6 +414,7 @@ class ThreadWorker(base.Worker):
                 raise StopIteration()
             raise
         finally:
+            request_finished.send(sender=self.__class__)
             request_time = datetime.now() - request_start
             environ = wsgi.default_environ(req, conn.sock, self.cfg)
             if conn.client:

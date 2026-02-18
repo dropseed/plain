@@ -91,11 +91,13 @@ def create_plain_request(
     """
     from plain.http import Request as PlainRequest
     from plain.http.cookie import parse_cookie
+    from plain.internal.handlers.wsgi import LimitedStream
     from plain.utils.http import parse_header_parameters
 
     # Extract headers into a dict with standard HTTP names
     headers: dict[str, str] = {}
     content_type_raw = ""
+    content_length = 0
     host = None
     cookie_header = ""
     for hdr_name, hdr_value in req.headers:
@@ -109,6 +111,11 @@ def create_plain_request(
             host = hdr_value
         elif hdr_name == "CONTENT-TYPE":
             content_type_raw = hdr_value
+        elif hdr_name == "CONTENT-LENGTH":
+            try:
+                content_length = int(hdr_value)
+            except (ValueError, TypeError):
+                content_length = 0
         elif hdr_name == "COOKIE":
             cookie_header = hdr_value
 
@@ -164,7 +171,7 @@ def create_plain_request(
         content_type=content_type,
         content_params=content_params,
         headers=headers,
-        body=req.body,
+        body=LimitedStream(req.body, content_length),
         scheme=req.scheme,
         server_name=server_name,
         server_port=server_port,

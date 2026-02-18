@@ -11,6 +11,16 @@ class ChannelRegistry:
 
     def __init__(self) -> None:
         self._channels: dict[str, Channel] = {}
+        self._discovered = False
+
+    def import_modules(self) -> None:
+        """Import channel modules from installed packages and app to trigger registration."""
+        if self._discovered:
+            return
+        from plain.packages import packages_registry
+
+        packages_registry.autodiscover_modules("channels", include_app=True)
+        self._discovered = True
 
     def register(self, channel_class: type[Channel]) -> type[Channel]:
         """Register a Channel class. Can be used as a decorator."""
