@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
-# Start a local PostgreSQL instance via Docker for development/testing.
+# Start a local PostgreSQL instance for development/testing.
+# Tries system Postgres first, then falls back to Docker.
 # Sets DATABASE_URL if not already set.
 #
 # Usage:
@@ -14,16 +15,29 @@ if [ -z "$DATABASE_URL" ]; then
   export DATABASE_URL="postgres://postgres:postgres@localhost:5432/$DB_NAME"
 
   if ! pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
-    echo "Starting PostgreSQL via Docker..."
-    # Try starting an existing stopped container first, otherwise create a new one
-    if docker start plain-postgres-dev >/dev/null 2>&1; then
-      true
-    else
-      docker run -d --name plain-postgres-dev \
-        -e POSTGRES_PASSWORD=postgres \
-        -e POSTGRES_DB="$DB_NAME" \
-        -p 5432:5432 \
-        postgres:16 >/dev/null 2>&1
+    # Try starting system Postgres first (e.g. pg_ctlcluster on Debian/Ubuntu)
+    if command -v pg_ctlcluster >/dev/null 2>&1; then
+      PG_VERSION=$(pg_lsclusters -h 2>/dev/null | head -1 | awk '{print $1}')
+      PG_CLUSTER=$(pg_lsclusters -h 2>/dev/null | head -1 | awk '{print $2}')
+      if [ -n "$PG_VERSION" ] && [ -n "$PG_CLUSTER" ]; then
+        echo "Starting system PostgreSQL ${PG_VERSION}/${PG_CLUSTER}..."
+        pg_ctlcluster "$PG_VERSION" "$PG_CLUSTER" start 2>/dev/null || true
+      fi
+    fi
+
+    # If system Postgres didn't start, try Docker
+    if ! pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+      echo "Starting PostgreSQL via Docker..."
+      # Try starting an existing stopped container first, otherwise create a new one
+      if docker start plain-postgres-dev >/dev/null 2>&1; then
+        true
+      else
+        docker run -d --name plain-postgres-dev \
+          -e POSTGRES_PASSWORD=postgres \
+          -e POSTGRES_DB="$DB_NAME" \
+          -p 5432:5432 \
+          postgres:16 >/dev/null 2>&1
+      fi
     fi
 
     # Wait for PostgreSQL to be ready
@@ -36,8 +50,13 @@ if [ -z "$DATABASE_URL" ]; then
     done
 
     if ! pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
-      echo "ERROR: PostgreSQL failed to start. Check Docker."
+      echo "ERROR: PostgreSQL failed to start."
       exit 1
+    fi
+
+    # Ensure the postgres user has the expected password for TCP connections
+    if command -v sudo >/dev/null 2>&1 && sudo -u postgres psql -c "" >/dev/null 2>&1; then
+      sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';" >/dev/null 2>&1 || true
     fi
   fi
 fi
