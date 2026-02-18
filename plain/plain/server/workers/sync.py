@@ -7,6 +7,7 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import errno
+import logging
 import os
 import select
 import socket
@@ -18,6 +19,8 @@ from typing import Any
 from .. import http, sock, util
 from ..http import wsgi
 from . import base
+
+log = logging.getLogger("plain.channels")
 
 
 class StopWaiting(Exception):
@@ -132,12 +135,13 @@ class SyncWorker(base.Worker):
         self, listener: sock.BaseSocket, client: socket.socket, addr: Any
     ) -> None:
         req = None
+        handed_off = False
         try:
             if self.cfg.is_ssl:
                 client = sock.ssl_wrap_socket(client, self.cfg)
             parser = http.RequestParser(self.cfg, client, addr)
             req = next(parser)
-            self.handle_request(listener, req, client, addr)
+            handed_off = self.handle_request(listener, req, client, addr)
         except http.errors.NoMoreData as e:
             self.log.debug("Ignored premature client disconnection. %s", e)
         except StopIteration as e:
@@ -162,18 +166,95 @@ class SyncWorker(base.Worker):
         except BaseException as e:
             self.handle_error(req, client, addr, e)
         finally:
-            util.close(client)
+            # Don't close the socket if it was handed off to the async loop
+            if not handed_off:
+                util.close(client)
 
     def handle_request(
         self, listener: sock.BaseSocket, req: Any, client: socket.socket, addr: Any
-    ) -> None:
-        environ = {}
+    ) -> bool:
+        """Handle a request. Returns True if the socket was handed off to the async loop."""
+        # Check if this is a channel (SSE) request
+        channel = self._match_channel(req)
+        if channel is not None:
+            return self._handle_channel_request(req, client, addr, listener, channel)
+
+        return self._handle_http_request(req, client, addr, listener)
+
+    def _match_channel(self, req: Any) -> Any:
+        """Check if the request path matches a registered channel."""
+        try:
+            from plain.channels import channel_registry
+
+            return channel_registry.match(req.path)
+        except Exception:
+            return None
+
+    def _handle_channel_request(
+        self,
+        req: Any,
+        client: socket.socket,
+        addr: Any,
+        listener: sock.BaseSocket,
+        channel: Any,
+    ) -> bool:
+        """Handle an SSE channel request. Returns True if handoff succeeded."""
+        try:
+            # Create a Plain Request for auth/subscribe (sync context)
+            plain_request = wsgi.create_plain_request(
+                req, addr, listener.getsockname(), self.cfg
+            )
+
+            # Authorize in the sync context — full ORM/session access
+            if not channel.authorize(plain_request):
+                # Send 403 and let the caller close the socket
+                util.write_error(client, 403, "Forbidden", "")
+                return False
+
+            # Get subscriptions in the sync context
+            subscriptions = channel.subscribe(plain_request)
+
+            # Dup the socket fd — the async side takes ownership of the dup
+            dup_fd = os.dup(client.fileno())
+
+            # Hand off to the async event loop
+            if (
+                hasattr(self, "connection_manager")
+                and self.connection_manager is not None
+            ):
+                self._async_loop.call_soon_threadsafe(
+                    self.connection_manager.accept_connection,
+                    dup_fd,
+                    channel,
+                    subscriptions,
+                )
+                log.debug("Handed off SSE connection for %s", channel.path)
+                return True
+            else:
+                os.close(dup_fd)
+                util.write_error(client, 503, "Service Unavailable", "")
+                return False
+
+        except Exception:
+            self.log.exception("Error handling channel request")
+            try:
+                util.write_error(client, 500, "Internal Server Error", "")
+            except Exception:
+                pass
+            return False
+
+    def _handle_http_request(
+        self,
+        req: Any,
+        client: socket.socket,
+        addr: Any,
+        listener: sock.BaseSocket,
+    ) -> bool:
+        """Handle a regular HTTP request. Always returns False (no handoff)."""
         resp = None
         try:
             request_start = datetime.now()
-            resp, environ = wsgi.create(
-                req, client, addr, listener.getsockname(), self.cfg
-            )
+            resp = wsgi.Response(req, client, self.cfg)
             # Force the connection closed until someone shows
             # a buffering proxy that supports Keep-Alive to
             # the backend.
@@ -182,19 +263,37 @@ class SyncWorker(base.Worker):
             if self.nr >= self.max_requests:
                 self.log.info("Autorestarting worker after current request.")
                 self.alive = False
-            respiter = self.wsgi(environ, resp.start_response)
-            try:
-                if isinstance(respiter, environ["wsgi.file_wrapper"]):
-                    resp.write_file(respiter)
-                else:
-                    for item in respiter:
-                        resp.write(item)
-                resp.close()
-            finally:
-                request_time = datetime.now() - request_start
-                self.log.access(resp, req, environ, request_time)
-                if hasattr(respiter, "close"):
-                    respiter.close()
+
+            # Handle 100-continue
+            for hdr_name, hdr_value in req.headers:
+                if hdr_name == "EXPECT" and hdr_value.lower() == "100-continue":
+                    client.send(b"HTTP/1.1 100 Continue\r\n\r\n")
+
+            # Create Plain Request directly from parsed HTTP data
+            plain_request = wsgi.create_plain_request(
+                req, addr, listener.getsockname(), self.cfg
+            )
+
+            # Get response from Plain handler
+            response = self.handler.get_response(plain_request)
+
+            # Write response using the server's Response writer
+            status = f"{response.status_code} {response.reason_phrase}"
+            response_headers = [
+                *((k, v) for k, v in response.headers.items() if v is not None),
+                *(
+                    ("Set-Cookie", c.output(header=""))
+                    for c in response.cookies.values()
+                ),
+            ]
+            resp.start_response(status, response_headers)
+
+            for item in response:
+                resp.write(item)
+            resp.close()
+
+            if hasattr(response, "close"):
+                response.close()
         except OSError:
             # pass to next try-except level
             util.reraise(*sys.exc_info())
@@ -210,3 +309,14 @@ class SyncWorker(base.Worker):
                     pass
                 raise StopIteration()
             raise
+        finally:
+            request_time = datetime.now() - request_start
+            environ = wsgi.default_environ(req, client, self.cfg)
+            if addr:
+                if isinstance(addr, tuple):
+                    environ["REMOTE_ADDR"] = addr[0]
+                    environ["REMOTE_PORT"] = str(addr[1])
+                else:
+                    environ["REMOTE_ADDR"] = str(addr)
+            self.log.access(resp, req, environ, request_time)
+        return False

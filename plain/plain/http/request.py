@@ -58,24 +58,49 @@ class Request:
 
     non_picklable_attrs = frozenset(["resolver_match", "_stream"])
 
-    method: str | None
     resolver_match: ResolverMatch | None
-    content_type: str | None
-    content_params: dict[str, str] | None
-    query_params: QueryDict
-    cookies: dict[str, str]
-    environ: dict[str, Any]
-    path: str
-    path_info: str
-    unique_id: str
 
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        method: str = "",
+        path: str = "",
+        path_info: str = "",
+        query_string: str = "",
+        content_type: str = "",
+        content_params: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+        body: Any = None,
+        scheme: str = "http",
+        server_name: str = "localhost",
+        server_port: str = "80",
+        remote_addr: str = "127.0.0.1",
+        cookies: dict[str, str] | None = None,
+    ):
         # A unique ID we can use to trace this request
         self.unique_id = str(uuid.uuid4())
         self.resolver_match = None
+        self.method = method
+        self.path = path
+        self.path_info = path_info or path
+        self._query_string = query_string
+        self.content_type = content_type or None
+        self.content_params = content_params
+        self._headers_dict = headers or {}
+        self._scheme = scheme
+        self.server_name = server_name
+        self.server_port = server_port
+        self.remote_addr = remote_addr
+        self._cookies = cookies or {}
+        self._read_started = False
+
+        if body is not None:
+            self._stream = body
+        else:
+            self._stream = BytesIO(b"")
 
     def __repr__(self) -> str:
-        if self.method is None or not self.get_full_path():
+        if not self.method or not self.get_full_path():
             return f"<{self.__class__.__name__}>"
         return f"<{self.__class__.__name__}: {self.method} {self.get_full_path()!r}>"
 
@@ -96,7 +121,15 @@ class Request:
 
     @cached_property
     def headers(self) -> RequestHeaders:
-        return RequestHeaders(self.environ)
+        return RequestHeaders(self._headers_dict)
+
+    @cached_property
+    def query_params(self) -> QueryDict:
+        return QueryDict(self._query_string, encoding=self.encoding)
+
+    @cached_property
+    def cookies(self) -> dict[str, str]:
+        return self._cookies
 
     @cached_property
     def csp_nonce(self) -> str:
@@ -157,8 +190,8 @@ class Request:
         elif http_host := self.headers.get("Host"):
             host = http_host
         else:
-            # Reconstruct the host using the algorithm from PEP 333.
-            host = self.environ["SERVER_NAME"]
+            # Reconstruct the host using the server name.
+            host = self.server_name
             server_port = self.port
             if server_port != ("443" if self.is_https() else "80"):
                 host = f"{host}:{server_port}"
@@ -172,7 +205,7 @@ class Request:
         ):
             port = xff_port
         else:
-            port = self.environ["SERVER_PORT"]
+            port = self.server_port
         return str(port)
 
     @cached_property
@@ -188,18 +221,18 @@ class Request:
         if settings.HTTP_X_FORWARDED_FOR:
             if xff := self.headers.get("X-Forwarded-For"):
                 return xff.split(",")[0].strip()
-        return self.environ["REMOTE_ADDR"]
+        return self.remote_addr
 
     @property
     def query_string(self) -> str:
         """Return the raw query string from the request URL."""
-        return self.environ.get("QUERY_STRING", "")
+        return self._query_string
 
     @property
     def content_length(self) -> int:
         """Return the Content-Length header value, or 0 if not provided."""
         try:
-            return int(self.environ.get("CONTENT_LENGTH") or 0)
+            return int(self.headers.get("Content-Length") or 0)
         except (ValueError, TypeError):
             return 0
 
@@ -278,11 +311,8 @@ class Request:
         return iri_to_uri(location) or ""
 
     def _get_scheme(self) -> str:
-        """
-        Hook for subclasses like WSGIRequest to implement. Return 'http' by
-        default.
-        """
-        return "http"
+        """Return the URL scheme for this request."""
+        return self._scheme
 
     @property
     def scheme(self) -> str:
@@ -466,17 +496,27 @@ class RequestHeaders(CaseInsensitiveMapping):
     # PEP 333 gives two headers which aren't prepended with HTTP_.
     UNPREFIXED_HEADERS = {"CONTENT_TYPE", "CONTENT_LENGTH"}
 
-    def __init__(self, environ: dict[str, Any]):
-        headers = {}
-        for header, value in environ.items():
-            name = self.parse_header_name(header)
-            if name:
-                headers[name] = value
-        super().__init__(headers)
+    def __init__(self, headers: dict[str, Any]):
+        """Accept a dict of HTTP headers with standard names (e.g. Content-Type)."""
+        # Normalize keys to Title-Case for consistent lookup
+        normalized = {}
+        for key, value in headers.items():
+            normalized[key.replace("_", "-").title()] = value
+        super().__init__(normalized)
 
     def __getitem__(self, key: str) -> str:
         """Allow header lookup using underscores in place of hyphens."""
         return super().__getitem__(key.replace("_", "-"))
+
+    @classmethod
+    def from_wsgi_environ(cls, environ: dict[str, Any]) -> RequestHeaders:
+        """Construct RequestHeaders from a WSGI environ dict."""
+        headers = {}
+        for header, value in environ.items():
+            name = cls.parse_header_name(header)
+            if name:
+                headers[name] = value
+        return cls(headers)
 
     @classmethod
     def parse_header_name(cls, header: str) -> str | None:

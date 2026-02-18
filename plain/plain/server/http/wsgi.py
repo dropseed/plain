@@ -79,6 +79,100 @@ class WSGIErrorsWrapper(io.RawIOBase):
             stream.flush()
 
 
+def create_plain_request(
+    req: Request,
+    client: str | bytes | tuple[str, int],
+    server: str | tuple[str, int],
+    cfg: Config,
+) -> plain.http.Request:
+    """Create a Plain Request directly from the server's parsed HTTP request.
+
+    This bypasses the WSGI environ dict entirely.
+    """
+    from plain.http import Request as PlainRequest
+    from plain.http.cookie import parse_cookie
+    from plain.utils.http import parse_header_parameters
+
+    # Extract headers into a dict with standard HTTP names
+    headers: dict[str, str] = {}
+    content_type_raw = ""
+    host = None
+    cookie_header = ""
+    for hdr_name, hdr_value in req.headers:
+        # Normalize header name: CONTENT-TYPE -> Content-Type
+        normalized = hdr_name.replace("_", "-").title()
+
+        if hdr_name == "EXPECT":
+            # 100-continue is handled at the socket level, not here
+            pass
+        elif hdr_name == "HOST":
+            host = hdr_value
+        elif hdr_name == "CONTENT-TYPE":
+            content_type_raw = hdr_value
+        elif hdr_name == "COOKIE":
+            cookie_header = hdr_value
+
+        # Combine duplicate headers (e.g. multiple Cookie headers)
+        if normalized in headers:
+            hdr_value = f"{headers[normalized]},{hdr_value}"
+        headers[normalized] = hdr_value
+
+    # Parse content type
+    content_type, content_params = parse_header_parameters(content_type_raw)
+
+    # Determine server name and port
+    server_name: str
+    server_port: str
+    if isinstance(server, str):
+        parts = server.split(":")
+        server_name = parts[0]
+        if len(parts) > 1:
+            server_port = parts[1]
+        elif host:
+            host_parts = host.split(":")
+            server_name = host_parts[0]
+            server_port = (
+                host_parts[1]
+                if len(host_parts) > 1
+                else ("443" if req.scheme == "https" else "80")
+            )
+        else:
+            server_port = ""
+    else:
+        server_name = str(server[0])
+        server_port = str(server[1])
+
+    # Determine remote address
+    if isinstance(client, str):
+        remote_addr = client
+    elif isinstance(client, bytes):
+        remote_addr = client.decode()
+    else:
+        remote_addr = client[0]
+
+    # Parse path
+    path_info = req.path or "/"
+
+    # Parse cookies
+    cookies = parse_cookie(cookie_header)
+
+    return PlainRequest(
+        method=req.method or "",
+        path=path_info,
+        path_info=path_info,
+        query_string=req.query or "",
+        content_type=content_type,
+        content_params=content_params,
+        headers=headers,
+        body=req.body,
+        scheme=req.scheme,
+        server_name=server_name,
+        server_port=server_port,
+        remote_addr=remote_addr,
+        cookies=cookies,
+    )
+
+
 def base_environ(cfg: Config) -> dict[str, Any]:
     return {
         "wsgi.errors": WSGIErrorsWrapper(cfg),

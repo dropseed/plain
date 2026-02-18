@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import codecs
-from functools import cached_property
 from io import IOBase
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from plain import signals
-from plain.http import FileResponse, QueryDict, Request, parse_cookie
+from plain.http import FileResponse, Request, RequestHeaders, parse_cookie
 from plain.internal.handlers import base
 from plain.utils.http import parse_header_parameters
 from plain.utils.regex_helper import _lazy_re_compile
@@ -65,67 +64,81 @@ class LimitedStream(IOBase):
 class WSGIRequest(Request):
     non_picklable_attrs = Request.non_picklable_attrs | frozenset(["environ"])
 
-    method: str  # Always set from environ, overrides Request.method: str | None
-
     def __init__(self, environ: dict[str, Any]) -> None:
-        super().__init__()
-
         script_name = get_script_name(environ)
         # If PATH_INFO is empty (e.g. accessing the SCRIPT_NAME URL without a
         # trailing slash), operate as if '/' was requested.
         path_info = get_path_info(environ) or "/"
-        self.environ = environ
-        self.path_info = path_info
+
         # be careful to only replace the first slash in the path because of
         # http://test/something and http://test//something being different as
         # stated in RFC 3986.
-        self.path = "{}/{}".format(
-            script_name.rstrip("/"), path_info.replace("/", "", 1)
-        )
-        self.environ = environ
-        self.environ["PATH_INFO"] = path_info
-        self.environ["SCRIPT_NAME"] = script_name
-        self.method = environ["REQUEST_METHOD"].upper()
+        path = "{}/{}".format(script_name.rstrip("/"), path_info.replace("/", "", 1))
 
-        # Set content_type, content_params, and encoding
-        self.content_type, self.content_params = parse_header_parameters(
+        # Parse content type
+        content_type, content_params = parse_header_parameters(
             environ.get("CONTENT_TYPE", "")
         )
-        if "charset" in self.content_params:
-            try:
-                codecs.lookup(self.content_params["charset"])
-            except LookupError:
-                pass
-            else:
-                self.encoding = self.content_params["charset"]
+
+        # Extract headers from environ
+        headers_obj = RequestHeaders.from_wsgi_environ(environ)
+        headers_dict = dict(headers_obj)
+
+        # Parse cookies from environ
+        raw_cookie = get_str_from_wsgi(environ, "HTTP_COOKIE", "")
+        cookies = parse_cookie(raw_cookie)
+
+        # Get query string (as bytes then decode for proper handling)
+        raw_query_string = get_bytes_from_wsgi(environ, "QUERY_STRING", "")
+
+        # Get server info
+        server_name = environ.get("SERVER_NAME", "localhost")
+        server_port = environ.get("SERVER_PORT", "80")
+
+        # Get remote addr
+        remote_addr = environ.get("REMOTE_ADDR", "127.0.0.1")
 
         try:
             content_length = int(environ.get("CONTENT_LENGTH") or 0)
         except (ValueError, TypeError):
             content_length = 0
-        self._stream = LimitedStream(self.environ["wsgi.input"], content_length)
-        self._read_started = False
+
+        super().__init__(
+            method=environ["REQUEST_METHOD"].upper(),
+            path=path,
+            path_info=path_info,
+            query_string=raw_query_string.decode(errors="replace"),
+            content_type=content_type,
+            content_params=content_params,
+            headers=headers_dict,
+            body=LimitedStream(environ["wsgi.input"], content_length),
+            scheme=environ.get("wsgi.url_scheme", "http"),
+            server_name=server_name,
+            server_port=server_port,
+            remote_addr=remote_addr,
+            cookies=cookies,
+        )
+
+        # Store environ for WSGI-specific access and backwards compatibility
+        self.environ = environ
+        self.environ["PATH_INFO"] = path_info
+        self.environ["SCRIPT_NAME"] = script_name
+
+        # Handle charset encoding
+        if content_params and "charset" in content_params:
+            try:
+                codecs.lookup(content_params["charset"])
+            except LookupError:
+                pass
+            else:
+                self.encoding = content_params["charset"]
 
     def __getstate__(self) -> dict[str, Any]:
         state = super().__getstate__()
         for attr in frozenset(["wsgi.errors", "wsgi.input"]):
-            if attr in state["environ"]:
+            if attr in state.get("environ", {}):
                 del state["environ"][attr]
         return state
-
-    def _get_scheme(self) -> str:
-        return self.environ.get("wsgi.url_scheme", "http")
-
-    @cached_property
-    def query_params(self) -> QueryDict:
-        # The WSGI spec says 'QUERY_STRING' may be absent.
-        raw_query_string = get_bytes_from_wsgi(self.environ, "QUERY_STRING", "")
-        return QueryDict(raw_query_string, encoding=self.encoding)
-
-    @cached_property
-    def cookies(self) -> dict[str, str]:
-        raw_cookie = get_str_from_wsgi(self.environ, "HTTP_COOKIE", "")
-        return parse_cookie(raw_cookie)
 
 
 class WSGIHandler(base.BaseHandler):

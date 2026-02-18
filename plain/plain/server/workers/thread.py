@@ -115,12 +115,14 @@ class ThreadWorker(base.Worker):
 
     def handle_quit(self, sig: int, frame: FrameType | None) -> None:
         self.alive = False
+        self.stop_async_loop()
         self.tpool.shutdown(wait=False, cancel_futures=True)
         time.sleep(0.1)
         sys.exit(0)
 
     def handle_abort(self, sig: int, frame: FrameType | None) -> None:
         self.alive = False
+        self.stop_async_loop()
         self.tpool.shutdown(wait=False, cancel_futures=True)
         sys.exit(1)
 
@@ -342,14 +344,10 @@ class ThreadWorker(base.Worker):
         return (False, conn)
 
     def handle_request(self, req: Any, conn: TConn) -> bool:
-        environ: dict[str, Any] = {}
         resp: wsgi.Response | None = None
         try:
             request_start = datetime.now()
-            resp, environ = wsgi.create(
-                req, conn.sock, conn.client, conn.server, self.cfg
-            )
-            environ["wsgi.multithread"] = True
+            resp = wsgi.Response(req, conn.sock, self.cfg)
             self.nr += 1
             if self.nr >= self.max_requests:
                 if self.alive:
@@ -362,20 +360,36 @@ class ThreadWorker(base.Worker):
             elif len(self._keep) >= self.max_keepalived:
                 resp.force_close()
 
-            respiter = self.wsgi(environ, resp.start_response)
-            try:
-                if isinstance(respiter, environ["wsgi.file_wrapper"]):
-                    resp.write_file(respiter)
-                else:
-                    for item in respiter:
-                        resp.write(item)
+            # Handle 100-continue
+            for hdr_name, hdr_value in req.headers:
+                if hdr_name == "EXPECT" and hdr_value.lower() == "100-continue":
+                    conn.sock.send(b"HTTP/1.1 100 Continue\r\n\r\n")
 
-                resp.close()
-            finally:
-                request_time = datetime.now() - request_start
-                self.log.access(resp, req, environ, request_time)
-                if hasattr(respiter, "close"):
-                    respiter.close()
+            # Create Plain Request directly from parsed HTTP data
+            plain_request = wsgi.create_plain_request(
+                req, conn.client, conn.server, self.cfg
+            )
+
+            # Get response from Plain handler
+            response = self.handler.get_response(plain_request)
+
+            # Write response using the server's Response writer
+            status = f"{response.status_code} {response.reason_phrase}"
+            response_headers = [
+                *((k, v) for k, v in response.headers.items() if v is not None),
+                *(
+                    ("Set-Cookie", c.output(header=""))
+                    for c in response.cookies.values()
+                ),
+            ]
+            resp.start_response(status, response_headers)
+
+            for item in response:
+                resp.write(item)
+            resp.close()
+
+            if hasattr(response, "close"):
+                response.close()
 
             if resp.should_close():
                 self.log.debug("Closing connection.")
@@ -395,5 +409,15 @@ class ThreadWorker(base.Worker):
                     pass
                 raise StopIteration()
             raise
+        finally:
+            request_time = datetime.now() - request_start
+            environ = wsgi.default_environ(req, conn.sock, self.cfg)
+            if conn.client:
+                if isinstance(conn.client, tuple):
+                    environ["REMOTE_ADDR"] = conn.client[0]
+                    environ["REMOTE_PORT"] = str(conn.client[1])
+                else:
+                    environ["REMOTE_ADDR"] = str(conn.client)
+            self.log.access(resp, req, environ, request_time)
 
         return True

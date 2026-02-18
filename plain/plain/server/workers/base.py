@@ -6,10 +6,12 @@ from __future__ import annotations
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
+import asyncio
 import io
 import os
 import signal
 import sys
+import threading
 import time
 import traceback
 from abc import ABC, abstractmethod
@@ -155,6 +157,11 @@ class Worker(ABC):
             self.reloader = Reloader(callback=changed, watch_html=True)
 
         self.load_wsgi()
+        self.load_handler()
+
+        # Start async event loop for real-time connections
+        self.start_async_loop()
+
         if self.reloader:
             self.reloader.start()
 
@@ -184,6 +191,61 @@ class Worker(ABC):
             finally:
                 del exc_tb
 
+    def load_handler(self) -> None:
+        """Load the Plain request handler for direct (non-WSGI) request handling."""
+        try:
+            self.handler = self.app.handler()
+        except SyntaxError:
+            if not self.cfg.reload:
+                raise
+            self.log.exception("Error loading Plain handler")
+            self.handler = None
+
+    # --- Async event loop for real-time connections ---
+
+    def start_async_loop(self) -> None:
+        """Start a background asyncio event loop for handling real-time connections.
+
+        The event loop runs in a daemon thread so it doesn't prevent
+        worker shutdown. Use `schedule_async()` to run coroutines on it.
+        """
+        from plain.channels.handler import AsyncConnectionManager
+
+        self._async_loop = asyncio.new_event_loop()
+        self._async_thread = threading.Thread(
+            target=self._run_async_loop,
+            name="plain-async",
+            daemon=True,
+        )
+        self._async_thread.start()
+
+        # Create the connection manager for SSE connections
+        self.connection_manager = AsyncConnectionManager(self._async_loop)
+
+        self.log.debug("Async event loop started in background thread")
+
+    def _run_async_loop(self) -> None:
+        """Target for the async background thread."""
+        asyncio.set_event_loop(self._async_loop)
+        self._async_loop.run_forever()
+
+    def stop_async_loop(self) -> None:
+        """Gracefully stop the async event loop and wait for the thread to finish."""
+        if hasattr(self, "connection_manager") and self.connection_manager is not None:
+            self.connection_manager.close_all()
+        if hasattr(self, "_async_loop") and self._async_loop.is_running():
+            self._async_loop.call_soon_threadsafe(self._async_loop.stop)
+            self._async_thread.join(timeout=5.0)
+            self._async_loop.close()
+            self.log.debug("Async event loop stopped")
+
+    def schedule_async(self, coro: Any) -> asyncio.Future:
+        """Schedule a coroutine on the async event loop from the sync worker.
+
+        Returns a concurrent.futures.Future that can be used to get the result.
+        """
+        return asyncio.run_coroutine_threadsafe(coro, self._async_loop)
+
     def init_signals(self) -> None:
         # reset signaling
         for s in self.SIGNALS:
@@ -209,14 +271,17 @@ class Worker(ABC):
 
     def handle_exit(self, sig: int, frame: Any) -> None:
         self.alive = False
+        self.stop_async_loop()
 
     def handle_quit(self, sig: int, frame: Any) -> None:
         self.alive = False
+        self.stop_async_loop()
         time.sleep(0.1)
         sys.exit(0)
 
     def handle_abort(self, sig: int, frame: Any) -> None:
         self.alive = False
+        self.stop_async_loop()
         sys.exit(1)
 
     def handle_error(
