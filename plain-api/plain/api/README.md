@@ -9,6 +9,11 @@
 - [API keys](#api-keys)
 - [OpenAPI](#openapi)
     - [Deploying](#deploying)
+- [Device flow](#device-flow)
+    - [How it works](#how-it-works)
+    - [Setup](#setup)
+    - [Verification page](#verification-page)
+    - [Client example](#client-example)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -425,11 +430,130 @@ class APIRouter(Router):
     ]
 ```
 
+## Device flow
+
+The device flow ([RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)) lets CLI tools and devices without a browser obtain API keys through user authorization. The device displays a short code, the user visits a URL to approve it, and the device receives an API key.
+
+### How it works
+
+1. The device sends a `POST` to the authorize endpoint and receives a `device_code`, `user_code`, and `verification_uri`.
+2. The device displays the `user_code` and `verification_uri` to the user.
+3. The user visits the verification URI in a browser, logs in, enters the code, and approves the request.
+4. Meanwhile, the device polls the token endpoint with its `device_code`.
+5. Once approved, the token endpoint returns an `access_token` (an API key token).
+
+### Setup
+
+Include the device flow URL router in your app's URLs:
+
+```python
+# app/urls.py
+from plain.urls import Router, include
+from plain.api.urls import DeviceFlowRouter
+
+
+class AppRouter(Router):
+    urls = [
+        include("device/", DeviceFlowRouter),
+        # ...other routes
+    ]
+```
+
+Configure the verification URI in your settings — this is the URL displayed to users where they enter their code:
+
+```python
+# app/settings.py
+API_DEVICE_FLOW_VERIFICATION_URI = "https://myapp.com/device"
+```
+
+### Verification page
+
+You need to build a user-facing page where authenticated users enter the user code and approve the device. The [`DeviceGrant`](./models.py#DeviceGrant) model provides `authorize()` and `deny()` methods to handle the approval.
+
+```python
+# app/views.py
+from plain.api.models import DeviceGrant, APIKey
+from plain.auth.views import AuthView
+from plain.http import JsonResponse, Response
+from plain.utils import timezone
+from plain.views import TemplateView
+
+
+class DeviceVerificationView(AuthView, TemplateView):
+    template_name = "device_verification.html"
+
+    def get_template_context(self):
+        context = super().get_template_context()
+        context["user_code"] = self.request.query_params.get("code", "")
+        return context
+
+    def post(self) -> Response:
+        user_code = self.request.form_data.get("user_code", "").strip().upper()
+        action = self.request.form_data.get("action")
+
+        try:
+            grant = DeviceGrant.query.get(
+                user_code=user_code,
+                status=DeviceGrant.STATUS_PENDING,
+                expires_at__gt=timezone.now(),
+            )
+        except DeviceGrant.DoesNotExist:
+            return JsonResponse({"error": "Invalid or expired code"}, status_code=400)
+
+        if action == "approve":
+            # Create an API key and associate it however your app needs
+            api_key = APIKey(name=f"Device: {grant.user_code}")
+            api_key.save()
+            grant.authorize(api_key=api_key)
+            # Associate the API key with the user in your own model...
+        elif action == "deny":
+            grant.deny()
+
+        return JsonResponse({"status": grant.status})
+```
+
+### Client example
+
+Here's how a CLI client would use the device flow:
+
+```python
+import time
+import requests
+
+# Step 1: Request a device code
+response = requests.post("https://myapp.com/device/authorize/")
+data = response.json()
+
+print(f"Visit {data['verification_uri']} and enter code: {data['user_code']}")
+
+# Step 2: Poll for the token
+while True:
+    time.sleep(data["interval"])
+    token_response = requests.post(
+        "https://myapp.com/device/token/",
+        json={"device_code": data["device_code"]},
+    )
+    token_data = token_response.json()
+
+    if "access_token" in token_data:
+        print(f"Authenticated! Token: {token_data['access_token']}")
+        break
+
+    if token_data.get("error") == "authorization_pending":
+        continue  # Keep polling
+
+    # Handle other errors (expired_token, access_denied)
+    print(f"Error: {token_data['error']}")
+    break
+```
+
 ## Settings
 
-| Setting              | Default | Env var                    |
-| -------------------- | ------- | -------------------------- |
-| `API_OPENAPI_ROUTER` | `""`    | `PLAIN_API_OPENAPI_ROUTER` |
+| Setting                            | Default | Env var                                  |
+| ---------------------------------- | ------- | ---------------------------------------- |
+| `API_OPENAPI_ROUTER`               | `""`    | `PLAIN_API_OPENAPI_ROUTER`               |
+| `API_DEVICE_GRANT_EXPIRES`         | `1800`  | `PLAIN_API_DEVICE_GRANT_EXPIRES`         |
+| `API_DEVICE_FLOW_VERIFICATION_URI` | `""`    | `PLAIN_API_DEVICE_FLOW_VERIFICATION_URI` |
 
 See [`default_settings.py`](./default_settings.py) for more details.
 
