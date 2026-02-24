@@ -1,5 +1,16 @@
 # plain-models changelog
 
+## [0.79.0](https://github.com/dropseed/plain/releases/plain-models@0.79.0) (2026-02-24)
+
+### What's changed
+
+- Added `plain db drop-unknown-tables` command to remove database tables not associated with any Plain model ([108b0bce59e6](https://github.com/dropseed/plain/commit/108b0bce59e6))
+- The unknown-tables preflight warning now suggests running `plain db drop-unknown-tables` instead of manual SQL ([108b0bce59e6](https://github.com/dropseed/plain/commit/108b0bce59e6))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.78.0](https://github.com/dropseed/plain/releases/plain-models@0.78.0) (2026-02-16)
 
 ### What's changed
