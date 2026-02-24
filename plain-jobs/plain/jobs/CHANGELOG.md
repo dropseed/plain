@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.45.0](https://github.com/dropseed/plain/releases/plain-jobs@0.45.0) (2026-02-24)
+
+### What's changed
+
+- Worker CLI options (`--max-processes`, `--max-jobs-per-process`, `--max-pending-per-process`, `--stats-every`) now use `SettingOption` to read defaults from Plain settings instead of environment variables ([cb5353b9d266](https://github.com/dropseed/plain/commit/cb5353b9d266))
+- Added `JOBS_WORKER_MAX_PROCESSES`, `JOBS_WORKER_MAX_JOBS_PER_PROCESS`, `JOBS_WORKER_MAX_PENDING_PER_PROCESS`, and `JOBS_WORKER_STATS_EVERY` settings as the new source of truth for worker defaults ([cb5353b9d266](https://github.com/dropseed/plain/commit/cb5353b9d266))
+
+### Upgrade instructions
+
+- If you configured worker options via environment variables (`PLAIN_JOBS_WORKER_*`), move them to Plain settings (e.g., `JOBS_WORKER_MAX_PROCESSES = 4` in your settings module). CLI flags still take priority when passed explicitly.
+
 ## [0.44.0](https://github.com/dropseed/plain/releases/plain-jobs@0.44.0) (2026-02-16)
 
 ### What's changed
