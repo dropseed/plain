@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.55.1](https://github.com/dropseed/plain/releases/plain-dev@0.55.1) (2026-02-24)
+
+### What's changed
+
+- Dev server now explicitly passes `--workers 1` to keep single-process behavior after the core server default changed to `auto` ([c38ee93de5b4](https://github.com/dropseed/plain/commit/c38ee93de5b4))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.55.0](https://github.com/dropseed/plain/releases/plain-dev@0.55.0) (2026-02-12)
 
 ### What's changed
