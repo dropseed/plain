@@ -338,6 +338,8 @@ class DevProcess(ProcessManager):
             "'[%(levelname)s] %(message)s'",
             "--access-log-format",
             "'\"%(r)s\" status=%(s)s length=%(b)s time=%(M)sms'",
+            "--workers",
+            "1",
             "--reload",  # Enable auto-reload for development
         ]
 

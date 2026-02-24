@@ -22,12 +22,12 @@ import plain.runtime
 from . import sock, util
 from .errors import AppImportError, HaltServer
 from .pidfile import Pidfile
+from .workers.thread import ThreadWorker
 
 if TYPE_CHECKING:
     from .app import ServerApplication
     from .config import Config
     from .glogging import Logger
-    from .workers.base import Worker
 
 
 class Arbiter:
@@ -48,7 +48,7 @@ class Arbiter:
     START_CTX: dict[int | str, Any] = {}
 
     LISTENERS: list[sock.BaseSocket] = []
-    WORKERS: dict[int, Worker] = {}
+    WORKERS: dict[int, ThreadWorker] = {}
     PIPE: list[int] = []
 
     # I love dynamic languages
@@ -101,7 +101,6 @@ class Arbiter:
 
             self.log: Logger = Logger(self.cfg)
 
-        self.worker_class: type[Worker] = self.cfg.worker_class
         self.address: str = self.cfg.address
         self.num_workers = self.cfg.workers
         self.timeout: int = self.cfg.timeout
@@ -122,16 +121,13 @@ class Arbiter:
 
         listeners_str = ",".join([str(lnr) for lnr in self.LISTENERS])
         self.log.info(
-            "Plain server started address=%s pid=%s worker=%s version=%s",
+            "Plain server started address=%s pid=%s version=%s",
             listeners_str,
             self.pid,
-            self.cfg.worker_class_str,
             plain.runtime.__version__,
         )
 
-        # check worker class requirements
-        if check_config := getattr(self.worker_class, "check_config", None):
-            check_config(self.cfg, self.log)
+        ThreadWorker.check_config(self.cfg, self.log)
 
     def init_signals(self) -> None:
         """\
@@ -468,7 +464,7 @@ class Arbiter:
 
     def spawn_worker(self) -> int:
         self.worker_age += 1
-        worker = self.worker_class(
+        worker = ThreadWorker(
             self.worker_age,
             self.pid,
             self.LISTENERS,

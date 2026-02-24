@@ -23,8 +23,8 @@ def parse_workers(ctx: click.Context, param: click.Parameter, value: str) -> int
 )
 @click.option(
     "--threads",
-    type=int,
-    default=1,
+    type=click.IntRange(min=1),
+    default=4,
     help="Number of threads per worker",
     show_default=True,
 )
@@ -32,7 +32,7 @@ def parse_workers(ctx: click.Context, param: click.Parameter, value: str) -> int
     "--workers",
     "-w",
     type=str,
-    default="1",
+    default="auto",
     envvar="WEB_CONCURRENCY",
     callback=parse_workers,
     help="Number of worker processes (or 'auto' for CPU count)",

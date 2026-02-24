@@ -10,8 +10,6 @@ import os
 from dataclasses import dataclass
 
 from . import util
-from .workers.sync import SyncWorker
-from .workers.thread import ThreadWorker
 
 
 @dataclass
@@ -37,25 +35,6 @@ class Config:
     errorlog: str
     log_format: str
     access_log_format: str
-
-    @property
-    def worker_class_str(self) -> str:
-        # Auto-select based on threads
-        if self.threads > 1:
-            return "thread"
-        return "sync"
-
-    @property
-    def worker_class(self) -> type:
-        # Auto-select based on threads
-        if self.threads > 1:
-            worker_class = ThreadWorker
-        else:
-            worker_class = SyncWorker
-
-        if hasattr(worker_class, "setup"):
-            worker_class.setup()
-        return worker_class
 
     @property
     def address(self) -> list[tuple[str, int] | str]:

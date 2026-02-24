@@ -3,7 +3,7 @@
 **A production-ready WSGI HTTP server based on gunicorn.**
 
 - [Overview](#overview)
-- [Worker types](#worker-types)
+- [Workers and threads](#workers-and-threads)
 - [Configuration options](#configuration-options)
 - [Environment variables](#environment-variables)
 - [Signals](#signals)
@@ -19,18 +19,7 @@ You can run the built-in HTTP server with the `plain server` command.
 plain server
 ```
 
-By default, the server binds to `127.0.0.1:8000` and uses a single worker process. In production, you will typically want to increase the number of workers and optionally enable threading.
-
-```bash
-# Run with 4 worker processes
-plain server --workers 4
-
-# Auto-detect based on available CPUs
-plain server --workers auto
-
-# Run with 2 workers and 4 threads each
-plain server --workers 2 --threads 4
-```
+By default, the server binds to `127.0.0.1:8000` with one worker process per CPU core and 4 threads per worker.
 
 For local development, you can enable auto-reload to restart workers when code changes.
 
@@ -38,25 +27,29 @@ For local development, you can enable auto-reload to restart workers when code c
 plain server --reload
 ```
 
-## Worker types
+## Workers and threads
 
-The server automatically selects the worker type based on your configuration.
+The server uses two levels of concurrency:
 
-**Sync workers** handle one request at a time per worker. These are simple and predictable.
+- **Workers** are separate OS processes. Each worker runs independently with its own memory. The default is `auto`, which spawns one worker per CPU core.
+- **Threads** run inside each worker. Threads share memory within a worker and handle concurrent requests using a thread pool. The default is 4 threads per worker.
+
+Total concurrent requests = `workers × threads`. On a 4-core machine with the defaults, that's `4 × 4 = 16` concurrent requests.
+
+**When to adjust workers:** Workers provide true parallelism since each is a separate process with its own Python GIL. More workers means more memory usage but better CPU utilization. Use `--workers auto` (the default) to match your CPU cores, or set an explicit number.
+
+**When to adjust threads:** Threads are efficient for I/O-bound work (database queries, external API calls) since they release the GIL while waiting. Most web applications are I/O-bound, so the default of 4 threads works well. Increase threads if your application spends a lot of time waiting on I/O. Decrease to 1 if you need to avoid thread-safety concerns.
 
 ```bash
-# Single-threaded (uses sync worker)
-plain server --workers 4
+# Explicit worker count
+plain server --workers 2
+
+# More threads for I/O-heavy apps
+plain server --threads 8
+
+# Single-threaded workers (simplest, one request at a time per worker)
+plain server --threads 1
 ```
-
-**Threaded workers** handle multiple concurrent requests per worker using a thread pool. These are useful when your application does blocking I/O.
-
-```bash
-# Multi-threaded (uses threaded worker)
-plain server --workers 2 --threads 8
-```
-
-For advanced worker customization, see the [`SyncWorker`](./workers/sync.py#SyncWorker) and [`ThreadWorker`](./workers/thread.py#ThreadWorker) classes.
 
 ## Configuration options
 
@@ -65,8 +58,8 @@ All options are available via the command line. Run `plain server --help` to see
 | Option             | Default          | Description                                           |
 | ------------------ | ---------------- | ----------------------------------------------------- |
 | `--bind` / `-b`    | `127.0.0.1:8000` | Address to bind (can be used multiple times)          |
-| `--workers` / `-w` | `1`              | Number of worker processes (or `auto` for CPU count)  |
-| `--threads`        | `1`              | Number of threads per worker                          |
+| `--workers` / `-w` | `auto`           | Number of worker processes (or `auto` for CPU count)  |
+| `--threads`        | `4`              | Number of threads per worker                          |
 | `--timeout` / `-t` | `30`             | Worker timeout in seconds                             |
 | `--reload`         | `False`          | Restart workers when code changes                     |
 | `--certfile`       | -                | Path to SSL certificate file                          |
