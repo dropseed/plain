@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.107.0](https://github.com/dropseed/plain/releases/plain@0.107.0) (2026-02-24)
+
+### What's changed
+
+- Added `SettingOption` — a custom Click option class that reads defaults from Plain settings, bridging CLI options to the settings system ([cb5353b9d266](https://github.com/dropseed/plain/commit/cb5353b9d266))
+- Removed `SyncWorker` from the built-in HTTP server; `ThreadWorker` is now the only worker type ([c38ee93de5b4](https://github.com/dropseed/plain/commit/c38ee93de5b4))
+- Changed `plain server` defaults to `--workers auto` (one per CPU core) and `--threads 4` for better out-of-the-box concurrency ([c38ee93de5b4](https://github.com/dropseed/plain/commit/c38ee93de5b4))
+
+### Upgrade instructions
+
+- If you relied on `SyncWorker` or single-threaded behavior, explicitly pass `--threads 1` to `plain server`.
+- If you pinned `--workers 1`, note the default is now `auto`. Pass `--workers 1` explicitly to keep the old behavior.
+
 ## [0.106.2](https://github.com/dropseed/plain/releases/plain@0.106.2) (2026-02-13)
 
 ### What's changed
