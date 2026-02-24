@@ -31,7 +31,7 @@ class TestBrowser:
         self.host = "localhost"
         self.port = _get_available_port()
         self.base_url = f"{self.protocol}://{self.host}:{self.port}"
-        self.server_process = None
+        self.server_process: subprocess.Popen | None = None
         self.tmpdir = tempfile.TemporaryDirectory()
 
         # Set the initial browser context
@@ -93,9 +93,7 @@ class TestBrowser:
 
         def relative_url(url: str) -> str:
             """Convert a URL to a relative URL based on the base URL."""
-            if url.startswith(self.base_url):
-                return url[len(self.base_url) :]
-            return url
+            return url.removeprefix(self.base_url)
 
         # Start with the initial URLs
         to_visit = {relative_url(url) for url in urls}
@@ -117,11 +115,7 @@ class TestBrowser:
                 continue
 
             # Get the current page's path for resolving relative URLs
-            current_page_url = response.url
-            if current_page_url.startswith(self.base_url):
-                current_page_path = current_page_url[len(self.base_url) :]
-            else:
-                current_page_path = "/"
+            current_page_path = response.url.removeprefix(self.base_url)
 
             # Find all <a> links on the page
             for link in page.query_selector_all("a"):
@@ -240,7 +234,25 @@ class TestBrowser:
             env=env,
         )
 
-        time.sleep(0.7)  # quick grace period
+        self._wait_for_server()
+
+    def _wait_for_server(self, timeout: float = 10.0, interval: float = 0.1) -> None:
+        """Wait until the server is accepting connections."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            # Check that the server process hasn't crashed
+            if self.server_process and self.server_process.poll() is not None:
+                raise RuntimeError(
+                    f"Server process exited with code {self.server_process.returncode}"
+                )
+            try:
+                with socket.create_connection((self.host, self.port), timeout=interval):
+                    return
+            except OSError:
+                time.sleep(interval)
+        raise RuntimeError(
+            f"Server did not start within {timeout}s at {self.host}:{self.port}"
+        )
 
     def cleanup_server(self) -> None:
         if self.server_process:
@@ -256,5 +268,4 @@ def _get_available_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", 0))
         s.listen(1)
-        port = s.getsockname()[1]
-    return port
+        return s.getsockname()[1]
