@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.108.0](https://github.com/dropseed/plain/releases/plain@0.108.0) (2026-02-24)
+
+### What's changed
+
+- Added absolute URL generation: new `absolute_url()` and `reverse_absolute()` functions that prepend the scheme and domain using a new `BASE_URL` setting ([1e0d09f3ec70](https://github.com/dropseed/plain/commit/1e0d09f3ec70))
+- Added `reverse_absolute` and `absolute_url` as Jinja template globals for use in templates ([1e0d09f3ec70](https://github.com/dropseed/plain/commit/1e0d09f3ec70))
+- Added `reverse` as an explicit template global (previously only available as `url`) ([1e0d09f3ec70](https://github.com/dropseed/plain/commit/1e0d09f3ec70))
+
+### Upgrade instructions
+
+- No changes required. To use absolute URLs, set `BASE_URL` in your settings (e.g. `BASE_URL = "https://example.com"`).
+
 ## [0.107.0](https://github.com/dropseed/plain/releases/plain@0.107.0) (2026-02-24)
 
 ### What's changed
