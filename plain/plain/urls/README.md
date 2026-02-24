@@ -12,6 +12,10 @@
     - [In templates](#in-templates)
     - [In Python code](#in-python-code)
     - [Lazy reverse](#lazy-reverse)
+- [Absolute URLs](#absolute-urls)
+    - [Setting up BASE_URL](#setting-up-base_url)
+    - [In templates](#in-templates-1)
+    - [In Python code](#in-python-code-1)
 - [Regex patterns](#regex-patterns)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -153,7 +157,7 @@ path("archive/<year:year>/", views.ArchiveView, name="archive")
 
 ### In templates
 
-Use the `url()` function to generate URLs by name:
+Use `url()` to generate URLs by name (`url` is a template alias for `reverse`):
 
 ```html
 <a href="{{ url('about') }}">About</a>
@@ -188,6 +192,48 @@ class MyView(View):
 ```
 
 The URL is not resolved until it is actually used as a string.
+
+## Absolute URLs
+
+Generate full URLs that include the scheme and domain. This is useful for links in emails, background jobs, API responses, Open Graph tags, and anywhere else you need a complete URL.
+
+### Setting up BASE_URL
+
+Set the `BASE_URL` setting to your site's root URL (scheme + host, no trailing slash):
+
+```python
+# app/settings.py
+BASE_URL = "https://example.com"
+```
+
+If `BASE_URL` is not configured, calling `absolute_url()` or `reverse_absolute()` will raise a `ValueError`.
+
+### In templates
+
+Use `reverse_absolute()` — the absolute version of `reverse()`. It takes the same arguments (a URL name and optional parameters) and returns a full URL:
+
+```html
+<a href="{{ url('article', slug=article.slug) }}">Read more</a>
+<meta property="og:url" content="{{ reverse_absolute('article', slug=article.slug) }}">
+```
+
+### In Python code
+
+Use `reverse_absolute()` to reverse a URL name into a full URL:
+
+```python
+from plain.urls import reverse_absolute
+
+url = reverse_absolute("user", user_id=42)  # "https://example.com/user/42/"
+```
+
+Use `absolute_url()` when you already have a path (e.g. from `get_absolute_url()`):
+
+```python
+from plain.urls import absolute_url
+
+url = absolute_url(article.get_absolute_url())  # "https://example.com/articles/hello-world/"
+```
 
 ## Regex patterns
 

@@ -8,21 +8,29 @@ from .resolvers import (
 )
 from .routers import Router, include, path
 from .utils import (
+    absolute_url,
     reverse,
+    reverse_absolute,
     reverse_lazy,
 )
 
 __all__ = [
-    "NoReverseMatch",
-    "URLPattern",
-    "URLResolver",
-    "Resolver404",
-    "ResolverMatch",
-    "get_resolver",
+    # Routing
+    "Router",
     "include",
     "path",
     "register_converter",
+    # Reversing
     "reverse",
     "reverse_lazy",
-    "Router",
+    "reverse_absolute",
+    "absolute_url",
+    # Resolving
+    "URLPattern",
+    "URLResolver",
+    "ResolverMatch",
+    "get_resolver",
+    # Exceptions
+    "NoReverseMatch",
+    "Resolver404",
 ]

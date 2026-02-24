@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from plain.runtime import settings
 from plain.utils.functional import lazy
 
 from .exceptions import NoReverseMatch
@@ -45,3 +46,22 @@ def reverse(url_name: str, *args: Any, **kwargs: Any) -> str:
 
 
 reverse_lazy = lazy(reverse, str)
+
+
+def absolute_url(path: str) -> str:
+    """Convert a relative path to an absolute URL using the BASE_URL setting."""
+    if not settings.BASE_URL:
+        raise ValueError(
+            "The BASE_URL setting must be configured to generate absolute URLs."
+        )
+
+    base = settings.BASE_URL.rstrip("/")
+    if path and not path.startswith("/"):
+        path = "/" + path
+
+    return base + path
+
+
+def reverse_absolute(url_name: str, *args: Any, **kwargs: Any) -> str:
+    """Reverse a URL name and return an absolute URL using the BASE_URL setting."""
+    return absolute_url(reverse(url_name, *args, **kwargs))

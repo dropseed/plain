@@ -93,6 +93,10 @@ DEFAULT_CHARSET = "utf-8"
 
 # MARK: URL Configuration
 
+# The base URL of the site, used to generate absolute URLs outside of request contexts.
+# Should include scheme and host with no trailing slash (e.g. "https://example.com").
+BASE_URL: str = ""
+
 # Whether to append trailing slashes to URLs.
 APPEND_SLASH = True
 
