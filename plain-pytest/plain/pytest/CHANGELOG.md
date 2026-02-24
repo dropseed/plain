@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.16.3](https://github.com/dropseed/plain/releases/plain-pytest@0.16.3) (2026-02-24)
+
+### What's changed
+
+- Fixed flaky Playwright tests caused by a race condition in test server startup. The fixed 700ms sleep is replaced with an active connection check that polls until the server is actually accepting connections, with a 10s timeout and early failure detection if the server process crashes ([d87c7d868eb7](https://github.com/dropseed/plain/commit/d87c7d868eb7))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.16.2](https://github.com/dropseed/plain/releases/plain-pytest@0.16.2) (2026-02-04)
 
 ### What's changed
