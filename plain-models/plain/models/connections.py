@@ -3,6 +3,7 @@ from __future__ import annotations
 from threading import local
 from typing import TYPE_CHECKING, Any, TypedDict
 
+from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings as plain_settings
 
 if TYPE_CHECKING:
@@ -14,10 +15,10 @@ class DatabaseConfig(TypedDict, total=False):
     CONN_MAX_AGE: int | None
     CONN_HEALTH_CHECKS: bool
     HOST: str
-    NAME: str | None
+    DATABASE: str | None
     OPTIONS: dict[str, Any]
     PASSWORD: str
-    PORT: str | int
+    PORT: int | None
     TEST: dict[str, Any]
     TIME_ZONE: str | None
     USER: str
@@ -26,27 +27,36 @@ class DatabaseConfig(TypedDict, total=False):
 class DatabaseConnection:
     """Lazy access to the single configured database connection."""
 
-    __slots__ = ("_settings", "_local")
+    __slots__ = ("_local",)
 
     def __init__(self) -> None:
-        self._settings: DatabaseConfig = {}
         self._local = local()
 
     def configure_settings(self) -> DatabaseConfig:
-        database = plain_settings.DATABASE
+        if plain_settings.POSTGRES_DATABASE == "":
+            raise ImproperlyConfigured(
+                "The PostgreSQL database has been disabled (DATABASE_URL=none). "
+                "No database operations are available in this context."
+            )
+        if not plain_settings.POSTGRES_DATABASE:  # None or unresolved setting
+            raise ImproperlyConfigured(
+                "PostgreSQL database is not configured. "
+                "Set DATABASE_URL or the individual POSTGRES_* settings."
+            )
 
-        database.setdefault("AUTOCOMMIT", True)
-        database.setdefault("CONN_MAX_AGE", 0)
-        database.setdefault("CONN_HEALTH_CHECKS", False)
-        database.setdefault("OPTIONS", {})
-        database.setdefault("TIME_ZONE", None)
-        for setting in ["NAME", "USER", "PASSWORD", "HOST", "PORT"]:
-            database.setdefault(setting, "")
-
-        test_settings = database.setdefault("TEST", {})
-        test_settings.setdefault("NAME", None)
-
-        return database
+        return {
+            "DATABASE": plain_settings.POSTGRES_DATABASE,
+            "USER": plain_settings.POSTGRES_USER,
+            "PASSWORD": plain_settings.POSTGRES_PASSWORD,
+            "HOST": plain_settings.POSTGRES_HOST,
+            "PORT": plain_settings.POSTGRES_PORT,
+            "AUTOCOMMIT": True,
+            "CONN_MAX_AGE": plain_settings.POSTGRES_CONN_MAX_AGE,
+            "CONN_HEALTH_CHECKS": plain_settings.POSTGRES_CONN_HEALTH_CHECKS,
+            "OPTIONS": plain_settings.POSTGRES_OPTIONS,
+            "TIME_ZONE": plain_settings.POSTGRES_TIME_ZONE,
+            "TEST": {"DATABASE": None},
+        }
 
     def create_connection(self) -> DatabaseWrapper:
         from plain.models.postgres.wrapper import DatabaseWrapper
@@ -66,8 +76,9 @@ class DatabaseConnection:
     def __setattr__(self, name: str, value: Any) -> None:
         if name.startswith("_"):
             super().__setattr__(name, value)
-        else:
-            if not self.has_connection():
-                self._local.conn = self.create_connection()
+            return
 
-            setattr(self._local.conn, name, value)
+        if not self.has_connection():
+            self._local.conn = self.create_connection()
+
+        setattr(self._local.conn, name, value)

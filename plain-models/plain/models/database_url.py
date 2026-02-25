@@ -1,20 +1,17 @@
+from __future__ import annotations
+
 # Copyright (c) Kenneth Reitz & individual contributors
 # All rights reserved.
-
 # Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:
-
 #     1. Redistributions of source code must retain the above copyright notice,
 #        this list of conditions and the following disclaimer.
-
 #     2. Redistributions in binary form must reproduce the above copyright
 #        notice, this list of conditions and the following disclaimer in the
 #        documentation and/or other materials provided with the distribution.
-
 #     3. Neither the name of Plain nor the names of its contributors may be used
 #        to endorse or promote products derived from this software without
 #        specific prior written permission.
-
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 # ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 # WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -26,7 +23,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import urllib.parse as urlparse
-from typing import Any
 
 from .connections import DatabaseConfig
 
@@ -37,58 +33,37 @@ for scheme in SCHEMES:
     urlparse.uses_netloc.append(scheme)
 
 
-def parse_database_url(
-    url: str,
-    conn_max_age: int | None = 0,
-    conn_health_checks: bool = False,
-) -> DatabaseConfig:
+def parse_database_url(url: str) -> DatabaseConfig:
     """Parses a database URL."""
-    parsed_config: DatabaseConfig = {}
-
     spliturl = urlparse.urlsplit(url)
 
-    # Validate scheme is PostgreSQL.
     if spliturl.scheme not in SCHEMES:
         raise ValueError(
-            "No support for '{}'. We support: {}".format(
-                spliturl.scheme, ", ".join(sorted(SCHEMES))
-            )
+            f"No support for '{spliturl.scheme}'. We support: {', '.join(sorted(SCHEMES))}"
         )
 
-    # Split query strings from path.
     path = spliturl.path[1:]
     query = urlparse.parse_qs(spliturl.query)
 
-    # Handle postgres percent-encoded paths.
+    # Handle percent-encoded hostnames (e.g. socket paths).
     hostname = spliturl.hostname or ""
     if "%" in hostname:
-        # Switch to url.netloc to avoid lower cased paths
+        # Use netloc to avoid lowercased paths, strip credentials if present.
         hostname = spliturl.netloc
         if "@" in hostname:
             hostname = hostname.rsplit("@", 1)[1]
-        # Use URL Parse library to decode % encodes
         hostname = urlparse.unquote(hostname)
 
-    port = spliturl.port
-
-    # Update with environment configuration.
-    parsed_config.update(
-        {
-            "NAME": urlparse.unquote(path or ""),
-            "USER": urlparse.unquote(spliturl.username or ""),
-            "PASSWORD": urlparse.unquote(spliturl.password or ""),
-            "HOST": hostname,
-            "PORT": port or "",
-            "CONN_MAX_AGE": conn_max_age,
-            "CONN_HEALTH_CHECKS": conn_health_checks,
-        }
-    )
+    parsed_config: DatabaseConfig = {
+        "DATABASE": urlparse.unquote(path or ""),
+        "USER": urlparse.unquote(spliturl.username or ""),
+        "PASSWORD": urlparse.unquote(spliturl.password or ""),
+        "HOST": hostname,
+        "PORT": spliturl.port,
+    }
 
     # Pass the query string into OPTIONS.
-    options: dict[str, Any] = {}
-    for key, values in query.items():
-        options[key] = values[-1]
-
+    options = {key: values[-1] for key, values in query.items()}
     if options:
         parsed_config["OPTIONS"] = options
 
@@ -98,17 +73,13 @@ def parse_database_url(
 def build_database_url(config: DatabaseConfig) -> str:
     """Build a database URL from a configuration dictionary."""
     options = config.get("OPTIONS", {})
-    query_parts: list[tuple[str, Any]] = []
-    for key, value in options.items():
-        query_parts.append((key, value))
-
-    query = urlparse.urlencode(query_parts)
+    query = urlparse.urlencode(list(options.items()))
 
     user = urlparse.quote(str(config.get("USER", "")))
     password = urlparse.quote(str(config.get("PASSWORD", "")))
     host = config.get("HOST", "")
-    port = config.get("PORT", "")
-    name = urlparse.quote(str(config.get("NAME", "")))
+    port = config.get("PORT")
+    name = urlparse.quote(str(config.get("DATABASE", "")))
 
     netloc = ""
     if user or password:
@@ -120,6 +91,4 @@ def build_database_url(config: DatabaseConfig) -> str:
     if port:
         netloc += f":{port}"
 
-    path = f"/{name}"
-    url = urlparse.urlunsplit(("postgresql", netloc, path, query, ""))
-    return str(url)
+    return urlparse.urlunsplit(("postgresql", netloc, f"/{name}", query, ""))

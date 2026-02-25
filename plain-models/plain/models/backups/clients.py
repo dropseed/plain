@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from plain.exceptions import ImproperlyConfigured
+
 if TYPE_CHECKING:
     from plain.models.postgres.wrapper import DatabaseWrapper
 
@@ -16,111 +18,77 @@ class PostgresBackupClient:
     def get_env(self) -> dict[str, str]:
         settings_dict = self.connection.settings_dict
         options = settings_dict.get("OPTIONS", {})
-        env = {}
-        if options.get("passfile"):
-            env["PGPASSFILE"] = str(options.get("passfile"))
-        if settings_dict.get("PASSWORD"):
-            env["PGPASSWORD"] = str(settings_dict.get("PASSWORD"))
-        if options.get("service"):
-            env["PGSERVICE"] = str(options.get("service"))
-        if options.get("sslmode"):
-            env["PGSSLMODE"] = str(options.get("sslmode"))
-        if options.get("sslrootcert"):
-            env["PGSSLROOTCERT"] = str(options.get("sslrootcert"))
-        if options.get("sslcert"):
-            env["PGSSLCERT"] = str(options.get("sslcert"))
-        if options.get("sslkey"):
-            env["PGSSLKEY"] = str(options.get("sslkey"))
+        env: dict[str, str] = {}
+
+        if password := settings_dict.get("PASSWORD"):
+            env["PGPASSWORD"] = str(password)
+
+        # Map OPTIONS keys to their corresponding environment variables.
+        option_env_vars = {
+            "passfile": "PGPASSFILE",
+            "sslmode": "PGSSLMODE",
+            "sslrootcert": "PGSSLROOTCERT",
+            "sslcert": "PGSSLCERT",
+            "sslkey": "PGSSLKEY",
+        }
+        for option_key, env_var in option_env_vars.items():
+            if value := options.get(option_key):
+                env[env_var] = str(value)
+
         return env
+
+    def _get_conn_args(self) -> list[str]:
+        """Build common connection CLI args from settings."""
+        settings_dict = self.connection.settings_dict
+        args: list[str] = []
+        if user := settings_dict.get("USER"):
+            args += ["-U", user]
+        if host := settings_dict.get("HOST"):
+            args += ["-h", host]
+        if port := settings_dict.get("PORT"):
+            args += ["-p", str(port)]
+        return args
+
+    def _run(self, cmd: str | list[str], *, shell: bool = False) -> None:
+        subprocess.run(
+            cmd, env={**os.environ, **self.get_env()}, check=True, shell=shell
+        )
 
     def create_backup(self, backup_path: Path, *, pg_dump: str = "pg_dump") -> None:
         settings_dict = self.connection.settings_dict
+        dbname = settings_dict.get("DATABASE")
+        if not dbname:
+            raise ImproperlyConfigured("POSTGRES_DATABASE is required in settings")
 
-        args = pg_dump.split()
-        options = settings_dict.get("OPTIONS", {})
+        args = pg_dump.split() + self._get_conn_args()
+        args += ["-Fc", dbname]
 
-        host = settings_dict.get("HOST")
-        port = settings_dict.get("PORT")
-        dbname = settings_dict.get("NAME")
-        user = settings_dict.get("USER")
-        service = options.get("service")
-
-        if not dbname and not service:
-            # Connect to the default 'postgres' db.
-            dbname = "postgres"
-        if user:
-            args += ["-U", user]
-        if host:
-            args += ["-h", host]
-        if port:
-            args += ["-p", str(port)]
-
-        args += ["-Fc"]
-        # args += ["-f", backup_path]
-
-        if dbname:
-            args += [dbname]
-
-        # Using stdin/stdout let's us use executables from within a docker container too
+        # Pipe through gzip for compression
         args += ["|", "gzip", ">", str(backup_path)]
-
-        cmd = " ".join(args)
-
-        subprocess.run(
-            cmd, env={**os.environ, **self.get_env()}, check=True, shell=True
-        )
+        self._run(" ".join(args), shell=True)
 
     def restore_backup(
         self, backup_path: Path, *, pg_restore: str = "pg_restore", psql: str = "psql"
     ) -> None:
         settings_dict = self.connection.settings_dict
+        dbname = settings_dict.get("DATABASE")
+        if not dbname:
+            raise ImproperlyConfigured("POSTGRES_DATABASE is required in settings")
 
-        host = settings_dict.get("HOST")
-        port = settings_dict.get("PORT")
-        dbname = settings_dict.get("NAME")
-        assert dbname is not None, "Database NAME is required in settings"
-        user = settings_dict.get("USER")
+        conn_args = self._get_conn_args()
 
-        # Build common connection args
-        conn_args: list[str] = []
-        if user:
-            conn_args += ["-U", user]
-        if host:
-            conn_args += ["-h", host]
-        if port:
-            conn_args += ["-p", str(port)]
-
-        # First, drop and recreate the database
-        # Connect to 'template1' database to do this (works for all databases including 'postgres')
+        # Drop and recreate the database via template1
         drop_create_cmds = [
             f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{dbname}' AND pid <> pg_backend_pid()",
             f'DROP DATABASE IF EXISTS "{dbname}"',
             f'CREATE DATABASE "{dbname}"',
         ]
+        for sql in drop_create_cmds:
+            self._run(psql.split() + conn_args + ["-d", "template1", "-c", sql])
 
-        for cmd in drop_create_cmds:
-            psql_args = (
-                psql.split()
-                + conn_args
-                + [
-                    "-d",
-                    "template1",  # Always use template1
-                    "-c",
-                    cmd,
-                ]
-            )
-            subprocess.run(psql_args, env={**os.environ, **self.get_env()}, check=True)
+        # Restore into the fresh database
+        args = pg_restore.split() + conn_args + ["-d", dbname]
 
-        # Now restore into the fresh database
-        args = pg_restore.split()
-        args += conn_args
-        args += ["-d", dbname]
-
-        # Using stdin/stdout let's us use executables from within a docker container too
+        # Pipe through gunzip for decompression
         args = ["gunzip", "<", str(backup_path), "|"] + args
-
-        cmd = " ".join(args)
-
-        subprocess.run(
-            cmd, env={**os.environ, **self.get_env()}, check=True, shell=True
-        )
+        self._run(" ".join(args), shell=True)

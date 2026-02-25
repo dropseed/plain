@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from opentelemetry.trace import Span
 
     from plain.models.postgres.wrapper import DatabaseWrapper
+
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,
     DB_USER,
@@ -64,24 +65,21 @@ def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]
     # Matches: "quoted" (PostgreSQL), unquoted.name
     identifier_pattern = r'("([^"]+)"|([\w.]+))'
 
+    # Map operations to the SQL keyword that precedes the table name.
+    keyword_by_operation = {
+        "SELECT": "FROM",
+        "DELETE": "FROM",
+        "INSERT": "INTO",
+        "UPDATE": "UPDATE",
+    }
+
     # Extract table/collection name based on operation
     collection_name = None
     summary = operation
 
-    if operation in ("SELECT", "DELETE"):
-        match = re.search(rf"FROM\s+{identifier_pattern}", sql, re.IGNORECASE)
-        if match:
-            collection_name = _clean_identifier(match.group(1))
-            summary = f"{operation} {collection_name}"
-
-    elif operation == "INSERT":
-        match = re.search(rf"INTO\s+{identifier_pattern}", sql, re.IGNORECASE)
-        if match:
-            collection_name = _clean_identifier(match.group(1))
-            summary = f"{operation} {collection_name}"
-
-    elif operation == "UPDATE":
-        match = re.search(rf"UPDATE\s+{identifier_pattern}", sql, re.IGNORECASE)
+    keyword = keyword_by_operation.get(operation)
+    if keyword:
+        match = re.search(rf"{keyword}\s+{identifier_pattern}", sql, re.IGNORECASE)
         if match:
             collection_name = _clean_identifier(match.group(1))
             summary = f"{operation} {collection_name}"
@@ -132,7 +130,7 @@ def db_span(
     # Build attribute set following semantic conventions
     attrs: dict[str, Any] = {
         DB_SYSTEM_NAME: DB_SYSTEM,
-        DB_NAMESPACE: db.settings_dict.get("NAME"),
+        DB_NAMESPACE: db.settings_dict.get("DATABASE"),
         DB_QUERY_TEXT: sql,  # Already parameterized from Django/Plain
         DB_QUERY_SUMMARY: summary,
         DB_OPERATION_NAME: operation,
@@ -163,7 +161,7 @@ def db_span(
         # Convert params to appropriate format based on type
         if isinstance(params, dict):
             # Dictionary params (e.g., for named placeholders)
-            for i, (key, value) in enumerate(params.items()):
+            for key, value in params.items():
                 attrs[f"{DB_QUERY_PARAMETER_TEMPLATE}.{key}"] = str(value)
         elif isinstance(params, list | tuple):
             # Sequential params (e.g., for %s or ? placeholders)
@@ -189,6 +187,18 @@ def suppress_db_tracing() -> Generator[None, None, None]:
         otel_context.detach(token)
 
 
+def _is_internal_frame(frame: traceback.FrameSummary) -> bool:
+    """Return True if the frame is internal to plain.models or contextlib."""
+    filepath = frame.filename
+    if not filepath:
+        return True
+    if "/plain/models/" in filepath:
+        return True
+    if filepath.endswith("contextlib.py"):
+        return True
+    return False
+
+
 def _get_code_attributes() -> dict[str, Any]:
     """Extract code context attributes for the current database query.
 
@@ -196,23 +206,14 @@ def _get_code_attributes() -> dict[str, Any]:
     """
     stack = traceback.extract_stack()
 
-    # Find the user code frame
+    # Find the first user code frame (outermost non-internal frame from the top of the call stack)
     for frame in reversed(stack):
-        filepath = frame.filename
-        if not filepath:
+        if _is_internal_frame(frame):
             continue
 
-        if "/plain/models/" in filepath:
-            continue
-
-        if filepath.endswith("contextlib.py"):
-            continue
-
-        # Found user code - build attributes dict
-        attrs = {}
-
-        if filepath:
-            attrs[CODE_FILE_PATH] = filepath
+        attrs: dict[str, Any] = {
+            CODE_FILE_PATH: frame.filename,
+        }
         if frame.lineno:
             attrs[CODE_LINE_NUMBER] = frame.lineno
         if frame.name:
@@ -222,18 +223,7 @@ def _get_code_attributes() -> dict[str, Any]:
 
         # Add full stack trace only in DEBUG mode (expensive)
         if settings.DEBUG:
-            # Filter out internal frames from the stack trace
-            filtered_stack = []
-            for frame in stack:
-                filepath = frame.filename
-                if not filepath:
-                    continue
-                if "/plain/models/" in filepath:
-                    continue
-                if filepath.endswith("contextlib.py"):
-                    continue
-                filtered_stack.append(frame)
-
+            filtered_stack = [f for f in stack if not _is_internal_frame(f)]
             attrs[CODE_STACKTRACE] = "".join(traceback.format_list(filtered_stack))
 
         return attrs
