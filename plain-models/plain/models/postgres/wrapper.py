@@ -204,9 +204,6 @@ class DatabaseWrapper:
         self.savepoint_ids: list[str] = []
         # Stack of active 'atomic' blocks.
         self.atomic_blocks: list[Any] = []
-        # Tracks if the outermost 'atomic' block should commit on exit,
-        # ie. if autocommit was active on entry.
-        self.commit_on_exit: bool = True
         # Tracks if the transaction should be rolled back to the next
         # available savepoint because of an exception in an inner block.
         self.needs_rollback: bool = False
@@ -406,16 +403,11 @@ class DatabaseWrapper:
             self.check_database_version_supported()
             RAN_DB_VERSION_CHECK = True
 
-        # Commit after setting the time zone.
-        commit_tz = self.ensure_timezone()
+        self.ensure_timezone()
         # Set the role on the connection. This is useful if the credential used
         # to login is not the same as the role that owns database resources. As
         # can be the case when using temporary or ephemeral credentials.
-        commit_role = self.ensure_role()
-
-        if (commit_role or commit_tz) and not self.get_autocommit():
-            assert self.connection is not None
-            self.connection.commit()
+        self.ensure_role()
 
     def create_cursor(self, name: str | None = None) -> Any:
         """Create a cursor. Assume that a connection is established."""
@@ -560,7 +552,7 @@ class DatabaseWrapper:
         # Establish the connection
         conn_params = self.get_connection_params()
         self.connection = self.get_new_connection(conn_params)
-        self.set_autocommit(self.settings_dict["AUTOCOMMIT"])
+        self.set_autocommit(True)
         self.init_connection_state()
 
         self.run_on_commit = []
@@ -726,7 +718,12 @@ class DatabaseWrapper:
         return self.autocommit
 
     def set_autocommit(self, autocommit: bool) -> None:
-        """Enable or disable autocommit."""
+        """
+        Enable or disable autocommit.
+
+        Used internally by atomic() to manage transactions. Don't call this
+        directly — use atomic() instead.
+        """
         self.validate_no_atomic_block()
         self.close_if_health_check_failed()
         self.ensure_connection()
@@ -796,9 +793,9 @@ class DatabaseWrapper:
         """
         if self.connection is not None:
             self.health_check_done = False
-            # If the application didn't restore the original autocommit setting,
-            # don't take chances, drop the connection.
-            if self.get_autocommit() != self.settings_dict["AUTOCOMMIT"]:
+            # If autocommit was not restored (e.g. a transaction was not
+            # properly closed), don't take chances, drop the connection.
+            if not self.get_autocommit():
                 self.close()
                 return
 
@@ -891,13 +888,8 @@ class DatabaseWrapper:
         if self.in_atomic_block:
             # Transaction in progress; save for execution on commit.
             self.run_on_commit.append((set(self.savepoint_ids), func, robust))
-        elif not self.get_autocommit():
-            raise TransactionManagementError(
-                "on_commit() cannot be used in manual transaction management"
-            )
         else:
-            # No transaction in progress and in autocommit mode; execute
-            # immediately.
+            # No transaction in progress; execute immediately.
             if robust:
                 try:
                     func()

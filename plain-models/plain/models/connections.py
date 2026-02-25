@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 
 
 class DatabaseConfig(TypedDict, total=False):
-    AUTOCOMMIT: bool
     CONN_MAX_AGE: int | None
     CONN_HEALTH_CHECKS: bool
     HOST: str
@@ -50,7 +49,6 @@ class DatabaseConnection:
             "PASSWORD": plain_settings.POSTGRES_PASSWORD,
             "HOST": plain_settings.POSTGRES_HOST,
             "PORT": plain_settings.POSTGRES_PORT,
-            "AUTOCOMMIT": True,
             "CONN_MAX_AGE": plain_settings.POSTGRES_CONN_MAX_AGE,
             "CONN_HEALTH_CHECKS": plain_settings.POSTGRES_CONN_HEALTH_CHECKS,
             "OPTIONS": plain_settings.POSTGRES_OPTIONS,
