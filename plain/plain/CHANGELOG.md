@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.110.1](https://github.com/dropseed/plain/releases/plain@0.110.1) (2026-02-26)
+
+### What's changed
+
+- Added type annotations to all settings in `global_settings.py` so they can be set via environment variables — previously 11 settings like `HTTPS_REDIRECT_ENABLED`, `APPEND_SLASH`, and `FILE_UPLOAD_MAX_MEMORY_SIZE` were missing annotations and would error when set via env vars ([37e8a58ca9b5](https://github.com/dropseed/plain/commit/37e8a58ca9b5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.110.0](https://github.com/dropseed/plain/releases/plain@0.110.0) (2026-02-26)
 
 ### What's changed
