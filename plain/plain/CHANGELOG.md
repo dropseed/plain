@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.110.0](https://github.com/dropseed/plain/releases/plain@0.110.0) (2026-02-26)
+
+### What's changed
+
+- Environment variables now take highest precedence, overriding values set in `settings.py` — previously explicit settings would win over env vars ([0d40bcfcd539](https://github.com/dropseed/plain/commit/0d40bcfcd539))
+- Moved SSL handshake from the main thread to the worker thread so handshake errors no longer crash the main loop, ported from gunicorn PR #3440 ([6309ef82642e](https://github.com/dropseed/plain/commit/6309ef82642e))
+- Switched keepalive timeouts to use `time.monotonic()` instead of `time.time()` for correctness during clock adjustments ([e7ddd1a31cfe](https://github.com/dropseed/plain/commit/e7ddd1a31cfe))
+- Extracted `finish_body()` method on the HTTP parser for explicit cleanup before returning keepalive connections to the poller ([0cf51dd17c6f](https://github.com/dropseed/plain/commit/0cf51dd17c6f))
+
+### Upgrade instructions
+
+- If you rely on `settings.py` values taking precedence over `PLAIN_`-prefixed environment variables, be aware that env vars now win. Remove any env vars that conflict with values you want to set in code.
+
 ## [0.109.0](https://github.com/dropseed/plain/releases/plain@0.109.0) (2026-02-26)
 
 ### What's changed
