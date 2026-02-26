@@ -17,9 +17,10 @@ Plain.code provides comprehensive code quality tools with sensible defaults:
 
 - **[Ruff](https://astral.sh/ruff)** - Python linting and formatting
 - **[ty](https://astral.sh/ty)** - Python type checking
-- **[Biome](https://biomejs.dev/)** - JavaScript, JSON, and CSS formatting
+- **[oxlint](https://oxc.rs/)** - JavaScript and TypeScript linting
+- **[oxfmt](https://oxc.rs/)** - JavaScript, TypeScript, JSON, and CSS formatting
 
-Ruff and ty are installed as Python dependencies. Biome is managed automatically as a standalone binary (npm is not required).
+Ruff and ty are installed as Python dependencies. oxlint and oxfmt are managed automatically as standalone binaries (npm is not required).
 
 ## Commands
 
@@ -58,10 +59,10 @@ You can skip specific tools if needed:
 plain code check --skip-ty
 
 # Only run type checks
-plain code check --skip-ruff --skip-biome
+plain code check --skip-ruff --skip-oxc
 
-# Skip Biome checks
-plain code check --skip-biome
+# Skip oxlint and oxfmt checks
+plain code check --skip-oxc
 
 # Skip annotation coverage checks
 plain code check --skip-annotations
@@ -93,7 +94,7 @@ plain code annotations --json
 
 ## Settings
 
-Default configuration is provided by [`ruff_defaults.toml`](./ruff_defaults.toml) and [`biome_defaults.json`](./biome_defaults.json).
+Default configuration is provided by [`ruff_defaults.toml`](./ruff_defaults.toml).
 
 You can customize the behavior in your `pyproject.toml`:
 
@@ -104,9 +105,9 @@ exclude = ["path/to/exclude"]
 [tool.plain.code.ty]
 enabled = true  # Set to false to disable ty
 
-[tool.plain.code.biome]
-enabled = true  # Set to false to disable Biome
-version = "1.5.3"  # Pin to a specific version
+[tool.plain.code.oxc]
+enabled = true  # Set to false to disable oxlint/oxfmt
+version = "1.43.0"  # Pin to a specific version
 
 [tool.plain.code.annotations]
 enabled = true  # Set to false to disable annotation checks
@@ -115,16 +116,16 @@ exclude = ["migrations"]  # Exclude specific patterns
 
 For more advanced configuration options, see [`get_code_config`](./cli.py#get_code_config).
 
-Generally you won't need to change the configuration. The defaults are designed to "just work" for most projects. If you find yourself needing extensive customization, consider using the underlying tools (Ruff, ty, Biome) directly instead.
+Generally you won't need to change the configuration. The defaults are designed to "just work" for most projects. If you find yourself needing extensive customization, consider using the underlying tools (Ruff, ty, oxlint, oxfmt) directly instead.
 
 ## FAQs
 
-#### How do I install or update Biome manually?
+#### How do I install or update oxlint/oxfmt manually?
 
-Biome is installed automatically when you run `plain fix` or `plain code check`. If you need to manage it manually:
+oxlint and oxfmt are installed automatically when you run `plain fix` or `plain code check`. If you need to manage them manually:
 
 ```bash
-# Install Biome (or reinstall if corrupted)
+# Install oxlint/oxfmt (or reinstall if corrupted)
 plain code install
 
 # Force reinstall even if up to date

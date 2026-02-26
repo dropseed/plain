@@ -3,40 +3,40 @@ name = "example"
 version = "0.0.0"
 requires-python = ">=3.13"
 dependencies = [
-    # All of the Plain packages (from the workspace)
-    "plain",
-    "plain-admin",
-    "plain-api",
-    "plain-auth",
-    "plain-cache",
-    "plain-code",
-    "plain-dev",
-    "plain-elements",
-    "plain-esbuild",
-    "plain-flags",
-    "plain-htmx",
-    "plain-jobs",
-    "plain-loginlink",
-    "plain-email",
-    "plain-models",
-    "plain-oauth",
-    "plain-pages",
-    "plain-pageviews",
-    "plain-passwords",
-    "plain-pytest",
-    "plain-redirection",
-    "plain-scan",
-    "plain-sessions",
-    "plain-support",
-    "plain-tailwind",
-    "plain-toolbar",
-    "plain-tunnel",
-    "plain-vendor",
-    "plain-observer",
+  # All of the Plain packages (from the workspace)
+  "plain",
+  "plain-admin",
+  "plain-api",
+  "plain-auth",
+  "plain-cache",
+  "plain-code",
+  "plain-dev",
+  "plain-elements",
+  "plain-esbuild",
+  "plain-flags",
+  "plain-htmx",
+  "plain-jobs",
+  "plain-loginlink",
+  "plain-email",
+  "plain-models",
+  "plain-oauth",
+  "plain-pages",
+  "plain-pageviews",
+  "plain-passwords",
+  "plain-pytest",
+  "plain-redirection",
+  "plain-scan",
+  "plain-sessions",
+  "plain-support",
+  "plain-tailwind",
+  "plain-toolbar",
+  "plain-tunnel",
+  "plain-vendor",
+  "plain-observer",
 ]
 
 [tool.plain.tailwind]
 version = "4.1.17"
 
-[tool.plain.code.biome]
-version = "2.0.6"
+[tool.plain.code.oxc]
+version = "1.50.0"
