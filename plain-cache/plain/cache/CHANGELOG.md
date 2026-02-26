@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.25.3](https://github.com/dropseed/plain/releases/plain-cache@0.25.3) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.25.2](https://github.com/dropseed/plain/releases/plain-cache@0.25.2) (2026-02-04)
 
 ### What's changed
