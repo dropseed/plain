@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.10.3](https://github.com/dropseed/plain/releases/plain-toolbar@0.10.3) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted JavaScript assets and config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.10.2](https://github.com/dropseed/plain/releases/plain-toolbar@0.10.2) (2026-02-12)
 
 ### What's changed
