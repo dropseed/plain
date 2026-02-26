@@ -1,6 +1,6 @@
 [project]
 name = "plain.htmx"
-version = "0.16.1"
+version = "0.16.2"
 description = "Integrate HTMX with templates and views."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"

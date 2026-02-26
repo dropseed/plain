@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.16.2](https://github.com/dropseed/plain/releases/plain-htmx@0.16.2) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted JavaScript assets and config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.16.1](https://github.com/dropseed/plain/releases/plain-htmx@0.16.1) (2026-02-04)
 
 ### What's changed
