@@ -42,16 +42,24 @@ class Parser:
     def __iter__(self) -> Iterator[Request]:
         return self
 
+    def finish_body(self) -> None:
+        """Discard any unread body of the current message.
+
+        Call before returning a keepalive connection to the poller so the
+        socket doesn't appear readable due to leftover body bytes.
+        """
+        if self.mesg and self.mesg.body:
+            data = self.mesg.body.read(8192)
+            while data:
+                data = self.mesg.body.read(8192)
+
     def __next__(self) -> Request:
         # Stop if HTTP dictates a stop.
         if self.mesg and self.mesg.should_close():
             raise StopIteration()
 
         # Discard any unread body of the previous message
-        if self.mesg and self.mesg.body:
-            data = self.mesg.body.read(8192)
-            while data:
-                data = self.mesg.body.read(8192)
+        self.finish_body()
 
         # Parse the next request
         self.req_count += 1
