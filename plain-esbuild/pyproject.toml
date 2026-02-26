@@ -1,6 +1,6 @@
 [project]
 name = "plain.esbuild"
-version = "0.8.0"
+version = "0.8.1"
 description = "Build JavaScript files with esbuild."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
