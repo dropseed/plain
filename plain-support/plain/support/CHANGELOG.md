@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.31.4](https://github.com/dropseed/plain/releases/plain-support@0.31.4) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted JavaScript assets and config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.31.3](https://github.com/dropseed/plain/releases/plain-support@0.31.3) (2026-02-04)
 
 ### What's changed
