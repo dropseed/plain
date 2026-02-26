@@ -45,6 +45,8 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 - `uv run plain shell` — interactive Python shell with Plain configured (`-c "..."` for one-off commands)
 - `uv run plain run script.py` — run a script with Plain configured
 - `uv run plain request /path` — test HTTP request against dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`)
+- `uv run plain settings list` — list all settings with their current values and sources
+- `uv run plain settings get <SETTING_NAME>` — get the value of a specific setting
 
 ## Views
 
