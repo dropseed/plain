@@ -1,5 +1,0 @@
-DEV_REQUESTS_IGNORE_PATHS = [
-    "/favicon.ico",
-]
-
-DEV_REQUESTS_MAX = 50
