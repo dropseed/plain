@@ -79,7 +79,7 @@ class TConn:
 
     def set_timeout(self) -> None:
         # set the timeout
-        self.timeout = time.time() + KEEPALIVE
+        self.timeout = time.monotonic() + KEEPALIVE
 
     def close(self) -> None:
         util.close(self.sock)
@@ -173,7 +173,7 @@ class ThreadWorker(base.Worker):
         self.enqueue_req(conn)
 
     def murder_keepalived(self) -> None:
-        now = time.time()
+        now = time.monotonic()
         while True:
             with self._lock:
                 try:
