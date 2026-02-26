@@ -150,6 +150,13 @@ class ListView(AdminModelListView):
     nav_icon = "shopping-cart"  # Icon for the section
 ```
 
+Icons come from [Bootstrap Icons](https://icons.getbootstrap.com/). To search available icon names:
+
+```bash
+uv run plain admin icons         # List all ~2,078 icons
+uv run plain admin icons cart    # Search by keyword
+```
+
 Setting `nav_section = None` hides a view from the navigation entirely.
 
 ## Admin cards
