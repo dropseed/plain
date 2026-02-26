@@ -1,5 +1,33 @@
 # plain-models changelog
 
+## [0.80.0](https://github.com/dropseed/plain/releases/plain-models@0.80.0) (2026-02-25)
+
+### What's changed
+
+- Replaced the `DATABASE` dict setting with individual `POSTGRES_*` settings (`POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DATABASE`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, etc.) configurable via `PLAIN_POSTGRES_*` environment variables or `app/settings.py` ([e3c5a32d4da6](https://github.com/dropseed/plain/commit/e3c5a32d4da6))
+- `DATABASE_URL` still works and takes priority — individual settings are parsed from it automatically ([e3c5a32d4da6](https://github.com/dropseed/plain/commit/e3c5a32d4da6))
+- Added `DATABASE_URL=none` to explicitly disable the database (e.g. during Docker builds) ([e3c5a32d4da6](https://github.com/dropseed/plain/commit/e3c5a32d4da6))
+- Removed the `AUTOCOMMIT` config setting — Plain always runs with autocommit=True ([5dc1995615d9](https://github.com/dropseed/plain/commit/5dc1995615d9))
+- Refactored backup client internals with shared `_get_conn_args()` and `_run()` helpers ([e3c5a32d4da6](https://github.com/dropseed/plain/commit/e3c5a32d4da6))
+
+### Upgrade instructions
+
+- If you use `DATABASE_URL`, no changes are required — it continues to work as before.
+- If you manually defined the `DATABASE` dict in settings, replace it with individual `POSTGRES_*` settings:
+
+    ```python
+    # Before
+    DATABASE = {"NAME": "mydb", "USER": "me", "HOST": "localhost"}
+
+    # After
+    POSTGRES_DATABASE = "mydb"
+    POSTGRES_USER = "me"
+    POSTGRES_HOST = "localhost"
+    ```
+
+- The `DATABASE` dict key `"NAME"` is now `"DATABASE"` internally — update any code that accessed `settings_dict["NAME"]` directly.
+- Remove any `AUTOCOMMIT` setting from your database config — it is no longer recognized.
+
 ## [0.79.0](https://github.com/dropseed/plain/releases/plain-models@0.79.0) (2026-02-24)
 
 ### What's changed
