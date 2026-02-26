@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.109.0](https://github.com/dropseed/plain/releases/plain@0.109.0) (2026-02-26)
+
+### What's changed
+
+- Added `--outline` flag to `plain docs` CLI to display section headings for quick navigation ([153502ee90f5](https://github.com/dropseed/plain/commit/153502ee90f5))
+- Added `--search` flag to `plain docs` CLI to find which modules and sections mention a term ([153502ee90f5](https://github.com/dropseed/plain/commit/153502ee90f5))
+- Enhanced `plain docs --list` to show core modules alongside packages, with color-coded output ([3f34b5405ea3](https://github.com/dropseed/plain/commit/3f34b5405ea3))
+- Updated shell banner to show app name and version in a styled box instead of generic welcome message ([a7b152d0baf8](https://github.com/dropseed/plain/commit/a7b152d0baf8))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.108.1](https://github.com/dropseed/plain/releases/plain@0.108.1) (2026-02-26)
 
 ### What's changed
