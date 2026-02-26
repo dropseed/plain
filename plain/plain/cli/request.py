@@ -92,7 +92,7 @@ def request(
             raise SystemExit(1)
 
         # Create test client
-        client = Client()
+        client = Client(SERVER_NAME="localhost")
 
         # If user_id provided, force login
         if user_id:
@@ -114,8 +114,8 @@ def request(
                 click.secho(f"Authentication error: {e}", fg="red", err=True)
                 raise SystemExit(1)
 
-        # Parse additional headers
-        header_dict = {}
+        # Parse additional headers (default Accept to text/html)
+        header_dict = {"Accept": "text/html"}
         for header in headers:
             if ":" in header:
                 key, value = header.split(":", 1)
@@ -135,8 +135,7 @@ def request(
         kwargs: dict[str, Any] = {
             "follow": follow,
         }
-        if header_dict:
-            kwargs["headers"] = header_dict
+        kwargs["headers"] = header_dict
 
         if method in ("POST", "PUT", "PATCH") and data:
             kwargs["data"] = data
