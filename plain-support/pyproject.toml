@@ -1,6 +1,6 @@
 [project]
 name = "plain.support"
-version = "0.31.4"
+version = "0.31.5"
 description = "Provides support forms for your application."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
