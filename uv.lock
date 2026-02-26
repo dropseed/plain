@@ -785,7 +785,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-pages"
-version = "0.18.3"
+version = "0.18.4"
 source = { editable = "plain-pages" }
 dependencies = [
     { name = "mistune" },

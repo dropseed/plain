@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.18.4](https://github.com/dropseed/plain/releases/plain-pages@0.18.4) (2026-02-26)
+
+### What's changed
+
+- Added type annotation to `PAGES_SERVE_MARKDOWN` setting so it can be set via environment variables ([37e8a58ca9b5](https://github.com/dropseed/plain/commit/37e8a58ca9b5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.18.3](https://github.com/dropseed/plain/releases/plain-pages@0.18.3) (2026-02-26)
 
 ### What's changed
