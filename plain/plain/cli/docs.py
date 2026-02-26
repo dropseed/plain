@@ -107,17 +107,29 @@ def _extract_preamble(content: str) -> str | None:
     return text if text else None
 
 
-def _extract_section(content: str, target_slug: str) -> str | None:
-    """Extract a ## section from markdown content by its slugified heading."""
-    lines = content.split("\n")
+def _extract_heading_section(
+    lines: list[str],
+    prefix: str,
+    target_slug: str,
+    stop_prefixes: list[str],
+) -> str | None:
+    """Extract a section starting with a heading that matches target_slug.
+
+    Captures lines from the matching heading until a line starting with any
+    of the stop_prefixes is encountered.
+    """
     capturing = False
     captured: list[str] = []
 
     for line in lines:
-        if line.startswith("## "):
+        is_stop = any(line.startswith(p) for p in stop_prefixes)
+        if is_stop:
             if capturing:
                 break
-            if _slugify(line[3:].strip()) == target_slug:
+            if (
+                line.startswith(prefix)
+                and _slugify(line[len(prefix) :].strip()) == target_slug
+            ):
                 capturing = True
                 captured.append(line)
         elif capturing:
@@ -129,13 +141,29 @@ def _extract_section(content: str, target_slug: str) -> str | None:
     return None
 
 
+def _extract_section(content: str, target_slug: str) -> str | None:
+    """Extract a ## or ### section from markdown content by its slugified heading.
+
+    First tries to match a ## heading. If no match, tries ### headings.
+    A ## section runs until the next ## heading.
+    A ### section runs until the next ## or ### heading.
+    """
+    lines = content.split("\n")
+
+    return _extract_heading_section(
+        lines, "## ", target_slug, ["## "]
+    ) or _extract_heading_section(lines, "### ", target_slug, ["## ", "### "])
+
+
 def _get_section_slugs(content: str) -> list[str]:
-    """Get slugified names of all ## sections in markdown content."""
-    return [
-        _slugify(line[3:].strip())
-        for line in content.split("\n")
-        if line.startswith("## ")
-    ]
+    """Get slugified names of all ## and ### sections in markdown content."""
+    slugs = []
+    for line in content.split("\n"):
+        for prefix in ("## ", "### "):
+            if line.startswith(prefix):
+                slugs.append(_slugify(line[len(prefix) :].strip()))
+                break
+    return slugs
 
 
 def _find_namespace_readme(spec: importlib.machinery.ModuleSpec) -> Path | None:
