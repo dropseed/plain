@@ -1,5 +1,21 @@
 # plain-tunnel changelog
 
+## [0.10.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.10.0) (2026-02-25)
+
+### What's changed
+
+- Added protocol version handshake — the client now sends a version query parameter and the server rejects incompatible clients with a clear error message ([a173676c0f3c](https://github.com/dropseed/plain/commit/a173676c0f3c))
+- Fixed tunnel connection reliability with improved reconnection logic and exponential backoff ([4c09c9893528](https://github.com/dropseed/plain/commit/4c09c9893528))
+- Replaced urllib with httpx for HTTP forwarding in the client ([4c09c9893528](https://github.com/dropseed/plain/commit/4c09c9893528))
+- Simplified binary message parsing using struct-based framing instead of custom delimiters ([a9d11c51351b](https://github.com/dropseed/plain/commit/a9d11c51351b))
+- Refactored client and server into cleaner request/response handling with dedicated `TunnelRequest` and `TunnelResponse` dataclasses ([4c09c9893528](https://github.com/dropseed/plain/commit/4c09c9893528))
+- Renamed `PLAIN_DEV_TUNNEL_URL` environment variable to `DEV_TUNNEL_URL` ([6154e6ef8693](https://github.com/dropseed/plain/commit/6154e6ef8693))
+
+### Upgrade instructions
+
+- Rename `PLAIN_DEV_TUNNEL_URL` to `DEV_TUNNEL_URL` in your `.env` file.
+- The tunnel server must be updated alongside the client due to the new protocol version handshake.
+
 ## [0.9.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.9.0) (2026-01-13)
 
 ### What's changed
