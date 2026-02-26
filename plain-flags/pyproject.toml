@@ -1,6 +1,6 @@
 [project]
 name = "plain.flags"
-version = "0.33.3"
+version = "0.33.4"
 description = "Local feature flags via database models."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
