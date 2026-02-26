@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.27.4](https://github.com/dropseed/plain/releases/plain-observer@0.27.4) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted JavaScript assets and config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.3](https://github.com/dropseed/plain/releases/plain-observer@0.27.3) (2026-02-04)
 
 ### What's changed
