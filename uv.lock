@@ -872,7 +872,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-scan"
-version = "0.6.1"
+version = "0.6.2"
 source = { editable = "plain-scan" }
 dependencies = [
     { name = "plain" },
