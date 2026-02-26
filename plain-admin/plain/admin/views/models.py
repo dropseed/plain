@@ -42,7 +42,7 @@ def get_model_field(instance: models.Model, field: str) -> Any:
 
 
 class AdminModelListView(AdminListView):
-    allow_global_search = True
+    allow_global_search = False
 
     model: type[models.Model]
 

@@ -19,7 +19,7 @@ class AdminIndexView(AdminView):
     def get(self) -> Response:
         # Slight hack to redirect to the first view that doesn't
         # require any url params...
-        if views := registry.get_searchable_views():
+        if views := registry.get_list_views():
             return RedirectResponse(list(views)[0].get_view_url())
 
         return super().get()

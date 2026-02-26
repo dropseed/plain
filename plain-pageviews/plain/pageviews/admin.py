@@ -25,7 +25,6 @@ class PageviewAdmin(AdminViewset):
         title = "Pageviews"
         description = "Page visits with UTM tracking and session attribution."
         fields = ["user_id", "url", "source", "timestamp", "session_id"]
-        allow_global_search = False
         search_fields = ["id", "user_id", "url", "session_id", "source", "medium"]
         cards = [PageviewsTrendCard]
 
