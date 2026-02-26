@@ -64,8 +64,8 @@ class TConn:
         self.sock.setblocking(False)
 
     def init(self) -> None:
-        self.initialized = True
-        self.sock.setblocking(True)
+        if self.initialized:
+            return
 
         if self.parser is None:
             # wrap the socket if needed
@@ -74,6 +74,8 @@ class TConn:
 
             # initialize the parser
             self.parser = http.RequestParser(self.cfg, self.sock, self.client)
+
+        self.initialized = True
 
     def set_timeout(self) -> None:
         # set the timeout
@@ -130,8 +132,9 @@ class ThreadWorker(base.Worker):
         fs.add_done_callback(self.finish_request)
 
     def enqueue_req(self, conn: TConn) -> None:
-        conn.init()
-        # submit the connection to a worker
+        # conn.init() is called inside handle(), not here, so that SSL
+        # handshake errors are caught in the worker thread instead of
+        # crashing the main loop. (Ported from gunicorn PR #3440.)
         fs = self.tpool.submit(self.handle, conn)
         self._wrap_future(fs, conn)
 
@@ -303,7 +306,10 @@ class ThreadWorker(base.Worker):
         keepalive = False
         req = None
         try:
-            # conn.parser is guaranteed to be initialized by enqueue_req -> conn.init()
+            # Ensure blocking mode before init/parsing. Critical for keepalive
+            # connections where finish_request sets non-blocking for the poller.
+            conn.sock.setblocking(True)
+            conn.init()
             assert conn.parser is not None
             req = next(conn.parser)
             if not req:
