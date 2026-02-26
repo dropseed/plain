@@ -38,5 +38,8 @@ dependencies = [
 [tool.plain.tailwind]
 version = "4.1.17"
 
+[tool.plain.dev.run]
+tunnel = { cmd = "plain tunnel $PLAIN_DEV_URL --subdomain plain-example --quiet" }
+
 [tool.plain.code.oxc]
 version = "1.50.0"
