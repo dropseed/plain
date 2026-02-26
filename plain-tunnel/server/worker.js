@@ -30,6 +30,10 @@ export default {
   },
 };
 
+// Bump when making breaking protocol changes.
+// Clients with a version below this will be rejected.
+const MIN_PROTOCOL_VERSION = 1;
+
 export class Tunnel {
   constructor(_state, _env) {
     this.clientSocket = null;
@@ -41,7 +45,7 @@ export class Tunnel {
   async fetch(request) {
     if (request.headers.get("Upgrade") === "websocket") {
       console.debug("Received WebSocket upgrade request");
-      return this.handleWebSocket();
+      return this.handleWebSocket(request);
     }
     console.debug("Received HTTP request");
     return this.handleHttpRequest(request);
@@ -88,7 +92,17 @@ export class Tunnel {
     }
   }
 
-  handleWebSocket() {
+  handleWebSocket(request) {
+    const url = new URL(request.url);
+    const clientVersion = parseInt(url.searchParams.get("v") || "0", 10);
+
+    if (clientVersion < MIN_PROTOCOL_VERSION) {
+      return new Response(
+        `Client protocol version ${clientVersion} is too old (minimum: ${MIN_PROTOCOL_VERSION}). Please upgrade: uv sync --upgrade-package plain.tunnel`,
+        { status: 426 },
+      );
+    }
+
     const [client, server] = Object.values(new WebSocketPair());
 
     if (this.clientSocket) {

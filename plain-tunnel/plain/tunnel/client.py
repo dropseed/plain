@@ -11,6 +11,10 @@ import click
 import httpx
 import websockets
 
+# Bump this when making breaking changes to the WebSocket protocol.
+# The server will reject clients with a version lower than its minimum.
+PROTOCOL_VERSION = 1
+
 
 class TunnelClient:
     def __init__(
@@ -21,7 +25,9 @@ class TunnelClient:
         self.tunnel_host = tunnel_host
 
         self.tunnel_http_url = f"https://{subdomain}.{tunnel_host}"
-        self.tunnel_websocket_url = f"wss://{subdomain}.{tunnel_host}"
+        self.tunnel_websocket_url = (
+            f"wss://{subdomain}.{tunnel_host}?v={PROTOCOL_VERSION}"
+        )
 
         self.logger = logging.getLogger(__name__)
         level = getattr(logging, log_level.upper())
@@ -55,6 +61,15 @@ class TunnelClient:
             except asyncio.CancelledError:
                 self.logger.debug("Connection cancelled")
                 break
+            except websockets.InvalidStatus as e:
+                if e.response.status_code == 426:
+                    body = e.response.body.decode() if e.response.body else ""
+                    click.secho(
+                        body or "Client version too old. Please upgrade plain.tunnel.",
+                        fg="red",
+                    )
+                    break
+                raise
             except (websockets.ConnectionClosed, ConnectionError, Exception) as e:
                 if self.stop_event.is_set():
                     self.logger.debug("Stopping reconnect attempts due to shutdown")
