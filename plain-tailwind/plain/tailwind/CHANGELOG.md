@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.20.5](https://github.com/dropseed/plain/releases/plain-tailwind@0.20.5) (2026-02-26)
+
+### What's changed
+
+- Added type annotations to `TAILWIND_SRC_PATH` and `TAILWIND_DIST_PATH` settings ([37e8a58ca9b5](https://github.com/dropseed/plain/commit/37e8a58ca9b5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.20.4](https://github.com/dropseed/plain/releases/plain-tailwind@0.20.4) (2026-02-26)
 
 ### What's changed

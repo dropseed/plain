@@ -946,7 +946,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-tailwind"
-version = "0.20.4"
+version = "0.20.5"
 source = { editable = "plain-tailwind" }
 dependencies = [
     { name = "plain" },
