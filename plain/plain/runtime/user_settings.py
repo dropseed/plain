@@ -74,10 +74,12 @@ class Settings:
 
         # Load default settings from installed packages
         self._load_default_settings(mod)
-        # Load environment settings
-        self._load_env_settings()
         # Load explicit settings from the settings module
         self._load_explicit_settings(mod)
+        # Load environment settings (last, so env vars override settings.py)
+        self._load_env_settings()
+        # Apply timezone after all settings are loaded
+        self._apply_timezone()
         # Check for any required settings that are missing
         self._check_required_settings()
         # Check for any collected errors
@@ -181,6 +183,7 @@ class Settings:
                         f"Unknown setting '{setting}'. Custom settings must start with '{_CUSTOM_SETTINGS_PREFIX}'."
                     )
 
+    def _apply_timezone(self) -> None:
         if hasattr(time, "tzset") and self.TIME_ZONE:
             zoneinfo_root = Path("/usr/share/zoneinfo")
             zone_info_file = zoneinfo_root.joinpath(*self.TIME_ZONE.split("/"))

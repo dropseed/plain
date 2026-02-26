@@ -8,4 +8,4 @@ INSTALLED_PACKAGES = [
 ]
 
 EXPLICIT_SETTING = "explicitly changed"
-ENV_OVERRIDDEN_SETTING = "explicitly overridden"
+EXPLICIT_OVERRIDDEN_SETTING = "explicit value"

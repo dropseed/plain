@@ -60,7 +60,7 @@ Plain's built-in settings are defined in [`global_settings.py`](./global_setting
 
 ## Environment variables
 
-Type-annotated settings can be loaded from environment variables using a `PLAIN_` prefix.
+Type-annotated settings can be loaded from environment variables using a `PLAIN_` prefix. Environment variables take the highest precedence — they override values set in `settings.py`, so you can change behavior per deployment without editing code.
 
 For example, if you define a setting with a type annotation:
 

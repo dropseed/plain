@@ -6,4 +6,4 @@ def test_user_settings():
     assert settings.DEFAULT_SETTING == "unchanged default"
     assert settings.EXPLICIT_SETTING == "explicitly changed"
     assert settings.ENV_SETTING == 1
-    assert settings.ENV_OVERRIDDEN_SETTING == "explicitly overridden"
+    assert settings.EXPLICIT_OVERRIDDEN_SETTING == "env value"
