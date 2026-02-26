@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.56.0](https://github.com/dropseed/plain/releases/plain-dev@0.56.0) (2026-02-25)
+
+### What's changed
+
+- Renamed `PLAIN_DEV_TUNNEL_URL` environment variable to `DEV_TUNNEL_URL` for displaying the tunnel URL in the dev server header ([6154e6ef8693](https://github.com/dropseed/plain/commit/6154e6ef8693))
+- Removed unused `default_settings.py` ([73a51a723c64](https://github.com/dropseed/plain/commit/73a51a723c64))
+
+### Upgrade instructions
+
+- Rename `PLAIN_DEV_TUNNEL_URL` to `DEV_TUNNEL_URL` in your `.env` file.
+
 ## [0.55.1](https://github.com/dropseed/plain/releases/plain-dev@0.55.1) (2026-02-24)
 
 ### What's changed
