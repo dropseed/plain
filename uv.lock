@@ -838,7 +838,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-pytest"
-version = "0.16.3"
+version = "0.16.4"
 source = { editable = "plain-pytest" }
 dependencies = [
     { name = "click" },
@@ -895,7 +895,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-sessions"
-version = "0.42.2"
+version = "0.42.3"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },

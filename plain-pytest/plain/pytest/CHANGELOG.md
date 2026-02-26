@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.16.4](https://github.com/dropseed/plain/releases/plain-pytest@0.16.4) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.16.3](https://github.com/dropseed/plain/releases/plain-pytest@0.16.3) (2026-02-24)
 
 ### What's changed
