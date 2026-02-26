@@ -1,5 +1,15 @@
 # plain-start changelog
 
+## [0.2.2](https://github.com/dropseed/plain/releases/plain-start@0.2.2) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.1](https://github.com/dropseed/plain/releases/plain-start@0.2.1) (2026-02-12)
 
 ### What's changed
