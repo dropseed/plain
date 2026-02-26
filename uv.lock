@@ -492,7 +492,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-api"
-version = "0.26.2"
+version = "0.26.3"
 source = { editable = "plain-api" }
 dependencies = [
     { name = "plain" },
