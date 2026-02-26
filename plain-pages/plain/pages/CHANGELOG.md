@@ -1,5 +1,17 @@
 # plain-pages changelog
 
+## [0.18.3](https://github.com/dropseed/plain/releases/plain-pages@0.18.3) (2026-02-26)
+
+### What's changed
+
+- Fixed markdown pages serving unrendered Jinja templates — pages now render through the template engine before serving as markdown via content negotiation or `PageMarkdownView` ([8bcebc4064de](https://github.com/dropseed/plain/commit/8bcebc4064de))
+- Removed unnecessary Vary header from `PageMarkdownView` ([fa6f98991d65](https://github.com/dropseed/plain/commit/fa6f98991d65))
+- Moved `get_template_context()` up to `PageViewMixin` so all page view types share the same template context ([8bcebc4064de](https://github.com/dropseed/plain/commit/8bcebc4064de))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.18.2](https://github.com/dropseed/plain/releases/plain-pages@0.18.2) (2026-02-04)
 
 ### What's changed
