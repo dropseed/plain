@@ -1,6 +1,6 @@
 [project]
 name = "plainx.dev"
-version = "0.1.0"
+version = "0.1.1"
 description = "Development tools for plainx package developers, including release automation."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
