@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.108.1](https://github.com/dropseed/plain/releases/plain@0.108.1) (2026-02-26)
+
+### What's changed
+
+- Fixed `plain request` to use `localhost` as SERVER_NAME and default the Accept header to `text/html`, matching typical browser behavior ([01731c5485cf](https://github.com/dropseed/plain/commit/01731c5485cf))
+- Updated `plain-bug` skill to create GitHub Issues via `gh` CLI instead of posting to the Plain API ([ce7b95bd056d](https://github.com/dropseed/plain/commit/ce7b95bd056d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.108.0](https://github.com/dropseed/plain/releases/plain@0.108.0) (2026-02-24)
 
 ### What's changed
