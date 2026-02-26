@@ -64,7 +64,7 @@ class DevProcess(ProcessManager):
         self.ssl_cert_path = None
 
         self.url = f"https://{self.hostname}:{self.port}"
-        self.tunnel_url = os.environ.get("PLAIN_DEV_TUNNEL_URL", "")
+        self.tunnel_url = os.environ.get("DEV_TUNNEL_URL", "")
 
         self.plain_env = {
             "PYTHONUNBUFFERED": "true",
