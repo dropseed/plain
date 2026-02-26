@@ -695,7 +695,7 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-loginlink"
-version = "0.18.0"
+version = "0.18.1"
 source = { editable = "plain-loginlink" }
 dependencies = [
     { name = "plain" },

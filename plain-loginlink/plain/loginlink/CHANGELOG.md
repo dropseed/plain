@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.18.1](https://github.com/dropseed/plain/releases/plain-loginlink@0.18.1) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.18.0) (2026-01-13)
 
 ### What's changed
