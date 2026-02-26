@@ -94,8 +94,4 @@ class PageMarkdownView(PageViewMixin, TemplateView):
         """Serve the markdown content without frontmatter."""
         context = self.get_template_context()
         markdown_content = self.page.rendered_source(context)
-        response = Response(markdown_content, content_type="text/plain; charset=utf-8")
-        response.headers["Vary"] = (
-            "Accept-Encoding"  # Set Vary header for proper caching
-        )
-        return response
+        return Response(markdown_content, content_type="text/plain; charset=utf-8")
