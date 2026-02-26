@@ -29,6 +29,12 @@ class PageViewMixin:
         except PageNotFoundError:
             raise NotFoundError404()
 
+    def get_template_context(self) -> dict[str, Any]:
+        context = super().get_template_context()  # type: ignore[misc]
+        context["page"] = self.page
+        self.page.set_template_context(context)  # Pass the standard context through
+        return context
+
 
 class PageView(PageViewMixin, TemplateView):
     template_name = "page.html"
@@ -40,7 +46,8 @@ class PageView(PageViewMixin, TemplateView):
                 "text/markdown", "text/plain", "text/html"
             )
             if preferred in ("text/markdown", "text/plain"):
-                markdown_content = self.page._frontmatter.content
+                context = self.get_template_context()
+                markdown_content = self.page.rendered_source(context)
                 response = Response(
                     markdown_content, content_type="text/plain; charset=utf-8"
                 )
@@ -58,12 +65,6 @@ class PageView(PageViewMixin, TemplateView):
             return [template_name]
 
         return super().get_template_names()
-
-    def get_template_context(self) -> dict[str, Any]:
-        context = super().get_template_context()
-        context["page"] = self.page
-        self.page.set_template_context(context)  # Pass the standard context through
-        return context
 
 
 class PageRedirectView(PageViewMixin, View):
@@ -88,10 +89,11 @@ class PageAssetView(PageViewMixin, AssetView):
         return self.page.absolute_path
 
 
-class PageMarkdownView(PageViewMixin, View):
+class PageMarkdownView(PageViewMixin, TemplateView):
     def get(self) -> Response:
         """Serve the markdown content without frontmatter."""
-        markdown_content = self.page._frontmatter.content
+        context = self.get_template_context()
+        markdown_content = self.page.rendered_source(context)
         response = Response(markdown_content, content_type="text/plain; charset=utf-8")
         response.headers["Vary"] = (
             "Accept-Encoding"  # Set Vary header for proper caching

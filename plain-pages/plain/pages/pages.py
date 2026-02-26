@@ -42,22 +42,28 @@ class Page:
         default_title = os.path.splitext(os.path.basename(self.relative_path))[0]
         return self.vars.get("title", default_title)
 
-    @cached_property
-    def content(self) -> str:
-        # Strip the frontmatter
+    def rendered_source(self, context: dict[str, Any] | None = None) -> str:
+        """Render Jinja templates and strip frontmatter, but don't convert markdown to HTML."""
         content = self._frontmatter.content
 
         if not self.vars.get("render_plain", False):
             template = Template(os.path.join("pages", self.relative_path))
+            render_context = context if context is not None else self._template_context
 
             try:
-                content = template.render(self._template_context)
+                content = template.render(render_context)
             except Exception as e:
                 # Throw our own error so we don't get shadowed by the Jinja error
                 raise PageRenderError(f"Error rendering page {self.relative_path}: {e}")
 
             # Strip the frontmatter again, since it was in the template file itself
             _, content = frontmatter.parse(content)
+
+        return content
+
+    @cached_property
+    def content(self) -> str:
+        content = self.rendered_source()
 
         if self.is_markdown():
             content = render_markdown(content, current_page_path=self.relative_path)

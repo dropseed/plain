@@ -794,6 +794,11 @@ dependencies = [
     { name = "python-frontmatter" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "mistune", specifier = ">=3.0.0" },
@@ -801,6 +806,9 @@ requires-dist = [
     { name = "pygments", specifier = ">=2.0.0" },
     { name = "python-frontmatter", specifier = ">=1.0.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-pageviews"

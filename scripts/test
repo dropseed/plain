@@ -21,6 +21,7 @@ plain-auth
 plain-api
 plain-elements
 plain-htmx
+plain-pages
 EOF
 )"
 
