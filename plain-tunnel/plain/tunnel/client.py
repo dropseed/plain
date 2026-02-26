@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import math
+import struct
 from typing import Any
 from urllib.parse import urlparse
 
@@ -70,17 +71,22 @@ class TunnelClient:
                     )
                     break
                 raise
-            except (websockets.ConnectionClosed, ConnectionError, Exception) as e:
+            except (websockets.ConnectionClosed, ConnectionError) as e:
                 if self.stop_event.is_set():
                     self.logger.debug("Stopping reconnect attempts due to shutdown")
                     break
-                label = (
-                    "Connection lost"
-                    if isinstance(e, websockets.ConnectionClosed | ConnectionError)
-                    else "Unexpected error"
-                )
                 click.secho(
-                    f"{label}: {e}. Retrying in {retry_delay:.0f}s...",
+                    f"Connection lost: {e}. Retrying in {retry_delay:.0f}s...",
+                    fg="yellow",
+                )
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, max_retry_delay)
+            except Exception as e:
+                if self.stop_event.is_set():
+                    self.logger.debug("Stopping reconnect attempts due to shutdown")
+                    break
+                click.secho(
+                    f"Unexpected error: {e}. Retrying in {retry_delay:.0f}s...",
                     fg="yellow",
                 )
                 await asyncio.sleep(retry_delay)
@@ -133,25 +139,11 @@ class TunnelClient:
     async def handle_request_body_chunk(
         self, websocket: Any, chunk_data: bytes
     ) -> None:
-        offset = 0
-
-        id_length = int.from_bytes(chunk_data[offset : offset + 4], byteorder="little")
-        offset += 4
-
-        request_id = chunk_data[offset : offset + id_length].decode("utf-8")
-        offset += id_length
-
-        chunk_index = int.from_bytes(
-            chunk_data[offset : offset + 4], byteorder="little"
-        )
-        offset += 4
-
-        total_chunks = int.from_bytes(
-            chunk_data[offset : offset + 4], byteorder="little"
-        )
-        offset += 4
-
-        body_chunk = chunk_data[offset:]
+        (id_length,) = struct.unpack_from("<I", chunk_data, 0)
+        request_id = chunk_data[4 : 4 + id_length].decode("utf-8")
+        header_end = 4 + id_length + 8
+        chunk_index, total_chunks = struct.unpack_from("<II", chunk_data, 4 + id_length)
+        body_chunk = chunk_data[header_end:]
 
         if request_id in self.pending_requests:
             request = self.pending_requests[request_id]
@@ -218,11 +210,11 @@ class TunnelClient:
         else:
             body_data = None
 
-        parsed_url = urlparse(request_metadata["url"])
-        path_and_query = parsed_url.path
-        if parsed_url.query:
-            path_and_query += f"?{parsed_url.query}"
-        forward_url = self.destination_url + path_and_query
+        parsed = urlparse(request_metadata["url"])
+        path = parsed.path
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        forward_url = f"{self.destination_url}{path}"
 
         self.logger.debug(f"Forwarding request to: {forward_url}")
 
@@ -278,12 +270,8 @@ class TunnelClient:
             for i in range(total_body_chunks):
                 chunk_start = i * max_chunk_size
                 chunk_end = min(chunk_start + max_chunk_size, len(response_body))
-                body_chunk = response_body[chunk_start:chunk_end]
-
-                chunk_index_bytes = i.to_bytes(4, byteorder="little")
-                total_chunks_bytes = total_body_chunks.to_bytes(4, byteorder="little")
-                message = id_bytes + chunk_index_bytes + total_chunks_bytes + body_chunk
-                await websocket.send(message)
+                header = id_bytes + struct.pack("<II", i, total_body_chunks)
+                await websocket.send(header + response_body[chunk_start:chunk_end])
                 self.logger.debug(
                     f"Sent body chunk {i + 1}/{total_body_chunks} for ID: {request_id}"
                 )

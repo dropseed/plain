@@ -34,6 +34,9 @@ export default {
 // Clients with a version below this will be rejected.
 const MIN_PROTOCOL_VERSION = 1;
 
+// Response body chunks use a fixed-length UUID (36 bytes) as the ID prefix.
+const UUID_BYTE_LENGTH = 36;
+
 export class Tunnel {
   constructor(_state, _env) {
     this.clientSocket = null;
@@ -175,29 +178,15 @@ export class Tunnel {
   }
 
   handleResponseBodyChunk(chunkData) {
-    const idDecoder = new TextDecoder();
-    const idBytes = chunkData.slice(0, 36);
-    const id = idDecoder.decode(idBytes);
-
-    const chunkIndexArray = new Uint32Array(chunkData.slice(36, 40));
-    const chunkIndex = chunkIndexArray[0];
-
-    const totalChunksArray = new Uint32Array(chunkData.slice(40, 44));
-    const totalChunks = totalChunksArray[0];
-
-    const bodyChunk = chunkData.slice(44);
+    const id = new TextDecoder().decode(chunkData.slice(0, UUID_BYTE_LENGTH));
+    const headerEnd = UUID_BYTE_LENGTH + 8;
+    const [chunkIndex, totalChunks] = new Uint32Array(chunkData.slice(UUID_BYTE_LENGTH, headerEnd));
+    const bodyChunk = chunkData.slice(headerEnd);
 
     const pendingRequest = this.pendingRequests.get(id);
     if (pendingRequest) {
       console.info(`Received body chunk ${chunkIndex + 1}/${totalChunks} for ID: ${id}`);
-
-      if (!pendingRequest.bodyChunks) {
-        pendingRequest.bodyChunks = {};
-        pendingRequest.totalBodyChunks = totalChunks;
-      }
-
       pendingRequest.bodyChunks[chunkIndex] = bodyChunk;
-
       this.checkIfResponseComplete(id);
     } else {
       console.warn(`Received body chunk for unknown or completed request ID: ${id}`);
@@ -210,9 +199,7 @@ export class Tunnel {
 
     const { responseMetadata, has_body, totalBodyChunks, bodyChunks } = pendingRequest;
 
-    const allChunksReceived = has_body
-      ? bodyChunks && Object.keys(bodyChunks).length === totalBodyChunks
-      : true;
+    const allChunksReceived = !has_body || Object.keys(bodyChunks).length === totalBodyChunks;
 
     if (responseMetadata && allChunksReceived) {
       console.debug(`Response complete for ID: ${id}`);
@@ -290,8 +277,8 @@ export class Tunnel {
         cleanup,
         responseMetadata: null,
         has_body: null,
-        totalBodyChunks: null,
-        bodyChunks: null,
+        totalBodyChunks: 0,
+        bodyChunks: {},
       });
 
       const onClose = () => {
@@ -317,31 +304,28 @@ export class Tunnel {
 
         const idBytes = new TextEncoder().encode(id);
         const idLength = idBytes.length;
+        const headerSize = 4 + idLength + 8;
 
         for (let i = 0; i < totalChunks; i++) {
           const chunkStart = i * maxChunkSize;
           const chunkEnd = Math.min(chunkStart + maxChunkSize, requestBodyArrayBuffer.byteLength);
-          const bodyChunk = requestBodyArrayBuffer.slice(chunkStart, chunkEnd);
+          const bodyChunk = new Uint8Array(requestBodyArrayBuffer.slice(chunkStart, chunkEnd));
 
-          const messageSize = 4 + idLength + 4 + 4 + bodyChunk.byteLength;
-          const messageBuffer = new Uint8Array(messageSize);
+          const message = new Uint8Array(headerSize + bodyChunk.byteLength);
+          const view = new DataView(message.buffer);
           let offset = 0;
 
-          messageBuffer.set(new Uint8Array(new Uint32Array([idLength]).buffer), offset);
+          view.setUint32(offset, idLength, true);
           offset += 4;
-
-          messageBuffer.set(idBytes, offset);
+          message.set(idBytes, offset);
           offset += idLength;
-
-          messageBuffer.set(new Uint8Array(new Uint32Array([i]).buffer), offset);
+          view.setUint32(offset, i, true);
           offset += 4;
-
-          messageBuffer.set(new Uint8Array(new Uint32Array([totalChunks]).buffer), offset);
+          view.setUint32(offset, totalChunks, true);
           offset += 4;
+          message.set(bodyChunk, offset);
 
-          messageBuffer.set(new Uint8Array(bodyChunk), offset);
-
-          socket.send(messageBuffer.buffer);
+          socket.send(message.buffer);
           console.debug(`Sent body chunk ${i + 1}/${totalChunks} for ID: ${id}`);
         }
       }
