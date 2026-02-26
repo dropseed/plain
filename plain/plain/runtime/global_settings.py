@@ -51,7 +51,7 @@ DEFAULT_RESPONSE_HEADERS: dict = {
 # Whether to redirect all non-HTTPS requests to HTTPS (blanket redirect).
 # For anything more advanced (custom host, path exemptions, etc.), write
 # your own middleware.
-HTTPS_REDIRECT_ENABLED = True
+HTTPS_REDIRECT_ENABLED: bool = True
 
 # If your Plain app is behind a proxy that sets a header to specify secure
 # connections, AND that proxy ensures that user-submitted headers with the
@@ -89,7 +89,7 @@ TIME_ZONE: str = "UTC"
 
 # Default charset to use for all Response objects, if a MIME type isn't
 # manually specified. It's used to construct the Content-Type header.
-DEFAULT_CHARSET = "utf-8"
+DEFAULT_CHARSET: str = "utf-8"
 
 # MARK: URL Configuration
 
@@ -98,36 +98,36 @@ DEFAULT_CHARSET = "utf-8"
 BASE_URL: str = ""
 
 # Whether to append trailing slashes to URLs.
-APPEND_SLASH = True
+APPEND_SLASH: bool = True
 
 # MARK: File Uploads
 
 # List of upload handler classes to be applied in order.
-FILE_UPLOAD_HANDLERS = [
+FILE_UPLOAD_HANDLERS: list[str] = [
     "plain.internal.files.uploadhandler.MemoryFileUploadHandler",
     "plain.internal.files.uploadhandler.TemporaryFileUploadHandler",
 ]
 
 # Maximum size, in bytes, of a request before it will be streamed to the
 # file system instead of into memory.
-FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440  # i.e. 2.5 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE: int = 2621440  # i.e. 2.5 MB
 
 # Maximum size in bytes of request data (excluding file uploads) that will be
 # read before a SuspiciousOperationError400 (RequestDataTooBigError400) is raised.
-DATA_UPLOAD_MAX_MEMORY_SIZE = 2621440  # i.e. 2.5 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE: int = 2621440  # i.e. 2.5 MB
 
 # Maximum number of GET/POST parameters that will be read before a
 # SuspiciousOperationError400 (TooManyFieldsSentError400) is raised.
-DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
+DATA_UPLOAD_MAX_NUMBER_FIELDS: int = 1000
 
 # Maximum number of files encoded in a multipart upload that will be read
 # before a SuspiciousOperationError400 (TooManyFilesSentError400) is raised.
-DATA_UPLOAD_MAX_NUMBER_FILES = 100
+DATA_UPLOAD_MAX_NUMBER_FILES: int = 100
 
 # Directory in which upload streamed files will be temporarily saved. A value of
 # `None` will make Plain use the operating system's default temporary directory
 # (i.e. "/tmp" on *nix systems).
-FILE_UPLOAD_TEMP_DIR = None
+FILE_UPLOAD_TEMP_DIR: str | None = None
 
 # MARK: Middleware
 
@@ -157,7 +157,7 @@ LOG_STREAM: str = "split"  # "split", "stdout", or "stderr"
 # MARK: Assets
 
 # Whether to redirect the original asset path to the fingerprinted path.
-ASSETS_REDIRECT_ORIGINAL = True
+ASSETS_REDIRECT_ORIGINAL: bool = True
 
 # If assets are served by a CDN, use this URL to prefix asset paths.
 # Ex. "https://cdn.example.com/assets/"
@@ -173,7 +173,7 @@ PREFLIGHT_SILENCED_RESULTS: list[str] = []
 
 # MARK: Templates
 
-TEMPLATES_JINJA_ENVIRONMENT = "plain.templates.jinja.DefaultEnvironment"
+TEMPLATES_JINJA_ENVIRONMENT: str = "plain.templates.jinja.DefaultEnvironment"
 
 # MARK: Shell
 
