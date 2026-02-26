@@ -2,22 +2,20 @@
 name = "plain.auth"
 version = "0.25.3"
 description = "Add users to your app and decide what they can access."
-authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
 dependencies = [
-    "plain<1.0.0",
-    "plain.models<1.0.0",
-    # Technically you can swap out sessions entirely with your own,
-    # so long as the request.session exists and has a similar API.
-    "plain.sessions<1.0.0",
+  "plain<1.0.0",
+  "plain.models<1.0.0",
+  # Technically you can swap out sessions entirely with your own,
+  # so long as the request.session exists and has a similar API.
+  "plain.sessions<1.0.0",
 ]
 
 [dependency-groups]
-dev = [
-    "plain.pytest<1.0.0",
-]
+dev = ["plain.pytest<1.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

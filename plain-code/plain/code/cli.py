@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import click
+
 from plain.cli import register_cli
 from plain.cli.print import print_event
 from plain.cli.runtime import common_command, without_runtime_setup

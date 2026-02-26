@@ -11,9 +11,7 @@ jQuery(($) => {
   $actionCheckbox.on("change", () => {
     if ($actionCheckboxHeader.is(":checked")) {
       // If header is checked and a row changes, uncheck header
-      if (
-        $actionCheckbox.filter(":checked").length !== $actionCheckbox.length
-      ) {
+      if ($actionCheckbox.filter(":checked").length !== $actionCheckbox.length) {
         $actionCheckboxHeader.prop("checked", false);
       }
     }
@@ -84,8 +82,7 @@ jQuery(($) => {
   // Merge query params with the current url and the link url
   $("[data-merge-params]").each(function () {
     const currentUrl = new URL(window.location.href);
-    const params = new URL($(this).attr("href"), window.location.href)
-      .searchParams;
+    const params = new URL($(this).attr("href"), window.location.href).searchParams;
     params.forEach((value, key) => {
       currentUrl.searchParams.set(key, value);
     });

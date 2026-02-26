@@ -27,12 +27,9 @@
         const actionElt = htmx.closest(elt, "[plain-hx-action]");
         const fragmentElt = htmx.closest(elt, "[plain-hx-fragment]");
 
-        if (actionElt)
-          headers["Plain-HX-Action"] =
-            actionElt.getAttribute("plain-hx-action");
+        if (actionElt) headers["Plain-HX-Action"] = actionElt.getAttribute("plain-hx-action");
         if (fragmentElt)
-          headers["Plain-HX-Fragment"] =
-            fragmentElt.getAttribute("plain-hx-fragment");
+          headers["Plain-HX-Fragment"] = fragmentElt.getAttribute("plain-hx-fragment");
       }
     },
   });

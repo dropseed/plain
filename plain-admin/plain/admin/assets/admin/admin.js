@@ -10,9 +10,7 @@ jQuery(($) => {
     }
     // Use form action if set, otherwise current path
     const basePath = form.getAttribute("action") || window.location.pathname;
-    const url = params.toString()
-      ? `${basePath}?${params.toString()}`
-      : basePath;
+    const url = params.toString() ? `${basePath}?${params.toString()}` : basePath;
     window.location.href = url;
   }
 
@@ -100,7 +98,7 @@ jQuery(($) => {
           message = response.error || response.message;
         }
       }
-    } catch (_e) {
+    } catch {
       // Ignore JSON parsing errors, use default message
     }
 
@@ -119,11 +117,7 @@ jQuery(($) => {
   $(document).on("keydown", (e) => {
     const activeTag = document.activeElement.tagName;
     const isEditable = document.activeElement.isContentEditable;
-    if (
-      e.key === "/" &&
-      !["INPUT", "TEXTAREA", "SELECT"].includes(activeTag) &&
-      !isEditable
-    ) {
+    if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(activeTag) && !isEditable) {
       e.preventDefault();
       $("#topbar-search").trigger("focus");
     }

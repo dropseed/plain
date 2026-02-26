@@ -104,17 +104,13 @@ export class Tunnel {
     const { id, has_body, totalBodyChunks } = data;
     const pendingRequest = this.pendingRequests.get(id);
     if (pendingRequest) {
-      console.info(
-        `Received response metadata for ID: ${id}, has_body: ${has_body}`,
-      );
+      console.info(`Received response metadata for ID: ${id}, has_body: ${has_body}`);
       pendingRequest.responseMetadata = data;
       pendingRequest.has_body = has_body;
       pendingRequest.totalBodyChunks = totalBodyChunks || 0;
       this.checkIfResponseComplete(id);
     } else {
-      console.warn(
-        `Received metadata for unknown or completed request ID: ${id}`,
-      );
+      console.warn(`Received metadata for unknown or completed request ID: ${id}`);
     }
   }
 
@@ -133,9 +129,7 @@ export class Tunnel {
 
     const pendingRequest = this.pendingRequests.get(id);
     if (pendingRequest) {
-      console.info(
-        `Received body chunk ${chunkIndex + 1}/${totalChunks} for ID: ${id}`,
-      );
+      console.info(`Received body chunk ${chunkIndex + 1}/${totalChunks} for ID: ${id}`);
 
       if (!pendingRequest.bodyChunks) {
         pendingRequest.bodyChunks = {};
@@ -146,9 +140,7 @@ export class Tunnel {
 
       this.checkIfResponseComplete(id);
     } else {
-      console.warn(
-        `Received body chunk for unknown or completed request ID: ${id}`,
-      );
+      console.warn(`Received body chunk for unknown or completed request ID: ${id}`);
     }
   }
 
@@ -156,8 +148,7 @@ export class Tunnel {
     const pendingRequest = this.pendingRequests.get(id);
     if (!pendingRequest) return;
 
-    const { responseMetadata, has_body, totalBodyChunks, bodyChunks } =
-      pendingRequest;
+    const { responseMetadata, has_body, totalBodyChunks, bodyChunks } = pendingRequest;
 
     const allChunksReceived = has_body
       ? bodyChunks && Object.keys(bodyChunks).length === totalBodyChunks
@@ -173,9 +164,7 @@ export class Tunnel {
         const chunksArray = [];
         for (let i = 0; i < totalBodyChunks; i++) {
           if (bodyChunks[i] === undefined) {
-            console.error(
-              `Missing chunk ${i + 1}/${totalBodyChunks} for request ID: ${id}`,
-            );
+            console.error(`Missing chunk ${i + 1}/${totalBodyChunks} for request ID: ${id}`);
             return;
           }
           chunksArray.push(new Uint8Array(bodyChunks[i]));
@@ -276,9 +265,7 @@ export class Tunnel {
       socket.addEventListener("error", onError);
 
       // Send metadata
-      console.debug(
-        `Sending request metadata for ID: ${id}, has_body: ${has_body}`,
-      );
+      console.debug(`Sending request metadata for ID: ${id}, has_body: ${has_body}`);
       socket.send(metadataString);
 
       // Send body if present
@@ -291,10 +278,7 @@ export class Tunnel {
 
         for (let i = 0; i < totalChunks; i++) {
           const chunkStart = i * maxChunkSize;
-          const chunkEnd = Math.min(
-            chunkStart + maxChunkSize,
-            requestBodyArrayBuffer.byteLength,
-          );
+          const chunkEnd = Math.min(chunkStart + maxChunkSize, requestBodyArrayBuffer.byteLength);
           const bodyChunk = requestBodyArrayBuffer.slice(chunkStart, chunkEnd);
 
           // Prepare the binary message
@@ -335,9 +319,7 @@ export class Tunnel {
 
           // Send the message
           socket.send(messageBuffer.buffer);
-          console.debug(
-            `Sent body chunk ${i + 1}/${totalChunks} for ID: ${id}`,
-          );
+          console.debug(`Sent body chunk ${i + 1}/${totalChunks} for ID: ${id}`);
         }
       } else {
         console.debug(`No body to send for ID: ${id}`);

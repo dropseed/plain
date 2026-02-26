@@ -2,14 +2,11 @@
 name = "plain.tunnel"
 version = "0.9.0"
 description = "Connect to your local development server remotely."
-authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-    "plain<1.0.0",
-    "websockets>=14.0",
-]
+dependencies = ["plain<1.0.0", "websockets>=14.0"]
 
 # Make it also available as plain-tunnel,
 # so tools like pipx and uvx can run it independently

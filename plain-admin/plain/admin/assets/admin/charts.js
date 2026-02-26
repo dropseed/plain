@@ -38,12 +38,7 @@ window.AdminCharts = {
 
     // Create gradient for bars
     const context = ctx.getContext("2d");
-    const gradient = context.createLinearGradient(
-      0,
-      0,
-      0,
-      ctx.parentElement.offsetHeight || 140,
-    );
+    const gradient = context.createLinearGradient(0, 0, 0, ctx.parentElement.offsetHeight || 140);
     gradient.addColorStop(0, "rgba(120, 113, 108, 0.85)"); // stone-500
     gradient.addColorStop(0.5, "rgba(168, 162, 158, 0.7)"); // stone-400
     gradient.addColorStop(1, "rgba(214, 211, 209, 0.5)"); // stone-300
@@ -60,9 +55,7 @@ window.AdminCharts = {
    * @param {Element} container - DOM element to search for charts
    */
   renderAll: function (container) {
-    const charts = container.querySelectorAll
-      ? container.querySelectorAll("[data-chart-id]")
-      : [];
+    const charts = container.querySelectorAll ? container.querySelectorAll("[data-chart-id]") : [];
     charts.forEach((el) => {
       const slug = el.getAttribute("data-chart-id");
       if (slug) this.render(slug);

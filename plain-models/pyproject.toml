@@ -2,14 +2,11 @@
 name = "plain.models"
 version = "0.79.0"
 description = "Model your data and store it in a database."
-authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
-dependencies = [
-    "plain<1.0.0",
-    "sqlparse>=0.3.1",
-]
+dependencies = ["plain<1.0.0", "sqlparse>=0.3.1"]
 
 [project.entry-points."plain.setup"]
 "models-setup" = "plain.models.entrypoints:setup"
@@ -19,9 +16,7 @@ dependencies = [
 "plain.models" = "plain.models.test.pytest"
 
 [dependency-groups]
-dev = [
-    "plain.pytest<1.0.0",
-]
+dev = ["plain.pytest<1.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

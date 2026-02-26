@@ -2,22 +2,22 @@ target-version = "py311"
 
 [lint]
 ignore = [
-    "E501",  # Never enforce `E501` (line length violations)
-    "S101",  # pytest use of assert
-    "ISC001",  # Implicit string concatenation
+  "E501", # Never enforce `E501` (line length violations)
+  "S101", # pytest use of assert
+  "ISC001", # Implicit string concatenation
 ]
 extend-select = [
-    "I",  # isort
-    # # "C90",  # mccabe
-    # # "N",  # pep8-naming
-    "UP",  # pyupgrade
-    # "S",  # bandit
-    # # "B",  # bugbear
-    "C4",  # flake8-comprehensions
-    # # "DTZ",  # flake8-datetimez
-    "ISC",  # flake8-implicit-str-concat
-    # # "G",  # flake8-logging-format
-    # # "T20",  # print
-    "PT",  # pytest
-    "B006",  # mutable-argument-default
+  "I", # isort
+  # # "C90",  # mccabe
+  # # "N",  # pep8-naming
+  "UP", # pyupgrade
+  # "S",  # bandit
+  # # "B",  # bugbear
+  "C4", # flake8-comprehensions
+  # # "DTZ",  # flake8-datetimez
+  "ISC", # flake8-implicit-str-concat
+  # # "G",  # flake8-logging-format
+  # # "T20",  # print
+  "PT", # pytest
+  "B006", # mutable-argument-default
 ]
