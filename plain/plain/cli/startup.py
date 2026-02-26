@@ -21,12 +21,18 @@ def print_dim(s: str) -> None:
     print("\x1b[0m", end="")
 
 
-print_bold("\n⬣ Welcome to the Plain shell! ⬣\n")
+name = plain.runtime.settings.NAME
+version = plain.runtime.settings.VERSION
+width = len(name) + 1 + len(version) + 2  # space between + padding
+line = "─" * width
+print(f"\n╭{line}╮")
+print(f"│ \033[1m{name}\033[0m \033[2m{version}\033[0m │")
+print(f"╰{line}╯\n")
 
 if shell_import := plain.runtime.settings.SHELL_IMPORT:
     from importlib import import_module
 
-    print_bold(f"Importing {shell_import}")
+    print_bold(f"Importing {shell_import}...")
     module = import_module(shell_import)
 
     if module.__file__:
