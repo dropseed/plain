@@ -62,10 +62,29 @@ def test_markdown_jinja_rendered_via_md_url():
 def test_wildcard_accept_prefers_markdown():
     """With */* accept (agent-friendly), markdown pages serve markdown over HTML."""
     client = Client()
-    response = client.get("/")
+    response = client.get("/", headers={"Accept": "*/*"})
     assert response.status_code == 200
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
     assert b"# Welcome" in response.content
+
+
+def test_html_page_ignores_markdown_accept():
+    """An HTML page should return HTML even when Accept prefers markdown."""
+    client = Client()
+    response = client.get("/about/", headers={"Accept": "text/markdown"})
+    assert response.status_code == 200
+    assert b"About" in response.content
+    assert b"<h1>" in response.content
+
+
+def test_render_plain_skips_jinja():
+    """Pages with render_plain: true should not have Jinja tags processed."""
+    client = Client()
+    response = client.get("/raw.md")
+    assert response.status_code == 200
+    content = response.content.decode()
+    # The raw {{ not_rendered }} should pass through unchanged
+    assert "{{ not_rendered }}" in content
 
 
 def test_markdown_frontmatter_stripped():
