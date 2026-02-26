@@ -27,10 +27,14 @@ When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
 ## Documentation
 
-- `uv run plain docs <package>` — markdown docs for an installed package
-- `uv run plain docs <package> --api` — symbolicated API surface
-- `uv run plain docs <package> --section <name>` — show a specific `##` section
-- `uv run plain docs --list` — all official packages (installed and uninstalled) with descriptions
+- `uv run plain docs <name>` — markdown docs for a package or core module
+- `uv run plain docs <name> --api` — symbolicated API surface
+- `uv run plain docs <name> --section <name>` — show a specific `##` section
+- `uv run plain docs --list` — all available docs with descriptions
+
+Packages: plain, plain-admin, plain-api, plain-auth, plain-cache, plain-code, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-models, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-toolbar, plain-tunnel, plain-vendor
+
+Core modules: agents, assets, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, signals, templates, test, urls, utils, views
 
 Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/path>/README.md`
 

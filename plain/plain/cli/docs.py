@@ -43,6 +43,22 @@ KNOWN_PACKAGES = {
 }
 
 
+def _discover_core_modules() -> dict[str, str]:
+    """Discover core submodules within the plain package that have their own docs."""
+    plain_dir = Path(__file__).resolve().parent.parent
+    modules = {}
+    for readme in sorted(plain_dir.glob("*/README.md")):
+        name = readme.parent.name
+        # Extract description from line 3 (bold subtitle pattern: **Description.**)
+        lines = readme.read_text().split("\n")
+        if len(lines) >= 3:
+            desc = lines[2].strip().strip("*").rstrip(".")
+        else:
+            desc = ""
+        modules[name] = desc
+    return modules
+
+
 def _normalize_module(module: str) -> str:
     """Normalize a module string to dotted form (e.g. plain-models -> plain.models)."""
     module = module.replace("-", ".")
@@ -117,12 +133,18 @@ def _get_section_slugs(content: str) -> list[str]:
 def docs(module: str, api: bool, show_list: bool, section: str) -> None:
     """Show documentation for a package"""
     if show_list:
+        click.echo("Packages:")
         for pip_name in sorted(KNOWN_PACKAGES):
             description = KNOWN_PACKAGES[pip_name]
             dotted = pip_name.replace("-", ".")
             installed = _is_installed(dotted)
             status = " (installed)" if installed else ""
             click.echo(f"  {pip_name}{status} — {description}")
+
+        click.echo()
+        click.echo("Core modules (use as `plain docs <module>`):")
+        for module_name, description in _discover_core_modules().items():
+            click.echo(f"  {module_name} — {description}")
         return
 
     if not module:
