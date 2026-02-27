@@ -465,11 +465,12 @@ dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-admin"
-version = "0.68.1"
+version = "0.69.0"
 source = { editable = "plain-admin" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },
+    { name = "plain-elements" },
     { name = "plain-htmx" },
     { name = "plain-tailwind" },
 ]

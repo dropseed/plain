@@ -1,5 +1,18 @@
 # plain-admin changelog
 
+## [0.69.0](https://github.com/dropseed/plain/releases/plain-admin@0.69.0) (2026-02-26)
+
+### What's changed
+
+- Admin global search is now opt-in — `AdminModelListView.allow_global_search` defaults to `False` instead of `True`, so model views must explicitly set `allow_global_search = True` to appear in global search results ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+- Added `plain admin icons` CLI command for searching available Bootstrap Icons by keyword ([22786347fc](https://github.com/dropseed/plain/commit/22786347fc))
+- Added `plain.elements` as a dependency ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+- Admin index now redirects to the first list view instead of the first searchable view ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+
+### Upgrade instructions
+
+- If you rely on model views appearing in global search, add `allow_global_search = True` to those views.
+
 ## [0.68.1](https://github.com/dropseed/plain/releases/plain-admin@0.68.1) (2026-02-26)
 
 ### What's changed
