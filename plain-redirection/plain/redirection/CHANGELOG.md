@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.31.5](https://github.com/dropseed/plain/releases/plain-redirection@0.31.5) (2026-02-26)
+
+### What's changed
+
+- Removed redundant `allow_global_search = False` from redirect, redirect log, and not-found log admin views — this is now the default in plain-admin ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.31.4](https://github.com/dropseed/plain/releases/plain-redirection@0.31.4) (2026-02-26)
 
 ### What's changed
