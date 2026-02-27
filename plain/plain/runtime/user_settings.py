@@ -165,10 +165,11 @@ class Settings:
 
                 elif setting.startswith(_CUSTOM_SETTINGS_PREFIX):
                     # Accept custom settings prefixed with '{_CUSTOM_SETTINGS_PREFIX}'
+                    annotation = _get_annotation(settings_module, setting)
                     setting_def = SettingDefinition(
                         name=setting,
                         default_value=None,
-                        annotation=None,
+                        annotation=annotation,
                         required=False,
                     )
                     try:
@@ -257,6 +258,15 @@ class Settings:
         return self.get_settings(source="env")
 
 
+def _get_annotation(module: types.ModuleType, setting: str) -> type | None:
+    """Get the resolved type annotation for a setting, handling string annotations."""
+    try:
+        hints = typing.get_type_hints(module, include_extras=True)
+        return hints.get(setting, None)
+    except Exception:
+        return None
+
+
 def _parse_env_value(
     value: str, annotation: type | None, setting_name: str
 ) -> typing.Any:
@@ -314,7 +324,13 @@ class SettingDefinition:
 
     def display_value(self) -> str:
         """Return value for display, masked if secret."""
-        if self.is_secret:
+        if self.is_secret and self.value:
+            if isinstance(self.value, dict):
+                return f"{{******** ({len(self.value)} items)}}"
+            if isinstance(self.value, list):
+                return f"[******** ({len(self.value)} items)]"
+            if isinstance(self.value, tuple):
+                return f"(******** ({len(self.value)} items))"
             return "********"
         return repr(self.value)
 
