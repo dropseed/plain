@@ -261,6 +261,34 @@ def _search_docs(doc_paths: list[Path], pattern: re.Pattern[str]) -> dict[str, s
     return results
 
 
+def _search_api(llm_docs: LLMDocs, pattern: re.Pattern[str]) -> dict[Path, str]:
+    """Search public API symbols for matches.
+
+    Returns a dict of {source_path: symbolicated_output} for files containing
+    matching public symbols.
+    """
+    results: dict[Path, str] = {}
+    for source in llm_docs.sources:
+        file_public_names = {
+            name for (path, name) in llm_docs.public_symbols if path == source
+        }
+        matching_names = {name for name in file_public_names if pattern.search(name)}
+        if not matching_names:
+            continue
+        symbolicated = llm_docs.symbolicate(source, matching_names)
+        if symbolicated:
+            results[source] = symbolicated
+    return results
+
+
+def _display_source_path(source_path: Path) -> str:
+    """Get a display-friendly string for a source file path."""
+    try:
+        return str(LLMDocs.display_path(source_path))
+    except ValueError:
+        return source_path.name
+
+
 def _module_not_found_error(module: str) -> click.UsageError:
     """Build a UsageError for a module that could not be found or is not installed."""
     pip_name = _pip_package_name(module)
@@ -354,17 +382,32 @@ def docs(
         all_docs = _collect_all_doc_paths()
         found = False
         for name, doc_paths in sorted(all_docs.items()):
-            matches = _search_docs(doc_paths, pattern)
-            if matches:
-                found = True
-                click.secho(f"{name}:", bold=True)
-                for section_heading, preview in matches.items():
-                    if section_heading:
-                        heading = click.style(f"## {section_heading}", fg="cyan")
-                        click.echo(f"  {heading} — {preview}")
-                    else:
-                        click.echo(f"  {preview}")
-                click.echo()
+            doc_matches = _search_docs(doc_paths, pattern)
+            api_matches: dict[Path, str] = {}
+            if api:
+                try:
+                    resolved = _resolve_module_paths(_normalize_module(name))
+                    pkg_docs = LLMDocs(resolved)
+                    pkg_docs.load()
+                    api_matches = _search_api(pkg_docs, pattern)
+                except click.UsageError:
+                    pass
+            if not doc_matches and not api_matches:
+                continue
+            found = True
+            click.secho(f"{name}:", bold=True)
+            for section_heading, preview in doc_matches.items():
+                if section_heading:
+                    heading = click.style(f"## {section_heading}", fg="cyan")
+                    click.echo(f"  {heading} — {preview}")
+                else:
+                    click.echo(f"  {preview}")
+            for source_path, symbolicated in api_matches.items():
+                display = _display_source_path(source_path)
+                click.echo(f"  {click.style(display, fg='yellow')}")
+                for line in symbolicated.split("\n"):
+                    click.echo(f"    {line}")
+            click.echo()
         if not found:
             click.echo(f"No results for '{search}'.")
         return
@@ -403,16 +446,24 @@ def docs(
 
     if search:
         pattern = re.compile(re.escape(search), re.IGNORECASE)
-        matches = _search_docs(llm_docs.docs, pattern)
-        if not matches:
+        doc_matches = _search_docs(llm_docs.docs, pattern)
+        api_matches = _search_api(llm_docs, pattern) if api else {}
+        if not doc_matches and not api_matches:
             click.echo(f"No results for '{search}'.")
             return
-        for i, section_heading in enumerate(matches):
+        for i, section_heading in enumerate(doc_matches):
             content = _find_section_content(llm_docs.docs, section_heading)
             if content is not None:
                 if i > 0:
                     click.echo()
                 click.echo(content)
+        for source_path, symbolicated in api_matches.items():
+            if doc_matches:
+                click.echo()
+            display = _display_source_path(source_path)
+            click.secho(f"<Source: {display}>", fg="yellow")
+            click.echo(symbolicated)
+            click.secho(f"</Source: {display}>", fg="yellow")
         return
 
     if section:

@@ -33,15 +33,17 @@ When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 - `uv run plain docs --outline` — section headings for all installed docs
 - `uv run plain docs <name> --outline` — section headings (with `###` subsections) for one module
 - `uv run plain docs --search <term>` — find which modules/sections mention a term (compact, one line per section)
+- `uv run plain docs --search <term> --api` — also search public API symbols (class/function names), not just docs
 
 **Reading** — get full content:
 
 - `uv run plain docs <name>` — full markdown docs
 - `uv run plain docs <name> --section <name>` — one specific `##` section
 - `uv run plain docs <name> --search <term>` — full content of all matching sections in that module
+- `uv run plain docs <name> --search <term> --api` — also include matching API symbols in search results
 - `uv run plain docs <name> --api` — public API surface (classes, functions, signatures)
 
-**Workflow**: Use `--search <term>` to find which module has what you need, then `<name> --search <term>` to get the full sections, or `<name> --section <name>` for a specific one.
+**Workflow**: Use `--search <term>` to find which module has what you need, then `<name> --search <term>` to get the full sections, or `<name> --section <name>` for a specific one. Add `--api` to search if looking for a class or function name that might not appear in docs prose.
 
 Packages: plain, plain-admin, plain-api, plain-auth, plain-cache, plain-code, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-models, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-toolbar, plain-tunnel, plain-vendor
 
