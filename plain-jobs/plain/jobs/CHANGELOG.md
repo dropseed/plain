@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.45.2](https://github.com/dropseed/plain/releases/plain-jobs@0.45.2) (2026-02-26)
+
+### What's changed
+
+- Removed redundant `allow_global_search = False` from job result admin view — this is now the default in plain-admin ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.45.1](https://github.com/dropseed/plain/releases/plain-jobs@0.45.1) (2026-02-26)
 
 ### What's changed
