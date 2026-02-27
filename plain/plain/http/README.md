@@ -15,6 +15,7 @@
     - [Default response headers](#default-response-headers)
 - [Content Security Policy (CSP)](#content-security-policy-csp)
 - [Middleware](#middleware)
+- [Healthcheck](#healthcheck)
 - [Exceptions](#exceptions)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -308,6 +309,22 @@ class TimingMiddleware(HttpMiddleware):
         response.headers["X-Request-Duration"] = f"{duration:.3f}s"
         return response
 ```
+
+## Healthcheck
+
+The `HEALTHCHECK_PATH` setting provides a built-in healthcheck endpoint for load balancers, Kubernetes probes, and PaaS platforms like Railway.
+
+```python
+# app/settings.py
+HEALTHCHECK_PATH = "/up/"
+```
+
+When set, requests to this exact path return a `200` response before any other middleware runs — bypassing host validation, HTTPS redirects, and authentication. This avoids two common issues with health checkers:
+
+1. **ALLOWED_HOSTS rejection** — the health checker uses an internal hostname not in the allowlist
+2. **HTTPS redirect loops** — the health checker sends plain HTTP without proxy headers
+
+By default, `HEALTHCHECK_PATH` is empty (disabled).
 
 ## Exceptions
 

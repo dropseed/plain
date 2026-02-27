@@ -33,6 +33,12 @@ ENV_SETTINGS_PREFIXES: list[str] = ["PLAIN_"]
 # - "192.168.1.0/24" matches IP addresses in that CIDR range
 ALLOWED_HOSTS: list[str] = []
 
+# Path for the built-in healthcheck endpoint.
+# When set, requests to this exact path return a 200 "ok" response
+# before host validation, HTTPS redirect, or any other middleware runs.
+# Example: HEALTHCHECK_PATH = "/up/"
+HEALTHCHECK_PATH: str = ""
+
 # Default headers for all responses.
 # Header values can include {request.attribute} placeholders for dynamic content.
 # Example: "script-src 'nonce-{request.csp_nonce}'" will use the request's nonce.

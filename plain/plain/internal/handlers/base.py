@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 # These middleware classes are always used by Plain.
 BUILTIN_BEFORE_MIDDLEWARE = [
+    "plain.internal.middleware.healthcheck.HealthcheckMiddleware",  # Respond to healthcheck before anything else
     "plain.internal.middleware.hosts.HostValidationMiddleware",  # Validate Host header first
     "plain.internal.middleware.headers.DefaultHeadersMiddleware",  # Runs after response, to set missing headers
     "plain.internal.middleware.https.HttpsRedirectMiddleware",  # Runs before response, to redirect to HTTPS quickly
