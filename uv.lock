@@ -436,7 +436,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.110.1"
+version = "0.111.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -484,6 +484,7 @@ dev = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
 ]

@@ -1,5 +1,20 @@
 # plain changelog
 
+## [0.111.0](https://github.com/dropseed/plain/releases/plain@0.111.0) (2026-02-26)
+
+### What's changed
+
+- Added built-in `HEALTHCHECK_PATH` setting — when set, requests to this exact path return a `200` response before any middleware runs, avoiding ALLOWED_HOSTS rejection and HTTPS redirect loops from health checkers ([2c25ccbadd](https://github.com/dropseed/plain/commit/2c25ccbadd))
+- Fixed test client to handle responses from middleware that bypass URL routing (e.g. healthcheck) — previously missing sessions or unresolvable paths would raise exceptions ([bcd8913f02](https://github.com/dropseed/plain/commit/bcd8913f02))
+- Custom settings (prefixed with `APP_`) now resolve type annotations properly, enabling environment variable parsing for custom settings ([d9fff3223e](https://github.com/dropseed/plain/commit/d9fff3223e))
+- Secret settings now show collection size hints (e.g. `{******** (3 items)}`) instead of a flat `********` for dict, list, and tuple values ([d9fff3223e](https://github.com/dropseed/plain/commit/d9fff3223e))
+- `plain docs --search` now supports `--api` to also search public API symbols ([e3ef3f3d84](https://github.com/dropseed/plain/commit/e3ef3f3d84))
+- `plain docs --section` now matches `###` subsections in addition to `##` sections ([9db0491a3f](https://github.com/dropseed/plain/commit/9db0491a3f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.110.1](https://github.com/dropseed/plain/releases/plain@0.110.1) (2026-02-26)
 
 ### What's changed
