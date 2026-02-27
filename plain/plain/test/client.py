@@ -569,14 +569,23 @@ class Client:
             from plain.auth.requests import get_request_user
 
             client_response.user = get_request_user(client_response.wsgi_request)
-        except ImportError:
+        except Exception:
+            # ImportError if plain.auth not installed, or other exceptions
+            # if session middleware didn't run (e.g. healthcheck)
             pass
 
         # Attach the ResolverMatch instance to the response.
+        # Returns None for paths handled by middleware (e.g. healthcheck)
+        # that don't have a corresponding URL route.
         resolver = get_resolver()
-        client_response.resolver_match = SimpleLazyObject(
-            lambda: resolver.resolve(request["PATH_INFO"]),
-        )
+
+        def _resolve_or_none():
+            try:
+                return resolver.resolve(request["PATH_INFO"])
+            except Exception:
+                return None
+
+        client_response.resolver_match = SimpleLazyObject(_resolve_or_none)
 
         # Update persistent cookie data.
         if client_response.cookies:
