@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.33.2](https://github.com/dropseed/plain/releases/plain-pageviews@0.33.2) (2026-02-26)
+
+### What's changed
+
+- Pageviews admin is no longer included in global search — previously it was searchable by default, now excluded since the admin default changed to opt-in ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.33.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.33.1) (2026-02-26)
 
 ### What's changed
