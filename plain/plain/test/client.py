@@ -11,7 +11,6 @@ from plain.http import QueryDict, RequestHeaders
 from plain.internal.handlers.base import BaseHandler
 from plain.internal.handlers.wsgi import WSGIRequest
 from plain.json import PlainJSONEncoder
-from plain.runtime import settings
 from plain.signals import request_started
 from plain.urls import get_resolver
 from plain.utils.encoding import force_bytes
@@ -293,7 +292,7 @@ class RequestFactory:
             if match:
                 charset = match[1]
             else:
-                charset = settings.DEFAULT_CHARSET
+                charset = "utf-8"
             return force_bytes(data, encoding=charset)
 
     def _encode_json(self, data: Any, content_type: str) -> Any:
@@ -472,7 +471,7 @@ class RequestFactory:
     ) -> WSGIRequest:
         """Construct an arbitrary HTTP request."""
         parsed = urlparse(str(path))  # path can be lazy
-        data = force_bytes(data, settings.DEFAULT_CHARSET)
+        data = force_bytes(data, "utf-8")
         r: dict[str, Any] = {
             "PATH_INFO": self._get_path(parsed),
             "REQUEST_METHOD": method,

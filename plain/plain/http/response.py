@@ -17,7 +17,6 @@ from typing import IO, Any
 from plain import signals
 from plain.http.cookie import sign_cookie_value
 from plain.json import PlainJSONEncoder
-from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.datastructures import CaseInsensitiveMapping
 from plain.utils.encoding import iri_to_uri
@@ -178,7 +177,7 @@ class ResponseBase:
                 # store it back into the _charset for later intentionally, to
                 # allow for the Content-Type to be switched again later.
                 return matched["charset"].replace('"', "")
-        return settings.DEFAULT_CHARSET
+        return "utf-8"
 
     @charset.setter
     def charset(self, value: str) -> None:

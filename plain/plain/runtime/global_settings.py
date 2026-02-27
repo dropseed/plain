@@ -93,9 +93,6 @@ SECRET_KEY_FALLBACKS: Secret[list[str]] = []  # type: ignore[assignment]
 # user time zone.
 TIME_ZONE: str = "UTC"
 
-# Default charset to use for all Response objects, if a MIME type isn't
-# manually specified. It's used to construct the Content-Type header.
-DEFAULT_CHARSET: str = "utf-8"
 
 # MARK: URL Configuration
 

@@ -513,7 +513,7 @@ class QueryDict(MultiValueDict):
     will always return a mutable copy.
 
     Both keys and values set on this class are converted from the given encoding
-    (DEFAULT_CHARSET by default) to str.
+    (UTF-8 by default) to str.
     """
 
     # These are both reset in __init__, but is specified here at the class
@@ -528,7 +528,7 @@ class QueryDict(MultiValueDict):
         encoding: str | None = None,
     ):
         super().__init__()
-        self.encoding = encoding or settings.DEFAULT_CHARSET
+        self.encoding = encoding or "utf-8"
         query_string = query_string or ""
         parse_qsl_kwargs: dict[str, Any] = {
             "keep_blank_values": True,
@@ -579,7 +579,7 @@ class QueryDict(MultiValueDict):
     @property
     def encoding(self) -> str:
         if self._encoding is None:
-            self._encoding = settings.DEFAULT_CHARSET
+            self._encoding = "utf-8"
         return self._encoding
 
     @encoding.setter

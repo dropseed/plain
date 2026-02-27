@@ -109,7 +109,7 @@ class MultiPartParser:
         possible_sizes = [x.chunk_size for x in self._upload_handlers if x.chunk_size]
         self._chunk_size = min([2**31 - 4] + possible_sizes)
 
-        self._encoding = request.encoding or settings.DEFAULT_CHARSET
+        self._encoding = request.encoding or "utf-8"
         self._content_length = content_length
 
     def parse(self) -> tuple[Any, MultiValueDict]:
