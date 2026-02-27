@@ -7,9 +7,12 @@
 
 ## Commands
 
+Always use `./scripts/` commands from the repo root — never run `uv run plain fix`, `uv run plain pre-commit`, etc. directly in the `example/` directory.
+
 | Command                      | Purpose                    |
 | ---------------------------- | -------------------------- |
 | `./scripts/fix`              | Format and lint code       |
+| `./scripts/pre-commit`       | Full pre-commit validation |
 | `./scripts/test [package]`   | Run tests                  |
 | `./scripts/makemigrations`   | Create database migrations |
 | `./scripts/type-check <dir>` | Type check a directory     |
