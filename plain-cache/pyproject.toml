@@ -1,7 +1,7 @@
 [project]
 name = "plain.cache"
 packages = [{ include = "plain" }]
-version = "0.25.3"
+version = "0.25.4"
 description = "A simple database-backed cache for storing JSON-serializable values with optional expiration."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"

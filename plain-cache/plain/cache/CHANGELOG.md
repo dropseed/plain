@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.25.4](https://github.com/dropseed/plain/releases/plain-cache@0.25.4) (2026-02-26)
+
+### What's changed
+
+- Removed redundant `allow_global_search = False` from cache admin views — this is now the default in plain-admin ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.25.3](https://github.com/dropseed/plain/releases/plain-cache@0.25.3) (2026-02-26)
 
 ### What's changed
