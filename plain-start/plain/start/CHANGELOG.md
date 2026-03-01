@@ -1,5 +1,17 @@
 # plain-start changelog
 
+## [0.3.0](https://github.com/dropseed/plain/releases/plain-start@0.3.0) (2026-02-28)
+
+### What's changed
+
+- Support `project_name="."` to scaffold into the current directory instead of creating a subdirectory ([37c934b567f5](https://github.com/dropseed/plain/commit/37c934b567f5))
+- When using `.`, the project name is derived from the current directory name
+- The current directory must be empty when using `.`
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.2](https://github.com/dropseed/plain/releases/plain-start@0.2.2) (2026-02-26)
 
 ### What's changed
