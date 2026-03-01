@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.57.1](https://github.com/dropseed/plain/releases/plain-dev@0.57.1) (2026-02-28)
+
+### What's changed
+
+- Fixed dev server crash on macOS where Tailwind would exit immediately after compiling instead of watching for changes, bringing down all other processes ([5b7db81a43da](https://github.com/dropseed/plain/commit/5b7db81a43da))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.57.0](https://github.com/dropseed/plain/releases/plain-dev@0.57.0) (2026-02-28)
 
 ### What's changed
