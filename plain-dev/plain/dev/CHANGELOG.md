@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.57.0](https://github.com/dropseed/plain/releases/plain-dev@0.57.0) (2026-02-28)
+
+### What's changed
+
+- `plain dev` no longer prompts for sudo to modify `/etc/hosts` on systems where `*.localhost` already resolves to loopback (e.g., modern macOS and Linux with systemd-resolved) ([a97e244091](https://github.com/dropseed/plain/commit/a97e244091))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.56.0](https://github.com/dropseed/plain/releases/plain-dev@0.56.0) (2026-02-25)
 
 ### What's changed
