@@ -254,6 +254,15 @@ class DevProcess(ProcessManager):
 
     def modify_hosts_file(self) -> None:
         """Modify the hosts file to map the custom domain to 127.0.0.1."""
+        # Check if the hostname already resolves to loopback (e.g., *.localhost on modern OS)
+        try:
+            results = socket.getaddrinfo(self.hostname, None)
+            addrs = {r[4][0] for r in results}
+            if addrs <= {"127.0.0.1", "::1"}:
+                return
+        except socket.gaierror:
+            pass  # Doesn't resolve; fall through to modify hosts file
+
         entry_identifier = "# Added by plain"
         hosts_entry = f"127.0.0.1 {self.hostname}  {entry_identifier}"
 
