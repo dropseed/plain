@@ -32,13 +32,29 @@ TEMPLATE_DB_PORT = "54321"
 )
 def cli(project_name: str, starter_type: str, no_install: bool) -> None:
     """Bootstrap a new Plain project from starter templates"""
-    project_path = Path.cwd() / project_name
+    if project_name == ".":
+        project_path = Path.cwd()
+        display_name = project_path.name
+    else:
+        project_path = Path.cwd() / project_name
+        display_name = project_name
 
-    if project_path.exists():
-        click.secho(
-            f"Error: Directory '{project_name}' already exists", fg="red", err=True
-        )
-        raise click.Abort()
+    if project_name == ".":
+        if any(project_path.iterdir()):
+            click.secho(
+                "Error: Current directory is not empty",
+                fg="red",
+                err=True,
+            )
+            raise click.Abort()
+    else:
+        if project_path.exists():
+            click.secho(
+                f"Error: Directory '{project_name}' already exists",
+                fg="red",
+                err=True,
+            )
+            raise click.Abort()
 
     # Clone the starter repository
     repo_url = STARTER_REPOS[starter_type]
@@ -46,7 +62,7 @@ def cli(project_name: str, starter_type: str, no_install: bool) -> None:
 
     try:
         subprocess.run(
-            ["git", "clone", "--depth", "1", repo_url, project_name],
+            ["git", "clone", "--depth", "1", repo_url, str(project_path)],
             check=True,
             capture_output=True,
         )
@@ -78,12 +94,12 @@ def cli(project_name: str, starter_type: str, no_install: bool) -> None:
         content = pyproject_path.read_text()
         content = re.sub(
             r'^name\s*=\s*["\'].*?["\']',
-            f'name = "{project_name}"',
+            f'name = "{display_name}"',
             content,
             count=1,
             flags=re.MULTILINE,
         )
-        content = content.replace(TEMPLATE_CONTAINER_NAME, f"{project_name}-postgres")
+        content = content.replace(TEMPLATE_CONTAINER_NAME, f"{display_name}-postgres")
         content = content.replace(TEMPLATE_DB_PORT, db_port)
         pyproject_path.write_text(content)
 
@@ -122,11 +138,12 @@ def cli(project_name: str, starter_type: str, no_install: bool) -> None:
     # Success message
     click.echo()
     click.secho(
-        f"✓ Project '{project_name}' created successfully!", fg="green", bold=True
+        f"✓ Project '{display_name}' created successfully!", fg="green", bold=True
     )
     click.echo()
     click.secho("Next steps:", bold=True)
-    click.secho(f"  cd {project_name}")
+    if project_name != ".":
+        click.secho(f"  cd {project_name}")
     if no_install:
         click.secho("  ./scripts/install")
     click.secho("  uv run plain dev")
