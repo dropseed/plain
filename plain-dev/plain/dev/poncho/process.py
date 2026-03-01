@@ -97,6 +97,7 @@ class Popen(subprocess.Popen):
     def __init__(self, cmd: str, **kwargs: Any) -> None:
         start_new_session = kwargs.pop("start_new_session", True)
         options = {
+            "stdin": subprocess.PIPE,
             "stdout": subprocess.PIPE,
             "stderr": subprocess.PIPE,
             "shell": True,
