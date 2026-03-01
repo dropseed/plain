@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.112.0](https://github.com/dropseed/plain/releases/plain@0.112.0) (2026-02-28)
+
+### What's changed
+
+- Removed `DEFAULT_CHARSET` setting — the charset is now always `utf-8`, which was already the default. All references in `QueryDict`, `ResponseBase`, multipart parsing, and test utilities now use the hardcoded value directly ([901e6b3c49](https://github.com/dropseed/plain/commit/901e6b3c49))
+
+### Upgrade instructions
+
+- If you were customizing `DEFAULT_CHARSET` in your settings, remove it. UTF-8 is now always used.
+
 ## [0.111.0](https://github.com/dropseed/plain/releases/plain@0.111.0) (2026-02-26)
 
 ### What's changed
