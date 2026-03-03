@@ -199,7 +199,7 @@ Plain includes several built-in commands:
 | `plain check`         | Run core validation checks               |
 | `plain shell`         | Interactive Python shell                 |
 | `plain run <script>`  | Execute a Python script with app context |
-| `plain server`        | Production-ready WSGI server             |
+| `plain server`        | Production-ready HTTP server             |
 | `plain preflight`     | Validation checks before deployment      |
 | `plain create <name>` | Create a new local package               |
 | `plain settings`      | View current settings                    |

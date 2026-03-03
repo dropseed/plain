@@ -82,7 +82,7 @@ class Config:
     @property
     def forwarder_headers(self) -> list[str]:
         """
-        Header names that proxies can use to override WSGI environment.
+        Header names that proxies can use to override request attributes.
         Default: ['SCRIPT_NAME', 'PATH_INFO']
         """
         return ["SCRIPT_NAME", "PATH_INFO"]

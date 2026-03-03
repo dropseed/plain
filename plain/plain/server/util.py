@@ -25,8 +25,7 @@ from typing import Any
 
 # Server and Date aren't technically hop-by-hop
 # headers, but they are in the purview of the
-# origin server which the WSGI spec says we should
-# act like. So we drop them and add our own.
+# origin server, so we drop them and add our own.
 #
 # In the future, concatenation server header values
 # might be better, but nothing else does it and
@@ -263,19 +262,6 @@ def has_fileno(obj: Any) -> bool:
         return False
 
     return True
-
-
-def make_fail_app(msg: str | bytes) -> Callable[..., Any]:
-    msg = to_bytestring(msg)
-
-    def app(environ: Any, start_response: Any) -> list[bytes]:
-        start_response(
-            "500 Internal Server Error",
-            [("Content-Type", "text/plain"), ("Content-Length", str(len(msg)))],
-        )
-        return [msg]
-
-    return app
 
 
 def make_fail_handler(msg: str | bytes) -> Any:

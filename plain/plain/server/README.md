@@ -1,13 +1,12 @@
 # Server
 
-**A production-ready WSGI HTTP server based on gunicorn.**
+**A production-ready HTTP server based on gunicorn.**
 
 - [Overview](#overview)
 - [Workers and threads](#workers-and-threads)
 - [Configuration options](#configuration-options)
 - [Environment variables](#environment-variables)
 - [Signals](#signals)
-- [Using a different WSGI server](#using-a-different-wsgi-server)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -91,21 +90,6 @@ The server responds to UNIX signals for process management.
 | `SIGTTIN` | Increase worker count by 1       |
 | `SIGTTOU` | Decrease worker count by 1       |
 | `SIGUSR1` | Reopen log files                 |
-
-## Using a different WSGI server
-
-You can use any WSGI-compatible server instead of the built-in one. Plain provides a standard WSGI application interface at `plain.wsgi:app`.
-
-```bash
-# Using uvicorn
-uvicorn plain.wsgi:app --port 8000
-
-# Using waitress
-waitress-serve --port=8000 plain.wsgi:app
-
-# Using gunicorn directly
-gunicorn plain.wsgi:app --workers 4
-```
 
 ## FAQs
 

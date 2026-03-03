@@ -154,7 +154,7 @@ assert "abc123" in response.content.decode()
 
 ## RequestFactory
 
-Use [`RequestFactory`](./client.py#RequestFactory) to create request objects directly without going through the WSGI handler. This is useful for testing views in isolation.
+Use [`RequestFactory`](./client.py#RequestFactory) to create request objects directly without going through the middleware stack. This is useful for testing views in isolation.
 
 ```python
 from plain.test import RequestFactory
