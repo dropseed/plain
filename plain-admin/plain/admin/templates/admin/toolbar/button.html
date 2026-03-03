@@ -18,4 +18,33 @@
         {{ object_class_name }}
     </a>
     {% endif %}
+
+    <a
+        id="toolbar-preflight-link"
+        href="{{ url('admin:preflight') }}"
+        class="relative hidden items-center ml-1 hover:text-white text-white/50"
+        title="Preflight checks"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-3.5 h-3.5" viewBox="0 0 16 16">
+            <path fill-rule="evenodd" d="M8 0c-.69 0-1.843.265-2.928.56-1.11.3-2.229.655-2.887.87a1.54 1.54 0 0 0-1.044 1.262c-.596 4.477.787 7.795 2.465 9.99a11.8 11.8 0 0 0 2.517 2.453c.386.273.744.482 1.048.625.28.132.581.24.829.24s.548-.108.829-.24a7 7 0 0 0 1.048-.625 11.8 11.8 0 0 0 2.517-2.453c1.678-2.195 3.061-5.513 2.465-9.99a1.54 1.54 0 0 0-1.044-1.263 63 63 0 0 0-2.887-.87C9.843.266 8.69 0 8 0m2.146 5.146a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-2-2a.5.5 0 0 1 .708-.708L6.5 8.793z"/>
+        </svg>
+        <span
+            id="toolbar-preflight-badge"
+            class="absolute -top-1 -right-1.5 min-w-[12px] h-3 px-0.5 text-[8px] font-bold leading-3 text-center text-white rounded-full"
+        ></span>
+    </a>
 </div>
+<script nonce="{{ request.csp_nonce }}">
+window._preflightStatus = window._preflightStatus || fetch("{{ url('admin:preflight') }}", {headers: {"Accept": "application/json"}}).then(r => r.json());
+window._preflightStatus.then(data => {
+    const total = data.errors + data.warnings;
+    if (total > 0) {
+        const link = document.getElementById("toolbar-preflight-link");
+        const badge = document.getElementById("toolbar-preflight-badge");
+        badge.textContent = total;
+        badge.classList.add(data.errors > 0 ? "bg-red-500" : "bg-amber-500");
+        link.classList.remove("hidden");
+        link.classList.add("inline-flex");
+    }
+}).catch(() => {});
+</script>

@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from plain.http import NotFoundError404, RedirectResponse, Response
+from plain.http import JsonResponse, NotFoundError404, RedirectResponse, Response
 from plain.models import QuerySet
+from plain.packages import packages_registry
+from plain.preflight import run_checks
 from plain.runtime import settings as plain_settings
 
 from .models import PinnedNavItem
@@ -15,6 +17,11 @@ from .views.objects import AdminListView
 from .views.registry import registry
 
 MAX_PINNED_ITEMS = 6
+
+# Module-level cache for preflight results.
+# Populated on first request and updated when the full preflight page is viewed.
+# Valid for the lifetime of the process since settings/DB structure don't change without restart.
+_preflight_cache: dict[str, int] | None = None
 
 
 class AdminIndexView(AdminView):
@@ -206,6 +213,98 @@ class SettingDetailView(AdminView):
         context = super().get_template_context()
         context["title"] = name
         context["setting"] = _setting_to_dict(name, defn)
+        return context
+
+
+class PreflightView(AdminView):
+    """Run and display preflight check results.
+
+    Returns JSON status counts when Accept: application/json is set (used by
+    the header/toolbar badge fetch). HTML requests always run fresh checks;
+    JSON requests serve from the module-level cache when available.
+    """
+
+    template_name = "admin/preflight.html"
+    title = "Preflight"
+    description = "System checks that verify your app configuration is correct."
+    nav_section = None
+
+    def _run_checks(self) -> tuple[list[dict], int, int, int]:
+        """Run all preflight checks and return (checks, passed, warnings, errors)."""
+        global _preflight_cache
+
+        packages_registry.autodiscover_modules("preflight", include_app=True)
+
+        include_deploy = not plain_settings.DEBUG
+
+        checks = []
+        passed_count = 0
+        warning_count = 0
+        error_count = 0
+
+        for check_class, name, results in run_checks(
+            include_deploy_checks=include_deploy
+        ):
+            issues = []
+            for result in results:
+                if result.is_silenced():
+                    continue
+                issues.append(
+                    {
+                        "fix": result.fix,
+                        "id": result.id,
+                        "warning": result.warning,
+                    }
+                )
+
+            has_errors = any(not issue["warning"] for issue in issues)
+            if issues:
+                if has_errors:
+                    error_count += 1
+                else:
+                    warning_count += 1
+            else:
+                passed_count += 1
+
+            checks.append(
+                {
+                    "name": name,
+                    "passed": not issues,
+                    "has_errors": has_errors,
+                    "issues": issues,
+                }
+            )
+
+        _preflight_cache = {"errors": error_count, "warnings": warning_count}
+
+        return checks, passed_count, warning_count, error_count
+
+    def get(self) -> Response | JsonResponse:
+        if (
+            self.request.get_preferred_type("text/html", "application/json")
+            == "application/json"
+        ):
+            if _preflight_cache is None:
+                self._run_checks()
+
+            return JsonResponse(_preflight_cache)
+
+        return super().get()
+
+    def get_template_context(self) -> dict[str, Any]:
+        checks, passed_count, warning_count, error_count = self._run_checks()
+
+        total_count = passed_count + warning_count + error_count
+        pass_percent = (passed_count / total_count * 100) if total_count else 100
+
+        context = super().get_template_context()
+        context["checks"] = checks
+        context["passed_count"] = passed_count
+        context["warning_count"] = warning_count
+        context["error_count"] = error_count
+        context["total_count"] = total_count
+        context["pass_percent"] = pass_percent
+        context["include_deploy"] = not plain_settings.DEBUG
         return context
 
 
