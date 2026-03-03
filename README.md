@@ -116,12 +116,14 @@ Plain is opinionated. These are the technologies it's built on:
 29 first-party packages, one framework. All with built-in docs.
 
 **Foundation:**
+
 - [plain](https://plainframework.com/docs/plain/plain/) — core framework
 - [plain.models](https://plainframework.com/docs/plain-models/plain/models/) — database ORM
 - [plain.auth](https://plainframework.com/docs/plain-auth/plain/auth/) — authentication
 - [plain.sessions](https://plainframework.com/docs/plain-sessions/plain/sessions/) — session storage
 
 **Backend:**
+
 - [plain.api](https://plainframework.com/docs/plain-api/plain/api/) — REST APIs
 - [plain.jobs](https://plainframework.com/docs/plain-jobs/plain/jobs/) — background jobs
 - [plain.email](https://plainframework.com/docs/plain-email/plain/email/) — sending email
@@ -130,6 +132,7 @@ Plain is opinionated. These are the technologies it's built on:
 - [plain.vendor](https://plainframework.com/docs/plain-vendor/plain/vendor/) — vendored dependencies
 
 **Frontend:**
+
 - [plain.htmx](https://plainframework.com/docs/plain-htmx/plain/htmx/) — dynamic UI
 - [plain.tailwind](https://plainframework.com/docs/plain-tailwind/plain/tailwind/) — CSS framework
 - [plain.elements](https://plainframework.com/docs/plain-elements/plain/elements/) — HTML components
@@ -137,6 +140,7 @@ Plain is opinionated. These are the technologies it's built on:
 - [plain.esbuild](https://plainframework.com/docs/plain-esbuild/plain/esbuild/) — JS bundling
 
 **Development:**
+
 - [plain.dev](https://plainframework.com/docs/plain-dev/plain/dev/) — local server
 - [plain.pytest](https://plainframework.com/docs/plain-pytest/plain/pytest/) — testing helpers
 - [plain.toolbar](https://plainframework.com/docs/plain-toolbar/plain/toolbar/) — debug toolbar
@@ -145,6 +149,7 @@ Plain is opinionated. These are the technologies it's built on:
 - [plain.start](https://plainframework.com/docs/plain-start/plain/start/) — project starter
 
 **Production:**
+
 - [plain.admin](https://plainframework.com/docs/plain-admin/plain/admin/) — database admin
 - [plain.observer](https://plainframework.com/docs/plain-observer/plain/observer/) — request tracing
 - [plain.flags](https://plainframework.com/docs/plain-flags/plain/flags/) — feature flags
@@ -153,6 +158,7 @@ Plain is opinionated. These are the technologies it's built on:
 - [plain.support](https://plainframework.com/docs/plain-support/plain/support/) — support tickets
 
 **Users:**
+
 - [plain.passwords](https://plainframework.com/docs/plain-passwords/plain/passwords/) — password auth
 - [plain.oauth](https://plainframework.com/docs/plain-oauth/plain/oauth/) — social login
 - [plain.loginlink](https://plainframework.com/docs/plain-loginlink/plain/loginlink/) — magic links
