@@ -1,6 +1,6 @@
 # Plain
 
-**A full-stack Python framework, redesigned for coding agents.**
+**The full-stack Python framework designed for humans and agents.**
 
 ## Get started
 
