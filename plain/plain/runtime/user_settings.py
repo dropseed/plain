@@ -248,6 +248,8 @@ class Settings:
         self._setup()
         result = []
         for name, defn in sorted(self._settings.items()):
+            if name.startswith("_"):
+                continue
             if source is not None and defn.source != source:
                 continue
             result.append((name, defn))

@@ -1,12 +1,17 @@
 """Built-in admin views for core functionality."""
 
+from __future__ import annotations
+
 import json
 from typing import Any
 
-from plain.http import RedirectResponse, Response
+from plain.http import NotFoundError404, RedirectResponse, Response
+from plain.models import QuerySet
+from plain.runtime import settings as plain_settings
 
 from .models import PinnedNavItem
 from .views.base import AdminView
+from .views.objects import AdminListView
 from .views.registry import registry
 
 MAX_PINNED_ITEMS = 6
@@ -126,6 +131,82 @@ class ReorderPinnedView(AdminView):
 
         # No redirect needed for drag-and-drop reorder (called via fetch)
         return Response("OK")
+
+
+def _setting_to_dict(name: str, defn: Any) -> dict[str, Any]:
+    return {
+        "name": name,
+        "source": defn.source,
+        "value": defn.display_value(),
+        "env_var_name": defn.env_var_name,
+        "is_secret": defn.is_secret,
+    }
+
+
+class SettingsView(AdminListView):
+    title = "App Settings"
+    description = (
+        "All framework and app settings with their current values and sources."
+    )
+    nav_section = None
+    fields = ["name", "source", "value"]
+
+    @classmethod
+    def get_view_url(cls, obj: Any = None) -> str:
+        return "/admin/settings/"
+
+    search_fields = ["name"]
+    filters = ["default", "explicit", "env"]
+    page_size = 100
+
+    _FIELD_TEMPLATES = {
+        "name": ["admin/values/setting_name.html"],
+        "source": ["admin/values/setting_source.html"],
+        "value": ["admin/values/setting_value.html"],
+    }
+
+    def get_initial_objects(self) -> list[dict[str, Any]]:
+        return [
+            _setting_to_dict(name, defn) for name, defn in plain_settings.get_settings()
+        ]
+
+    def filter_objects(
+        self, objects: list[Any] | QuerySet[Any]
+    ) -> list[Any] | QuerySet[Any]:
+        if self.filter:
+            return [obj for obj in objects if obj["source"] == self.filter]
+        return objects
+
+    def format_field_value(self, obj: Any, field: str, value: Any) -> Any:
+        if field == "source" and obj.get("env_var_name"):
+            return obj["env_var_name"]
+        return value
+
+    def get_detail_url(self, obj: Any) -> str:
+        return f"/admin/settings/{obj['name']}/"
+
+    def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
+        if field in self._FIELD_TEMPLATES:
+            return self._FIELD_TEMPLATES[field]
+        return super().get_field_value_template(obj, field, value)
+
+
+class SettingDetailView(AdminView):
+    template_name = "admin/setting_detail.html"
+    parent_view_class = SettingsView
+    nav_section = None
+
+    def get_template_context(self) -> dict[str, Any]:
+        name = self.url_kwargs["name"]
+        settings_map = dict(plain_settings.get_settings())
+        defn = settings_map.get(name)
+        if defn is None:
+            raise NotFoundError404()
+
+        context = super().get_template_context()
+        context["title"] = name
+        context["setting"] = _setting_to_dict(name, defn)
+        return context
 
 
 class StyleGuideView(AdminView):

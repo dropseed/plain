@@ -6,6 +6,8 @@ from .builtin_views import (
     AdminSearchView,
     PinNavView,
     ReorderPinnedView,
+    SettingDetailView,
+    SettingsView,
     StyleGuideView,
     UnpinNavView,
 )
@@ -20,6 +22,8 @@ class AdminRouter(Router):
     urls = [
         path("search/", AdminSearchView, name="search"),
         path("style/", StyleGuideView, name="style"),
+        path("settings/", SettingsView, name="settings"),
+        path("settings/<name>/", SettingDetailView, name="setting_detail"),
         path("logout/", LogoutView, name="logout"),
         path("_/pin/", PinNavView, name="pin"),
         path("_/unpin/", UnpinNavView, name="unpin"),

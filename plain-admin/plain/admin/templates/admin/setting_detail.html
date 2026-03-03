@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+
+{% use_elements %}
+
+{% block content %}
+
+<div class="card">
+    <section>
+        <dl>
+            <div class="flex gap-8 py-1.5">
+                <dt class="w-40 flex-shrink-0 text-black/50">Name</dt>
+                <dd class="min-w-0">
+                    <span class="font-mono text-sm">{{ setting.name }}</span>
+                </dd>
+            </div>
+            <div class="flex gap-8 py-1.5">
+                <dt class="w-40 flex-shrink-0 text-black/50">Source</dt>
+                <dd class="min-w-0">
+                    <span
+                        data-source="{{ setting.source }}"
+                        class="inline-flex items-center px-1.5 py-0.5 text-xs rounded-md
+                               data-[source=default]:bg-stone-100 data-[source=default]:text-stone-400
+                               data-[source=explicit]:bg-stone-200/70 data-[source=explicit]:text-stone-600
+                               data-[source=env]:bg-amber-50 data-[source=env]:text-amber-800 data-[source=env]:font-mono"
+                    >{{ setting.env_var_name or setting.source }}</span>
+                </dd>
+            </div>
+            <div class="flex gap-8 py-1.5">
+                <dt class="w-40 flex-shrink-0 text-black/50">Value</dt>
+                <dd class="min-w-0">
+                    <span
+                        data-secret="{{ setting.is_secret }}"
+                        class="font-mono text-sm break-all whitespace-pre-wrap data-[secret=True]:text-stone-400 data-[secret=True]:italic"
+                    >{{ setting.value }}</span>
+                </dd>
+            </div>
+        </dl>
+    </section>
+</div>
+
+{% endblock %}
