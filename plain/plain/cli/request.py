@@ -92,7 +92,7 @@ def request(
             raise SystemExit(1)
 
         # Create test client
-        client = Client(SERVER_NAME="localhost")
+        client = Client(headers={"Host": "localhost"})
 
         # If user_id provided, force login
         if user_id:
@@ -170,7 +170,7 @@ def request(
         click.echo(f"  Status: {response.status_code}")
 
         # Request ID
-        click.echo(f"  Request ID: {response.wsgi_request.unique_id}")
+        click.echo(f"  Request ID: {response.request.unique_id}")
 
         # User
         if getattr(response, "user", None):

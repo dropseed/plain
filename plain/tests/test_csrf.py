@@ -144,15 +144,7 @@ def test_origin_host_comparison(origin, expected_allowed, expected_reason_contai
 
     # Configure request based on the origin
     request_kwargs: dict[str, Any] = {"headers": {"Origin": origin}}
-    if origin == "https://testserver:443":
-        request_kwargs.update(
-            {
-                "SERVER_NAME": "testserver",
-                "SERVER_PORT": "443",
-                "secure": True,
-            }
-        )
-    elif origin == "https://testserver":
+    if origin in ("https://testserver:443", "https://testserver"):
         request_kwargs["secure"] = True
 
     request = rf.post("/test/", **request_kwargs)

@@ -6,7 +6,7 @@ import secrets
 import uuid
 from collections.abc import Iterator
 from functools import cached_property
-from io import BytesIO
+from io import BytesIO, IOBase
 from itertools import chain
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
@@ -34,6 +34,47 @@ from .exceptions import (
 )
 
 _T = TypeVar("_T")
+
+
+class LimitedStream(IOBase):
+    """
+    Wrap another stream to disallow reading it past a number of bytes.
+
+    Based on the implementation from werkzeug.wsgi.LimitedStream
+    See https://github.com/pallets/werkzeug/blob/dbf78f67/src/werkzeug/wsgi.py#L828
+    """
+
+    def __init__(self, stream: Any, limit: int) -> None:
+        self._read = stream.read
+        self._readline = stream.readline
+        self._pos = 0
+        self.limit = limit
+
+    def read(self, size: int = -1, /) -> bytes:
+        _pos = self._pos
+        limit = self.limit
+        if _pos >= limit:
+            return b""
+        if size == -1 or size is None:
+            size = limit - _pos
+        else:
+            size = min(size, limit - _pos)
+        data = self._read(size)
+        self._pos += len(data)
+        return data
+
+    def readline(self, size: int | None = -1, /) -> bytes:
+        _pos = self._pos
+        limit = self.limit
+        if _pos >= limit:
+            return b""
+        if size is None or size == -1:
+            size = limit - _pos
+        else:
+            size = min(size, limit - _pos)
+        line = self._readline(size)
+        self._pos += len(line)
+        return line
 
 
 class UnreadablePostError(OSError):

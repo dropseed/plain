@@ -119,7 +119,7 @@ The [`ClientResponse`](./client.py#ClientResponse) wrapper provides access to:
 - `content` - Response body as bytes
 - `headers` - Response headers
 - `cookies` - Cookies set by the response
-- `wsgi_request` - The original request object
+- `request` - The original request object
 - `resolver_match` - URL resolver match information
 - `redirect_chain` - List of redirects when using `follow=True`
 

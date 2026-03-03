@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import codecs
 from functools import cached_property
-from io import IOBase
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from plain import signals
-from plain.http import FileResponse, QueryDict, Request, parse_cookie
+from plain.http import FileResponse, LimitedStream, QueryDict, Request, parse_cookie
 from plain.internal.handlers import base
 from plain.utils.http import parse_header_parameters
 from plain.utils.regex_helper import _lazy_re_compile
@@ -39,47 +38,6 @@ def _extract_headers_from_environ(environ: dict[str, Any]) -> dict[str, str]:
             name = key.replace("_", "-").title()
             headers[name] = value
     return headers
-
-
-class LimitedStream(IOBase):
-    """
-    Wrap another stream to disallow reading it past a number of bytes.
-
-    Based on the implementation from werkzeug.wsgi.LimitedStream
-    See https://github.com/pallets/werkzeug/blob/dbf78f67/src/werkzeug/wsgi.py#L828
-    """
-
-    def __init__(self, stream: Any, limit: int) -> None:
-        self._read = stream.read
-        self._readline = stream.readline
-        self._pos = 0
-        self.limit = limit
-
-    def read(self, size: int = -1, /) -> bytes:
-        _pos = self._pos
-        limit = self.limit
-        if _pos >= limit:
-            return b""
-        if size == -1 or size is None:
-            size = limit - _pos
-        else:
-            size = min(size, limit - _pos)
-        data = self._read(size)
-        self._pos += len(data)
-        return data
-
-    def readline(self, size: int | None = -1, /) -> bytes:
-        _pos = self._pos
-        limit = self.limit
-        if _pos >= limit:
-            return b""
-        if size is None or size == -1:
-            size = limit - _pos
-        else:
-            size = min(size, limit - _pos)
-        line = self._readline(size)
-        self._pos += len(line)
-        return line
 
 
 class WSGIRequest(Request):

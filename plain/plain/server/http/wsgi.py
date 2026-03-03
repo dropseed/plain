@@ -18,9 +18,8 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import quote, unquote_to_bytes
 
 import plain.runtime
-from plain.http import FileResponse
+from plain.http import FileResponse, LimitedStream
 from plain.http import Request as HttpRequest
-from plain.internal.handlers.wsgi import LimitedStream
 from plain.utils.http import parse_header_parameters
 
 from .. import util

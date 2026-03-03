@@ -12,6 +12,7 @@ from .exceptions import (
 )
 from .middleware import HttpMiddleware
 from .request import (
+    LimitedStream,
     QueryDict,
     RawPostDataException,
     Request,
@@ -42,6 +43,7 @@ __all__ = [
     "QueryDict",
     "RawPostDataException",
     "UnreadablePostError",
+    "LimitedStream",
     # Response
     "Response",
     "ResponseBase",
