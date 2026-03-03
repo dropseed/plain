@@ -94,3 +94,80 @@ def test_markdown_frontmatter_stripped():
     content = response.content.decode()
     assert "---" not in content
     assert "title:" not in content
+
+
+def test_paired_html_page():
+    """Paired .html page should serve HTML at its normal URL."""
+    client = Client()
+    response = client.get("/paired/")
+    assert response.status_code == 200
+    assert b"Paired HTML" in response.content
+    assert b"<h1>" in response.content
+
+
+def test_paired_markdown_url():
+    """Paired .md file should be served at .md URL."""
+    client = Client()
+    response = client.get("/paired.md")
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
+    assert b"# Paired Markdown" in response.content
+
+
+def test_paired_accept_header():
+    """Paired page with Accept: text/markdown should return the companion markdown."""
+    client = Client()
+    response = client.get("/paired/", headers={"Accept": "text/markdown"})
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
+    assert b"# Paired Markdown" in response.content
+    assert b"<h1>" not in response.content
+
+
+def test_paired_accept_header_uses_companion_context():
+    """Companion markdown served via Accept header should render with its own page context."""
+    client = Client()
+    response = client.get("/paired/", headers={"Accept": "text/markdown"})
+    content = response.content.decode()
+    # Should use the companion .md's frontmatter (title: "Paired Page"),
+    # not the HTML page's default title
+    assert "Title is Paired Page." in content
+    assert "{{ page.title }}" not in content
+
+
+def test_paired_html_ignores_html_accept():
+    """Paired page with Accept: text/html should return the HTML version."""
+    client = Client()
+    response = client.get("/paired/", headers={"Accept": "text/html"})
+    assert response.status_code == 200
+    assert b"Paired HTML" in response.content
+    assert b"<h1>" in response.content
+
+
+def test_paired_html_has_vary_header():
+    """Paired HTML responses should include Vary: Accept for correct caching."""
+    client = Client()
+    response = client.get("/paired/")
+    assert response.status_code == 200
+    assert response.headers.get("Vary") == "Accept"
+
+
+def test_unpaired_html_no_vary_header():
+    """Unpaired HTML pages should not include Vary: Accept."""
+    client = Client()
+    response = client.get("/about/")
+    assert response.status_code == 200
+    assert "Vary" not in response.headers
+
+
+def test_paired_serve_markdown_disabled(monkeypatch):
+    """Paired page should return HTML when PAGES_SERVE_MARKDOWN is False, even with Accept: text/markdown."""
+    from plain.runtime import settings
+
+    monkeypatch.setattr(settings, "PAGES_SERVE_MARKDOWN", False)
+
+    client = Client()
+    response = client.get("/paired/", headers={"Accept": "text/markdown"})
+    assert response.status_code == 200
+    assert b"Paired HTML" in response.content
+    assert b"<h1>" in response.content

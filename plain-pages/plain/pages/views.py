@@ -10,6 +10,7 @@ from plain.http import (
     Response,
 )
 from plain.runtime import settings
+from plain.utils.cache import patch_vary_headers
 from plain.views import TemplateView, View
 
 from .exceptions import PageNotFoundError, RedirectPageError
@@ -39,22 +40,48 @@ class PageViewMixin:
 class PageView(PageViewMixin, TemplateView):
     template_name = "page.html"
 
+    def _markdown_response(self, page: Page) -> Response:
+        """Build a plain-text markdown response with Vary header."""
+        context = {**self.get_template_context(), "page": page}
+        page.set_template_context(context)
+        markdown_content = page.rendered_source(context)
+        response = Response(markdown_content, content_type="text/plain; charset=utf-8")
+        patch_vary_headers(response, ["Accept"])
+        return response
+
+    def _prefers_markdown(self, *types: str) -> bool:
+        """Check if the request prefers markdown over the given types."""
+        preferred = self.request.get_preferred_type(*types)
+        return preferred in ("text/markdown", "text/plain")
+
     def get(self) -> Response:
         """Check Accept header and serve markdown if requested."""
-        if self.page.is_markdown() and settings.PAGES_SERVE_MARKDOWN:
-            preferred = self.request.get_preferred_type(
-                "text/markdown", "text/plain", "text/html"
-            )
-            if preferred in ("text/markdown", "text/plain"):
-                context = self.get_template_context()
-                markdown_content = self.page.rendered_source(context)
-                response = Response(
-                    markdown_content, content_type="text/plain; charset=utf-8"
-                )
-                response.headers["Vary"] = "Accept"
-                return response
+        if not settings.PAGES_SERVE_MARKDOWN:
+            return super().get()
 
-        return super().get()
+        # Standalone markdown page -- markdown is preferred by default.
+        # Type order matters: first type listed wins ties, so markdown
+        # types come first here to default to raw markdown.
+        if self.page.is_markdown():
+            if self._prefers_markdown("text/markdown", "text/plain", "text/html"):
+                return self._markdown_response(self.page)
+            response = super().get()
+            patch_vary_headers(response, ["Accept"])
+            return response
+
+        # HTML page -- only serve markdown if a companion exists and is explicitly preferred.
+        # Type order matters: text/html first so HTML wins ties.
+        companion = pages_registry.get_markdown_companion(self.page.get_url_name())
+        if not companion:
+            return super().get()
+
+        if self._prefers_markdown("text/html", "text/markdown", "text/plain"):
+            return self._markdown_response(companion)
+
+        # HTML response varies by Accept when a companion exists
+        response = super().get()
+        patch_vary_headers(response, ["Accept"])
+        return response
 
     def get_template_names(self) -> list[str]:
         """
