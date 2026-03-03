@@ -17,26 +17,22 @@ if TYPE_CHECKING:
 
 
 class ServerApplication:
-    """
-    Plain's server application.
-
-    This class provides the interface for running the WSGI server.
-    """
+    """Plain's server application."""
 
     def __init__(self, cfg: Config) -> None:
         self.cfg: Config = cfg
         self.callable: Any = None
 
     def load(self) -> Any:
-        """Load the WSGI application."""
-        # Import locally to avoid circular dependencies and allow
-        # the WSGI module to handle Plain runtime setup
-        from plain.wsgi import app
+        """Load the request handler."""
+        import plain.runtime
+        from plain.internal.handlers.wsgi import WSGIHandler
 
-        return app
+        plain.runtime.setup()
+        return WSGIHandler()
 
-    def wsgi(self) -> Any:
-        """Get the WSGI application."""
+    def handler(self) -> Any:
+        """Get the request handler."""
         if self.callable is None:
             self.callable = self.load()
         return self.callable

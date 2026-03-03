@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from plain.urls import ResolverMatch
 
 from plain.exceptions import ImproperlyConfigured
-from plain.http.cookie import unsign_cookie_value
+from plain.http.cookie import parse_cookie, unsign_cookie_value
 from plain.http.multipartparser import (
     MultiPartParser,
 )
@@ -62,8 +62,6 @@ class Request:
     resolver_match: ResolverMatch | None
     content_type: str | None
     content_params: dict[str, str] | None
-    query_params: QueryDict
-    cookies: dict[str, str]
     path: str
     path_info: str
     unique_id: str
@@ -104,6 +102,14 @@ class Request:
     @cached_property
     def headers(self) -> RequestHeaders:
         return RequestHeaders(self._headers)
+
+    @cached_property
+    def query_params(self) -> QueryDict:
+        return QueryDict(self._query_string, encoding=self.encoding)
+
+    @cached_property
+    def cookies(self) -> dict[str, str]:
+        return parse_cookie(self._headers.get("Cookie", ""))
 
     @cached_property
     def csp_nonce(self) -> str:

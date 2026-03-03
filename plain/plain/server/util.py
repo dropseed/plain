@@ -278,6 +278,19 @@ def make_fail_app(msg: str | bytes) -> Callable[..., Any]:
     return app
 
 
+def make_fail_handler(msg: str | bytes) -> Any:
+    """Create a handler that returns a 500 error for all requests."""
+    msg = to_bytestring(msg)
+
+    class FailHandler:
+        def get_response(self, request: Any) -> Any:
+            from plain.http import Response
+
+            return Response(msg, status_code=500, content_type="text/plain")
+
+    return FailHandler()
+
+
 def split_request_uri(uri: str) -> urllib.parse.SplitResult:
     if uri.startswith("//"):
         # When the path starts with //, urlsplit considers it as a

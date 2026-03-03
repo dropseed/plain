@@ -6,6 +6,7 @@ from __future__ import annotations
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
+import codecs
 import io
 import logging
 import os
@@ -14,8 +15,13 @@ import socket
 import sys
 from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import quote, unquote_to_bytes
 
 import plain.runtime
+from plain.http import FileResponse
+from plain.http import Request as HttpRequest
+from plain.internal.handlers.wsgi import LimitedStream
+from plain.utils.http import parse_header_parameters
 
 from .. import util
 from .errors import ConfigurationProblem, InvalidHeader, InvalidHeaderName
@@ -23,7 +29,7 @@ from .message import TOKEN_RE
 
 if TYPE_CHECKING:
     from ..config import Config
-    from .message import Request
+    from .message import Request as ServerRequest
 
 # Send files in at most 1GB blocks as some operating systems can have problems
 # with sending files in blocks over 2GB.
@@ -92,7 +98,9 @@ def base_environ(cfg: Config) -> dict[str, Any]:
     }
 
 
-def default_environ(req: Request, sock: socket.socket, cfg: Config) -> dict[str, Any]:
+def default_environ(
+    req: ServerRequest, sock: socket.socket, cfg: Config
+) -> dict[str, Any]:
     env = base_environ(cfg)
     env.update(
         {
@@ -110,7 +118,7 @@ def default_environ(req: Request, sock: socket.socket, cfg: Config) -> dict[str,
 
 
 def create(
-    req: Request,
+    req: ServerRequest,
     sock: socket.socket,
     client: str | bytes | tuple[str, int],
     server: str | tuple[str, int],
@@ -205,8 +213,138 @@ def create(
     return resp, environ
 
 
+def create_request(
+    req: ServerRequest,
+    sock: socket.socket,
+    client: str | bytes | tuple[str, int],
+    server: str | tuple[str, int],
+    cfg: Config,
+) -> HttpRequest:
+    """Build a plain.http.Request directly from the server's parsed HTTP message."""
+    request = HttpRequest()
+
+    # Extract headers from server message (list of (UPPER_NAME, value) tuples)
+    headers: dict[str, str] = {}
+    host = None
+    script_name = os.environ.get("SCRIPT_NAME", "")
+
+    for hdr_name, hdr_value in req.headers:
+        if hdr_name == "EXPECT":
+            if hdr_value.lower() == "100-continue":
+                sock.send(b"HTTP/1.1 100 Continue\r\n\r\n")
+        elif hdr_name == "HOST":
+            host = hdr_value
+        elif hdr_name == "SCRIPT_NAME":
+            script_name = hdr_value
+
+        # Convert to standard header name (Title-Case)
+        name = hdr_name.replace("_", "-").title()
+        # Handle duplicate headers by joining with comma
+        if name in headers:
+            headers[name] = f"{headers[name]},{hdr_value}"
+        else:
+            headers[name] = hdr_value
+
+    request.method = (req.method or "GET").upper()
+    request._headers = headers
+    request._query_string = req.query or ""
+    request._scheme = req.scheme
+
+    # Remote address
+    if isinstance(client, str):
+        request.remote_addr = client
+    elif isinstance(client, bytes):
+        request.remote_addr = client.decode()
+    else:
+        request.remote_addr = client[0]
+
+    # Server name/port
+    server_name, server_port = _resolve_server_address(server, host, req.scheme)
+    request.server_name = server_name
+    request.server_port = server_port
+
+    # Path
+    raw_path = req.path or ""
+    if script_name:
+        if not raw_path.startswith(script_name):
+            raise ConfigurationProblem(
+                f"Request path {raw_path!r} does not start with SCRIPT_NAME {script_name!r}"
+            )
+        raw_path = raw_path[len(script_name) :]
+
+    # Decode path: percent-decode then handle broken UTF-8
+    path_bytes = unquote_to_bytes(raw_path)
+    path_info = _decode_path(path_bytes) or "/"
+
+    request.path_info = path_info
+    request.path = "{}/{}".format(
+        script_name.rstrip("/"), path_info.replace("/", "", 1)
+    )
+
+    # Content type and encoding
+    content_type_header = headers.get("Content-Type", "")
+    request.content_type, request.content_params = parse_header_parameters(
+        content_type_header
+    )
+    if "charset" in request.content_params:
+        try:
+            codecs.lookup(request.content_params["charset"])
+        except LookupError:
+            pass
+        else:
+            request.encoding = request.content_params["charset"]
+
+    # Body stream
+    try:
+        content_length = int(headers.get("Content-Length") or 0)
+    except (ValueError, TypeError):
+        content_length = 0
+    request._stream = LimitedStream(req.body, content_length)
+    request._read_started = False
+
+    return request
+
+
+def _resolve_server_address(
+    server: str | tuple[str, int],
+    host: str | None,
+    scheme: str,
+) -> tuple[str, str]:
+    """Resolve server name and port from the server address and Host header."""
+    if isinstance(server, str):
+        parts = server.split(":")
+        if len(parts) == 1:
+            # unix socket
+            if host:
+                host_parts = host.split(":")
+                if len(host_parts) == 1:
+                    default_port = (
+                        "443" if scheme == "https" else "80" if scheme == "http" else ""
+                    )
+                    return host_parts[0], default_port
+                return host_parts[0], host_parts[1]
+            return parts[0], ""
+        return parts[0], parts[1]
+    return str(server[0]), str(server[1])
+
+
+def _decode_path(path_bytes: bytes) -> str:
+    """Decode percent-decoded path bytes to a UTF-8 string.
+
+    Handles broken UTF-8 by repercent-encoding invalid sequences.
+    """
+    while True:
+        try:
+            return path_bytes.decode()
+        except UnicodeDecodeError as e:
+            repercent = quote(path_bytes[e.start : e.end], safe=b"/#%[]=:;$&()+,!?*@'~")
+            path_bytes = (
+                path_bytes[: e.start] + repercent.encode() + path_bytes[e.end :]
+            )
+
+
 class Response:
-    def __init__(self, req: Request, sock: socket.socket, cfg: Config) -> None:
+    def __init__(self, req: ServerRequest, sock: socket.socket, cfg: Config) -> None:
         self.req = req
         self.sock = sock
         self.version = "plain"
@@ -413,6 +551,35 @@ class Response:
         else:
             for item in respiter:
                 self.write(item)
+
+    def write_response(self, http_response: Any) -> None:
+        """Write a plain.http.ResponseBase directly to the socket."""
+        status = f"{http_response.status_code} {http_response.reason_phrase}"
+        response_headers = [
+            *((k, v) for k, v in http_response.headers.items() if v is not None),
+            *(
+                ("Set-Cookie", c.output(header=""))
+                for c in http_response.cookies.values()
+            ),
+        ]
+
+        self.start_response(status, response_headers)
+
+        if (
+            isinstance(http_response, FileResponse)
+            and http_response.file_to_stream is not None
+        ):
+            file_wrapper = FileWrapper(
+                http_response.file_to_stream, http_response.block_size
+            )
+            # Patch close so the response gets properly cleaned up
+            http_response.file_to_stream.close = http_response.close
+            self.write_file(file_wrapper)
+        else:
+            for chunk in http_response:
+                self.write(chunk)
+
+        self.close()
 
     def close(self) -> None:
         if not self.headers_sent:

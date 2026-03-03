@@ -28,6 +28,8 @@ from threading import RLock
 from types import FrameType
 from typing import TYPE_CHECKING, Any
 
+from plain import signals
+
 from .. import http, sock, util
 from ..http import wsgi
 from . import base
@@ -348,14 +350,16 @@ class ThreadWorker(base.Worker):
         return (False, conn)
 
     def handle_request(self, req: Any, conn: TConn) -> bool:
-        environ: dict[str, Any] = {}
         resp: wsgi.Response | None = None
         try:
             request_start = datetime.now()
-            resp, environ = wsgi.create(
+
+            # Build Request directly from parsed HTTP message
+            http_request = wsgi.create_request(
                 req, conn.sock, conn.client, conn.server, self.cfg
             )
-            environ["wsgi.multithread"] = True
+
+            resp = wsgi.Response(req, conn.sock, self.cfg)
             self.nr += 1
             if self.nr >= self.max_requests:
                 if self.alive:
@@ -368,20 +372,16 @@ class ThreadWorker(base.Worker):
             elif len(self._keep) >= self.max_keepalived:
                 resp.force_close()
 
-            respiter = self.wsgi(environ, resp.start_response)
-            try:
-                if isinstance(respiter, environ["wsgi.file_wrapper"]):
-                    resp.write_file(respiter)
-                else:
-                    for item in respiter:
-                        resp.write(item)
+            signals.request_started.send(sender=self.__class__, request=http_request)
+            http_response = self.handler.get_response(http_request)
 
-                resp.close()
+            try:
+                resp.write_response(http_response)
             finally:
                 request_time = datetime.now() - request_start
-                self.log.access(resp, req, environ, request_time)
-                if hasattr(respiter, "close"):
-                    respiter.close()
+                self.log.access(resp, req, request_time)
+                if hasattr(http_response, "close"):
+                    http_response.close()
 
             if resp.should_close():
                 self.log.debug("Closing connection.")

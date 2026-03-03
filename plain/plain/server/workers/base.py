@@ -34,7 +34,7 @@ from ..http.errors import (
     ObsoleteFolding,
     UnsupportedTransferCoding,
 )
-from ..http.wsgi import Response, default_environ
+from ..http.wsgi import Response
 from .workertmp import WorkerTmp
 
 if TYPE_CHECKING:
@@ -154,7 +154,7 @@ class Worker(ABC):
 
             self.reloader = Reloader(callback=changed, watch_html=True)
 
-        self.load_wsgi()
+        self.load_handler()
         if self.reloader:
             self.reloader.start()
 
@@ -162,14 +162,14 @@ class Worker(ABC):
         self.booted = True
         self.run()
 
-    def load_wsgi(self) -> None:
+    def load_handler(self) -> None:
         try:
-            self.wsgi = self.app.wsgi()
+            self.handler = self.app.handler()
         except SyntaxError:
             if not self.cfg.reload:
                 raise
 
-            self.log.exception("Error loading WSGI application")
+            self.log.exception("Error loading application")
 
             # fix from PR #1228
             # storing the traceback into exc_tb will create a circular reference.
@@ -180,7 +180,7 @@ class Worker(ABC):
 
                 tb_string = io.StringIO()
                 traceback.print_tb(exc_tb, file=tb_string)
-                self.wsgi = util.make_fail_app(tb_string.getvalue())
+                self.handler = util.make_fail_handler(tb_string.getvalue())
             finally:
                 del exc_tb
 
@@ -286,13 +286,10 @@ class Worker(ABC):
 
         if req is not None:
             request_time = datetime.now() - request_start
-            environ = default_environ(req, client, self.cfg)
-            environ["REMOTE_ADDR"] = addr[0]
-            environ["REMOTE_PORT"] = str(addr[1])
             resp = Response(req, client, self.cfg)
             resp.status = f"{status_int} {reason}"
             resp.response_length = len(mesg)
-            self.log.access(resp, req, environ, request_time)
+            self.log.access(resp, req, request_time)
 
         try:
             util.write_error(client, status_int, reason, mesg)
