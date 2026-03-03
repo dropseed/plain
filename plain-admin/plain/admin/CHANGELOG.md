@@ -1,5 +1,18 @@
 # plain-admin changelog
 
+## [0.70.0](https://github.com/dropseed/plain/releases/plain-admin@0.70.0) (2026-03-03)
+
+### What's changed
+
+- Added **Settings view** — browse all framework and app settings with their values, sources, and environment variable names. Includes list view with search/filter and detail view for each setting ([7bd0064bdc](https://github.com/dropseed/plain/commit/7bd0064bdc))
+- Added **Preflight checks view** — run and display all preflight checks with a summary card, pass/warn/error counts, and expandable issue details ([58e62380dd](https://github.com/dropseed/plain/commit/58e62380dd))
+- Added async preflight badge to the admin header and toolbar that shows warning/error counts, fetched via JSON endpoint with a module-level cache ([58e62380dd](https://github.com/dropseed/plain/commit/58e62380dd))
+- Fixed breadcrumb separator (`/`) only appearing when an object detail was present — now shows correctly between parent views ([e1fc1909bb](https://github.com/dropseed/plain/commit/e1fc1909bb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.69.0](https://github.com/dropseed/plain/releases/plain-admin@0.69.0) (2026-02-26)
 
 ### What's changed
