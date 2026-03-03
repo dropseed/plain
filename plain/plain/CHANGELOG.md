@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.112.1](https://github.com/dropseed/plain/releases/plain@0.112.1) (2026-03-03)
+
+### What's changed
+
+- `settings.get_settings()` now skips internal settings whose names start with `_` ([7bd0064bdc](https://github.com/dropseed/plain/commit/7bd0064bdc))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.112.0](https://github.com/dropseed/plain/releases/plain@0.112.0) (2026-02-28)
 
 ### What's changed
