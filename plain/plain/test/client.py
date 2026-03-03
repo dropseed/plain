@@ -7,7 +7,7 @@ from io import BytesIO, IOBase
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
 
-from plain.http import QueryDict, RequestHeaders
+from plain.http import QueryDict, headers_to_wsgi_environ
 from plain.internal.handlers.base import BaseHandler
 from plain.internal.handlers.wsgi import WSGIRequest
 from plain.json import PlainJSONEncoder
@@ -244,7 +244,7 @@ class RequestFactory:
         self.cookies: SimpleCookie[str] = SimpleCookie()
         self.errors = BytesIO()
         if headers:
-            self.defaults.update(RequestHeaders.to_wsgi_names(headers))
+            self.defaults.update(headers_to_wsgi_environ(headers))
 
     def _base_environ(self, **request: Any) -> dict[str, Any]:
         """
@@ -487,7 +487,7 @@ class RequestFactory:
                 }
             )
         if headers:
-            extra.update(RequestHeaders.to_wsgi_names(headers))
+            extra.update(headers_to_wsgi_environ(headers))
         r.update(extra)
         # If QUERY_STRING is absent or empty, we want to extract it from the URL.
         if not r.get("QUERY_STRING"):

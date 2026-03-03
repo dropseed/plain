@@ -20,6 +20,26 @@ if TYPE_CHECKING:
 
 _slashes_re = _lazy_re_compile(rb"/+")
 
+_HTTP_PREFIX = "HTTP_"
+_UNPREFIXED_HEADERS = {"CONTENT_TYPE", "CONTENT_LENGTH"}
+
+
+def _extract_headers_from_environ(environ: dict[str, Any]) -> dict[str, str]:
+    """Extract HTTP headers from a WSGI environ dict into a plain dict.
+
+    Converts WSGI-style header names (HTTP_ACCEPT, CONTENT_TYPE) to
+    standard HTTP header names (Accept, Content-Type).
+    """
+    headers: dict[str, str] = {}
+    for key, value in environ.items():
+        if key.startswith(_HTTP_PREFIX):
+            name = key[len(_HTTP_PREFIX) :].replace("_", "-").title()
+            headers[name] = value
+        elif key in _UNPREFIXED_HEADERS:
+            name = key.replace("_", "-").title()
+            headers[name] = value
+    return headers
+
 
 class LimitedStream(IOBase):
     """
@@ -82,10 +102,19 @@ class WSGIRequest(Request):
         self.path = "{}/{}".format(
             script_name.rstrip("/"), path_info.replace("/", "", 1)
         )
-        self.environ = environ
         self.environ["PATH_INFO"] = path_info
         self.environ["SCRIPT_NAME"] = script_name
         self.method = environ["REQUEST_METHOD"].upper()
+
+        # Populate base Request attributes from environ
+        self.server_name = environ.get("SERVER_NAME", "")
+        self.server_port = environ.get("SERVER_PORT", "")
+        self.remote_addr = environ.get("REMOTE_ADDR", "")
+        self._query_string = environ.get("QUERY_STRING", "")
+        self._scheme = environ.get("wsgi.url_scheme", "http")
+
+        # Extract headers from environ (HTTP_* keys + CONTENT_TYPE/CONTENT_LENGTH)
+        self._headers = _extract_headers_from_environ(environ)
 
         # Set content_type, content_params, and encoding
         self.content_type, self.content_params = parse_header_parameters(
@@ -113,12 +142,8 @@ class WSGIRequest(Request):
                 del state["environ"][attr]
         return state
 
-    def _get_scheme(self) -> str:
-        return self.environ.get("wsgi.url_scheme", "http")
-
     @cached_property
     def query_params(self) -> QueryDict:
-        # The WSGI spec says 'QUERY_STRING' may be absent.
         raw_query_string = get_bytes_from_wsgi(self.environ, "QUERY_STRING", "")
         return QueryDict(raw_query_string, encoding=self.encoding)
 

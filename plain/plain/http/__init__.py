@@ -17,6 +17,7 @@ from .request import (
     Request,
     RequestHeaders,
     UnreadablePostError,
+    headers_to_wsgi_environ,
 )
 from .response import (
     BadHeaderError,
@@ -61,4 +62,6 @@ __all__ = [
     "TooManyFieldsSentError400",
     "TooManyFilesSentError400",
     "RequestDataTooBigError400",
+    # WSGI helpers (used by test client)
+    "headers_to_wsgi_environ",
 ]

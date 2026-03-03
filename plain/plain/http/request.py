@@ -64,10 +64,17 @@ class Request:
     content_params: dict[str, str] | None
     query_params: QueryDict
     cookies: dict[str, str]
-    environ: dict[str, Any]
     path: str
     path_info: str
     unique_id: str
+
+    # Server/connection attributes populated by subclasses or request creators
+    server_name: str
+    server_port: str
+    remote_addr: str
+    _query_string: str
+    _scheme: str
+    _headers: dict[str, str]
 
     def __init__(self):
         # A unique ID we can use to trace this request
@@ -96,7 +103,7 @@ class Request:
 
     @cached_property
     def headers(self) -> RequestHeaders:
-        return RequestHeaders(self.environ)
+        return RequestHeaders(self._headers)
 
     @cached_property
     def csp_nonce(self) -> str:
@@ -157,8 +164,8 @@ class Request:
         elif http_host := self.headers.get("Host"):
             host = http_host
         else:
-            # Reconstruct the host using the algorithm from PEP 333.
-            host = self.environ["SERVER_NAME"]
+            # Reconstruct the host from server_name/port.
+            host = self.server_name
             server_port = self.port
             if server_port != ("443" if self.is_https() else "80"):
                 host = f"{host}:{server_port}"
@@ -172,7 +179,7 @@ class Request:
         ):
             port = xff_port
         else:
-            port = self.environ["SERVER_PORT"]
+            port = self.server_port
         return str(port)
 
     @cached_property
@@ -188,18 +195,18 @@ class Request:
         if settings.HTTP_X_FORWARDED_FOR:
             if xff := self.headers.get("X-Forwarded-For"):
                 return xff.split(",")[0].strip()
-        return self.environ["REMOTE_ADDR"]
+        return self.remote_addr
 
     @property
     def query_string(self) -> str:
         """Return the raw query string from the request URL."""
-        return self.environ.get("QUERY_STRING", "")
+        return self._query_string
 
     @property
     def content_length(self) -> int:
         """Return the Content-Length header value, or 0 if not provided."""
         try:
-            return int(self.environ.get("CONTENT_LENGTH") or 0)
+            return int(self._headers.get("Content-Length") or 0)
         except (ValueError, TypeError):
             return 0
 
@@ -278,11 +285,8 @@ class Request:
         return iri_to_uri(location) or ""
 
     def _get_scheme(self) -> str:
-        """
-        Hook for subclasses like WSGIRequest to implement. Return 'http' by
-        default.
-        """
-        return "http"
+        """Return the URL scheme for the request."""
+        return self._scheme
 
     @property
     def scheme(self) -> str:
@@ -462,43 +466,36 @@ class Request:
 
 
 class RequestHeaders(CaseInsensitiveMapping):
-    HTTP_PREFIX = "HTTP_"
-    # PEP 333 gives two headers which aren't prepended with HTTP_.
-    UNPREFIXED_HEADERS = {"CONTENT_TYPE", "CONTENT_LENGTH"}
-
-    def __init__(self, environ: dict[str, Any]):
-        headers = {}
-        for header, value in environ.items():
-            name = self.parse_header_name(header)
-            if name:
-                headers[name] = value
-        super().__init__(headers)
+    def __init__(self, headers: dict[str, str]):
+        # Normalize header names to Title-Case
+        normalized = {}
+        for name, value in headers.items():
+            normalized[name.replace("_", "-").title()] = value
+        super().__init__(normalized)
 
     def __getitem__(self, key: str) -> str:
         """Allow header lookup using underscores in place of hyphens."""
         return super().__getitem__(key.replace("_", "-"))
 
-    @classmethod
-    def parse_header_name(cls, header: str) -> str | None:
-        if header.startswith(cls.HTTP_PREFIX):
-            header = header.removeprefix(cls.HTTP_PREFIX)
-        elif header not in cls.UNPREFIXED_HEADERS:
-            return None
-        return header.replace("_", "-").title()
 
-    @classmethod
-    def to_wsgi_name(cls, header: str) -> str:
-        header = header.replace("-", "_").upper()
-        if header in cls.UNPREFIXED_HEADERS:
-            return header
-        return f"{cls.HTTP_PREFIX}{header}"
+# WSGI environ conversion helpers (used by test client and WSGIRequest)
+_WSGI_UNPREFIXED_HEADERS = {"CONTENT_TYPE", "CONTENT_LENGTH"}
 
-    @classmethod
-    def to_wsgi_names(cls, headers: dict[str, Any]) -> dict[str, Any]:
-        return {
-            cls.to_wsgi_name(header_name): value
-            for header_name, value in headers.items()
-        }
+
+def headers_to_wsgi_environ(headers: dict[str, str]) -> dict[str, str]:
+    """Convert standard HTTP header names to WSGI environ keys.
+
+    Example: {"Content-Type": "text/html"} -> {"CONTENT_TYPE": "text/html"}
+             {"Accept": "text/html"} -> {"HTTP_ACCEPT": "text/html"}
+    """
+    result: dict[str, str] = {}
+    for name, value in headers.items():
+        key = name.replace("-", "_").upper()
+        if key in _WSGI_UNPREFIXED_HEADERS:
+            result[key] = value
+        else:
+            result[f"HTTP_{key}"] = value
+    return result
 
 
 class QueryDict(MultiValueDict):
