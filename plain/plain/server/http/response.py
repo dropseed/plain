@@ -12,12 +12,10 @@ import logging
 import os
 import re
 import socket
-import sys
 from collections.abc import Callable, Iterator
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote_to_bytes
 
-import plain.runtime
 from plain.http import FileResponse, LimitedStream
 from plain.http import Request as HttpRequest
 from plain.utils.http import parse_header_parameters
@@ -53,163 +51,6 @@ class FileWrapper:
         if data:
             return data
         raise IndexError
-
-
-class WSGIErrorsWrapper(io.RawIOBase):
-    def __init__(self, cfg: Config) -> None:
-        # There is no public __init__ method for RawIOBase so
-        # we don't need to call super() in the __init__ method.
-        # pylint: disable=super-init-not-called
-        errorlog = logging.getLogger("plain.server.error")
-        handlers = errorlog.handlers
-        self.streams: list[Any] = []
-
-        if cfg.errorlog == "-":
-            self.streams.append(sys.stderr)
-            handlers = handlers[1:]
-
-        for h in handlers:
-            if hasattr(h, "stream"):
-                self.streams.append(h.stream)
-
-    def write(self, data: str | bytes) -> None:  # type: ignore[override]
-        for stream in self.streams:
-            try:
-                stream.write(data)
-            except UnicodeError:
-                if isinstance(data, str):
-                    stream.write(data.encode("UTF-8"))
-                else:
-                    stream.write(data)
-            stream.flush()
-
-
-def base_environ(cfg: Config) -> dict[str, Any]:
-    return {
-        "wsgi.errors": WSGIErrorsWrapper(cfg),
-        "wsgi.version": (1, 0),
-        "wsgi.multithread": False,
-        "wsgi.multiprocess": (cfg.workers > 1),
-        "wsgi.run_once": False,
-        "wsgi.file_wrapper": FileWrapper,
-        "wsgi.input_terminated": True,
-        "SERVER_SOFTWARE": f"plain/{plain.runtime.__version__}",
-    }
-
-
-def default_environ(
-    req: ServerRequest, sock: socket.socket, cfg: Config
-) -> dict[str, Any]:
-    env = base_environ(cfg)
-    env.update(
-        {
-            "wsgi.input": req.body,
-            "plain.server.socket": sock,
-            "REQUEST_METHOD": req.method,
-            "QUERY_STRING": req.query,
-            "RAW_URI": req.uri,
-            "SERVER_PROTOCOL": "HTTP/{}".format(
-                ".".join([str(v) for v in req.version])
-            ),
-        }
-    )
-    return env
-
-
-def create(
-    req: ServerRequest,
-    sock: socket.socket,
-    client: str | bytes | tuple[str, int],
-    server: str | tuple[str, int],
-    cfg: Config,
-) -> tuple[Response, dict[str, Any]]:
-    resp = Response(req, sock, cfg)
-
-    # set initial environ
-    environ = default_environ(req, sock, cfg)
-
-    # default variables
-    host = None
-    script_name = os.environ.get("SCRIPT_NAME", "")
-
-    # add the headers to the environ
-    for hdr_name, hdr_value in req.headers:
-        if hdr_name == "EXPECT":
-            # handle expect
-            if hdr_value.lower() == "100-continue":
-                sock.send(b"HTTP/1.1 100 Continue\r\n\r\n")
-        elif hdr_name == "HOST":
-            host = hdr_value
-        elif hdr_name == "SCRIPT_NAME":
-            script_name = hdr_value
-        elif hdr_name == "CONTENT-TYPE":
-            environ["CONTENT_TYPE"] = hdr_value
-            continue
-        elif hdr_name == "CONTENT-LENGTH":
-            environ["CONTENT_LENGTH"] = hdr_value
-            continue
-
-        # do not change lightly, this is a common source of security problems
-        # RFC9110 Section 17.10 discourages ambiguous or incomplete mappings
-        key = "HTTP_" + hdr_name.replace("-", "_")
-        if key in environ:
-            hdr_value = f"{environ[key]},{hdr_value}"
-        environ[key] = hdr_value
-
-    # set the url scheme
-    environ["wsgi.url_scheme"] = req.scheme
-
-    # set the REMOTE_* keys in environ
-    # authors should be aware that REMOTE_HOST and REMOTE_ADDR
-    # may not qualify the remote addr:
-    # http://www.ietf.org/rfc/rfc3875
-    if isinstance(client, str):
-        environ["REMOTE_ADDR"] = client
-    elif isinstance(client, bytes):
-        environ["REMOTE_ADDR"] = client.decode()
-    else:
-        environ["REMOTE_ADDR"] = client[0]
-        environ["REMOTE_PORT"] = str(client[1])
-
-    # handle the SERVER_*
-    # Normally only the application should use the Host header but since the
-    # WSGI spec doesn't support unix sockets, we are using it to create
-    # viable SERVER_* if possible.
-    server_parts: list[str | int]
-    if isinstance(server, str):
-        server_parts = cast(list[str | int], server.split(":"))
-        if len(server_parts) == 1:
-            # unix socket
-            if host:
-                server_parts = cast(list[str | int], host.split(":"))
-                if len(server_parts) == 1:
-                    if req.scheme == "http":
-                        server_parts.append(80)
-                    elif req.scheme == "https":
-                        server_parts.append(443)
-                    else:
-                        server_parts.append("")
-            else:
-                # no host header given which means that we are not behind a
-                # proxy, so append an empty port.
-                server_parts.append("")
-    else:
-        server_parts = list(server)
-    environ["SERVER_NAME"] = str(server_parts[0])
-    environ["SERVER_PORT"] = str(server_parts[1])
-
-    # set the path and script name
-    path_info: str = req.path or ""
-    if script_name:
-        if not path_info.startswith(script_name):
-            raise ConfigurationProblem(
-                f"Request path {path_info!r} does not start with SCRIPT_NAME {script_name!r}"
-            )
-        path_info = path_info[len(script_name) :]
-    environ["PATH_INFO"] = util.unquote_to_wsgi_str(path_info)
-    environ["SCRIPT_NAME"] = script_name
-
-    return resp, environ
 
 
 def create_request(

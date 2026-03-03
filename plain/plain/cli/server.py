@@ -120,7 +120,7 @@ def server(
     max_requests: int,
     pidfile: str | None,
 ) -> None:
-    """Production-ready WSGI server"""
+    """Production-ready HTTP server"""
     from plain.runtime import settings
 
     # Show settings loaded from environment

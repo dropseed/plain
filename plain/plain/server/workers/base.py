@@ -34,7 +34,7 @@ from ..http.errors import (
     ObsoleteFolding,
     UnsupportedTransferCoding,
 )
-from ..http.wsgi import Response
+from ..http.response import Response
 from .workertmp import WorkerTmp
 
 if TYPE_CHECKING:

@@ -290,7 +290,7 @@ class URLResolver:
                         text_candidate_subs[k] = str(v)
                 if not match:
                     continue
-                # WSGI provides decoded URLs, without %xx escapes, and the URL
+                # The server provides decoded URLs, without %xx escapes, and the URL
                 # resolver operates on such URLs. First substitute arguments
                 # without quoting to build a decoded URL and look for a match.
                 # Then, if we have a match, redo the substitution with quoted

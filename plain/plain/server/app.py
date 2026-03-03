@@ -26,10 +26,12 @@ class ServerApplication:
     def load(self) -> Any:
         """Load the request handler."""
         import plain.runtime
-        from plain.internal.handlers.wsgi import WSGIHandler
+        from plain.internal.handlers.base import BaseHandler
 
         plain.runtime.setup()
-        return WSGIHandler()
+        handler = BaseHandler()
+        handler.load_middleware()
+        return handler
 
     def handler(self) -> Any:
         """Get the request handler."""

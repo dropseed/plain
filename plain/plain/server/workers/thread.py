@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 from plain import signals
 
 from .. import http, sock, util
-from ..http import wsgi
+from ..http import response as server_response
 from . import base
 
 if TYPE_CHECKING:
@@ -350,16 +350,16 @@ class ThreadWorker(base.Worker):
         return (False, conn)
 
     def handle_request(self, req: Any, conn: TConn) -> bool:
-        resp: wsgi.Response | None = None
+        resp: server_response.Response | None = None
         try:
             request_start = datetime.now()
 
             # Build Request directly from parsed HTTP message
-            http_request = wsgi.create_request(
+            http_request = server_response.create_request(
                 req, conn.sock, conn.client, conn.server, self.cfg
             )
 
-            resp = wsgi.Response(req, conn.sock, self.cfg)
+            resp = server_response.Response(req, conn.sock, self.cfg)
             self.nr += 1
             if self.nr >= self.max_requests:
                 if self.alive:

@@ -26,51 +26,18 @@ import plain.runtime  # noqa: E402
 
 plain.runtime.setup()
 
-from collections.abc import Iterable  # noqa: E402
-from io import BytesIO  # noqa: E402
-from typing import cast  # noqa: E402
-
-from plain.internal.handlers.wsgi import WSGIHandler  # noqa: E402
-
-
-def create_environ(path="/"):
-    """Create WSGI environ for a GET request."""
-    return {
-        "REQUEST_METHOD": "GET",
-        "PATH_INFO": path,
-        "QUERY_STRING": "",
-        "SERVER_NAME": "testserver",
-        "SERVER_PORT": "443",
-        "SERVER_PROTOCOL": "HTTP/1.1",
-        "SCRIPT_NAME": "",
-        "REMOTE_ADDR": "127.0.0.1",
-        "wsgi.version": (1, 0),
-        "wsgi.url_scheme": "https",
-        "wsgi.input": BytesIO(b""),
-        "wsgi.errors": None,
-        "wsgi.multiprocess": True,
-        "wsgi.multithread": False,
-        "wsgi.run_once": False,
-    }
-
-
-def start_response(status, headers):
-    """Minimal WSGI start_response."""
-    pass
+from plain.test import Client  # noqa: E402
 
 
 def main():
-    handler = WSGIHandler()
-    environ = create_environ()
+    client = Client()
 
     print("Warmup request...")
-    list(cast(Iterable[bytes], handler(environ.copy(), start_response)))
+    client.get("/")
 
     print("Running 100 requests for profiling...")
     for i in range(100):
-        env = environ.copy()
-        env["wsgi.input"] = BytesIO(b"")
-        list(cast(Iterable[bytes], handler(env, start_response)))
+        client.get("/")
 
     print("Done!")
 

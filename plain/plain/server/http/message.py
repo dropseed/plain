@@ -160,7 +160,7 @@ class Message:
             # X-Forwarded-For: 2001:db8::ha:cc:ed
             # X_Forwarded_For: 127.0.0.1,::1
             # HTTP_X_FORWARDED_FOR = 2001:db8::ha:cc:ed,127.0.0.1,::1
-            # Only modify after fixing *ALL* header transformations; network to wsgi env
+            # Only modify after fixing *ALL* header transformations
             if "_" in name:
                 if name in forwarder_headers or "*" in forwarder_headers:
                     # This forwarder may override our environment

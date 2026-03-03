@@ -82,11 +82,10 @@ class BaseHandler:
             url_attributes.URL_SCHEME: request.scheme,
         }
 
-        # Add full URL if we can build it (requires proper WSGI environment)
+        # Add full URL if we can build it
         try:
             span_attributes[url_attributes.URL_FULL] = request.build_absolute_uri()
-        except KeyError:
-            # Missing required WSGI environment variables (e.g. in tests)
+        except (KeyError, AttributeError):
             pass
 
         # Add query string if present

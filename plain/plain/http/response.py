@@ -305,7 +305,7 @@ class ResponseBase:
         # Handle non-string types.
         return str(value).encode(self.charset)
 
-    # The WSGI server must call this method upon completion of the request.
+    # The server must call this method upon completion of the request.
     # See http://blog.dscpl.com.au/2012/10/obligations-for-calling-close-on.html
     def close(self) -> None:
         for closer in self._resource_closers:

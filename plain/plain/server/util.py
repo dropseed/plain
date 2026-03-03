@@ -324,7 +324,3 @@ def bytes_to_str(b: str | bytes) -> str:
     if isinstance(b, str):
         return b
     return str(b, "latin1")
-
-
-def unquote_to_wsgi_str(string: str) -> str:
-    return urllib.parse.unquote_to_bytes(string).decode("latin-1")

@@ -466,7 +466,7 @@ class Request:
     # File-like and iterator interface.
     #
     # Expects self._stream to be set to an appropriate source of bytes by
-    # a corresponding request subclass (e.g. WSGIRequest).
+    # a corresponding request creator (e.g. server or test client).
     # Also when request data has already been read by request.json_data,
     # request.form_data, or request.body, self._stream points to a BytesIO
     # instance containing that data.
@@ -523,26 +523,6 @@ class RequestHeaders(CaseInsensitiveMapping):
     def __getitem__(self, key: str) -> str:
         """Allow header lookup using underscores in place of hyphens."""
         return super().__getitem__(key.replace("_", "-"))
-
-
-# WSGI environ conversion helpers (used by test client and WSGIRequest)
-_WSGI_UNPREFIXED_HEADERS = {"CONTENT_TYPE", "CONTENT_LENGTH"}
-
-
-def headers_to_wsgi_environ(headers: dict[str, str]) -> dict[str, str]:
-    """Convert standard HTTP header names to WSGI environ keys.
-
-    Example: {"Content-Type": "text/html"} -> {"CONTENT_TYPE": "text/html"}
-             {"Accept": "text/html"} -> {"HTTP_ACCEPT": "text/html"}
-    """
-    result: dict[str, str] = {}
-    for name, value in headers.items():
-        key = name.replace("-", "_").upper()
-        if key in _WSGI_UNPREFIXED_HEADERS:
-            result[key] = value
-        else:
-            result[f"HTTP_{key}"] = value
-    return result
 
 
 class QueryDict(MultiValueDict):
