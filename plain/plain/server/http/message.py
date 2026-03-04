@@ -8,7 +8,7 @@ from __future__ import annotations
 # Vendored and modified for Plain.
 import io
 import re
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from ..util import bytes_to_str, split_request_uri
 from .body import Body, ChunkedReader, EOFReader, LengthReader
@@ -27,9 +27,6 @@ from .errors import (
     UnsupportedTransferCoding,
 )
 
-if TYPE_CHECKING:
-    from ..config import Config
-
 MAX_REQUEST_LINE = 8190
 MAX_HEADERS = 32768
 DEFAULT_MAX_HEADERFIELD_SIZE = 8190
@@ -47,10 +44,30 @@ METHOD_BADCHAR_RE = re.compile("[a-z#]")
 VERSION_RE = re.compile(r"HTTP/(\d)\.(\d)")
 RFC9110_5_5_INVALID_AND_DANGEROUS = re.compile(r"[\0\r\n]")
 
+# Headers that indicate HTTPS when set by a trusted proxy.
+SECURE_SCHEME_HEADERS: dict[str, str] = {
+    "X-FORWARDED-PROTOCOL": "ssl",
+    "X-FORWARDED-PROTO": "https",
+    "X-FORWARDED-SSL": "on",
+}
+
+# Header names that proxies can use to override request attributes.
+FORWARDER_HEADERS: list[str] = ["SCRIPT_NAME", "PATH_INFO"]
+
+# How to handle header names with underscores: "drop" silently drops them.
+HEADER_MAP: str = "drop"
+
+
+def _get_forwarded_allow_ips() -> list[str]:
+    """Trusted proxy IPs allowed to set secure headers."""
+    from plain.runtime import settings
+
+    val = settings.SERVER_FORWARDED_ALLOW_IPS
+    return [v.strip() for v in val.split(",") if v]
+
 
 class Message:
-    def __init__(self, cfg: Config, unreader: Any, peer_addr: tuple[str, int] | Any):
-        self.cfg = cfg
+    def __init__(self, is_ssl: bool, unreader: Any, peer_addr: tuple[str, int] | Any):
         self.unreader = unreader
         self.peer_addr = peer_addr
         self.remote_addr = peer_addr
@@ -58,7 +75,7 @@ class Message:
         self.headers: list[tuple[str, str]] = []
         self.trailers: list[tuple[str, str]] = []
         self.body: Body | None = None
-        self.scheme = "https" if cfg.is_ssl else "http"
+        self.scheme = "https" if is_ssl else "http"
         self.must_close = False
 
         # set headers limits
@@ -90,7 +107,6 @@ class Message:
     def parse_headers(
         self, data: bytes, from_trailer: bool = False
     ) -> list[tuple[str, str]]:
-        cfg = self.cfg
         headers = []
 
         # Split lines on \r\n
@@ -98,19 +114,21 @@ class Message:
 
         # handle scheme headers
         scheme_header = False
-        secure_scheme_headers = {}
-        forwarder_headers = []
+        secure_scheme_headers: dict[str, str] = {}
+        forwarder_headers: list[str] = []
         if from_trailer:
             # nonsense. either a request is https from the beginning
             #  .. or we are just behind a proxy who does not remove conflicting trailers
             pass
-        elif (
-            "*" in cfg.forwarded_allow_ips
-            or not isinstance(self.peer_addr, tuple)
-            or self.peer_addr[0] in cfg.forwarded_allow_ips
-        ):
-            secure_scheme_headers = cfg.secure_scheme_headers
-            forwarder_headers = cfg.forwarder_headers
+        else:
+            forwarded_allow_ips = _get_forwarded_allow_ips()
+            if (
+                "*" in forwarded_allow_ips
+                or not isinstance(self.peer_addr, tuple)
+                or self.peer_addr[0] in forwarded_allow_ips
+            ):
+                secure_scheme_headers = SECURE_SCHEME_HEADERS
+                forwarder_headers = FORWARDER_HEADERS
 
         # Parse headers into key/value pairs paying attention
         # to continuation lines.
@@ -165,10 +183,10 @@ class Message:
                 if name in forwarder_headers or "*" in forwarder_headers:
                     # This forwarder header is allowed through
                     pass
-                elif self.cfg.header_map == "dangerous":
+                elif HEADER_MAP == "dangerous":
                     # as if we did not know we cannot safely map this
                     pass
-                elif self.cfg.header_map == "drop":
+                elif HEADER_MAP == "drop":
                     # almost as if it never had been there
                     # but still counts against resource limits
                     continue
@@ -259,7 +277,7 @@ class Message:
 class Request(Message):
     def __init__(
         self,
-        cfg: Config,
+        is_ssl: bool,
         unreader: Any,
         peer_addr: tuple[str, int] | Any,
         req_number: int = 1,
@@ -276,7 +294,7 @@ class Request(Message):
             self.limit_request_line = MAX_REQUEST_LINE
 
         self.req_number = req_number
-        super().__init__(cfg, unreader, peer_addr)
+        super().__init__(is_ssl, unreader, peer_addr)
 
     def get_data(self, unreader: Any, buf: io.BytesIO, stop: bool = False) -> None:
         data = unreader.read()

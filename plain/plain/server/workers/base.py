@@ -44,7 +44,6 @@ if TYPE_CHECKING:
     import socket
 
     from ..app import ServerApplication
-    from ..config import Config
     from ..http.message import Request
 
 # Maximum jitter to add to max_requests to stagger worker restarts
@@ -66,7 +65,6 @@ class Worker(ABC):
         sockets: list[sock.BaseSocket],
         app: ServerApplication,
         timeout: int | float,
-        cfg: Config,
         log: logging.Logger,
     ):
         """\
@@ -80,22 +78,21 @@ class Worker(ABC):
         self.sockets = sockets
         self.app = app
         self.timeout = timeout
-        self.cfg = cfg
         self.booted = False
         self.aborted = False
         self.reloader: Any = None
 
         self.nr = 0
 
-        if cfg.max_requests > 0:
+        if app.max_requests > 0:
             jitter = randint(0, MAX_REQUESTS_JITTER)
-            self.max_requests = cfg.max_requests + jitter
+            self.max_requests = app.max_requests + jitter
         else:
             self.max_requests = sys.maxsize
 
         self.alive = True
         self.log = log
-        self.tmp = WorkerTmp(cfg)
+        self.tmp = WorkerTmp()
 
     def __str__(self) -> str:
         return f"<Worker {self.pid}>"
@@ -143,7 +140,7 @@ class Worker(ABC):
         self.init_signals()
 
         # start the reloader
-        if self.cfg.reload:
+        if self.app.reload:
 
             def changed(fname: str) -> None:
                 self.log.debug("Server worker reloading: %s modified", fname)
@@ -166,7 +163,7 @@ class Worker(ABC):
         try:
             self.handler = self.app.handler()
         except SyntaxError:
-            if not self.cfg.reload:
+            if not self.app.reload:
                 raise
 
             self.log.exception("Error loading application")
@@ -289,7 +286,7 @@ class Worker(ABC):
 
         if req is not None:
             request_time = datetime.now() - request_start
-            resp = Response(req, client, self.cfg)
+            resp = Response(req, client)
             resp.status = f"{status_int} {reason}"
             resp.response_length = len(mesg)
             log_access(resp, req, request_time)

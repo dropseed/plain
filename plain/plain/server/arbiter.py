@@ -28,7 +28,6 @@ from .workers.thread import ThreadWorker
 
 if TYPE_CHECKING:
     from .app import ServerApplication
-    from .config import Config
 
 
 class Arbiter:
@@ -94,30 +93,27 @@ class Arbiter:
 
     def setup(self, app: ServerApplication) -> None:
         self.app: ServerApplication = app
-        assert app.cfg is not None, "Application config must be initialized"
-        self.cfg: Config = app.cfg
 
         if not hasattr(self, "log"):
-            setup_bootstrap_logging(self.cfg.accesslog)
+            setup_bootstrap_logging(self.app.accesslog)
             self.log: logging.Logger = logging.getLogger("plain.server")
 
-        self.address: str = self.cfg.address
-        self.num_workers = self.cfg.workers
-        self.timeout: int = self.cfg.timeout
+        self.num_workers = self.app.workers
+        self.timeout: int = self.app.timeout
 
     def start(self) -> None:
         """\
         Initialize the arbiter. Start listening and set pidfile if needed.
         """
         self.pid: int = os.getpid()
-        if self.cfg.pidfile is not None:
-            self.pidfile = Pidfile(self.cfg.pidfile)
+        if self.app.pidfile is not None:
+            self.pidfile = Pidfile(self.app.pidfile)
             self.pidfile.create(self.pid)
 
         self.init_signals()
 
         if not self.LISTENERS:
-            self.LISTENERS = sock.create_sockets(self.cfg, self.log)
+            self.LISTENERS = sock.create_sockets(self.app)
 
         listeners_str = ",".join([str(lnr) for lnr in self.LISTENERS])
         self.log.info(
@@ -127,7 +123,7 @@ class Arbiter:
             plain.runtime.__version__,
         )
 
-        ThreadWorker.check_config(self.cfg, self.log)
+        ThreadWorker.check_config(self.app.threads, self.log)
 
     def init_signals(self) -> None:
         """\
@@ -315,7 +311,9 @@ class Arbiter:
         sig = signal.SIGTERM
         if not graceful:
             sig = signal.SIGQUIT
-        limit = time.time() + self.cfg.graceful_timeout
+        from plain.runtime import settings
+
+        limit = time.time() + settings.SERVER_GRACEFUL_TIMEOUT
         # instruct the workers to exit
         self.kill_workers(sig)
         # wait until the graceful timeout
@@ -325,17 +323,17 @@ class Arbiter:
         self.kill_workers(signal.SIGKILL)
 
     def reload(self) -> None:
-        old_address = self.cfg.address
+        old_address = self.app.address
 
         self.setup(self.app)
 
         # do we need to change listener ?
-        if old_address != self.cfg.address:
+        if old_address != self.app.address:
             # close all listeners
             for lnr in self.LISTENERS:
                 lnr.close()
             # init new listeners
-            self.LISTENERS = sock.create_sockets(self.cfg, self.log)
+            self.LISTENERS = sock.create_sockets(self.app)
             listeners_str = ",".join([str(lnr) for lnr in self.LISTENERS])
             self.log.info("Listening at: %s", listeners_str)
 
@@ -344,12 +342,12 @@ class Arbiter:
             self.pidfile.unlink()
 
         # create new pidfile
-        if self.cfg.pidfile is not None:
-            self.pidfile = Pidfile(self.cfg.pidfile)
+        if self.app.pidfile is not None:
+            self.pidfile = Pidfile(self.app.pidfile)
             self.pidfile.create(self.pid)
 
         # spawn new workers
-        for _ in range(self.cfg.workers):
+        for _ in range(self.app.workers):
             self.spawn_worker()
 
         # manage workers
@@ -464,7 +462,6 @@ class Arbiter:
             self.LISTENERS,
             self.app,
             self.timeout / 2.0,
-            self.cfg,
             self.log,
         )
         pid = os.fork()

@@ -8,15 +8,10 @@ from collections.abc import Iterator
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from .message import Request
 from .unreader import IterUnreader, SocketUnreader
-
-if TYPE_CHECKING:
-    import socket
-
-    from ..config import Config
 
 
 class Parser:
@@ -24,11 +19,11 @@ class Parser:
 
     def __init__(
         self,
-        cfg: Config,
-        source: socket.socket | Any,
+        is_ssl: bool,
+        source: Any,
         source_addr: tuple[str, int] | Any,
     ) -> None:
-        self.cfg = cfg
+        self.is_ssl = is_ssl
         if hasattr(source, "recv"):
             self.unreader = SocketUnreader(source)
         else:
@@ -65,7 +60,7 @@ class Parser:
         self.req_count += 1
         assert self.mesg_class is not None, "mesg_class must be set by subclass"
         self.mesg = self.mesg_class(
-            self.cfg, self.unreader, self.source_addr, self.req_count
+            self.is_ssl, self.unreader, self.source_addr, self.req_count
         )
         if not self.mesg:
             raise StopIteration()

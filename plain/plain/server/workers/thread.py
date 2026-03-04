@@ -37,7 +37,7 @@ from ..http import response as server_response
 from . import base
 
 if TYPE_CHECKING:
-    from ..config import Config
+    from ..app import ServerApplication
 
 # Keep-alive connection timeout in seconds
 KEEPALIVE = 2
@@ -49,12 +49,12 @@ WORKER_CONNECTIONS = 1000
 class TConn:
     def __init__(
         self,
-        cfg: Config,
+        app: ServerApplication,
         sock: socket.socket,
         client: tuple[str, int],
         server: tuple[str, int],
     ) -> None:
-        self.cfg = cfg
+        self.app = app
         self.sock = sock
         self.client = client
         self.server = server
@@ -72,11 +72,14 @@ class TConn:
 
         if self.parser is None:
             # wrap the socket if needed
-            if self.cfg.is_ssl:
-                self.sock = sock.ssl_wrap_socket(self.sock, self.cfg)
+            if self.app.is_ssl:
+                assert self.app.certfile is not None
+                self.sock = sock.ssl_wrap_socket(
+                    self.sock, self.app.certfile, self.app.keyfile
+                )
 
             # initialize the parser
-            self.parser = http.RequestParser(self.cfg, self.sock, self.client)
+            self.parser = http.RequestParser(self.app.is_ssl, self.sock, self.client)
 
         self.initialized = True
 
@@ -92,14 +95,14 @@ class ThreadWorker(base.Worker):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.worker_connections: int = WORKER_CONNECTIONS
-        self.max_keepalived: int = WORKER_CONNECTIONS - self.cfg.threads
+        self.max_keepalived: int = WORKER_CONNECTIONS - self.app.threads
         self.futures: deque[futures.Future[tuple[bool, TConn]]] = deque()
         self._keep: deque[TConn] = deque()
         self.nr_conns: int = 0
 
     @classmethod
-    def check_config(cls, cfg: Config, log: logging.Logger) -> None:
-        max_keepalived = WORKER_CONNECTIONS - cfg.threads
+    def check_config(cls, threads: int, log: logging.Logger) -> None:
+        max_keepalived = WORKER_CONNECTIONS - threads
 
         if max_keepalived <= 0:
             log.warning(
@@ -116,7 +119,7 @@ class ThreadWorker(base.Worker):
 
     def get_thread_pool(self) -> futures.ThreadPoolExecutor:
         """Override this method to customize how the thread pool is created"""
-        return futures.ThreadPoolExecutor(max_workers=self.cfg.threads)
+        return futures.ThreadPoolExecutor(max_workers=self.app.threads)
 
     def handle_quit(self, sig: int, frame: FrameType | None) -> None:
         self.alive = False
@@ -145,7 +148,7 @@ class ThreadWorker(base.Worker):
         try:
             sock, client = listener.accept()
             # initialize the connection object
-            conn = TConn(self.cfg, sock, client, server)
+            conn = TConn(self.app, sock, client, server)
 
             self.nr_conns += 1
             # wait until socket is readable
@@ -269,7 +272,9 @@ class ThreadWorker(base.Worker):
         for s in self.sockets:
             s.close()
 
-        futures.wait(self.futures, timeout=self.cfg.graceful_timeout)
+        from plain.runtime import settings
+
+        futures.wait(self.futures, timeout=settings.SERVER_GRACEFUL_TIMEOUT)
 
     def finish_request(self, fs: futures.Future[tuple[bool, TConn]]) -> None:
         if fs.cancelled():
@@ -357,10 +362,10 @@ class ThreadWorker(base.Worker):
 
             # Build Request directly from parsed HTTP message
             http_request = server_response.create_request(
-                req, conn.sock, conn.client, conn.server, self.cfg
+                req, conn.sock, conn.client, conn.server
             )
 
-            resp = server_response.Response(req, conn.sock, self.cfg)
+            resp = server_response.Response(req, conn.sock, is_ssl=self.app.is_ssl)
             self.nr += 1
             if self.nr >= self.max_requests:
                 if self.alive:

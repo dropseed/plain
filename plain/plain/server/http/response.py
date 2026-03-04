@@ -23,7 +23,6 @@ from .errors import ConfigurationProblem, InvalidHeader, InvalidHeaderName
 from .message import TOKEN_RE
 
 if TYPE_CHECKING:
-    from ..config import Config
     from .message import Request as ServerRequest
 
 # Send files in at most 1GB blocks as some operating systems can have problems
@@ -56,7 +55,6 @@ def create_request(
     sock: socket.socket,
     client: str | bytes | tuple[str, int],
     server: str | tuple[str, int],
-    cfg: Config,
 ) -> HttpRequest:
     """Build a plain.http.Request directly from the server's parsed HTTP message."""
 
@@ -163,9 +161,12 @@ def _decode_path(path_bytes: bytes) -> str:
 
 
 class Response:
-    def __init__(self, req: ServerRequest, sock: socket.socket, cfg: Config) -> None:
+    def __init__(
+        self, req: ServerRequest, sock: socket.socket, *, is_ssl: bool = False
+    ) -> None:
         self.req = req
         self.sock = sock
+        self.is_ssl = is_ssl
         self.version = "plain"
         self.status: str | None = None
         self.chunked = False
@@ -175,7 +176,6 @@ class Response:
         self.response_length: int | None = None
         self.sent = 0
         self.upgrade = False
-        self.cfg = cfg
         self.status_code: int | None = None
 
     def force_close(self) -> None:
@@ -316,10 +316,12 @@ class Response:
         return None
 
     def can_sendfile(self) -> bool:
-        return self.cfg.sendfile is not False
+        from plain.runtime import settings
+
+        return settings.SERVER_SENDFILE
 
     def sendfile(self, respiter: FileWrapper) -> bool:
-        if self.cfg.is_ssl or not self.can_sendfile():
+        if self.is_ssl or not self.can_sendfile():
             return False
 
         if not util.has_fileno(respiter.filelike):

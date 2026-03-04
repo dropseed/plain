@@ -10,19 +10,15 @@ import os
 import platform
 import tempfile
 import time
-from typing import TYPE_CHECKING
 
 from .. import util
-
-if TYPE_CHECKING:
-    from ..config import Config
 
 PLATFORM = platform.system()
 IS_CYGWIN = PLATFORM.startswith("CYGWIN")
 
 
 class WorkerTmp:
-    def __init__(self, cfg: Config) -> None:
+    def __init__(self) -> None:
         fd, name = tempfile.mkstemp(prefix="wplain-")
 
         # unlink the file so we don't leak temporary files

@@ -101,9 +101,8 @@ def server(
         workers = os.cpu_count() or 1
 
     from plain.server import ServerApplication
-    from plain.server.config import Config
 
-    cfg = Config(
+    ServerApplication(
         bind=list(bind),
         threads=threads,
         workers=workers,
@@ -114,5 +113,4 @@ def server(
         certfile=certfile,
         keyfile=keyfile,
         accesslog=access_log,
-    )
-    ServerApplication(cfg=cfg).run()
+    ).run()
