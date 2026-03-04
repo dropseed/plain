@@ -198,6 +198,16 @@ return StreamingResponse(generate_data(), content_type="text/plain")
 
 Other response types include [`NotModifiedResponse`](./response.py#NotModifiedResponse) (304) and [`NotAllowedResponse`](./response.py#NotAllowedResponse) (405).
 
+### Access log control
+
+Set `log_access` to `False` on a response to exclude it from the server access log.
+
+```python
+response = Response("ok")
+response.log_access = False
+return response
+```
+
 ### Setting cookies
 
 Set cookies on the response.

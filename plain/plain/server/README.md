@@ -1,6 +1,6 @@
 # Server
 
-**A production-ready HTTP server based on gunicorn.**
+**A production-ready HTTP server, originally based on gunicorn.**
 
 - [Overview](#overview)
 - [Workers and threads](#workers-and-threads)
@@ -87,6 +87,18 @@ SERVER_FORWARDED_ALLOW_IPS = "127.0.0.1,::1"
 Settings can also be set via environment variables with the `PLAIN_` prefix (e.g., `PLAIN_SERVER_WORKERS=4`).
 
 The `WEB_CONCURRENCY` environment variable is supported as an alias for `SERVER_WORKERS`.
+
+### Per-response access log control
+
+Individual responses can opt out of the access log by setting `log_access = False` on the response object. This is useful for noisy endpoints like health checks or asset serving.
+
+```python
+response = Response("ok")
+response.log_access = False
+return response
+```
+
+Plain uses this internally to suppress asset 304 responses (controlled by the `ASSETS_LOG_304` setting).
 
 ## Signals
 

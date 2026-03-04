@@ -203,6 +203,12 @@ All logging settings use environment variables:
 
 Valid log levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
 
+## Server access log
+
+The server writes access logs to a separate `plain.server.access` logger that always outputs to stdout, regardless of the `LOG_STREAM` setting. This keeps access logs separate from application logs.
+
+Access logging is controlled by the `SERVER_ACCESS_LOG` setting (see the server docs). Individual responses can opt out by setting `response.log_access = False`.
+
 ## FAQs
 
 #### How do I use a custom logger instead of app_logger?
