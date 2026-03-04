@@ -69,6 +69,7 @@ class DevProcess(ProcessManager):
         self.plain_env = {
             "PYTHONUNBUFFERED": "true",
             "PLAIN_DEV": "true",
+            "PLAIN_SERVER_ACCESS_LOG_FIELDS": '["method", "url", "status", "duration_ms", "size"]',
             "FORCE_COLOR": "1",
             "PYTHONWARNINGS": "default::DeprecationWarning,default::PendingDeprecationWarning",
             **os.environ,

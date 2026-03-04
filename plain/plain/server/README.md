@@ -79,6 +79,7 @@ SERVER_THREADS = 4
 SERVER_TIMEOUT = 30
 SERVER_MAX_REQUESTS = 0      # 0 = disabled
 SERVER_ACCESS_LOG = True
+SERVER_ACCESS_LOG_FIELDS = ["method", "path", "query", "status", "duration_ms", "size", "ip", "user_agent", "referer"]
 SERVER_GRACEFUL_TIMEOUT = 30
 SERVER_SENDFILE = True
 SERVER_FORWARDED_ALLOW_IPS = "127.0.0.1,::1"
@@ -87,6 +88,34 @@ SERVER_FORWARDED_ALLOW_IPS = "127.0.0.1,::1"
 Settings can also be set via environment variables with the `PLAIN_` prefix (e.g., `PLAIN_SERVER_WORKERS=4`).
 
 The `WEB_CONCURRENCY` environment variable is supported as an alias for `SERVER_WORKERS`.
+
+### Access log format
+
+Access logs use the same `LOG_FORMAT` setting as the app logger, so they produce structured output in key-value or JSON format:
+
+```
+[INFO] Request method=GET path="/" status=200 duration_ms=12 size=1234 ip="127.0.0.1" user_agent="Mozilla/5.0..." referer="https://example.com"
+```
+
+See the [logs docs](../logs/README.md) for details on output formats.
+
+### Access log fields
+
+`SERVER_ACCESS_LOG_FIELDS` controls exactly which fields appear in access log entries. The default includes all common fields:
+
+```python
+# settings.py (default)
+SERVER_ACCESS_LOG_FIELDS = [
+    "method", "path", "query", "status", "duration_ms", "size",
+    "ip", "user_agent", "referer",
+]
+```
+
+Available fields: `method`, `path`, `url`, `query`, `status`, `duration_ms`, `size`, `ip`, `user_agent`, `referer`, `protocol`.
+
+Use `url` for a combined path + query string (e.g., `url="/search?q=hello"`). Use `path` and `query` separately for production log aggregation.
+
+In development, `plain dev` sets a minimal field list for cleaner output (`method`, `url`, `status`, `duration_ms`, `size`). Set `PLAIN_SERVER_ACCESS_LOG_FIELDS` in your environment to override.
 
 ### Per-response access log control
 

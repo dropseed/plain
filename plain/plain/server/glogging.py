@@ -6,44 +6,23 @@ from __future__ import annotations
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-import base64
-import binascii
 import datetime
 import logging
-import os
 import sys
-import time
 import traceback
 from typing import Any
+
+from plain.logs.formatters import KeyValueFormatter
 
 # Module-level loggers
 log = logging.getLogger("plain.server")
 access_log = logging.getLogger("plain.server.access")
 
-# Access log format (Apache Combined Log Format)
-ACCESS_LOG_FORMAT = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
-
-
-class SafeAtoms(dict[str, Any]):
-    def __init__(self, atoms: dict[str, Any]) -> None:
-        dict.__init__(self)
-        for key, value in atoms.items():
-            if isinstance(value, str):
-                self[key] = value.replace('"', '\\"')
-            else:
-                self[key] = value
-
-    def __getitem__(self, k: str) -> Any:
-        if k.startswith("{"):
-            kl = k.lower()
-            if kl in self:
-                return super().__getitem__(kl)
-            else:
-                return "-"
-        if k in self:
-            return super().__getitem__(k)
-        else:
-            return "-"
+# Maps field names that come from request headers
+_HEADER_FIELDS = {
+    "user_agent": "USER-AGENT",
+    "referer": "REFERER",
+}
 
 
 def setup_bootstrap_logging(accesslog: bool) -> None:
@@ -70,7 +49,7 @@ def setup_bootstrap_logging(accesslog: bool) -> None:
     if accesslog:
         _set_handler(
             access_log,
-            logging.Formatter("%(message)s"),
+            KeyValueFormatter("[%(levelname)s] %(message)s %(keyvalue)s"),
             stream=sys.stdout,
         )
 
@@ -91,91 +70,62 @@ def _set_handler(
     logger.addHandler(h)
 
 
+def _get_header(req: Any, header_name: str) -> str:
+    """Look up a header value from the request's header list."""
+    for name, value in req.headers:
+        if name == header_name:
+            return value
+    return ""
+
+
 def log_access(
     resp: Any,
     req: Any,
     request_time: datetime.timedelta,
 ) -> None:
     """Log an access entry for a completed request."""
-    if not access_log.handlers:
+    if not access_log.handlers or not access_log.isEnabledFor(logging.INFO):
         return
 
-    safe_atoms = SafeAtoms(_build_atoms(resp, req, request_time))
+    from plain.runtime import settings
 
-    try:
-        access_log.info(ACCESS_LOG_FORMAT, safe_atoms)
-    except Exception:
-        log.error(traceback.format_exc())
-
-
-def _build_atoms(
-    resp: Any,
-    req: Any,
-    request_time: datetime.timedelta,
-) -> dict[str, Any]:
-    """Build log atoms from server response and request objects."""
     status = resp.status
     if isinstance(status, str):
         status = status.split(None, 1)[0]
 
-    protocol = f"HTTP/{req.version[0]}.{req.version[1]}"
+    context: dict[str, Any] = {}
 
-    # Get client IP from the server request's peer address
-    if isinstance(req.peer_addr, tuple):
-        remote_addr = req.peer_addr[0]
-    elif isinstance(req.peer_addr, str):
-        remote_addr = req.peer_addr
-    else:
-        remote_addr = "-"
+    for field in settings.SERVER_ACCESS_LOG_FIELDS:
+        if field == "method":
+            context["method"] = req.method
+        elif field == "path":
+            context["path"] = req.path
+        elif field == "status":
+            context["status"] = int(status)
+        elif field == "duration_ms":
+            context["duration_ms"] = int(request_time.total_seconds() * 1000)
+        elif field == "size":
+            context["size"] = getattr(resp, "sent", None) or 0
+        elif field == "ip":
+            if isinstance(req.peer_addr, tuple):
+                context["ip"] = req.peer_addr[0]
+            elif isinstance(req.peer_addr, str):
+                context["ip"] = req.peer_addr
+            else:
+                context["ip"] = ""
+        elif field == "url":
+            if req.query:
+                context["url"] = f"{req.path}?{req.query}"
+            else:
+                context["url"] = req.path
+        elif field == "query":
+            context["query"] = req.query or ""
+        elif field == "protocol":
+            context["protocol"] = f"HTTP/{req.version[0]}.{req.version[1]}"
+        elif header_name := _HEADER_FIELDS.get(field):
+            context[field] = _get_header(req, header_name)
 
-    atoms: dict[str, Any] = {}
-
-    # Add request headers as {name}i atoms
-    atoms.update({f"{{{k.lower()}}}i": v for k, v in req.headers})
-
-    # Add response headers as {name}o atoms
-    resp_headers = resp.headers
-    if hasattr(resp_headers, "items"):
-        resp_headers = resp_headers.items()
-    atoms.update({f"{{{k.lower()}}}o": v for k, v in resp_headers})
-
-    atoms.update(
-        {
-            "h": remote_addr,
-            "l": "-",
-            "u": _get_user(atoms) or "-",
-            "t": time.strftime("[%d/%b/%Y:%H:%M:%S %z]"),
-            "r": f"{req.method} {req.uri} {protocol}",
-            "s": status,
-            "m": req.method,
-            "U": req.path,
-            "q": req.query,
-            "H": protocol,
-            "b": getattr(resp, "sent", None) is not None and str(resp.sent) or "-",
-            "B": getattr(resp, "sent", None),
-            "f": atoms.get("{referer}i", "-"),
-            "a": atoms.get("{user-agent}i", "-"),
-            "T": request_time.seconds,
-            "D": (request_time.seconds * 1000000) + request_time.microseconds,
-            "M": (request_time.seconds * 1000) + int(request_time.microseconds / 1000),
-            "L": f"{request_time.seconds}.{request_time.microseconds:06d}",
-            "p": f"<{os.getpid()}>",
-        }
-    )
-
-    return atoms
-
-
-def _get_user(atoms: dict[str, Any]) -> str | None:
-    """Extract username from Basic auth in request headers."""
-    user = None
-    http_auth = atoms.get("{authorization}i")
-    if http_auth and http_auth.lower().startswith("basic"):
-        auth = http_auth.split(" ", 1)
-        if len(auth) == 2:
-            try:
-                auth = base64.b64decode(auth[1].strip().encode("utf-8"))
-                user = auth.split(b":", 1)[0].decode("UTF-8")
-            except (TypeError, binascii.Error, UnicodeDecodeError) as exc:
-                log.debug("Couldn't get username: %s", exc)
-    return user
+    try:
+        access_log.info("Request", extra={"context": context})
+    except Exception:
+        log.error(traceback.format_exc())

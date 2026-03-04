@@ -195,6 +195,20 @@ Valid log levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
 
 The server writes access logs to a separate `plain.server.access` logger that always outputs to stdout, regardless of the `LOG_STREAM` setting. This keeps access logs separate from application logs.
 
+Access logs use the same `LOG_FORMAT` setting as the app logger, producing structured output with request fields:
+
+```
+[INFO] Request method=GET path="/" status=200 duration_ms=12 size=1234 ip="127.0.0.1" user_agent="Mozilla/5.0..." referer="https://example.com"
+```
+
+In JSON format:
+
+```json
+{"timestamp": "2024-01-15 10:30:00,123", "level": "INFO", "message": "Request", "logger": "plain.server.access", "method": "GET", "path": "/", "status": 200, "duration_ms": 12, "size": 1234, "ip": "127.0.0.1", "user_agent": "Mozilla/5.0...", "referer": "https://example.com"}
+```
+
+Additional fields beyond the defaults are controlled by `SERVER_ACCESS_LOG_FIELDS` (see the server docs).
+
 Access logging is controlled by the `SERVER_ACCESS_LOG` setting (see the server docs). Individual responses can opt out by setting `response.log_access = False`.
 
 ## FAQs

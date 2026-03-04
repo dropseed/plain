@@ -179,6 +179,17 @@ SERVER_THREADS: int = 4
 SERVER_TIMEOUT: int = 30
 SERVER_MAX_REQUESTS: int = 0
 SERVER_ACCESS_LOG: bool = True
+SERVER_ACCESS_LOG_FIELDS: list[str] = [
+    "method",
+    "path",
+    "query",
+    "status",
+    "duration_ms",
+    "size",
+    "ip",
+    "user_agent",
+    "referer",
+]
 SERVER_GRACEFUL_TIMEOUT: int = 30
 SERVER_SENDFILE: bool = True
 SERVER_FORWARDED_ALLOW_IPS: str = (
