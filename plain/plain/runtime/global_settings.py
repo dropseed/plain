@@ -3,6 +3,8 @@ Default Plain settings. Override these with settings in the module pointed to
 by the PLAIN_SETTINGS_MODULE environment variable.
 """
 
+import os
+
 from .secret import Secret
 from .utils import get_app_info_from_pyproject
 
@@ -165,6 +167,19 @@ ASSETS_REDIRECT_ORIGINAL: bool = True
 # If assets are served by a CDN, use this URL to prefix asset paths.
 # Ex. "https://cdn.example.com/assets/"
 ASSETS_CDN_URL: str = ""
+
+# MARK: Server
+
+SERVER_WORKERS: int = int(os.environ.get("WEB_CONCURRENCY", 0))  # 0 = auto (CPU count)
+SERVER_THREADS: int = 4
+SERVER_TIMEOUT: int = 30
+SERVER_MAX_REQUESTS: int = 0
+SERVER_ACCESS_LOG: bool = True
+SERVER_GRACEFUL_TIMEOUT: int = 30
+SERVER_SENDFILE: bool = True
+SERVER_FORWARDED_ALLOW_IPS: str = (
+    "127.0.0.1,::1"  # see proposals/plain-server-forwarded-allow-ips.md
+)
 
 # MARK: Preflight Checks
 

@@ -5,7 +5,7 @@
 - [Overview](#overview)
 - [Workers and threads](#workers-and-threads)
 - [Configuration options](#configuration-options)
-- [Environment variables](#environment-variables)
+- [Settings](#settings)
 - [Signals](#signals)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -30,12 +30,12 @@ plain server --reload
 
 The server uses two levels of concurrency:
 
-- **Workers** are separate OS processes. Each worker runs independently with its own memory. The default is `auto`, which spawns one worker per CPU core.
+- **Workers** are separate OS processes. Each worker runs independently with its own memory. The default is `0` (auto), which spawns one worker per CPU core.
 - **Threads** run inside each worker. Threads share memory within a worker and handle concurrent requests using a thread pool. The default is 4 threads per worker.
 
 Total concurrent requests = `workers × threads`. On a 4-core machine with the defaults, that's `4 × 4 = 16` concurrent requests.
 
-**When to adjust workers:** Workers provide true parallelism since each is a separate process with its own Python GIL. More workers means more memory usage but better CPU utilization. Use `--workers auto` (the default) to match your CPU cores, or set an explicit number.
+**When to adjust workers:** Workers provide true parallelism since each is a separate process with its own Python GIL. More workers means more memory usage but better CPU utilization. Use `--workers 0` (the default) to match your CPU cores, or set an explicit number.
 
 **When to adjust threads:** Threads are efficient for I/O-bound work (database queries, external API calls) since they release the GIL while waiting. Most web applications are I/O-bound, so the default of 4 threads works well. Increase threads if your application spends a lot of time waiting on I/O. Decrease to 1 if you need to avoid thread-safety concerns.
 
@@ -54,28 +54,39 @@ plain server --threads 1
 
 All options are available via the command line. Run `plain server --help` to see the full list.
 
-| Option             | Default          | Description                                           |
-| ------------------ | ---------------- | ----------------------------------------------------- |
-| `--bind` / `-b`    | `127.0.0.1:8000` | Address to bind (can be used multiple times)          |
-| `--workers` / `-w` | `auto`           | Number of worker processes (or `auto` for CPU count)  |
-| `--threads`        | `4`              | Number of threads per worker                          |
-| `--timeout` / `-t` | `30`             | Worker timeout in seconds                             |
-| `--reload`         | `False`          | Restart workers when code changes                     |
-| `--certfile`       | -                | Path to SSL certificate file                          |
-| `--keyfile`        | -                | Path to SSL key file                                  |
-| `--log-level`      | `info`           | Logging level (debug, info, warning, error, critical) |
-| `--access-log`     | `-` (stdout)     | Access log file path                                  |
-| `--error-log`      | `-` (stderr)     | Error log file path                                   |
-| `--max-requests`   | `0` (disabled)   | Max requests before worker restart                    |
-| `--pidfile`        | -                | PID file path                                         |
+Most options can also be configured via settings (see below). CLI arguments take priority over settings.
 
-## Environment variables
+| Option                           | Setting               | Description                          |
+| -------------------------------- | --------------------- | ------------------------------------ |
+| `--bind` / `-b`                  | -                     | Address to bind (can repeat)         |
+| `--workers` / `-w`               | `SERVER_WORKERS`      | Worker processes (0=auto, CPU count) |
+| `--threads`                      | `SERVER_THREADS`      | Threads per worker                   |
+| `--timeout` / `-t`               | `SERVER_TIMEOUT`      | Worker timeout in seconds            |
+| `--access-log / --no-access-log` | `SERVER_ACCESS_LOG`   | Enable/disable access logging        |
+| `--max-requests`                 | `SERVER_MAX_REQUESTS` | Max requests before worker restart   |
+| `--reload`                       | -                     | Restart workers on code changes      |
+| `--certfile`                     | -                     | Path to SSL certificate file         |
+| `--keyfile`                      | -                     | Path to SSL key file                 |
+| `--pidfile`                      | -                     | PID file path                        |
 
-| Variable              | Description                                                              |
-| --------------------- | ------------------------------------------------------------------------ |
-| `WEB_CONCURRENCY`     | Sets the number of workers (use `auto` to detect CPU cores, or a number) |
-| `SENDFILE`            | Enable sendfile() syscall (`1`, `yes`, `true`, or `y` to enable)         |
-| `FORWARDED_ALLOW_IPS` | Comma-separated list of trusted proxy IPs (default: `127.0.0.1,::1`)     |
+## Settings
+
+Server behavior can be configured in your `settings.py` file. These are the defaults:
+
+```python
+SERVER_WORKERS = 0           # 0 = auto (one per CPU core)
+SERVER_THREADS = 4
+SERVER_TIMEOUT = 30
+SERVER_MAX_REQUESTS = 0      # 0 = disabled
+SERVER_ACCESS_LOG = True
+SERVER_GRACEFUL_TIMEOUT = 30
+SERVER_SENDFILE = True
+SERVER_FORWARDED_ALLOW_IPS = "127.0.0.1,::1"
+```
+
+Settings can also be set via environment variables with the `PLAIN_` prefix (e.g., `PLAIN_SERVER_WORKERS=4`).
+
+The `WEB_CONCURRENCY` environment variable is supported as an alias for `SERVER_WORKERS`.
 
 ## Signals
 
@@ -89,7 +100,6 @@ The server responds to UNIX signals for process management.
 | `SIGHUP`  | Reload configuration and workers |
 | `SIGTTIN` | Increase worker count by 1       |
 | `SIGTTOU` | Decrease worker count by 1       |
-| `SIGUSR1` | Reopen log files                 |
 
 ## FAQs
 
@@ -103,28 +113,28 @@ plain server --certfile cert.pem --keyfile key.pem
 
 #### How do I run behind a reverse proxy?
 
-Configure your proxy to pass the appropriate headers, then set `FORWARDED_ALLOW_IPS` to include your proxy's IP address.
+Configure your proxy to pass the appropriate headers, then set `SERVER_FORWARDED_ALLOW_IPS` to include your proxy's IP address.
 
-```bash
-FORWARDED_ALLOW_IPS="10.0.0.1,10.0.0.2" plain server --bind 0.0.0.0:8000
+```python
+# settings.py
+SERVER_FORWARDED_ALLOW_IPS = "10.0.0.1,10.0.0.2"
 ```
 
 The server recognizes `X-Forwarded-Proto`, `X-Forwarded-Protocol`, and `X-Forwarded-SSL` headers from trusted proxies.
 
 #### How do I handle worker timeouts?
 
-If workers are being killed due to timeouts, increase the `--timeout` value. This is common when handling long-running requests.
+If workers are being killed due to timeouts, increase the timeout. This is common when handling long-running requests.
+
+```python
+# settings.py
+SERVER_TIMEOUT = 120
+```
+
+Or via the CLI:
 
 ```bash
 plain server --timeout 120
-```
-
-#### How do I rotate log files?
-
-Send `SIGUSR1` to the master process to reopen log files. This works with tools like `logrotate`.
-
-```bash
-kill -USR1 $(cat /path/to/pidfile)
 ```
 
 ## Installation

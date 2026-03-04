@@ -1,15 +1,11 @@
+from __future__ import annotations
+
 import os
 
 import click
 
+from plain.cli.options import SettingOption
 from plain.cli.runtime import without_runtime_setup
-
-
-def parse_workers(ctx: click.Context, param: click.Parameter, value: str) -> int:
-    """Parse workers value - accepts int or 'auto' for CPU count."""
-    if value == "auto":
-        return os.cpu_count() or 1
-    return int(value)
 
 
 @without_runtime_setup
@@ -24,27 +20,25 @@ def parse_workers(ctx: click.Context, param: click.Parameter, value: str) -> int
 @click.option(
     "--threads",
     type=click.IntRange(min=1),
-    default=4,
+    cls=SettingOption,
+    setting="SERVER_THREADS",
     help="Number of threads per worker",
-    show_default=True,
 )
 @click.option(
     "--workers",
     "-w",
-    type=str,
-    default="auto",
-    envvar="WEB_CONCURRENCY",
-    callback=parse_workers,
-    help="Number of worker processes (or 'auto' for CPU count)",
-    show_default=True,
+    type=int,
+    cls=SettingOption,
+    setting="SERVER_WORKERS",
+    help="Number of worker processes (0=auto, based on CPU count)",
 )
 @click.option(
     "--timeout",
     "-t",
     type=int,
-    default=30,
+    cls=SettingOption,
+    setting="SERVER_TIMEOUT",
     help="Worker timeout in seconds",
-    show_default=True,
 )
 @click.option(
     "--certfile",
@@ -63,16 +57,16 @@ def parse_workers(ctx: click.Context, param: click.Parameter, value: str) -> int
 )
 @click.option(
     "--access-log/--no-access-log",
-    default=True,
+    cls=SettingOption,
+    setting="SERVER_ACCESS_LOG",
     help="Enable/disable access logging to stdout",
-    show_default=True,
 )
 @click.option(
     "--max-requests",
     type=int,
-    default=0,
+    cls=SettingOption,
+    setting="SERVER_MAX_REQUESTS",
     help="Max requests before worker restart (0=disabled)",
-    show_default=True,
 )
 @click.option(
     "--pidfile",
@@ -101,6 +95,10 @@ def server(
             click.secho(
                 f"  {defn.env_var_name} -> {name}={defn.display_value()}", dim=True
             )
+
+    # 0 = auto (CPU count)
+    if workers == 0:
+        workers = os.cpu_count() or 1
 
     from plain.server import ServerApplication
     from plain.server.config import Config
