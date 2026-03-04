@@ -8,7 +8,7 @@ from io import BytesIO, IOBase
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse, urlsplit
 
-from plain.http import LimitedStream, QueryDict, Request
+from plain.http import QueryDict, Request
 from plain.internal.handlers.base import BaseHandler
 from plain.json import PlainJSONEncoder
 from plain.signals import request_started
@@ -132,9 +132,8 @@ class FakePayload(IOBase):
             self.read_started = True
         if size == -1 or size is None:
             size = self.__len
-        assert self.__len >= size, (
-            "Cannot read more than the available bytes from the HTTP incoming data."
-        )
+        else:
+            size = min(size, self.__len)
         content = self.__content.read(size)
         self.__len -= len(content)
         return content
@@ -145,9 +144,8 @@ class FakePayload(IOBase):
             self.read_started = True
         if size is None or size == -1:
             size = self.__len
-        assert self.__len >= size, (
-            "Cannot read more than the available bytes from the HTTP incoming data."
-        )
+        else:
+            size = min(size, self.__len)
         content = self.__content.readline(size)
         self.__len -= len(content)
         return content
@@ -300,9 +298,8 @@ class RequestFactory:
             else:
                 request.encoding = request.content_params["charset"]
 
-        # Set the body stream, wrapped in LimitedStream to match real server behavior
         payload = FakePayload(data) if data else FakePayload(b"")
-        request._stream = LimitedStream(payload, len(data))
+        request._stream = payload
         request._read_started = False
 
         return request

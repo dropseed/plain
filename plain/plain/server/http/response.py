@@ -16,7 +16,7 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote_to_bytes
 
-from plain.http import FileResponse, LimitedStream
+from plain.http import FileResponse
 from plain.http import Request as HttpRequest
 from plain.utils.http import parse_header_parameters
 
@@ -135,11 +135,7 @@ def create_request(
             request.encoding = request.content_params["charset"]
 
     # Body stream
-    try:
-        content_length = int(headers.get("Content-Length") or 0)
-    except (ValueError, TypeError):
-        content_length = 0
-    request._stream = LimitedStream(req.body, content_length)
+    request._stream = req.body
     request._read_started = False
 
     return request

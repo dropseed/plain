@@ -6,7 +6,7 @@ import secrets
 import uuid
 from collections.abc import Iterator
 from functools import cached_property
-from io import BytesIO, IOBase
+from io import BytesIO
 from itertools import chain
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
@@ -34,47 +34,6 @@ from .exceptions import (
 )
 
 _T = TypeVar("_T")
-
-
-class LimitedStream(IOBase):
-    """
-    Wrap another stream to disallow reading it past a number of bytes.
-
-    Based on the implementation from werkzeug.wsgi.LimitedStream
-    See https://github.com/pallets/werkzeug/blob/dbf78f67/src/werkzeug/wsgi.py#L828
-    """
-
-    def __init__(self, stream: Any, limit: int) -> None:
-        self._read = stream.read
-        self._readline = stream.readline
-        self._pos = 0
-        self.limit = limit
-
-    def read(self, size: int = -1, /) -> bytes:
-        _pos = self._pos
-        limit = self.limit
-        if _pos >= limit:
-            return b""
-        if size == -1 or size is None:
-            size = limit - _pos
-        else:
-            size = min(size, limit - _pos)
-        data = self._read(size)
-        self._pos += len(data)
-        return data
-
-    def readline(self, size: int | None = -1, /) -> bytes:
-        _pos = self._pos
-        limit = self.limit
-        if _pos >= limit:
-            return b""
-        if size is None or size == -1:
-            size = limit - _pos
-        else:
-            size = min(size, limit - _pos)
-        line = self._readline(size)
-        self._pos += len(line)
-        return line
 
 
 class UnreadablePostError(OSError):
@@ -363,17 +322,34 @@ class Request:
                     "You cannot access body after reading from request's data stream"
                 )
 
-            # Limit the maximum request data size that will be handled in-memory.
-            if (
-                settings.DATA_UPLOAD_MAX_MEMORY_SIZE is not None
-                and self.content_length > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
-            ):
+            max_size = settings.DATA_UPLOAD_MAX_MEMORY_SIZE
+
+            # Fast path: reject immediately if Content-Length exceeds the limit.
+            if max_size is not None and self.content_length > max_size:
                 raise RequestDataTooBigError400(
                     "Request body exceeded settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
                 )
 
             try:
-                self._body = self.read()
+                if max_size is not None:
+                    # Read in chunks to enforce the limit without buffering
+                    # an arbitrarily large body (e.g. chunked transfers
+                    # with no Content-Length).
+                    chunks = []
+                    bytes_read = 0
+                    while True:
+                        chunk = self.read(max_size - bytes_read + 1)
+                        if not chunk:
+                            break
+                        bytes_read += len(chunk)
+                        if bytes_read > max_size:
+                            raise RequestDataTooBigError400(
+                                "Request body exceeded settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
+                            )
+                        chunks.append(chunk)
+                    self._body = b"".join(chunks)
+                else:
+                    self._body = self.read()
             except OSError as e:
                 raise UnreadablePostError(*e.args) from e
             finally:
