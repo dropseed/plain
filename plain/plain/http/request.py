@@ -125,7 +125,7 @@ class Request:
 
     @cached_property
     def cookies(self) -> dict[str, str]:
-        return parse_cookie(self._headers.get("Cookie", ""))
+        return parse_cookie(self.headers.get("Cookie", ""))
 
     @cached_property
     def csp_nonce(self) -> str:
@@ -228,7 +228,7 @@ class Request:
     def content_length(self) -> int:
         """Return the Content-Length header value, or 0 if not provided."""
         try:
-            return int(self._headers.get("Content-Length") or 0)
+            return int(self.headers.get("Content-Length") or 0)
         except (ValueError, TypeError):
             return 0
 
@@ -505,12 +505,11 @@ class Request:
 
 
 class RequestHeaders(CaseInsensitiveMapping):
-    def __init__(self, headers: dict[str, str]):
-        # Normalize header names to Title-Case
-        normalized = {}
-        for name, value in headers.items():
-            normalized[name.replace("_", "-").title()] = value
-        super().__init__(normalized)
+    """Case-insensitive mapping of HTTP request headers.
+
+    Headers are expected to be pre-normalized to Title-Case by the
+    server or test client before being passed to Request.__init__.
+    """
 
     def __getitem__(self, key: str) -> str:
         """Allow header lookup using underscores in place of hyphens."""

@@ -308,6 +308,8 @@ class ResponseBase:
     # The server must call this method upon completion of the request.
     # See http://blog.dscpl.com.au/2012/10/obligations-for-calling-close-on.html
     def close(self) -> None:
+        if self.closed:
+            return
         for closer in self._resource_closers:
             try:
                 closer()

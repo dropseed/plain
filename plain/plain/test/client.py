@@ -792,7 +792,6 @@ class Client:
             ):
                 # Preserve request method for 307/308 responses.
                 method = response.request.method
-                assert method is not None
 
                 if method in ("GET", "HEAD"):
                     # GET/HEAD: re-encode data as query string
