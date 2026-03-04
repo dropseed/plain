@@ -83,3 +83,20 @@ def configure_logging(
 
     # Register the app_logger in the logging system so getLogger("app") returns it
     logging.root.manager.loggerDict["app"] = app_logger
+
+    # Reconfigure server loggers (post-fork in worker processes).
+    # Replace bootstrap handlers with propagation to the "plain" logger,
+    # keeping the access log on its own stdout handler.
+    server_logger = logging.getLogger("plain.server")
+    server_logger.handlers.clear()
+    server_logger.propagate = True  # inherit from "plain" logger
+
+    server_access_logger = logging.getLogger("plain.server.access")
+    # Replace bootstrap handler with a properly configured one
+    had_handlers = bool(server_access_logger.handlers)
+    server_access_logger.handlers.clear()
+    server_access_logger.propagate = False
+    if had_handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        server_access_logger.addHandler(handler)

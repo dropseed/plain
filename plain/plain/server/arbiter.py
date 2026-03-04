@@ -7,6 +7,7 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import errno
+import logging
 import os
 import random
 import select
@@ -21,13 +22,13 @@ import plain.runtime
 
 from . import sock, util
 from .errors import AppImportError, HaltServer
+from .glogging import setup_bootstrap_logging
 from .pidfile import Pidfile
 from .workers.thread import ThreadWorker
 
 if TYPE_CHECKING:
     from .app import ServerApplication
     from .config import Config
-    from .glogging import Logger
 
 
 class Arbiter:
@@ -97,9 +98,8 @@ class Arbiter:
         self.cfg: Config = app.cfg
 
         if not hasattr(self, "log"):
-            from .glogging import Logger
-
-            self.log: Logger = Logger(self.cfg)
+            setup_bootstrap_logging(self.cfg.accesslog)
+            self.log: logging.Logger = logging.getLogger("plain.server")
 
         self.address: str = self.cfg.address
         self.num_workers = self.cfg.workers

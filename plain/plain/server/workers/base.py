@@ -7,6 +7,7 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import io
+import logging
 import os
 import signal
 import sys
@@ -21,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 from plain.internal.reloader import Reloader
 
 from .. import sock, util
+from ..glogging import log_access
 from ..http.errors import (
     ConfigurationProblem,
     InvalidHeader,
@@ -43,7 +45,6 @@ if TYPE_CHECKING:
 
     from ..app import ServerApplication
     from ..config import Config
-    from ..glogging import Logger
     from ..http.message import Request
 
 # Maximum jitter to add to max_requests to stagger worker restarts
@@ -66,7 +67,7 @@ class Worker(ABC):
         app: ServerApplication,
         timeout: int | float,
         cfg: Config,
-        log: Logger,
+        log: logging.Logger,
     ):
         """\
         This is called pre-fork so it shouldn't do anything to the
@@ -291,7 +292,7 @@ class Worker(ABC):
             resp = Response(req, client, self.cfg)
             resp.status = f"{status_int} {reason}"
             resp.response_length = len(mesg)
-            self.log.access(resp, req, request_time)
+            log_access(resp, req, request_time)
 
         try:
             util.write_error(client, status_int, reason, mesg)

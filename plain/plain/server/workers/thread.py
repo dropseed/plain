@@ -14,6 +14,7 @@ from __future__ import annotations
 # closed.
 # pylint: disable=no-else-break
 import errno
+import logging
 import os
 import selectors
 import socket
@@ -31,12 +32,12 @@ from typing import TYPE_CHECKING, Any
 from plain import signals
 
 from .. import http, sock, util
+from ..glogging import log_access
 from ..http import response as server_response
 from . import base
 
 if TYPE_CHECKING:
     from ..config import Config
-    from ..glogging import Logger
 
 # Keep-alive connection timeout in seconds
 KEEPALIVE = 2
@@ -97,7 +98,7 @@ class ThreadWorker(base.Worker):
         self.nr_conns: int = 0
 
     @classmethod
-    def check_config(cls, cfg: Config, log: Logger) -> None:
+    def check_config(cls, cfg: Config, log: logging.Logger) -> None:
         max_keepalived = WORKER_CONNECTIONS - cfg.threads
 
         if max_keepalived <= 0:
@@ -380,7 +381,7 @@ class ThreadWorker(base.Worker):
             finally:
                 request_time = datetime.now() - request_start
                 if http_response.log_access:
-                    self.log.access(resp, req, request_time)
+                    log_access(resp, req, request_time)
                 if hasattr(http_response, "close"):
                     http_response.close()
 

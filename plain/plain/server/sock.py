@@ -7,6 +7,7 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import errno
+import logging
 import os
 import socket
 import ssl
@@ -19,7 +20,6 @@ from . import util
 
 if TYPE_CHECKING:
     from .config import Config
-    from .glogging import Logger
 
 # Maximum number of pending connections in the socket listen queue
 BACKLOG = 2048
@@ -32,7 +32,7 @@ class BaseSocket:
         self,
         address: tuple[str, int] | str,
         conf: Config,
-        log: Logger,
+        log: logging.Logger,
         fd: int | None = None,
     ) -> None:
         self.log = log
@@ -138,7 +138,7 @@ class UnixSocket(BaseSocket):
         self,
         addr: str,
         conf: Config,
-        log: Logger,
+        log: logging.Logger,
         fd: int | None = None,
     ):
         if fd is None:
@@ -174,7 +174,7 @@ def _sock_type(addr: tuple[str, int] | str | bytes) -> type[BaseSocket]:
     return sock_type
 
 
-def create_sockets(conf: Config, log: Logger) -> list[BaseSocket]:
+def create_sockets(conf: Config, log: logging.Logger) -> list[BaseSocket]:
     """
     Create a new socket for the configured addresses.
 
