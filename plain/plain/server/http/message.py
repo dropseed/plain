@@ -54,9 +54,6 @@ SECURE_SCHEME_HEADERS: dict[str, str] = {
 # Header names that proxies can use to override request attributes.
 FORWARDER_HEADERS: list[str] = ["SCRIPT_NAME", "PATH_INFO"]
 
-# How to handle header names with underscores: "drop" silently drops them.
-HEADER_MAP: str = "drop"
-
 
 def _get_forwarded_allow_ips() -> list[str]:
     """Trusted proxy IPs allowed to set secure headers."""
@@ -175,24 +172,13 @@ class Message:
                     scheme_header = True
                     self.scheme = scheme
 
-            # Underscore-containing header names are ambiguous since they could
-            # collide with hyphenated names after normalization, e.g.:
-            # X-Forwarded-For: 2001:db8::ha:cc:ed
-            # X_Forwarded_For: 127.0.0.1,::1
+            # Drop underscore-containing header names — they're ambiguous
+            # since they could collide with hyphenated names after
+            # normalization (e.g. X_Forwarded_For vs X-Forwarded-For).
+            # Forwarder headers are exempted.
             if "_" in name:
-                if name in forwarder_headers or "*" in forwarder_headers:
-                    # This forwarder header is allowed through
-                    pass
-                elif HEADER_MAP == "dangerous":
-                    # as if we did not know we cannot safely map this
-                    pass
-                elif HEADER_MAP == "drop":
-                    # almost as if it never had been there
-                    # but still counts against resource limits
+                if name not in forwarder_headers and "*" not in forwarder_headers:
                     continue
-                else:
-                    # fail-safe fallthrough: refuse
-                    raise InvalidHeaderName(name)
 
             headers.append((name, value))
 
