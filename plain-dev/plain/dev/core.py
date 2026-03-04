@@ -341,12 +341,6 @@ class DevProcess(ProcessManager):
             "4",
             "--timeout",
             "60",
-            "--log-level",
-            self.log_level or "info",
-            "--log-format",
-            "'[%(levelname)s] %(message)s'",
-            "--access-log-format",
-            "'\"%(r)s\" status=%(s)s length=%(b)s time=%(M)sms'",
             "--workers",
             "1",
             "--reload",  # Enable auto-reload for development

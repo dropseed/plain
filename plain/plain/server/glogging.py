@@ -70,6 +70,7 @@ class Logger:
     datefmt = r"[%Y-%m-%d %H:%M:%S %z]"
 
     access_fmt = "%(message)s"
+    access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
     syslog_fmt = "[%(process)d] %(message)s"
 
     atoms_wrapper_class = SafeAtoms
@@ -87,23 +88,22 @@ class Logger:
         self.setup(cfg)
 
     def setup(self, cfg: Config) -> None:
-        self.loglevel = self.LOG_LEVELS.get(cfg.loglevel.lower(), logging.INFO)
-        self.error_log.setLevel(self.loglevel)
+        self.error_log.setLevel(logging.INFO)
         self.access_log.setLevel(logging.INFO)
 
-        # set plain.server.error handler
+        # Error log always goes to stderr
         self._set_handler(
             self.error_log,
-            cfg.errorlog,
-            logging.Formatter(cfg.log_format, self.datefmt),
+            "-",
+            logging.Formatter(self.error_fmt, self.datefmt),
         )
 
-        # set plain.server.access handler
+        # Access log goes to stdout when enabled
         if cfg.accesslog is not None:
             self._set_handler(
                 self.access_log,
                 cfg.accesslog,
-                fmt=logging.Formatter(cfg.log_format, self.datefmt),
+                fmt=logging.Formatter(self.access_fmt),
                 stream=sys.stdout,
             )
 
@@ -211,7 +211,7 @@ class Logger:
         safe_atoms = self.atoms_wrapper_class(self.atoms(resp, req, request_time))
 
         try:
-            self.access_log.info(self.cfg.access_log_format, safe_atoms)
+            self.access_log.info(self.access_log_format, safe_atoms)
         except Exception:
             self.error(traceback.format_exc())
 
