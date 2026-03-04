@@ -280,9 +280,7 @@ class AssetView(View):
         Support conditional requests (HTTP 304 response) based on ETag and Last-Modified headers.
         """
         if self.request.headers.get("If-None-Match") == self.get_etag(path):
-            response = NotModifiedResponse()
-            response.headers = self.update_headers(response.headers, path)
-            return response
+            return self._not_modified_response(path)
 
         if "If-Modified-Since" in self.request.headers:
             if_modified_since = parsedate(self.request.headers["If-Modified-Since"])
@@ -292,10 +290,15 @@ class AssetView(View):
                 and last_modified
                 and if_modified_since >= last_modified
             ):
-                response = NotModifiedResponse()
-                response.headers = self.update_headers(response.headers, path)
-                return response
+                return self._not_modified_response(path)
         return None
+
+    def _not_modified_response(self, path: str) -> NotModifiedResponse:
+        response = NotModifiedResponse()
+        response.headers = self.update_headers(response.headers, path)
+        if not settings.ASSETS_LOG_304:
+            response.log_access = False
+        return response
 
     def get_range_response(self, path: str) -> Response | StreamingResponse | None:
         """

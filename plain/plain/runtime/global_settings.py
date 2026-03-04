@@ -168,6 +168,10 @@ ASSETS_REDIRECT_ORIGINAL: bool = True
 # Ex. "https://cdn.example.com/assets/"
 ASSETS_CDN_URL: str = ""
 
+# Whether to log 304 Not Modified responses for assets in the access log.
+# Disabled by default to reduce noise from conditional requests.
+ASSETS_LOG_304: bool = False
+
 # MARK: Server
 
 SERVER_WORKERS: int = int(os.environ.get("WEB_CONCURRENCY", 0))  # 0 = auto (CPU count)

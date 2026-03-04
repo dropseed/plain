@@ -379,7 +379,8 @@ class ThreadWorker(base.Worker):
                 resp.write_response(http_response)
             finally:
                 request_time = datetime.now() - request_start
-                self.log.access(resp, req, request_time)
+                if http_response.log_access:
+                    self.log.access(resp, req, request_time)
                 if hasattr(http_response, "close"):
                     http_response.close()
 

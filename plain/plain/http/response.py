@@ -151,6 +151,8 @@ class ResponseBase:
         self._reason_phrase = reason
         # Exception that caused this response, if any (primarily for 500 errors)
         self.exception: Exception | None = None
+        # Whether the server should log this response in the access log
+        self.log_access: bool = True
 
     @property
     def reason_phrase(self) -> str:
