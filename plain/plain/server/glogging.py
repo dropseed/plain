@@ -99,10 +99,10 @@ class Logger:
         )
 
         # Access log goes to stdout when enabled
-        if cfg.accesslog is not None:
+        if cfg.accesslog:
             self._set_handler(
                 self.access_log,
-                cfg.accesslog,
+                "-",
                 fmt=logging.Formatter(self.access_fmt),
                 stream=sys.stdout,
             )

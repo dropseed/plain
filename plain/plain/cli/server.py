@@ -62,9 +62,9 @@ def parse_workers(ctx: click.Context, param: click.Parameter, value: str) -> int
     help="Restart workers when code changes (dev only)",
 )
 @click.option(
-    "--access-log",
-    default="-",
-    help="Access log file (use '-' for stdout)",
+    "--access-log/--no-access-log",
+    default=True,
+    help="Enable/disable access logging to stdout",
     show_default=True,
 )
 @click.option(
@@ -87,7 +87,7 @@ def server(
     certfile: str | None,
     keyfile: str | None,
     reload: bool,
-    access_log: str,
+    access_log: bool,
     max_requests: int,
     pidfile: str | None,
 ) -> None:

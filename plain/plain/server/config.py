@@ -30,7 +30,7 @@ class Config:
     pidfile: str | None
     certfile: str | None
     keyfile: str | None
-    accesslog: str
+    accesslog: bool
 
     @property
     def address(self) -> list[tuple[str, int] | str]:
