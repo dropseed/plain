@@ -72,7 +72,9 @@ def configure_logging(
         case "keyvalue":
             formatter = KeyValueFormatter("[%(levelname)s] %(message)s %(keyvalue)s")
         case _:
-            formatter = logging.Formatter("[%(levelname)s] %(message)s")
+            raise ValueError(
+                f"Invalid LOG_FORMAT: {app_log_format!r}. Must be 'keyvalue' or 'json'."
+            )
 
     attach_log_handlers(
         logger=app_logger,

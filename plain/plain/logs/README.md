@@ -9,7 +9,7 @@
 - [Output formats](#output-formats)
     - [Key-value format](#key-value-format)
     - [JSON format](#json-format)
-    - [Standard format](#standard-format)
+
 - [Context management](#context-management)
     - [Persistent context](#persistent-context)
     - [Temporary context](#temporary-context)
@@ -107,18 +107,6 @@ export APP_LOG_FORMAT=json
 {"timestamp": "2024-01-15 10:30:00,123", "level": "INFO", "message": "User logged in", "logger": "app", "user_id": 123, "method": "oauth"}
 ```
 
-### Standard format
-
-A minimal format that omits context data entirely.
-
-```bash
-export APP_LOG_FORMAT=standard
-```
-
-```
-[INFO] User logged in
-```
-
 ## Context management
 
 ### Persistent context
@@ -194,12 +182,12 @@ export PLAIN_LOG_STREAM=stderr
 
 All logging settings use environment variables:
 
-| Environment Variable        | Default    | Description                                      |
-| --------------------------- | ---------- | ------------------------------------------------ |
-| `PLAIN_FRAMEWORK_LOG_LEVEL` | `INFO`     | Log level for the `plain` logger                 |
-| `PLAIN_LOG_LEVEL`           | `INFO`     | Log level for the `app` logger                   |
-| `PLAIN_LOG_FORMAT`          | `keyvalue` | Output format: `json`, `keyvalue`, or `standard` |
-| `PLAIN_LOG_STREAM`          | `split`    | Output stream: `split`, `stdout`, or `stderr`    |
+| Environment Variable        | Default    | Description                                   |
+| --------------------------- | ---------- | --------------------------------------------- |
+| `PLAIN_FRAMEWORK_LOG_LEVEL` | `INFO`     | Log level for the `plain` logger              |
+| `PLAIN_LOG_LEVEL`           | `INFO`     | Log level for the `app` logger                |
+| `PLAIN_LOG_FORMAT`          | `keyvalue` | Output format: `keyvalue` or `json`           |
+| `PLAIN_LOG_STREAM`          | `split`    | Output stream: `split`, `stdout`, or `stderr` |
 
 Valid log levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
 
