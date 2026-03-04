@@ -74,13 +74,11 @@ def create_request(
         elif hdr_name == "SCRIPT_NAME":
             script_name = hdr_value
 
-        # Convert to standard header name (Title-Case)
-        name = hdr_name.replace("_", "-").title()
         # Handle duplicate headers by joining with comma
-        if name in headers:
-            headers[name] = f"{headers[name]},{hdr_value}"
+        if hdr_name in headers:
+            headers[hdr_name] = f"{headers[hdr_name]},{hdr_value}"
         else:
-            headers[name] = hdr_value
+            headers[hdr_name] = hdr_value
 
     # Remote address
     if isinstance(client, str):
@@ -112,7 +110,7 @@ def create_request(
         path=path,
         headers=headers,
         query_string=req.query or "",
-        scheme=req.scheme,
+        server_scheme=req.scheme,
         server_name=server_name,
         server_port=server_port,
         remote_addr=remote_addr,

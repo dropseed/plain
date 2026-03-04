@@ -60,7 +60,7 @@ class Request:
         path: str,
         headers: dict[str, str] | None = None,
         query_string: str = "",
-        scheme: str = "http",
+        server_scheme: str = "http",
         server_name: str = "",
         server_port: str = "",
         remote_addr: str = "",
@@ -75,16 +75,15 @@ class Request:
         self.server_name = server_name
         self.server_port = server_port
         self.remote_addr = remote_addr
-        self._query_string = query_string
-        self._scheme = scheme
-        self._headers = headers or {}
+        self.query_string = query_string
+        self.server_scheme = server_scheme
+        self.headers = RequestHeaders(headers or {})
 
         # Parse content type, params, and encoding from headers
-        content_type_header = self._headers.get("Content-Type", "")
         self.content_type: str | None
         self.content_params: dict[str, str] | None
         self.content_type, self.content_params = parse_header_parameters(
-            content_type_header
+            self.headers.get("Content-Type", "")
         )
         self.encoding: str | None = None
         if "charset" in (self.content_params or {}):
@@ -116,12 +115,8 @@ class Request:
         return obj
 
     @cached_property
-    def headers(self) -> RequestHeaders:
-        return RequestHeaders(self._headers)
-
-    @cached_property
     def query_params(self) -> QueryDict:
-        return QueryDict(self._query_string, encoding=self.encoding)
+        return QueryDict(self.query_string, encoding=self.encoding)
 
     @cached_property
     def cookies(self) -> dict[str, str]:
@@ -220,11 +215,6 @@ class Request:
         return self.remote_addr
 
     @property
-    def query_string(self) -> str:
-        """Return the raw query string from the request URL."""
-        return self._query_string
-
-    @property
     def content_length(self) -> int:
         """Return the Content-Length header value, or 0 if not provided."""
         try:
@@ -306,10 +296,6 @@ class Request:
 
         return iri_to_uri(location) or ""
 
-    def _get_scheme(self) -> str:
-        """Return the URL scheme for the request."""
-        return self._scheme
-
     @property
     def scheme(self) -> str:
         if settings.HTTPS_PROXY_HEADER:
@@ -325,7 +311,7 @@ class Request:
             if header_value is not None:
                 header_value, *_ = header_value.split(",", 1)
                 return "https" if header_value.strip() == secure_value else "http"
-        return self._get_scheme()
+        return self.server_scheme
 
     def is_https(self) -> bool:
         return self.scheme == "https"
@@ -505,11 +491,11 @@ class Request:
 
 
 class RequestHeaders(CaseInsensitiveMapping):
-    """Case-insensitive mapping of HTTP request headers.
-
-    Headers are expected to be pre-normalized to Title-Case by the
-    server or test client before being passed to Request.__init__.
-    """
+    def __init__(self, headers: dict[str, str]):
+        normalized = {
+            name.replace("_", "-").title(): value for name, value in headers.items()
+        }
+        super().__init__(normalized)
 
     def __getitem__(self, key: str) -> str:
         """Allow header lookup using underscores in place of hyphens."""

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
 from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
 
@@ -70,7 +70,9 @@ class Observer:
     SUMMARY_COOKIE_DURATION = 60 * 60 * 24 * 7  # 1 week in seconds
     PERSIST_COOKIE_DURATION = 60 * 60 * 24  # 1 day in seconds
 
-    def __init__(self, *, cookies: dict[str, str], headers: dict[str, str]) -> None:
+    def __init__(
+        self, *, cookies: Mapping[str, str], headers: Mapping[str, str]
+    ) -> None:
         self.cookies = cookies
         self.headers = headers
 

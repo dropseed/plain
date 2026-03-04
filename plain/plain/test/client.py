@@ -269,18 +269,12 @@ class RequestFactory:
             all_headers["Content-Type"] = content_type
             all_headers["Content-Length"] = str(len(data))
 
-        # Normalize header names to Title-Case so that direct dict lookups
-        # (e.g. _headers.get("Cookie")) work regardless of caller casing.
-        normalized_headers = {
-            k.replace("_", "-").title(): v for k, v in all_headers.items()
-        }
-
         request = Request(
             method=method,
             path=path,
-            headers=normalized_headers,
+            headers=all_headers,
             query_string=query_string,
-            scheme="https" if secure else "http",
+            server_scheme="https" if secure else "http",
             server_name=server_name,
             server_port=server_port or ("443" if secure else "80"),
             remote_addr="127.0.0.1",
