@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def login_client(client: Client, user: Any) -> None:
     """Log a user into a test client."""
-    request = Request()
+    request = Request(method="GET", path="/")
     if client.session:
         session = client.session
     else:
@@ -40,7 +40,7 @@ def login_client(client: Client, user: Any) -> None:
 
 def logout_client(client: Client) -> None:
     """Log out a user from a test client."""
-    request = Request()
+    request = Request(method="GET", path="/")
     if client.session:
         session = client.session
         set_request_session(request, session)

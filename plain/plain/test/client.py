@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import codecs
 import json
 from http import HTTPStatus
 from http.cookies import SimpleCookie
@@ -15,7 +14,7 @@ from plain.signals import request_started
 from plain.urls import get_resolver
 from plain.utils.encoding import force_bytes
 from plain.utils.functional import SimpleLazyObject
-from plain.utils.http import parse_header_parameters, urlencode
+from plain.utils.http import urlencode
 from plain.utils.regex_helper import _lazy_re_compile
 
 from .encoding import encode_multipart
@@ -251,16 +250,6 @@ class RequestFactory:
         headers: dict[str, str] | None = None,
     ) -> Request:
         """Build a Request object directly from the given parameters."""
-        request = Request()
-        request.method = method
-        request.path = path
-        request.path_info = path
-        request.server_name = server_name
-        request.server_port = server_port or ("443" if secure else "80")
-        request.remote_addr = "127.0.0.1"
-        request._query_string = query_string
-        request._scheme = "https" if secure else "http"
-
         # Merge headers: defaults first, then per-request overrides
         all_headers: dict[str, str] = dict(self._default_headers)
         if headers:
@@ -282,21 +271,20 @@ class RequestFactory:
 
         # Normalize header names to Title-Case so that direct dict lookups
         # (e.g. _headers.get("Cookie")) work regardless of caller casing.
-        request._headers = {
+        normalized_headers = {
             k.replace("_", "-").title(): v for k, v in all_headers.items()
         }
 
-        # Parse content type, params, and encoding
-        request.content_type, request.content_params = parse_header_parameters(
-            all_headers.get("Content-Type", "")
+        request = Request(
+            method=method,
+            path=path,
+            headers=normalized_headers,
+            query_string=query_string,
+            scheme="https" if secure else "http",
+            server_name=server_name,
+            server_port=server_port or ("443" if secure else "80"),
+            remote_addr="127.0.0.1",
         )
-        if "charset" in (request.content_params or {}):
-            try:
-                codecs.lookup(request.content_params["charset"])
-            except LookupError:
-                pass
-            else:
-                request.encoding = request.content_params["charset"]
 
         payload = FakePayload(data) if data else FakePayload(b"")
         request._stream = payload

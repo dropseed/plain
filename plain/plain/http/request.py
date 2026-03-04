@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import copy
 import json
 import secrets
@@ -20,10 +21,7 @@ from plain.http.multipartparser import (
     MultiPartParser,
 )
 from plain.runtime import settings
-from plain.utils.datastructures import (
-    CaseInsensitiveMapping,
-    MultiValueDict,
-)
+from plain.utils.datastructures import CaseInsensitiveMapping, MultiValueDict
 from plain.utils.encoding import iri_to_uri
 from plain.utils.http import parse_header_parameters
 
@@ -53,34 +51,52 @@ class RawPostDataException(Exception):
 class Request:
     """A basic HTTP request."""
 
-    # The encoding used in GET/POST dicts. None means use default setting.
-    encoding: str | None = None
-
     non_picklable_attrs = frozenset(["resolver_match", "_stream"])
 
-    method: str | None
-    resolver_match: ResolverMatch | None
-    content_type: str | None
-    content_params: dict[str, str] | None
-    path: str
-    path_info: str
-    unique_id: str
-
-    # Server/connection attributes populated by subclasses or request creators
-    server_name: str
-    server_port: str
-    remote_addr: str
-    _query_string: str
-    _scheme: str
-    _headers: dict[str, str]
-
-    def __init__(self):
-        # A unique ID we can use to trace this request
+    def __init__(
+        self,
+        *,
+        method: str,
+        path: str,
+        headers: dict[str, str] | None = None,
+        query_string: str = "",
+        scheme: str = "http",
+        server_name: str = "",
+        server_port: str = "",
+        remote_addr: str = "",
+        path_info: str = "",
+    ):
         self.unique_id = str(uuid.uuid4())
-        self.resolver_match = None
+        self.resolver_match: ResolverMatch | None = None
+
+        self.method = method
+        self.path = path
+        self.path_info = path_info or path
+        self.server_name = server_name
+        self.server_port = server_port
+        self.remote_addr = remote_addr
+        self._query_string = query_string
+        self._scheme = scheme
+        self._headers = headers or {}
+
+        # Parse content type, params, and encoding from headers
+        content_type_header = self._headers.get("Content-Type", "")
+        self.content_type: str | None
+        self.content_params: dict[str, str] | None
+        self.content_type, self.content_params = parse_header_parameters(
+            content_type_header
+        )
+        self.encoding: str | None = None
+        if "charset" in (self.content_params or {}):
+            try:
+                codecs.lookup(self.content_params["charset"])
+            except LookupError:
+                pass
+            else:
+                self.encoding = self.content_params["charset"]
 
     def __repr__(self) -> str:
-        if self.method is None or not self.get_full_path():
+        if not self.get_full_path():
             return f"<{self.__class__.__name__}>"
         return f"<{self.__class__.__name__}: {self.method} {self.get_full_path()!r}>"
 

@@ -6,7 +6,6 @@ from __future__ import annotations
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-import codecs
 import io
 import logging
 import os
@@ -18,7 +17,6 @@ from urllib.parse import quote, unquote_to_bytes
 
 from plain.http import FileResponse
 from plain.http import Request as HttpRequest
-from plain.utils.http import parse_header_parameters
 
 from .. import util
 from .errors import ConfigurationProblem, InvalidHeader, InvalidHeaderName
@@ -61,7 +59,6 @@ def create_request(
     cfg: Config,
 ) -> HttpRequest:
     """Build a plain.http.Request directly from the server's parsed HTTP message."""
-    request = HttpRequest()
 
     # Extract headers from server message (list of (UPPER_NAME, value) tuples)
     headers: dict[str, str] = {}
@@ -85,23 +82,16 @@ def create_request(
         else:
             headers[name] = hdr_value
 
-    request.method = (req.method or "GET").upper()
-    request._headers = headers
-    request._query_string = req.query or ""
-    request._scheme = req.scheme
-
     # Remote address
     if isinstance(client, str):
-        request.remote_addr = client
+        remote_addr = client
     elif isinstance(client, bytes):
-        request.remote_addr = client.decode()
+        remote_addr = client.decode()
     else:
-        request.remote_addr = client[0]
+        remote_addr = client[0]
 
     # Server name/port
     server_name, server_port = _resolve_server_address(server, host, req.scheme)
-    request.server_name = server_name
-    request.server_port = server_port
 
     # Path
     raw_path = req.path or ""
@@ -115,24 +105,19 @@ def create_request(
     # Decode path: percent-decode then handle broken UTF-8
     path_bytes = unquote_to_bytes(raw_path)
     path_info = _decode_path(path_bytes) or "/"
+    path = "{}/{}".format(script_name.rstrip("/"), path_info.replace("/", "", 1))
 
-    request.path_info = path_info
-    request.path = "{}/{}".format(
-        script_name.rstrip("/"), path_info.replace("/", "", 1)
+    request = HttpRequest(
+        method=(req.method or "GET").upper(),
+        path=path,
+        headers=headers,
+        query_string=req.query or "",
+        scheme=req.scheme,
+        server_name=server_name,
+        server_port=server_port,
+        remote_addr=remote_addr,
+        path_info=path_info,
     )
-
-    # Content type and encoding
-    content_type_header = headers.get("Content-Type", "")
-    request.content_type, request.content_params = parse_header_parameters(
-        content_type_header
-    )
-    if "charset" in request.content_params:
-        try:
-            codecs.lookup(request.content_params["charset"])
-        except LookupError:
-            pass
-        else:
-            request.encoding = request.content_params["charset"]
 
     # Body stream
     request._stream = req.body
