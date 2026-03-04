@@ -145,8 +145,6 @@ class Arbiter:
             util.set_non_blocking(p)
             util.close_on_exec(p)
 
-        self.log.close_on_exec()
-
         # initialize all signals
         for s in self.SIGNALS:
             signal.signal(s, self.signal)
@@ -249,7 +247,6 @@ class Arbiter:
         SIGUSR1 handling.
         Kill all workers by sending them a SIGUSR1
         """
-        self.log.reopen_files()
         self.kill_workers(signal.SIGUSR1)
 
     def handle_usr2(self) -> None:
@@ -331,9 +328,6 @@ class Arbiter:
         old_address = self.cfg.address
 
         self.setup(self.app)
-
-        # reopen log files
-        self.log.reopen_files()
 
         # do we need to change listener ?
         if old_address != self.cfg.address:

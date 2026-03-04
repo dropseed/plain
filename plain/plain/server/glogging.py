@@ -16,22 +16,10 @@ from typing import TYPE_CHECKING, Any
 logging.Logger.manager.emittedNoHandlerWarning = True
 import os  # noqa: E402
 import sys  # noqa: E402
-import threading  # noqa: E402
 import traceback  # noqa: E402
 
-from . import util  # noqa: E402
-
 if TYPE_CHECKING:
-    from io import TextIOWrapper
-
     from .config import Config
-
-
-def loggers() -> list[logging.Logger]:
-    """get list of all loggers"""
-    root = logging.root
-    existing = list(root.manager.loggerDict.keys())
-    return [logging.getLogger(name) for name in existing]
 
 
 class SafeAtoms(dict[str, Any]):
@@ -57,21 +45,11 @@ class SafeAtoms(dict[str, Any]):
 
 
 class Logger:
-    LOG_LEVELS = {
-        "critical": logging.CRITICAL,
-        "error": logging.ERROR,
-        "warning": logging.WARNING,
-        "info": logging.INFO,
-        "debug": logging.DEBUG,
-    }
-    loglevel = logging.INFO
-
     error_fmt = r"%(asctime)s [%(process)d] [%(levelname)s] %(message)s"
     datefmt = r"[%Y-%m-%d %H:%M:%S %z]"
 
     access_fmt = "%(message)s"
     access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
-    syslog_fmt = "[%(process)d] %(message)s"
 
     atoms_wrapper_class = SafeAtoms
 
@@ -80,10 +58,6 @@ class Logger:
         self.error_log.propagate = False
         self.access_log = logging.getLogger("plain.server.access")
         self.access_log.propagate = False
-        self.error_handlers: list[logging.Handler] = []
-        self.access_handlers: list[logging.Handler] = []
-        self.logfile: TextIOWrapper | None = None
-        self.lock = threading.Lock()
         self.cfg = cfg
         self.setup(cfg)
 
@@ -124,11 +98,6 @@ class Logger:
 
     def exception(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.error_log.exception(msg, *args, **kwargs)
-
-    def log(self, lvl: int | str, msg: str, *args: Any, **kwargs: Any) -> None:
-        if isinstance(lvl, str):
-            lvl = self.LOG_LEVELS.get(lvl.lower(), logging.INFO)
-        self.error_log.log(lvl, msg, *args, **kwargs)
 
     def atoms(
         self,
@@ -221,29 +190,6 @@ class Logger:
         """return date in Apache Common Log Format"""
         return time.strftime("[%d/%b/%Y:%H:%M:%S %z]")
 
-    def reopen_files(self) -> None:
-        for log in loggers():
-            for handler in log.handlers:
-                if isinstance(handler, logging.FileHandler):
-                    handler.acquire()
-                    try:
-                        if handler.stream:
-                            handler.close()
-                            handler.stream = handler._open()
-                    finally:
-                        handler.release()
-
-    def close_on_exec(self) -> None:
-        for log in loggers():
-            for handler in log.handlers:
-                if isinstance(handler, logging.FileHandler):
-                    handler.acquire()
-                    try:
-                        if handler.stream:
-                            util.close_on_exec(handler.stream.fileno())
-                    finally:
-                        handler.release()
-
     def _get_plain_server_handler(self, log: logging.Logger) -> logging.Handler | None:
         for h in log.handlers:
             if getattr(h, "_plain_server", False):
@@ -263,12 +209,7 @@ class Logger:
             log.handlers.remove(h)
 
         if output is not None:
-            if output == "-":
-                h = logging.StreamHandler(stream)
-            else:
-                util.check_is_writable(output)
-                h = logging.FileHandler(output)
-
+            h = logging.StreamHandler(stream)
             h.setFormatter(fmt)
             h._plain_server = True  # type: ignore[attr-defined]  # custom attribute
             log.addHandler(h)

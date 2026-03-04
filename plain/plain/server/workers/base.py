@@ -139,8 +139,6 @@ class Worker(ABC):
 
         self.wait_fds: list[sock.BaseSocket | int] = self.sockets + [self.PIPE[0]]
 
-        self.log.close_on_exec()
-
         self.init_signals()
 
         # start the reloader
@@ -206,7 +204,7 @@ class Worker(ABC):
             signal.set_wakeup_fd(self.PIPE[1])
 
     def handle_usr1(self, sig: int, frame: Any) -> None:
-        self.log.reopen_files()
+        pass
 
     def handle_exit(self, sig: int, frame: Any) -> None:
         self.alive = False
