@@ -12,7 +12,7 @@ import logging
 import os
 import re
 import socket
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote_to_bytes
 
@@ -215,26 +215,16 @@ class Response:
             return False
         return True
 
-    def start_response(
+    def set_status_and_headers(
         self,
         status: str,
         headers: list[tuple[str, str]],
-        exc_info: tuple[type[BaseException], BaseException, Any] | None = None,
-    ) -> Callable[[bytes], None]:
-        if exc_info:
-            try:
-                if self.status and self.headers_sent:
-                    util.reraise(exc_info[0], exc_info[1], exc_info[2])
-            finally:
-                exc_info = None
-        elif self.status is not None:
+    ) -> None:
+        if self.status is not None:
             raise AssertionError("Response headers already set!")
 
         self.status = status
 
-        # get the status code from the response here so we can use it to check
-        # the need for the connection header later without parsing the string
-        # each time.
         try:
             self.status_code = int(self.status.split()[0])
         except ValueError:
@@ -242,7 +232,6 @@ class Response:
 
         self.process_headers(headers)
         self.chunked = self.is_chunked()
-        return self.write
 
     def process_headers(self, headers: list[tuple[str, str]]) -> None:
         for name, value in headers:
@@ -403,7 +392,7 @@ class Response:
             ),
         ]
 
-        self.start_response(status, response_headers)
+        self.set_status_and_headers(status, response_headers)
 
         if (
             isinstance(http_response, FileResponse)

@@ -156,14 +156,13 @@ class Message:
                     scheme_header = True
                     self.scheme = scheme
 
-            # ambiguous mapping allows fooling downstream, e.g. merging non-identical headers:
+            # Underscore-containing header names are ambiguous since they could
+            # collide with hyphenated names after normalization, e.g.:
             # X-Forwarded-For: 2001:db8::ha:cc:ed
             # X_Forwarded_For: 127.0.0.1,::1
-            # HTTP_X_FORWARDED_FOR = 2001:db8::ha:cc:ed,127.0.0.1,::1
-            # Only modify after fixing *ALL* header transformations
             if "_" in name:
                 if name in forwarder_headers or "*" in forwarder_headers:
-                    # This forwarder may override our environment
+                    # This forwarder header is allowed through
                     pass
                 elif self.cfg.header_map == "dangerous":
                     # as if we did not know we cannot safely map this
