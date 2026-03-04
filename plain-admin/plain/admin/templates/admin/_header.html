@@ -42,17 +42,18 @@
             </a>
 
             <!-- Preflight -->
+            {% set preflight_total = preflight_counts.errors + preflight_counts.warnings %}
             <a
                 href="{{ url('admin:preflight') }}"
                 class="relative flex items-center justify-center w-7 h-7 text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100"
                 title="Preflight checks"
-                id="preflight-link"
             >
                 <admin.Icon name="shield-check" />
+                {% if preflight_total > 0 %}
                 <span
-                    id="preflight-badge"
-                    class="hidden absolute -top-1 -right-1 min-w-[16px] h-4 px-1 text-[10px] font-bold leading-4 text-center text-white rounded-full"
-                ></span>
+                    class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 text-[10px] font-bold leading-4 text-center text-white rounded-full {{ 'bg-red-500' if preflight_counts.errors > 0 else 'bg-amber-500' }}"
+                >{{ preflight_total }}</span>
+                {% endif %}
             </a>
 
             <button type="button" data-dropdown class="flex items-center cursor-pointer">
@@ -164,16 +165,4 @@
             </div>
         </div>
     </dialog>
-    <script nonce="{{ request.csp_nonce }}">
-    window._preflightStatus = window._preflightStatus || fetch("{{ url('admin:preflight') }}", {headers: {"Accept": "application/json"}}).then(r => r.json());
-    window._preflightStatus.then(data => {
-        const total = data.errors + data.warnings;
-        if (total > 0) {
-            const badge = document.getElementById("preflight-badge");
-            badge.textContent = total;
-            badge.classList.remove("hidden");
-            badge.classList.add(data.errors > 0 ? "bg-red-500" : "bg-amber-500");
-        }
-    }).catch(() => {});
-    </script>
 </header>

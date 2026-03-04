@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain.auth.views import AuthView
+from plain.preflight import get_check_counts
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.utils import timezone
@@ -85,6 +86,7 @@ class AdminView(AuthView, TemplateView):
                 "view_slug", flat=True
             )
         )
+        context["preflight_counts"] = get_check_counts()
 
         return context
 

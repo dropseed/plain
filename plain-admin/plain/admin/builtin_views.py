@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from plain.http import JsonResponse, NotFoundError404, RedirectResponse, Response
+from plain.http import NotFoundError404, RedirectResponse, Response
 from plain.models import QuerySet
 from plain.packages import packages_registry
-from plain.preflight import run_checks
+from plain.preflight import run_checks, set_check_counts
 from plain.runtime import settings as plain_settings
 
 from .models import PinnedNavItem
@@ -17,11 +17,6 @@ from .views.objects import AdminListView
 from .views.registry import registry
 
 MAX_PINNED_ITEMS = 6
-
-# Module-level cache for preflight results.
-# Populated on first request and updated when the full preflight page is viewed.
-# Valid for the lifetime of the process since settings/DB structure don't change without restart.
-_preflight_cache: dict[str, int] | None = None
 
 
 class AdminIndexView(AdminView):
@@ -217,12 +212,7 @@ class SettingDetailView(AdminView):
 
 
 class PreflightView(AdminView):
-    """Run and display preflight check results.
-
-    Returns JSON status counts when Accept: application/json is set (used by
-    the header/toolbar badge fetch). HTML requests always run fresh checks;
-    JSON requests serve from the module-level cache when available.
-    """
+    """Run and display preflight check results."""
 
     template_name = "admin/preflight.html"
     title = "Preflight"
@@ -231,8 +221,6 @@ class PreflightView(AdminView):
 
     def _run_checks(self) -> tuple[list[dict], int, int, int]:
         """Run all preflight checks and return (checks, passed, warnings, errors)."""
-        global _preflight_cache
-
         packages_registry.autodiscover_modules("preflight", include_app=True)
 
         include_deploy = not plain_settings.DEBUG
@@ -275,21 +263,10 @@ class PreflightView(AdminView):
                 }
             )
 
-        _preflight_cache = {"errors": error_count, "warnings": warning_count}
+        # Refresh the shared cache so badge counts stay current.
+        set_check_counts(errors=error_count, warnings=warning_count)
 
         return checks, passed_count, warning_count, error_count
-
-    def get(self) -> Response | JsonResponse:
-        if (
-            self.request.get_preferred_type("text/html", "application/json")
-            == "application/json"
-        ):
-            if _preflight_cache is None:
-                self._run_checks()
-
-            return JsonResponse(_preflight_cache)
-
-        return super().get()
 
     def get_template_context(self) -> dict[str, Any]:
         checks, passed_count, warning_count, error_count = self._run_checks()
