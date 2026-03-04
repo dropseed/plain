@@ -25,6 +25,7 @@ from ..http.errors import (
     ConfigurationProblem,
     InvalidHeader,
     InvalidHeaderName,
+    InvalidHostHeader,
     InvalidHTTPVersion,
     InvalidRequestLine,
     InvalidRequestMethod,
@@ -231,6 +232,7 @@ class Worker(ABC):
             | InvalidHTTPVersion
             | InvalidHeader
             | InvalidHeaderName
+            | InvalidHostHeader
             | LimitRequestLine
             | LimitRequestHeaders
             | InvalidSchemeHeaders
@@ -255,6 +257,8 @@ class Worker(ABC):
                 mesg = f"{str(exc)}"
                 status_int = 500
             elif isinstance(exc, ObsoleteFolding):
+                mesg = f"{str(exc)}"
+            elif isinstance(exc, InvalidHostHeader):
                 mesg = f"{str(exc)}"
             elif isinstance(exc, InvalidHeaderName | InvalidHeader):
                 mesg = f"{str(exc)}"

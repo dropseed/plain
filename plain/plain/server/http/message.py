@@ -15,6 +15,7 @@ from .body import Body, ChunkedReader, EOFReader, LengthReader
 from .errors import (
     InvalidHeader,
     InvalidHeaderName,
+    InvalidHostHeader,
     InvalidHTTPVersion,
     InvalidRequestLine,
     InvalidRequestMethod,
@@ -315,11 +316,20 @@ class Request(Message):
 
         if done:
             self.unreader.unread(data[2:])
-            return b""
+            ret = b""
+        else:
+            self.headers = self.parse_headers(data[:idx], from_trailer=False)
+            ret = data[idx + 4 :]
 
-        self.headers = self.parse_headers(data[:idx], from_trailer=False)
+        if self.version >= (1, 1):
+            host_headers = [v for name, v in self.headers if name == "HOST"]
+            if not host_headers:
+                raise InvalidHostHeader("missing required Host header")
+            if len(host_headers) > 1:
+                raise InvalidHostHeader("multiple Host headers")
+            if " " in host_headers[0] or "\t" in host_headers[0]:
+                raise InvalidHostHeader("invalid whitespace in Host value")
 
-        ret = data[idx + 4 :]
         buf = None
         return ret
 
