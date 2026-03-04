@@ -69,8 +69,6 @@ def create_request(
                 sock.send(b"HTTP/1.1 100 Continue\r\n\r\n")
         elif hdr_name == "HOST":
             host = hdr_value
-        elif hdr_name == "SCRIPT_NAME":
-            script_name = hdr_value
 
         # Handle duplicate headers by joining with comma
         if hdr_name in headers:

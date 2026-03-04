@@ -156,8 +156,3 @@ class InvalidHostHeader(ParseException):
 
     def __str__(self) -> str:
         return f"Invalid Host header: {self.reason}"
-
-
-class InvalidSchemeHeaders(ParseException):
-    def __str__(self) -> str:
-        return "Contradictory scheme headers"

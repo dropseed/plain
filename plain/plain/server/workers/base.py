@@ -31,7 +31,6 @@ from ..http.errors import (
     InvalidHTTPVersion,
     InvalidRequestLine,
     InvalidRequestMethod,
-    InvalidSchemeHeaders,
     LimitRequestHeaders,
     LimitRequestLine,
     ObsoleteFolding,
@@ -226,7 +225,6 @@ class Worker(ABC):
             | InvalidHostHeader
             | LimitRequestLine
             | LimitRequestHeaders
-            | InvalidSchemeHeaders
             | UnsupportedTransferCoding
             | ConfigurationProblem
             | ObsoleteFolding
@@ -261,8 +259,6 @@ class Worker(ABC):
                 reason = "Request Header Fields Too Large"
                 mesg = f"Error parsing headers: '{str(exc)}'"
                 status_int = 431
-            elif isinstance(exc, InvalidSchemeHeaders):
-                mesg = f"{str(exc)}"
             elif isinstance(exc, SSLError):
                 reason = "Forbidden"
                 mesg = f"'{str(exc)}'"

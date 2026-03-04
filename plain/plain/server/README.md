@@ -82,7 +82,6 @@ SERVER_ACCESS_LOG = True
 SERVER_ACCESS_LOG_FIELDS = ["method", "path", "query", "status", "duration_ms", "size", "ip", "user_agent", "referer"]
 SERVER_GRACEFUL_TIMEOUT = 30
 SERVER_SENDFILE = True
-SERVER_FORWARDED_ALLOW_IPS = "127.0.0.1,::1"
 ```
 
 Settings can also be set via environment variables with the `PLAIN_` prefix (e.g., `PLAIN_SERVER_WORKERS=4`).
@@ -129,6 +128,14 @@ return response
 
 Plain uses this internally to suppress asset 304 responses (controlled by the `ASSETS_LOG_304` setting).
 
+### How access logging works
+
+Access logging has three layers, each at the right level of abstraction:
+
+1. **`SERVER_ACCESS_LOG`** (server setting) — master switch that enables or disables access logging entirely.
+2. **`response.log_access`** (per-response) — individual responses can opt out by setting `log_access = False`.
+3. **`ASSETS_LOG_304`** (assets setting) — controls whether 304 Not Modified responses for assets are logged. When `False` (default), asset 304s set `log_access = False` on the response.
+
 ## Signals
 
 The server responds to UNIX signals for process management.
@@ -151,14 +158,21 @@ plain server --certfile cert.pem --keyfile key.pem
 
 #### How do I run behind a reverse proxy?
 
-Configure your proxy to pass the appropriate headers, then set `SERVER_FORWARDED_ALLOW_IPS` to include your proxy's IP address.
+Configure your proxy to pass the appropriate headers, then use these settings to tell Plain how to interpret them:
 
 ```python
 # settings.py
-SERVER_FORWARDED_ALLOW_IPS = "10.0.0.1,10.0.0.2"
+
+# Tell Plain which header indicates HTTPS (format: "Header-Name: value")
+HTTPS_PROXY_HEADER = "X-Forwarded-Proto: https"
+
+# Trust X-Forwarded-Host, X-Forwarded-Port, X-Forwarded-For headers
+HTTP_X_FORWARDED_HOST = True
+HTTP_X_FORWARDED_PORT = True
+HTTP_X_FORWARDED_FOR = True
 ```
 
-The server recognizes `X-Forwarded-Proto`, `X-Forwarded-Protocol`, and `X-Forwarded-SSL` headers from trusted proxies.
+See the [HTTP settings docs](../../http/README.md) for details on proxy header configuration.
 
 #### How do I handle worker timeouts?
 

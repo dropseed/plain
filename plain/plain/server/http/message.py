@@ -19,7 +19,6 @@ from .errors import (
     InvalidHTTPVersion,
     InvalidRequestLine,
     InvalidRequestMethod,
-    InvalidSchemeHeaders,
     LimitRequestHeaders,
     LimitRequestLine,
     NoMoreData,
@@ -43,24 +42,6 @@ METHOD_BADCHAR_RE = re.compile("[a-z#]")
 # usually 1.0 or 1.1 - RFC9112 permits restricting to single-digit versions
 VERSION_RE = re.compile(r"HTTP/(\d)\.(\d)")
 RFC9110_5_5_INVALID_AND_DANGEROUS = re.compile(r"[\0\r\n]")
-
-# Headers that indicate HTTPS when set by a trusted proxy.
-SECURE_SCHEME_HEADERS: dict[str, str] = {
-    "X-FORWARDED-PROTOCOL": "ssl",
-    "X-FORWARDED-PROTO": "https",
-    "X-FORWARDED-SSL": "on",
-}
-
-# Header names that proxies can use to override request attributes.
-FORWARDER_HEADERS: list[str] = ["SCRIPT_NAME", "PATH_INFO"]
-
-
-def _get_forwarded_allow_ips() -> list[str]:
-    """Trusted proxy IPs allowed to set secure headers."""
-    from plain.runtime import settings
-
-    val = settings.SERVER_FORWARDED_ALLOW_IPS
-    return [v.strip() for v in val.split(",") if v]
 
 
 class Message:
@@ -109,24 +90,6 @@ class Message:
         # Split lines on \r\n
         lines = [bytes_to_str(line) for line in data.split(b"\r\n")]
 
-        # handle scheme headers
-        scheme_header = False
-        secure_scheme_headers: dict[str, str] = {}
-        forwarder_headers: list[str] = []
-        if from_trailer:
-            # nonsense. either a request is https from the beginning
-            #  .. or we are just behind a proxy who does not remove conflicting trailers
-            pass
-        else:
-            forwarded_allow_ips = _get_forwarded_allow_ips()
-            if (
-                "*" in forwarded_allow_ips
-                or not isinstance(self.peer_addr, tuple)
-                or self.peer_addr[0] in forwarded_allow_ips
-            ):
-                secure_scheme_headers = SECURE_SCHEME_HEADERS
-                forwarder_headers = FORWARDER_HEADERS
-
         # Parse headers into key/value pairs paying attention
         # to continuation lines.
         while lines:
@@ -162,23 +125,11 @@ class Message:
             if header_length > self.limit_request_field_size > 0:
                 raise LimitRequestHeaders("limit request headers fields size")
 
-            if name in secure_scheme_headers:
-                secure = value == secure_scheme_headers[name]
-                scheme = "https" if secure else "http"
-                if scheme_header:
-                    if scheme != self.scheme:
-                        raise InvalidSchemeHeaders()
-                else:
-                    scheme_header = True
-                    self.scheme = scheme
-
             # Drop underscore-containing header names — they're ambiguous
             # since they could collide with hyphenated names after
             # normalization (e.g. X_Forwarded_For vs X-Forwarded-For).
-            # Forwarder headers are exempted.
             if "_" in name:
-                if name not in forwarder_headers and "*" not in forwarder_headers:
-                    continue
+                continue
 
             headers.append((name, value))
 

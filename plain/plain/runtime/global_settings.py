@@ -192,9 +192,6 @@ SERVER_ACCESS_LOG_FIELDS: list[str] = [
 ]
 SERVER_GRACEFUL_TIMEOUT: int = 30
 SERVER_SENDFILE: bool = True
-SERVER_FORWARDED_ALLOW_IPS: str = (
-    "127.0.0.1,::1"  # see proposals/plain-server-forwarded-allow-ips.md
-)
 
 # MARK: Preflight Checks
 
