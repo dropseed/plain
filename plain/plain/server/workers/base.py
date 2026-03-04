@@ -53,7 +53,7 @@ MAX_REQUESTS_JITTER = 50
 class Worker(ABC):
     SIGNALS = [
         getattr(signal, f"SIG{x}")
-        for x in ("ABRT HUP QUIT INT TERM USR1 USR2 WINCH CHLD".split())
+        for x in ("ABRT HUP QUIT INT TERM WINCH CHLD".split())
     ]
 
     PIPE = []
@@ -190,19 +190,14 @@ class Worker(ABC):
         signal.signal(signal.SIGTERM, self.handle_exit)
         signal.signal(signal.SIGINT, self.handle_quit)
         signal.signal(signal.SIGWINCH, self.handle_winch)
-        signal.signal(signal.SIGUSR1, self.handle_usr1)
         signal.signal(signal.SIGABRT, self.handle_abort)
 
-        # Don't let SIGTERM and SIGUSR1 disturb active requests
+        # Don't let SIGTERM disturb active requests
         # by interrupting system calls
         signal.siginterrupt(signal.SIGTERM, False)
-        signal.siginterrupt(signal.SIGUSR1, False)
 
         if hasattr(signal, "set_wakeup_fd"):
             signal.set_wakeup_fd(self.PIPE[1])
-
-    def handle_usr1(self, sig: int, frame: Any) -> None:
-        pass
 
     def handle_exit(self, sig: int, frame: Any) -> None:
         self.alive = False

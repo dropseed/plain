@@ -104,14 +104,11 @@ Plain uses this internally to suppress asset 304 responses (controlled by the `A
 
 The server responds to UNIX signals for process management.
 
-| Signal    | Effect                           |
-| --------- | -------------------------------- |
-| `SIGTERM` | Graceful shutdown                |
-| `SIGINT`  | Quick shutdown                   |
-| `SIGQUIT` | Quick shutdown                   |
-| `SIGHUP`  | Reload configuration and workers |
-| `SIGTTIN` | Increase worker count by 1       |
-| `SIGTTOU` | Decrease worker count by 1       |
+| Signal    | Effect            |
+| --------- | ----------------- |
+| `SIGTERM` | Graceful shutdown |
+| `SIGINT`  | Quick shutdown    |
+| `SIGQUIT` | Quick shutdown    |
 
 ## FAQs
 

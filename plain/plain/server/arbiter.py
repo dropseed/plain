@@ -32,9 +32,8 @@ if TYPE_CHECKING:
 
 class Arbiter:
     """
-    Arbiter maintain the workers processes alive. It launches or
-    kills them if needed. It also manages application reloading
-    via SIGHUP.
+    Arbiter maintains the worker processes alive. It launches or
+    kills them if needed.
     """
 
     # A flag indicating if a worker failed to
@@ -53,10 +52,7 @@ class Arbiter:
 
     # I love dynamic languages
     SIG_QUEUE: list[int] = []
-    SIGNALS: list[int] = [
-        getattr(signal, f"SIG{x}")
-        for x in "HUP QUIT INT TERM TTIN TTOU USR1 USR2 WINCH".split()
-    ]
+    SIGNALS: list[int] = [getattr(signal, f"SIG{x}") for x in "QUIT INT TERM".split()]
     SIG_NAMES: dict[int, str] = {
         getattr(signal, name): name[3:].lower()
         for name in dir(signal)
@@ -196,16 +192,6 @@ class Arbiter:
         self.reap_workers()
         self.wakeup()
 
-    def handle_hup(self) -> None:
-        """\
-        HUP handling.
-        - Reload configuration
-        - Start the new worker processes with a new configuration
-        - Gracefully shutdown the old worker processes
-        """
-        self.log.info("Hang up: Master")
-        self.reload()
-
     def handle_term(self) -> None:
         "SIGTERM handling"
         raise StopIteration
@@ -219,42 +205,6 @@ class Arbiter:
         "SIGQUIT handling"
         self.stop(False)
         raise StopIteration
-
-    def handle_ttin(self) -> None:
-        """\
-        SIGTTIN handling.
-        Increases the number of workers by one.
-        """
-        self.num_workers += 1
-        self.manage_workers()
-
-    def handle_ttou(self) -> None:
-        """\
-        SIGTTOU handling.
-        Decreases the number of workers by one.
-        """
-        if self.num_workers <= 1:
-            return None
-        self.num_workers -= 1
-        self.manage_workers()
-
-    def handle_usr1(self) -> None:
-        """\
-        SIGUSR1 handling.
-        Kill all workers by sending them a SIGUSR1
-        """
-        self.kill_workers(signal.SIGUSR1)
-
-    def handle_usr2(self) -> None:
-        """SIGUSR2 handling"""
-        # USR2 for graceful restart is not supported
-        self.log.debug("SIGUSR2 ignored")
-
-    def handle_winch(self) -> None:
-        """SIGWINCH handling"""
-        # SIGWINCH is typically used to gracefully stop workers when running as daemon
-        # Since we don't support daemon mode, just log that it's ignored
-        self.log.debug("SIGWINCH ignored")
 
     def wakeup(self) -> None:
         """\
@@ -321,37 +271,6 @@ class Arbiter:
             time.sleep(0.1)
 
         self.kill_workers(signal.SIGKILL)
-
-    def reload(self) -> None:
-        old_address = self.app.address
-
-        self.setup(self.app)
-
-        # do we need to change listener ?
-        if old_address != self.app.address:
-            # close all listeners
-            for lnr in self.LISTENERS:
-                lnr.close()
-            # init new listeners
-            self.LISTENERS = sock.create_sockets(self.app)
-            listeners_str = ",".join([str(lnr) for lnr in self.LISTENERS])
-            self.log.info("Listening at: %s", listeners_str)
-
-        # unlink pidfile
-        if self.pidfile is not None:
-            self.pidfile.unlink()
-
-        # create new pidfile
-        if self.app.pidfile is not None:
-            self.pidfile = Pidfile(self.app.pidfile)
-            self.pidfile.create(self.pid)
-
-        # spawn new workers
-        for _ in range(self.app.workers):
-            self.spawn_worker()
-
-        # manage workers
-        self.manage_workers()
 
     def murder_workers(self) -> None:
         """\
