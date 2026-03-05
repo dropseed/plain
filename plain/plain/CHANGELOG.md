@@ -36,6 +36,7 @@
 - **Log format `standard` removed** — Only `keyvalue` or `json` are supported. Update `LOG_FORMAT` if you were using `standard`.
 - **Server logging CLI options removed** — `--log-level`, `--log-format`, and `--access-log-format` have been removed. Configure via settings or environment variables instead.
 - **`--access-log` is now a boolean** — Use `--access-log` / `--no-access-log` instead of passing a file path. Access logs always go to stdout.
+- **`HTTPS_PROXY_HEADER` now required behind reverse proxies** — The server no longer auto-detects HTTPS from the connection. If your app runs behind an SSL-terminating proxy (Heroku, AWS ALB, nginx, etc.) and `HTTPS_REDIRECT_ENABLED` is `True` (the default), you **must** set `HTTPS_PROXY_HEADER` or you'll get an infinite 301 redirect loop. For example, on Heroku: `HTTPS_PROXY_HEADER = "X-Forwarded-Proto: https"` (or set `PLAIN_HTTPS_PROXY_HEADER="X-Forwarded-Proto: https"` as an env var).
 - **Server process model changed from fork to spawn** — This should be transparent, but if you relied on fork-inherited state in worker processes, it will no longer be available.
 - **`LimitedStream` removed** — Body size limits are now enforced automatically during reads.
 - **`HEADER_MAP` config removed** — Underscore-containing headers are always dropped (the previous default behavior). The `refuse` and `dangerous` options no longer exist.
