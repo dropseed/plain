@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.21.1](https://github.com/dropseed/plain/releases/plain-code@0.21.1) (2026-03-04)
+
+### What's changed
+
+- Fixed `plain code update` failing with a 404 error when downloading oxlint/oxfmt — GitHub's "latest" release now points to `crates_v` tags which don't contain the binaries. The update command now queries the GitHub API to find the correct `apps_v` release. ([54298b724d3b](https://github.com/dropseed/plain/commit/54298b724d3b))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-code@0.21.0) (2026-02-25)
 
 ### What's changed
