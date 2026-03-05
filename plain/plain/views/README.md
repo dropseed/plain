@@ -342,7 +342,7 @@ path("ws/echo/", EchoView)
 
 For server-push via Postgres LISTEN/NOTIFY over WebSocket, use `RealtimeWebSocketView` from the [realtime](../../../plain-realtime/plain/realtime/README.md#websocket-views) package.
 
-For server-to-client push without bidirectional messaging, use [`SSEView`](../realtime/README.md) (SSE) instead — it's simpler and works with the browser's `EventSource` API.
+For server-to-client push without bidirectional messaging, use [`SSEView`](../../../plain-realtime/plain/realtime/README.md) (SSE) instead — it's simpler and works with the browser's `EventSource` API.
 
 ## ResponseException
 
