@@ -455,7 +455,7 @@ class Worker:
         # Store on a private attr so resolve_request() in the handler can
         # skip re-resolving.  We use _worker_resolver_match (not the public
         # resolver_match) so middleware can't accidentally interfere.
-        http_request._worker_resolver_match = resolver_match  # type: ignore[attr-defined]
+        http_request._worker_resolver_match = resolver_match
 
         view_func = resolver_match.view
         is_async_view = getattr(view_func, "view_is_async", False)
