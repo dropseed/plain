@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from plain.http import Request
 from plain.realtime import SSEView
 from plain.views import WebSocketView
 
@@ -8,10 +7,10 @@ from plain.views import WebSocketView
 class EchoSSE(SSEView):
     """SSE echo endpoint for testing."""
 
-    def authorize(self, request: Request) -> bool:
+    def authorize(self) -> bool:
         return True
 
-    def subscribe(self, request: Request) -> list[str]:
+    def subscribe(self) -> list[str]:
         return ["echo"]
 
     def transform(self, channel_name: str, payload: str) -> str:

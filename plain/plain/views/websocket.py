@@ -91,7 +91,7 @@ class WebSocketView(View):
         if self._closed or self._writer is None:
             return
 
-        from plain.realtime.websocket import OP_BINARY, OP_TEXT, encode_frame
+        from plain.server.protocols.websocket import OP_BINARY, OP_TEXT, encode_frame
 
         if isinstance(message, bytes):
             data = encode_frame(OP_BINARY, message)
@@ -115,7 +115,7 @@ class WebSocketView(View):
             return
         self._closed = True
 
-        from plain.realtime.websocket import encode_close
+        from plain.server.protocols.websocket import encode_close
 
         if self._writer:
             try:

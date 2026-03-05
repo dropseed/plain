@@ -10,8 +10,8 @@ import struct
 import pytest
 
 from plain.realtime.channel import SSEView
-from plain.realtime.sse import SSE_HEADERS, format_sse_comment, format_sse_event
-from plain.realtime.websocket import (
+from plain.server.protocols.sse import SSE_HEADERS, format_sse_comment, format_sse_event
+from plain.server.protocols.websocket import (
     CLOSE_NORMAL,
     CLOSE_PROTOCOL_ERROR,
     OP_BINARY,
@@ -81,11 +81,11 @@ class TestSSEFormatting:
 class TestSSEViewBaseClass:
     def test_default_authorize(self):
         ch = SSEView()
-        assert ch.authorize(None) is True  # type: ignore[arg-type]
+        assert ch.authorize() is True
 
     def test_default_subscribe(self):
         ch = SSEView()
-        assert ch.subscribe(None) == []  # type: ignore[arg-type]
+        assert ch.subscribe() == []
 
     def test_default_transform(self):
         ch = SSEView()

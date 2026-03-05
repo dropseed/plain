@@ -635,20 +635,9 @@ class Worker:
         http_response: Any,
     ) -> None:
         """Handle a WebSocket upgrade and lifecycle."""
-        from plain.realtime.websocket import (
-            CLOSE_MESSAGE_TOO_BIG,
-            CLOSE_PROTOCOL_ERROR,
-            MAX_DATA_PAYLOAD,
-            OP_BINARY,
-            OP_CLOSE,
-            OP_CONTINUATION,
-            OP_PING,
-            OP_PONG,
-            OP_TEXT,
+        from plain.server.protocols.websocket import (
             build_accept_response,
-            encode_frame,
-            parse_close_payload,
-            read_frame,
+            handle_websocket_connection,
             validate_handshake_headers,
         )
 
@@ -680,121 +669,7 @@ class Worker:
 
         ws_view.bind_transport(reader, writer)
 
-        listen_tasks = []
-        try:
-            # Call connect()
-            await ws_view.connect()
-
-            # Start pg_listen tasks for subscriptions if any
-            if ws_view._subscriptions:
-                for sub_channel in ws_view._subscriptions:
-                    task = loop.create_task(self._ws_pg_listen(ws_view, sub_channel))
-                    listen_tasks.append(task)
-
-            # Read loop
-            frag_opcode = None
-            frag_payload = bytearray()
-
-            while not ws_view._closed:
-                try:
-                    frame = await read_frame(reader)
-                except (asyncio.IncompleteReadError, ConnectionError):
-                    break
-                except ValueError as e:
-                    self.log.debug("WebSocket protocol error: %s", e)
-                    await ws_view.close(CLOSE_PROTOCOL_ERROR, str(e))
-                    break
-
-                if frame.opcode == OP_CLOSE:
-                    close = parse_close_payload(frame.payload)
-                    await ws_view.close(close.code)
-                    break
-
-                if frame.opcode == OP_PING:
-                    writer.write(encode_frame(OP_PONG, frame.payload))
-                    await writer.drain()
-                    continue
-
-                if frame.opcode == OP_PONG:
-                    continue
-
-                # Data frames
-                if frame.opcode == OP_CONTINUATION:
-                    if frag_opcode is None:
-                        await ws_view.close(
-                            CLOSE_PROTOCOL_ERROR, "Unexpected continuation"
-                        )
-                        break
-                    frag_payload.extend(frame.payload)
-                    if len(frag_payload) > MAX_DATA_PAYLOAD:
-                        await ws_view.close(CLOSE_MESSAGE_TOO_BIG, "Message too large")
-                        break
-                    if frame.fin:
-                        await self._ws_dispatch(
-                            ws_view, frag_opcode, bytes(frag_payload)
-                        )
-                        frag_opcode = None
-                        frag_payload.clear()
-                elif frame.opcode in (OP_TEXT, OP_BINARY):
-                    if frag_opcode is not None:
-                        await ws_view.close(
-                            CLOSE_PROTOCOL_ERROR,
-                            "New data frame during fragmentation",
-                        )
-                        break
-                    if frame.fin:
-                        await self._ws_dispatch(ws_view, frame.opcode, frame.payload)
-                    else:
-                        frag_opcode = frame.opcode
-                        frag_payload.extend(frame.payload)
-        except Exception:
-            self.log.exception("WebSocket error")
-        finally:
-            # Cancel listen tasks and wait for them to finish
-            for task in listen_tasks:
-                task.cancel()
-            if listen_tasks:
-                await asyncio.gather(*listen_tasks, return_exceptions=True)
-
-            ws_view._closed = True
-            await ws_view.disconnect()
-
-            try:
-                writer.close()
-            except OSError:
-                pass
-
-    async def _ws_dispatch(self, ws_view: Any, opcode: int, payload: bytes) -> None:
-        """Dispatch a WebSocket message to the view's receive method."""
-        from plain.realtime.websocket import OP_TEXT
-
-        if opcode == OP_TEXT:
-            try:
-                message: str | bytes = payload.decode("utf-8")
-            except UnicodeDecodeError:
-                from plain.realtime.websocket import CLOSE_INVALID_PAYLOAD
-
-                await ws_view.close(CLOSE_INVALID_PAYLOAD, "Invalid UTF-8")
-                return
-        else:
-            message = payload
-
-        await ws_view.receive(message)
-
-    async def _ws_pg_listen(self, ws_view: Any, channel: str) -> None:
-        """Listen for Postgres NOTIFY and send to WebSocket client."""
-
-        from plain.realtime.channel import pg_listen
-
-        try:
-            async for channel_name, payload in pg_listen(channel):
-                if ws_view._closed:
-                    break
-                if channel_name is None:
-                    continue  # heartbeat
-                await ws_view.send(payload)
-        except asyncio.CancelledError:
-            pass
+        await handle_websocket_connection(reader, writer, ws_view, self.log)
 
     async def _write_async_response(self, resp: Response, http_response: Any) -> None:
         """Write an AsyncStreamingResponse to the socket."""

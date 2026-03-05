@@ -9,8 +9,9 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import logging
 import struct
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 # WebSocket opcodes (RFC 6455 Section 5.2)
 OP_CONTINUATION = 0x0
@@ -87,7 +88,7 @@ def encode_frame(
     payload: bytes = b"",
     fin: bool = True,
 ) -> bytes:
-    """Encode a WebSocket frame for sending (server→client, no masking)."""
+    """Encode a WebSocket frame for sending (server->client, no masking)."""
     header = bytearray()
 
     # First byte: FIN + opcode
@@ -159,7 +160,7 @@ async def read_frame(
 ) -> Frame:
     """Read and decode a single WebSocket frame from the stream.
 
-    Client→server frames must be masked (RFC 6455 Section 5.1).
+    Client->server frames must be masked (RFC 6455 Section 5.1).
     Raises ConnectionError on EOF, ValueError on protocol violations.
     """
     # Read first 2 bytes
@@ -270,3 +271,126 @@ def build_accept_response(ws_key: str) -> bytes:
         "",
     ]
     return "\r\n".join(lines).encode("utf-8")
+
+
+async def handle_websocket_connection(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+    ws_view: Any,
+    log: logging.Logger,
+) -> None:
+    """Handle the WebSocket lifecycle after upgrade handshake.
+
+    Runs the frame read loop, handling ping/pong, close, fragmentation,
+    and dispatching data frames to the view's receive() method.
+    Also manages Postgres LISTEN subscriptions if any.
+    """
+    listen_tasks: list[asyncio.Task] = []
+    try:
+        # Call connect()
+        await ws_view.connect()
+
+        # Start pg_listen tasks for subscriptions if any
+        if ws_view._subscriptions:
+            loop = asyncio.get_running_loop()
+            for sub_channel in ws_view._subscriptions:
+                task = loop.create_task(_ws_pg_listen(ws_view, sub_channel))
+                listen_tasks.append(task)
+
+        # Read loop
+        frag_opcode = None
+        frag_payload = bytearray()
+
+        while not ws_view._closed:
+            try:
+                frame = await read_frame(reader)
+            except (asyncio.IncompleteReadError, ConnectionError):
+                break
+            except ValueError as e:
+                log.debug("WebSocket protocol error: %s", e)
+                await ws_view.close(CLOSE_PROTOCOL_ERROR, str(e))
+                break
+
+            if frame.opcode == OP_CLOSE:
+                close = parse_close_payload(frame.payload)
+                await ws_view.close(close.code)
+                break
+
+            if frame.opcode == OP_PING:
+                writer.write(encode_frame(OP_PONG, frame.payload))
+                await writer.drain()
+                continue
+
+            if frame.opcode == OP_PONG:
+                continue
+
+            # Data frames
+            if frame.opcode == OP_CONTINUATION:
+                if frag_opcode is None:
+                    await ws_view.close(CLOSE_PROTOCOL_ERROR, "Unexpected continuation")
+                    break
+                frag_payload.extend(frame.payload)
+                if len(frag_payload) > MAX_DATA_PAYLOAD:
+                    await ws_view.close(CLOSE_MESSAGE_TOO_BIG, "Message too large")
+                    break
+                if frame.fin:
+                    await _ws_dispatch(ws_view, frag_opcode, bytes(frag_payload))
+                    frag_opcode = None
+                    frag_payload.clear()
+            elif frame.opcode in (OP_TEXT, OP_BINARY):
+                if frag_opcode is not None:
+                    await ws_view.close(
+                        CLOSE_PROTOCOL_ERROR,
+                        "New data frame during fragmentation",
+                    )
+                    break
+                if frame.fin:
+                    await _ws_dispatch(ws_view, frame.opcode, frame.payload)
+                else:
+                    frag_opcode = frame.opcode
+                    frag_payload.extend(frame.payload)
+    except Exception:
+        log.exception("WebSocket error")
+    finally:
+        # Cancel listen tasks and wait for them to finish
+        for task in listen_tasks:
+            task.cancel()
+        if listen_tasks:
+            await asyncio.gather(*listen_tasks, return_exceptions=True)
+
+        ws_view._closed = True
+        await ws_view.disconnect()
+
+        try:
+            writer.close()
+        except OSError:
+            pass
+
+
+async def _ws_dispatch(ws_view: Any, opcode: int, payload: bytes) -> None:
+    """Dispatch a WebSocket message to the view's receive method."""
+    if opcode == OP_TEXT:
+        try:
+            message: str | bytes = payload.decode("utf-8")
+        except UnicodeDecodeError:
+            await ws_view.close(CLOSE_INVALID_PAYLOAD, "Invalid UTF-8")
+            return
+    else:
+        message = payload
+
+    await ws_view.receive(message)
+
+
+async def _ws_pg_listen(ws_view: Any, channel: str) -> None:
+    """Listen for Postgres NOTIFY and send to WebSocket client."""
+    from plain.realtime.channel import pg_listen
+
+    try:
+        async for channel_name, payload in pg_listen(channel):
+            if ws_view._closed:
+                break
+            if channel_name is None:
+                continue  # heartbeat
+            await ws_view.send(payload)
+    except asyncio.CancelledError:
+        pass

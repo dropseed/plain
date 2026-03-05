@@ -18,15 +18,14 @@ The realtime module lets you push events to connected browsers. Define an `SSEVi
 ```python
 # app/realtime.py
 from plain.realtime import SSEView, notify
-from plain.http import Request
 
 
 class UserNotifications(SSEView):
-    def authorize(self, request):
-        return request.user.is_authenticated
+    def authorize(self):
+        return self.request.user.is_authenticated
 
-    def subscribe(self, request):
-        return [f"user:{request.user.pk}"]
+    def subscribe(self):
+        return [f"user:{self.request.user.pk}"]
 ```
 
 ```python
@@ -58,7 +57,7 @@ events.onmessage = (e) => {
 };
 ```
 
-All `SSEView` methods are sync. You have full access to the ORM, sessions, and everything else — no `async def`, no `await`, no special wrappers.
+All `SSEView` methods are sync. You have full access to the ORM, sessions, and everything else via `self.request` — no `async def`, no `await`, no special wrappers.
 
 For bidirectional WebSocket communication, see [WebSocket views](#websocket-views) below.
 
@@ -72,10 +71,10 @@ from plain.realtime import SSEView
 
 
 class DashboardUpdates(SSEView):
-    def authorize(self, request):
-        return request.user.is_staff
+    def authorize(self):
+        return self.request.user.is_staff
 
-    def subscribe(self, request):
+    def subscribe(self):
         return ["dashboard:metrics"]
 
     def transform(self, channel_name, payload):
@@ -102,22 +101,22 @@ class AppRouter(Router):
 
 | Method                             | Purpose                                                  | Required                |
 | ---------------------------------- | -------------------------------------------------------- | ----------------------- |
-| `authorize(request)`               | Return `True` to allow the connection, `False` for 403   | No (defaults to `True`) |
-| `subscribe(request)`               | Return a list of Postgres channel names to listen on     | Yes                     |
+| `authorize()`                      | Return `True` to allow the connection, `False` for 403   | No (defaults to `True`) |
+| `subscribe()`                      | Return a list of Postgres channel names to listen on     | Yes                     |
 | `transform(channel_name, payload)` | Reshape the event before sending. Return `None` to skip. | No (sends raw payload)  |
 
-All methods receive the full `Request` object with access to `request.user`, the ORM, sessions, etc.
+All methods have access to `self.request` with `request.user`, the ORM, sessions, etc.
 
 ### Channel names
 
 The strings returned by `subscribe()` are Postgres LISTEN/NOTIFY channel names. They can be any string, but a namespaced convention keeps things organized:
 
 ```python
-def subscribe(self, request):
+def subscribe(self):
     return [
-        f"user:{request.user.pk}",           # Per-user events
-        f"org:{request.org.pk}",              # Per-organization events
-        "system:announcements",                # Global broadcast
+        f"user:{self.request.user.pk}",           # Per-user events
+        f"org:{self.request.org.pk}",              # Per-organization events
+        "system:announcements",                     # Global broadcast
     ]
 ```
 
@@ -182,17 +181,17 @@ For bidirectional communication, use a `WebSocketView` (see [WebSocket views](#w
 
 ```python
 class ProjectEvents(SSEView):
-    def authorize(self, request):
-        project_id = request.GET.get("project_id")
+    def authorize(self):
+        project_id = self.request.GET.get("project_id")
         if not project_id:
             return False
         return ProjectMembership.query.filter(
             project_id=project_id,
-            user=request.user,
+            user=self.request.user,
         ).exists()
 
-    def subscribe(self, request):
-        project_id = request.GET["project_id"]
+    def subscribe(self):
+        project_id = self.request.GET["project_id"]
         return [f"project:{project_id}"]
 ```
 
@@ -262,11 +261,11 @@ Use `WebSocketView` when you genuinely need **high-frequency bidirectional messa
 
 ```python
 class Notifications(SSEView):
-    def authorize(self, request):
-        return request.user.is_authenticated
+    def authorize(self):
+        return self.request.user.is_authenticated
 
-    def subscribe(self, request):
-        return [f"user:{request.user.pk}"]
+    def subscribe(self):
+        return [f"user:{self.request.user.pk}"]
 ```
 
 ```python
@@ -289,10 +288,10 @@ def create_comment(request):
 
 ```python
 class Dashboard(SSEView):
-    def authorize(self, request):
-        return request.user.is_staff
+    def authorize(self):
+        return self.request.user.is_staff
 
-    def subscribe(self, request):
+    def subscribe(self):
         return ["dashboard:metrics"]
 
     def transform(self, channel_name, payload):
@@ -315,14 +314,14 @@ def compute_metrics():
 
 ```python
 class Chat(SSEView):
-    def authorize(self, request):
-        room_id = request.GET.get("room")
+    def authorize(self):
+        room_id = self.request.GET.get("room")
         return ChatRoom.query.filter(
-            pk=room_id, members=request.user
+            pk=room_id, members=self.request.user
         ).exists()
 
-    def subscribe(self, request):
-        room_id = request.GET["room"]
+    def subscribe(self):
+        room_id = self.request.GET["room"]
         return [f"chat:room:{room_id}"]
 ```
 
@@ -361,14 +360,14 @@ function sendMessage(text) {
 
 ```python
 class AgentStream(SSEView):
-    def authorize(self, request):
-        session_id = request.GET.get("session")
+    def authorize(self):
+        session_id = self.request.GET.get("session")
         return AgentSession.query.filter(
-            pk=session_id, user=request.user
+            pk=session_id, user=self.request.user
         ).exists()
 
-    def subscribe(self, request):
-        session_id = request.GET["session"]
+    def subscribe(self):
+        session_id = self.request.GET["session"]
         return [f"agent:{session_id}"]
 ```
 

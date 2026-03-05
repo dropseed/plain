@@ -6,12 +6,11 @@ from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
 from plain.http import AsyncStreamingResponse, ForbiddenError403
+from plain.server.protocols.sse import SSE_HEADERS, format_sse_comment, format_sse_event
 from plain.views import View
 
-from .sse import SSE_HEADERS, format_sse_comment, format_sse_event
-
 if TYPE_CHECKING:
-    from plain.http import Request, ResponseBase
+    from plain.http import ResponseBase
 
 
 async def pg_listen(
@@ -52,11 +51,11 @@ class SSEView(View):
     Example::
 
         class UserEvents(SSEView):
-            def authorize(self, request):
-                return request.user.is_authenticated
+            def authorize(self):
+                return self.request.user.is_authenticated
 
-            def subscribe(self, request):
-                return [f"user:{request.user.pk}"]
+            def subscribe(self):
+                return [f"user:{self.request.user.pk}"]
 
             def transform(self, channel_name, payload):
                 return {"type": "update", "data": payload}
@@ -64,18 +63,20 @@ class SSEView(View):
 
     view_protocol: str | None = "sse"
 
-    def authorize(self, request: Request) -> bool:
-        """Check if the request is allowed to connect to this channel.
+    def authorize(self) -> bool:
+        """Check if the request is allowed to connect.
 
         Called in the sync context with full access to the ORM, sessions, etc.
         Return True to allow the connection, False to reject with 403.
+        Access the request via self.request.
         """
         return True
 
-    def subscribe(self, request: Request) -> list[str]:
+    def subscribe(self) -> list[str]:
         """Return the list of Postgres NOTIFY channel names to listen on.
 
         Called in the sync context after authorize() succeeds.
+        Access the request via self.request.
         """
         return []
 
@@ -91,11 +92,11 @@ class SSEView(View):
         loop = asyncio.get_running_loop()
 
         # Run sync authorize/subscribe in executor for ORM access
-        authorized = await loop.run_in_executor(None, self.authorize, self.request)
+        authorized = await loop.run_in_executor(None, self.authorize)
         if not authorized:
             raise ForbiddenError403
 
-        subscriptions = await loop.run_in_executor(None, self.subscribe, self.request)
+        subscriptions = await loop.run_in_executor(None, self.subscribe)
         if not subscriptions:
             raise ForbiddenError403
 
