@@ -74,10 +74,8 @@ class TestSSEFormatting:
         assert result == b": \n\n"
 
     def test_sse_headers(self):
-        header_dict = dict(SSE_HEADERS)
-        assert header_dict["Content-Type"] == "text/event-stream"
-        assert header_dict["Cache-Control"] == "no-cache"
-        assert header_dict["Connection"] == "keep-alive"
+        assert SSE_HEADERS["Cache-Control"] == "no-cache"
+        assert SSE_HEADERS["X-Accel-Buffering"] == "no"
 
 
 class TestChannelBaseClass:

@@ -107,11 +107,12 @@ class SharedListener:
             try:
                 async for notify in self._conn.notifies():
                     backoff = 0.5  # Reset on successful notification
-                    async with self._lock:
-                        queues = self._subscribers.get(notify.channel)
-                        if queues:
-                            for queue in queues:
-                                queue.put_nowait((notify.channel, notify.payload or ""))
+                    # Snapshot queues without holding the lock to avoid
+                    # blocking subscribe/unsubscribe during fan-out.
+                    queues = self._subscribers.get(notify.channel)
+                    if queues:
+                        for queue in queues.copy():
+                            queue.put_nowait((notify.channel, notify.payload or ""))
             except asyncio.CancelledError:
                 return
             except Exception:

@@ -743,9 +743,11 @@ class Worker:
         except Exception:
             self.log.exception("WebSocket error")
         finally:
-            # Cancel listen tasks
+            # Cancel listen tasks and wait for them to finish
             for task in listen_tasks:
                 task.cancel()
+            if listen_tasks:
+                await asyncio.gather(*listen_tasks, return_exceptions=True)
 
             ws_view._closed = True
             await ws_view.disconnect()

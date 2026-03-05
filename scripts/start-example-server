@@ -20,6 +20,9 @@ fi
 
 export PYTHONPATH="$REPO_ROOT/example${PYTHONPATH:+:$PYTHONPATH}"
 
+# Disable HTTPS redirect when running without TLS (test/benchmark scripts)
+export PLAIN_HTTPS_REDIRECT_ENABLED=false
+
 uv run plain server --bind "127.0.0.1:$PORT" --workers 1 "$@" &>/dev/null &
 SERVER_PID=$!
 cd "$REPO_ROOT"

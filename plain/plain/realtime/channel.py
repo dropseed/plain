@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from plain.http import AsyncStreamingResponse, ForbiddenError403
 from plain.views import View
 
-from .sse import format_sse_comment, format_sse_event
+from .sse import SSE_HEADERS, format_sse_comment, format_sse_event
 
 if TYPE_CHECKING:
     from plain.http import Request, ResponseBase
@@ -123,8 +123,5 @@ class Channel(View):
         return AsyncStreamingResponse(
             stream(),
             content_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no",
-            },
+            headers=SSE_HEADERS,
         )

@@ -57,9 +57,7 @@ def format_sse_comment(comment: str = "") -> bytes:
     return f": {comment}\n\n".encode()
 
 
-SSE_HEADERS = [
-    ("Content-Type", "text/event-stream"),
-    ("Cache-Control", "no-cache"),
-    ("Connection", "keep-alive"),
-    ("X-Accel-Buffering", "no"),  # Disable nginx buffering
-]
+SSE_HEADERS: dict[str, str] = {
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",  # Disable nginx buffering
+}

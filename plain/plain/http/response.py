@@ -114,6 +114,7 @@ class ResponseBase:
 
     status_code = 200
     is_async = False
+    streaming = False
 
     def __init__(
         self,
@@ -330,8 +331,6 @@ class Response(ResponseBase):
 
     This content can be read, appended to, or replaced.
     """
-
-    streaming = False
 
     def __init__(self, content: bytes | str | Iterator[bytes] = b"", **kwargs: Any):
         super().__init__(**kwargs)

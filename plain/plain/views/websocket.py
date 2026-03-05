@@ -154,6 +154,7 @@ class WebSocketUpgradeResponse(ResponseBase):
 
     status_code = 101
     is_websocket = True
+    streaming = True  # Skip Content-Length middleware
 
     def __init__(self, ws_view: WebSocketView, **kwargs: Any) -> None:
         super().__init__(**kwargs)
