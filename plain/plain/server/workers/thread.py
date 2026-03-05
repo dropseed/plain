@@ -177,6 +177,8 @@ class Worker:
 
         self.max_keepalived: int = WORKER_CONNECTIONS - self.app.threads
         self.nr_conns: int = 0
+        # Track long-lived async connections (WebSocket, H2, SSE) for graceful shutdown
+        self._async_tasks: set[asyncio.Task] = set()
 
     def __str__(self) -> str:
         return f"<Worker {self.pid}>"
@@ -443,8 +445,9 @@ class Worker:
         try:
             resolver_match = get_resolver().resolve(http_request.path_info)
         except Exception:
-            # Fall back to sync handling if resolution fails
-            # (middleware will handle the 404)
+            # Fall back to sync handling if resolution fails.
+            # This re-resolves in get_response (producing the 404 via middleware).
+            # The double resolve on 404s is intentional — keeping it simple.
             return await loop.run_in_executor(
                 self.tpool, self.handle_request, req, conn, http_request
             )
@@ -464,26 +467,41 @@ class Worker:
 
     async def _handle_h2(self, loop: asyncio.AbstractEventLoop, conn: TConn) -> None:
         """Run the async H2 handler on the connection socket."""
-        await async_handle_h2_connection(
-            conn.sock,
-            conn.client,
-            conn.server,
-            self.handler,
-            self.app.is_ssl,
-            self.tpool,
-        )
+        task = asyncio.current_task()
+        if task is not None:
+            self._async_tasks.add(task)
+        try:
+            await async_handle_h2_connection(
+                conn.sock,
+                conn.client,
+                conn.server,
+                self.handler,
+                self.app.is_ssl,
+                self.tpool,
+            )
+        finally:
+            if task is not None:
+                self._async_tasks.discard(task)
 
     async def _graceful_shutdown(self, loop: asyncio.AbstractEventLoop) -> None:
         # Stop accepting new connections
         for s in self.sockets:
             s.close()
 
-        # Wait for in-flight connections to finish
+        # Wait for in-flight HTTP connections to finish
         from plain.runtime import settings
 
         deadline = time.monotonic() + settings.SERVER_GRACEFUL_TIMEOUT
         while self.nr_conns > 0 and time.monotonic() < deadline:
             await asyncio.sleep(0.5)
+
+        # Cancel long-lived async connections (WebSocket, H2, SSE) so they
+        # can run their cleanup (close frames, disconnect hooks, etc.)
+        if self._async_tasks:
+            for task in self._async_tasks:
+                task.cancel()
+            await asyncio.gather(*self._async_tasks, return_exceptions=True)
+            self._async_tasks.clear()
 
         self.tpool.shutdown(False)
 
@@ -654,7 +672,11 @@ class Worker:
             )
             return
 
-        # Mark as handed off now that handshake is validated
+        # Mark as handed off now that handshake is validated.
+        # This is safe because _handle_connection (the caller) and this
+        # method both run as tasks on the same event loop — no concurrent
+        # access between the `handed_off = True` here and the `finally`
+        # check in _handle_connection.
         conn.handed_off = True
 
         # Send the 101 Switching Protocols response
@@ -666,7 +688,14 @@ class Worker:
 
         ws_view.bind_transport(reader, writer)
 
-        await handle_websocket_connection(reader, writer, ws_view, self.log)
+        task = asyncio.current_task()
+        if task is not None:
+            self._async_tasks.add(task)
+        try:
+            await handle_websocket_connection(reader, writer, ws_view, self.log)
+        finally:
+            if task is not None:
+                self._async_tasks.discard(task)
 
     async def _write_async_response(self, resp: Response, http_response: Any) -> None:
         """Write an AsyncStreamingResponse to the socket."""
@@ -675,10 +704,18 @@ class Worker:
         resp.set_status_and_headers(status, http_response.header_items())
         await loop.run_in_executor(self.tpool, resp.send_headers)
 
-        # Iterate async streaming content, write chunks in executor
-        # to avoid blocking the event loop on slow clients
-        async for chunk in http_response:
-            await loop.run_in_executor(self.tpool, resp.write, chunk)
+        # Track this task so graceful shutdown can cancel long-lived streams (SSE)
+        task = asyncio.current_task()
+        if task is not None:
+            self._async_tasks.add(task)
+        try:
+            # Iterate async streaming content, write chunks in executor
+            # to avoid blocking the event loop on slow clients
+            async for chunk in http_response:
+                await loop.run_in_executor(self.tpool, resp.write, chunk)
+        finally:
+            if task is not None:
+                self._async_tasks.discard(task)
 
         await loop.run_in_executor(self.tpool, resp.close)
 

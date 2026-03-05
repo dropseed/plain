@@ -340,7 +340,8 @@ async def async_handle_h2_connection(
                 loop.call_soon_threadsafe(recv_queue.put_nowait, data)
                 if not data:
                     break
-        except OSError:
+        except OSError as e:
+            log.debug("H2 reader thread stopped: %s", e)
             loop.call_soon_threadsafe(recv_queue.put_nowait, None)
 
     reader_thread = threading.Thread(target=_reader_thread, daemon=True)
@@ -630,20 +631,40 @@ async def _async_send_h2_data(
             # Window exhausted — flush pending data before waiting
             await state.flush()
 
-        # Wait for a window update (set by the read loop)
-        done, pending = await asyncio.wait(
-            [
-                asyncio.ensure_future(stream_event.wait()),
-                asyncio.ensure_future(conn_event.wait()),
-            ],
-            timeout=5.0,
-            return_when=asyncio.FIRST_COMPLETED,
-        )
+        # Wait for a window update (set by the read loop).
+        # We create short-lived tasks to race the two events; the loser
+        # is cancelled immediately so nothing leaks.
+        stream_waiter = asyncio.create_task(stream_event.wait())
+        conn_waiter = asyncio.create_task(conn_event.wait())
+        try:
+            done, pending = await asyncio.wait(
+                [stream_waiter, conn_waiter],
+                timeout=5.0,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+        except asyncio.CancelledError:
+            stream_waiter.cancel()
+            conn_waiter.cancel()
+            raise
         for p in pending:
             p.cancel()
 
         if not done:
-            return  # Timed out waiting for window update; give up
+            # Timed out waiting for flow-control window update.
+            # Reset the stream so the client knows the response is incomplete
+            # rather than silently truncating it.
+            log.warning(
+                "H2 stream %d: timed out waiting for flow-control window update, "
+                "resetting stream",
+                stream_id,
+            )
+            async with state.write_lock:
+                try:
+                    conn.reset_stream(stream_id)
+                    await state.flush()
+                except Exception:
+                    pass
+            return
 
     if end_stream and offset == 0:
         async with state.write_lock:

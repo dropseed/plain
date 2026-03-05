@@ -167,7 +167,9 @@ class BaseHandler:
         )
 
         loop = asyncio.get_running_loop()
-        # Store loop on request so _get_response can bridge async views
+        # Store loop on request so _get_response (running in an executor thread)
+        # can bridge async views back via run_coroutine_threadsafe. This is a
+        # private attr — only read by _get_response in this same module.
         request._event_loop = loop  # type: ignore[attr-defined]
 
         span_attributes, span_context = self._build_request_span(request)

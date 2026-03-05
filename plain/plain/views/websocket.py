@@ -34,8 +34,6 @@ class WebSocketView(View):
                 await self.send(f"echo: {message}")
     """
 
-    view_protocol: str | None = "websocket"
-
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._writer: asyncio.StreamWriter | None = None
@@ -90,8 +88,15 @@ class WebSocketView(View):
         """Hook called before disconnect(). Override in subclasses for pre-disconnect cleanup."""
         pass
 
+    # Maximum time to wait for a slow client to accept written data.
+    # If drain() doesn't complete in this time, the connection is closed.
+    send_timeout: float = 10.0
+
     async def send(self, message: str | bytes) -> None:
-        """Send a message to the WebSocket client."""
+        """Send a message to the WebSocket client.
+
+        Closes the connection if the client can't keep up (drain times out).
+        """
         if self._closed or self._writer is None:
             return
 
@@ -103,7 +108,11 @@ class WebSocketView(View):
             data = encode_frame(OP_TEXT, str(message).encode("utf-8"))
 
         self._writer.write(data)
-        await self._writer.drain()
+        try:
+            await asyncio.wait_for(self._writer.drain(), timeout=self.send_timeout)
+        except TimeoutError:
+            logger.warning("WebSocket send timed out (slow client), closing connection")
+            await self.close(1001, "Send timeout")
 
     async def send_json(self, data: Any) -> None:
         """Send JSON data to the WebSocket client."""
@@ -135,13 +144,8 @@ class WebSocketView(View):
         if not authorized:
             raise ForbiddenError403
 
-        # The actual WebSocket lifecycle is handled by the server's
-        # connection handler which detects view_protocol == "websocket"
-        # and performs the upgrade handshake before calling into the
-        # WebSocket lifecycle methods.
-        #
-        # This get() method returns a special marker response that
-        # the server knows to handle as a WebSocket upgrade.
+        # Return a marker response that tells the server to perform
+        # the WebSocket upgrade handshake and run the lifecycle.
         return WebSocketUpgradeResponse(self)
 
 

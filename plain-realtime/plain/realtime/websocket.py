@@ -32,7 +32,12 @@ class RealtimeWebSocketView(WebSocketView):
         self._listen_tasks: list[asyncio.Task] = []
 
     async def subscribe(self, channel: str) -> None:
-        """Subscribe to a Postgres NOTIFY channel for server-push events."""
+        """Subscribe to a Postgres NOTIFY channel for server-push events.
+
+        Must be called during connect(). Subscriptions added later
+        (e.g. in receive()) will have no effect — listeners are started
+        once after connect() returns.
+        """
         self._subscriptions.append(channel)
 
     async def _after_connect(self) -> None:

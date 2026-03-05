@@ -10,7 +10,9 @@ import logging
 
 logger = logging.getLogger("plain.realtime")
 
-_shared_listener: SharedListener | None = None
+# Keyed by event loop id so a new asyncio.run() gets a fresh listener
+# instead of reusing one whose tasks belong to a dead loop.
+_shared_listeners: dict[int, SharedListener] = {}
 
 
 def _get_connection_string() -> str:
@@ -24,7 +26,9 @@ def _get_connection_string() -> str:
 class SharedListener:
     """Per-worker singleton that holds one Postgres connection for LISTEN.
 
-    Fans out notifications to subscriber queues.
+    Fans out notifications to subscriber queues. Scoped to the running
+    event loop — if the loop changes (e.g. tests calling asyncio.run()
+    multiple times), a new listener is created automatically.
     """
 
     def __init__(self) -> None:
@@ -36,10 +40,13 @@ class SharedListener:
 
     @classmethod
     def get(cls) -> SharedListener:
-        global _shared_listener
-        if _shared_listener is None:
-            _shared_listener = cls()
-        return _shared_listener
+        loop = asyncio.get_running_loop()
+        loop_id = id(loop)
+        listener = _shared_listeners.get(loop_id)
+        if listener is None:
+            listener = cls()
+            _shared_listeners[loop_id] = listener
+        return listener
 
     async def subscribe(self, queue: asyncio.Queue, *channels: str) -> None:
         async with self._lock:

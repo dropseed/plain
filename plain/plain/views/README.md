@@ -313,11 +313,6 @@ class EchoView(WebSocketView):
     async def authorize(self):
         return self.request.user.is_authenticated
 
-    async def connect(self):
-        # Called after the WebSocket connection is established.
-        # Use self.subscribe() to listen for Postgres NOTIFY events.
-        await self.subscribe(f"room:{self.url_kwargs['room_id']}")
-
     async def receive(self, message):
         # Called when the client sends a message (str or bytes).
         await self.send(f"echo: {message}")
@@ -333,13 +328,19 @@ Register it in your URL router like any other view:
 path("ws/echo/", EchoView)
 ```
 
-Available methods for sending data back to the client:
+### WebSocketView methods
 
-- `await self.send(message)` — send a text or binary message
-- `await self.send_json(data)` — send JSON-serialized data
-- `await self.close(code, reason)` — close the connection
+| Method                | Purpose                                     | Required |
+| --------------------- | ------------------------------------------- | -------- |
+| `authorize()`         | Return `True` to allow, `False` for 403     | No       |
+| `connect()`           | Called after connection established         | No       |
+| `receive(message)`    | Handle incoming messages (`str` or `bytes`) | No       |
+| `disconnect()`        | Called on connection close. Cleanup here.   | No       |
+| `send(message)`       | Send a text or binary message               | -        |
+| `send_json(data)`     | Send JSON-serialized data                   | -        |
+| `close(code, reason)` | Close the connection                        | -        |
 
-Server-push events arrive automatically when you `subscribe()` to Postgres NOTIFY channels. Clients receive them alongside messages sent via `send()`.
+For server-push via Postgres LISTEN/NOTIFY over WebSocket, use `RealtimeWebSocketView` from the [realtime](../../../plain-realtime/plain/realtime/README.md#websocket-views) package.
 
 For server-to-client push without bidirectional messaging, use [`SSEView`](../realtime/README.md) (SSE) instead — it's simpler and works with the browser's `EventSource` API.
 

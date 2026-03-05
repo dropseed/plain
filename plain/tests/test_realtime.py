@@ -1,14 +1,28 @@
-"""Tests for SSE formatting and WebSocket framing protocols.
+"""Tests for SSE formatting, WebSocket framing, and H2 handler protocols.
 
 Integration tests for the full SSE/WebSocket pipeline require a running server.
 """
+
+from __future__ import annotations
 
 import asyncio
 import struct
 
 import pytest
 
-from plain.server.protocols.sse import SSE_HEADERS, format_sse_comment, format_sse_event
+from plain.server.http.h2handler import (
+    H2Request,
+    H2Stream,
+    _build_h2_response_headers,
+    _build_http_request,
+    _extract_headers_from_stream,
+)
+from plain.server.protocols.sse import (
+    SSE_HEADERS,
+    _sanitize_field,
+    format_sse_comment,
+    format_sse_event,
+)
 from plain.server.protocols.websocket import (
     CLOSE_NORMAL,
     CLOSE_PROTOCOL_ERROR,
@@ -74,6 +88,31 @@ class TestSSEFormatting:
     def test_sse_headers(self):
         assert SSE_HEADERS["Cache-Control"] == "no-cache"
         assert SSE_HEADERS["X-Accel-Buffering"] == "no"
+
+    def test_sanitize_field_strips_newlines(self):
+        assert _sanitize_field("evil\ninjection") == "evilinjection"
+        assert _sanitize_field("evil\r\ninjection") == "evilinjection"
+        assert _sanitize_field("evil\rinjection") == "evilinjection"
+
+    def test_format_event_with_json_dict(self):
+        result = format_sse_event({"key": "value"})
+        assert b'data: {"key": "value"}\n\n' == result
+
+    def test_format_event_with_json_list(self):
+        result = format_sse_event([1, 2, 3])
+        assert b"data: [1, 2, 3]\n\n" == result
+
+    def test_format_event_with_retry(self):
+        result = format_sse_event("data", retry=5000)
+        assert b"retry: 5000\n" in result
+        assert b"data: data\n\n" in result
+
+    def test_event_type_injection_blocked(self):
+        """Newlines in event field are stripped to prevent SSE injection."""
+        result = format_sse_event("data", event="legit\ndata: injected")
+        assert b"event: legitdata: injected\n" in result
+        # The injected "data:" is on the same line as event, not a separate field
+        assert result.count(b"data:") == 2  # one from event field, one from actual data
 
 
 class TestWebSocketFrameProtocol:
@@ -300,3 +339,218 @@ class TestReadFrame:
         assert f2.fin is True
         assert f2.opcode == 0x0  # continuation
         assert f2.payload == b"lo"
+
+    def test_read_medium_payload(self):
+        """Test reading a frame with 2-byte extended length."""
+        payload = b"x" * 200
+        data = _make_masked_frame(OP_BINARY, payload)
+        frame = asyncio.run(_read_frame_from_data(data))
+        assert frame.payload == payload
+
+    def test_reject_unknown_opcode(self):
+        """Unknown opcodes should be rejected."""
+        # opcode 0x5 is reserved
+        header = bytes([0x85, 0x80, 0x01, 0x02, 0x03, 0x04])
+        with pytest.raises(ValueError, match="Unknown opcode"):
+            asyncio.run(_read_frame_from_data(header))
+
+    def test_reject_fragmented_control_frame(self):
+        """Control frames must not be fragmented."""
+        # PING with fin=False
+        data = _make_masked_frame(OP_PING, b"", fin=False)
+        with pytest.raises(ValueError, match="Fragmented control"):
+            asyncio.run(_read_frame_from_data(data))
+
+
+class TestApplyMaskPerformance:
+    """Test masking correctness across payload sizes."""
+
+    def test_mask_empty(self):
+        assert _apply_mask(b"", b"\x01\x02\x03\x04") == b""
+
+    def test_mask_small(self):
+        """Payloads smaller than 8 bytes use the remainder path."""
+        mask = b"\xaa\xbb\xcc\xdd"
+        data = b"Hi"
+        masked = _apply_mask(data, mask)
+        assert _apply_mask(masked, mask) == data
+
+    def test_mask_exactly_8_bytes(self):
+        mask = b"\x12\x34\x56\x78"
+        data = b"12345678"
+        masked = _apply_mask(data, mask)
+        assert _apply_mask(masked, mask) == data
+
+    def test_mask_large_payload(self):
+        """Exercise the memoryview path for payloads > 1024 bytes."""
+        mask = b"\xde\xad\xbe\xef"
+        data = b"A" * 2000
+        masked = _apply_mask(data, mask)
+        assert _apply_mask(masked, mask) == data
+        assert len(masked) == 2000
+
+    def test_mask_invalid_length(self):
+        with pytest.raises(ValueError, match="4 bytes"):
+            _apply_mask(b"data", b"\x01\x02\x03")
+
+
+# ---------------------------------------------------------------------------
+# H2 handler unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestH2Stream:
+    def test_stream_accumulates_data(self):
+        stream = H2Stream(1)
+        stream.headers = [(":method", "POST"), (":path", "/upload")]
+        stream.data.write(b"hello ")
+        stream.data_size += 6
+        stream.data.write(b"world")
+        stream.data_size += 5
+        stream.data.seek(0)
+        assert stream.data.read() == b"hello world"
+        assert stream.data_size == 11
+
+
+class TestH2ExtractHeaders:
+    def test_basic_extraction(self):
+        stream = H2Stream(1)
+        stream.headers = [
+            (":method", "GET"),
+            (":path", "/foo?bar=1"),
+            (":authority", "example.com"),
+            (":scheme", "https"),
+            ("content-type", "text/html"),
+        ]
+        method, path, authority, scheme, raw_headers = _extract_headers_from_stream(
+            stream, "http"
+        )
+        assert method == "GET"
+        assert path == "/foo?bar=1"
+        assert authority == "example.com"
+        assert scheme == "https"
+        assert ("CONTENT-TYPE", "text/html") in raw_headers
+
+    def test_authority_becomes_host(self):
+        stream = H2Stream(1)
+        stream.headers = [
+            (":method", "GET"),
+            (":path", "/"),
+            (":authority", "example.com"),
+        ]
+        _, _, _, _, raw_headers = _extract_headers_from_stream(stream, "https")
+        assert ("HOST", "example.com") in raw_headers
+
+    def test_existing_host_not_duplicated(self):
+        stream = H2Stream(1)
+        stream.headers = [
+            (":method", "GET"),
+            (":path", "/"),
+            (":authority", "example.com"),
+            ("host", "example.com"),
+        ]
+        _, _, _, _, raw_headers = _extract_headers_from_stream(stream, "https")
+        host_count = sum(1 for n, _ in raw_headers if n == "HOST")
+        assert host_count == 1
+
+
+class TestH2BuildHttpRequest:
+    def test_builds_request(self):
+        request = _build_http_request(
+            method="POST",
+            path_info="/api/data",
+            query="key=val",
+            scheme="https",
+            raw_headers=[("CONTENT-TYPE", "application/json")],
+            authority="api.example.com:8443",
+            client=("127.0.0.1", 5000),
+            server=("0.0.0.0", 8443),
+        )
+        assert request.method == "POST"
+        assert request.path_info == "/api/data"
+        assert request.query_string == "key=val"
+        assert request.server_scheme == "https"
+        assert request.headers["Content-Type"] == "application/json"
+
+    def test_server_from_authority_fallback(self):
+        """When server is not a tuple, falls back to authority."""
+        request = _build_http_request(
+            method="GET",
+            path_info="/",
+            query="",
+            scheme="https",
+            raw_headers=[],
+            authority="example.com:443",
+            client="127.0.0.1",
+            server="unix:/tmp/sock",
+        )
+        assert request.server_name == "example.com"
+        assert request.server_port == "443"
+
+
+class TestH2ResponseHeaders:
+    def test_skip_hop_by_hop(self):
+        """H2 responses must not include hop-by-hop headers."""
+
+        class FakeResponse:
+            status_code = 200
+
+            def header_items(self):
+                return [
+                    ("Content-Type", "text/html"),
+                    ("Connection", "keep-alive"),
+                    ("Transfer-Encoding", "chunked"),
+                    ("X-Custom", "value"),
+                ]
+
+        headers = _build_h2_response_headers(FakeResponse())
+        header_names = [n for n, _ in headers]
+        assert ":status" in header_names
+        assert "connection" not in header_names
+        assert "transfer-encoding" not in header_names
+        assert "x-custom" in header_names
+
+    def test_status_header(self):
+        class FakeResponse:
+            status_code = 404
+
+            def header_items(self):
+                return []
+
+        headers = _build_h2_response_headers(FakeResponse())
+        assert (":status", "404") in headers
+
+
+class TestH2Request:
+    def test_should_close_always_false(self):
+        req = H2Request(
+            method="GET",
+            path="/",
+            query="",
+            headers=[],
+            peer_addr=("127.0.0.1", 1234),
+            scheme="https",
+        )
+        assert req.should_close() is False
+
+    def test_uri_with_query(self):
+        req = H2Request(
+            method="GET",
+            path="/search",
+            query="q=test",
+            headers=[],
+            peer_addr=("127.0.0.1", 1234),
+            scheme="https",
+        )
+        assert req.uri == "/search?q=test"
+
+    def test_uri_without_query(self):
+        req = H2Request(
+            method="GET",
+            path="/",
+            query="",
+            headers=[],
+            peer_addr=("127.0.0.1", 1234),
+            scheme="https",
+        )
+        assert req.uri == "/"

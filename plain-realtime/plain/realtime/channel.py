@@ -61,8 +61,6 @@ class SSEView(View):
                 return {"type": "update", "data": payload}
     """
 
-    view_protocol: str | None = "sse"
-
     def authorize(self) -> bool:
         """Check if the request is allowed to connect.
 
@@ -89,6 +87,9 @@ class SSEView(View):
         return payload
 
     async def get(self) -> ResponseBase:
+        # This method is async so SSEView triggers the async view path internally.
+        # User-facing methods (authorize, subscribe, transform) are all sync —
+        # they run in the executor via run_in_executor below.
         loop = asyncio.get_running_loop()
 
         # Run sync authorize/subscribe in executor for ORM access

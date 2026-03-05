@@ -51,10 +51,10 @@ notify("user:42", {"type": "new_comment", "comment_id": 7})
 ```javascript
 // In the browser
 const events = new EventSource("/events/notifications/");
-events.onmessage = (e) => {
+events.addEventListener("user:42", (e) => {
     const data = JSON.parse(e.data);
     // Update the UI
-};
+});
 ```
 
 All `SSEView` methods are sync. You have full access to the ORM, sessions, and everything else via `self.request` — no `async def`, no `await`, no special wrappers.
@@ -154,14 +154,11 @@ notify("user:42", {"type": "report_ready", "report_id": 99})
 ```javascript
 const events = new EventSource("/events/notifications/");
 
-events.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    console.log(data);
-};
-
-// Named events (channel_name becomes the event type)
+// Each event's type is the channel_name from subscribe().
+// Use addEventListener to listen for specific channels.
 events.addEventListener("user:42", (e) => {
-    console.log("User event:", JSON.parse(e.data));
+    const data = JSON.parse(e.data);
+    console.log("User event:", data);
 });
 
 events.onerror = () => {
@@ -182,7 +179,7 @@ For bidirectional communication, use a `WebSocketView` (see [WebSocket views](#w
 ```python
 class ProjectEvents(SSEView):
     def authorize(self):
-        project_id = self.request.GET.get("project_id")
+        project_id = self.request.query_params.get("project_id")
         if not project_id:
             return False
         return ProjectMembership.query.filter(
@@ -191,21 +188,21 @@ class ProjectEvents(SSEView):
         ).exists()
 
     def subscribe(self):
-        project_id = self.request.GET["project_id"]
+        project_id = self.request.query_params["project_id"]
         return [f"project:{project_id}"]
 ```
 
-A failed `authorize()` returns a 403 response. An empty `subscribe()` list returns a 403.
+A failed `authorize()` returns a 403 response. An empty `subscribe()` list raises a `ValueError` — this is a programming error (you forgot to return channels), not an authorization failure.
 
 ## WebSocket views
 
-For bidirectional communication, use `WebSocketView` from `plain.views`. This is a separate view class from `SSEView` — it handles the WebSocket protocol while `SSEView` handles SSE.
+For bidirectional communication with Postgres LISTEN/NOTIFY support, use `RealtimeWebSocketView`. It extends the base `WebSocketView` (from `plain.views`) with a `subscribe()` method for server-push events.
 
 ```python
-from plain.views import WebSocketView
+from plain.realtime import RealtimeWebSocketView
 
 
-class ChatSocket(WebSocketView):
+class ChatSocket(RealtimeWebSocketView):
     async def authorize(self):
         return self.request.user.is_authenticated
 
@@ -227,20 +224,17 @@ class ChatSocket(WebSocketView):
 path("ws/chat/<room_id>/", ChatSocket)
 ```
 
-### WebSocketView methods
+### RealtimeWebSocketView methods
 
-| Method                | Purpose                                                | Required |
-| --------------------- | ------------------------------------------------------ | -------- |
-| `authorize()`         | Return `True` to allow, `False` for 403                | No       |
-| `connect()`           | Called after connection established. Subscribe here.   | No       |
-| `receive(message)`    | Handle incoming messages (`str` or `bytes`)            | No       |
-| `disconnect()`        | Called on connection close. Cleanup here.              | No       |
-| `send(message)`       | Send a text or binary message to the client            | -        |
-| `send_json(data)`     | Send JSON data to the client                           | -        |
-| `subscribe(channel)`  | Subscribe to a Postgres NOTIFY channel for push events | -        |
-| `close(code, reason)` | Close the connection                                   | -        |
+All methods from `WebSocketView` (see [views docs](../../../plain/plain/views/README.md#websocketview)), plus:
 
-**Note:** `WebSocketView` methods are `async`. This is the one place in Plain where you write async code, because WebSocket lifecycle management requires it. You still have access to `self.request` for auth checking.
+| Method               | Purpose                                                | Required |
+| -------------------- | ------------------------------------------------------ | -------- |
+| `subscribe(channel)` | Subscribe to a Postgres NOTIFY channel for push events | -        |
+
+Call `subscribe()` in `connect()` to start receiving server-push events. Events from subscribed channels are automatically sent to the client as WebSocket messages.
+
+**Note:** All methods are `async`. This is the one place in Plain where you write async code, because WebSocket lifecycle management requires it. You still have access to `self.request` for auth checking.
 
 ### SSE vs WebSocket: which to use
 
@@ -315,24 +309,25 @@ def compute_metrics():
 ```python
 class Chat(SSEView):
     def authorize(self):
-        room_id = self.request.GET.get("room")
+        room_id = self.request.query_params.get("room")
         return ChatRoom.query.filter(
             pk=room_id, members=self.request.user
         ).exists()
 
     def subscribe(self):
-        room_id = self.request.GET["room"]
+        room_id = self.request.query_params["room"]
         return [f"chat:room:{room_id}"]
 ```
 
 ```python
 # POST view for sending messages
 def send_message(request):
-    room_id = request.POST["room_id"]
+    data = request.json_data
+    room_id = data["room_id"]
     message = Message.query.create(
         room_id=room_id,
         author=request.user,
-        text=request.POST["text"],
+        text=data["text"],
     )
     notify(f"chat:room:{room_id}", {
         "type": "message",
@@ -346,7 +341,7 @@ def send_message(request):
 ```javascript
 // Browser: SSE for receiving, POST for sending
 const events = new EventSource("/events/chat/?room=42");
-events.onmessage = (e) => renderMessage(JSON.parse(e.data));
+events.addEventListener("chat:room:42", (e) => renderMessage(JSON.parse(e.data)));
 
 function sendMessage(text) {
     fetch("/chat/send/", {
@@ -361,13 +356,13 @@ function sendMessage(text) {
 ```python
 class AgentStream(SSEView):
     def authorize(self):
-        session_id = self.request.GET.get("session")
+        session_id = self.request.query_params.get("session")
         return AgentSession.query.filter(
             pk=session_id, user=self.request.user
         ).exists()
 
     def subscribe(self):
-        session_id = self.request.GET["session"]
+        session_id = self.request.query_params["session"]
         return [f"agent:{session_id}"]
 ```
 

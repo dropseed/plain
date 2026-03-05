@@ -31,10 +31,6 @@ tracer = trace.get_tracer("plain")
 
 
 class View:
-    # Protocol declaration for the server's connection handler.
-    # None = regular HTTP, "sse" = server-sent events, "websocket" = WebSocket
-    view_protocol: str | None = None
-
     request: Request
     url_args: tuple[Any, ...]
     url_kwargs: dict[str, Any]
@@ -109,7 +105,6 @@ class View:
                     return response
 
         view.view_class = cls  # type: ignore[attr-defined]
-        view.view_protocol = cls.view_protocol  # type: ignore[attr-defined]
         view.view_is_async = _is_async  # type: ignore[attr-defined]
 
         return view
