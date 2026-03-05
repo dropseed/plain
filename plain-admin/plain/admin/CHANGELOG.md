@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.70.2](https://github.com/dropseed/plain/releases/plain-admin@0.70.2) (2026-03-04)
+
+### What's changed
+
+- Added minimum `plain>=0.113.0` version constraint in dependencies ([217751b866](https://github.com/dropseed/plain/commit/217751b866))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.70.1](https://github.com/dropseed/plain/releases/plain-admin@0.70.1) (2026-03-04)
 
 ### What's changed
