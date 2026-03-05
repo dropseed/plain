@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.114.1](https://github.com/dropseed/plain/releases/plain@0.114.1) (2026-03-04)
+
+### What's changed
+
+- Fixed server error responses being malformed on Python 3.14 due to a `textwrap.dedent()` behavior change that strips `\r` as whitespace, breaking the `\r\n\r\n` header-body separator ([6e61cf5e39b3](https://github.com/dropseed/plain/commit/6e61cf5e39b3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.114.0](https://github.com/dropseed/plain/releases/plain@0.114.0) (2026-03-04)
 
 ### What's changed
