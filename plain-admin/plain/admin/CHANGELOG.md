@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.70.1](https://github.com/dropseed/plain/releases/plain-admin@0.70.1) (2026-03-04)
+
+### What's changed
+
+- Preflight badge in header and toolbar is now rendered inline in HTML instead of fetched via JavaScript, removing the async JSON endpoint and module-level cache ([2894abfc5d98](https://github.com/dropseed/plain/commit/2894abfc5d98))
+- Removed unused `type: ignore` comment in model search query ([ed086b376a11](https://github.com/dropseed/plain/commit/ed086b376a11))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.70.0](https://github.com/dropseed/plain/releases/plain-admin@0.70.0) (2026-03-03)
 
 ### What's changed
