@@ -224,6 +224,7 @@ def close_sockets(listeners: list[BaseSocket], unlink: bool = True) -> None:
 def ssl_context(certfile: str, keyfile: str | None) -> ssl.SSLContext:
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     context.load_cert_chain(certfile=certfile, keyfile=keyfile)
+    context.set_alpn_protocols(["h2", "http/1.1"])
     return context
 
 
