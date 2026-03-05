@@ -51,6 +51,7 @@ class SharedListener:
         self._lock = asyncio.Lock()
         self._reader_task: asyncio.Task | None = None
         self._reconnecting = False
+        self._loop_ref: weakref.ref | None = None
 
     @classmethod
     def get(cls) -> SharedListener:
@@ -62,7 +63,10 @@ class SharedListener:
             _shared_listeners[loop_id] = listener
             # When the loop is GC'd, remove this entry so a recycled id()
             # can't return a stale listener bound to a dead loop.
-            weakref.ref(loop, lambda ref: _remove_listener(loop_id, ref))
+            # Must store the ref so it isn't immediately garbage-collected.
+            listener._loop_ref = weakref.ref(
+                loop, lambda ref: _remove_listener(loop_id, ref)
+            )
         return listener
 
     async def close(self) -> None:
@@ -171,6 +175,11 @@ class SharedListener:
                 )
                 # Connection is dead — reconnect directly (don't use
                 # _ensure_connected which would spawn a duplicate reader task)
+                if self._conn is not None:
+                    try:
+                        await self._conn.close()
+                    except Exception:
+                        pass
                 self._conn = None
                 self._reconnecting = True
                 await asyncio.sleep(backoff)

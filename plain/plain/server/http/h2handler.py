@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+import os
 import socket
 import threading  # for reader thread only
 from concurrent.futures import ThreadPoolExecutor
@@ -16,7 +17,7 @@ import h2.events
 import h2.exceptions
 
 from plain import signals
-from plain.http import FileResponse, StreamingResponse
+from plain.http import AsyncStreamingResponse, FileResponse, StreamingResponse
 from plain.http import Request as HttpRequest
 
 from ..accesslog import log_access
@@ -160,7 +161,9 @@ def _build_http_request(
     headers_dict: dict[str, str] = {}
     for name, value in raw_headers:
         if name in headers_dict:
-            headers_dict[name] = f"{headers_dict[name]},{value}"
+            # Cookie headers must be joined with '; ' per RFC 9113 Section 8.2.3
+            sep = "; " if name == "COOKIE" else ","
+            headers_dict[name] = f"{headers_dict[name]}{sep}{value}"
         else:
             headers_dict[name] = value
 
@@ -182,9 +185,19 @@ def _build_http_request(
     else:
         remote_addr = str(client)
 
+    # Apply SCRIPT_NAME prefix handling (same as HTTP/1 path)
+    script_name = os.environ.get("SCRIPT_NAME", "")
+    path = path_info
+    if script_name:
+        if path_info.startswith(script_name):
+            path_info = path_info[len(script_name) :] or "/"
+        path = "{}/{}".format(script_name.rstrip("/"), path_info.replace("/", "", 1))
+    else:
+        path = path_info
+
     return HttpRequest(
         method=method,
-        path=path_info,
+        path=path,
         headers=headers_dict,
         query_string=query,
         server_scheme=scheme,
@@ -555,6 +568,22 @@ async def _async_write_h2_response(
             if chunk is None:
                 break
             if chunk:
+                h2_resp.sent += len(chunk)
+                await _async_send_h2_data(state, stream_id, chunk, end_stream=False)
+
+        async with state.write_lock:
+            conn.send_data(stream_id, b"", end_stream=True)
+            await state.flush()
+    elif isinstance(http_response, AsyncStreamingResponse):
+        # Async streaming (SSE, long-lived async generators)
+        async with state.write_lock:
+            conn.send_headers(stream_id, response_headers)
+            await state.flush()
+
+        async for chunk in http_response.streaming_content:
+            if chunk:
+                if isinstance(chunk, str):
+                    chunk = chunk.encode("utf-8")
                 h2_resp.sent += len(chunk)
                 await _async_send_h2_data(state, stream_id, chunk, end_stream=False)
 

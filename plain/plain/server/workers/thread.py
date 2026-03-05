@@ -613,6 +613,11 @@ class Worker:
 
             # Check if this is a WebSocket upgrade
             if isinstance(http_response, WebSocketUpgradeResponse):
+                # Close the upgrade response to fire request_finished signal
+                # and release request-scoped resources (e.g. DB connections)
+                # before the long-lived WebSocket session begins.
+                if hasattr(http_response, "close"):
+                    http_response.close()
                 await self._handle_websocket(
                     loop, req, conn, http_request, http_response
                 )
@@ -680,15 +685,12 @@ class Worker:
             )
             return
 
-        # Mark as handed off now that handshake is validated.
-        # This is safe because _handle_connection (the caller) and this
-        # method both run as tasks on the same event loop — no concurrent
-        # access between the `handed_off = True` here and the `finally`
-        # check in _handle_connection.
-        conn.handed_off = True
-
-        # Send the 101 Switching Protocols response
+        # Send the 101 Switching Protocols response and mark as handed off.
+        # Setting handed_off tells _handle_connection's finally block not to
+        # close the socket (we manage it from here). If sendall fails, we
+        # leave handed_off False so the caller cleans up.
         conn.sock.sendall(build_accept_response(ws_key))
+        conn.handed_off = True
 
         # Set up async reader/writer
         conn.sock.setblocking(False)
