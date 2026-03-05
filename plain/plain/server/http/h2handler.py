@@ -333,10 +333,20 @@ async def async_handle_h2_connection(
     # so we never block an executor thread for the connection lifetime.
     recv_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
 
+    # Sentinel used to tell the reader thread to stop.  Set from the
+    # finally block before joining; the thread checks it on timeout.
+    reader_stop = threading.Event()
+
     def _reader_thread() -> None:
         try:
-            while True:
-                data = sock.recv(65535)
+            # Use a timeout so the thread doesn't block indefinitely if
+            # the socket is never closed (e.g. due to a cleanup bug).
+            sock.settimeout(5.0)
+            while not reader_stop.is_set():
+                try:
+                    data = sock.recv(65535)
+                except TimeoutError:
+                    continue
                 loop.call_soon_threadsafe(recv_queue.put_nowait, data)
                 if not data:
                     break
@@ -458,8 +468,11 @@ async def async_handle_h2_connection(
         except Exception:
             pass
 
+        reader_stop.set()
         await loop.run_in_executor(executor, _graceful_close, sock)
-        reader_thread.join(timeout=2.0)
+        reader_thread.join(timeout=7.0)
+        if reader_thread.is_alive():
+            log.warning("H2 reader thread did not exit cleanly")
 
 
 async def _async_handle_stream(

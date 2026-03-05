@@ -30,18 +30,26 @@ class RealtimeWebSocketView(WebSocketView):
         super().__init__(**kwargs)
         self._subscriptions: list[str] = []
         self._listen_tasks: list[asyncio.Task] = []
+        # True during connect() so subscribe() is allowed; flipped to False
+        # in _after_connect() to prevent silent no-ops from receive().
+        self._connect_phase = True
 
     async def subscribe(self, channel: str) -> None:
         """Subscribe to a Postgres NOTIFY channel for server-push events.
 
-        Must be called during connect(). Subscriptions added later
-        (e.g. in receive()) will have no effect — listeners are started
-        once after connect() returns.
+        Must be called during connect(). Raises RuntimeError if called
+        after connect() has returned (e.g. from receive()).
         """
+        if not self._connect_phase:
+            raise RuntimeError(
+                "subscribe() must be called during connect(). "
+                "Subscriptions cannot be added after the connection is established."
+            )
         self._subscriptions.append(channel)
 
     async def _after_connect(self) -> None:
         """Start pg_listen tasks for all subscriptions after connect()."""
+        self._connect_phase = False
         if self._subscriptions:
             loop = asyncio.get_running_loop()
             for channel in self._subscriptions:

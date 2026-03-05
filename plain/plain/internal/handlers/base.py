@@ -167,9 +167,10 @@ class BaseHandler:
         )
 
         loop = asyncio.get_running_loop()
-        # Store loop on request so _get_response (running in an executor thread)
-        # can bridge async views back via run_coroutine_threadsafe. This is a
-        # private attr — only read by _get_response in this same module.
+        # Store loop on request so _get_response (running in an executor
+        # thread) can bridge async views back via run_coroutine_threadsafe.
+        # This is a private attr — only read by _get_response in this same
+        # module.  It must not be shared across requests or event loops.
         request._event_loop = loop  # type: ignore[attr-defined]
 
         span_attributes, span_context = self._build_request_span(request)
@@ -193,10 +194,14 @@ class BaseHandler:
         with its args and kwargs.
         """
 
-        # Reuse resolver_match if already set (avoids double resolution
-        # when the worker pre-resolved to check for async views).
-        if hasattr(request, "resolver_match") and request.resolver_match is not None:
-            resolver_match = request.resolver_match
+        # The worker pre-resolves to check for async views and stores the
+        # result in _worker_resolver_match.  We only reuse that private attr
+        # — never trust request.resolver_match alone, since middleware could
+        # have set it for other reasons.
+        worker_match = getattr(request, "_worker_resolver_match", None)
+        if worker_match is not None:
+            resolver_match = worker_match
+            del request._worker_resolver_match  # type: ignore[attr-defined]
         else:
             resolver = get_resolver()
             resolver_match = resolver.resolve(request.path_info)

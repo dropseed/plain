@@ -5,6 +5,7 @@ import json
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
+from plain.exceptions import ImproperlyConfigured
 from plain.http import AsyncStreamingResponse, ForbiddenError403
 from plain.server.protocols.sse import SSE_HEADERS, format_sse_comment, format_sse_event
 from plain.views import View
@@ -99,7 +100,7 @@ class SSEView(View):
 
         subscriptions = await loop.run_in_executor(None, self.subscribe)
         if not subscriptions:
-            raise ValueError(
+            raise ImproperlyConfigured(
                 f"{self.__class__.__name__}.subscribe() returned no channels. "
                 "Override subscribe() to return a list of Postgres NOTIFY channel names."
             )

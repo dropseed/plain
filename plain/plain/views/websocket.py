@@ -19,6 +19,12 @@ class WebSocketView(View):
     Always async. The framework handles the HTTP upgrade handshake,
     then runs the WebSocket lifecycle as a coroutine on the event loop.
 
+    Note: The full middleware chain runs before the WebSocket upgrade
+    occurs.  Response-modifying middleware (compression, header injection)
+    sees the ``WebSocketUpgradeResponse`` marker — but the server replaces
+    it with the raw 101 handshake, so middleware modifications are ignored.
+    Middleware that short-circuits (e.g. auth returning 403) works normally.
+
     Register via URL router like any other view::
 
         # urls.py
@@ -87,6 +93,10 @@ class WebSocketView(View):
     async def _before_disconnect(self) -> None:
         """Hook called before disconnect(). Override in subclasses for pre-disconnect cleanup."""
         pass
+
+    # Maximum incoming message size in bytes (after fragment reassembly).
+    # Frames exceeding this are rejected with CLOSE_MESSAGE_TOO_BIG.
+    max_message_size: int = 1 * 1024 * 1024  # 1 MiB
 
     # Maximum time to wait for a slow client to accept written data.
     # If drain() doesn't complete in this time, the connection is closed.
@@ -165,4 +175,6 @@ class WebSocketUpgradeResponse(ResponseBase):
         self.log_access = False
 
     def __iter__(self) -> Iterator[bytes]:
+        # Required by ResponseBase interface.  Never actually iterated —
+        # the server intercepts this response type before writing.
         return iter([])

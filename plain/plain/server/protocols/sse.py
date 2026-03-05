@@ -46,6 +46,11 @@ def format_sse_event(
     else:
         data_str = str(data)
 
+    # Normalize \r\n and bare \r to \n before splitting, since the SSE
+    # spec treats all three as line terminators.  Without this, a bare \r
+    # would be sent raw and the browser would split mid-field.
+    data_str = data_str.replace("\r\n", "\n").replace("\r", "\n")
+
     # Each line of data gets its own "data: " prefix
     for line in data_str.split("\n"):
         lines.append(f"data: {line}")

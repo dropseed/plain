@@ -114,6 +114,16 @@ class TestSSEFormatting:
         # The injected "data:" is on the same line as event, not a separate field
         assert result.count(b"data:") == 2  # one from event field, one from actual data
 
+    def test_data_bare_cr_normalized(self):
+        """Bare \\r in data is normalized to \\n so it splits correctly."""
+        result = format_sse_event("line1\rline2")
+        assert b"data: line1\ndata: line2\n\n" == result
+
+    def test_data_crlf_normalized(self):
+        """\\r\\n in data is normalized to \\n."""
+        result = format_sse_event("line1\r\nline2")
+        assert b"data: line1\ndata: line2\n\n" == result
+
 
 class TestWebSocketFrameProtocol:
     """Unit tests for WebSocket frame encoding/decoding."""

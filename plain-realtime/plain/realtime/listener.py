@@ -7,12 +7,24 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import weakref
 
 logger = logging.getLogger("plain.realtime")
 
 # Keyed by event loop id so a new asyncio.run() gets a fresh listener
-# instead of reusing one whose tasks belong to a dead loop.
+# instead of reusing one whose tasks belong to a dead loop.  A weak-ref
+# callback on the loop removes the entry when the loop is garbage-collected,
+# preventing both stale reuse (id() can be recycled) and memory leaks.
 _shared_listeners: dict[int, SharedListener] = {}
+
+
+def _remove_listener(loop_id: int, _ref: weakref.ref) -> None:
+    """Weak-ref callback: clean up when an event loop is garbage-collected."""
+    removed = _shared_listeners.pop(loop_id, None)
+    if removed is not None:
+        # Best-effort close — the loop is dead so we can't await, but we
+        # can at least drop the reference to the psycopg connection.
+        removed._conn = None
 
 
 def _get_connection_string() -> str:
@@ -28,7 +40,9 @@ class SharedListener:
 
     Fans out notifications to subscriber queues. Scoped to the running
     event loop — if the loop changes (e.g. tests calling asyncio.run()
-    multiple times), a new listener is created automatically.
+    multiple times), a new listener is created automatically. A weak
+    reference on the loop ensures stale entries are cleaned up even if
+    the loop's id() is recycled by a later loop object.
     """
 
     def __init__(self) -> None:
@@ -46,7 +60,31 @@ class SharedListener:
         if listener is None:
             listener = cls()
             _shared_listeners[loop_id] = listener
+            # When the loop is GC'd, remove this entry so a recycled id()
+            # can't return a stale listener bound to a dead loop.
+            weakref.ref(loop, lambda ref: _remove_listener(loop_id, ref))
         return listener
+
+    async def close(self) -> None:
+        """Shut down the listener, cancelling the reader task and closing the connection."""
+        if self._reader_task is not None:
+            self._reader_task.cancel()
+            try:
+                await self._reader_task
+            except asyncio.CancelledError:
+                pass
+            self._reader_task = None
+        if self._conn is not None:
+            try:
+                await self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
+        self._subscribers.clear()
+
+        # Remove ourselves from the global dict
+        loop_id = id(asyncio.get_running_loop())
+        _shared_listeners.pop(loop_id, None)
 
     async def subscribe(self, queue: asyncio.Queue, *channels: str) -> None:
         async with self._lock:

@@ -439,7 +439,7 @@ class Worker:
 
         req, http_request = parse_result
 
-        # Resolve the URL to check if the view is async
+        # Lazy import: avoid pulling in URL routing at worker module load time
         from plain.urls import get_resolver
 
         try:
@@ -452,8 +452,10 @@ class Worker:
                 self.tpool, self.handle_request, req, conn, http_request
             )
 
-        # Attach resolver_match so the handler can skip re-resolving
-        http_request.resolver_match = resolver_match
+        # Store on a private attr so resolve_request() in the handler can
+        # skip re-resolving.  We use _worker_resolver_match (not the public
+        # resolver_match) so middleware can't accidentally interfere.
+        http_request._worker_resolver_match = resolver_match  # type: ignore[attr-defined]
 
         view_func = resolver_match.view
         is_async_view = getattr(view_func, "view_is_async", False)
@@ -494,6 +496,12 @@ class Worker:
         deadline = time.monotonic() + settings.SERVER_GRACEFUL_TIMEOUT
         while self.nr_conns > 0 and time.monotonic() < deadline:
             await asyncio.sleep(0.5)
+
+        if self.nr_conns > 0:
+            self.log.warning(
+                "Graceful timeout expired with %d connections still active",
+                self.nr_conns,
+            )
 
         # Cancel long-lived async connections (WebSocket, H2, SSE) so they
         # can run their cleanup (close frames, disconnect hooks, etc.)

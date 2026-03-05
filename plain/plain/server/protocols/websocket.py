@@ -72,27 +72,18 @@ def _apply_mask(data: bytes, mask: bytes) -> bytes:
     if n == 0:
         return b""
 
-    # Build a mask buffer the same length as data, then XOR in bulk
-    # via int operations on large (up to 8-byte) words.
     result = bytearray(data)
     mask8 = int.from_bytes(mask * 2, "big")
 
-    # Process 8 bytes at a time
+    # Process 8 bytes at a time.  Use memoryview for reads to avoid
+    # repeated slicing copies on large payloads.
+    mv = memoryview(result)
     i = 0
-    # For large payloads, use memoryview to avoid repeated slicing copies
-    if n > 1024:
-        mv = memoryview(result)
-        while i + 8 <= n:
-            chunk = int.from_bytes(mv[i : i + 8], "big")
-            chunk ^= mask8
-            result[i : i + 8] = chunk.to_bytes(8, "big")
-            i += 8
-    else:
-        while i + 8 <= n:
-            chunk = int.from_bytes(result[i : i + 8], "big")
-            chunk ^= mask8
-            result[i : i + 8] = chunk.to_bytes(8, "big")
-            i += 8
+    while i + 8 <= n:
+        chunk = int.from_bytes(mv[i : i + 8], "big")
+        chunk ^= mask8
+        result[i : i + 8] = chunk.to_bytes(8, "big")
+        i += 8
 
     # Handle remaining bytes
     for j in range(i, n):
@@ -301,7 +292,13 @@ async def handle_websocket_connection(
 
     Runs the frame read loop, handling ping/pong, close, fragmentation,
     and dispatching data frames to the view's receive() method.
+
+    The maximum reassembled message size is taken from
+    ``ws_view.max_message_size`` (defaults to ``MAX_DATA_PAYLOAD`` if
+    the attribute is absent).
     """
+    max_msg = getattr(ws_view, "max_message_size", MAX_DATA_PAYLOAD)
+
     try:
         # Call connect() and optional post-connect hook
         await ws_view.connect()
@@ -313,7 +310,7 @@ async def handle_websocket_connection(
 
         while not ws_view._closed:
             try:
-                frame = await read_frame(reader)
+                frame = await read_frame(reader, max_payload=max_msg)
             except (asyncio.IncompleteReadError, ConnectionError):
                 break
             except ValueError as e:
@@ -340,7 +337,7 @@ async def handle_websocket_connection(
                     await ws_view.close(CLOSE_PROTOCOL_ERROR, "Unexpected continuation")
                     break
                 frag_payload.extend(frame.payload)
-                if len(frag_payload) > MAX_DATA_PAYLOAD:
+                if len(frag_payload) > max_msg:
                     await ws_view.close(CLOSE_MESSAGE_TOO_BIG, "Message too large")
                     break
                 if frame.fin:
