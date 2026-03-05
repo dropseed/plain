@@ -24,7 +24,7 @@ from . import sock
 from .errors import APP_LOAD_ERROR, WORKER_BOOT_ERROR, HaltServer
 from .pidfile import Pidfile
 from .workers.entry import worker_main
-from .workers.thread import ThreadWorker
+from .workers.thread import check_worker_config
 from .workers.workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
@@ -115,7 +115,7 @@ class Arbiter:
             plain.runtime.__version__,
         )
 
-        ThreadWorker.check_config(self.app.threads, self.log)
+        check_worker_config(self.app.threads, self.log)
 
     def _handle_signal(self, sig: int, frame: object) -> None:
         self._shutdown_event.set()

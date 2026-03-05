@@ -41,15 +41,6 @@ class ServerApplication:
         self.certfile = certfile
         self.keyfile = keyfile
         self.accesslog = accesslog
-        self.callable: Any = None
-
-    def __getstate__(self) -> dict:
-        # One-way pickle for spawn: the callable (loaded request handler)
-        # can't be pickled, but workers don't need it — they call
-        # load() independently after setup().
-        state = self.__dict__.copy()
-        state["callable"] = None
-        return state
 
     @property
     def address(self) -> list[tuple[str, int] | str]:
@@ -61,42 +52,11 @@ class ServerApplication:
 
     def load(self) -> Any:
         """Load the request handler."""
-        import logging
-        import sys
-
-        import plain.runtime
         from plain.internal.handlers.base import BaseHandler
-        from plain.logs.configure import create_log_formatter
-
-        plain.runtime.setup()
-
-        # Replace bootstrap handlers on the server logger with
-        # propagation to the "plain" logger configured by setup().
-        server_logger = logging.getLogger("plain.server")
-        server_logger.handlers.clear()
-        server_logger.propagate = True
-
-        # Configure access logger based on the --access-log CLI flag.
-        access_logger = logging.getLogger("plain.server.access")
-        access_logger.setLevel(logging.INFO)
-        access_logger.handlers.clear()
-        access_logger.propagate = False
-        if self.accesslog:
-            log_handler = logging.StreamHandler(sys.stdout)
-            log_handler.setFormatter(
-                create_log_formatter(plain.runtime.settings.LOG_FORMAT)
-            )
-            access_logger.addHandler(log_handler)
 
         handler = BaseHandler()
         handler.load_middleware()
         return handler
-
-    def handler(self) -> Any:
-        """Get the request handler."""
-        if self.callable is None:
-            self.callable = self.load()
-        return self.callable
 
     def run(self) -> None:
         """Run the server."""

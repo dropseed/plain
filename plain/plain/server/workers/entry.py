@@ -34,7 +34,7 @@ def worker_main(
     from ..sock import TCP6Socket, TCPSocket, UnixSocket
 
     # Temporary stderr handler for the brief window before
-    # app.load() clears it and sets up proper logging.
+    # runtime.setup() configures proper logging.
     log = logging.getLogger("plain.server")
     log.setLevel(logging.INFO)
     _handler = logging.StreamHandler(sys.stderr)
@@ -62,12 +62,45 @@ def worker_main(
             listener = sock_class(addr, is_ssl=is_ssl, fd=fd)
             listeners.append(listener)
 
-        # Import ThreadWorker here (after all server modules are available).
-        from .thread import ThreadWorker
+        # Setup Plain runtime (settings, packages, logging)
+        import plain.runtime
 
-        worker = ThreadWorker(
-            age, os.getppid(), listeners, app, timeout, log, heartbeat
-        )
+        try:
+            plain.runtime.setup()
+        finally:
+            # Always replace bootstrap stderr handler — either with proper
+            # logging from setup(), or to avoid handler accumulation on failure.
+            log.handlers.clear()
+            log.propagate = True
+
+        # Configure access logger based on the --access-log CLI flag.
+        access_logger = logging.getLogger("plain.server.access")
+        access_logger.setLevel(logging.INFO)
+        access_logger.handlers.clear()
+        access_logger.propagate = False
+        if app.accesslog:
+            from plain.logs.configure import create_log_formatter
+
+            log_handler = logging.StreamHandler(sys.stdout)
+            log_handler.setFormatter(
+                create_log_formatter(plain.runtime.settings.LOG_FORMAT)
+            )
+            access_logger.addHandler(log_handler)
+
+        # Load the request handler
+        try:
+            handler = app.load()
+        except SyntaxError:
+            if not app.reload:
+                raise
+            log.exception("Error loading application")
+            from .. import util
+
+            handler = util.make_fail_handler(traceback.format_exc())
+
+        from .thread import Worker
+
+        worker = Worker(age, os.getppid(), listeners, app, timeout, heartbeat, handler)
         worker.pid = os.getpid()
 
         log.info("Server worker started pid=%s", worker.pid)

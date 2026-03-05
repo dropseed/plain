@@ -17,6 +17,7 @@ import errno
 import logging
 import os
 import selectors
+import signal
 import socket
 import ssl
 import sys
@@ -25,25 +26,63 @@ from collections import deque
 from concurrent import futures
 from datetime import datetime
 from functools import partial
+from random import randint
 from threading import RLock
 from types import FrameType
 from typing import TYPE_CHECKING, Any
 
 from plain import signals
+from plain.internal.reloader import Reloader
 
 from .. import http, sock, util
 from ..accesslog import log_access
-from ..http import response as server_response
-from . import base
+from ..http.errors import (
+    ConfigurationProblem,
+    InvalidHeader,
+    InvalidHeaderName,
+    InvalidHostHeader,
+    InvalidHTTPVersion,
+    InvalidRequestLine,
+    InvalidRequestMethod,
+    LimitRequestHeaders,
+    LimitRequestLine,
+    ObsoleteFolding,
+    UnsupportedTransferCoding,
+)
+from ..http.response import Response, create_request
+from .workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
     from ..app import ServerApplication
+    from ..http.message import Request
+
+# Maximum jitter to add to max_requests to stagger worker restarts
+MAX_REQUESTS_JITTER = 50
 
 # Keep-alive connection timeout in seconds
 KEEPALIVE = 2
 
 # Maximum number of simultaneous client connections
 WORKER_CONNECTIONS = 1000
+
+SIGNALS = [
+    signal.SIGABRT,
+    signal.SIGHUP,
+    signal.SIGQUIT,
+    signal.SIGINT,
+    signal.SIGTERM,
+    signal.SIGWINCH,
+]
+
+
+def check_worker_config(threads: int, log: logging.Logger) -> None:
+    max_keepalived = WORKER_CONNECTIONS - threads
+
+    if max_keepalived <= 0:
+        log.warning(
+            "No keepalived connections can be handled. "
+            "Check the number of worker connections and threads."
+        )
 
 
 class TConn:
@@ -91,35 +130,115 @@ class TConn:
         util.close(self.sock)
 
 
-class ThreadWorker(base.Worker):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+class Worker:
+    def __init__(
+        self,
+        age: int,
+        ppid: int,
+        sockets: list[sock.BaseSocket],
+        app: ServerApplication,
+        timeout: int | float,
+        heartbeat: WorkerHeartbeat,
+        handler: Any,
+    ):
+        self.age = age
+        self.pid: str | int = "[booting]"
+        self.ppid = ppid
+        self.sockets = sockets
+        self.app = app
+        self.timeout = timeout
+        self.booted = False
+        self.reloader: Any = None
+
+        self.nr = 0
+
+        if app.max_requests > 0:
+            jitter = randint(0, MAX_REQUESTS_JITTER)
+            self.max_requests = app.max_requests + jitter
+        else:
+            self.max_requests = sys.maxsize
+
+        self.alive = True
+        self.log = logging.getLogger("plain.server")
+        self.heartbeat = heartbeat
+        self.handler = handler
+
         self.worker_connections: int = WORKER_CONNECTIONS
         self.max_keepalived: int = WORKER_CONNECTIONS - self.app.threads
         self.futures: deque[futures.Future[tuple[bool, TConn]]] = deque()
         self._keep: deque[TConn] = deque()
         self.nr_conns: int = 0
 
-    @classmethod
-    def check_config(cls, threads: int, log: logging.Logger) -> None:
-        max_keepalived = WORKER_CONNECTIONS - threads
+    def __str__(self) -> str:
+        return f"<Worker {self.pid}>"
 
-        if max_keepalived <= 0:
-            log.warning(
-                "No keepalived connections can be handled. "
-                "Check the number of worker connections and threads."
-            )
+    def notify(self) -> None:
+        self.heartbeat.notify()
 
     def init_process(self) -> None:
-        # These are always initialized before any worker methods are called
-        self.tpool: futures.ThreadPoolExecutor = self.get_thread_pool()
+        # Thread pool and poller
+        self.tpool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(
+            max_workers=self.app.threads
+        )
         self.poller: selectors.DefaultSelector = selectors.DefaultSelector()
         self._lock: RLock = RLock()
-        super().init_process()
 
-    def get_thread_pool(self) -> futures.ThreadPoolExecutor:
-        """Override this method to customize how the thread pool is created"""
-        return futures.ThreadPoolExecutor(max_workers=self.app.threads)
+        # Reseed the random number generator
+        util.seed()
+
+        # For waking ourselves up
+        self.PIPE: tuple[int, int] = os.pipe()
+        for p in self.PIPE:
+            util.set_non_blocking(p)
+            util.close_on_exec(p)
+
+        # Prevent listener sockets from leaking into subprocesses
+        for s in self.sockets:
+            util.close_on_exec(s.fileno())
+
+        self.wait_fds: list[sock.BaseSocket | int] = self.sockets + [self.PIPE[0]]
+
+        self.init_signals()
+
+        # start the reloader
+        if self.app.reload:
+
+            def changed(fname: str) -> None:
+                self.log.debug("Server worker reloading: %s modified", fname)
+                self.alive = False
+                os.write(self.PIPE[1], b"1")
+                time.sleep(0.1)
+                sys.exit(0)
+
+            self.reloader = Reloader(callback=changed, watch_html=True)
+
+        if self.reloader:
+            self.reloader.start()
+
+        # Enter main run loop
+        self.booted = True
+        self.run()
+
+    def init_signals(self) -> None:
+        # reset signaling
+        for s in SIGNALS:
+            signal.signal(s, signal.SIG_DFL)
+        # init new signaling
+        signal.signal(signal.SIGQUIT, self.handle_quit)
+        signal.signal(signal.SIGTERM, self.handle_exit)
+        signal.signal(signal.SIGINT, self.handle_quit)
+        signal.signal(signal.SIGWINCH, self.handle_winch)
+        signal.signal(signal.SIGABRT, self.handle_abort)
+
+        # Don't let SIGTERM disturb active requests
+        # by interrupting system calls
+        signal.siginterrupt(signal.SIGTERM, False)
+
+        if hasattr(signal, "set_wakeup_fd"):
+            signal.set_wakeup_fd(self.PIPE[1])
+
+    def handle_exit(self, sig: int, frame: Any) -> None:
+        self.alive = False
 
     def handle_quit(self, sig: int, frame: FrameType | None) -> None:
         self.alive = False
@@ -131,6 +250,87 @@ class ThreadWorker(base.Worker):
         self.alive = False
         self.tpool.shutdown(wait=False, cancel_futures=True)
         sys.exit(1)
+
+    def handle_winch(self, sig: int, fname: Any) -> None:
+        # Ignore SIGWINCH in worker. Fixes a crash on OpenBSD.
+        self.log.debug("worker: SIGWINCH ignored.")
+
+    def handle_error(
+        self, req: Request | None, client: socket.socket, addr: Any, exc: BaseException
+    ) -> None:
+        request_start = datetime.now()
+        addr = addr or ("", -1)  # unix socket case
+        if isinstance(
+            exc,
+            InvalidRequestLine
+            | InvalidRequestMethod
+            | InvalidHTTPVersion
+            | InvalidHeader
+            | InvalidHeaderName
+            | InvalidHostHeader
+            | LimitRequestLine
+            | LimitRequestHeaders
+            | UnsupportedTransferCoding
+            | ConfigurationProblem
+            | ObsoleteFolding
+            | ssl.SSLError,
+        ):
+            status_int = 400
+            reason = "Bad Request"
+
+            if isinstance(exc, InvalidRequestLine):
+                mesg = f"Invalid Request Line '{exc}'"
+            elif isinstance(exc, InvalidRequestMethod):
+                mesg = f"Invalid Method '{exc}'"
+            elif isinstance(exc, InvalidHTTPVersion):
+                mesg = f"Invalid HTTP Version '{exc}'"
+            elif isinstance(exc, UnsupportedTransferCoding):
+                mesg = str(exc)
+                status_int = 501
+            elif isinstance(exc, ConfigurationProblem):
+                mesg = str(exc)
+                status_int = 500
+            elif isinstance(exc, ObsoleteFolding):
+                mesg = str(exc)
+            elif isinstance(exc, InvalidHostHeader):
+                mesg = str(exc)
+            elif isinstance(exc, InvalidHeaderName | InvalidHeader):
+                mesg = str(exc)
+                if not req and hasattr(exc, "req"):
+                    req = exc.req  # type: ignore[assignment]  # for access log
+            elif isinstance(exc, LimitRequestLine):
+                mesg = str(exc)
+            elif isinstance(exc, LimitRequestHeaders):
+                reason = "Request Header Fields Too Large"
+                mesg = f"Error parsing headers: '{exc}'"
+                status_int = 431
+            elif isinstance(exc, ssl.SSLError):
+                reason = "Forbidden"
+                mesg = f"'{exc}'"
+                status_int = 403
+
+            msg = "Invalid request from ip={ip}: {error}"
+            self.log.warning(msg.format(ip=addr[0], error=str(exc)))
+        else:
+            if hasattr(req, "uri"):
+                self.log.exception("Error handling request %s", req.uri)
+            else:
+                self.log.exception("Error handling request (no URI read)")
+            status_int = 500
+            reason = "Internal Server Error"
+            mesg = ""
+
+        if req is not None:
+            request_time = datetime.now() - request_start
+            resp = Response(req, client)
+            resp.status = f"{status_int} {reason}"
+            resp.response_length = len(mesg)
+            log_access(resp, req, request_time)
+
+        try:
+            util.write_error(client, status_int, reason, mesg)
+        except Exception:
+            self.log.debug("Failed to send error message.")
 
     def _wrap_future(self, fs: futures.Future[tuple[bool, TConn]], conn: TConn) -> None:
         fs.conn = conn  # type: ignore[attr-defined]
@@ -356,16 +556,14 @@ class ThreadWorker(base.Worker):
         return (False, conn)
 
     def handle_request(self, req: Any, conn: TConn) -> bool:
-        resp: server_response.Response | None = None
+        resp: Response | None = None
         try:
             request_start = datetime.now()
 
             # Build Request directly from parsed HTTP message
-            http_request = server_response.create_request(
-                req, conn.sock, conn.client, conn.server
-            )
+            http_request = create_request(req, conn.sock, conn.client, conn.server)
 
-            resp = server_response.Response(req, conn.sock, is_ssl=self.app.is_ssl)
+            resp = Response(req, conn.sock, is_ssl=self.app.is_ssl)
             self.nr += 1
             if self.nr >= self.max_requests:
                 if self.alive:
