@@ -1,20 +1,38 @@
 """Tests for the plain.channels infrastructure.
 
 Tests are organized in three levels:
-1. Unit tests — SSE formatting, channel registry (no infrastructure needed)
-2. Integration tests — AsyncConnectionManager + SSEConnection with socket pairs (no Postgres)
+1. Unit tests — SSE formatting, WebSocket framing, channel registry (no infrastructure needed)
+2. Integration tests — SSE/WebSocket connections with socket pairs (no Postgres)
 3. Postgres integration — PostgresListener + full pipeline (needs DATABASE_URL)
 """
 
 import asyncio
 import os
 import socket
+import struct
 
 import pytest
 
 from plain.channels.channel import Channel
 from plain.channels.registry import ChannelRegistry
 from plain.channels.sse import SSE_HEADERS, format_sse_comment, format_sse_event
+from plain.channels.websocket import (
+    CLOSE_NORMAL,
+    CLOSE_PROTOCOL_ERROR,
+    OP_BINARY,
+    OP_CLOSE,
+    OP_PING,
+    OP_PONG,
+    OP_TEXT,
+    _apply_mask,
+    build_accept_response,
+    compute_accept_key,
+    encode_close,
+    encode_frame,
+    parse_close_payload,
+    read_frame,
+    validate_handshake_headers,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +46,21 @@ class StubChannel(Channel):
 
     def subscribe(self, request):
         return ["test_chan"]
+
+
+class EchoChannel(Channel):
+    """WebSocket echo channel for testing."""
+
+    path = "/ws-echo/"
+
+    def authorize(self, request):
+        return True
+
+    def subscribe(self, request):
+        return ["echo_chan"]
+
+    def receive(self, message):
+        return message
 
     def transform(self, channel_name, payload):
         return payload
@@ -135,6 +168,299 @@ class TestChannelBaseClass:
     def test_default_transform(self):
         ch = Channel()
         assert ch.transform("chan", "payload") == "payload"
+
+    def test_default_receive(self):
+        ch = Channel()
+        assert ch.receive("hello") is None
+
+    def test_echo_channel_receive(self):
+        ch = EchoChannel()
+        assert ch.receive("hello") == "hello"
+
+
+class TestWebSocketFrameProtocol:
+    """Unit tests for WebSocket frame encoding/decoding."""
+
+    def test_encode_text_frame(self):
+        frame = encode_frame(OP_TEXT, b"hello")
+        assert frame[0] == 0x81  # FIN + TEXT
+        assert frame[1] == 5  # payload length
+        assert frame[2:] == b"hello"
+
+    def test_encode_binary_frame(self):
+        frame = encode_frame(OP_BINARY, b"\x00\x01\x02")
+        assert frame[0] == 0x82  # FIN + BINARY
+        assert frame[1] == 3
+
+    def test_encode_empty_frame(self):
+        frame = encode_frame(OP_TEXT, b"")
+        assert frame[0] == 0x81
+        assert frame[1] == 0
+
+    def test_encode_medium_payload(self):
+        """Payload 126-65535 bytes uses 2-byte extended length."""
+        payload = b"x" * 200
+        frame = encode_frame(OP_TEXT, payload)
+        assert frame[1] == 126
+        length = struct.unpack("!H", frame[2:4])[0]
+        assert length == 200
+        assert frame[4:] == payload
+
+    def test_encode_large_payload(self):
+        """Payload > 65535 bytes uses 8-byte extended length."""
+        payload = b"x" * 70000
+        frame = encode_frame(OP_TEXT, payload)
+        assert frame[1] == 127
+        length = struct.unpack("!Q", frame[2:10])[0]
+        assert length == 70000
+
+    def test_encode_no_fin(self):
+        frame = encode_frame(OP_TEXT, b"partial", fin=False)
+        assert frame[0] == 0x01  # no FIN + TEXT
+
+    def test_encode_ping(self):
+        frame = encode_frame(OP_PING, b"")
+        assert frame[0] == 0x89  # FIN + PING
+        assert frame[1] == 0
+
+    def test_encode_pong(self):
+        frame = encode_frame(OP_PONG, b"data")
+        assert frame[0] == 0x8A  # FIN + PONG
+
+    def test_encode_close(self):
+        frame = encode_close(CLOSE_NORMAL, "bye")
+        assert frame[0] == 0x88  # FIN + CLOSE
+        # Payload: 2-byte code + reason
+        payload = frame[2:]
+        code = struct.unpack("!H", payload[:2])[0]
+        assert code == 1000
+        assert payload[2:] == b"bye"
+
+    def test_apply_mask(self):
+        mask = b"\x37\xfa\x21\x3d"
+        data = b"Hello"
+        masked = _apply_mask(data, mask)
+        # Unmasking is the same operation
+        assert _apply_mask(masked, mask) == data
+
+    def test_parse_close_payload_normal(self):
+        payload = struct.pack("!H", 1000) + b"goodbye"
+        result = parse_close_payload(payload)
+        assert result.code == 1000
+        assert result.reason == "goodbye"
+
+    def test_parse_close_payload_empty(self):
+        result = parse_close_payload(b"")
+        assert result.code == 1005  # CLOSE_NO_STATUS
+
+    def test_parse_close_payload_single_byte(self):
+        result = parse_close_payload(b"\x00")
+        assert result.code == CLOSE_PROTOCOL_ERROR
+
+    def test_compute_accept_key(self):
+        key = "dGhlIHNhbXBsZSBub25jZQ=="
+        expected = "cOfHahk5/XGjY8XhRkGxODLWrNc="
+        assert compute_accept_key(key) == expected
+
+
+class TestWebSocketHandshakeValidation:
+    """Unit tests for WebSocket upgrade request validation."""
+
+    def test_valid_upgrade(self):
+        headers = [
+            ("CONNECTION", "Upgrade"),
+            ("UPGRADE", "websocket"),
+            ("SEC-WEBSOCKET-KEY", "dGhlIHNhbXBsZSBub25jZQ=="),
+            ("SEC-WEBSOCKET-VERSION", "13"),
+        ]
+        is_ws, key, error = validate_handshake_headers(headers)
+        assert is_ws is True
+        assert key == "dGhlIHNhbXBsZSBub25jZQ=="
+        assert error == ""
+
+    def test_not_websocket(self):
+        headers = [("CONNECTION", "keep-alive")]
+        is_ws, key, error = validate_handshake_headers(headers)
+        assert is_ws is False
+
+    def test_wrong_version(self):
+        headers = [
+            ("CONNECTION", "Upgrade"),
+            ("UPGRADE", "websocket"),
+            ("SEC-WEBSOCKET-KEY", "dGhlIHNhbXBsZSBub25jZQ=="),
+            ("SEC-WEBSOCKET-VERSION", "8"),
+        ]
+        is_ws, _, error = validate_handshake_headers(headers)
+        assert is_ws is True
+        assert "version" in error.lower()
+
+    def test_missing_key(self):
+        headers = [
+            ("CONNECTION", "Upgrade"),
+            ("UPGRADE", "websocket"),
+            ("SEC-WEBSOCKET-VERSION", "13"),
+        ]
+        is_ws, _, error = validate_handshake_headers(headers)
+        assert is_ws is True
+        assert "Key" in error
+
+    def test_build_accept_response(self):
+        resp = build_accept_response("dGhlIHNhbXBsZSBub25jZQ==")
+        assert b"HTTP/1.1 101 Switching Protocols" in resp
+        assert b"Upgrade: websocket" in resp
+        assert b"Connection: Upgrade" in resp
+        assert b"cOfHahk5/XGjY8XhRkGxODLWrNc=" in resp
+
+
+class TestReadFrame:
+    """Unit tests for async frame reading."""
+
+    def _make_masked_frame(self, opcode, payload, fin=True, mask=b"\x01\x02\x03\x04"):
+        """Build a client→server masked frame."""
+        header = bytearray()
+        first_byte = (0x80 if fin else 0x00) | (opcode & 0x0F)
+        header.append(first_byte)
+
+        length = len(payload)
+        if length < 126:
+            header.append(0x80 | length)  # mask bit set
+        elif length < 65536:
+            header.append(0x80 | 126)
+            header.extend(struct.pack("!H", length))
+        else:
+            header.append(0x80 | 127)
+            header.extend(struct.pack("!Q", length))
+
+        header.extend(mask)
+        masked_payload = _apply_mask(payload, mask)
+        return bytes(header) + masked_payload
+
+    def test_read_text_frame(self):
+        data = self._make_masked_frame(OP_TEXT, b"hello")
+        loop = asyncio.new_event_loop()
+        try:
+            reader = asyncio.StreamReader(loop=loop)
+            reader.feed_data(data)
+
+            async def run():
+                return await read_frame(reader)
+
+            frame = loop.run_until_complete(run())
+            assert frame.fin is True
+            assert frame.opcode == OP_TEXT
+            assert frame.payload == b"hello"
+        finally:
+            loop.close()
+
+    def test_read_binary_frame(self):
+        data = self._make_masked_frame(OP_BINARY, b"\x00\x01\x02")
+        loop = asyncio.new_event_loop()
+        try:
+            reader = asyncio.StreamReader(loop=loop)
+            reader.feed_data(data)
+
+            async def run():
+                return await read_frame(reader)
+
+            frame = loop.run_until_complete(run())
+            assert frame.opcode == OP_BINARY
+            assert frame.payload == b"\x00\x01\x02"
+        finally:
+            loop.close()
+
+    def test_read_ping_frame(self):
+        data = self._make_masked_frame(OP_PING, b"")
+        loop = asyncio.new_event_loop()
+        try:
+            reader = asyncio.StreamReader(loop=loop)
+            reader.feed_data(data)
+
+            async def run():
+                return await read_frame(reader)
+
+            frame = loop.run_until_complete(run())
+            assert frame.opcode == OP_PING
+        finally:
+            loop.close()
+
+    def test_read_close_frame(self):
+        close_payload = struct.pack("!H", 1000) + b"bye"
+        data = self._make_masked_frame(OP_CLOSE, close_payload)
+        loop = asyncio.new_event_loop()
+        try:
+            reader = asyncio.StreamReader(loop=loop)
+            reader.feed_data(data)
+
+            async def run():
+                return await read_frame(reader)
+
+            frame = loop.run_until_complete(run())
+            assert frame.opcode == OP_CLOSE
+            close = parse_close_payload(frame.payload)
+            assert close.code == 1000
+            assert close.reason == "bye"
+        finally:
+            loop.close()
+
+    def test_reject_unmasked_frame(self):
+        """Client frames must be masked."""
+        # Build an unmasked frame manually
+        data = bytes([0x81, 0x05]) + b"hello"  # no mask bit
+        loop = asyncio.new_event_loop()
+        try:
+            reader = asyncio.StreamReader(loop=loop)
+            reader.feed_data(data)
+
+            async def run():
+                return await read_frame(reader)
+
+            with pytest.raises(ValueError, match="not masked"):
+                loop.run_until_complete(run())
+        finally:
+            loop.close()
+
+    def test_reject_rsv_bits(self):
+        """RSV bits must be 0 (no extensions)."""
+        # Set RSV1 bit
+        header = bytearray(
+            [0xC1, 0x80, 0x01, 0x02, 0x03, 0x04]
+        )  # FIN+RSV1+TEXT, masked, 0 length
+        loop = asyncio.new_event_loop()
+        try:
+            reader = asyncio.StreamReader(loop=loop)
+            reader.feed_data(bytes(header))
+
+            async def run():
+                return await read_frame(reader)
+
+            with pytest.raises(ValueError, match="RSV"):
+                loop.run_until_complete(run())
+        finally:
+            loop.close()
+
+    def test_fragmented_text(self):
+        """Test reading fragmented message (first + continuation)."""
+        frame1 = self._make_masked_frame(OP_TEXT, b"hel", fin=False)
+        frame2 = self._make_masked_frame(0x0, b"lo", fin=True)  # continuation
+        loop = asyncio.new_event_loop()
+        try:
+            reader = asyncio.StreamReader(loop=loop)
+            reader.feed_data(frame1 + frame2)
+
+            async def run():
+                f1 = await read_frame(reader)
+                f2 = await read_frame(reader)
+                return f1, f2
+
+            f1, f2 = loop.run_until_complete(run())
+            assert f1.fin is False
+            assert f1.opcode == OP_TEXT
+            assert f1.payload == b"hel"
+            assert f2.fin is True
+            assert f2.opcode == 0x0  # continuation
+            assert f2.payload == b"lo"
+        finally:
+            loop.close()
 
 
 # ===================================================================
@@ -288,7 +614,7 @@ class TestAsyncConnectionManager:
 
             async def run():
                 # Accept
-                await manager._accept_connection_async(fd, StubChannel(), ["test_chan"])
+                await manager._accept_sse_async(fd, StubChannel(), ["test_chan"])
                 assert len(manager._connections) == 1
 
                 # Dispatch
@@ -321,7 +647,7 @@ class TestAsyncConnectionManager:
             manager = AsyncConnectionManager(loop)
 
             async def run():
-                await manager._accept_connection_async(fd, StubChannel(), ["test_chan"])
+                await manager._accept_sse_async(fd, StubChannel(), ["test_chan"])
                 await manager.dispatch_event("other_chan", "ignored")
 
             loop.run_until_complete(run())
@@ -348,7 +674,7 @@ class TestAsyncConnectionManager:
             manager = AsyncConnectionManager(loop)
 
             async def run():
-                await manager._accept_connection_async(fd, StubChannel(), ["test_chan"])
+                await manager._accept_sse_async(fd, StubChannel(), ["test_chan"])
                 assert len(manager._connections) == 1
 
                 # Close client to simulate disconnect
@@ -378,8 +704,8 @@ class TestAsyncConnectionManager:
             manager = AsyncConnectionManager(loop)
 
             async def run():
-                await manager._accept_connection_async(fd1, StubChannel(), ["a"])
-                await manager._accept_connection_async(fd2, StubChannel(), ["b"])
+                await manager._accept_sse_async(fd1, StubChannel(), ["a"])
+                await manager._accept_sse_async(fd2, StubChannel(), ["b"])
                 assert len(manager._connections) == 2
 
             loop.run_until_complete(run())
@@ -407,7 +733,7 @@ class TestAsyncConnectionManager:
             manager = AsyncConnectionManager(loop)
 
             async def run():
-                await manager._accept_connection_async(fd, TransformChannel(), ["x"])
+                await manager._accept_sse_async(fd, TransformChannel(), ["x"])
                 await manager.dispatch_event("x", "raw")
 
             loop.run_until_complete(run())
@@ -438,7 +764,7 @@ class TestAsyncConnectionManager:
             manager = AsyncConnectionManager(loop)
 
             async def run():
-                await manager._accept_connection_async(fd, FilterChannel(), ["x"])
+                await manager._accept_sse_async(fd, FilterChannel(), ["x"])
                 await manager.dispatch_event("x", "should_be_filtered")
 
             loop.run_until_complete(run())
@@ -450,6 +776,276 @@ class TestAsyncConnectionManager:
             assert b"data:" not in data
 
             manager.close_all()
+        finally:
+            client.close()
+            loop.close()
+
+
+class TestWebSocketConnection:
+    """Integration tests for WebSocketConnection with socket pairs."""
+
+    def _make_masked_frame(self, opcode, payload, fin=True, mask=b"\x01\x02\x03\x04"):
+        """Build a client→server masked frame."""
+        header = bytearray()
+        first_byte = (0x80 if fin else 0x00) | (opcode & 0x0F)
+        header.append(first_byte)
+
+        length = len(payload)
+        if length < 126:
+            header.append(0x80 | length)
+        elif length < 65536:
+            header.append(0x80 | 126)
+            header.extend(struct.pack("!H", length))
+        else:
+            header.append(0x80 | 127)
+            header.extend(struct.pack("!Q", length))
+
+        header.extend(mask)
+        masked_payload = _apply_mask(payload, mask)
+        return bytes(header) + masked_payload
+
+    def _read_server_frame(self, sock, timeout=1.0):
+        """Read a single server→client (unmasked) frame from a socket."""
+        sock.setblocking(True)
+        sock.settimeout(timeout)
+        data = sock.recv(8192)
+        if not data:
+            return None
+        fin = bool(data[0] & 0x80)
+        opcode = data[0] & 0x0F
+        length = data[1] & 0x7F
+        offset = 2
+        if length == 126:
+            length = struct.unpack("!H", data[2:4])[0]
+            offset = 4
+        elif length == 127:
+            length = struct.unpack("!Q", data[2:10])[0]
+            offset = 10
+        payload = data[offset : offset + length]
+        return {"fin": fin, "opcode": opcode, "payload": payload}
+
+    def test_echo_via_receive(self):
+        """Send a text frame, echo channel returns it."""
+        from plain.channels.handler import WebSocketConnection
+
+        fd, client = _make_socket_pair()
+        loop = asyncio.new_event_loop()
+        try:
+
+            async def run():
+                conn = WebSocketConnection(fd, EchoChannel(), ["echo"], loop)
+                await conn.open()
+                conn.start_reading()
+
+                # Give the read loop time to start
+                await asyncio.sleep(0.1)
+
+                # Client sends a masked text frame
+                frame_data = self._make_masked_frame(OP_TEXT, b"hello ws")
+                client.setblocking(True)
+                client.sendall(frame_data)
+
+                # Wait for echo response
+                await asyncio.sleep(0.3)
+
+                # Client sends close
+                close_data = self._make_masked_frame(
+                    OP_CLOSE, struct.pack("!H", CLOSE_NORMAL)
+                )
+                client.sendall(close_data)
+                await asyncio.sleep(0.1)
+
+            loop.run_until_complete(run())
+
+            # Read the echo response from the client side
+            client.setblocking(True)
+            client.settimeout(1.0)
+            all_data = client.recv(8192)
+
+            # Should contain the echoed text
+            assert b"hello ws" in all_data
+
+        finally:
+            client.close()
+            loop.close()
+
+    def test_ping_pong(self):
+        """Server responds to ping with pong."""
+        from plain.channels.handler import WebSocketConnection
+
+        fd, client = _make_socket_pair()
+        loop = asyncio.new_event_loop()
+        try:
+
+            async def run():
+                conn = WebSocketConnection(fd, EchoChannel(), ["echo"], loop)
+                await conn.open()
+                conn.start_reading()
+                await asyncio.sleep(0.1)
+
+                # Client sends ping
+                ping_data = self._make_masked_frame(OP_PING, b"ping!")
+                client.setblocking(True)
+                client.sendall(ping_data)
+
+                await asyncio.sleep(0.2)
+
+                # Send close
+                close_data = self._make_masked_frame(
+                    OP_CLOSE, struct.pack("!H", CLOSE_NORMAL)
+                )
+                client.sendall(close_data)
+                await asyncio.sleep(0.1)
+
+            loop.run_until_complete(run())
+
+            client.setblocking(True)
+            client.settimeout(1.0)
+            all_data = client.recv(8192)
+
+            # Should have a pong frame (opcode 0x0A)
+            # Find pong in the data
+            found_pong = False
+            i = 0
+            while i < len(all_data):
+                opcode = all_data[i] & 0x0F
+                if opcode == OP_PONG:
+                    found_pong = True
+                    break
+                # Skip past this frame
+                length = all_data[i + 1] & 0x7F
+                if length == 126:
+                    length = struct.unpack("!H", all_data[i + 2 : i + 4])[0]
+                    i += 4 + length
+                elif length == 127:
+                    length = struct.unpack("!Q", all_data[i + 2 : i + 10])[0]
+                    i += 10 + length
+                else:
+                    i += 2 + length
+            assert found_pong, "No pong frame found in response data"
+
+        finally:
+            client.close()
+            loop.close()
+
+    def test_close_handshake(self):
+        """Server echoes close frame."""
+        from plain.channels.handler import WebSocketConnection
+
+        fd, client = _make_socket_pair()
+        loop = asyncio.new_event_loop()
+        try:
+
+            async def run():
+                conn = WebSocketConnection(fd, EchoChannel(), ["echo"], loop)
+                await conn.open()
+                conn.start_reading()
+                await asyncio.sleep(0.1)
+
+                # Client initiates close
+                close_payload = struct.pack("!H", CLOSE_NORMAL) + b"bye"
+                close_data = self._make_masked_frame(OP_CLOSE, close_payload)
+                client.setblocking(True)
+                client.sendall(close_data)
+
+                await asyncio.sleep(0.3)
+
+            loop.run_until_complete(run())
+
+            client.setblocking(True)
+            client.settimeout(1.0)
+            all_data = client.recv(8192)
+
+            # Should contain a close frame
+            found_close = False
+            i = 0
+            while i < len(all_data):
+                opcode = all_data[i] & 0x0F
+                if opcode == OP_CLOSE:
+                    found_close = True
+                    break
+                length = all_data[i + 1] & 0x7F
+                if length == 126:
+                    length = struct.unpack("!H", all_data[i + 2 : i + 4])[0]
+                    i += 4 + length
+                elif length == 127:
+                    length = struct.unpack("!Q", all_data[i + 2 : i + 10])[0]
+                    i += 10 + length
+                else:
+                    i += 2 + length
+            assert found_close, "No close frame in response"
+
+        finally:
+            client.close()
+            loop.close()
+
+    def test_binary_echo(self):
+        """Binary frames are echoed back as binary."""
+        from plain.channels.handler import WebSocketConnection
+
+        fd, client = _make_socket_pair()
+        loop = asyncio.new_event_loop()
+        try:
+
+            async def run():
+                conn = WebSocketConnection(fd, EchoChannel(), ["echo"], loop)
+                await conn.open()
+                conn.start_reading()
+                await asyncio.sleep(0.1)
+
+                # Client sends binary frame
+                frame_data = self._make_masked_frame(OP_BINARY, b"\x00\x01\xff")
+                client.setblocking(True)
+                client.sendall(frame_data)
+                await asyncio.sleep(0.3)
+
+                # Close
+                close_data = self._make_masked_frame(
+                    OP_CLOSE, struct.pack("!H", CLOSE_NORMAL)
+                )
+                client.sendall(close_data)
+                await asyncio.sleep(0.1)
+
+            loop.run_until_complete(run())
+
+            client.setblocking(True)
+            client.settimeout(1.0)
+            all_data = client.recv(8192)
+
+            # Should have a binary frame with our data
+            assert b"\x00\x01\xff" in all_data
+
+        finally:
+            client.close()
+            loop.close()
+
+    def test_server_push_event(self):
+        """Server-push via dispatch_event sends a text frame."""
+        from plain.channels.handler import AsyncConnectionManager
+
+        fd, client = _make_socket_pair()
+        loop = asyncio.new_event_loop()
+        try:
+
+            async def run():
+                manager = AsyncConnectionManager(loop)
+                await manager._accept_ws_async(fd, EchoChannel(), ["echo_chan"])
+
+                await asyncio.sleep(0.1)
+                await manager.dispatch_event("echo_chan", "server push")
+                await asyncio.sleep(0.2)
+
+                manager.close_all()
+
+            loop.run_until_complete(run())
+
+            client.setblocking(True)
+            client.settimeout(1.0)
+            all_data = client.recv(8192)
+
+            # Should contain the pushed data as a text frame
+            assert b"server push" in all_data
+
         finally:
             client.close()
             loop.close()
@@ -650,7 +1246,7 @@ class TestFullPipeline:
                 await listener.start()
 
                 # Accept an SSE connection
-                await manager._accept_connection_async(fd, StubChannel(), ["test_chan"])
+                await manager._accept_sse_async(fd, StubChannel(), ["test_chan"])
 
                 # Subscribe the channel in the listener
                 await listener.listen("test_chan")

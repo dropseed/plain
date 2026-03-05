@@ -686,7 +686,10 @@ class Worker:
         return (False, conn)
 
     def _try_channel_handoff(self, req: Any, conn: TConn) -> bool:
-        """Check if the request matches an SSE channel and hand off the socket.
+        """Check if the request matches a channel and hand off the socket.
+
+        Supports both SSE and WebSocket connections. The protocol is
+        determined by the presence of WebSocket upgrade headers.
 
         Returns True if the connection was handed off (caller should NOT close it).
         Returns False if this is a normal request.
@@ -701,28 +704,51 @@ class Worker:
         if channel is None:
             return False
 
-        # Build a minimal request for authorization
+        # Build a request for authorization
         http_request = create_request(req, conn.sock, conn.client, conn.server)
 
         if not channel.authorize(http_request):
             util.write_error(conn.sock, 403, "Forbidden", "Channel access denied")
-            return True  # We handled it (with an error), don't process further
+            return True
 
         subscriptions = channel.subscribe(http_request)
         if not subscriptions:
             util.write_error(conn.sock, 400, "Bad Request", "No channel subscriptions")
             return True
 
+        # Detect WebSocket upgrade
+        from plain.channels.websocket import (
+            build_accept_response,
+            validate_handshake_headers,
+        )
+
+        is_ws, ws_key, ws_error = validate_handshake_headers(req.headers)
+
+        if is_ws and ws_error:
+            util.write_error(conn.sock, 400, "Bad Request", ws_error)
+            return True
+
         # Dup the socket fd for the async thread to own
         sock_fd = os.dup(conn.sock.fileno())
 
-        # Hand off to the async connection manager
-        self._async_loop.call_soon_threadsafe(
-            self._connection_manager.accept_connection,
-            sock_fd,
-            channel,
-            subscriptions,
-        )
+        if is_ws:
+            # Send the 101 Switching Protocols response before handoff
+            conn.sock.sendall(build_accept_response(ws_key))
+
+            self._async_loop.call_soon_threadsafe(
+                self._connection_manager.accept_ws_connection,
+                sock_fd,
+                channel,
+                subscriptions,
+            )
+        else:
+            # SSE connection
+            self._async_loop.call_soon_threadsafe(
+                self._connection_manager.accept_sse_connection,
+                sock_fd,
+                channel,
+                subscriptions,
+            )
 
         return True
 

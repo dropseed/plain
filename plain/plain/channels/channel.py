@@ -7,10 +7,14 @@ if TYPE_CHECKING:
 
 
 class Channel:
-    """Base class for server-sent event channels.
+    """Base class for real-time channels (SSE and WebSocket).
 
     Subclass this to define real-time endpoints. All methods are sync —
     the framework handles async infrastructure internally.
+
+    Supports both SSE (server-push only) and WebSocket (bidirectional).
+    The protocol is determined by the client's request headers — the same
+    Channel class works with both.
 
     Example::
 
@@ -25,6 +29,10 @@ class Channel:
 
             def transform(self, channel_name, payload):
                 return {"type": "update", "data": payload}
+
+            def receive(self, message):
+                # Only called for WebSocket connections
+                return f"echo: {message}"
     """
 
     # URL path for this channel. Required.
@@ -53,3 +61,14 @@ class Channel:
         or None to skip sending this event.
         """
         return payload
+
+    def receive(self, message: str | bytes) -> str | bytes | None:
+        """Handle an incoming WebSocket message.
+
+        Called in the sync context (via threadpool) when the client sends
+        a text or binary message. Only used for WebSocket connections.
+
+        Return a string or bytes to send a response back to the client,
+        or None to send nothing.
+        """
+        return None
