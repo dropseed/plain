@@ -19,6 +19,7 @@ from .request import (
     UnreadablePostError,
 )
 from .response import (
+    AsyncStreamingResponse,
     BadHeaderError,
     FileResponse,
     JsonResponse,
@@ -45,6 +46,7 @@ __all__ = [
     "Response",
     "ResponseBase",
     "StreamingResponse",
+    "AsyncStreamingResponse",
     "RedirectResponse",
     "NotModifiedResponse",
     "NotAllowedResponse",

@@ -8,7 +8,7 @@ import os
 import re
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from email.header import Header
 from http.client import responses
 from http.cookies import SimpleCookie
@@ -113,6 +113,7 @@ class ResponseBase:
     """
 
     status_code = 200
+    is_async = False
 
     def __init__(
         self,
@@ -415,6 +416,46 @@ class StreamingResponse(ResponseBase):
 
     def __iter__(self) -> Iterator[bytes]:
         return iter(self.streaming_content)
+
+
+class AsyncStreamingResponse(ResponseBase):
+    """
+    A streaming HTTP response class with an async iterator as content.
+
+    The server uses `async for` to iterate chunks and write them to the socket.
+    This is used for SSE connections and other long-lived async streams.
+    """
+
+    streaming = True
+    is_async = True
+
+    def __init__(self, streaming_content: Any = (), **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.streaming_content = streaming_content
+
+    @property
+    def content(self) -> Any:
+        raise AttributeError(
+            f"This {self.__class__.__name__} instance has no `content` attribute. Use "
+            "`streaming_content` instead."
+        )
+
+    @property
+    def streaming_content(self) -> Any:
+        return self._iterator
+
+    @streaming_content.setter
+    def streaming_content(self, value: Any) -> None:
+        self._set_streaming_content(value)
+
+    def _set_streaming_content(self, value: Any) -> None:
+        self._iterator = value.__aiter__() if hasattr(value, "__aiter__") else value
+        if hasattr(value, "close"):
+            self._resource_closers.append(value.close)
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        async for chunk in self._iterator:
+            yield self.make_bytes(chunk)
 
 
 class FileResponse(StreamingResponse):

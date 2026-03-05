@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from plain.http import Request
-from plain.realtime import Channel, realtime_registry
+from plain.realtime import Channel
+from plain.views import WebSocketView
 
 
-@realtime_registry.register
 class EchoChannel(Channel):
-    """WebSocket echo channel for conformance testing."""
-
-    path = "/ws-echo/"
+    """SSE echo channel for testing."""
 
     def authorize(self, request: Request) -> bool:
         return True
@@ -16,5 +14,15 @@ class EchoChannel(Channel):
     def subscribe(self, request: Request) -> list[str]:
         return ["echo"]
 
-    def receive(self, message: str | bytes) -> str | bytes:
-        return message
+    def transform(self, channel_name: str, payload: str) -> str:
+        return payload
+
+
+class EchoWebSocket(WebSocketView):
+    """WebSocket echo endpoint for Autobahn conformance testing."""
+
+    async def authorize(self) -> bool:
+        return True
+
+    async def receive(self, message: str | bytes) -> None:
+        await self.send(message)

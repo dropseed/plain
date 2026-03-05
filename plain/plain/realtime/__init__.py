@@ -1,9 +1,11 @@
-from .channel import Channel
+from .channel import Channel, pg_listen
 from .notify import notify
-from .registry import realtime_registry
+from .sse import format_sse_comment, format_sse_event
 
 __all__ = [
     "Channel",
-    "realtime_registry",
+    "pg_listen",
     "notify",
+    "format_sse_event",
+    "format_sse_comment",
 ]

@@ -16,17 +16,13 @@ import asyncio
 import errno
 import logging
 import os
-import selectors
 import signal
 import socket
 import ssl
 import sys
-import threading
 import time
-from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from functools import partial
 from random import randint
 from types import FrameType
 from typing import TYPE_CHECKING, Any
@@ -54,8 +50,6 @@ from ..http.response import Response, create_request
 from .workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from ..app import ServerApplication
     from ..http.message import Request
 
@@ -88,55 +82,6 @@ def check_worker_config(threads: int, log: logging.Logger) -> None:
         )
 
 
-class PollableMethodQueue:
-    """Pipe-based queue for deferring method calls to the main thread.
-
-    Worker threads call defer() to queue a callback. The pipe write
-    wakes the poller so the main loop processes queued calls without
-    any locks — all poller and keepalive operations happen on one thread.
-    """
-
-    def __init__(self) -> None:
-        self._read_fd, self._write_fd = os.pipe()
-        # Non-blocking on both ends for BSD compatibility
-        util.set_non_blocking(self._read_fd)
-        util.set_non_blocking(self._write_fd)
-        util.close_on_exec(self._read_fd)
-        util.close_on_exec(self._write_fd)
-        # deque.append/popleft are atomic under CPython's GIL
-        self._queue: deque[tuple[Callable[..., Any], tuple[Any, ...]]] = deque()
-
-    def fileno(self) -> int:
-        return self._read_fd
-
-    def defer(self, fn: Callable[..., Any], *args: Any) -> None:
-        """Queue a function to run on the main thread."""
-        self._queue.append((fn, args))
-        try:
-            os.write(self._write_fd, b"\x00")
-        except OSError:
-            pass  # Pipe full — main loop will still drain the queue
-
-    def process(self, _fd: Any = None) -> None:
-        """Drain the pipe and run all queued callbacks. Called on the main thread."""
-        try:
-            while os.read(self._read_fd, 4096):
-                pass
-        except OSError:
-            pass
-
-        while True:
-            try:
-                fn, args = self._queue.popleft()
-            except IndexError:
-                break
-            fn(*args)
-
-    def close(self) -> None:
-        os.close(self._read_fd)
-        os.close(self._write_fd)
-
-
 class TConn:
     def __init__(
         self,
@@ -154,6 +99,7 @@ class TConn:
         self.parser: http.RequestParser | None = None
         self.initialized: bool = False
         self.is_h2: bool = False
+        self.handed_off: bool = False
 
         # set the socket to non blocking
         self.sock.setblocking(False)
@@ -226,15 +172,7 @@ class Worker:
         self.handler = handler
 
         self.max_keepalived: int = WORKER_CONNECTIONS - self.app.threads
-        self._keep: deque[TConn] = deque()
         self.nr_conns: int = 0
-        self._in_flight: int = 0
-        self._accepting: bool = False
-
-        # Async event loop for SSE channel connections
-        self._async_loop: asyncio.AbstractEventLoop | None = None
-        self._async_thread: threading.Thread | None = None
-        self._connection_manager: Any = None
 
     def __str__(self) -> str:
         return f"<Worker {self.pid}>"
@@ -243,27 +181,21 @@ class Worker:
         self.heartbeat.notify()
 
     def init_process(self) -> None:
-        # Thread pool, poller, and method queue
+        # Thread pool
         self.tpool: ThreadPoolExecutor = ThreadPoolExecutor(
             max_workers=self.app.threads
         )
-        self.poller: selectors.DefaultSelector = selectors.DefaultSelector()
-        self._method_queue: PollableMethodQueue = PollableMethodQueue()
 
         # Reseed the random number generator
         util.seed()
-
-        # For waking ourselves up (signals, reloader)
-        self.PIPE: tuple[int, int] = os.pipe()
-        for p in self.PIPE:
-            util.set_non_blocking(p)
-            util.close_on_exec(p)
 
         # Prevent listener sockets from leaking into subprocesses
         for s in self.sockets:
             util.close_on_exec(s.fileno())
 
-        self.init_signals()
+        # Reset all signals to default before setting up asyncio handlers
+        for s in SIGNALS:
+            signal.signal(s, signal.SIG_DFL)
 
         # start the reloader
         if self.app.reload:
@@ -271,7 +203,6 @@ class Worker:
             def changed(fname: str) -> None:
                 self.log.debug("Server worker reloading: %s modified", fname)
                 self.alive = False
-                os.write(self.PIPE[1], b"1")
                 time.sleep(0.1)
                 sys.exit(0)
 
@@ -280,39 +211,16 @@ class Worker:
         if self.reloader:
             self.reloader.start()
 
-        # Start async event loop for SSE channels
-        self._start_async_loop()
-
         # Enter main run loop
         self.booted = True
-        self.run()
+        asyncio.run(self.run())
 
-    def init_signals(self) -> None:
-        # reset signaling
-        for s in SIGNALS:
-            signal.signal(s, signal.SIG_DFL)
-        # init new signaling
-        signal.signal(signal.SIGQUIT, self.handle_quit)
-        signal.signal(signal.SIGTERM, self.handle_exit)
-        signal.signal(signal.SIGINT, self.handle_quit)
-        signal.signal(signal.SIGWINCH, self.handle_winch)
-        signal.signal(signal.SIGABRT, self.handle_abort)
-
-        # Don't let SIGTERM disturb active requests
-        # by interrupting system calls
-        signal.siginterrupt(signal.SIGTERM, False)
-
-        if hasattr(signal, "set_wakeup_fd"):
-            signal.set_wakeup_fd(self.PIPE[1])
-
-    def handle_exit(self, sig: int, frame: Any) -> None:
+    def handle_exit_async(self) -> None:
         self.alive = False
 
-    def handle_quit(self, sig: int, frame: FrameType | None) -> None:
+    def handle_quit_async(self) -> None:
         self.alive = False
         self.tpool.shutdown(wait=False, cancel_futures=True)
-        time.sleep(0.1)
-        sys.exit(0)
 
     def handle_abort(self, sig: int, frame: FrameType | None) -> None:
         self.alive = False
@@ -322,69 +230,6 @@ class Worker:
     def handle_winch(self, sig: int, fname: Any) -> None:
         # Ignore SIGWINCH in worker. Fixes a crash on OpenBSD.
         self.log.debug("worker: SIGWINCH ignored.")
-
-    # ----- Async event loop for SSE/WebSocket channels -----
-    #
-    # A background asyncio thread holds real-time connections cheaply as
-    # coroutines, while the sync worker threads handle regular HTTP unchanged.
-    # This avoids ASGI (which would require wrapping the entire app) and
-    # avoids a separate sidecar process (which adds deployment complexity
-    # and doesn't work on single-port platforms like Heroku).
-    # See plain/realtime/ARCHITECTURE.md for the full decision record.
-
-    def _start_async_loop(self) -> None:
-        """Start a background async event loop for channel connections."""
-        try:
-            from plain.realtime.handler import AsyncConnectionManager
-            from plain.realtime.registry import realtime_registry
-        except ImportError:
-            return  # realtime module not available
-
-        realtime_registry.import_modules()
-
-        self._async_loop = asyncio.new_event_loop()
-        self._connection_manager = AsyncConnectionManager(self._async_loop)
-
-        def run_loop(loop: asyncio.AbstractEventLoop) -> None:
-            asyncio.set_event_loop(loop)
-            loop.run_forever()
-
-        self._async_thread = threading.Thread(
-            target=run_loop, args=(self._async_loop,), daemon=True
-        )
-        self._async_thread.start()
-
-        # Start the connection manager (heartbeats + Postgres listener)
-        self._async_loop.call_soon_threadsafe(self._connection_manager.start)
-
-    def _stop_async_loop(self) -> None:
-        """Stop the background async event loop."""
-        if self._async_loop is None or self._connection_manager is None:
-            return
-
-        try:
-            future = asyncio.run_coroutine_threadsafe(
-                self._connection_manager.stop(), self._async_loop
-            )
-            future.result(timeout=3)
-        except Exception:
-            self._connection_manager.close_all()
-
-        self._async_loop.call_soon_threadsafe(self._async_loop.stop)
-        if self._async_thread:
-            self._async_thread.join(timeout=2)
-
-    def _invoke_channel_method(self, method: Any, *args: Any) -> Any:
-        """Call a Channel method, supporting both sync and async implementations.
-
-        Called from the sync worker thread. If the method is async, dispatches
-        it to the background event loop and blocks until it completes.
-        """
-        if asyncio.iscoroutinefunction(method):
-            assert self._async_loop is not None
-            future = asyncio.run_coroutine_threadsafe(method(*args), self._async_loop)
-            return future.result(timeout=10)
-        return method(*args)
 
     def handle_error(
         self, req: Request | None, client: socket.socket, addr: Any, exc: BaseException
@@ -463,110 +308,6 @@ class Worker:
         except Exception:
             self.log.debug("Failed to send error message.")
 
-    def enqueue_req(self, conn: TConn) -> None:
-        # conn.init() is called inside handle(), not here, so that SSL
-        # handshake errors are caught in the worker thread instead of
-        # crashing the main loop. (Ported from gunicorn PR #3440.)
-        self._in_flight += 1
-        try:
-            self.tpool.submit(self._run_handle, conn)
-        except RuntimeError:
-            # Pool shut down (e.g. during SIGQUIT) — clean up counters
-            self._in_flight -= 1
-            self.nr_conns -= 1
-            conn.close()
-
-    def _run_handle(self, conn: TConn) -> None:
-        """Run handle() in a worker thread, defer completion to main thread."""
-        keepalive, conn = self.handle(conn)
-        self._method_queue.defer(self.finish_request, keepalive, conn)
-
-    def set_accept_enabled(self, enabled: bool) -> None:
-        """Register or unregister listener sockets for accepting connections."""
-        if enabled == self._accepting:
-            return
-
-        for listener in self.sockets:
-            if enabled:
-                listener.setblocking(False)
-                server = listener.getsockname()
-                self.poller.register(
-                    listener,
-                    selectors.EVENT_READ,
-                    partial(self.accept, server),
-                )
-            else:
-                self.poller.unregister(listener)
-
-        self._accepting = enabled
-
-    def accept(self, server: tuple[str, int], listener: socket.socket) -> None:
-        try:
-            sock, client = listener.accept()
-            # initialize the connection object
-            conn = TConn(self.app, sock, client, server)
-
-            self.nr_conns += 1
-            # wait until socket is readable
-            self.poller.register(
-                conn.sock,
-                selectors.EVENT_READ,
-                partial(self.on_client_socket_readable, conn),
-            )
-        except OSError as e:
-            if e.errno not in (errno.EAGAIN, errno.ECONNABORTED, errno.EWOULDBLOCK):
-                raise
-
-    def on_client_socket_readable(self, conn: TConn, client: socket.socket) -> None:
-        # unregister the client from the poller
-        self.poller.unregister(client)
-
-        if conn.initialized:
-            # remove the connection from keepalive
-            try:
-                self._keep.remove(conn)
-            except ValueError:
-                return
-
-        # submit the connection to a worker
-        self.enqueue_req(conn)
-
-    def murder_keepalived(self) -> None:
-        now = time.monotonic()
-        while True:
-            try:
-                # remove the connection from the queue
-                conn = self._keep.popleft()
-            except IndexError:
-                break
-
-            # Connections in _keep always have timeout set via set_timeout()
-            assert conn.timeout is not None, (
-                "timeout should be set for keepalive connections"
-            )
-            delta = conn.timeout - now
-            if delta > 0:
-                # add the connection back to the queue
-                self._keep.appendleft(conn)
-                break
-            else:
-                self.nr_conns -= 1
-                # remove the socket from the poller
-                try:
-                    self.poller.unregister(conn.sock)
-                except OSError as e:
-                    if e.errno != errno.EBADF:
-                        raise
-                except KeyError:
-                    # already removed by the system, continue
-                    pass
-                except ValueError:
-                    # already removed by the system continue
-                    pass
-
-                # close the socket
-                conn.close()
-
     def is_parent_alive(self) -> bool:
         # If our parent changed then we shut down.
         if self.ppid != os.getppid():
@@ -574,96 +315,167 @@ class Worker:
             return False
         return True
 
-    def run(self) -> None:
-        # Register the method queue so worker thread completions
-        # wake up the poller
-        self.poller.register(
-            self._method_queue.fileno(),
-            selectors.EVENT_READ,
-            self._method_queue.process,
-        )
+    async def run(self) -> None:
+        loop = asyncio.get_running_loop()
 
-        # Start accepting connections
-        self.set_accept_enabled(True)
+        # Add signal handlers
+        loop.add_signal_handler(signal.SIGTERM, self.handle_exit_async)
+        loop.add_signal_handler(signal.SIGINT, self.handle_quit_async)
+        loop.add_signal_handler(signal.SIGQUIT, self.handle_quit_async)
+        signal.signal(signal.SIGABRT, self.handle_abort)
+        signal.signal(signal.SIGWINCH, self.handle_winch)
 
+        # Don't let SIGTERM disturb active requests
+        # by interrupting system calls
+        signal.siginterrupt(signal.SIGTERM, False)
+
+        # Start accepting on all listener sockets
+        for listener in self.sockets:
+            listener.setblocking(False)
+            loop.create_task(self._accept_loop(loop, listener))
+
+        # Main heartbeat loop
         while self.alive:
-            # notify the arbiter we are alive
             self.notify()
-
-            # Backpressure: stop accepting when at capacity
-            self.set_accept_enabled(self.nr_conns < WORKER_CONNECTIONS)
-
-            # Single unified event loop — handles accepts, client data,
-            # and worker thread completions (via method queue pipe)
-            events = self.poller.select(1.0)
-            for key, _ in events:
-                callback = key.data
-                callback(key.fileobj)
 
             if not self.is_parent_alive():
                 break
 
-            # handle keepalive timeouts
-            self.murder_keepalived()
+            await asyncio.sleep(1.0)
 
-        self.set_accept_enabled(False)
-        self.tpool.shutdown(False)
+        # Graceful shutdown
+        await self._graceful_shutdown(loop)
 
+    async def _accept_loop(
+        self, loop: asyncio.AbstractEventLoop, listener: sock.BaseSocket
+    ) -> None:
+        server: tuple[str, int] = listener.getsockname()  # type: ignore[assignment]
+        while self.alive:
+            if self.nr_conns >= WORKER_CONNECTIONS:
+                await asyncio.sleep(0.1)  # backpressure
+                continue
+            try:
+                client_sock, client = await loop.sock_accept(listener)  # type: ignore[arg-type]
+                self.nr_conns += 1
+                loop.create_task(
+                    self._handle_connection(loop, client_sock, client, server)
+                )
+            except OSError as e:
+                if e.errno not in (
+                    errno.EAGAIN,
+                    errno.ECONNABORTED,
+                    errno.EWOULDBLOCK,
+                ):
+                    raise
+
+    async def _wait_readable(
+        self, loop: asyncio.AbstractEventLoop, s: socket.socket
+    ) -> None:
+        """Wait until a socket has data to read."""
+        fut = loop.create_future()
+
+        def _ready() -> None:
+            if not fut.done():
+                fut.set_result(None)
+
+        loop.add_reader(s.fileno(), _ready)
+        try:
+            await fut
+        finally:
+            loop.remove_reader(s.fileno())
+
+    async def _handle_connection(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        client_sock: socket.socket,
+        client: tuple[str, int],
+        server: tuple[str, int],
+    ) -> None:
+        conn = TConn(self.app, client_sock, client, server)
+        try:
+            # Parse and handle the first request
+            keepalive = await self._dispatch_request(loop, conn)
+
+            while keepalive and self.alive:
+                # Wait for socket to be readable (keepalive)
+                conn.sock.setblocking(False)
+                try:
+                    await asyncio.wait_for(
+                        self._wait_readable(loop, conn.sock),
+                        timeout=KEEPALIVE,
+                    )
+                except TimeoutError:
+                    break  # keepalive timeout
+
+                # Socket is readable -- handle next request
+                keepalive = await self._dispatch_request(loop, conn)
+        except Exception:
+            pass
+        finally:
+            self.nr_conns -= 1
+            if not conn.handed_off:
+                conn.close()
+
+    async def _dispatch_request(
+        self, loop: asyncio.AbstractEventLoop, conn: TConn
+    ) -> bool:
+        """Parse a request in the executor, then dispatch sync or async."""
+        # Parse the request in executor (blocking I/O)
+        parse_result = await loop.run_in_executor(self.tpool, self._parse_request, conn)
+        if parse_result is None:
+            return False
+
+        req, http_request = parse_result
+
+        # Resolve the URL to check if the view is async
+        from plain.urls import get_resolver
+
+        try:
+            resolver_match = get_resolver().resolve(http_request.path_info)
+        except Exception:
+            # Fall back to sync handling if resolution fails
+            # (middleware will handle the 404)
+            return await loop.run_in_executor(
+                self.tpool, self.handle_request, req, conn, http_request
+            )
+
+        # Attach resolver_match so the handler can skip re-resolving
+        http_request.resolver_match = resolver_match
+
+        view_func = resolver_match.view
+        is_async_view = getattr(view_func, "view_is_async", False)
+
+        if is_async_view:
+            return await self._handle_async_request(loop, req, conn, http_request)
+        else:
+            return await loop.run_in_executor(
+                self.tpool, self.handle_request, req, conn, http_request
+            )
+
+    async def _graceful_shutdown(self, loop: asyncio.AbstractEventLoop) -> None:
+        # Stop accepting new connections
         for s in self.sockets:
             s.close()
 
-        # Graceful shutdown: keep processing completions until all
-        # in-flight requests finish or the timeout expires
+        self.tpool.shutdown(False)
+
+        # Wait for in-flight connections to finish
         from plain.runtime import settings
 
         deadline = time.monotonic() + settings.SERVER_GRACEFUL_TIMEOUT
-        while self._in_flight > 0 and time.monotonic() < deadline:
-            events = self.poller.select(0.5)
-            for key, _ in events:
-                callback = key.data
-                callback(key.fileobj)
+        while self.nr_conns > 0 and time.monotonic() < deadline:
+            await asyncio.sleep(0.5)
 
-        # Stop the async event loop for SSE channels
-        self._stop_async_loop()
+    def _parse_request(self, conn: TConn) -> tuple[Any, Any] | None:
+        """Parse an HTTP request from the connection. Runs in executor.
 
-        self.poller.close()
-        self._method_queue.close()
-
-    def finish_request(self, keepalive: bool, conn: TConn) -> None:
-        """Process a completed request. Runs on the main thread via method queue."""
-        self._in_flight -= 1
-
-        if keepalive and self.alive:
-            # flag the socket as non blocked
-            conn.sock.setblocking(False)
-
-            # register the connection
-            conn.set_timeout()
-            self._keep.append(conn)
-
-            # add the socket to the event loop
-            self.poller.register(
-                conn.sock,
-                selectors.EVENT_READ,
-                partial(self.on_client_socket_readable, conn),
-            )
-        else:
-            self.nr_conns -= 1
-            conn.close()
-
-    def handle(self, conn: TConn) -> tuple[bool, TConn]:
-        keepalive = False
-        req = None
+        Returns (raw_req, http_request) or None if parsing failed.
+        For H2 connections, handles the entire connection and returns None.
+        """
         try:
-            # Ensure blocking mode before init/parsing. Critical for keepalive
-            # connections where finish_request sets non-blocking for the poller.
+            # Ensure blocking mode before init/parsing
             conn.sock.setblocking(True)
 
-            # For new connections, set a read timeout so slow clients can't
-            # hold a thread indefinitely. Without this, a client that sends
-            # partial headers ties up a thread pool slot until the server
-            # timeout kills the whole worker. Keepalive connections are
-            # protected by murder_keepalived() while idle on the poller.
             is_new = not conn.initialized
             if is_new:
                 conn.sock.settimeout(KEEPALIVE)
@@ -671,7 +483,6 @@ class Worker:
             conn.init()
 
             # HTTP/2 connections are handled entirely within handle_h2_connection
-            # which manages its own frame loop and stream dispatching.
             if conn.is_h2:
                 conn.sock.settimeout(None)
                 handle_h2_connection(
@@ -680,33 +491,27 @@ class Worker:
                     conn.server,
                     self.handler,
                     self.app.is_ssl,
-                    connection_manager=self._connection_manager,
-                    async_loop=self._async_loop,
                 )
-                # H2 connection is done — don't keepalive
-                return (False, conn)
+                return None
 
             assert conn.parser is not None
             try:
                 req = next(conn.parser)
             except TimeoutError:
                 self.log.debug("Slow client timed out during request parsing")
-                return (False, conn)
+                return None
 
             if is_new:
-                # Clear the read timeout now that parsing is done.
                 conn.sock.settimeout(None)
 
             if not req:
-                return (False, conn)
+                return None
 
-            # handle the request
-            keepalive = self.handle_request(req, conn)
-            if keepalive:
-                return (keepalive, conn)
+            http_request = create_request(req, conn.sock, conn.client, conn.server)
+            return (req, http_request)
+
         except http.errors.NoMoreData as e:
             self.log.debug("Ignored premature client disconnection. %s", e)
-
         except StopIteration as e:
             self.log.debug("Closing connection. %s", e)
         except ssl.SSLError as e:
@@ -715,8 +520,7 @@ class Worker:
                 conn.sock.close()
             else:
                 self.log.debug("Error processing SSL request.")
-                self.handle_error(req, conn.sock, conn.client, e)
-
+                self.handle_error(None, conn.sock, conn.client, e)
         except OSError as e:
             if e.errno not in (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN):
                 self.log.exception("Socket error processing request.")
@@ -728,107 +532,279 @@ class Worker:
                 else:
                     self.log.debug("Ignoring connection epipe")
         except Exception as e:
-            self.handle_error(req, conn.sock, conn.client, e)
+            self.handle_error(None, conn.sock, conn.client, e)
 
-        return (False, conn)
+        return None
 
-    def _try_channel_handoff(self, req: Any, conn: TConn) -> bool:
-        """Check if the request matches a channel and hand off the socket.
+    def _prepare_request(self, req: Any, conn: TConn, http_request: Any) -> Response:
+        """Common request setup: create Response, check limits, send signal."""
+        resp = Response(req, conn.sock, is_ssl=self.app.is_ssl)
+        self.nr += 1
+        if self.nr >= self.max_requests:
+            if self.alive:
+                self.log.info("Autorestarting worker after current request.")
+                self.alive = False
+            resp.force_close()
 
-        Supports both SSE and WebSocket connections. The protocol is
-        determined by the presence of WebSocket upgrade headers.
+        if not self.alive:
+            resp.force_close()
+        elif self.nr_conns >= self.max_keepalived:
+            resp.force_close()
 
-        Returns True if the connection was handed off (caller should NOT close it).
-        Returns False if this is a normal request.
-        """
-        if self._connection_manager is None:
-            return False
+        signals.request_started.send(sender=self.__class__, request=http_request)
+        return resp
 
-        from plain.realtime.registry import realtime_registry
+    async def _handle_async_request(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        req: Any,
+        conn: TConn,
+        http_request: Any,
+    ) -> bool:
+        """Handle a request with an async view on the event loop."""
+        resp: Response | None = None
+        try:
+            request_start = datetime.now()
+            resp = self._prepare_request(req, conn, http_request)
 
-        path = req.path or "/"
-        channel = realtime_registry.match(path)
-        if channel is None:
-            return False
+            # Use the async handler path
+            http_response = await self.handler.aget_response(http_request)
 
-        # Build a request for authorization
-        http_request = create_request(req, conn.sock, conn.client, conn.server)
+            # Check if this is a WebSocket upgrade
+            if getattr(http_response, "is_websocket", False):
+                conn.handed_off = True
+                await self._handle_websocket(
+                    loop, req, conn, http_request, http_response
+                )
+                return False
 
-        if not self._invoke_channel_method(channel.authorize, http_request):
-            util.write_error(conn.sock, 403, "Forbidden", "Channel access denied")
-            return True
+            try:
+                # Check if this is an async streaming response
+                if getattr(http_response, "is_async", False):
+                    await self._write_async_response(resp, http_response)
+                else:
+                    # Write sync response (headers + body)
+                    await loop.run_in_executor(
+                        self.tpool, resp.write_response, http_response
+                    )
+            finally:
+                request_time = datetime.now() - request_start
+                if http_response.log_access:
+                    log_access(resp, req, request_time)
+                if hasattr(http_response, "close"):
+                    http_response.close()
 
-        subscriptions = self._invoke_channel_method(channel.subscribe, http_request)
-        if not subscriptions:
-            util.write_error(conn.sock, 400, "Bad Request", "No channel subscriptions")
-            return True
-
-        # Detect WebSocket upgrade
-        from plain.realtime.websocket import (
-            build_accept_response,
-            validate_handshake_headers,
-        )
-
-        is_ws, ws_key, ws_error = validate_handshake_headers(req.headers)
-
-        if is_ws and ws_error:
-            util.write_error(conn.sock, 400, "Bad Request", ws_error)
-            return True
-
-        # Dup the fd so the async thread gets its own copy. The sync worker
-        # will close the original fd when finish_request() runs with
-        # keepalive=False. Without the dup, the async side would be writing
-        # to a closed fd.
-        sock_fd = os.dup(conn.sock.fileno())
-        assert self._async_loop is not None
-
-        if is_ws:
-            # Send the 101 Switching Protocols response before handoff
-            conn.sock.sendall(build_accept_response(ws_key))
-
-            self._async_loop.call_soon_threadsafe(
-                self._connection_manager.accept_ws_connection,
-                sock_fd,
-                channel,
-                subscriptions,
-            )
-        else:
-            # SSE connection
-            self._async_loop.call_soon_threadsafe(
-                self._connection_manager.accept_sse_connection,
-                sock_fd,
-                channel,
-                subscriptions,
-            )
+            if resp.should_close():
+                self.log.debug("Closing connection.")
+                return False
+        except OSError:
+            raise
+        except Exception:
+            if resp and resp.headers_sent:
+                self.log.exception("Error handling request")
+                try:
+                    conn.sock.shutdown(socket.SHUT_RDWR)
+                    conn.sock.close()
+                except OSError:
+                    pass
+                return False
+            raise
 
         return True
 
-    def handle_request(self, req: Any, conn: TConn) -> bool:
-        # Check for SSE channel handoff before normal request handling
-        if self._try_channel_handoff(req, conn):
-            return False  # No keepalive — socket ownership transferred
+    async def _handle_websocket(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        req: Any,
+        conn: TConn,
+        http_request: Any,
+        http_response: Any,
+    ) -> None:
+        """Handle a WebSocket upgrade and lifecycle."""
+        from plain.realtime.websocket import (
+            CLOSE_PROTOCOL_ERROR,
+            OP_BINARY,
+            OP_CLOSE,
+            OP_CONTINUATION,
+            OP_PING,
+            OP_PONG,
+            OP_TEXT,
+            build_accept_response,
+            encode_frame,
+            parse_close_payload,
+            read_frame,
+            validate_handshake_headers,
+        )
 
+        ws_view = http_response.ws_view
+
+        # Validate WebSocket handshake headers
+        is_ws, ws_key, ws_error = validate_handshake_headers(req.headers)
+        if not is_ws or ws_error:
+            util.write_error(
+                conn.sock,
+                400,
+                "Bad Request",
+                ws_error or "Not a WebSocket request",
+            )
+            return
+
+        # Send the 101 Switching Protocols response
+        conn.sock.sendall(build_accept_response(ws_key))
+
+        # Set up async reader/writer
+        conn.sock.setblocking(False)
+        reader = asyncio.StreamReader()
+        protocol = asyncio.StreamReaderProtocol(reader)
+        transport, _ = await loop.create_connection(lambda: protocol, sock=conn.sock)
+        writer = asyncio.StreamWriter(transport, protocol, reader, loop)
+
+        ws_view._reader = reader
+        ws_view._writer = writer
+
+        try:
+            # Call connect()
+            await ws_view.connect()
+
+            # Start pg_listen tasks for subscriptions if any
+            listen_tasks = []
+            if ws_view._subscriptions:
+                for sub_channel in ws_view._subscriptions:
+                    task = loop.create_task(self._ws_pg_listen(ws_view, sub_channel))
+                    listen_tasks.append(task)
+
+            # Read loop
+            frag_opcode = None
+            frag_payload = bytearray()
+
+            while not ws_view._closed:
+                try:
+                    frame = await read_frame(reader)
+                except (asyncio.IncompleteReadError, ConnectionError):
+                    break
+                except ValueError as e:
+                    self.log.debug("WebSocket protocol error: %s", e)
+                    await ws_view.close(CLOSE_PROTOCOL_ERROR, str(e))
+                    break
+
+                if frame.opcode == OP_CLOSE:
+                    close = parse_close_payload(frame.payload)
+                    await ws_view.close(close.code)
+                    break
+
+                if frame.opcode == OP_PING:
+                    writer.write(encode_frame(OP_PONG, frame.payload))
+                    await writer.drain()
+                    continue
+
+                if frame.opcode == OP_PONG:
+                    continue
+
+                # Data frames
+                if frame.opcode == OP_CONTINUATION:
+                    if frag_opcode is None:
+                        await ws_view.close(
+                            CLOSE_PROTOCOL_ERROR, "Unexpected continuation"
+                        )
+                        break
+                    frag_payload.extend(frame.payload)
+                    if frame.fin:
+                        await self._ws_dispatch(
+                            ws_view, frag_opcode, bytes(frag_payload)
+                        )
+                        frag_opcode = None
+                        frag_payload.clear()
+                elif frame.opcode in (OP_TEXT, OP_BINARY):
+                    if frag_opcode is not None:
+                        await ws_view.close(
+                            CLOSE_PROTOCOL_ERROR,
+                            "New data frame during fragmentation",
+                        )
+                        break
+                    if frame.fin:
+                        await self._ws_dispatch(ws_view, frame.opcode, frame.payload)
+                    else:
+                        frag_opcode = frame.opcode
+                        frag_payload.extend(frame.payload)
+        except Exception:
+            self.log.exception("WebSocket error")
+        finally:
+            # Cancel listen tasks
+            for task in listen_tasks:
+                task.cancel()
+
+            ws_view._closed = True
+            await ws_view.disconnect()
+
+            try:
+                writer.close()
+            except OSError:
+                pass
+
+    async def _ws_dispatch(self, ws_view: Any, opcode: int, payload: bytes) -> None:
+        """Dispatch a WebSocket message to the view's receive method."""
+        from plain.realtime.websocket import OP_TEXT
+
+        if opcode == OP_TEXT:
+            try:
+                message: str | bytes = payload.decode("utf-8")
+            except UnicodeDecodeError:
+                from plain.realtime.websocket import CLOSE_INVALID_PAYLOAD
+
+                await ws_view.close(CLOSE_INVALID_PAYLOAD, "Invalid UTF-8")
+                return
+        else:
+            message = payload
+
+        await ws_view.receive(message)
+
+    async def _ws_pg_listen(self, ws_view: Any, channel: str) -> None:
+        """Listen for Postgres NOTIFY and send to WebSocket client."""
+
+        from plain.realtime.channel import pg_listen
+
+        try:
+            async for channel_name, payload in pg_listen(channel):
+                if ws_view._closed:
+                    break
+                if channel_name is None:
+                    continue  # heartbeat
+                await ws_view.send(payload)
+        except asyncio.CancelledError:
+            pass
+
+    async def _write_async_response(self, resp: Response, http_response: Any) -> None:
+        """Write an AsyncStreamingResponse to the socket."""
+        loop = asyncio.get_running_loop()
+        status = f"{http_response.status_code} {http_response.reason_phrase}"
+        response_headers = [
+            *((k, v) for k, v in http_response.headers.items() if v is not None),
+            *(
+                ("Set-Cookie", c.output(header=""))
+                for c in http_response.cookies.values()
+            ),
+        ]
+
+        resp.set_status_and_headers(status, response_headers)
+        await loop.run_in_executor(self.tpool, resp.send_headers)
+
+        # Iterate async streaming content, write chunks in executor
+        # to avoid blocking the event loop on slow clients
+        async for chunk in http_response:
+            await loop.run_in_executor(self.tpool, resp.write, chunk)
+
+        await loop.run_in_executor(self.tpool, resp.close)
+
+    def handle_request(self, req: Any, conn: TConn, http_request: Any = None) -> bool:
         resp: Response | None = None
         try:
             request_start = datetime.now()
 
-            # Build Request directly from parsed HTTP message
-            http_request = create_request(req, conn.sock, conn.client, conn.server)
+            # Build Request directly from parsed HTTP message (if not already built)
+            if http_request is None:
+                http_request = create_request(req, conn.sock, conn.client, conn.server)
 
-            resp = Response(req, conn.sock, is_ssl=self.app.is_ssl)
-            self.nr += 1
-            if self.nr >= self.max_requests:
-                if self.alive:
-                    self.log.info("Autorestarting worker after current request.")
-                    self.alive = False
-                resp.force_close()
-
-            if not self.alive:
-                resp.force_close()
-            elif len(self._keep) >= self.max_keepalived:
-                resp.force_close()
-
-            signals.request_started.send(sender=self.__class__, request=http_request)
+            resp = self._prepare_request(req, conn, http_request)
             http_response = self.handler.get_response(http_request)
 
             try:

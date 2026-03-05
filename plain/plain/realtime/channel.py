@@ -1,28 +1,65 @@
 from __future__ import annotations
 
+import asyncio
+import json
+from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
+from plain.http import AsyncStreamingResponse, ForbiddenError403
+from plain.views import View
+
+from .sse import format_sse_comment, format_sse_event
+
 if TYPE_CHECKING:
-    from plain.http import Request
+    from plain.http import Request, ResponseBase
 
 
-class Channel:
-    """Base class for real-time channels (SSE and WebSocket).
+async def pg_listen(
+    *channels: str, heartbeat_interval: float = 15.0
+) -> AsyncGenerator[tuple[str | None, str], None]:
+    """Async generator that yields (channel, payload) from Postgres NOTIFY.
 
-    Subclass this to define real-time endpoints. All methods are sync —
-    the framework handles async infrastructure internally. This is a
-    deliberate choice to avoid Django's async API duplication problem.
-    See ARCHITECTURE.md for the full rationale.
+    Also sends periodic SSE heartbeat comments to keep connections alive.
+    """
+    import psycopg
+    import psycopg.sql
 
-    Supports both SSE (server-push only) and WebSocket (bidirectional).
-    The protocol is determined by the client's request headers — the same
-    Channel class works with both.
+    from .listener import _get_connection_string
+
+    conninfo = _get_connection_string()
+    conn = await psycopg.AsyncConnection.connect(conninfo, autocommit=True)
+
+    try:
+        for channel in channels:
+            await conn.execute(
+                psycopg.sql.SQL("LISTEN {}").format(psycopg.sql.Identifier(channel))
+            )
+
+        while True:
+            async for notify in conn.notifies(timeout=heartbeat_interval):
+                yield notify.channel, notify.payload or ""
+            # Timeout — send heartbeat by yielding None
+            yield None, ""
+    except (psycopg.OperationalError, asyncio.CancelledError):
+        pass
+    finally:
+        try:
+            await conn.close()
+        except Exception:
+            pass
+
+
+class Channel(View):
+    """View subclass for Server-Sent Events (SSE) via Postgres LISTEN/NOTIFY.
+
+    Register via URL router like any other view::
+
+        # urls.py
+        path("events/user/", UserEventsChannel)
 
     Example::
 
-        class UserEvents(Channel):
-            path = "/events/user/"
-
+        class UserEventsChannel(Channel):
             def authorize(self, request):
                 return request.user.is_authenticated
 
@@ -31,14 +68,9 @@ class Channel:
 
             def transform(self, channel_name, payload):
                 return {"type": "update", "data": payload}
-
-            def receive(self, message):
-                # Only called for WebSocket connections
-                return f"echo: {message}"
     """
 
-    # URL path for this channel. Required.
-    path: str = ""
+    view_protocol: str | None = "sse"
 
     def authorize(self, request: Request) -> bool:
         """Check if the request is allowed to connect to this channel.
@@ -58,19 +90,49 @@ class Channel:
     def transform(self, channel_name: str, payload: str) -> dict[str, Any] | str | None:
         """Transform a Postgres NOTIFY payload before sending to the client.
 
-        Called in the sync context (via threadpool) when a notification arrives.
         Return a dict (will be JSON-serialized), a string (sent as-is),
         or None to skip sending this event.
         """
         return payload
 
-    def receive(self, message: str | bytes) -> str | bytes | None:
-        """Handle an incoming WebSocket message.
+    async def get(self) -> ResponseBase:
+        loop = asyncio.get_running_loop()
 
-        Called in the sync context (via threadpool) when the client sends
-        a text or binary message. Only used for WebSocket connections.
+        # Run sync authorize/subscribe in executor for ORM access
+        authorized = await loop.run_in_executor(None, self.authorize, self.request)
+        if not authorized:
+            raise ForbiddenError403
 
-        Return a string or bytes to send a response back to the client,
-        or None to send nothing.
-        """
-        return None
+        subscriptions = await loop.run_in_executor(None, self.subscribe, self.request)
+        if not subscriptions:
+            raise ForbiddenError403
+
+        async def stream() -> AsyncGenerator[str, None]:
+            async for channel_name, payload in pg_listen(*subscriptions):
+                if channel_name is None:
+                    # Heartbeat
+                    yield format_sse_comment("heartbeat")
+                    continue
+
+                # Transform payload
+                transformed = await loop.run_in_executor(
+                    None, self.transform, channel_name, payload
+                )
+                if transformed is None:
+                    continue
+
+                if isinstance(transformed, dict):
+                    data = json.dumps(transformed)
+                else:
+                    data = str(transformed)
+
+                yield format_sse_event(data, event=channel_name)
+
+        return AsyncStreamingResponse(
+            stream(),
+            content_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )

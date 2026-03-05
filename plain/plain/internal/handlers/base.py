@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import inspect
 import types
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry import baggage, trace
+from opentelemetry.context import Context
 from opentelemetry.semconv.attributes import http_attributes, url_attributes
 
 from plain.exceptions import ImproperlyConfigured
@@ -69,12 +71,8 @@ class BaseHandler:
         # as a flag for initialization being complete.
         self._middleware_chain = handler
 
-    def get_response(self, request: Request) -> ResponseBase:
-        """Return a Response object for the given Request."""
-        assert self._middleware_chain is not None, (
-            "load_middleware() must be called before get_response()"
-        )
-
+    def _build_request_span(self, request: Request) -> tuple[dict[str, str], Context]:
+        """Build span attributes and baggage context for a request."""
         span_attributes: dict[str, str] = {
             "plain.request.id": request.unique_id,
             http_attributes.HTTP_REQUEST_METHOD: request.method or "",
@@ -82,13 +80,11 @@ class BaseHandler:
             url_attributes.URL_SCHEME: request.scheme,
         }
 
-        # Add full URL if we can build it
         try:
             span_attributes[url_attributes.URL_FULL] = request.build_absolute_uri()
         except (KeyError, AttributeError):
             pass
 
-        # Add query string if present
         if request.query_string:
             span_attributes[url_attributes.URL_QUERY] = request.query_string
 
@@ -96,6 +92,29 @@ class BaseHandler:
         span_context = baggage.set_baggage(
             "http.request.headers", request.headers, span_context
         )
+
+        return span_attributes, span_context
+
+    def _finish_span(self, span: Any, response: ResponseBase) -> None:
+        """Set span status and record exceptions from a response."""
+        span.set_attribute(
+            http_attributes.HTTP_RESPONSE_STATUS_CODE, response.status_code
+        )
+        span.set_status(
+            trace.StatusCode.OK
+            if response.status_code < 400
+            else trace.StatusCode.ERROR
+        )
+        if response.exception:
+            span.record_exception(response.exception)
+
+    def get_response(self, request: Request) -> ResponseBase:
+        """Return a Response object for the given Request."""
+        assert self._middleware_chain is not None, (
+            "load_middleware() must be called before get_response()"
+        )
+
+        span_attributes, span_context = self._build_request_span(request)
 
         with tracer.start_as_current_span(
             f"{request.method} {request.path_info}",
@@ -105,20 +124,7 @@ class BaseHandler:
         ) as span:
             response = self._middleware_chain(request)
             response._resource_closers.append(request.close)
-
-            span.set_attribute(
-                http_attributes.HTTP_RESPONSE_STATUS_CODE, response.status_code
-            )
-
-            span.set_status(
-                trace.StatusCode.OK
-                if response.status_code < 400
-                else trace.StatusCode.ERROR
-            )
-
-            if response.exception:
-                span.record_exception(response.exception)
-
+            self._finish_span(span, response)
             return response
 
     def _get_response(self, request: Request) -> ResponseBase:
@@ -138,15 +144,60 @@ class BaseHandler:
 
         return response
 
+    async def aget_response(self, request: Request) -> ResponseBase:
+        """Return a Response for the given Request, supporting async views.
+
+        Note: This bypasses the middleware chain because sync middleware
+        cannot call async views. Middleware support for async views
+        requires async-aware middleware wrapping (future work).
+        """
+        assert self._middleware_chain is not None, (
+            "load_middleware() must be called before aget_response()"
+        )
+
+        span_attributes, span_context = self._build_request_span(request)
+
+        with tracer.start_as_current_span(
+            f"{request.method} {request.path_info}",
+            context=span_context,
+            attributes=span_attributes,
+            kind=trace.SpanKind.SERVER,
+        ) as span:
+            response = await self._aget_response(request)
+            response._resource_closers.append(request.close)
+            self._finish_span(span, response)
+            return response
+
+    async def _aget_response(self, request: Request) -> ResponseBase:
+        """Async version of _get_response for async views."""
+        resolver_match = self.resolve_request(request)
+
+        view_func = resolver_match.view
+
+        if inspect.iscoroutinefunction(view_func):
+            response = await view_func(
+                request, *resolver_match.args, **resolver_match.kwargs
+            )
+        else:
+            response = view_func(request, *resolver_match.args, **resolver_match.kwargs)
+
+        self.check_response(response, view_func)
+
+        return response
+
     def resolve_request(self, request: Request) -> ResolverMatch:
         """
         Retrieve/set the urlrouter for the request. Return the view resolved,
         with its args and kwargs.
         """
 
-        resolver = get_resolver()
-        # Resolve the view, and assign the match object back to the request.
-        resolver_match = resolver.resolve(request.path_info)
+        # Reuse resolver_match if already set (avoids double resolution
+        # when the worker pre-resolved to check for async views).
+        if hasattr(request, "resolver_match") and request.resolver_match is not None:
+            resolver_match = request.resolver_match
+        else:
+            resolver = get_resolver()
+            resolver_match = resolver.resolve(request.path_info)
 
         span = trace.get_current_span()
 

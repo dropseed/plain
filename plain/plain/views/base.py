@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 from collections.abc import Callable
 from http import HTTPMethod
@@ -30,12 +31,27 @@ tracer = trace.get_tracer("plain")
 
 
 class View:
+    # Protocol declaration for the server's connection handler.
+    # None = regular HTTP, "sse" = server-sent events, "websocket" = WebSocket
+    view_protocol: str | None = None
+
     request: Request
     url_args: tuple[Any, ...]
     url_kwargs: dict[str, Any]
 
     # View.as_view(example="foo") usage can be customized by defining your own __init__ method.
     # def __init__(self, *args, **kwargs):
+
+    _HTTP_METHODS = ("get", "post", "put", "patch", "delete", "head", "options")
+
+    @classmethod
+    def _has_async_handlers(cls) -> bool:
+        """Check if any HTTP handler method on this class is a coroutine."""
+        for method_name in cls._HTTP_METHODS:
+            method = getattr(cls, method_name, None)
+            if method is not None and inspect.iscoroutinefunction(method):
+                return True
+        return False
 
     def setup(self, request: Request, *url_args: object, **url_kwargs: object) -> None:
         if hasattr(self, "get") and not hasattr(self, "head"):
@@ -48,29 +64,53 @@ class View:
     @classonlymethod
     def as_view(
         cls: type[Self], *init_args: object, **init_kwargs: object
-    ) -> Callable[[Request, Any, Any], ResponseBase]:
-        def view(
-            request: Request, *url_args: object, **url_kwargs: object
-        ) -> ResponseBase:
-            with tracer.start_as_current_span(
-                f"{cls.__name__}",
-                kind=trace.SpanKind.INTERNAL,
-                attributes={
-                    CODE_FUNCTION_NAME: "as_view",
-                    CODE_NAMESPACE: f"{cls.__module__}.{cls.__qualname__}",
-                },
-            ) as span:
-                v = cls(*init_args, **init_kwargs)
-                v.setup(request, *url_args, **url_kwargs)
-                response = v.get_response()
-                span.set_status(
-                    trace.StatusCode.OK
-                    if response.status_code < 400
-                    else trace.StatusCode.ERROR
-                )
-                return response
+    ) -> Callable[..., Any]:
+        _is_async = cls._has_async_handlers()
+
+        span_attrs = {
+            CODE_FUNCTION_NAME: "as_view",
+            CODE_NAMESPACE: f"{cls.__module__}.{cls.__qualname__}",
+        }
+
+        if _is_async:
+
+            async def view(
+                request: Request, *url_args: object, **url_kwargs: object
+            ) -> ResponseBase:
+                with tracer.start_as_current_span(
+                    cls.__name__, kind=trace.SpanKind.INTERNAL, attributes=span_attrs
+                ) as span:
+                    v = cls(*init_args, **init_kwargs)
+                    v.setup(request, *url_args, **url_kwargs)
+                    response = await v.aget_response()
+                    span.set_status(
+                        trace.StatusCode.OK
+                        if response.status_code < 400
+                        else trace.StatusCode.ERROR
+                    )
+                    return response
+
+        else:
+
+            def view(
+                request: Request, *url_args: object, **url_kwargs: object
+            ) -> ResponseBase:
+                with tracer.start_as_current_span(
+                    cls.__name__, kind=trace.SpanKind.INTERNAL, attributes=span_attrs
+                ) as span:
+                    v = cls(*init_args, **init_kwargs)
+                    v.setup(request, *url_args, **url_kwargs)
+                    response = v.get_response()
+                    span.set_status(
+                        trace.StatusCode.OK
+                        if response.status_code < 400
+                        else trace.StatusCode.ERROR
+                    )
+                    return response
 
         view.view_class = cls  # type: ignore[attr-defined]
+        view.view_protocol = cls.view_protocol  # type: ignore[attr-defined]
+        view.view_is_async = _is_async  # type: ignore[attr-defined]
 
         return view
 
@@ -96,6 +136,28 @@ class View:
 
         try:
             result: Any = handler()
+        except ResponseException as e:
+            return e.response
+
+        return self.convert_value_to_response(result)
+
+    async def aget_response(self) -> ResponseBase:
+        handler = self.get_request_handler()
+
+        if not handler:
+            logger.warning(
+                "Method Not Allowed (%s): %s",
+                self.request.method,
+                self.request.path,
+                extra={"status_code": 405, "request": self.request},
+            )
+            return NotAllowedResponse(self._allowed_methods())
+
+        try:
+            if inspect.iscoroutinefunction(handler):
+                result: Any = await handler()
+            else:
+                result = handler()
         except ResponseException as e:
             return e.response
 

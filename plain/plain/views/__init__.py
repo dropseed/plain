@@ -3,6 +3,7 @@ from .forms import FormView
 from .objects import CreateView, DeleteView, DetailView, ListView, UpdateView
 from .redirect import RedirectView
 from .templates import TemplateView
+from .websocket import WebSocketView
 
 __all__ = [
     "View",
@@ -14,4 +15,5 @@ __all__ = [
     "UpdateView",
     "DeleteView",
     "ListView",
+    "WebSocketView",
 ]
