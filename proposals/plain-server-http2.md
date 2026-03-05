@@ -13,38 +13,28 @@ The typical argument against HTTP/2 at the app server level is that a reverse pr
 - **Dev/staging simplicity** — Plain already does HTTPS in dev via `plain dev`, so HTTP/2 would work without needing a local proxy
 - **Direct-to-internet deployments** — edge cases but they exist (container platforms, simple setups)
 
-## Prerequisites: WSGI bypass
+## Prerequisites: WSGI bypass ✅
 
 WSGI is fundamentally HTTP/1.1 — it can't represent multiplexed streams. HTTP/2 support requires moving away from the WSGI interface between the server and the application.
 
-This work is already in progress on the `claude/websocket-architecture-exploration-dTU2c` branch, which:
+**Done.** The server now bypasses WSGI entirely — `create_request()` builds a `PlainRequest` directly from parsed HTTP data and the worker calls `handler.get_response()` instead of going through WSGI's `environ`/`start_response`. See `thread.py:handle_request()`.
 
-1. **Bypasses WSGI** — Both `SyncWorker` and `ThreadWorker` now construct a `PlainRequest` directly from parsed HTTP data (`create_plain_request()`) and call `handler.get_response()` instead of going through `self.wsgi(environ, resp.start_response)`.
-
-2. **Adds per-worker async infrastructure** — A background asyncio event loop per worker process handles long-lived SSE connections. The `AsyncConnectionManager` manages socket handoff, heartbeats, and Postgres LISTEN/NOTIFY dispatch.
-
-3. **Manages raw sockets** — SSE connections use `os.dup(client.fileno())` to hand sockets from the sync worker thread to the async loop. HTTP/2 stream multiplexing needs similar socket-level control.
-
-These are the same architectural changes HTTP/2 would require. The channels/SSE work is building the foundation.
+The server also migrated from `os.fork()` to `multiprocessing.spawn`, which simplifies the process model.
 
 ## Relationship to SSE/channels work
 
-HTTP/2 and SSE/channels are **independent features** that share the same architectural prerequisite: getting off WSGI.
+HTTP/2 and SSE/channels are **independent features** that were both blocked on WSGI bypass (now complete).
 
-- **SSE/channels** needs WSGI bypass because long-lived connections with socket handoff don't fit the WSGI request/response model.
-- **HTTP/2** needs WSGI bypass because WSGI can't represent multiplexed streams.
+- **SSE/channels** needs direct socket control that doesn't fit the WSGI request/response model.
+- **HTTP/2** needs multiplexed stream support that WSGI can't represent.
 
-Neither depends on the other to function. SSE works fine over HTTP/1.1 (it always has — `EventSource` is an HTTP/1.1 feature). HTTP/2 is useful without SSE (request/response multiplexing, header compression).
+They complement each other: HTTP/2 multiplexing lets a browser hold an SSE connection and make regular requests over the **same TCP connection**, instead of tying up one of the browser's ~6 per-host HTTP/1.1 connections. Nice-to-have, not a requirement.
 
-They do complement each other: HTTP/2 multiplexing lets a browser hold an SSE connection and make regular requests over the **same TCP connection**, instead of tying up one of the browser's ~6 per-host HTTP/1.1 connections. Nice-to-have, not a requirement.
-
-## Sequencing
+## Remaining prerequisites
 
 1. **Upstream fixes** (see `plain-server-gunicorn-upstream-fixes.md`) — Lock-free PollableMethodQueue, thread pool exhaustion protection, request body discard. Reliability and performance first.
 
-2. **WSGI bypass** (in progress on `claude/websocket-architecture-exploration-dTU2c`) — Drop WSGI as the internal interface. This is the big architectural shift that unblocks both SSE/channels and HTTP/2.
-
-3. **SSE/channels and HTTP/2** (independent, either order) — Once WSGI is gone, these can be added independently. Channels/SSE is further along since it's being built alongside the WSGI bypass. HTTP/2 can follow whenever it's prioritized.
+2. **HTTP/2 implementation** — With WSGI bypass complete, this is now unblocked. Main work is integrating the `h2` library with the thread worker's event loop.
 
 ## Gunicorn's implementation
 
