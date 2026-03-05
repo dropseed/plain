@@ -164,6 +164,9 @@ def handle_h2_connection(
                 elif isinstance(event, h2.events.WindowUpdated):
                     pass  # h2 handles flow control internally
 
+                elif isinstance(event, h2.events.PriorityUpdated):
+                    pass  # advisory only; no action needed
+
                 elif isinstance(event, h2.events.ConnectionTerminated):
                     return
 
@@ -174,6 +177,11 @@ def handle_h2_connection(
 
     except h2.exceptions.ProtocolError:
         log.debug("HTTP/2 protocol error on connection from %s", client)
+        # h2 queues a GOAWAY when it raises ProtocolError — flush it
+        try:
+            sock.sendall(conn.data_to_send())
+        except OSError:
+            pass
     except OSError:
         log.debug("HTTP/2 connection closed from %s", client)
     except Exception:
@@ -184,10 +192,41 @@ def handle_h2_connection(
             sock.sendall(conn.data_to_send())
         except Exception:
             pass
+        _graceful_close(sock)
+
+
+def _graceful_close(sock: socket.socket) -> None:
+    """Close a socket gracefully to avoid TCP RST.
+
+    Shuts down the write side, drains any remaining data from the peer,
+    then closes the socket. This ensures the peer sees a clean FIN
+    instead of a RST.
+    """
+    try:
+        sock.shutdown(socket.SHUT_WR)
+    except OSError:
         try:
             sock.close()
-        except Exception:
+        except OSError:
             pass
+        return
+
+    # Drain remaining data so the kernel doesn't RST (cap at 128 KB)
+    try:
+        sock.settimeout(1.0)
+        remaining = 128 * 1024
+        while remaining > 0:
+            chunk = sock.recv(min(remaining, 65535))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+    except OSError:
+        pass
+
+    try:
+        sock.close()
+    except OSError:
+        pass
 
 
 def _extract_headers_from_stream(
@@ -449,14 +488,18 @@ def _send_h2_data(
         if max_size <= 0:
             # Need to flush and wait for window update
             sock.sendall(conn.data_to_send())
-            # Re-read — the peer may have sent WINDOW_UPDATE
-            incoming = sock.recv(65535)
+            sock.settimeout(5.0)
+            try:
+                incoming = sock.recv(65535)
+            except TimeoutError:
+                return  # peer never sent WINDOW_UPDATE; give up
+            finally:
+                sock.settimeout(None)
             if incoming:
                 conn.receive_data(incoming)
             max_size = conn.local_flow_control_window(stream_id)
             if max_size <= 0:
-                # Still no window — send what we can
-                max_size = 1
+                return  # window still exhausted after wait; give up
 
         # Also respect max frame size
         chunk_size = min(max_size, len(data) - offset, conn.max_outbound_frame_size)
