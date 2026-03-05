@@ -226,152 +226,93 @@ class TestWebSocketHandshakeValidation:
         assert b"s3pPLMBiTxaQ9kYGzzhZRbK+xOo=" in resp
 
 
+def _make_masked_frame(opcode, payload, fin=True, mask=b"\x01\x02\x03\x04"):
+    """Build a client->server masked frame."""
+    header = bytearray()
+    first_byte = (0x80 if fin else 0x00) | (opcode & 0x0F)
+    header.append(first_byte)
+
+    length = len(payload)
+    if length < 126:
+        header.append(0x80 | length)  # mask bit set
+    elif length < 65536:
+        header.append(0x80 | 126)
+        header.extend(struct.pack("!H", length))
+    else:
+        header.append(0x80 | 127)
+        header.extend(struct.pack("!Q", length))
+
+    header.extend(mask)
+    masked_payload = _apply_mask(payload, mask)
+    return bytes(header) + masked_payload
+
+
+async def _read_frame_from_data(data: bytes):
+    """Helper: feed data into a StreamReader and read one frame."""
+    reader = asyncio.StreamReader()
+    reader.feed_data(data)
+    return await read_frame(reader)
+
+
 class TestReadFrame:
     """Unit tests for async frame reading."""
 
-    def _make_masked_frame(self, opcode, payload, fin=True, mask=b"\x01\x02\x03\x04"):
-        """Build a client->server masked frame."""
-        header = bytearray()
-        first_byte = (0x80 if fin else 0x00) | (opcode & 0x0F)
-        header.append(first_byte)
-
-        length = len(payload)
-        if length < 126:
-            header.append(0x80 | length)  # mask bit set
-        elif length < 65536:
-            header.append(0x80 | 126)
-            header.extend(struct.pack("!H", length))
-        else:
-            header.append(0x80 | 127)
-            header.extend(struct.pack("!Q", length))
-
-        header.extend(mask)
-        masked_payload = _apply_mask(payload, mask)
-        return bytes(header) + masked_payload
-
     def test_read_text_frame(self):
-        data = self._make_masked_frame(OP_TEXT, b"hello")
-        loop = asyncio.new_event_loop()
-        try:
-            reader = asyncio.StreamReader(loop=loop)
-            reader.feed_data(data)
-
-            async def run():
-                return await read_frame(reader)
-
-            frame = loop.run_until_complete(run())
-            assert frame.fin is True
-            assert frame.opcode == OP_TEXT
-            assert frame.payload == b"hello"
-        finally:
-            loop.close()
+        data = _make_masked_frame(OP_TEXT, b"hello")
+        frame = asyncio.run(_read_frame_from_data(data))
+        assert frame.fin is True
+        assert frame.opcode == OP_TEXT
+        assert frame.payload == b"hello"
 
     def test_read_binary_frame(self):
-        data = self._make_masked_frame(OP_BINARY, b"\x00\x01\x02")
-        loop = asyncio.new_event_loop()
-        try:
-            reader = asyncio.StreamReader(loop=loop)
-            reader.feed_data(data)
-
-            async def run():
-                return await read_frame(reader)
-
-            frame = loop.run_until_complete(run())
-            assert frame.opcode == OP_BINARY
-            assert frame.payload == b"\x00\x01\x02"
-        finally:
-            loop.close()
+        data = _make_masked_frame(OP_BINARY, b"\x00\x01\x02")
+        frame = asyncio.run(_read_frame_from_data(data))
+        assert frame.opcode == OP_BINARY
+        assert frame.payload == b"\x00\x01\x02"
 
     def test_read_ping_frame(self):
-        data = self._make_masked_frame(OP_PING, b"")
-        loop = asyncio.new_event_loop()
-        try:
-            reader = asyncio.StreamReader(loop=loop)
-            reader.feed_data(data)
-
-            async def run():
-                return await read_frame(reader)
-
-            frame = loop.run_until_complete(run())
-            assert frame.opcode == OP_PING
-        finally:
-            loop.close()
+        data = _make_masked_frame(OP_PING, b"")
+        frame = asyncio.run(_read_frame_from_data(data))
+        assert frame.opcode == OP_PING
 
     def test_read_close_frame(self):
         close_payload = struct.pack("!H", 1000) + b"bye"
-        data = self._make_masked_frame(OP_CLOSE, close_payload)
-        loop = asyncio.new_event_loop()
-        try:
-            reader = asyncio.StreamReader(loop=loop)
-            reader.feed_data(data)
-
-            async def run():
-                return await read_frame(reader)
-
-            frame = loop.run_until_complete(run())
-            assert frame.opcode == OP_CLOSE
-            close = parse_close_payload(frame.payload)
-            assert close.code == 1000
-            assert close.reason == "bye"
-        finally:
-            loop.close()
+        data = _make_masked_frame(OP_CLOSE, close_payload)
+        frame = asyncio.run(_read_frame_from_data(data))
+        assert frame.opcode == OP_CLOSE
+        close = parse_close_payload(frame.payload)
+        assert close.code == 1000
+        assert close.reason == "bye"
 
     def test_reject_unmasked_frame(self):
         """Client frames must be masked."""
-        # Build an unmasked frame manually
         data = bytes([0x81, 0x05]) + b"hello"  # no mask bit
-        loop = asyncio.new_event_loop()
-        try:
-            reader = asyncio.StreamReader(loop=loop)
-            reader.feed_data(data)
-
-            async def run():
-                return await read_frame(reader)
-
-            with pytest.raises(ValueError, match="not masked"):
-                loop.run_until_complete(run())
-        finally:
-            loop.close()
+        with pytest.raises(ValueError, match="not masked"):
+            asyncio.run(_read_frame_from_data(data))
 
     def test_reject_rsv_bits(self):
         """RSV bits must be 0 (no extensions)."""
-        # Set RSV1 bit
-        header = bytearray(
-            [0xC1, 0x80, 0x01, 0x02, 0x03, 0x04]
-        )  # FIN+RSV1+TEXT, masked, 0 length
-        loop = asyncio.new_event_loop()
-        try:
-            reader = asyncio.StreamReader(loop=loop)
-            reader.feed_data(bytes(header))
-
-            async def run():
-                return await read_frame(reader)
-
-            with pytest.raises(ValueError, match="RSV"):
-                loop.run_until_complete(run())
-        finally:
-            loop.close()
+        # FIN+RSV1+TEXT, masked, 0 length
+        header = bytes([0xC1, 0x80, 0x01, 0x02, 0x03, 0x04])
+        with pytest.raises(ValueError, match="RSV"):
+            asyncio.run(_read_frame_from_data(header))
 
     def test_fragmented_text(self):
         """Test reading fragmented message (first + continuation)."""
-        frame1 = self._make_masked_frame(OP_TEXT, b"hel", fin=False)
-        frame2 = self._make_masked_frame(0x0, b"lo", fin=True)  # continuation
-        loop = asyncio.new_event_loop()
-        try:
-            reader = asyncio.StreamReader(loop=loop)
+        frame1 = _make_masked_frame(OP_TEXT, b"hel", fin=False)
+        frame2 = _make_masked_frame(0x0, b"lo", fin=True)  # continuation
+
+        async def run():
+            reader = asyncio.StreamReader()
             reader.feed_data(frame1 + frame2)
+            f1 = await read_frame(reader)
+            f2 = await read_frame(reader)
+            return f1, f2
 
-            async def run():
-                f1 = await read_frame(reader)
-                f2 = await read_frame(reader)
-                return f1, f2
-
-            f1, f2 = loop.run_until_complete(run())
-            assert f1.fin is False
-            assert f1.opcode == OP_TEXT
-            assert f1.payload == b"hel"
-            assert f2.fin is True
-            assert f2.opcode == 0x0  # continuation
-            assert f2.payload == b"lo"
-        finally:
-            loop.close()
+        f1, f2 = asyncio.run(run())
+        assert f1.fin is False
+        assert f1.opcode == OP_TEXT
+        assert f1.payload == b"hel"
+        assert f2.fin is True
+        assert f2.opcode == 0x0  # continuation
+        assert f2.payload == b"lo"

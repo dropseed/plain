@@ -73,17 +73,16 @@ Bypassing WSGI (the server builds `Request` directly and calls `handler.get_resp
 
 A WSGI compatibility adapter remains available for third-party server deployments.
 
-### Socket handoff via `os.dup()`
+### Socket handoff to the event loop
 
-When the sync worker identifies a channel request, it:
+When the worker identifies a real-time request, it:
 
-1. Runs `authorize()` and `subscribe()` in the sync context (full ORM access)
-2. For WebSocket: sends the 101 Switching Protocols response
-3. Duplicates the socket fd with `os.dup()`
-4. Passes the fd to the async thread via `call_soon_threadsafe()`
-5. Returns `keepalive=False` so the sync worker releases the original socket
+1. Runs `authorize()` and `subscribe()` in the sync middleware chain (full ORM access)
+2. For WebSocket: the view returns a `WebSocketUpgradeResponse` marker; the worker sends the 101 Switching Protocols response, then wraps the socket in an `asyncio.StreamReader/Writer` pair
+3. For SSE: the view returns an `AsyncStreamingResponse`; the worker writes chunks via the event loop
+4. The connection is marked `handed_off = True` so the worker doesn't close the socket
 
-The `os.dup()` is necessary because the sync worker will close its copy of the socket when it moves on. The async thread needs its own fd that survives independently. `socket.fromfd()` on the async side creates a new socket object from the duplicated fd.
+The worker's `_handle_connection` tracks whether the socket was handed off. For WebSocket, `asyncio.create_connection(sock=conn.sock)` transfers socket ownership to the event loop's transport layer. For SSE, the async streaming response keeps the socket alive until the generator finishes.
 
 ### One Postgres connection per worker for LISTEN
 

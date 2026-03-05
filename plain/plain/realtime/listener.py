@@ -85,6 +85,7 @@ class SharedListener:
     async def _listen_channels(self, channels: list[str]) -> None:
         import psycopg.sql
 
+        assert self._conn is not None
         for channel in channels:
             await self._conn.execute(
                 psycopg.sql.SQL("LISTEN {}").format(psycopg.sql.Identifier(channel))
@@ -93,6 +94,7 @@ class SharedListener:
     async def _unlisten_channels(self, channels: list[str]) -> None:
         import psycopg.sql
 
+        assert self._conn is not None
         for channel in channels:
             await self._conn.execute(
                 psycopg.sql.SQL("UNLISTEN {}").format(psycopg.sql.Identifier(channel))
@@ -105,6 +107,7 @@ class SharedListener:
 
         while True:
             try:
+                assert self._conn is not None
                 async for notify in self._conn.notifies():
                     backoff = 0.5  # Reset on successful notification
                     # Snapshot queues without holding the lock to avoid

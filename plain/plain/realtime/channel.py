@@ -100,7 +100,7 @@ class SSEView(View):
         if not subscriptions:
             raise ForbiddenError403
 
-        async def stream() -> AsyncGenerator[str, None]:
+        async def stream() -> AsyncGenerator[bytes, None]:
             async for channel_name, payload in pg_listen(*subscriptions):
                 if channel_name is None:
                     # Heartbeat
