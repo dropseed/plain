@@ -21,7 +21,7 @@ OP_PING = 0x9
 OP_PONG = 0xA
 
 # Magic GUID for Sec-WebSocket-Accept (RFC 6455 Section 4.2.2)
-_WS_GUID = "258EAFA5-E914-47DA-95CA-5AB9DC085B11"
+_WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 # Close status codes (RFC 6455 Section 7.4.1)
 CLOSE_NORMAL = 1000
@@ -103,15 +103,42 @@ def encode_close(code: int = CLOSE_NORMAL, reason: str = "") -> bytes:
 
 
 def parse_close_payload(payload: bytes) -> CloseReason:
-    """Parse a close frame payload into (code, reason)."""
+    """Parse a close frame payload into (code, reason).
+
+    Returns CLOSE_PROTOCOL_ERROR for invalid payloads (wrong length,
+    invalid close code, or invalid UTF-8 in reason).
+    """
     if len(payload) == 0:
         return CloseReason(CLOSE_NO_STATUS, "")
     if len(payload) == 1:
         # Invalid: close payload must be 0 or >= 2 bytes
         return CloseReason(CLOSE_PROTOCOL_ERROR, "")
     code = struct.unpack("!H", payload[:2])[0]
-    reason = payload[2:].decode("utf-8", errors="replace")
+    if not _is_valid_close_code(code):
+        return CloseReason(CLOSE_PROTOCOL_ERROR, "Invalid close code")
+    try:
+        reason = payload[2:].decode("utf-8")
+    except UnicodeDecodeError:
+        return CloseReason(CLOSE_PROTOCOL_ERROR, "Invalid UTF-8 in close reason")
     return CloseReason(code, reason)
+
+
+def _is_valid_close_code(code: int) -> bool:
+    """Check if a close code is valid per RFC 6455 Section 7.4."""
+    # 1000-1003 are valid
+    if 1000 <= code <= 1003:
+        return True
+    # 1007-1011 are valid
+    if 1007 <= code <= 1011:
+        return True
+    # 3000-3999 reserved for libraries/frameworks/applications
+    if 3000 <= code <= 3999:
+        return True
+    # 4000-4999 reserved for private use
+    if 4000 <= code <= 4999:
+        return True
+    # Everything else is invalid (0-999, 1004-1006, 1012-2999, 5000+)
+    return False
 
 
 async def read_frame(

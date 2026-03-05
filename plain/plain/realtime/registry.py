@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from .channel import Channel
 
 
-class ChannelRegistry:
+class RealtimeRegistry:
     """Registry of Channel classes, keyed by their path."""
 
     def __init__(self) -> None:
@@ -19,7 +19,7 @@ class ChannelRegistry:
             return
         from plain.packages import packages_registry
 
-        packages_registry.autodiscover_modules("channels", include_app=True)
+        packages_registry.autodiscover_modules("realtime", include_app=True)
         self._discovered = True
 
     def register(self, channel_class: type[Channel]) -> type[Channel]:
@@ -39,4 +39,4 @@ class ChannelRegistry:
         return dict(self._channels)
 
 
-channel_registry = ChannelRegistry()
+realtime_registry = RealtimeRegistry()

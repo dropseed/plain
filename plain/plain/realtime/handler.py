@@ -3,6 +3,10 @@
 This module contains the async infrastructure that runs in the worker's
 background event loop thread. The developer never imports or uses this
 directly — it's internal framework plumbing.
+
+This is the only async code in the realtime system. All application-facing
+APIs (Channel.authorize, .subscribe, .transform, .receive) are sync and
+called via run_in_executor() when needed. See ARCHITECTURE.md for why.
 """
 
 from __future__ import annotations
@@ -36,7 +40,15 @@ if TYPE_CHECKING:
     from .channel import Channel
     from .listener import PostgresListener
 
-log = logging.getLogger("plain.channels")
+log = logging.getLogger("plain.realtime")
+
+
+async def _invoke(loop: asyncio.AbstractEventLoop, func: Any, *args: Any) -> Any:
+    """Call a Channel method, supporting both sync and async implementations."""
+    if asyncio.iscoroutinefunction(func):
+        return await func(*args)
+    return await loop.run_in_executor(None, func, *args)
+
 
 # Socket send timeout in seconds — prevents blocking the async thread
 # if a client stops reading.
@@ -61,9 +73,13 @@ class SSEConnection:
         self._closed = False
 
     def open(self) -> None:
-        """Take ownership of the socket fd and send SSE response headers."""
+        """Take ownership of the socket fd and send SSE response headers.
+
+        The fd was duplicated via os.dup() in the sync worker thread before
+        handoff. fromfd() dups again, so we close the intermediate fd.
+        See ARCHITECTURE.md "Socket handoff via os.dup()" for the full sequence.
+        """
         self._socket = socket.fromfd(self.sock_fd, socket.AF_INET, socket.SOCK_STREAM)
-        # Close the duplicated fd since fromfd() dups it
         os.close(self.sock_fd)
 
         # Set a send timeout so blocking sends don't stall the async thread
@@ -161,6 +177,8 @@ class WebSocketConnection:
 
     async def _read_loop(self) -> None:
         """Read WebSocket frames and dispatch messages."""
+        assert self._reader is not None
+
         # Fragmentation state
         frag_opcode: int | None = None
         frag_payload = bytearray()
@@ -229,10 +247,7 @@ class WebSocketConnection:
             else:
                 message = payload
 
-            # Run the sync receive() in a thread
-            result = await self._loop.run_in_executor(
-                None, self.channel.receive, message
-            )
+            result = await _invoke(self._loop, self.channel.receive, message)
 
             # If receive() returns a value, send it back
             if result is not None:
@@ -319,7 +334,7 @@ class WebSocketConnection:
 
 
 class AsyncConnectionManager:
-    """Manages real-time connections (SSE and WebSocket) on the async event loop.
+    """Manages real-time connections (SSE, WebSocket, and H2 SSE) on the async event loop.
 
     One instance per worker process. Handles:
     - Accepting new connections (socket handoff from worker thread)
@@ -329,7 +344,7 @@ class AsyncConnectionManager:
 
     def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
-        self._connections: list[SSEConnection | WebSocketConnection] = []
+        self._connections: list[Any] = []
         self._heartbeat_task: asyncio.Task | None = None
         self._listener: PostgresListener | None = None
         # Track subscription counts so we can UNLISTEN when no clients remain
@@ -374,7 +389,7 @@ class AsyncConnectionManager:
         """Send periodic heartbeats to all connections."""
         while True:
             await asyncio.sleep(15)
-            dead: list[SSEConnection | WebSocketConnection] = []
+            dead: list[Any] = []
             for conn in self._connections:
                 if not await conn.send_heartbeat():
                     dead.append(conn)
@@ -403,6 +418,44 @@ class AsyncConnectionManager:
     ) -> None:
         """Accept a new WebSocket connection from the worker thread."""
         self._loop.create_task(self._accept_ws_async(sock_fd, channel, subscriptions))
+
+    def accept_h2_connection(self, h2_conn: Any) -> None:
+        """Accept an H2SSEConnection from the h2 frame loop thread.
+
+        Unlike SSE/WS, no socket setup is needed — the h2 frame loop
+        owns the socket. We just subscribe to Postgres channels.
+        """
+        self._loop.create_task(self._accept_h2_async(h2_conn))
+
+    async def _accept_h2_async(self, h2_conn: Any) -> None:
+        """Async implementation of H2 SSE accept."""
+        self._connections.append(h2_conn)
+        await self._subscribe_channels(h2_conn.subscriptions)
+        log.debug(
+            "Accepted H2 SSE connection for %s, %d total",
+            h2_conn.channel.path,
+            len(self._connections),
+        )
+
+    def remove_connection(self, conn: Any) -> None:
+        """Remove a connection and unsubscribe its channels.
+
+        Called via call_soon_threadsafe when a channel stream is reset
+        or the h2 connection closes.
+        """
+        self._loop.create_task(self._remove_async(conn))
+
+    async def _remove_async(self, conn: Any) -> None:
+        """Async implementation of connection removal."""
+        try:
+            self._connections.remove(conn)
+        except ValueError:
+            return  # Already removed
+        await self._unsubscribe_channels(conn.subscriptions)
+        log.debug(
+            "Removed H2 SSE connection, %d remaining",
+            len(self._connections),
+        )
 
     # Keep old name for backwards compat with tests
     accept_connection = accept_sse_connection
@@ -456,13 +509,12 @@ class AsyncConnectionManager:
         payload: str,
     ) -> None:
         """Dispatch a Postgres NOTIFY event to all matching connections."""
-        dead: list[SSEConnection | WebSocketConnection] = []
+        dead: list[Any] = []
         for conn in self._connections:
             if channel_name in conn.subscriptions:
-                # Run the sync transform in a thread to avoid blocking the loop
                 try:
-                    transformed = await self._loop.run_in_executor(
-                        None, conn.channel.transform, channel_name, payload
+                    transformed = await _invoke(
+                        self._loop, conn.channel.transform, channel_name, payload
                     )
                 except Exception:
                     log.exception("Error in channel transform")

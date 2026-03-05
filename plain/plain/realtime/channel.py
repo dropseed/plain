@@ -10,7 +10,9 @@ class Channel:
     """Base class for real-time channels (SSE and WebSocket).
 
     Subclass this to define real-time endpoints. All methods are sync —
-    the framework handles async infrastructure internally.
+    the framework handles async infrastructure internally. This is a
+    deliberate choice to avoid Django's async API duplication problem.
+    See ARCHITECTURE.md for the full rationale.
 
     Supports both SSE (server-push only) and WebSocket (bidirectional).
     The protocol is determined by the client's request headers — the same

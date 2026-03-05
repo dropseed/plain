@@ -12,11 +12,12 @@ import logging
 from typing import TYPE_CHECKING
 
 import psycopg
+import psycopg.sql
 
 if TYPE_CHECKING:
     from .handler import AsyncConnectionManager
 
-log = logging.getLogger("plain.channels")
+log = logging.getLogger("plain.realtime")
 
 
 def _get_connection_string() -> str:
@@ -33,6 +34,12 @@ class PostgresListener:
     One instance per worker process, running on the background async event loop.
     Dynamically subscribes/unsubscribes to Postgres channels as SSE clients
     connect and disconnect.
+
+    Uses a single Postgres connection to multiplex all channel subscriptions
+    for the worker, so 4 workers = 4 connections regardless of client count.
+    Postgres LISTEN/NOTIFY was chosen over Redis pub/sub because Plain is
+    Postgres-exclusive and NOTIFY is transactional (rolls back with the
+    transaction). See ARCHITECTURE.md for the full rationale.
     """
 
     # How often (seconds) the listen loop checks for shutdown.

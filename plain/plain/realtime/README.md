@@ -1,0 +1,363 @@
+# Realtime
+
+**Real-time server-to-client push using Postgres LISTEN/NOTIFY.**
+
+- [Overview](#overview)
+- [Defining a channel](#defining-a-channel)
+- [Sending events](#sending-events)
+- [Connecting from the browser](#connecting-from-the-browser)
+- [Authorization](#authorization)
+- [WebSocket support](#websocket-support)
+- [Patterns](#patterns)
+- [How it works](#how-it-works)
+
+## Overview
+
+The realtime module lets you push events to connected browsers. Define a `Channel` class with a path, and the server handles SSE and WebSocket connections automatically. Events are sent from anywhere in your code using Postgres NOTIFY.
+
+```python
+# app/realtime.py
+from plain.realtime import Channel, realtime_registry, notify
+
+@realtime_registry.register
+class UserNotifications(Channel):
+    path = "/events/notifications/"
+
+    def authorize(self, request):
+        return request.user.is_authenticated
+
+    def subscribe(self, request):
+        return [f"user:{request.user.pk}"]
+```
+
+```python
+# In a view, job, signal handler — anywhere
+from plain.realtime import notify
+
+notify("user:42", {"type": "new_comment", "comment_id": 7})
+```
+
+```javascript
+// In the browser
+const events = new EventSource("/events/notifications/");
+events.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    // Update the UI
+};
+```
+
+All channel methods are sync. You have full access to the ORM, sessions, and everything else — no `async def`, no `await`, no special wrappers.
+
+## Defining a channel
+
+Create a `realtime.py` file in your app (it's autodiscovered). Subclass `Channel` and register it:
+
+```python
+from plain.realtime import Channel, realtime_registry
+
+@realtime_registry.register
+class DashboardUpdates(Channel):
+    path = "/events/dashboard/"
+
+    def authorize(self, request):
+        return request.user.is_staff
+
+    def subscribe(self, request):
+        return ["dashboard:metrics"]
+
+    def transform(self, channel_name, payload):
+        # Optional: reshape the payload before sending to the client.
+        # Return a dict (JSON-serialized), a string (sent as-is),
+        # or None to skip this event.
+        return {"metric": channel_name, "value": payload}
+```
+
+### Channel methods
+
+| Method                             | Purpose                                                        | Required                |
+| ---------------------------------- | -------------------------------------------------------------- | ----------------------- |
+| `authorize(request)`               | Return `True` to allow the connection, `False` for 403         | No (defaults to `True`) |
+| `subscribe(request)`               | Return a list of Postgres channel names to listen on           | Yes                     |
+| `transform(channel_name, payload)` | Reshape the event before sending. Return `None` to skip.       | No (sends raw payload)  |
+| `receive(message)`                 | Handle incoming WebSocket messages. Return a value to respond. | No (WebSocket only)     |
+
+All methods receive the full `Request` object with access to `request.user`, the ORM, sessions, etc.
+
+### Channel names
+
+The strings returned by `subscribe()` are Postgres LISTEN/NOTIFY channel names. They can be any string, but a namespaced convention keeps things organized:
+
+```python
+def subscribe(self, request):
+    return [
+        f"user:{request.user.pk}",           # Per-user events
+        f"org:{request.org.pk}",              # Per-organization events
+        "system:announcements",                # Global broadcast
+    ]
+```
+
+A client receives events from all channels they're subscribed to. The `channel_name` argument in `transform()` tells you which one fired.
+
+## Sending events
+
+Call `notify()` from anywhere — views, jobs, signal handlers, management commands:
+
+```python
+from plain.realtime import notify
+
+# Dict payload (JSON-serialized automatically)
+notify("user:42", {"type": "new_message", "from": "alice"})
+
+# String payload
+notify("dashboard:metrics", "cpu:72.5")
+
+# No payload (just a ping)
+notify("user:42")
+```
+
+`notify()` calls Postgres `pg_notify()` under the hood. If called inside a transaction, the notification is only sent when the transaction commits. If the transaction rolls back, the notification is never sent.
+
+Payloads are limited to ~8000 bytes. For larger data, send a reference and let the client fetch details:
+
+```python
+notify("user:42", {"type": "report_ready", "report_id": 99})
+```
+
+## Connecting from the browser
+
+### SSE (recommended for most use cases)
+
+```javascript
+const events = new EventSource("/events/notifications/");
+
+events.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    console.log(data);
+};
+
+// Named events (channel_name becomes the event type)
+events.addEventListener("user:42", (e) => {
+    console.log("User event:", JSON.parse(e.data));
+});
+
+events.onerror = () => {
+    // EventSource auto-reconnects. This fires on each retry.
+};
+```
+
+`EventSource` sends cookies automatically (same origin), so auth just works. The browser reconnects automatically if the connection drops.
+
+### WebSocket
+
+```javascript
+const ws = new WebSocket("wss://example.com/events/notifications/");
+
+ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    console.log(data);
+};
+
+// Send messages to the server (triggers channel.receive())
+ws.send("hello");
+```
+
+The same `Channel` class handles both SSE and WebSocket connections. The protocol is determined by the client's request headers.
+
+## Authorization
+
+`authorize()` runs in the sync request context with full access to cookies, sessions, and the ORM:
+
+```python
+@realtime_registry.register
+class ProjectEvents(Channel):
+    path = "/events/project/"
+
+    def authorize(self, request):
+        project_id = request.GET.get("project_id")
+        if not project_id:
+            return False
+        return ProjectMembership.query.filter(
+            project_id=project_id,
+            user=request.user,
+        ).exists()
+
+    def subscribe(self, request):
+        project_id = request.GET["project_id"]
+        return [f"project:{project_id}"]
+```
+
+A failed `authorize()` returns a 403 response. An empty `subscribe()` list returns a 400.
+
+## WebSocket support
+
+For bidirectional communication, implement `receive()`:
+
+```python
+@realtime_registry.register
+class ChatRoom(Channel):
+    path = "/ws/chat/"
+
+    def authorize(self, request):
+        return request.user.is_authenticated
+
+    def subscribe(self, request):
+        room_id = request.GET["room"]
+        return [f"chat:{room_id}"]
+
+    def receive(self, message):
+        # Called when the client sends a WebSocket message.
+        # Return a value to send a response back to the sender.
+        return f"echo: {message}"
+```
+
+For chat, the typical pattern is: client sends a message via HTTP POST (which saves to the database and calls `notify()`), and all connected clients receive it through their channel subscription. The `receive()` method is for cases where you need direct request/response over the WebSocket itself.
+
+## Patterns
+
+### Live notifications
+
+```python
+@realtime_registry.register
+class Notifications(Channel):
+    path = "/events/notifications/"
+
+    def authorize(self, request):
+        return request.user.is_authenticated
+
+    def subscribe(self, request):
+        return [f"user:{request.user.pk}"]
+```
+
+```python
+# Anywhere in your app
+def create_comment(request):
+    comment = Comment.query.create(post=post, author=request.user, text=text)
+    notify(f"user:{post.author_id}", {
+        "type": "new_comment",
+        "comment_id": comment.pk,
+    })
+    return redirect(post)
+```
+
+### Live dashboard
+
+```python
+@realtime_registry.register
+class Dashboard(Channel):
+    path = "/events/dashboard/"
+
+    def authorize(self, request):
+        return request.user.is_staff
+
+    def subscribe(self, request):
+        return ["dashboard:metrics"]
+
+    def transform(self, channel_name, payload):
+        import json
+        data = json.loads(payload)
+        # Only send metrics this user cares about
+        return data
+```
+
+```python
+# In a background job
+from plain.realtime import notify
+
+def compute_metrics():
+    metrics = calculate_current_metrics()
+    notify("dashboard:metrics", metrics)
+```
+
+### Chat
+
+```python
+@realtime_registry.register
+class Chat(Channel):
+    path = "/events/chat/"
+
+    def authorize(self, request):
+        room_id = request.GET.get("room")
+        return ChatRoom.query.filter(
+            pk=room_id, members=request.user
+        ).exists()
+
+    def subscribe(self, request):
+        room_id = request.GET["room"]
+        return [f"chat:room:{room_id}"]
+```
+
+```python
+# POST view for sending messages
+def send_message(request):
+    room_id = request.POST["room_id"]
+    message = Message.query.create(
+        room_id=room_id,
+        author=request.user,
+        text=request.POST["text"],
+    )
+    notify(f"chat:room:{room_id}", {
+        "type": "message",
+        "id": message.pk,
+        "author": request.user.username,
+        "text": message.text,
+    })
+    return JsonResponse({"id": message.pk})
+```
+
+```javascript
+// Browser: SSE for receiving, POST for sending
+const events = new EventSource("/events/chat/?room=42");
+events.onmessage = (e) => renderMessage(JSON.parse(e.data));
+
+function sendMessage(text) {
+    fetch("/chat/send/", {
+        method: "POST",
+        body: JSON.stringify({ room_id: 42, text }),
+    });
+}
+```
+
+### AI agent streaming
+
+```python
+@realtime_registry.register
+class AgentStream(Channel):
+    path = "/events/agent/"
+
+    def authorize(self, request):
+        session_id = request.GET.get("session")
+        return AgentSession.query.filter(
+            pk=session_id, user=request.user
+        ).exists()
+
+    def subscribe(self, request):
+        session_id = request.GET["session"]
+        return [f"agent:{session_id}"]
+```
+
+```python
+# In a background job running the agent
+def run_agent(session_id, prompt):
+    for event in agent.run(prompt):
+        notify(f"agent:{session_id}", {
+            "type": event.type,
+            "text": getattr(event, "text", ""),
+        })
+```
+
+## How it works
+
+Channels use Postgres LISTEN/NOTIFY for event delivery and the server's built-in async infrastructure for connection management. No Redis, no external message broker, no separate process.
+
+When a client connects to a channel path:
+
+1. The server matches the path to a registered `Channel`
+2. `authorize()` and `subscribe()` run in the sync request context (full ORM access)
+3. The socket is handed off to a background async thread in the worker process
+4. The async thread subscribes to the specified Postgres channels via LISTEN
+5. When a NOTIFY arrives, `transform()` runs (in a threadpool) and the result is sent to the client
+6. Heartbeats detect dead connections; disconnected clients are cleaned up automatically
+
+Each worker process maintains one Postgres connection for all LISTEN subscriptions, regardless of how many clients are connected. Events flow through Postgres to whichever worker holds the client's connection.
+
+Your application code is always sync. The async infrastructure is internal to the framework.

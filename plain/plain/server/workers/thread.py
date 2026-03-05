@@ -323,17 +323,24 @@ class Worker:
         # Ignore SIGWINCH in worker. Fixes a crash on OpenBSD.
         self.log.debug("worker: SIGWINCH ignored.")
 
-    # ----- Async event loop for SSE channels -----
+    # ----- Async event loop for SSE/WebSocket channels -----
+    #
+    # A background asyncio thread holds real-time connections cheaply as
+    # coroutines, while the sync worker threads handle regular HTTP unchanged.
+    # This avoids ASGI (which would require wrapping the entire app) and
+    # avoids a separate sidecar process (which adds deployment complexity
+    # and doesn't work on single-port platforms like Heroku).
+    # See plain/realtime/ARCHITECTURE.md for the full decision record.
 
     def _start_async_loop(self) -> None:
-        """Start a background async event loop for SSE channel connections."""
+        """Start a background async event loop for channel connections."""
         try:
-            from plain.channels.handler import AsyncConnectionManager
-            from plain.channels.registry import channel_registry
+            from plain.realtime.handler import AsyncConnectionManager
+            from plain.realtime.registry import realtime_registry
         except ImportError:
-            return  # channels module not available
+            return  # realtime module not available
 
-        channel_registry.import_modules()
+        realtime_registry.import_modules()
 
         self._async_loop = asyncio.new_event_loop()
         self._connection_manager = AsyncConnectionManager(self._async_loop)
@@ -366,6 +373,18 @@ class Worker:
         self._async_loop.call_soon_threadsafe(self._async_loop.stop)
         if self._async_thread:
             self._async_thread.join(timeout=2)
+
+    def _invoke_channel_method(self, method: Any, *args: Any) -> Any:
+        """Call a Channel method, supporting both sync and async implementations.
+
+        Called from the sync worker thread. If the method is async, dispatches
+        it to the background event loop and blocks until it completes.
+        """
+        if asyncio.iscoroutinefunction(method):
+            assert self._async_loop is not None
+            future = asyncio.run_coroutine_threadsafe(method(*args), self._async_loop)
+            return future.result(timeout=10)
+        return method(*args)
 
     def handle_error(
         self, req: Request | None, client: socket.socket, addr: Any, exc: BaseException
@@ -661,6 +680,8 @@ class Worker:
                     conn.server,
                     self.handler,
                     self.app.is_ssl,
+                    connection_manager=self._connection_manager,
+                    async_loop=self._async_loop,
                 )
                 # H2 connection is done — don't keepalive
                 return (False, conn)
@@ -723,27 +744,27 @@ class Worker:
         if self._connection_manager is None:
             return False
 
-        from plain.channels.registry import channel_registry
+        from plain.realtime.registry import realtime_registry
 
         path = req.path or "/"
-        channel = channel_registry.match(path)
+        channel = realtime_registry.match(path)
         if channel is None:
             return False
 
         # Build a request for authorization
         http_request = create_request(req, conn.sock, conn.client, conn.server)
 
-        if not channel.authorize(http_request):
+        if not self._invoke_channel_method(channel.authorize, http_request):
             util.write_error(conn.sock, 403, "Forbidden", "Channel access denied")
             return True
 
-        subscriptions = channel.subscribe(http_request)
+        subscriptions = self._invoke_channel_method(channel.subscribe, http_request)
         if not subscriptions:
             util.write_error(conn.sock, 400, "Bad Request", "No channel subscriptions")
             return True
 
         # Detect WebSocket upgrade
-        from plain.channels.websocket import (
+        from plain.realtime.websocket import (
             build_accept_response,
             validate_handshake_headers,
         )
@@ -754,8 +775,12 @@ class Worker:
             util.write_error(conn.sock, 400, "Bad Request", ws_error)
             return True
 
-        # Dup the socket fd for the async thread to own
+        # Dup the fd so the async thread gets its own copy. The sync worker
+        # will close the original fd when finish_request() runs with
+        # keepalive=False. Without the dup, the async side would be writing
+        # to a closed fd.
         sock_fd = os.dup(conn.sock.fileno())
+        assert self._async_loop is not None
 
         if is_ws:
             # Send the 101 Switching Protocols response before handoff

@@ -2,7 +2,7 @@
 
 Usage from views or anywhere in sync code::
 
-    from plain.channels import notify
+    from plain.realtime import notify
     notify("user:123", {"comment_id": 42, "text": "Hello"})
 """
 

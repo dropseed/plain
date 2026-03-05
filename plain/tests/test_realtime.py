@@ -1,4 +1,4 @@
-"""Tests for the plain.channels infrastructure.
+"""Tests for the plain.realtime infrastructure.
 
 Tests are organized in three levels:
 1. Unit tests — SSE formatting, WebSocket framing, channel registry (no infrastructure needed)
@@ -13,10 +13,10 @@ import struct
 
 import pytest
 
-from plain.channels.channel import Channel
-from plain.channels.registry import ChannelRegistry
-from plain.channels.sse import SSE_HEADERS, format_sse_comment, format_sse_event
-from plain.channels.websocket import (
+from plain.realtime.channel import Channel
+from plain.realtime.registry import RealtimeRegistry
+from plain.realtime.sse import SSE_HEADERS, format_sse_comment, format_sse_event
+from plain.realtime.websocket import (
     CLOSE_NORMAL,
     CLOSE_PROTOCOL_ERROR,
     OP_BINARY,
@@ -116,23 +116,24 @@ class TestSSEFormatting:
         assert header_dict["Connection"] == "keep-alive"
 
 
-class TestChannelRegistry:
+class TestRealtimeRegistry:
     def test_register_and_match(self):
-        registry = ChannelRegistry()
+        registry = RealtimeRegistry()
 
         @registry.register
         class MyChannel(Channel):
             path = "/events/"
 
-        assert registry.match("/events/") is not None
-        assert registry.match("/events/").path == "/events/"
+        match = registry.match("/events/")
+        assert match is not None
+        assert match.path == "/events/"
 
     def test_match_returns_none_for_unknown(self):
-        registry = ChannelRegistry()
+        registry = RealtimeRegistry()
         assert registry.match("/unknown/") is None
 
     def test_register_requires_path(self):
-        registry = ChannelRegistry()
+        registry = RealtimeRegistry()
         with pytest.raises(ValueError, match="must define a 'path'"):
 
             @registry.register
@@ -140,7 +141,7 @@ class TestChannelRegistry:
                 pass
 
     def test_get_all(self):
-        registry = ChannelRegistry()
+        registry = RealtimeRegistry()
 
         @registry.register
         class Chan1(Channel):
@@ -159,11 +160,11 @@ class TestChannelRegistry:
 class TestChannelBaseClass:
     def test_default_authorize(self):
         ch = Channel()
-        assert ch.authorize(None) is True
+        assert ch.authorize(None) is True  # type: ignore[arg-type]
 
     def test_default_subscribe(self):
         ch = Channel()
-        assert ch.subscribe(None) == []
+        assert ch.subscribe(None) == []  # type: ignore[arg-type]
 
     def test_default_transform(self):
         ch = Channel()
@@ -259,7 +260,7 @@ class TestWebSocketFrameProtocol:
 
     def test_compute_accept_key(self):
         key = "dGhlIHNhbXBsZSBub25jZQ=="
-        expected = "cOfHahk5/XGjY8XhRkGxODLWrNc="
+        expected = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
         assert compute_accept_key(key) == expected
 
 
@@ -309,7 +310,7 @@ class TestWebSocketHandshakeValidation:
         assert b"HTTP/1.1 101 Switching Protocols" in resp
         assert b"Upgrade: websocket" in resp
         assert b"Connection: Upgrade" in resp
-        assert b"cOfHahk5/XGjY8XhRkGxODLWrNc=" in resp
+        assert b"s3pPLMBiTxaQ9kYGzzhZRbK+xOo=" in resp
 
 
 class TestReadFrame:
@@ -484,7 +485,7 @@ def _make_socket_pair():
 class TestSSEConnection:
     def test_open_sends_headers(self):
         """SSEConnection.open() should send HTTP 200 + SSE headers."""
-        from plain.channels.handler import SSEConnection
+        from plain.realtime.handler import SSEConnection
 
         loop = asyncio.new_event_loop()
         fd, client = _make_socket_pair()
@@ -508,7 +509,7 @@ class TestSSEConnection:
 
     def test_send_event(self):
         """SSEConnection.send_event() should send formatted SSE data."""
-        from plain.channels.handler import SSEConnection
+        from plain.realtime.handler import SSEConnection
 
         loop = asyncio.new_event_loop()
         fd, client = _make_socket_pair()
@@ -536,7 +537,7 @@ class TestSSEConnection:
 
     def test_send_heartbeat(self):
         """SSEConnection.send_heartbeat() should send an SSE comment."""
-        from plain.channels.handler import SSEConnection
+        from plain.realtime.handler import SSEConnection
 
         loop = asyncio.new_event_loop()
         fd, client = _make_socket_pair()
@@ -561,7 +562,7 @@ class TestSSEConnection:
 
     def test_send_to_closed_returns_false(self):
         """Sending to a closed connection should return False."""
-        from plain.channels.handler import SSEConnection
+        from plain.realtime.handler import SSEConnection
 
         loop = asyncio.new_event_loop()
         fd, client = _make_socket_pair()
@@ -581,7 +582,7 @@ class TestSSEConnection:
 
     def test_send_to_broken_pipe_returns_false(self):
         """Sending after the client disconnects should return False."""
-        from plain.channels.handler import SSEConnection
+        from plain.realtime.handler import SSEConnection
 
         loop = asyncio.new_event_loop()
         fd, client = _make_socket_pair()
@@ -605,7 +606,7 @@ class TestSSEConnection:
 class TestAsyncConnectionManager:
     def test_accept_and_dispatch(self):
         """Accept a connection then dispatch an event — data should arrive."""
-        from plain.channels.handler import AsyncConnectionManager
+        from plain.realtime.handler import AsyncConnectionManager
 
         loop = asyncio.new_event_loop()
         fd, client = _make_socket_pair()
@@ -639,7 +640,7 @@ class TestAsyncConnectionManager:
 
     def test_dispatch_to_wrong_channel_is_silent(self):
         """Dispatching to a channel no one subscribes to should be a no-op."""
-        from plain.channels.handler import AsyncConnectionManager
+        from plain.realtime.handler import AsyncConnectionManager
 
         loop = asyncio.new_event_loop()
         fd, client = _make_socket_pair()
@@ -666,7 +667,7 @@ class TestAsyncConnectionManager:
 
     def test_dead_connection_removed_on_dispatch(self):
         """If a client disconnects, dispatch should remove it."""
-        from plain.channels.handler import AsyncConnectionManager
+        from plain.realtime.handler import AsyncConnectionManager
 
         loop = asyncio.new_event_loop()
         fd, client = _make_socket_pair()
@@ -695,7 +696,7 @@ class TestAsyncConnectionManager:
 
     def test_close_all(self):
         """close_all() should close all connections."""
-        from plain.channels.handler import AsyncConnectionManager
+        from plain.realtime.handler import AsyncConnectionManager
 
         loop = asyncio.new_event_loop()
         fd1, client1 = _make_socket_pair()
@@ -719,7 +720,7 @@ class TestAsyncConnectionManager:
 
     def test_transform_modifies_payload(self):
         """Channel.transform() should be applied before sending."""
-        from plain.channels.handler import AsyncConnectionManager
+        from plain.realtime.handler import AsyncConnectionManager
 
         class TransformChannel(Channel):
             path = "/transform/"
@@ -750,7 +751,7 @@ class TestAsyncConnectionManager:
 
     def test_transform_returning_none_skips_event(self):
         """If transform() returns None, the event should not be sent."""
-        from plain.channels.handler import AsyncConnectionManager
+        from plain.realtime.handler import AsyncConnectionManager
 
         class FilterChannel(Channel):
             path = "/filter/"
@@ -826,7 +827,7 @@ class TestWebSocketConnection:
 
     def test_echo_via_receive(self):
         """Send a text frame, echo channel returns it."""
-        from plain.channels.handler import WebSocketConnection
+        from plain.realtime.handler import WebSocketConnection
 
         fd, client = _make_socket_pair()
         loop = asyncio.new_event_loop()
@@ -871,7 +872,7 @@ class TestWebSocketConnection:
 
     def test_ping_pong(self):
         """Server responds to ping with pong."""
-        from plain.channels.handler import WebSocketConnection
+        from plain.realtime.handler import WebSocketConnection
 
         fd, client = _make_socket_pair()
         loop = asyncio.new_event_loop()
@@ -930,7 +931,7 @@ class TestWebSocketConnection:
 
     def test_close_handshake(self):
         """Server echoes close frame."""
-        from plain.channels.handler import WebSocketConnection
+        from plain.realtime.handler import WebSocketConnection
 
         fd, client = _make_socket_pair()
         loop = asyncio.new_event_loop()
@@ -981,7 +982,7 @@ class TestWebSocketConnection:
 
     def test_binary_echo(self):
         """Binary frames are echoed back as binary."""
-        from plain.channels.handler import WebSocketConnection
+        from plain.realtime.handler import WebSocketConnection
 
         fd, client = _make_socket_pair()
         loop = asyncio.new_event_loop()
@@ -1021,7 +1022,7 @@ class TestWebSocketConnection:
 
     def test_server_push_event(self):
         """Server-push via dispatch_event sends a text frame."""
-        from plain.channels.handler import AsyncConnectionManager
+        from plain.realtime.handler import AsyncConnectionManager
 
         fd, client = _make_socket_pair()
         loop = asyncio.new_event_loop()
@@ -1082,8 +1083,8 @@ class TestPostgresListener:
         """PostgresListener should receive Postgres NOTIFY events."""
         import psycopg
 
-        from plain.channels.handler import AsyncConnectionManager
-        from plain.channels.listener import PostgresListener
+        from plain.realtime.handler import AsyncConnectionManager
+        from plain.realtime.listener import PostgresListener
 
         conninfo = os.environ["DATABASE_URL"]
         loop = asyncio.new_event_loop()
@@ -1131,8 +1132,8 @@ class TestPostgresListener:
         """Notifications on unsubscribed channels should not be dispatched."""
         import psycopg
 
-        from plain.channels.handler import AsyncConnectionManager
-        from plain.channels.listener import PostgresListener
+        from plain.realtime.handler import AsyncConnectionManager
+        from plain.realtime.listener import PostgresListener
 
         conninfo = os.environ["DATABASE_URL"]
         loop = asyncio.new_event_loop()
@@ -1175,8 +1176,8 @@ class TestPostgresListener:
         """After UNLISTEN, notifications should no longer arrive."""
         import psycopg
 
-        from plain.channels.handler import AsyncConnectionManager
-        from plain.channels.listener import PostgresListener
+        from plain.realtime.handler import AsyncConnectionManager
+        from plain.realtime.listener import PostgresListener
 
         conninfo = os.environ["DATABASE_URL"]
         loop = asyncio.new_event_loop()
@@ -1228,8 +1229,8 @@ class TestFullPipeline:
         """Full pipeline: pg_notify → PostgresListener → AsyncConnectionManager → SSE socket."""
         import psycopg
 
-        from plain.channels.handler import AsyncConnectionManager
-        from plain.channels.listener import PostgresListener
+        from plain.realtime.handler import AsyncConnectionManager
+        from plain.realtime.listener import PostgresListener
 
         conninfo = os.environ["DATABASE_URL"]
         loop = asyncio.new_event_loop()

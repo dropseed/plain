@@ -1,9 +1,9 @@
 from .channel import Channel
 from .notify import notify
-from .registry import channel_registry
+from .registry import realtime_registry
 
 __all__ = [
     "Channel",
-    "channel_registry",
+    "realtime_registry",
     "notify",
 ]

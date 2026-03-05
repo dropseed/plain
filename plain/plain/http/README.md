@@ -196,6 +196,8 @@ def generate_data():
 return StreamingResponse(generate_data(), content_type="text/plain")
 ```
 
+For real-time server-to-client push (notifications, live updates, streaming AI responses), use [realtime](../realtime/README.md) instead of building SSE manually with `StreamingResponse`.
+
 Other response types include [`NotModifiedResponse`](./response.py#NotModifiedResponse) (304) and [`NotAllowedResponse`](./response.py#NotAllowedResponse) (405).
 
 ### Access log control

@@ -1,9 +1,11 @@
 # Server
 
-**A production-ready HTTP server, originally based on gunicorn.**
+**A production-ready HTTP server with built-in support for HTTP/2, SSE, and WebSockets.**
 
 - [Overview](#overview)
 - [Workers and threads](#workers-and-threads)
+- [Real-time connections](#real-time-connections)
+- [HTTP/2](#http2)
 - [Configuration options](#configuration-options)
 - [Settings](#settings)
 - [Signals](#signals)
@@ -26,14 +28,16 @@ For local development, you can enable auto-reload to restart workers when code c
 plain server --reload
 ```
 
+The server handles regular HTTP requests, Server-Sent Events (SSE), WebSocket connections, and HTTP/2 — all on the same port, in the same process. No additional servers or proxies are required.
+
 ## Workers and threads
 
-The server uses two levels of concurrency:
+The server uses two levels of concurrency for HTTP requests:
 
 - **Workers** are separate OS processes. Each worker runs independently with its own memory. The default is `0` (auto), which spawns one worker per CPU core.
 - **Threads** run inside each worker. Threads share memory within a worker and handle concurrent requests using a thread pool. The default is 4 threads per worker.
 
-Total concurrent requests = `workers × threads`. On a 4-core machine with the defaults, that's `4 × 4 = 16` concurrent requests.
+Total concurrent requests = `workers x threads`. On a 4-core machine with the defaults, that's `4 x 4 = 16` concurrent requests.
 
 **When to adjust workers:** Workers provide true parallelism since each is a separate process with its own Python GIL. More workers means more memory usage but better CPU utilization. Use `--workers 0` (the default) to match your CPU cores, or set an explicit number.
 
@@ -49,6 +53,26 @@ plain server --threads 8
 # Single-threaded workers (simplest, one request at a time per worker)
 plain server --threads 1
 ```
+
+## Real-time connections
+
+SSE and WebSocket connections are handled by a background async thread inside each worker process. These connections don't consume worker threads — they sit as lightweight coroutines on an asyncio event loop while idle.
+
+This means you can have hundreds of SSE/WebSocket connections alongside normal HTTP traffic without adjusting worker or thread counts. The async thread manages connection lifecycle, heartbeats, and event delivery from Postgres LISTEN/NOTIFY automatically.
+
+See the [realtime docs](../realtime/README.md) for how to define real-time endpoints.
+
+## HTTP/2
+
+When SSL is enabled (`--certfile` and `--keyfile`), the server supports HTTP/2 via ALPN negotiation. Clients that support HTTP/2 (all modern browsers) will automatically use it. Clients that don't will fall back to HTTP/1.1.
+
+HTTP/2 benefits include:
+
+- **Multiplexing** — multiple requests and SSE streams over a single TCP connection, instead of tying up one of the browser's ~6 per-host HTTP/1.1 connections
+- **Header compression** — reduces overhead for repeated headers
+- **No extra configuration** — it works automatically when SSL is enabled
+
+HTTP/2 requires SSL because browsers only support HTTP/2 over TLS (via the ALPN extension). In development, `plain dev` provides HTTPS automatically, so HTTP/2 works out of the box.
 
 ## Configuration options
 
@@ -150,7 +174,7 @@ The server responds to UNIX signals for process management.
 
 #### How do I run with SSL/TLS?
 
-Provide both `--certfile` and `--keyfile` options pointing to your certificate and key files.
+Provide both `--certfile` and `--keyfile` options pointing to your certificate and key files. This also enables HTTP/2 support.
 
 ```bash
 plain server --certfile cert.pem --keyfile key.pem
@@ -174,6 +198,17 @@ HTTP_X_FORWARDED_FOR = True
 
 See the [HTTP settings docs](../../http/README.md) for details on proxy header configuration.
 
+If you're using SSE or WebSocket connections through a reverse proxy, make sure proxy buffering is disabled for those paths. For nginx:
+
+```nginx
+location /events/ {
+    proxy_pass http://localhost:8000;
+    proxy_set_header Connection '';
+    proxy_http_version 1.1;
+    proxy_buffering off;
+}
+```
+
 #### How do I handle worker timeouts?
 
 If workers are being killed due to timeouts, increase the timeout. This is common when handling long-running requests.
@@ -188,6 +223,14 @@ Or via the CLI:
 ```bash
 plain server --timeout 120
 ```
+
+Note: SSE and WebSocket connections are not affected by the worker timeout. They run on the async thread, not in the worker thread pool.
+
+#### How do SSE/WebSocket connections scale?
+
+Each worker has one background async thread that holds all real-time connections for that worker as lightweight coroutines. Each worker also maintains one Postgres connection for LISTEN/NOTIFY, regardless of how many clients are connected.
+
+The practical limit depends on your deployment, but hundreds of concurrent connections per worker is reasonable. If you need thousands, increase workers or deploy multiple instances — Postgres LISTEN/NOTIFY delivers events to all of them.
 
 ## Installation
 
