@@ -45,13 +45,15 @@ from ..http.errors import (
     ObsoleteFolding,
     UnsupportedTransferCoding,
 )
-from ..http.h2handler import handle_h2_connection
+from ..http.h2handler import async_handle_h2_connection
 from ..http.response import Response, create_request
 from .workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
     from ..app import ServerApplication
     from ..http.message import Request
+
+_H2_SENTINEL = object()
 
 # Maximum jitter to add to max_requests to stagger worker restarts
 MAX_REQUESTS_JITTER = 50
@@ -425,6 +427,12 @@ class Worker:
         if parse_result is None:
             return False
 
+        # HTTP/2 sentinel: hand off to async H2 handler
+        if parse_result is _H2_SENTINEL:
+            conn.handed_off = True
+            await self._handle_h2(loop, conn)
+            return False
+
         req, http_request = parse_result
 
         # Resolve the URL to check if the view is async
@@ -452,6 +460,17 @@ class Worker:
                 self.tpool, self.handle_request, req, conn, http_request
             )
 
+    async def _handle_h2(self, loop: asyncio.AbstractEventLoop, conn: TConn) -> None:
+        """Run the async H2 handler on the connection socket."""
+        await async_handle_h2_connection(
+            conn.sock,
+            conn.client,
+            conn.server,
+            self.handler,
+            self.app.is_ssl,
+            self.tpool,
+        )
+
     async def _graceful_shutdown(self, loop: asyncio.AbstractEventLoop) -> None:
         # Stop accepting new connections
         for s in self.sockets:
@@ -466,11 +485,10 @@ class Worker:
         while self.nr_conns > 0 and time.monotonic() < deadline:
             await asyncio.sleep(0.5)
 
-    def _parse_request(self, conn: TConn) -> tuple[Any, Any] | None:
+    def _parse_request(self, conn: TConn) -> Any:
         """Parse an HTTP request from the connection. Runs in executor.
 
-        Returns (raw_req, http_request) or None if parsing failed.
-        For H2 connections, handles the entire connection and returns None.
+        Returns (raw_req, http_request), _H2_SENTINEL, or None.
         """
         try:
             # Ensure blocking mode before init/parsing
@@ -482,17 +500,10 @@ class Worker:
 
             conn.init()
 
-            # HTTP/2 connections are handled entirely within handle_h2_connection
+            # HTTP/2: return sentinel so _dispatch_request hands off to async
             if conn.is_h2:
                 conn.sock.settimeout(None)
-                handle_h2_connection(
-                    conn.sock,
-                    conn.client,
-                    conn.server,
-                    self.handler,
-                    self.app.is_ssl,
-                )
-                return None
+                return _H2_SENTINEL
 
             assert conn.parser is not None
             try:
