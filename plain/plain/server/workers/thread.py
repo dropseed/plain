@@ -47,6 +47,7 @@ from ..http.errors import (
     ObsoleteFolding,
     UnsupportedTransferCoding,
 )
+from ..http.h2handler import handle_h2_connection
 from ..http.response import Response, create_request
 from .workertmp import WorkerHeartbeat
 
@@ -150,6 +151,7 @@ class TConn:
         self.timeout: float | None = None
         self.parser: http.RequestParser | None = None
         self.initialized: bool = False
+        self.is_h2: bool = False
 
         # set the socket to non blocking
         self.sock.setblocking(False)
@@ -166,7 +168,16 @@ class TConn:
                     self.sock, self.app.certfile, self.app.keyfile
                 )
 
-            # initialize the parser
+                # Check ALPN-negotiated protocol
+                if (
+                    hasattr(self.sock, "selected_alpn_protocol")
+                    and self.sock.selected_alpn_protocol() == "h2"
+                ):
+                    self.is_h2 = True
+                    self.initialized = True
+                    return
+
+            # initialize the parser (HTTP/1.x)
             self.parser = http.RequestParser(self.app.is_ssl, self.sock, self.client)
 
         self.initialized = True
@@ -582,6 +593,21 @@ class Worker:
                 conn.sock.settimeout(KEEPALIVE)
 
             conn.init()
+
+            # HTTP/2 connections are handled entirely within handle_h2_connection
+            # which manages its own frame loop and stream dispatching.
+            if conn.is_h2:
+                conn.sock.settimeout(None)
+                handle_h2_connection(
+                    conn.sock,
+                    conn.client,
+                    conn.server,
+                    self.handler,
+                    self.app.is_ssl,
+                )
+                # H2 connection is done — don't keepalive
+                return (False, conn)
+
             assert conn.parser is not None
             try:
                 req = next(conn.parser)
