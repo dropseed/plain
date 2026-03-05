@@ -1,0 +1,75 @@
+#!/bin/bash -e
+
+# Run HTTP/2 conformance tests against the Plain server using h2spec.
+#
+# Requires: h2spec (brew install h2spec)
+#
+# Usage:
+#   ./scripts/h2spec                          # starts example server automatically
+#   ./scripts/h2spec host:port                # test against an already-running TLS server
+#   ./scripts/h2spec -S section               # run specific test section (e.g. -S 6.1)
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if ! command -v h2spec &>/dev/null; then
+    echo "h2spec not found. Install with: brew install h2spec" >&2
+    exit 1
+fi
+
+TARGET=""
+H2SPEC_ARGS=()
+for arg in "$@"; do
+    if [ -z "$TARGET" ] && [[ "$arg" == *:* ]] && [[ "$arg" != -* ]]; then
+        TARGET="$arg"
+    else
+        H2SPEC_ARGS+=("$arg")
+    fi
+done
+
+if [ -n "$TARGET" ]; then
+    HOST="${TARGET%%:*}"
+    PORT="${TARGET##*:}"
+    h2spec --host "$HOST" --port "$PORT" --tls --insecure "${H2SPEC_ARGS[@]}"
+    exit $?
+fi
+
+# Generate a temporary self-signed certificate for TLS
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
+
+openssl req -x509 -newkey rsa:2048 -keyout "$TMPDIR/key.pem" -out "$TMPDIR/cert.pem" \
+    -days 1 -nodes -subj "/CN=localhost" 2>/dev/null
+
+PORT=$(uv run python -c "import socket; s=socket.socket(); s.bind(('127.0.0.1',0)); print(s.getsockname()[1]); s.close()")
+
+cd "$REPO_ROOT/example"
+
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
+export PYTHONPATH="$REPO_ROOT/example${PYTHONPATH:+:$PYTHONPATH}"
+
+uv run plain server --bind "127.0.0.1:$PORT" --workers 1 \
+    --certfile "$TMPDIR/cert.pem" --keyfile "$TMPDIR/key.pem" &>/dev/null &
+SERVER_PID=$!
+cd "$REPO_ROOT"
+
+# Update trap to also kill the server
+trap 'kill "$SERVER_PID" 2>/dev/null; wait "$SERVER_PID" 2>/dev/null; rm -rf "$TMPDIR"' EXIT
+
+# Wait for server to accept connections
+for i in $(seq 1 30); do
+    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+        echo "Server process died before accepting connections" >&2
+        exit 1
+    fi
+    if nc -z 127.0.0.1 "$PORT" 2>/dev/null; then
+        break
+    fi
+    sleep 0.5
+done
+
+h2spec --host 127.0.0.1 --port "$PORT" --tls --insecure "${H2SPEC_ARGS[@]}"
