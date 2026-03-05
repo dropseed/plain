@@ -10,5 +10,5 @@ class TestView(View):
 class AppRouter(Router):
     namespace = ""
     urls = [
-        path("", TestView),
+        path("", TestView, name="index"),
     ]

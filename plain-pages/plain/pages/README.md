@@ -155,8 +155,8 @@ When markdown serving is enabled, you can link to the raw markdown version from 
 
 The `get_markdown_url()` method returns:
 
-- The markdown URL (e.g., `/docs/guide.md`) if the page is markdown and the feature is enabled
-- `None` if the page is not markdown or the feature is disabled
+- The `.md` URL (e.g., `/docs/guide.md`) if the page is a markdown page or an HTML page with a companion `.md` file
+- `None` if the page has no markdown URL or the feature is disabled
 
 ## Frontmatter
 

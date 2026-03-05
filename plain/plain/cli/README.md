@@ -7,6 +7,7 @@
     - [Register a command group](#register-a-command-group)
     - [Register a shortcut command](#register-a-shortcut-command)
     - [Mark commands as common](#mark-commands-as-common)
+    - [Bridge CLI options to settings](#bridge-cli-options-to-settings)
 - [Shell](#shell)
     - [Run a script with app context](#run-a-script-with-app-context)
     - [SHELL_IMPORT](#shell_import)
@@ -106,6 +107,36 @@ def dev():
 
 Common commands appear in a separate "Common Commands" section when running `plain --help`.
 
+### Bridge CLI options to settings
+
+Use [`SettingOption`](./options.py#SettingOption) to connect a Click option to a Plain setting. The setting provides the default value, and CLI args take priority when explicitly passed.
+
+```python
+import click
+from plain.cli import SettingOption, register_cli
+
+
+@register_cli("jobs")
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+@click.option(
+    "--max-processes",
+    type=int,
+    cls=SettingOption,
+    setting="JOBS_WORKER_MAX_PROCESSES",
+)
+def worker(max_processes):
+    click.echo(f"Max processes: {max_processes}")
+```
+
+Pass `cls=SettingOption` and `setting="SETTING_NAME"` to any `@click.option`. The setting name shown in `--help` output alongside the default value.
+
+`SettingOption` cannot be combined with `envvar=` or `default=` — the setting is the single source of truth for both the default value and environment variable resolution.
+
 ## Shell
 
 The `plain shell` command starts an interactive Python shell with your Plain app already loaded.
@@ -168,7 +199,7 @@ Plain includes several built-in commands:
 | `plain check`         | Run core validation checks               |
 | `plain shell`         | Interactive Python shell                 |
 | `plain run <script>`  | Execute a Python script with app context |
-| `plain server`        | Production-ready WSGI server             |
+| `plain server`        | Production-ready HTTP server             |
 | `plain preflight`     | Validation checks before deployment      |
 | `plain create <name>` | Create a new local package               |
 | `plain settings`      | View current settings                    |

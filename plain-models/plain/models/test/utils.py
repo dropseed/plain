@@ -5,7 +5,7 @@ from plain.models.otel import suppress_db_tracing
 
 
 def setup_database(*, verbosity: int, prefix: str = "") -> str:
-    old_name = db_connection.settings_dict["NAME"]
+    old_name = db_connection.settings_dict["DATABASE"]
     with suppress_db_tracing():
         db_connection.create_test_db(verbosity=verbosity, prefix=prefix)
     return old_name

@@ -1,5 +1,25 @@
 # plain-sessions changelog
 
+## [0.42.4](https://github.com/dropseed/plain/releases/plain-sessions@0.42.4) (2026-02-26)
+
+### What's changed
+
+- Added type annotations to all session cookie settings so they can be set via environment variables ([37e8a58ca9b5](https://github.com/dropseed/plain/commit/37e8a58ca9b5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.42.3](https://github.com/dropseed/plain/releases/plain-sessions@0.42.3) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.42.2](https://github.com/dropseed/plain/releases/plain-sessions@0.42.2) (2026-02-04)
 
 ### What's changed

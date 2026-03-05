@@ -5,13 +5,11 @@ from http import HTTPStatus
 from http.cookies import SimpleCookie
 from io import BytesIO, IOBase
 from typing import TYPE_CHECKING, Any
-from urllib.parse import unquote_to_bytes, urljoin, urlparse, urlsplit
+from urllib.parse import urljoin, urlparse, urlsplit
 
-from plain.http import QueryDict, RequestHeaders
+from plain.http import QueryDict, Request
 from plain.internal.handlers.base import BaseHandler
-from plain.internal.handlers.wsgi import WSGIRequest
 from plain.json import PlainJSONEncoder
-from plain.runtime import settings
 from plain.signals import request_started
 from plain.urls import get_resolver
 from plain.utils.encoding import force_bytes
@@ -52,15 +50,13 @@ class ClientResponse:
         self,
         response: ResponseBase,
         client: Client,
-        request: dict[str, Any],
     ):
         # Store wrapped response in __dict__ directly to avoid __setattr__ recursion
         object.__setattr__(self, "_response", response)
         object.__setattr__(self, "_json_cache", None)
         # Test-specific attributes
         self.client = client
-        self.request = request
-        self.wsgi_request: WSGIRequest
+        self.request: Request
         self.redirect_chain: list[tuple[str, int]]
         self.resolver_match: SimpleLazyObject | ResolverMatch
         # Optional: set by plain.auth if available
@@ -135,9 +131,8 @@ class FakePayload(IOBase):
             self.read_started = True
         if size == -1 or size is None:
             size = self.__len
-        assert self.__len >= size, (
-            "Cannot read more than the available bytes from the HTTP incoming data."
-        )
+        else:
+            size = min(size, self.__len)
         content = self.__content.read(size)
         self.__len -= len(content)
         return content
@@ -148,9 +143,8 @@ class FakePayload(IOBase):
             self.read_started = True
         if size is None or size == -1:
             size = self.__len
-        assert self.__len >= size, (
-            "Cannot read more than the available bytes from the HTTP incoming data."
-        )
+        else:
+            size = min(size, self.__len)
         content = self.__content.readline(size)
         self.__len -= len(content)
         return content
@@ -164,7 +158,7 @@ class FakePayload(IOBase):
 
 
 def _conditional_content_removal(
-    request: WSGIRequest, response: ResponseBase
+    request: Request, response: ResponseBase
 ) -> ResponseBase:
     """
     Simulate the behavior of most web servers by removing the content of
@@ -186,22 +180,21 @@ def _conditional_content_removal(
 
 class ClientHandler(BaseHandler):
     """
-    An HTTP Handler that can be used for testing purposes. Use the WSGI
-    interface to compose requests, but return the raw Response object with
-    the originating WSGIRequest attached to its ``wsgi_request`` attribute.
+    An HTTP Handler that can be used for testing purposes. Takes a Request
+    object directly and returns the raw Response with the originating
+    Request attached to its ``request`` attribute.
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
-    def __call__(self, environ: dict[str, Any]) -> ResponseBase:
+    def __call__(self, request: Request) -> ResponseBase:
         # Set up middleware if needed. We couldn't do this earlier, because
         # settings weren't available.
         if self._middleware_chain is None:
             self.load_middleware()
 
-        request_started.send(sender=self.__class__, environ=environ)
-        request = WSGIRequest(environ)
+        request_started.send(sender=self.__class__, request=request)
 
         # Request goes through middleware.
         response = self.get_response(request)
@@ -211,9 +204,9 @@ class ClientHandler(BaseHandler):
 
         # Attach the originating request to the response so that it could be
         # later retrieved.
-        response.wsgi_request = request  # type: ignore[attr-defined]
+        response.request = request  # type: ignore[attr-defined]
 
-        # Emulate a WSGI server by calling the close method on completion.
+        # Emulate a server by calling the close method on completion.
         response.close()
 
         return response
@@ -238,51 +231,64 @@ class RequestFactory:
         *,
         json_encoder: type[json.JSONEncoder] = PlainJSONEncoder,
         headers: dict[str, str] | None = None,
-        **defaults: Any,
     ) -> None:
         self.json_encoder = json_encoder
-        self.defaults: dict[str, Any] = defaults
+        self._default_headers: dict[str, str] = headers or {}
         self.cookies: SimpleCookie[str] = SimpleCookie()
-        self.errors = BytesIO()
+
+    def _build_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        data: bytes = b"",
+        content_type: str = "",
+        query_string: str = "",
+        secure: bool = True,
+        server_name: str = "testserver",
+        server_port: str = "",
+        headers: dict[str, str] | None = None,
+    ) -> Request:
+        """Build a Request object directly from the given parameters."""
+        # Merge headers: defaults first, then per-request overrides
+        all_headers: dict[str, str] = dict(self._default_headers)
         if headers:
-            self.defaults.update(RequestHeaders.to_wsgi_names(headers))
+            all_headers.update(headers)
 
-    def _base_environ(self, **request: Any) -> dict[str, Any]:
-        """
-        The base environment for a request.
-        """
-        # This is a minimal valid WSGI environ dictionary, plus:
-        # - HTTP_COOKIE: for cookie support,
-        # - REMOTE_ADDR: often useful, see #8551.
-        # See https://www.python.org/dev/peps/pep-3333/#environ-variables
-        return {
-            "HTTP_COOKIE": "; ".join(
-                sorted(
-                    f"{morsel.key}={morsel.coded_value}"
-                    for morsel in self.cookies.values()
-                )
-            ),
-            "PATH_INFO": "/",
-            "REMOTE_ADDR": "127.0.0.1",
-            "REQUEST_METHOD": "GET",
-            "SCRIPT_NAME": "",
-            "SERVER_NAME": "testserver",
-            "SERVER_PORT": "80",
-            "SERVER_PROTOCOL": "HTTP/1.1",
-            "wsgi.version": (1, 0),
-            "wsgi.url_scheme": "http",
-            "wsgi.input": FakePayload(b""),
-            "wsgi.errors": self.errors,
-            "wsgi.multiprocess": True,
-            "wsgi.multithread": False,
-            "wsgi.run_once": False,
-            **self.defaults,
-            **request,
-        }
+        # Add cookies
+        cookie_str = "; ".join(
+            sorted(
+                f"{morsel.key}={morsel.coded_value}" for morsel in self.cookies.values()
+            )
+        )
+        if cookie_str:
+            all_headers["Cookie"] = cookie_str
 
-    def request(self, **request: Any) -> WSGIRequest:
+        # Add content headers when there's a body
+        if data:
+            all_headers["Content-Type"] = content_type
+            all_headers["Content-Length"] = str(len(data))
+
+        request = Request(
+            method=method,
+            path=path,
+            headers=all_headers,
+            query_string=query_string,
+            server_scheme="https" if secure else "http",
+            server_name=server_name,
+            server_port=server_port or ("443" if secure else "80"),
+            remote_addr="127.0.0.1",
+        )
+
+        payload = FakePayload(data) if data else FakePayload(b"")
+        request._stream = payload
+        request._read_started = False
+
+        return request
+
+    def request(self, **kwargs: Any) -> Request:
         "Construct a generic request object."
-        return WSGIRequest(self._base_environ(**request))
+        return self._build_request(**kwargs)
 
     def _encode_data(self, data: dict[str, Any] | str, content_type: str) -> bytes:
         if content_type is _MULTIPART_CONTENT:
@@ -293,7 +299,7 @@ class RequestFactory:
             if match:
                 charset = match[1]
             else:
-                charset = settings.DEFAULT_CHARSET
+                charset = "utf-8"
             return force_bytes(data, encoding=charset)
 
     def _encode_json(self, data: Any, content_type: str) -> Any:
@@ -306,16 +312,38 @@ class RequestFactory:
         )
         return json.dumps(data, cls=self.json_encoder) if should_encode else data
 
-    def _get_path(self, parsed: Any) -> str:
+    def generic(
+        self,
+        method: str,
+        path: str,
+        data: Any = "",
+        content_type: str = "application/octet-stream",
+        secure: bool = True,
+        *,
+        headers: dict[str, str] | None = None,
+        query_string: str = "",
+        server_name: str = "testserver",
+        server_port: str = "",
+    ) -> Request:
+        """Construct an arbitrary HTTP request."""
+        parsed = urlparse(str(path))  # path can be lazy
         path = parsed.path
-        # If there are parameters, add them
         if parsed.params:
             path += ";" + parsed.params
-        path = unquote_to_bytes(path)
-        # Replace the behavior where non-ASCII values in the WSGI environ are
-        # arbitrarily decoded with ISO-8859-1.
-        # Refs comment in `get_bytes_from_wsgi()`.
-        return path.decode("iso-8859-1")
+        data = force_bytes(data, "utf-8")
+        if not query_string:
+            query_string = parsed.query
+        return self._build_request(
+            method=method,
+            path=path,
+            data=data,
+            content_type=content_type,
+            query_string=query_string,
+            secure=secure,
+            server_name=server_name,
+            server_port=server_port,
+            headers=headers,
+        )
 
     def get(
         self,
@@ -324,8 +352,7 @@ class RequestFactory:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
-    ) -> WSGIRequest:
+    ) -> Request:
         """Construct a GET request."""
         data = {} if data is None else data
         return self.generic(
@@ -333,10 +360,7 @@ class RequestFactory:
             path,
             secure=secure,
             headers=headers,
-            **{
-                "QUERY_STRING": urlencode(data, doseq=True),
-                **extra,
-            },
+            query_string=urlencode(data, doseq=True),
         )
 
     def post(
@@ -347,8 +371,7 @@ class RequestFactory:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
-    ) -> WSGIRequest:
+    ) -> Request:
         """Construct a POST request."""
         data = self._encode_json({} if data is None else data, content_type)
         post_data = self._encode_data(data, content_type)
@@ -360,7 +383,6 @@ class RequestFactory:
             content_type,
             secure=secure,
             headers=headers,
-            **extra,
         )
 
     def head(
@@ -370,8 +392,7 @@ class RequestFactory:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
-    ) -> WSGIRequest:
+    ) -> Request:
         """Construct a HEAD request."""
         data = {} if data is None else data
         return self.generic(
@@ -379,10 +400,7 @@ class RequestFactory:
             path,
             secure=secure,
             headers=headers,
-            **{
-                "QUERY_STRING": urlencode(data, doseq=True),
-                **extra,
-            },
+            query_string=urlencode(data, doseq=True),
         )
 
     def trace(
@@ -391,10 +409,9 @@ class RequestFactory:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
-    ) -> WSGIRequest:
+    ) -> Request:
         """Construct a TRACE request."""
-        return self.generic("TRACE", path, secure=secure, headers=headers, **extra)
+        return self.generic("TRACE", path, secure=secure, headers=headers)
 
     def options(
         self,
@@ -404,11 +421,10 @@ class RequestFactory:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
-    ) -> WSGIRequest:
+    ) -> Request:
         "Construct an OPTIONS request."
         return self.generic(
-            "OPTIONS", path, data, content_type, secure=secure, headers=headers, **extra
+            "OPTIONS", path, data, content_type, secure=secure, headers=headers
         )
 
     def put(
@@ -419,12 +435,11 @@ class RequestFactory:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
-    ) -> WSGIRequest:
+    ) -> Request:
         """Construct a PUT request."""
         data = self._encode_json(data, content_type)
         return self.generic(
-            "PUT", path, data, content_type, secure=secure, headers=headers, **extra
+            "PUT", path, data, content_type, secure=secure, headers=headers
         )
 
     def patch(
@@ -435,12 +450,11 @@ class RequestFactory:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
-    ) -> WSGIRequest:
+    ) -> Request:
         """Construct a PATCH request."""
         data = self._encode_json(data, content_type)
         return self.generic(
-            "PATCH", path, data, content_type, secure=secure, headers=headers, **extra
+            "PATCH", path, data, content_type, secure=secure, headers=headers
         )
 
     def delete(
@@ -451,51 +465,12 @@ class RequestFactory:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
-    ) -> WSGIRequest:
+    ) -> Request:
         """Construct a DELETE request."""
         data = self._encode_json(data, content_type)
         return self.generic(
-            "DELETE", path, data, content_type, secure=secure, headers=headers, **extra
+            "DELETE", path, data, content_type, secure=secure, headers=headers
         )
-
-    def generic(
-        self,
-        method: str,
-        path: str,
-        data: Any = "",
-        content_type: str = "application/octet-stream",
-        secure: bool = True,
-        *,
-        headers: dict[str, str] | None = None,
-        **extra: Any,
-    ) -> WSGIRequest:
-        """Construct an arbitrary HTTP request."""
-        parsed = urlparse(str(path))  # path can be lazy
-        data = force_bytes(data, settings.DEFAULT_CHARSET)
-        r: dict[str, Any] = {
-            "PATH_INFO": self._get_path(parsed),
-            "REQUEST_METHOD": method,
-            "SERVER_PORT": "443" if secure else "80",
-            "wsgi.url_scheme": "https" if secure else "http",
-        }
-        if data:
-            r.update(
-                {
-                    "CONTENT_LENGTH": str(len(data)),
-                    "CONTENT_TYPE": content_type,
-                    "wsgi.input": FakePayload(data),
-                }
-            )
-        if headers:
-            extra.update(RequestHeaders.to_wsgi_names(headers))
-        r.update(extra)
-        # If QUERY_STRING is absent or empty, we want to extract it from the URL.
-        if not r.get("QUERY_STRING"):
-            # WSGI requires latin-1 encoded strings. See get_path_info().
-            query_string = parsed[4].encode().decode("iso-8859-1")
-            r["QUERY_STRING"] = query_string
-        return self.request(**r)
 
 
 class Client:
@@ -522,13 +497,10 @@ class Client:
         raise_request_exception: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **defaults: Any,
     ) -> None:
-        self._request_factory = RequestFactory(headers=headers, **defaults)
+        self._request_factory = RequestFactory(headers=headers)
         self.handler = ClientHandler()
         self.raise_request_exception = raise_request_exception
-        self.extra: dict[str, Any] | None = None
-        self.headers: dict[str, str] | None = None
 
     @property
     def cookies(self) -> SimpleCookie[str]:
@@ -540,23 +512,17 @@ class Client:
         """Set the cookies on the request factory."""
         self._request_factory.cookies = value
 
-    def request(self, **request: Any) -> ClientResponse:
+    def request(self, http_request: Request) -> ClientResponse:
         """
-        Make a generic request. Compose the environment dictionary and pass
-        to the handler, return the result of the handler. Assume defaults for
-        the query environment, which can be overridden using the arguments to
-        the request.
+        Send a Request through the handler and return a ClientResponse.
         """
-        environ = self._request_factory._base_environ(**request)
-
         # Make the request
-        response = self.handler(environ)
+        response = self.handler(http_request)
 
         # Wrap the response in ClientResponse for test-specific attributes
         client_response = ClientResponse(
             response=response,
             client=self,
-            request=request,
         )
 
         # Re-raise the exception if configured to do so
@@ -568,15 +534,24 @@ class Client:
         try:
             from plain.auth.requests import get_request_user
 
-            client_response.user = get_request_user(client_response.wsgi_request)
-        except ImportError:
+            client_response.user = get_request_user(client_response.request)
+        except Exception:
+            # ImportError if plain.auth not installed, or other exceptions
+            # if session middleware didn't run (e.g. healthcheck)
             pass
 
         # Attach the ResolverMatch instance to the response.
+        # Returns None for paths handled by middleware (e.g. healthcheck)
+        # that don't have a corresponding URL route.
         resolver = get_resolver()
-        client_response.resolver_match = SimpleLazyObject(
-            lambda: resolver.resolve(request["PATH_INFO"]),
-        )
+
+        def _resolve_or_none():
+            try:
+                return resolver.resolve(http_request.path_info)
+            except Exception:
+                return None
+
+        client_response.resolver_match = SimpleLazyObject(_resolve_or_none)
 
         # Update persistent cookie data.
         if client_response.cookies:
@@ -591,21 +566,14 @@ class Client:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
     ) -> ClientResponse:
         """Request a response from the server using GET."""
-        self.extra = extra
-        self.headers = headers
-        # Build the request using the factory
-        wsgi_request = self._request_factory.get(
-            path, data=data, secure=secure, headers=headers, **extra
+        request = self._request_factory.get(
+            path, data=data, secure=secure, headers=headers
         )
-        # Execute and get response
-        response = self.request(**wsgi_request.environ)
+        response = self.request(request)
         if follow:
-            response = self._handle_redirects(
-                response, data=data, headers=headers, **extra
-            )
+            response = self._handle_redirects(response, data=data, headers=headers)
         return response
 
     def post(
@@ -617,25 +585,19 @@ class Client:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
     ) -> ClientResponse:
         """Request a response from the server using POST."""
-        self.extra = extra
-        self.headers = headers
-        # Build the request using the factory
-        wsgi_request = self._request_factory.post(
+        request = self._request_factory.post(
             path,
             data=data,
             content_type=content_type,
             secure=secure,
             headers=headers,
-            **extra,
         )
-        # Execute and get response
-        response = self.request(**wsgi_request.environ)
+        response = self.request(request)
         if follow:
             response = self._handle_redirects(
-                response, data=data, content_type=content_type, headers=headers, **extra
+                response, data=data, content_type=content_type, headers=headers
             )
         return response
 
@@ -647,21 +609,14 @@ class Client:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
     ) -> ClientResponse:
         """Request a response from the server using HEAD."""
-        self.extra = extra
-        self.headers = headers
-        # Build the request using the factory
-        wsgi_request = self._request_factory.head(
-            path, data=data, secure=secure, headers=headers, **extra
+        request = self._request_factory.head(
+            path, data=data, secure=secure, headers=headers
         )
-        # Execute and get response
-        response = self.request(**wsgi_request.environ)
+        response = self.request(request)
         if follow:
-            response = self._handle_redirects(
-                response, data=data, headers=headers, **extra
-            )
+            response = self._handle_redirects(response, data=data, headers=headers)
         return response
 
     def options(
@@ -673,25 +628,19 @@ class Client:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
     ) -> ClientResponse:
         """Request a response from the server using OPTIONS."""
-        self.extra = extra
-        self.headers = headers
-        # Build the request using the factory
-        wsgi_request = self._request_factory.options(
+        request = self._request_factory.options(
             path,
             data=data,
             content_type=content_type,
             secure=secure,
             headers=headers,
-            **extra,
         )
-        # Execute and get response
-        response = self.request(**wsgi_request.environ)
+        response = self.request(request)
         if follow:
             response = self._handle_redirects(
-                response, data=data, content_type=content_type, headers=headers, **extra
+                response, data=data, content_type=content_type, headers=headers
             )
         return response
 
@@ -704,25 +653,19 @@ class Client:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
     ) -> ClientResponse:
         """Send a resource to the server using PUT."""
-        self.extra = extra
-        self.headers = headers
-        # Build the request using the factory
-        wsgi_request = self._request_factory.put(
+        request = self._request_factory.put(
             path,
             data=data,
             content_type=content_type,
             secure=secure,
             headers=headers,
-            **extra,
         )
-        # Execute and get response
-        response = self.request(**wsgi_request.environ)
+        response = self.request(request)
         if follow:
             response = self._handle_redirects(
-                response, data=data, content_type=content_type, headers=headers, **extra
+                response, data=data, content_type=content_type, headers=headers
             )
         return response
 
@@ -735,25 +678,19 @@ class Client:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
     ) -> ClientResponse:
         """Send a resource to the server using PATCH."""
-        self.extra = extra
-        self.headers = headers
-        # Build the request using the factory
-        wsgi_request = self._request_factory.patch(
+        request = self._request_factory.patch(
             path,
             data=data,
             content_type=content_type,
             secure=secure,
             headers=headers,
-            **extra,
         )
-        # Execute and get response
-        response = self.request(**wsgi_request.environ)
+        response = self.request(request)
         if follow:
             response = self._handle_redirects(
-                response, data=data, content_type=content_type, headers=headers, **extra
+                response, data=data, content_type=content_type, headers=headers
             )
         return response
 
@@ -766,25 +703,19 @@ class Client:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
     ) -> ClientResponse:
         """Send a DELETE request to the server."""
-        self.extra = extra
-        self.headers = headers
-        # Build the request using the factory
-        wsgi_request = self._request_factory.delete(
+        request = self._request_factory.delete(
             path,
             data=data,
             content_type=content_type,
             secure=secure,
             headers=headers,
-            **extra,
         )
-        # Execute and get response
-        response = self.request(**wsgi_request.environ)
+        response = self.request(request)
         if follow:
             response = self._handle_redirects(
-                response, data=data, content_type=content_type, headers=headers, **extra
+                response, data=data, content_type=content_type, headers=headers
             )
         return response
 
@@ -796,21 +727,12 @@ class Client:
         secure: bool = True,
         *,
         headers: dict[str, str] | None = None,
-        **extra: Any,
     ) -> ClientResponse:
         """Send a TRACE request to the server."""
-        self.extra = extra
-        self.headers = headers
-        # Build the request using the factory
-        wsgi_request = self._request_factory.trace(
-            path, data=data, secure=secure, headers=headers, **extra
-        )
-        # Execute and get response
-        response = self.request(**wsgi_request.environ)
+        request = self._request_factory.trace(path, secure=secure, headers=headers)
+        response = self.request(request)
         if follow:
-            response = self._handle_redirects(
-                response, data=data, headers=headers, **extra
-            )
+            response = self._handle_redirects(response, data=data, headers=headers)
         return response
 
     def _handle_redirects(
@@ -819,7 +741,6 @@ class Client:
         data: Any = "",
         content_type: str = "",
         headers: dict[str, str] | None = None,
-        **extra: Any,
     ) -> ClientResponse:
         """
         Follow any redirects by requesting responses from the server using GET.
@@ -838,12 +759,18 @@ class Client:
             redirect_chain.append((response_url, response.status_code))
 
             url = urlsplit(response_url)
+
+            # Inherit server settings from the previous response's request
+            secure = response.request.scheme == "https"
+            server_name = response.request.server_name
+            server_port = response.request.server_port
+
             if url.scheme:
-                extra["wsgi.url_scheme"] = url.scheme
+                secure = url.scheme == "https"
             if url.hostname:
-                extra["SERVER_NAME"] = url.hostname
+                server_name = url.hostname
             if url.port:
-                extra["SERVER_PORT"] = str(url.port)
+                server_port = str(url.port)
 
             path = url.path
             # RFC 3986 Section 6.2.3: Empty path should be normalized to "/".
@@ -851,31 +778,66 @@ class Client:
                 path = "/"
             # Prepend the request path to handle relative path redirects
             if not path.startswith("/"):
-                path = urljoin(response.request["PATH_INFO"], path)
+                path = urljoin(response.request.path, path)
 
             if response.status_code in (
                 HTTPStatus.TEMPORARY_REDIRECT,
                 HTTPStatus.PERMANENT_REDIRECT,
             ):
-                # Preserve request method and query string (if needed)
-                # post-redirect for 307/308 responses.
-                request_method_name = response.request["REQUEST_METHOD"].lower()
-                if request_method_name not in ("get", "head"):
-                    extra["QUERY_STRING"] = url.query
-                request_method = getattr(self, request_method_name)
+                # Preserve request method for 307/308 responses.
+                method = response.request.method
+
+                if method in ("GET", "HEAD"):
+                    # GET/HEAD: re-encode data as query string
+                    if isinstance(data, QueryDict):
+                        qs = data.urlencode()
+                    elif isinstance(data, dict):
+                        qs = urlencode(data, doseq=True)
+                    else:
+                        qs = ""
+                    request = self._request_factory._build_request(
+                        method=method,
+                        path=path,
+                        query_string=qs,
+                        secure=secure,
+                        server_name=server_name,
+                        server_port=server_port,
+                        headers=headers,
+                    )
+                else:
+                    # POST/PUT/etc: preserve body and add redirect URL's query
+                    encoded_data = self._request_factory._encode_json(
+                        data, content_type
+                    )
+                    encoded_data = self._request_factory._encode_data(
+                        encoded_data, content_type
+                    )
+                    request = self._request_factory._build_request(
+                        method=method,
+                        path=path,
+                        data=encoded_data,
+                        content_type=content_type,
+                        query_string=url.query,
+                        secure=secure,
+                        server_name=server_name,
+                        server_port=server_port,
+                        headers=headers,
+                    )
             else:
-                request_method = self.get
+                # Non-307/308: redirect as GET with query from redirect URL
+                request = self._request_factory._build_request(
+                    method="GET",
+                    path=path,
+                    query_string=url.query,
+                    secure=secure,
+                    server_name=server_name,
+                    server_port=server_port,
+                    headers=headers,
+                )
                 data = QueryDict(url.query)
                 content_type = ""
 
-            response = request_method(
-                path,
-                data=data,
-                content_type=content_type,
-                follow=False,
-                headers=headers,
-                **extra,
-            )
+            response = self.request(request)
             response.redirect_chain = redirect_chain
 
             if redirect_chain[-1] in redirect_chain[:-1]:

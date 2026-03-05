@@ -4,7 +4,6 @@ import mimetypes
 import os
 from typing import Any
 
-from plain.runtime import settings
 from plain.utils.encoding import force_bytes
 from plain.utils.itercompat import is_iterable
 
@@ -20,7 +19,7 @@ def encode_multipart(boundary: str, data: dict[str, Any]) -> bytes:
     lines: list[bytes] = []
 
     def to_bytes(s: str) -> bytes:
-        return force_bytes(s, settings.DEFAULT_CHARSET)
+        return force_bytes(s, "utf-8")
 
     # Not by any means perfect, but good enough for our purposes.
     def is_file(thing: Any) -> bool:
@@ -73,7 +72,7 @@ def encode_multipart(boundary: str, data: dict[str, Any]) -> bytes:
 
 def encode_file(boundary: str, key: str, file: Any) -> list[bytes]:
     def to_bytes(s: str) -> bytes:
-        return force_bytes(s, settings.DEFAULT_CHARSET)
+        return force_bytes(s, "utf-8")
 
     # file.name might not be a string. For example, it's an int for
     # tempfile.TemporaryFile().

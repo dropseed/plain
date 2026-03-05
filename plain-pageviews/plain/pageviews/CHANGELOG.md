@@ -1,5 +1,25 @@
 # plain-pageviews changelog
 
+## [0.33.2](https://github.com/dropseed/plain/releases/plain-pageviews@0.33.2) (2026-02-26)
+
+### What's changed
+
+- Pageviews admin is no longer included in global search — previously it was searchable by default, now excluded since the admin default changed to opt-in ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.33.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.33.1) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted JavaScript assets and config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.33.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.33.0) (2026-02-16)
 
 ### What's changed

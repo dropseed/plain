@@ -1,5 +1,25 @@
 # plain-email changelog
 
+## [0.15.4](https://github.com/dropseed/plain/releases/plain-email@0.15.4) (2026-02-28)
+
+### What's changed
+
+- Replaced references to the removed `DEFAULT_CHARSET` setting with hardcoded `"utf-8"` in SMTP backend and message encoding ([901e6b3c49](https://github.com/dropseed/plain/commit/901e6b3c49))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.15.3](https://github.com/dropseed/plain/releases/plain-email@0.15.3) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.15.2](https://github.com/dropseed/plain/releases/plain-email@0.15.2) (2026-02-04)
 
 ### What's changed

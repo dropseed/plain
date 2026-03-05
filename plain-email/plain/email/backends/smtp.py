@@ -152,7 +152,7 @@ class EmailBackend(BaseEmailBackend):
         """A helper method that does the actual sending."""
         if not email_message.recipients():
             return False
-        encoding = email_message.encoding or settings.DEFAULT_CHARSET
+        encoding = email_message.encoding or "utf-8"
         from_email = _sanitize_address(email_message.from_email, encoding)
         recipients = [
             _sanitize_address(addr, encoding) for addr in email_message.recipients()

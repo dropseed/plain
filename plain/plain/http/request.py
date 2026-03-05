@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import copy
 import json
 import secrets
@@ -15,15 +16,12 @@ if TYPE_CHECKING:
     from plain.urls import ResolverMatch
 
 from plain.exceptions import ImproperlyConfigured
-from plain.http.cookie import unsign_cookie_value
+from plain.http.cookie import parse_cookie, unsign_cookie_value
 from plain.http.multipartparser import (
     MultiPartParser,
 )
 from plain.runtime import settings
-from plain.utils.datastructures import (
-    CaseInsensitiveMapping,
-    MultiValueDict,
-)
+from plain.utils.datastructures import CaseInsensitiveMapping, MultiValueDict
 from plain.utils.encoding import iri_to_uri
 from plain.utils.http import parse_header_parameters
 
@@ -53,54 +51,51 @@ class RawPostDataException(Exception):
 class Request:
     """A basic HTTP request."""
 
-    # The encoding used in GET/POST dicts. None means use default setting.
-    encoding: str | None = None
-
     non_picklable_attrs = frozenset(["resolver_match", "_stream"])
-
-    resolver_match: ResolverMatch | None
 
     def __init__(
         self,
         *,
-        method: str = "",
-        path: str = "",
-        path_info: str = "",
-        query_string: str = "",
-        content_type: str = "",
-        content_params: dict[str, str] | None = None,
+        method: str,
+        path: str,
         headers: dict[str, str] | None = None,
-        body: Any = None,
-        scheme: str = "http",
-        server_name: str = "localhost",
-        server_port: str = "80",
-        remote_addr: str = "127.0.0.1",
-        cookies: dict[str, str] | None = None,
+        query_string: str = "",
+        server_scheme: str = "http",
+        server_name: str = "",
+        server_port: str = "",
+        remote_addr: str = "",
+        path_info: str = "",
     ):
-        # A unique ID we can use to trace this request
         self.unique_id = str(uuid.uuid4())
-        self.resolver_match = None
+        self.resolver_match: ResolverMatch | None = None
+
         self.method = method
         self.path = path
         self.path_info = path_info or path
-        self._query_string = query_string
-        self.content_type = content_type or None
-        self.content_params = content_params
-        self._headers_dict = headers or {}
-        self._scheme = scheme
         self.server_name = server_name
         self.server_port = server_port
         self.remote_addr = remote_addr
-        self._cookies = cookies or {}
-        self._read_started = False
+        self.query_string = query_string
+        self.server_scheme = server_scheme
+        self.headers = RequestHeaders(headers or {})
 
-        if body is not None:
-            self._stream = body
-        else:
-            self._stream = BytesIO(b"")
+        # Parse content type, params, and encoding from headers
+        self.content_type: str | None
+        self.content_params: dict[str, str] | None
+        self.content_type, self.content_params = parse_header_parameters(
+            self.headers.get("Content-Type", "")
+        )
+        self.encoding: str | None = None
+        if "charset" in (self.content_params or {}):
+            try:
+                codecs.lookup(self.content_params["charset"])
+            except LookupError:
+                pass
+            else:
+                self.encoding = self.content_params["charset"]
 
     def __repr__(self) -> str:
-        if not self.method or not self.get_full_path():
+        if not self.get_full_path():
             return f"<{self.__class__.__name__}>"
         return f"<{self.__class__.__name__}: {self.method} {self.get_full_path()!r}>"
 
@@ -120,16 +115,12 @@ class Request:
         return obj
 
     @cached_property
-    def headers(self) -> RequestHeaders:
-        return RequestHeaders(self._headers_dict)
-
-    @cached_property
     def query_params(self) -> QueryDict:
-        return QueryDict(self._query_string, encoding=self.encoding)
+        return QueryDict(self.query_string, encoding=self.encoding)
 
     @cached_property
     def cookies(self) -> dict[str, str]:
-        return self._cookies
+        return parse_cookie(self.headers.get("Cookie", ""))
 
     @cached_property
     def csp_nonce(self) -> str:
@@ -190,7 +181,7 @@ class Request:
         elif http_host := self.headers.get("Host"):
             host = http_host
         else:
-            # Reconstruct the host using the server name.
+            # Reconstruct the host from server_name/port.
             host = self.server_name
             server_port = self.port
             if server_port != ("443" if self.is_https() else "80"):
@@ -222,11 +213,6 @@ class Request:
             if xff := self.headers.get("X-Forwarded-For"):
                 return xff.split(",")[0].strip()
         return self.remote_addr
-
-    @property
-    def query_string(self) -> str:
-        """Return the raw query string from the request URL."""
-        return self._query_string
 
     @property
     def content_length(self) -> int:
@@ -310,10 +296,6 @@ class Request:
 
         return iri_to_uri(location) or ""
 
-    def _get_scheme(self) -> str:
-        """Return the URL scheme for this request."""
-        return self._scheme
-
     @property
     def scheme(self) -> str:
         if settings.HTTPS_PROXY_HEADER:
@@ -329,7 +311,7 @@ class Request:
             if header_value is not None:
                 header_value, *_ = header_value.split(",", 1)
                 return "https" if header_value.strip() == secure_value else "http"
-        return self._get_scheme()
+        return self.server_scheme
 
     def is_https(self) -> bool:
         return self.scheme == "https"
@@ -342,17 +324,34 @@ class Request:
                     "You cannot access body after reading from request's data stream"
                 )
 
-            # Limit the maximum request data size that will be handled in-memory.
-            if (
-                settings.DATA_UPLOAD_MAX_MEMORY_SIZE is not None
-                and self.content_length > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
-            ):
+            max_size = settings.DATA_UPLOAD_MAX_MEMORY_SIZE
+
+            # Fast path: reject immediately if Content-Length exceeds the limit.
+            if max_size is not None and self.content_length > max_size:
                 raise RequestDataTooBigError400(
                     "Request body exceeded settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
                 )
 
             try:
-                self._body = self.read()
+                if max_size is not None:
+                    # Read in chunks to enforce the limit without buffering
+                    # an arbitrarily large body (e.g. chunked transfers
+                    # with no Content-Length).
+                    chunks = []
+                    bytes_read = 0
+                    while True:
+                        chunk = self.read(max_size - bytes_read + 1)
+                        if not chunk:
+                            break
+                        bytes_read += len(chunk)
+                        if bytes_read > max_size:
+                            raise RequestDataTooBigError400(
+                                "Request body exceeded settings.DATA_UPLOAD_MAX_MEMORY_SIZE."
+                            )
+                        chunks.append(chunk)
+                    self._body = b"".join(chunks)
+                else:
+                    self._body = self.read()
             except OSError as e:
                 raise UnreadablePostError(*e.args) from e
             finally:
@@ -445,7 +444,7 @@ class Request:
     # File-like and iterator interface.
     #
     # Expects self._stream to be set to an appropriate source of bytes by
-    # a corresponding request subclass (e.g. WSGIRequest).
+    # a corresponding request creator (e.g. server or test client).
     # Also when request data has already been read by request.json_data,
     # request.form_data, or request.body, self._stream points to a BytesIO
     # instance containing that data.
@@ -492,53 +491,15 @@ class Request:
 
 
 class RequestHeaders(CaseInsensitiveMapping):
-    HTTP_PREFIX = "HTTP_"
-    # PEP 333 gives two headers which aren't prepended with HTTP_.
-    UNPREFIXED_HEADERS = {"CONTENT_TYPE", "CONTENT_LENGTH"}
-
-    def __init__(self, headers: dict[str, Any]):
-        """Accept a dict of HTTP headers with standard names (e.g. Content-Type)."""
-        # Normalize keys to Title-Case for consistent lookup
-        normalized = {}
-        for key, value in headers.items():
-            normalized[key.replace("_", "-").title()] = value
+    def __init__(self, headers: dict[str, str]):
+        normalized = {
+            name.replace("_", "-").title(): value for name, value in headers.items()
+        }
         super().__init__(normalized)
 
     def __getitem__(self, key: str) -> str:
         """Allow header lookup using underscores in place of hyphens."""
         return super().__getitem__(key.replace("_", "-"))
-
-    @classmethod
-    def from_wsgi_environ(cls, environ: dict[str, Any]) -> RequestHeaders:
-        """Construct RequestHeaders from a WSGI environ dict."""
-        headers = {}
-        for header, value in environ.items():
-            name = cls.parse_header_name(header)
-            if name:
-                headers[name] = value
-        return cls(headers)
-
-    @classmethod
-    def parse_header_name(cls, header: str) -> str | None:
-        if header.startswith(cls.HTTP_PREFIX):
-            header = header.removeprefix(cls.HTTP_PREFIX)
-        elif header not in cls.UNPREFIXED_HEADERS:
-            return None
-        return header.replace("_", "-").title()
-
-    @classmethod
-    def to_wsgi_name(cls, header: str) -> str:
-        header = header.replace("-", "_").upper()
-        if header in cls.UNPREFIXED_HEADERS:
-            return header
-        return f"{cls.HTTP_PREFIX}{header}"
-
-    @classmethod
-    def to_wsgi_names(cls, headers: dict[str, Any]) -> dict[str, Any]:
-        return {
-            cls.to_wsgi_name(header_name): value
-            for header_name, value in headers.items()
-        }
 
 
 class QueryDict(MultiValueDict):
@@ -553,7 +514,7 @@ class QueryDict(MultiValueDict):
     will always return a mutable copy.
 
     Both keys and values set on this class are converted from the given encoding
-    (DEFAULT_CHARSET by default) to str.
+    (UTF-8 by default) to str.
     """
 
     # These are both reset in __init__, but is specified here at the class
@@ -568,7 +529,7 @@ class QueryDict(MultiValueDict):
         encoding: str | None = None,
     ):
         super().__init__()
-        self.encoding = encoding or settings.DEFAULT_CHARSET
+        self.encoding = encoding or "utf-8"
         query_string = query_string or ""
         parse_qsl_kwargs: dict[str, Any] = {
             "keep_blank_values": True,
@@ -619,7 +580,7 @@ class QueryDict(MultiValueDict):
     @property
     def encoding(self) -> str:
         if self._encoding is None:
-            self._encoding = settings.DEFAULT_CHARSET
+            self._encoding = "utf-8"
         return self._encoding
 
     @encoding.setter

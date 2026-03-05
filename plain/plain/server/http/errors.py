@@ -150,6 +150,9 @@ class ForbiddenProxyRequest(ParseException):
         return f"Proxy request from {self.host!r} not allowed"
 
 
-class InvalidSchemeHeaders(ParseException):
+class InvalidHostHeader(ParseException):
+    def __init__(self, reason: str):
+        self.reason = reason
+
     def __str__(self) -> str:
-        return "Contradictory scheme headers"
+        return f"Invalid Host header: {self.reason}"

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 
 import click
@@ -9,14 +11,14 @@ from .users.models import User
 
 @register_cli("app")
 @click.group()
-def cli():
+def cli() -> None:
     """App related commands"""
     pass
 
 
 @cli.command()
 @click.argument("email")
-def enable_admin_user(email):
+def enable_admin_user(email: str) -> None:
     """Enable admin privileges for a user"""
     result = User.query.filter(email=email).update(is_admin=True)
     if result:

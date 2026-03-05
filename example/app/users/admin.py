@@ -17,6 +17,7 @@ class UserAdmin(AdminViewset):
         title = "Users"
         fields = ["id", "email", "is_admin", "created_at"]
         search_fields = ["email"]
+        allow_global_search = True
         queryset_order = ["-created_at"]
 
     class DetailView(AdminModelDetailView):

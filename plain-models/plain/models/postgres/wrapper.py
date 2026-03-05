@@ -34,7 +34,6 @@ from plain.models.db import (
     NotSupportedError,
     db_connection,
 )
-from plain.models.db import DatabaseError as WrappedDatabaseError
 from plain.models.indexes import Index
 from plain.models.postgres import utils
 from plain.models.postgres.schema import DatabaseSchemaEditor
@@ -137,46 +136,31 @@ def _psql_settings_to_cmd_args_env(
     args = ["psql"]
     options = settings_dict.get("OPTIONS", {})
 
-    host = settings_dict.get("HOST")
-    port = settings_dict.get("PORT")
-    dbname = settings_dict.get("NAME")
-    user = settings_dict.get("USER")
-    passwd = settings_dict.get("PASSWORD")
-    passfile = options.get("passfile")
-    service = options.get("service")
-    sslmode = options.get("sslmode")
-    sslrootcert = options.get("sslrootcert")
-    sslcert = options.get("sslcert")
-    sslkey = options.get("sslkey")
-
-    if not dbname and not service:
-        # Connect to the default 'postgres' db.
-        dbname = "postgres"
-    if user:
+    if user := settings_dict.get("USER"):
         args += ["-U", user]
-    if host:
+    if host := settings_dict.get("HOST"):
         args += ["-h", host]
-    if port:
+    if port := settings_dict.get("PORT"):
         args += ["-p", str(port)]
     args.extend(parameters)
-    if dbname:
-        args += [dbname]
+    args += [settings_dict.get("DATABASE") or "postgres"]
 
-    env = {}
-    if passwd:
-        env["PGPASSWORD"] = str(passwd)
-    if service:
-        env["PGSERVICE"] = str(service)
-    if sslmode:
-        env["PGSSLMODE"] = str(sslmode)
-    if sslrootcert:
-        env["PGSSLROOTCERT"] = str(sslrootcert)
-    if sslcert:
-        env["PGSSLCERT"] = str(sslcert)
-    if sslkey:
-        env["PGSSLKEY"] = str(sslkey)
-    if passfile:
-        env["PGPASSFILE"] = str(passfile)
+    env: dict[str, str] = {}
+    if password := settings_dict.get("PASSWORD"):
+        env["PGPASSWORD"] = str(password)
+
+    # Map OPTIONS keys to their corresponding environment variables.
+    option_env_vars = {
+        "passfile": "PGPASSFILE",
+        "sslmode": "PGSSLMODE",
+        "sslrootcert": "PGSSLROOTCERT",
+        "sslcert": "PGSSLCERT",
+        "sslkey": "PGSSLKEY",
+    }
+    for option_key, env_var in option_env_vars.items():
+        if value := options.get(option_key):
+            env[env_var] = str(value)
+
     return args, (env or None)
 
 
@@ -201,7 +185,7 @@ class DatabaseWrapper:
         # The underlying database connection (from the database library, not a wrapper).
         self.connection: PsycopgConnection[Any] | None = None
         # `settings_dict` should be a dictionary containing keys such as
-        # NAME, USER, etc. It's called `settings_dict` instead of `settings`
+        # DATABASE, USER, etc. It's called `settings_dict` instead of `settings`
         # to disambiguate it from Plain settings modules.
         self.settings_dict: DatabaseConfig = settings_dict
         # Query logging in debug mode or when explicitly enabled.
@@ -220,9 +204,6 @@ class DatabaseWrapper:
         self.savepoint_ids: list[str] = []
         # Stack of active 'atomic' blocks.
         self.atomic_blocks: list[Any] = []
-        # Tracks if the outermost 'atomic' block should commit on exit,
-        # ie. if autocommit was active on entry.
-        self.commit_on_exit: bool = True
         # Tracks if the transaction should be rolled back to the next
         # available savepoint because of an exception in an inner block.
         self.needs_rollback: bool = False
@@ -271,8 +252,7 @@ class DatabaseWrapper:
         """
         if self.settings_dict["TIME_ZONE"] is None:
             return datetime.UTC
-        else:
-            return zoneinfo.ZoneInfo(self.settings_dict["TIME_ZONE"])
+        return zoneinfo.ZoneInfo(self.settings_dict["TIME_ZONE"])
 
     @cached_property
     def timezone_name(self) -> str:
@@ -281,8 +261,7 @@ class DatabaseWrapper:
         """
         if self.settings_dict["TIME_ZONE"] is None:
             return "UTC"
-        else:
-            return self.settings_dict["TIME_ZONE"]
+        return self.settings_dict["TIME_ZONE"]
 
     @property
     def queries_logged(self) -> bool:
@@ -314,36 +293,30 @@ class DatabaseWrapper:
         """Return a dict of parameters suitable for get_new_connection."""
         settings_dict = self.settings_dict
         options = settings_dict.get("OPTIONS", {})
-        # None may be used to connect to the default 'postgres' db
-        if settings_dict.get("NAME") == "" and not options.get("service"):
+        db_name = settings_dict.get("DATABASE")
+        if db_name == "":
             raise ImproperlyConfigured(
-                "settings.DATABASE is improperly configured. "
-                "Please supply the NAME or OPTIONS['service'] value."
+                "PostgreSQL database is not configured. "
+                "Set DATABASE_URL or the POSTGRES_DATABASE setting."
             )
-        db_name = settings_dict.get("NAME")
         if len(db_name or "") > MAX_NAME_LENGTH:
             raise ImproperlyConfigured(
                 "The database name '%s' (%d characters) is longer than "  # noqa: UP031
-                "PostgreSQL's limit of %d characters. Supply a shorter NAME "
-                "in settings.DATABASE."
+                "PostgreSQL's limit of %d characters. Supply a shorter "
+                "POSTGRES_DATABASE setting."
                 % (
                     db_name,
                     len(db_name or ""),
                     MAX_NAME_LENGTH,
                 )
             )
-        conn_params: dict[str, Any] = {"client_encoding": "UTF8"}
-        if db_name:
-            conn_params = {
-                "dbname": db_name,
-                **options,
-            }
-        elif db_name is None:
-            # Connect to the default 'postgres' db.
-            options.pop("service", None)
-            conn_params = {"dbname": "postgres", **options}
-        else:
-            conn_params = {**options}
+        if db_name is None:
+            # None is used to connect to the default 'postgres' db.
+            db_name = "postgres"
+        conn_params: dict[str, Any] = {
+            "dbname": db_name,
+            **options,
+        }
 
         conn_params.pop("assume_role", None)
         conn_params.pop("isolation_level", None)
@@ -430,16 +403,11 @@ class DatabaseWrapper:
             self.check_database_version_supported()
             RAN_DB_VERSION_CHECK = True
 
-        # Commit after setting the time zone.
-        commit_tz = self.ensure_timezone()
+        self.ensure_timezone()
         # Set the role on the connection. This is useful if the credential used
         # to login is not the same as the role that owns database resources. As
         # can be the case when using temporary or ephemeral credentials.
-        commit_role = self.ensure_role()
-
-        if (commit_role or commit_tz) and not self.get_autocommit():
-            assert self.connection is not None
-            self.connection.commit()
+        self.ensure_role()
 
     def create_cursor(self, name: str | None = None) -> Any:
         """Create a cursor. Assume that a connection is established."""
@@ -526,13 +494,13 @@ class DatabaseWrapper:
         """
         cursor = None
         try:
-            conn = self.__class__({**self.settings_dict, "NAME": None})
+            conn = self.__class__({**self.settings_dict, "DATABASE": None})
             try:
                 with conn.cursor() as cursor:
                     yield cursor
             finally:
                 conn.close()
-        except (Database.DatabaseError, WrappedDatabaseError):
+        except (Database.DatabaseError, DatabaseError):
             if cursor is not None:
                 raise
             warnings.warn(
@@ -546,7 +514,7 @@ class DatabaseWrapper:
             conn = self.__class__(
                 {
                     **self.settings_dict,
-                    "NAME": db_connection.settings_dict["NAME"],
+                    "DATABASE": db_connection.settings_dict["DATABASE"],
                 },
             )
             try:
@@ -584,7 +552,7 @@ class DatabaseWrapper:
         # Establish the connection
         conn_params = self.get_connection_params()
         self.connection = self.get_new_connection(conn_params)
-        self.set_autocommit(self.settings_dict["AUTOCOMMIT"])
+        self.set_autocommit(True)
         self.init_connection_state()
 
         self.run_on_commit = []
@@ -750,7 +718,12 @@ class DatabaseWrapper:
         return self.autocommit
 
     def set_autocommit(self, autocommit: bool) -> None:
-        """Enable or disable autocommit."""
+        """
+        Enable or disable autocommit.
+
+        Used internally by atomic() to manage transactions. Don't call this
+        directly — use atomic() instead.
+        """
         self.validate_no_atomic_block()
         self.close_if_health_check_failed()
         self.ensure_connection()
@@ -820,9 +793,9 @@ class DatabaseWrapper:
         """
         if self.connection is not None:
             self.health_check_done = False
-            # If the application didn't restore the original autocommit setting,
-            # don't take chances, drop the connection.
-            if self.get_autocommit() != self.settings_dict["AUTOCOMMIT"]:
+            # If autocommit was not restored (e.g. a transaction was not
+            # properly closed), don't take chances, drop the connection.
+            if not self.get_autocommit():
                 self.close()
                 return
 
@@ -915,13 +888,8 @@ class DatabaseWrapper:
         if self.in_atomic_block:
             # Transaction in progress; save for execution on commit.
             self.run_on_commit.append((set(self.savepoint_ids), func, robust))
-        elif not self.get_autocommit():
-            raise TransactionManagementError(
-                "on_commit() cannot be used in manual transaction management"
-            )
         else:
-            # No transaction in progress and in autocommit mode; execute
-            # immediately.
+            # No transaction in progress; execute immediately.
             if robust:
                 try:
                     func()
@@ -1266,8 +1234,8 @@ class DatabaseWrapper:
         )
 
         self.close()
-        settings.DATABASE["NAME"] = test_database_name
-        self.settings_dict["NAME"] = test_database_name
+        settings.POSTGRES_DATABASE = test_database_name
+        self.settings_dict["DATABASE"] = test_database_name
 
         apply.callback(
             package_label=None,
@@ -1290,19 +1258,22 @@ class DatabaseWrapper:
         """
         Internal implementation - return the name of the test DB that will be
         created. Only useful when called from create_test_db() and
-        _create_test_db() and when no external munging is done with the 'NAME'
+        _create_test_db() and when no external munging is done with the 'DATABASE'
         settings.
 
         If prefix is provided, it will be prepended to the database name.
         """
-        # Determine the base name: explicit TEST.NAME overrides base NAME.
-        base_name = self.settings_dict["TEST"]["NAME"] or self.settings_dict["NAME"]
+        # Determine the base name: explicit TEST.DATABASE overrides base DATABASE.
+        base_name = (
+            self.settings_dict["TEST"]["DATABASE"] or self.settings_dict["DATABASE"]
+        )
         if prefix:
             return f"{prefix}_{base_name}"
-        if self.settings_dict["TEST"]["NAME"]:
-            return self.settings_dict["TEST"]["NAME"]
-        name = self.settings_dict["NAME"]
-        assert name is not None, "DATABASE NAME must be set"
+        if self.settings_dict["TEST"]["DATABASE"]:
+            return self.settings_dict["TEST"]["DATABASE"]
+        name = self.settings_dict["DATABASE"]
+        if name is None:
+            raise ValueError("POSTGRES_DATABASE must be set")
         return TEST_DATABASE_PREFIX + name
 
     def _get_database_create_suffix(
@@ -1377,8 +1348,9 @@ class DatabaseWrapper:
         """
         self.close()
 
-        test_database_name = self.settings_dict["NAME"]
-        assert test_database_name is not None, "Test database NAME must be set"
+        test_database_name = self.settings_dict["DATABASE"]
+        if test_database_name is None:
+            raise ValueError("Test POSTGRES_DATABASE must be set")
 
         if verbosity >= 1:
             self._log(f"Destroying test database '{test_database_name}'...")
@@ -1386,8 +1358,8 @@ class DatabaseWrapper:
 
         # Restore the original database name
         if old_database_name is not None:
-            settings.DATABASE["NAME"] = old_database_name
-            self.settings_dict["NAME"] = old_database_name
+            settings.POSTGRES_DATABASE = old_database_name
+            self.settings_dict["DATABASE"] = old_database_name
 
     def _destroy_test_db(self, test_database_name: str, verbosity: int) -> None:
         """

@@ -189,12 +189,18 @@ Jobs can be linked to the originating trace context, allowing you to track jobs 
 
 ## Settings
 
-| Setting                  | Default           | Env var                        |
-| ------------------------ | ----------------- | ------------------------------ |
-| `JOBS_RESULTS_RETENTION` | `604800` (7 days) | `PLAIN_JOBS_RESULTS_RETENTION` |
-| `JOBS_TIMEOUT`           | `86400` (1 day)   | `PLAIN_JOBS_TIMEOUT`           |
-| `JOBS_MIDDLEWARE`        | `[...]`           | `PLAIN_JOBS_MIDDLEWARE`        |
-| `JOBS_SCHEDULE`          | `[]`              | `PLAIN_JOBS_SCHEDULE`          |
+| Setting                               | Default           |
+| ------------------------------------- | ----------------- |
+| `JOBS_RESULTS_RETENTION`              | `604800` (7 days) |
+| `JOBS_TIMEOUT`                        | `86400` (1 day)   |
+| `JOBS_MIDDLEWARE`                     | `[...]`           |
+| `JOBS_SCHEDULE`                       | `[]`              |
+| `JOBS_WORKER_MAX_PROCESSES`           | `None`            |
+| `JOBS_WORKER_MAX_JOBS_PER_PROCESS`    | `None`            |
+| `JOBS_WORKER_MAX_PENDING_PER_PROCESS` | `10`              |
+| `JOBS_WORKER_STATS_EVERY`             | `60`              |
+
+The `JOBS_WORKER_*` settings configure the `plain jobs worker` command and can also be overridden via CLI flags (e.g. `--max-processes`).
 
 See [`default_settings.py`](./default_settings.py) for more details.
 

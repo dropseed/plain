@@ -62,18 +62,12 @@ jQuery(($) => {
         tooltip.className =
           "hidden flex-col fixed z-50 bg-white text-black/90 border border-stone-200 shadow-lg rounded-md p-1 text-sm min-w-56 whitespace-nowrap";
 
-        tooltip.appendChild(
-          createTooltipRow(localTz, formatDatetime(date, localTz)),
-        );
-        tooltip.appendChild(
-          createTooltipRow("UTC", formatDatetime(date, "UTC")),
-        );
+        tooltip.appendChild(createTooltipRow(localTz, formatDatetime(date, localTz)));
+        tooltip.appendChild(createTooltipRow("UTC", formatDatetime(date, "UTC")));
         const relativeRow = createTooltipRow("Relative", relativeTime(date));
         tooltip.appendChild(relativeRow);
         tooltip.appendChild(createTooltipRow("Unix", String(unix)));
-        tooltip.appendChild(
-          createTooltipRow("ISO", this.getAttribute("datetime")),
-        );
+        tooltip.appendChild(createTooltipRow("ISO", this.getAttribute("datetime")));
 
         document.body.appendChild(tooltip);
         this._datetimeTooltip = tooltip;
@@ -90,10 +84,7 @@ jQuery(($) => {
           tooltip.classList.replace("hidden", "flex");
         };
         const hide = () => {
-          hideTimeout = setTimeout(
-            () => tooltip.classList.replace("flex", "hidden"),
-            100,
-          );
+          hideTimeout = setTimeout(() => tooltip.classList.replace("flex", "hidden"), 100);
         };
 
         this.addEventListener("mouseenter", show);

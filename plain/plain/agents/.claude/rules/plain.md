@@ -27,10 +27,25 @@ When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
 ## Documentation
 
-- `uv run plain docs <package>` — markdown docs for an installed package
-- `uv run plain docs <package> --api` — symbolicated API surface
-- `uv run plain docs <package> --section <name>` — show a specific `##` section
-- `uv run plain docs --list` — all official packages (installed and uninstalled) with descriptions
+**Discovery** — find what's available and where things are:
+
+- `uv run plain docs --list` — all packages and core modules with descriptions
+- `uv run plain docs --outline` — section headings for all installed docs
+- `uv run plain docs <name> --outline` — section headings (with `###` subsections) for one module
+- `uv run plain docs --search <term>` — find which modules/sections mention a term (compact, one line per section)
+
+**Reading** — get full content:
+
+- `uv run plain docs <name>` — full markdown docs
+- `uv run plain docs <name> --section <name>` — one specific `##` section
+- `uv run plain docs <name> --search <term>` — full content of all matching sections in that module
+- `uv run plain docs <name> --api` — public API surface (classes, functions, signatures)
+
+**Workflow**: Use `--search <term>` to find which module has what you need, then `<name> --search <term>` to get the full sections, or `<name> --section <name>` for a specific one.
+
+Packages: plain, plain-admin, plain-api, plain-auth, plain-cache, plain-code, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-models, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-toolbar, plain-tunnel, plain-vendor
+
+Core modules: agents, assets, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, signals, templates, test, urls, utils, views
 
 Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/path>/README.md`
 
@@ -41,6 +56,8 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 - `uv run plain shell` — interactive Python shell with Plain configured (`-c "..."` for one-off commands)
 - `uv run plain run script.py` — run a script with Plain configured
 - `uv run plain request /path` — test HTTP request against dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`)
+- `uv run plain settings list` — list all settings with their current values and sources
+- `uv run plain settings get <SETTING_NAME>` — get the value of a specific setting
 
 ## Views
 

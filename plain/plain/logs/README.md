@@ -9,7 +9,7 @@
 - [Output formats](#output-formats)
     - [Key-value format](#key-value-format)
     - [JSON format](#json-format)
-    - [Standard format](#standard-format)
+
 - [Context management](#context-management)
     - [Persistent context](#persistent-context)
     - [Temporary context](#temporary-context)
@@ -107,18 +107,6 @@ export APP_LOG_FORMAT=json
 {"timestamp": "2024-01-15 10:30:00,123", "level": "INFO", "message": "User logged in", "logger": "app", "user_id": 123, "method": "oauth"}
 ```
 
-### Standard format
-
-A minimal format that omits context data entirely.
-
-```bash
-export APP_LOG_FORMAT=standard
-```
-
-```
-[INFO] User logged in
-```
-
 ## Context management
 
 ### Persistent context
@@ -194,14 +182,34 @@ export PLAIN_LOG_STREAM=stderr
 
 All logging settings use environment variables:
 
-| Environment Variable        | Default    | Description                                      |
-| --------------------------- | ---------- | ------------------------------------------------ |
-| `PLAIN_FRAMEWORK_LOG_LEVEL` | `INFO`     | Log level for the `plain` logger                 |
-| `PLAIN_LOG_LEVEL`           | `INFO`     | Log level for the `app` logger                   |
-| `PLAIN_LOG_FORMAT`          | `keyvalue` | Output format: `json`, `keyvalue`, or `standard` |
-| `PLAIN_LOG_STREAM`          | `split`    | Output stream: `split`, `stdout`, or `stderr`    |
+| Environment Variable        | Default    | Description                                   |
+| --------------------------- | ---------- | --------------------------------------------- |
+| `PLAIN_FRAMEWORK_LOG_LEVEL` | `INFO`     | Log level for the `plain` logger              |
+| `PLAIN_LOG_LEVEL`           | `INFO`     | Log level for the `app` logger                |
+| `PLAIN_LOG_FORMAT`          | `keyvalue` | Output format: `keyvalue` or `json`           |
+| `PLAIN_LOG_STREAM`          | `split`    | Output stream: `split`, `stdout`, or `stderr` |
 
 Valid log levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+
+## Server access log
+
+The server writes access logs to a separate `plain.server.access` logger that always outputs to stdout, regardless of the `LOG_STREAM` setting. This keeps access logs separate from application logs.
+
+Access logs use the same `LOG_FORMAT` setting as the app logger, producing structured output with request fields:
+
+```
+[INFO] Request method=GET path="/" status=200 duration_ms=12 size=1234 ip="127.0.0.1" user_agent="Mozilla/5.0..." referer="https://example.com"
+```
+
+In JSON format:
+
+```json
+{"timestamp": "2024-01-15 10:30:00,123", "level": "INFO", "message": "Request", "logger": "plain.server.access", "method": "GET", "path": "/", "status": 200, "duration_ms": 12, "size": 1234, "ip": "127.0.0.1", "user_agent": "Mozilla/5.0...", "referer": "https://example.com"}
+```
+
+Additional fields beyond the defaults are controlled by `SERVER_ACCESS_LOG_FIELDS` (see the server docs).
+
+Access logging is controlled by the `SERVER_ACCESS_LOG` setting (see the server docs). Individual responses can opt out by setting `response.log_access = False`.
 
 ## FAQs
 

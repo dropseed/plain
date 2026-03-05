@@ -8,15 +8,10 @@ from collections.abc import Iterator
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from .message import Request
 from .unreader import IterUnreader, SocketUnreader
-
-if TYPE_CHECKING:
-    import socket
-
-    from ..config import Config
 
 
 class Parser:
@@ -24,11 +19,11 @@ class Parser:
 
     def __init__(
         self,
-        cfg: Config,
-        source: socket.socket | Any,
+        is_ssl: bool,
+        source: Any,
         source_addr: tuple[str, int] | Any,
     ) -> None:
-        self.cfg = cfg
+        self.is_ssl = is_ssl
         if hasattr(source, "recv"):
             self.unreader = SocketUnreader(source)
         else:
@@ -42,22 +37,30 @@ class Parser:
     def __iter__(self) -> Iterator[Request]:
         return self
 
+    def finish_body(self) -> None:
+        """Discard any unread body of the current message.
+
+        Call before returning a keepalive connection to the poller so the
+        socket doesn't appear readable due to leftover body bytes.
+        """
+        if self.mesg and self.mesg.body:
+            data = self.mesg.body.read(8192)
+            while data:
+                data = self.mesg.body.read(8192)
+
     def __next__(self) -> Request:
         # Stop if HTTP dictates a stop.
         if self.mesg and self.mesg.should_close():
             raise StopIteration()
 
         # Discard any unread body of the previous message
-        if self.mesg and self.mesg.body:
-            data = self.mesg.body.read(8192)
-            while data:
-                data = self.mesg.body.read(8192)
+        self.finish_body()
 
         # Parse the next request
         self.req_count += 1
         assert self.mesg_class is not None, "mesg_class must be set by subclass"
         self.mesg = self.mesg_class(
-            self.cfg, self.unreader, self.source_addr, self.req_count
+            self.is_ssl, self.unreader, self.source_addr, self.req_count
         )
         if not self.mesg:
             raise StopIteration()

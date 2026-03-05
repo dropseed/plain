@@ -12,6 +12,11 @@
 # pylint: disable=super-init-not-called
 
 
+# Exit codes used by workers to communicate failure reason to the arbiter.
+WORKER_BOOT_ERROR = 3
+APP_LOAD_ERROR = 4
+
+
 # we inherit from BaseException here to make sure to not be caught
 # at application level
 class HaltServer(BaseException):

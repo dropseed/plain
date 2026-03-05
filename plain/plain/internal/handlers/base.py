@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 # These middleware classes are always used by Plain.
 BUILTIN_BEFORE_MIDDLEWARE = [
+    "plain.internal.middleware.healthcheck.HealthcheckMiddleware",  # Respond to healthcheck before anything else
     "plain.internal.middleware.hosts.HostValidationMiddleware",  # Validate Host header first
     "plain.internal.middleware.headers.DefaultHeadersMiddleware",  # Runs after response, to set missing headers
     "plain.internal.middleware.https.HttpsRedirectMiddleware",  # Runs before response, to redirect to HTTPS quickly
@@ -81,11 +82,10 @@ class BaseHandler:
             url_attributes.URL_SCHEME: request.scheme,
         }
 
-        # Add full URL if we can build it (requires proper WSGI environment)
+        # Add full URL if we can build it
         try:
             span_attributes[url_attributes.URL_FULL] = request.build_absolute_uri()
-        except KeyError:
-            # Missing required WSGI environment variables (e.g. in tests)
+        except (KeyError, AttributeError):
             pass
 
         # Add query string if present

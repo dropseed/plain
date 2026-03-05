@@ -82,6 +82,19 @@ For each package with changes:
 
 Example: `./.claude/skills/release/bump-versions plain-admin:patch plain-dev:minor`
 
+### Phase 4b: Update Cross-Package Dependency Minimums
+
+When a package is being released because it depends on changes in another package being released in the same batch, update its minimum version constraint in `pyproject.toml`.
+
+For each sub-package being released, check if any of its dependencies (in `[project.dependencies]`) are also being released in this batch. If so, and the sub-package's changes are driven by the dependency's changes (e.g., adapting to a new API), update the constraint from `<1.0.0` to `>=<new_version>,<1.0.0`.
+
+Example: if `plain-auth` is being released because it adapted to `plain` 0.113.0's new Request API, update its pyproject.toml:
+
+- Before: `"plain<1.0.0"`
+- After: `"plain>=0.113.0,<1.0.0"`
+
+Only update constraints when there's an actual compatibility requirement — don't add minimums for packages whose changes are independent. Use the commit analysis from Phase 3 to determine this.
+
 ### Phase 5: Generate Release Notes
 
 For each package to release, sequentially:

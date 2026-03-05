@@ -47,13 +47,6 @@ class Pidfile:
         os.chmod(self.fname, 420)
         return None
 
-    def rename(self, path: str) -> None:
-        self.unlink()
-        self.fname = path
-        assert self.pid is not None
-        self.create(self.pid)
-        return None
-
     def unlink(self) -> None:
         """delete pidfile"""
         try:

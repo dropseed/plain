@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.11.1](https://github.com/dropseed/plain/releases/plain-vendor@0.11.1) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-vendor@0.11.0) (2026-01-13)
 
 ### What's changed

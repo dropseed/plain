@@ -1,5 +1,45 @@
 # plain-observer changelog
 
+## [0.28.1](https://github.com/dropseed/plain/releases/plain-observer@0.28.1) (2026-03-04)
+
+### What's changed
+
+- Added minimum `plain>=0.113.0` version constraint in dependencies ([217751b866](https://github.com/dropseed/plain/commit/217751b866))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-observer@0.28.0) (2026-03-04)
+
+### What's changed
+
+- Updated `Observer.__init__` to accept `Mapping` instead of `dict` for `cookies` and `headers` parameters, matching the new `RequestHeaders` type from plain 0.113.0 ([acec7dfd89be](https://github.com/dropseed/plain/commit/acec7dfd89be))
+
+### Upgrade instructions
+
+- Requires plain >= 0.113.0.
+
+## [0.27.5](https://github.com/dropseed/plain/releases/plain-observer@0.27.5) (2026-02-26)
+
+### What's changed
+
+- Removed redundant `allow_global_search = False` from trace, span, and log admin views — this is now the default in plain-admin ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.27.4](https://github.com/dropseed/plain/releases/plain-observer@0.27.4) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted JavaScript assets and config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.3](https://github.com/dropseed/plain/releases/plain-observer@0.27.3) (2026-02-04)
 
 ### What's changed

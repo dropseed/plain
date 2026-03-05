@@ -3,6 +3,8 @@ Default Plain settings. Override these with settings in the module pointed to
 by the PLAIN_SETTINGS_MODULE environment variable.
 """
 
+import os
+
 from .secret import Secret
 from .utils import get_app_info_from_pyproject
 
@@ -33,6 +35,12 @@ ENV_SETTINGS_PREFIXES: list[str] = ["PLAIN_"]
 # - "192.168.1.0/24" matches IP addresses in that CIDR range
 ALLOWED_HOSTS: list[str] = []
 
+# Path for the built-in healthcheck endpoint.
+# When set, requests to this exact path return a 200 "ok" response
+# before host validation, HTTPS redirect, or any other middleware runs.
+# Example: HEALTHCHECK_PATH = "/up/"
+HEALTHCHECK_PATH: str = ""
+
 # Default headers for all responses.
 # Header values can include {request.attribute} placeholders for dynamic content.
 # Example: "script-src 'nonce-{request.csp_nonce}'" will use the request's nonce.
@@ -51,7 +59,7 @@ DEFAULT_RESPONSE_HEADERS: dict = {
 # Whether to redirect all non-HTTPS requests to HTTPS (blanket redirect).
 # For anything more advanced (custom host, path exemptions, etc.), write
 # your own middleware.
-HTTPS_REDIRECT_ENABLED = True
+HTTPS_REDIRECT_ENABLED: bool = True
 
 # If your Plain app is behind a proxy that sets a header to specify secure
 # connections, AND that proxy ensures that user-submitted headers with the
@@ -87,43 +95,44 @@ SECRET_KEY_FALLBACKS: Secret[list[str]] = []  # type: ignore[assignment]
 # user time zone.
 TIME_ZONE: str = "UTC"
 
-# Default charset to use for all Response objects, if a MIME type isn't
-# manually specified. It's used to construct the Content-Type header.
-DEFAULT_CHARSET = "utf-8"
 
 # MARK: URL Configuration
 
+# The base URL of the site, used to generate absolute URLs outside of request contexts.
+# Should include scheme and host with no trailing slash (e.g. "https://example.com").
+BASE_URL: str = ""
+
 # Whether to append trailing slashes to URLs.
-APPEND_SLASH = True
+APPEND_SLASH: bool = True
 
 # MARK: File Uploads
 
 # List of upload handler classes to be applied in order.
-FILE_UPLOAD_HANDLERS = [
+FILE_UPLOAD_HANDLERS: list[str] = [
     "plain.internal.files.uploadhandler.MemoryFileUploadHandler",
     "plain.internal.files.uploadhandler.TemporaryFileUploadHandler",
 ]
 
 # Maximum size, in bytes, of a request before it will be streamed to the
 # file system instead of into memory.
-FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440  # i.e. 2.5 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE: int = 2621440  # i.e. 2.5 MB
 
 # Maximum size in bytes of request data (excluding file uploads) that will be
 # read before a SuspiciousOperationError400 (RequestDataTooBigError400) is raised.
-DATA_UPLOAD_MAX_MEMORY_SIZE = 2621440  # i.e. 2.5 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE: int = 2621440  # i.e. 2.5 MB
 
 # Maximum number of GET/POST parameters that will be read before a
 # SuspiciousOperationError400 (TooManyFieldsSentError400) is raised.
-DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
+DATA_UPLOAD_MAX_NUMBER_FIELDS: int = 1000
 
 # Maximum number of files encoded in a multipart upload that will be read
 # before a SuspiciousOperationError400 (TooManyFilesSentError400) is raised.
-DATA_UPLOAD_MAX_NUMBER_FILES = 100
+DATA_UPLOAD_MAX_NUMBER_FILES: int = 100
 
 # Directory in which upload streamed files will be temporarily saved. A value of
 # `None` will make Plain use the operating system's default temporary directory
 # (i.e. "/tmp" on *nix systems).
-FILE_UPLOAD_TEMP_DIR = None
+FILE_UPLOAD_TEMP_DIR: str | None = None
 
 # MARK: Middleware
 
@@ -153,11 +162,36 @@ LOG_STREAM: str = "split"  # "split", "stdout", or "stderr"
 # MARK: Assets
 
 # Whether to redirect the original asset path to the fingerprinted path.
-ASSETS_REDIRECT_ORIGINAL = True
+ASSETS_REDIRECT_ORIGINAL: bool = True
 
 # If assets are served by a CDN, use this URL to prefix asset paths.
 # Ex. "https://cdn.example.com/assets/"
 ASSETS_CDN_URL: str = ""
+
+# Whether to log 304 Not Modified responses for assets in the access log.
+# Disabled by default to reduce noise from conditional requests.
+ASSETS_LOG_304: bool = False
+
+# MARK: Server
+
+SERVER_WORKERS: int = int(os.environ.get("WEB_CONCURRENCY", 0))  # 0 = auto (CPU count)
+SERVER_THREADS: int = 4
+SERVER_TIMEOUT: int = 30
+SERVER_MAX_REQUESTS: int = 0
+SERVER_ACCESS_LOG: bool = True
+SERVER_ACCESS_LOG_FIELDS: list[str] = [
+    "method",
+    "path",
+    "query",
+    "status",
+    "duration_ms",
+    "size",
+    "ip",
+    "user_agent",
+    "referer",
+]
+SERVER_GRACEFUL_TIMEOUT: int = 30
+SERVER_SENDFILE: bool = True
 
 # MARK: Preflight Checks
 
@@ -169,7 +203,7 @@ PREFLIGHT_SILENCED_RESULTS: list[str] = []
 
 # MARK: Templates
 
-TEMPLATES_JINJA_ENVIRONMENT = "plain.templates.jinja.DefaultEnvironment"
+TEMPLATES_JINJA_ENVIRONMENT: str = "plain.templates.jinja.DefaultEnvironment"
 
 # MARK: Shell
 

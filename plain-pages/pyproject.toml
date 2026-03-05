@@ -1,17 +1,15 @@
 [project]
 name = "plain.pages"
-version = "0.18.2"
+version = "0.19.0"
 description = "Serve static pages, markdown, and assets from templates/pages directories."
-authors = [{name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev"}]
+authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
-dependencies = [
-    "plain<1.0.0",
-    "mistune>=3.0.0",
-    "python-frontmatter>=1.0.0",
-    "pygments>=2.0.0",
-]
+dependencies = ["plain<1.0.0", "mistune>=3.0.0", "python-frontmatter>=1.0.0", "pygments>=2.0.0"]
+
+[dependency-groups]
+dev = ["plain.pytest<1.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

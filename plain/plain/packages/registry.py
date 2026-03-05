@@ -58,7 +58,7 @@ class PackagesRegistry:
             return
 
         # populate() might be called by two threads in parallel on servers
-        # that create threads before initializing the WSGI callable.
+        # that create threads before initializing the request handler.
         with self._lock:
             if self.ready:
                 return

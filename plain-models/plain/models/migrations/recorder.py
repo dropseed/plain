@@ -12,6 +12,8 @@ from plain.utils.timezone import now
 
 from .exceptions import MigrationSchemaMissing
 
+MIGRATION_TABLE_NAME = "plainmigrations"
+
 if TYPE_CHECKING:
     from plain.models.postgres.wrapper import DatabaseWrapper
 
@@ -51,7 +53,7 @@ class MigrationRecorder:
 
                 model_options = models.Options(
                     package_label="migrations",
-                    db_table="plainmigrations",
+                    db_table=MIGRATION_TABLE_NAME,
                 )
 
                 def __str__(self) -> str:

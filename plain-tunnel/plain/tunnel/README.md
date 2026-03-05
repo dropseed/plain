@@ -40,10 +40,10 @@ tunnel = {cmd = "plain tunnel $PLAIN_DEV_URL --subdomain myapp --quiet"}
 
 The `$PLAIN_DEV_URL` variable is automatically set to your local server URL. The `--quiet` flag reduces log output so it does not clutter your terminal.
 
-To display the tunnel URL in the `plain dev` header, add `PLAIN_DEV_TUNNEL_URL` to your `.env` file:
+To display the tunnel URL in the `plain dev` header, add `DEV_TUNNEL_URL` to your `.env` file:
 
 ```bash
-PLAIN_DEV_TUNNEL_URL=https://myapp.plaintunnel.com
+DEV_TUNNEL_URL=https://myapp.plaintunnel.com
 ```
 
 ![](https://assets.plainframework.com/docs/plain-dev-tunnel.png)

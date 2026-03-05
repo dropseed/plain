@@ -1,50 +1,34 @@
 from __future__ import annotations
 
-#
-#
-# This file is part of gunicorn released under the MIT license.
-# See the LICENSE for more information.
-#
-# Vendored and modified for Plain.
-import os
-import platform
-import tempfile
 import time
-from typing import TYPE_CHECKING
-
-from .. import util
-
-if TYPE_CHECKING:
-    from ..config import Config
-
-PLATFORM = platform.system()
-IS_CYGWIN = PLATFORM.startswith("CYGWIN")
+from multiprocessing.context import BaseContext
 
 
-class WorkerTmp:
-    def __init__(self, cfg: Config) -> None:
-        fd, name = tempfile.mkstemp(prefix="wplain-")
+class WorkerHeartbeat:
+    """Shared-memory heartbeat for spawn-based workers.
 
-        # unlink the file so we don't leak temporary files
-        try:
-            if not IS_CYGWIN:
-                util.unlink(name)
-            # In Python 3.8, open() emits RuntimeWarning if buffering=1 for binary mode.
-            # Because we never write to this file, pass 0 to switch buffering off.
-            self._tmp = os.fdopen(fd, "w+b", 0)
-        except Exception:
-            os.close(fd)
-            raise
+    Uses multiprocessing.Value (shared double) instead of tmpfile utime,
+    since tmpfile-based heartbeats only work across fork (shared FDs).
+
+    Relies on time.monotonic() being system-wide (CLOCK_MONOTONIC on
+    Linux/macOS) so the arbiter and worker see the same clock.
+    """
+
+    def __init__(self, mp_context: BaseContext) -> None:
+        # lock=False avoids the arbiter hanging if a worker is killed
+        # while inside notify() (which would hold the lock). A torn
+        # read is harmless here — worst case is a slightly stale
+        # timestamp, which only affects heartbeat precision by microseconds.
+        self._timestamp = mp_context.Value("d", time.monotonic(), lock=False)
 
     def notify(self) -> None:
-        new_time = time.monotonic()
-        os.utime(self._tmp.fileno(), (new_time, new_time))
+        self._timestamp.value = time.monotonic()
 
     def last_update(self) -> float:
-        return os.fstat(self._tmp.fileno()).st_mtime
-
-    def fileno(self) -> int:
-        return self._tmp.fileno()
+        return self._timestamp.value
 
     def close(self) -> None:
-        return self._tmp.close()
+        # No-op: shared memory is cleaned up automatically.
+        # Called from both the worker (entry.py) and arbiter (reap_workers);
+        # safe to call multiple times.
+        pass

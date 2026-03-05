@@ -74,10 +74,12 @@ class Settings:
 
         # Load default settings from installed packages
         self._load_default_settings(mod)
-        # Load environment settings
-        self._load_env_settings()
         # Load explicit settings from the settings module
         self._load_explicit_settings(mod)
+        # Load environment settings (last, so env vars override settings.py)
+        self._load_env_settings()
+        # Apply timezone after all settings are loaded
+        self._apply_timezone()
         # Check for any required settings that are missing
         self._check_required_settings()
         # Check for any collected errors
@@ -163,10 +165,11 @@ class Settings:
 
                 elif setting.startswith(_CUSTOM_SETTINGS_PREFIX):
                     # Accept custom settings prefixed with '{_CUSTOM_SETTINGS_PREFIX}'
+                    annotation = _get_annotation(settings_module, setting)
                     setting_def = SettingDefinition(
                         name=setting,
                         default_value=None,
-                        annotation=None,
+                        annotation=annotation,
                         required=False,
                     )
                     try:
@@ -181,6 +184,7 @@ class Settings:
                         f"Unknown setting '{setting}'. Custom settings must start with '{_CUSTOM_SETTINGS_PREFIX}'."
                     )
 
+    def _apply_timezone(self) -> None:
         if hasattr(time, "tzset") and self.TIME_ZONE:
             zoneinfo_root = Path("/usr/share/zoneinfo")
             zone_info_file = zoneinfo_root.joinpath(*self.TIME_ZONE.split("/"))
@@ -244,6 +248,8 @@ class Settings:
         self._setup()
         result = []
         for name, defn in sorted(self._settings.items()):
+            if name.startswith("_"):
+                continue
             if source is not None and defn.source != source:
                 continue
             result.append((name, defn))
@@ -252,6 +258,15 @@ class Settings:
     def get_env_settings(self) -> list[tuple[str, SettingDefinition]]:
         """Get settings that were loaded from environment variables."""
         return self.get_settings(source="env")
+
+
+def _get_annotation(module: types.ModuleType, setting: str) -> type | None:
+    """Get the resolved type annotation for a setting, handling string annotations."""
+    try:
+        hints = typing.get_type_hints(module, include_extras=True)
+        return hints.get(setting, None)
+    except Exception:
+        return None
 
 
 def _parse_env_value(
@@ -311,7 +326,13 @@ class SettingDefinition:
 
     def display_value(self) -> str:
         """Return value for display, masked if secret."""
-        if self.is_secret:
+        if self.is_secret and self.value:
+            if isinstance(self.value, dict):
+                return f"{{******** ({len(self.value)} items)}}"
+            if isinstance(self.value, list):
+                return f"[******** ({len(self.value)} items)]"
+            if isinstance(self.value, tuple):
+                return f"(******** ({len(self.value)} items))"
             return "********"
         return repr(self.value)
 

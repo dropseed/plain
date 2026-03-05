@@ -269,6 +269,9 @@ class Body:
 
         return b"".join(ret)
 
+    def close(self) -> None:
+        pass
+
     def readlines(self, size: int | None = None) -> list[bytes]:
         ret = []
         data = self.read()

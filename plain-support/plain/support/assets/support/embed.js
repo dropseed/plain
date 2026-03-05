@@ -1,8 +1,5 @@
 const container = document.createElement("div");
-document.currentScript.parentNode.insertBefore(
-  container,
-  document.currentScript,
-);
+document.currentScript.parentNode.insertBefore(container, document.currentScript);
 
 // Build the iframe url based on the script src
 // (replace the .js extension with /iframe/)

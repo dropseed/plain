@@ -92,3 +92,42 @@ def register_check(name: str, *, deploy: bool = False) -> Callable[[type[T]], ty
 
 
 run_checks = checks_registry.run_checks
+
+# Cached error/warning counts — populated on first call, refreshed by
+# PreflightView when the full page is viewed.
+_check_counts: dict[str, int] | None = None
+
+
+def get_check_counts() -> dict[str, int]:
+    """Return ``{"errors": N, "warnings": N}``, caching for the process lifetime."""
+    global _check_counts
+
+    if _check_counts is not None:
+        return _check_counts
+
+    from plain.packages import packages_registry
+
+    packages_registry.autodiscover_modules("preflight", include_app=True)
+
+    include_deploy = not settings.DEBUG
+    warning_count = 0
+    error_count = 0
+
+    for _check_class, _name, results in run_checks(
+        include_deploy_checks=include_deploy
+    ):
+        issues = [r for r in results if not r.is_silenced()]
+        if issues:
+            if any(not issue.warning for issue in issues):
+                error_count += 1
+            else:
+                warning_count += 1
+
+    _check_counts = {"errors": error_count, "warnings": warning_count}
+    return _check_counts
+
+
+def set_check_counts(*, errors: int, warnings: int) -> None:
+    """Update the cached counts (called by PreflightView after running full checks)."""
+    global _check_counts
+    _check_counts = {"errors": errors, "warnings": warnings}

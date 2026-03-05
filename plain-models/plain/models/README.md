@@ -71,18 +71,20 @@ To connect to a database, you can provide a `DATABASE_URL` environment variable:
 DATABASE_URL=postgresql://user:password@localhost:5432/dbname
 ```
 
-Or you can manually define the `DATABASE` setting:
+Or you can set the individual `POSTGRES_*` settings (via `PLAIN_POSTGRES_*` environment variables or in `app/settings.py`):
 
 ```python
 # app/settings.py
-DATABASE = {
-    "NAME": "dbname",
-    "USER": "user",
-    "PASSWORD": "password",
-    "HOST": "localhost",
-    "PORT": "5432",
-}
+POSTGRES_HOST = "localhost"
+POSTGRES_PORT = 5432
+POSTGRES_DATABASE = "dbname"
+POSTGRES_USER = "user"
+POSTGRES_PASSWORD = "password"
 ```
+
+If `DATABASE_URL` is set, it takes priority and the individual connection settings are parsed from it.
+
+To explicitly disable the database (e.g. during Docker builds where no database is available), set `DATABASE_URL=none`.
 
 **PostgreSQL is the only supported database.** You need to install a PostgreSQL driver separately — [psycopg](https://www.psycopg.org/) is recommended:
 
@@ -831,33 +833,23 @@ graph TB
 
 ## Settings
 
-| Setting    | Default  | Env var            |
-| ---------- | -------- | ------------------ |
-| `DATABASE` | Required | Via `DATABASE_URL` |
+Connection settings are configured via `DATABASE_URL` or individual `POSTGRES_*` settings.
 
-When `DATABASE_URL` is set, the `DATABASE` setting is automatically configured:
+When `DATABASE_URL` is set, it is parsed into the individual connection settings automatically. When `DATABASE_URL` is not set, the connection settings are required individually.
 
-| Environment Variable          | Description                      | Default  |
-| ----------------------------- | -------------------------------- | -------- |
-| `DATABASE_URL`                | Database connection URL          | Required |
-| `DATABASE_CONN_MAX_AGE`       | Connection persistence (seconds) | `600`    |
-| `DATABASE_CONN_HEALTH_CHECKS` | Enable health checks             | `true`   |
+Set `DATABASE_URL=none` to explicitly disable the database (e.g. during Docker image builds).
 
-See [`default_settings.py`](./default_settings.py) for more details.
-
-## Settings
-
-| Setting    | Default  | Env var            |
-| ---------- | -------- | ------------------ |
-| `DATABASE` | Required | Via `DATABASE_URL` |
-
-When `DATABASE_URL` is set, the `DATABASE` setting is automatically configured:
-
-| Environment Variable          | Description                      | Default  |
-| ----------------------------- | -------------------------------- | -------- |
-| `DATABASE_URL`                | Database connection URL          | Required |
-| `DATABASE_CONN_MAX_AGE`       | Connection persistence (seconds) | `600`    |
-| `DATABASE_CONN_HEALTH_CHECKS` | Enable health checks             | `true`   |
+| Setting                       | Type          | Default | Env var                             |
+| ----------------------------- | ------------- | ------- | ----------------------------------- |
+| `POSTGRES_HOST`               | `str`         | —       | `PLAIN_POSTGRES_HOST`               |
+| `POSTGRES_PORT`               | `int \| None` | `None`  | `PLAIN_POSTGRES_PORT`               |
+| `POSTGRES_DATABASE`           | `str`         | —       | `PLAIN_POSTGRES_DATABASE`           |
+| `POSTGRES_USER`               | `str`         | —       | `PLAIN_POSTGRES_USER`               |
+| `POSTGRES_PASSWORD`           | `Secret[str]` | —       | `PLAIN_POSTGRES_PASSWORD`           |
+| `POSTGRES_CONN_MAX_AGE`       | `int`         | `600`   | `PLAIN_POSTGRES_CONN_MAX_AGE`       |
+| `POSTGRES_CONN_HEALTH_CHECKS` | `bool`        | `True`  | `PLAIN_POSTGRES_CONN_HEALTH_CHECKS` |
+| `POSTGRES_OPTIONS`            | `dict`        | `{}`    | —                                   |
+| `POSTGRES_TIME_ZONE`          | `str \| None` | `None`  | `PLAIN_POSTGRES_TIME_ZONE`          |
 
 See [`default_settings.py`](./default_settings.py) for more details.
 

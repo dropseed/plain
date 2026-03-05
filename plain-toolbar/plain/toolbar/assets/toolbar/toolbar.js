@@ -80,18 +80,14 @@ window.plainToolbar = window.plainToolbar || {
     localStorage.setItem("plaintoolbar.tab", tabName);
   },
   resetHeight: () => {
-    const content = document.querySelector(
-      "#plaintoolbar-details > div.overflow-auto",
-    );
+    const content = document.querySelector("#plaintoolbar-details > div.overflow-auto");
     if (content) {
       content.style.height = "";
     }
     localStorage.removeItem("plaintoolbar.height");
   },
   setHeight: (height) => {
-    const content = document.querySelector(
-      "#plaintoolbar-details > div.overflow-auto",
-    );
+    const content = document.querySelector("#plaintoolbar-details > div.overflow-auto");
     if (content) {
       content.style.height = height;
     }

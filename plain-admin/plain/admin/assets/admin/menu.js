@@ -70,18 +70,18 @@ document.addEventListener("DOMContentLoaded", () => {
     subsections.forEach((subsection) => {
       const nextGroup = subsection.nextElementSibling;
       if (nextGroup?.classList.contains("menu-items-group")) {
-        const hasVisibleItems = Array.from(
-          nextGroup.querySelectorAll(".menu-item"),
-        ).some((item) => item.style.display !== "none");
+        const hasVisibleItems = Array.from(nextGroup.querySelectorAll(".menu-item")).some(
+          (item) => item.style.display !== "none",
+        );
         subsection.style.display = hasVisibleItems ? "" : "none";
       }
     });
 
     // Hide empty top-level sections (App/Packages)
     sections.forEach((section) => {
-      const visibleItems = Array.from(
-        section.querySelectorAll(".menu-item"),
-      ).filter((item) => item.style.display !== "none");
+      const visibleItems = Array.from(section.querySelectorAll(".menu-item")).filter(
+        (item) => item.style.display !== "none",
+      );
       section.style.display = visibleItems.length > 0 ? "" : "none";
     });
   }
@@ -135,9 +135,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Get new order of pinned items and POST to server
     const container = document.getElementById("nav-tabs-container");
-    const newOrder = Array.from(
-      container.querySelectorAll(".nav-tab[data-slug]"),
-    ).map((t) => t.dataset.slug);
+    const newOrder = Array.from(container.querySelectorAll(".nav-tab[data-slug]")).map(
+      (t) => t.dataset.slug,
+    );
 
     // Get the reorder URL from the container's data attribute
     const reorderUrl = container.dataset.reorderUrl;

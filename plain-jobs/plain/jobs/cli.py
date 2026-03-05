@@ -7,7 +7,7 @@ from typing import Any
 
 import click
 
-from plain.cli import register_cli
+from plain.cli import SettingOption, register_cli
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -37,30 +37,30 @@ def cli() -> None:
 @click.option(
     "--max-processes",
     "max_processes",
-    default=None,
     type=int,
-    envvar="PLAIN_JOBS_WORKER_MAX_PROCESSES",
+    cls=SettingOption,
+    setting="JOBS_WORKER_MAX_PROCESSES",
 )
 @click.option(
     "--max-jobs-per-process",
     "max_jobs_per_process",
-    default=None,
     type=int,
-    envvar="PLAIN_JOBS_WORKER_MAX_JOBS_PER_PROCESS",
+    cls=SettingOption,
+    setting="JOBS_WORKER_MAX_JOBS_PER_PROCESS",
 )
 @click.option(
     "--max-pending-per-process",
     "max_pending_per_process",
-    default=10,
     type=int,
-    envvar="PLAIN_JOBS_WORKER_MAX_PENDING_PER_PROCESS",
+    cls=SettingOption,
+    setting="JOBS_WORKER_MAX_PENDING_PER_PROCESS",
 )
 @click.option(
     "--stats-every",
     "stats_every",
-    default=60,
     type=int,
-    envvar="PLAIN_JOBS_WORKER_STATS_EVERY",
+    cls=SettingOption,
+    setting="JOBS_WORKER_STATS_EVERY",
 )
 @click.option(
     "--reload",
@@ -78,64 +78,59 @@ def worker(
     """Run the job worker"""
     jobs_schedule = load_schedule(settings.JOBS_SCHEDULE)
 
+    worker_kwargs = {
+        "queues": list(queues),
+        "jobs_schedule": jobs_schedule,
+        "max_processes": max_processes,
+        "max_jobs_per_process": max_jobs_per_process,
+        "max_pending_per_process": max_pending_per_process,
+        "stats_every": stats_every,
+    }
+
     if reload:
-        from plain.internal.reloader import Reloader
-
-        # Track whether we should continue restarting
-        should_restart = {"value": True}
-        current_worker = {"instance": None}
-
-        def file_changed(filename: str) -> None:
-            if current_worker["instance"]:
-                current_worker["instance"].shutdown()
-
-        def signal_shutdown(signalnum: int, _: Any) -> None:
-            should_restart["value"] = False
-            if current_worker["instance"]:
-                current_worker["instance"].shutdown()
-
-        # Allow the worker to be stopped gracefully on SIGTERM/SIGINT
-        signal.signal(signal.SIGTERM, signal_shutdown)
-        signal.signal(signal.SIGINT, signal_shutdown)
-
-        # Start file watcher once, outside the loop
-        reloader = Reloader(callback=file_changed, watch_html=False)
-        reloader.start()
-
-        while should_restart["value"]:
-            worker = Worker(
-                queues=list(queues),
-                jobs_schedule=jobs_schedule,
-                max_processes=max_processes,
-                max_jobs_per_process=max_jobs_per_process,
-                max_pending_per_process=max_pending_per_process,
-                stats_every=stats_every,
-            )
-            current_worker["instance"] = worker
-
-            # Start processing jobs (blocks until shutdown)
-            worker.run()
-
+        _run_with_reload(worker_kwargs)
     else:
-        worker = Worker(
-            queues=list(queues),
-            jobs_schedule=jobs_schedule,
-            max_processes=max_processes,
-            max_jobs_per_process=max_jobs_per_process,
-            max_pending_per_process=max_pending_per_process,
-            stats_every=stats_every,
-        )
+        _run_once(worker_kwargs)
 
-        def _shutdown(signalnum: int, _: Any) -> None:
-            logger.info("Job worker shutdown signal received signalnum=%s", signalnum)
-            worker.shutdown()
 
-        # Allow the worker to be stopped gracefully on SIGTERM
-        signal.signal(signal.SIGTERM, _shutdown)
-        signal.signal(signal.SIGINT, _shutdown)
+def _run_with_reload(worker_kwargs: dict[str, Any]) -> None:
+    from plain.internal.reloader import Reloader
 
-        # Start processing jobs
-        worker.run()
+    should_restart = {"value": True}
+    current_worker: dict[str, Worker | None] = {"instance": None}
+
+    def file_changed(filename: str) -> None:
+        if current_worker["instance"]:
+            current_worker["instance"].shutdown()
+
+    def signal_shutdown(signalnum: int, _: Any) -> None:
+        should_restart["value"] = False
+        if current_worker["instance"]:
+            current_worker["instance"].shutdown()
+
+    signal.signal(signal.SIGTERM, signal_shutdown)
+    signal.signal(signal.SIGINT, signal_shutdown)
+
+    reloader = Reloader(callback=file_changed, watch_html=False)
+    reloader.start()
+
+    while should_restart["value"]:
+        w = Worker(**worker_kwargs)
+        current_worker["instance"] = w
+        w.run()
+
+
+def _run_once(worker_kwargs: dict[str, Any]) -> None:
+    w = Worker(**worker_kwargs)
+
+    def _shutdown(signalnum: int, _: Any) -> None:
+        logger.info("Job worker shutdown signal received signalnum=%s", signalnum)
+        w.shutdown()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
+    w.run()
 
 
 @cli.command()
@@ -195,8 +190,7 @@ def run(job_class_name: str) -> None:
 def list_jobs() -> None:
     """List all registered jobs"""
     for name, job_class in jobs_registry.jobs.items():
-        click.secho(f"{name}", bold=True, nl=False)
-        # Get description from class docstring
+        click.secho(name, bold=True, nl=False)
         description = job_class.__doc__.strip() if job_class.__doc__ else ""
         if description:
             click.secho(f": {description}", dim=True)

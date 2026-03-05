@@ -119,7 +119,7 @@ The [`ClientResponse`](./client.py#ClientResponse) wrapper provides access to:
 - `content` - Response body as bytes
 - `headers` - Response headers
 - `cookies` - Cookies set by the response
-- `wsgi_request` - The original request object
+- `request` - The original request object
 - `resolver_match` - URL resolver match information
 - `redirect_chain` - List of redirects when using `follow=True`
 
@@ -154,7 +154,7 @@ assert "abc123" in response.content.decode()
 
 ## RequestFactory
 
-Use [`RequestFactory`](./client.py#RequestFactory) to create request objects directly without going through the WSGI handler. This is useful for testing views in isolation.
+Use [`RequestFactory`](./client.py#RequestFactory) to create request objects directly without going through the middleware stack. This is useful for testing views in isolation.
 
 ```python
 from plain.test import RequestFactory

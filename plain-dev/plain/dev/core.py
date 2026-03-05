@@ -64,11 +64,12 @@ class DevProcess(ProcessManager):
         self.ssl_cert_path = None
 
         self.url = f"https://{self.hostname}:{self.port}"
-        self.tunnel_url = os.environ.get("PLAIN_DEV_TUNNEL_URL", "")
+        self.tunnel_url = os.environ.get("DEV_TUNNEL_URL", "")
 
         self.plain_env = {
             "PYTHONUNBUFFERED": "true",
             "PLAIN_DEV": "true",
+            "PLAIN_SERVER_ACCESS_LOG_FIELDS": '["method", "url", "status", "duration_ms", "size"]',
             "FORCE_COLOR": "1",
             "PYTHONWARNINGS": "default::DeprecationWarning,default::PendingDeprecationWarning",
             **os.environ,
@@ -254,6 +255,15 @@ class DevProcess(ProcessManager):
 
     def modify_hosts_file(self) -> None:
         """Modify the hosts file to map the custom domain to 127.0.0.1."""
+        # Check if the hostname already resolves to loopback (e.g., *.localhost on modern OS)
+        try:
+            results = socket.getaddrinfo(self.hostname, None)
+            addrs = {r[4][0] for r in results}
+            if addrs <= {"127.0.0.1", "::1"}:
+                return
+        except socket.gaierror:
+            pass  # Doesn't resolve; fall through to modify hosts file
+
         entry_identifier = "# Added by plain"
         hosts_entry = f"127.0.0.1 {self.hostname}  {entry_identifier}"
 
@@ -332,12 +342,8 @@ class DevProcess(ProcessManager):
             "4",
             "--timeout",
             "60",
-            "--log-level",
-            self.log_level or "info",
-            "--log-format",
-            "'[%(levelname)s] %(message)s'",
-            "--access-log-format",
-            "'\"%(r)s\" status=%(s)s length=%(b)s time=%(M)sms'",
+            "--workers",
+            "1",
             "--reload",  # Enable auto-reload for development
         ]
 

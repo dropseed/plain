@@ -25,7 +25,6 @@ class CachedItemViewset(AdminViewset):
             "updated_at",
         ]
         queryset_order = ["-id"]
-        allow_global_search = False
 
         def get_initial_queryset(self) -> QuerySet[CachedItem]:
             return (

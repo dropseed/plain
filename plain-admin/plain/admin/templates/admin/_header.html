@@ -41,6 +41,21 @@
                 <admin.Icon name="search" />
             </a>
 
+            <!-- Preflight -->
+            {% set preflight_total = preflight_counts.errors + preflight_counts.warnings %}
+            <a
+                href="{{ url('admin:preflight') }}"
+                class="relative flex items-center justify-center w-7 h-7 text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100"
+                title="Preflight checks"
+            >
+                <admin.Icon name="shield-check" />
+                {% if preflight_total > 0 %}
+                <span
+                    class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 text-[10px] font-bold leading-4 text-center text-white rounded-full {{ 'bg-red-500' if preflight_counts.errors > 0 else 'bg-amber-500' }}"
+                >{{ preflight_total }}</span>
+                {% endif %}
+            </a>
+
             <button type="button" data-dropdown class="flex items-center cursor-pointer">
                 {% set gravatar_url = get_gravatar_url(user) %}
                 {% if gravatar_url %}
@@ -59,6 +74,10 @@
                 {% endif %}
                 <template>
                     <div class="py-1">
+                        <a href="{{ url('admin:settings') }}" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
+                            <admin.Icon name="gear" />
+                            App Settings
+                        </a>
                         <form method="POST" action="{{ url('admin:logout') }}">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
                                 <admin.Icon name="box-arrow-right" />

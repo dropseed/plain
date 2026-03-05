@@ -2,14 +2,12 @@
 
 // Apply CSS custom properties for timeline positioning
 function applyTimelinePositioning() {
-  document
-    .querySelectorAll("[data-start-percent][data-width-percent]")
-    .forEach((el) => {
-      const start = el.dataset.startPercent;
-      const width = el.dataset.widthPercent;
-      el.style.setProperty("--start", `${start}%`);
-      el.style.setProperty("--width", `${width}%`);
-    });
+  document.querySelectorAll("[data-start-percent][data-width-percent]").forEach((el) => {
+    const start = el.dataset.startPercent;
+    const width = el.dataset.widthPercent;
+    el.style.setProperty("--start", `${start}%`);
+    el.style.setProperty("--width", `${width}%`);
+  });
 }
 
 // Apply on page load
@@ -40,11 +38,7 @@ async function copyJson(button) {
 
     setTimeout(() => {
       button.innerHTML = originalHTML;
-      button.classList.remove(
-        "bg-green-600",
-        "hover:bg-green-700",
-        "text-white",
-      );
+      button.classList.remove("bg-green-600", "hover:bg-green-700", "text-white");
       button.classList.add("bg-white/10", "hover:bg-white/20");
     }, 2000);
   } catch (error) {

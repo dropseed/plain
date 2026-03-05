@@ -8,7 +8,7 @@ import frontmatter
 
 from plain.runtime import settings
 from plain.templates import Template
-from plain.urls import URLPattern, path, reverse
+from plain.urls import URLPattern, path
 
 from .markdown import render_markdown
 
@@ -24,6 +24,7 @@ class Page:
         self.relative_path = relative_path
         self.absolute_path = absolute_path
         self._template_context: dict[str, Any] = {}
+        self._extension = os.path.splitext(absolute_path)[1]
 
     def set_template_context(self, context: dict[str, Any]) -> None:
         self._template_context = context
@@ -42,16 +43,16 @@ class Page:
         default_title = os.path.splitext(os.path.basename(self.relative_path))[0]
         return self.vars.get("title", default_title)
 
-    @cached_property
-    def content(self) -> str:
-        # Strip the frontmatter
+    def rendered_source(self, context: dict[str, Any] | None = None) -> str:
+        """Render Jinja templates and strip frontmatter, but don't convert markdown to HTML."""
         content = self._frontmatter.content
 
         if not self.vars.get("render_plain", False):
             template = Template(os.path.join("pages", self.relative_path))
+            render_context = context if context is not None else self._template_context
 
             try:
-                content = template.render(self._template_context)
+                content = template.render(render_context)
             except Exception as e:
                 # Throw our own error so we don't get shadowed by the Jinja error
                 raise PageRenderError(f"Error rendering page {self.relative_path}: {e}")
@@ -59,31 +60,34 @@ class Page:
             # Strip the frontmatter again, since it was in the template file itself
             _, content = frontmatter.parse(content)
 
+        return content
+
+    @cached_property
+    def content(self) -> str:
+        content = self.rendered_source()
+
         if self.is_markdown():
             content = render_markdown(content, current_page_path=self.relative_path)
 
         return content
 
     def is_markdown(self) -> bool:
-        extension = os.path.splitext(self.absolute_path)[1]
-        return extension == ".md"
+        return self._extension == ".md"
 
     def is_template(self) -> bool:
         return ".template." in os.path.basename(self.absolute_path)
 
     def is_asset(self) -> bool:
-        extension = os.path.splitext(self.absolute_path)[1]
         # Anything that we don't specifically recognize for pages
         # gets treated as an asset
-        return extension.lower() not in (
+        return self._extension.lower() not in (
             ".html",
             ".md",
             ".redirect",
         )
 
     def is_redirect(self) -> bool:
-        extension = os.path.splitext(self.absolute_path)[1]
-        return extension == ".redirect"
+        return self._extension == ".redirect"
 
     def get_template_name(self) -> str:
         if template_name := self.vars.get("template_name"):
@@ -137,9 +141,6 @@ class Page:
 
     def get_markdown_url(self) -> str | None:
         """Get the markdown URL for this page if it exists."""
-        if not self.is_markdown():
-            return None
-
         if not settings.PAGES_SERVE_MARKDOWN:
             return None
 
@@ -147,7 +148,9 @@ class Page:
         if not url_name:
             return None
 
-        return reverse(f"pages:{url_name}-md")
+        from .registry import pages_registry
+
+        return pages_registry.get_markdown_url(url_name)
 
     def get_urls(self) -> list[URLPattern]:
         """Get all URL path objects for this page."""

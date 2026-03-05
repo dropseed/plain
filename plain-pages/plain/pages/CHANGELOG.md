@@ -1,5 +1,40 @@
 # plain-pages changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-pages@0.19.0) (2026-03-03)
+
+### What's changed
+
+- Added **companion markdown support** for HTML pages — place a `.md` file alongside an `.html` page (e.g. `about.html` + `about.md`) and the markdown content is served via content negotiation or at the `.md` URL ([7c0f465898](https://github.com/dropseed/plain/commit/7c0f465898))
+- `get_markdown_url()` now returns a URL for both standalone markdown pages and HTML pages with a companion `.md` file ([7c0f465898](https://github.com/dropseed/plain/commit/7c0f465898))
+- Added `get_markdown_companion()` and `get_markdown_url()` methods to `PagesRegistry` ([7c0f465898](https://github.com/dropseed/plain/commit/7c0f465898))
+- Refactored page discovery to use a two-pass approach — non-markdown files are registered first, then `.md` files are checked for HTML companions ([7c0f465898](https://github.com/dropseed/plain/commit/7c0f465898))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.18.4](https://github.com/dropseed/plain/releases/plain-pages@0.18.4) (2026-02-26)
+
+### What's changed
+
+- Added type annotation to `PAGES_SERVE_MARKDOWN` setting so it can be set via environment variables ([37e8a58ca9b5](https://github.com/dropseed/plain/commit/37e8a58ca9b5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.18.3](https://github.com/dropseed/plain/releases/plain-pages@0.18.3) (2026-02-26)
+
+### What's changed
+
+- Fixed markdown pages serving unrendered Jinja templates — pages now render through the template engine before serving as markdown via content negotiation or `PageMarkdownView` ([8bcebc4064de](https://github.com/dropseed/plain/commit/8bcebc4064de))
+- Removed unnecessary Vary header from `PageMarkdownView` ([fa6f98991d65](https://github.com/dropseed/plain/commit/fa6f98991d65))
+- Moved `get_template_context()` up to `PageViewMixin` so all page view types share the same template context ([8bcebc4064de](https://github.com/dropseed/plain/commit/8bcebc4064de))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.18.2](https://github.com/dropseed/plain/releases/plain-pages@0.18.2) (2026-02-04)
 
 ### What's changed

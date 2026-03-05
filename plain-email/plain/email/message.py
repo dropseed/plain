@@ -70,7 +70,7 @@ def _forbid_multi_line_headers(
     name: str, val: str, encoding: str | None
 ) -> tuple[str, str]:
     """Forbid multi-line headers to prevent header injection."""
-    encoding = encoding or settings.DEFAULT_CHARSET
+    encoding = encoding or "utf-8"
     val = str(val)  # val may be lazy
     if "\n" in val or "\r" in val:
         raise BadHeaderError(
@@ -281,7 +281,7 @@ class EmailMessage:
         return self.connection
 
     def message(self) -> SafeMIMEText | SafeMIMEMultipart:
-        encoding = self.encoding or settings.DEFAULT_CHARSET
+        encoding = self.encoding or "utf-8"
         msg = SafeMIMEText(self.body, self.content_subtype, encoding)
         msg = self._create_message(msg)
         msg["Subject"] = self.subject
@@ -391,7 +391,7 @@ class EmailMessage:
         self, msg: SafeMIMEText | SafeMIMEMultipart
     ) -> SafeMIMEText | SafeMIMEMultipart:
         if self.attachments:
-            encoding = self.encoding or settings.DEFAULT_CHARSET
+            encoding = self.encoding or "utf-8"
             body_msg = msg
             msg = SafeMIMEMultipart(_subtype=self.mixed_subtype, encoding=encoding)
             if self.body or body_msg.is_multipart():
@@ -414,7 +414,7 @@ class EmailMessage:
         """
         basetype, subtype = mimetype.split("/", 1)
         if basetype == "text":
-            encoding = self.encoding or settings.DEFAULT_CHARSET
+            encoding = self.encoding or "utf-8"
             if not isinstance(content, str):
                 content = force_str(content)
             attachment = SafeMIMEText(content, subtype, encoding)
@@ -528,7 +528,7 @@ class EmailMultiAlternatives(EmailMessage):
     def _create_alternatives(
         self, msg: SafeMIMEText | SafeMIMEMultipart
     ) -> SafeMIMEText | SafeMIMEMultipart:
-        encoding = self.encoding or settings.DEFAULT_CHARSET
+        encoding = self.encoding or "utf-8"
         if self.alternatives:
             body_msg = msg
             msg = SafeMIMEMultipart(

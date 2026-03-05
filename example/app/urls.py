@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import NoReturn
+
 from plain.admin.urls import AdminRouter
 from plain.assets.urls import AssetsRouter
 from plain.auth.views import LogoutView
@@ -18,7 +22,7 @@ class IndexView(TemplateView):
 class ErrorView(TemplateView):
     template_name = "index.html"
 
-    def get(self):
+    def get(self) -> NoReturn:
         text = "This is a test exception to demonstrate the toolbar"
         raise ValueError(text)
 

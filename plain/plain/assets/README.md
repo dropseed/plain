@@ -118,6 +118,10 @@ If you also have `AssetsRouter` included in your URLs, requests to local asset p
 
 Only assets in the manifest are redirected. Other assets (like page assets from `plain-pages`) are served directly by your app.
 
+#### How do I control asset access logging?
+
+By default, 304 Not Modified responses for assets are excluded from the server access log to reduce noise. Set `ASSETS_LOG_304 = True` in your settings to include them.
+
 #### Why aren't the originals copied to the compiled directory?
 
 The default behavior is to fingerprint assets, which is an exact copy of the original file but with a different filename. The originals aren't copied over because you should generally always use this fingerprinted path (that automatically uses longer-lived caching).

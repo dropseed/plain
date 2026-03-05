@@ -27,7 +27,6 @@ class TraceViewset(AdminViewset):
             "user_id",
             "start_time",
         ]
-        allow_global_search = False
         actions = ["Delete"]
 
         def perform_action(self, action: str, target_ids: Sequence[int]) -> None:
@@ -56,7 +55,6 @@ class SpanViewset(AdminViewset):
             "start_time",
         ]
         queryset_order = ["-id"]
-        allow_global_search = False
         filters = ["Parents only"]
         search_fields = ["name", "span_id", "parent_id"]
         actions = ["Delete"]
@@ -102,7 +100,6 @@ class LogViewset(AdminViewset):
             "span",
         ]
         queryset_order = ["-timestamp"]
-        allow_global_search = False
         search_fields = ["message", "level"]
         actions = ["Delete selected", "Delete all"]
 

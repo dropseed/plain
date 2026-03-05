@@ -5,38 +5,38 @@ requires-python = ">=3.13"
 
 [dependency-groups]
 dev = [
-    "plain",
-    "plain-admin",
-    "plain-api",
-    "plain-auth",
-    "plain-cache",
-    "plain-code",
-    "plain-dev",
-    "plain-elements",
-    "plain-esbuild",
-    "plain-flags",
-    "plain-htmx",
-    "plain-jobs",
-    "plain-loginlink",
-    "plain-email",
-    "plain-models",
-    "plain-oauth",
-    "plain-observer",
-    "plain-pages",
-    "plain-pageviews",
-    "plain-passwords",
-    "plain-pytest",
-    "plain-redirection",
-    "plain-scan",
-    "plain-sessions",
-    "plain-support",
-    "plain-tailwind",
-    "plain-toolbar",
-    "plain-tunnel",
-    "plain-vendor",
-    # Type checking and better dev experience
-    "ty>=0.0.11",
-    "psycopg[binary]>=3.2.12",
+  "plain",
+  "plain-admin",
+  "plain-api",
+  "plain-auth",
+  "plain-cache",
+  "plain-code",
+  "plain-dev",
+  "plain-elements",
+  "plain-esbuild",
+  "plain-flags",
+  "plain-htmx",
+  "plain-jobs",
+  "plain-loginlink",
+  "plain-email",
+  "plain-models",
+  "plain-oauth",
+  "plain-observer",
+  "plain-pages",
+  "plain-pageviews",
+  "plain-passwords",
+  "plain-pytest",
+  "plain-redirection",
+  "plain-scan",
+  "plain-sessions",
+  "plain-support",
+  "plain-tailwind",
+  "plain-toolbar",
+  "plain-tunnel",
+  "plain-vendor",
+  # Type checking and better dev experience
+  "ty>=0.0.11",
+  "psycopg[binary]>=3.2.12",
 ]
 
 [tool.uv.sources]
@@ -73,15 +73,15 @@ dev = [
 
 [tool.uv.workspace]
 members = [
-    # By package name, or paths
-    "plain",
-    "plain-*",
-    "plainx-*",
-    "example",
+  # By package name, or paths
+  "plain",
+  "plain-*",
+  "plainx-*",
+  "example",
 ]
 
-[tool.plain.code.biome]
-version = "2.0.6"
+[tool.plain.code.oxc]
+version = "1.50.0"
 
 [tool.plain.code.annotations]
 exclude = ["example", "scratch", "scripts"]

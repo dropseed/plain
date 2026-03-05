@@ -1,5 +1,67 @@
 # plain-dev changelog
 
+## [0.58.1](https://github.com/dropseed/plain/releases/plain-dev@0.58.1) (2026-03-04)
+
+### What's changed
+
+- Added minimum `plain>=0.113.0` version constraint in dependencies ([217751b866](https://github.com/dropseed/plain/commit/217751b866))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.58.0](https://github.com/dropseed/plain/releases/plain-dev@0.58.0) (2026-03-04)
+
+### What's changed
+
+- Dev server now sets `PLAIN_SERVER_ACCESS_LOG_FIELDS` to show a compact set of fields (method, url, status, duration_ms, size) by default ([72a905fbe1c3](https://github.com/dropseed/plain/commit/72a905fbe1c3))
+- Removed logging CLI options (`--log-level`, `--log-format`, `--access-log-format`) from dev server invocation, matching the server's new settings-based configuration ([d00dc098b32d](https://github.com/dropseed/plain/commit/d00dc098b32d))
+
+### Upgrade instructions
+
+- Requires plain >= 0.113.0.
+
+## [0.57.1](https://github.com/dropseed/plain/releases/plain-dev@0.57.1) (2026-02-28)
+
+### What's changed
+
+- Fixed dev server crash on macOS where Tailwind would exit immediately after compiling instead of watching for changes, bringing down all other processes ([5b7db81a43da](https://github.com/dropseed/plain/commit/5b7db81a43da))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.57.0](https://github.com/dropseed/plain/releases/plain-dev@0.57.0) (2026-02-28)
+
+### What's changed
+
+- `plain dev` no longer prompts for sudo to modify `/etc/hosts` on systems where `*.localhost` already resolves to loopback (e.g., modern macOS and Linux with systemd-resolved) ([a97e244091](https://github.com/dropseed/plain/commit/a97e244091))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.56.0](https://github.com/dropseed/plain/releases/plain-dev@0.56.0) (2026-02-25)
+
+### What's changed
+
+- Renamed `PLAIN_DEV_TUNNEL_URL` environment variable to `DEV_TUNNEL_URL` for displaying the tunnel URL in the dev server header ([6154e6ef8693](https://github.com/dropseed/plain/commit/6154e6ef8693))
+- Removed unused `default_settings.py` ([73a51a723c64](https://github.com/dropseed/plain/commit/73a51a723c64))
+
+### Upgrade instructions
+
+- Rename `PLAIN_DEV_TUNNEL_URL` to `DEV_TUNNEL_URL` in your `.env` file.
+
+## [0.55.1](https://github.com/dropseed/plain/releases/plain-dev@0.55.1) (2026-02-24)
+
+### What's changed
+
+- Dev server now explicitly passes `--workers 1` to keep single-process behavior after the core server default changed to `auto` ([c38ee93de5b4](https://github.com/dropseed/plain/commit/c38ee93de5b4))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.55.0](https://github.com/dropseed/plain/releases/plain-dev@0.55.0) (2026-02-12)
 
 ### What's changed

@@ -9,21 +9,21 @@ class V(HTMXView):
 
 
 def test_is_htmx_request():
-    request = RequestFactory().get("/", HTTP_HX_REQUEST="true")
+    request = RequestFactory().get("/", headers={"HX-Request": "true"})
     view = V()
     view.setup(request)
     assert view.is_htmx_request()
 
 
 def test_plain_hx_fragment():
-    request = RequestFactory().get("/", HTTP_PLAIN_HX_FRAGMENT="main")
+    request = RequestFactory().get("/", headers={"Plain-HX-Fragment": "main"})
     view = V()
     view.setup(request)
     assert view.get_htmx_fragment_name() == "main"
 
 
 def test_plain_hx_action():
-    request = RequestFactory().get("/", HTTP_PLAIN_HX_ACTION="create")
+    request = RequestFactory().get("/", headers={"Plain-HX-Action": "create"})
     view = V()
     view.setup(request)
     assert view.get_htmx_action_name() == "create"

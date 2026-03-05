@@ -1,5 +1,178 @@
 # plain changelog
 
+## [0.114.1](https://github.com/dropseed/plain/releases/plain@0.114.1) (2026-03-04)
+
+### What's changed
+
+- Fixed server error responses being malformed on Python 3.14 due to a `textwrap.dedent()` behavior change that strips `\r` as whitespace, breaking the `\r\n\r\n` header-body separator ([6e61cf5e39b3](https://github.com/dropseed/plain/commit/6e61cf5e39b3))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.114.0](https://github.com/dropseed/plain/releases/plain@0.114.0) (2026-03-04)
+
+### What's changed
+
+- **Lock-free thread worker event loop** — replaced `RLock` and `futures.wait()` with a pipe-based `PollableMethodQueue` that defers worker thread completions back to the main thread, eliminating all lock contention in the connection handling hot path ([d0ecd12bbe](https://github.com/dropseed/plain/commit/d0ecd12bbe))
+- **Unified event loop** — the main loop now uses a single `poller.select()` call for accepts, client data, and worker completions instead of splitting between `poller.select()` and `futures.wait()` ([d0ecd12bbe](https://github.com/dropseed/plain/commit/d0ecd12bbe))
+- **Backpressure on accept** — listener sockets are dynamically registered/unregistered from the poller when at connection capacity, preventing thread pool exhaustion under load ([d0ecd12bbe](https://github.com/dropseed/plain/commit/d0ecd12bbe))
+- **Slow client timeout** — new connections now get a read timeout during request parsing so slow or stalled clients can't hold a thread pool slot indefinitely ([d0ecd12bbe](https://github.com/dropseed/plain/commit/d0ecd12bbe))
+- **Graceful shutdown improvement** — shutdown now drains in-flight requests via the method queue instead of polling futures ([d0ecd12bbe](https://github.com/dropseed/plain/commit/d0ecd12bbe))
+- Added `HTTPS_PROXY_HEADER` upgrade warning to 0.113.0 changelog ([b1d63fda04](https://github.com/dropseed/plain/commit/b1d63fda04))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.113.0](https://github.com/dropseed/plain/releases/plain@0.113.0) (2026-03-04)
+
+### What's changed
+
+- **Removed WSGI layer entirely** — the server now creates `Request` objects directly and writes `Response` to sockets, eliminating the WSGI environ abstraction ([163c31ba9f](https://github.com/dropseed/plain/commit/163c31ba9f), [4a4fe406086a](https://github.com/dropseed/plain/commit/4a4fe406086a))
+- `Request.__init__` now accepts `method`, `path`, `headers`, and connection params directly instead of a WSGI environ dict ([f25f430f54b4](https://github.com/dropseed/plain/commit/f25f430f54b4), [1c9ab9e67611](https://github.com/dropseed/plain/commit/1c9ab9e67611))
+- Test client creates `Request` directly without WSGI environ ([bed765f3ff77](https://github.com/dropseed/plain/commit/bed765f3ff77))
+- Centralized header normalization in `RequestHeaders` class, simplifying `Request` attributes ([acec7dfd89be](https://github.com/dropseed/plain/commit/acec7dfd89be))
+- Removed `LimitedStream` — body size limit is now enforced during reads ([cb8ac54654f3](https://github.com/dropseed/plain/commit/cb8ac54654f3))
+- Simplified `Response` by removing WSGI-era `start_response` method ([7cea8c314449](https://github.com/dropseed/plain/commit/7cea8c314449))
+- **Server migrated from fork to spawn** for process creation, with simplified process supervisor ([a19c13255a4d](https://github.com/dropseed/plain/commit/a19c13255a4d))
+- Flattened `Worker` classes and moved runtime setup to worker entry point ([ce1114615d86](https://github.com/dropseed/plain/commit/ce1114615d86))
+- Removed server-level scheme detection, unified on `HTTPS_PROXY_HEADER` setting ([05eea6446830](https://github.com/dropseed/plain/commit/05eea6446830))
+- Added `Host` header validation per RFC 9112 §3.2 ([bd07db36aec2](https://github.com/dropseed/plain/commit/bd07db36aec2))
+- **Structured access logging** — server access log now uses structured context logging with configurable fields ([72a905fbe1c3](https://github.com/dropseed/plain/commit/72a905fbe1c3))
+- Removed standard log format — only `keyvalue` or `json` log formats are supported ([96ad632e6f28](https://github.com/dropseed/plain/commit/96ad632e6f28))
+- Replaced `Logger` class with module-level functions and standard logging ([24d9665818de](https://github.com/dropseed/plain/commit/24d9665818de))
+- Removed logging CLI options from server command ([d00dc098b32d](https://github.com/dropseed/plain/commit/d00dc098b32d))
+- Added `SERVER_*` settings for server configuration ([9fadf8bafec2](https://github.com/dropseed/plain/commit/9fadf8bafec2))
+- Added per-response access log control and `ASSETS_LOG_304` setting to suppress noisy asset 304s ([4250db0ed02e](https://github.com/dropseed/plain/commit/4250db0ed02e))
+- Changed `--access-log` from file path to boolean flag ([6924211917f6](https://github.com/dropseed/plain/commit/6924211917f6))
+- Preflight badge rendered inline in HTML instead of JavaScript fetch ([2894abfc5d98](https://github.com/dropseed/plain/commit/2894abfc5d98))
+- Removed dead signal handlers (SIGUSR1, SIGUSR2, SIGWINCH, SIGHUP, SIGTTIN, SIGTTOU) ([37f13c730b47](https://github.com/dropseed/plain/commit/37f13c730b47))
+- Deleted `Config` dataclass — server params are passed directly ([4989df5eb147](https://github.com/dropseed/plain/commit/4989df5eb147))
+- Removed dead file-logging code from server ([7f4f80fa0ff4](https://github.com/dropseed/plain/commit/7f4f80fa0ff4))
+
+### Upgrade instructions
+
+- **WSGI removed** — The WSGI layer (`plain.wsgi`) has been completely removed. You can no longer use third-party WSGI servers (gunicorn, uvicorn, etc.) — use `plain server` directly. If you had a `wsgi.py` entry point, remove it.
+- **`Request()` constructor changed** — `Request()` now requires `method` and `path` keyword arguments. Code that constructed `Request` objects directly (e.g., in tests) must be updated: `Request(method="GET", path="/")`.
+- **`request_started` signal changed** — The signal no longer sends an `environ` keyword argument. If you connected to `request_started`, update your receiver to not expect `environ`.
+- **`WEB_CONCURRENCY` → `SERVER_WORKERS`** — The `--workers` CLI option now reads from the `SERVER_WORKERS` setting (default: `0` for auto/CPU count). `WEB_CONCURRENCY` env var is still read as a fallback in the default setting, but the canonical way is now `PLAIN_SERVER_WORKERS` env var or `SERVER_WORKERS` in settings.
+- **New `SERVER_*` settings** — Server configuration has moved from CLI-only options to settings: `SERVER_WORKERS`, `SERVER_THREADS`, `SERVER_TIMEOUT`, `SERVER_MAX_REQUESTS`, `SERVER_ACCESS_LOG`, `SERVER_ACCESS_LOG_FIELDS`, `SERVER_GRACEFUL_TIMEOUT`, `SERVER_SENDFILE`. CLI flags still work as overrides.
+- **Log format `standard` removed** — Only `keyvalue` or `json` are supported. Update `LOG_FORMAT` if you were using `standard`.
+- **Server logging CLI options removed** — `--log-level`, `--log-format`, and `--access-log-format` have been removed. Configure via settings or environment variables instead.
+- **`--access-log` is now a boolean** — Use `--access-log` / `--no-access-log` instead of passing a file path. Access logs always go to stdout.
+- **`HTTPS_PROXY_HEADER` now required behind reverse proxies** — The server no longer auto-detects HTTPS from the connection. If your app runs behind an SSL-terminating proxy (Heroku, AWS ALB, nginx, etc.) and `HTTPS_REDIRECT_ENABLED` is `True` (the default), you **must** set `HTTPS_PROXY_HEADER` or you'll get an infinite 301 redirect loop. For example, on Heroku: `HTTPS_PROXY_HEADER = "X-Forwarded-Proto: https"` (or set `PLAIN_HTTPS_PROXY_HEADER="X-Forwarded-Proto: https"` as an env var).
+- **Server process model changed from fork to spawn** — This should be transparent, but if you relied on fork-inherited state in worker processes, it will no longer be available.
+- **`LimitedStream` removed** — Body size limits are now enforced automatically during reads.
+- **`HEADER_MAP` config removed** — Underscore-containing headers are always dropped (the previous default behavior). The `refuse` and `dangerous` options no longer exist.
+
+## [0.112.1](https://github.com/dropseed/plain/releases/plain@0.112.1) (2026-03-03)
+
+### What's changed
+
+- `settings.get_settings()` now skips internal settings whose names start with `_` ([7bd0064bdc](https://github.com/dropseed/plain/commit/7bd0064bdc))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.112.0](https://github.com/dropseed/plain/releases/plain@0.112.0) (2026-02-28)
+
+### What's changed
+
+- Removed `DEFAULT_CHARSET` setting — the charset is now always `utf-8`, which was already the default. All references in `QueryDict`, `ResponseBase`, multipart parsing, and test utilities now use the hardcoded value directly ([901e6b3c49](https://github.com/dropseed/plain/commit/901e6b3c49))
+
+### Upgrade instructions
+
+- If you were customizing `DEFAULT_CHARSET` in your settings, remove it. UTF-8 is now always used.
+
+## [0.111.0](https://github.com/dropseed/plain/releases/plain@0.111.0) (2026-02-26)
+
+### What's changed
+
+- Added built-in `HEALTHCHECK_PATH` setting — when set, requests to this exact path return a `200` response before any middleware runs, avoiding ALLOWED_HOSTS rejection and HTTPS redirect loops from health checkers ([2c25ccbadd](https://github.com/dropseed/plain/commit/2c25ccbadd))
+- Fixed test client to handle responses from middleware that bypass URL routing (e.g. healthcheck) — previously missing sessions or unresolvable paths would raise exceptions ([bcd8913f02](https://github.com/dropseed/plain/commit/bcd8913f02))
+- Custom settings (prefixed with `APP_`) now resolve type annotations properly, enabling environment variable parsing for custom settings ([d9fff3223e](https://github.com/dropseed/plain/commit/d9fff3223e))
+- Secret settings now show collection size hints (e.g. `{******** (3 items)}`) instead of a flat `********` for dict, list, and tuple values ([d9fff3223e](https://github.com/dropseed/plain/commit/d9fff3223e))
+- `plain docs --search` now supports `--api` to also search public API symbols ([e3ef3f3d84](https://github.com/dropseed/plain/commit/e3ef3f3d84))
+- `plain docs --section` now matches `###` subsections in addition to `##` sections ([9db0491a3f](https://github.com/dropseed/plain/commit/9db0491a3f))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.110.1](https://github.com/dropseed/plain/releases/plain@0.110.1) (2026-02-26)
+
+### What's changed
+
+- Added type annotations to all settings in `global_settings.py` so they can be set via environment variables — previously 11 settings like `HTTPS_REDIRECT_ENABLED`, `APPEND_SLASH`, and `FILE_UPLOAD_MAX_MEMORY_SIZE` were missing annotations and would error when set via env vars ([37e8a58ca9b5](https://github.com/dropseed/plain/commit/37e8a58ca9b5))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.110.0](https://github.com/dropseed/plain/releases/plain@0.110.0) (2026-02-26)
+
+### What's changed
+
+- Environment variables now take highest precedence, overriding values set in `settings.py` — previously explicit settings would win over env vars ([0d40bcfcd539](https://github.com/dropseed/plain/commit/0d40bcfcd539))
+- Moved SSL handshake from the main thread to the worker thread so handshake errors no longer crash the main loop, ported from gunicorn PR #3440 ([6309ef82642e](https://github.com/dropseed/plain/commit/6309ef82642e))
+- Switched keepalive timeouts to use `time.monotonic()` instead of `time.time()` for correctness during clock adjustments ([e7ddd1a31cfe](https://github.com/dropseed/plain/commit/e7ddd1a31cfe))
+- Extracted `finish_body()` method on the HTTP parser for explicit cleanup before returning keepalive connections to the poller ([0cf51dd17c6f](https://github.com/dropseed/plain/commit/0cf51dd17c6f))
+
+### Upgrade instructions
+
+- If you rely on `settings.py` values taking precedence over `PLAIN_`-prefixed environment variables, be aware that env vars now win. Remove any env vars that conflict with values you want to set in code.
+
+## [0.109.0](https://github.com/dropseed/plain/releases/plain@0.109.0) (2026-02-26)
+
+### What's changed
+
+- Added `--outline` flag to `plain docs` CLI to display section headings for quick navigation ([153502ee90f5](https://github.com/dropseed/plain/commit/153502ee90f5))
+- Added `--search` flag to `plain docs` CLI to find which modules and sections mention a term ([153502ee90f5](https://github.com/dropseed/plain/commit/153502ee90f5))
+- Enhanced `plain docs --list` to show core modules alongside packages, with color-coded output ([3f34b5405ea3](https://github.com/dropseed/plain/commit/3f34b5405ea3))
+- Updated shell banner to show app name and version in a styled box instead of generic welcome message ([a7b152d0baf8](https://github.com/dropseed/plain/commit/a7b152d0baf8))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.108.1](https://github.com/dropseed/plain/releases/plain@0.108.1) (2026-02-26)
+
+### What's changed
+
+- Fixed `plain request` to use `localhost` as SERVER_NAME and default the Accept header to `text/html`, matching typical browser behavior ([01731c5485cf](https://github.com/dropseed/plain/commit/01731c5485cf))
+- Updated `plain-bug` skill to create GitHub Issues via `gh` CLI instead of posting to the Plain API ([ce7b95bd056d](https://github.com/dropseed/plain/commit/ce7b95bd056d))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.108.0](https://github.com/dropseed/plain/releases/plain@0.108.0) (2026-02-24)
+
+### What's changed
+
+- Added absolute URL generation: new `absolute_url()` and `reverse_absolute()` functions that prepend the scheme and domain using a new `BASE_URL` setting ([1e0d09f3ec70](https://github.com/dropseed/plain/commit/1e0d09f3ec70))
+- Added `reverse_absolute` and `absolute_url` as Jinja template globals for use in templates ([1e0d09f3ec70](https://github.com/dropseed/plain/commit/1e0d09f3ec70))
+- Added `reverse` as an explicit template global (previously only available as `url`) ([1e0d09f3ec70](https://github.com/dropseed/plain/commit/1e0d09f3ec70))
+
+### Upgrade instructions
+
+- No changes required. To use absolute URLs, set `BASE_URL` in your settings (e.g. `BASE_URL = "https://example.com"`).
+
+## [0.107.0](https://github.com/dropseed/plain/releases/plain@0.107.0) (2026-02-24)
+
+### What's changed
+
+- Added `SettingOption` — a custom Click option class that reads defaults from Plain settings, bridging CLI options to the settings system ([cb5353b9d266](https://github.com/dropseed/plain/commit/cb5353b9d266))
+- Removed `SyncWorker` from the built-in HTTP server; `ThreadWorker` is now the only worker type ([c38ee93de5b4](https://github.com/dropseed/plain/commit/c38ee93de5b4))
+- Changed `plain server` defaults to `--workers auto` (one per CPU core) and `--threads 4` for better out-of-the-box concurrency ([c38ee93de5b4](https://github.com/dropseed/plain/commit/c38ee93de5b4))
+
+### Upgrade instructions
+
+- If you relied on `SyncWorker` or single-threaded behavior, explicitly pass `--threads 1` to `plain server`.
+- If you pinned `--workers 1`, note the default is now `auto`. Pass `--workers 1` explicitly to keep the old behavior.
+
 ## [0.106.2](https://github.com/dropseed/plain/releases/plain@0.106.2) (2026-02-13)
 
 ### What's changed

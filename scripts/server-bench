@@ -1,0 +1,27 @@
+#!/bin/bash -e
+
+# Benchmark server throughput using wrk.
+#
+# Usage:
+#   ./scripts/server-bench                     # auto-start, default settings
+#   ./scripts/server-bench host:port           # existing server
+
+WRK_CONNECTIONS=50
+WRK_DURATION=10s
+
+if [ $# -gt 0 ] && [[ "$1" == *:* ]]; then
+    TARGET="$1"
+    shift
+    echo ""
+    echo "Benchmarking $TARGET ($WRK_CONNECTIONS connections, ${WRK_DURATION})..."
+    echo ""
+    wrk -t2 -c"$WRK_CONNECTIONS" -d"$WRK_DURATION" "http://$TARGET/"
+    exit $?
+fi
+
+source "$(dirname "$0")/start-example-server" --no-access-log
+
+echo ""
+echo "Benchmarking 127.0.0.1:$PORT ($WRK_CONNECTIONS connections, ${WRK_DURATION})..."
+echo ""
+wrk -t2 -c"$WRK_CONNECTIONS" -d"$WRK_DURATION" "http://127.0.0.1:$PORT/"

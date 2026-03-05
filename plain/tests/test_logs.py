@@ -18,7 +18,7 @@ class TestLoggingConfiguration:
         configure_logging(
             plain_log_level=logging.INFO,
             app_log_level=logging.WARNING,
-            app_log_format="standard",
+            app_log_format="keyvalue",
         )
 
         plain_logger = logging.getLogger("plain")
@@ -34,7 +34,7 @@ class TestLoggingConfiguration:
         configure_logging(
             plain_log_level=logging.ERROR,
             app_log_level=logging.DEBUG,
-            app_log_format="standard",
+            app_log_format="keyvalue",
         )
 
         # Test both nested and deeply nested loggers

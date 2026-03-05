@@ -198,7 +198,6 @@ class JobResultViewset(AdminViewset):
         actions = [
             "Retry",
         ]
-        allow_global_search = False
 
         def get_initial_queryset(self) -> JobResultQuerySet:
             queryset: JobResultQuerySet = super().get_initial_queryset()  # type: ignore[assignment]

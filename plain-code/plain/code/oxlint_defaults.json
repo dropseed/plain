@@ -1,0 +1,10 @@
+{
+  "ignorePatterns": [
+    "**/vendor/**",
+    "**/node_modules/**",
+    "**/*.min.*",
+    "**/htmlcov/**",
+    "**/.venv/**",
+    "**/.pytest_cache/**"
+  ]
+}

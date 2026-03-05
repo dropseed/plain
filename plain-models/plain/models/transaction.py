@@ -105,15 +105,7 @@ class Atomic(ContextDecorator):
             )
         if not db_connection.in_atomic_block:
             # Reset state when entering an outermost atomic block.
-            db_connection.commit_on_exit = True
             db_connection.needs_rollback = False
-            if not db_connection.get_autocommit():
-                # Pretend we're already in an atomic block to bypass the code
-                # that disables autocommit to enter a transaction, and make a
-                # note to deal with this case in __exit__.
-                db_connection.in_atomic_block = True
-                db_connection.commit_on_exit = False
-
         if db_connection.in_atomic_block:
             # We're already in a transaction; create a savepoint, unless we
             # were told not to or we're already waiting for a rollback. The
@@ -218,12 +210,6 @@ class Atomic(ContextDecorator):
                     db_connection.connection = None
                 else:
                     db_connection.set_autocommit(True)
-            # Outermost block exit when autocommit was disabled.
-            elif not db_connection.savepoint_ids and not db_connection.commit_on_exit:
-                if db_connection.closed_in_transaction:
-                    db_connection.connection = None
-                else:
-                    db_connection.in_atomic_block = False
 
 
 def atomic(

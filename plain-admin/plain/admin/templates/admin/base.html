@@ -56,9 +56,9 @@
                         <a href="{{ parent_view.get_view_url(object if object is defined else None) }}" class="hover:text-black/70 hover:underline">
                             {{ parent_view.get_nav_title() }}
                         </a>
-                        <span class="text-black/30">/</span>
                     {% endfor %}
                     {% if object is defined and parent_view_classes %}
+                        <span class="text-black/30">/</span>
                         <span class="text-black/60 truncate max-w-48">{{ object.__repr__() }}</span>
                     {% elif view_class.nav_section and not parent_view_classes %}
                         <span class="text-black/40">{{ view_class.nav_section }}</span>

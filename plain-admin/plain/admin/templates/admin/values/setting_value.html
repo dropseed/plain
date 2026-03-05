@@ -1,0 +1,8 @@
+{% if value == "''" %}
+<span class="text-stone-300">&mdash;</span>
+{% else %}
+<span
+    data-secret="{{ object.is_secret }}"
+    class="font-mono text-sm break-all data-[secret=True]:text-stone-400 data-[secret=True]:italic"
+>{{ value }}</span>
+{% endif %}

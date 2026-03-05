@@ -8,53 +8,55 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from . import util
 from .arbiter import Arbiter
-
-if TYPE_CHECKING:
-    from .config import Config
 
 
 class ServerApplication:
-    """
-    Plain's server application.
+    """Plain's server application."""
 
-    This class provides the interface for running the server.
-    """
+    def __init__(
+        self,
+        *,
+        bind: list[str],
+        workers: int,
+        threads: int,
+        timeout: int,
+        max_requests: int,
+        reload: bool,
+        pidfile: str | None,
+        certfile: str | None,
+        keyfile: str | None,
+        accesslog: bool,
+    ) -> None:
+        self.bind = bind
+        self.workers = workers
+        self.threads = threads
+        self.timeout = timeout
+        self.max_requests = max_requests
+        self.reload = reload
+        self.pidfile = pidfile
+        self.certfile = certfile
+        self.keyfile = keyfile
+        self.accesslog = accesslog
 
-    def __init__(self, cfg: Config) -> None:
-        self.cfg: Config = cfg
-        self.callable: Any = None
-        self._handler: Any = None
+    @property
+    def address(self) -> list[tuple[str, int] | str]:
+        return [util.parse_address(util.bytes_to_str(bind)) for bind in self.bind]
+
+    @property
+    def is_ssl(self) -> bool:
+        return self.certfile is not None or self.keyfile is not None
 
     def load(self) -> Any:
-        """Load the WSGI application (for backwards compatibility)."""
-        # Import locally to avoid circular dependencies and allow
-        # the WSGI module to handle Plain runtime setup
-        from plain.wsgi import app
+        """Load the request handler."""
+        from plain.internal.handlers.base import BaseHandler
 
-        return app
-
-    def wsgi(self) -> Any:
-        """Get the WSGI application (for backwards compatibility)."""
-        if self.callable is None:
-            self.callable = self.load()
-        return self.callable
-
-    def handler(self) -> Any:
-        """Get the Plain request handler (direct, no WSGI)."""
-        if self._handler is None:
-            import plain.runtime
-
-            plain.runtime.setup()
-
-            from plain.internal.handlers.base import BaseHandler
-
-            handler = BaseHandler()
-            handler.load_middleware()
-            self._handler = handler
-        return self._handler
+        handler = BaseHandler()
+        handler.load_middleware()
+        return handler
 
     def run(self) -> None:
         """Run the server."""

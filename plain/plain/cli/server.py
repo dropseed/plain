@@ -1,18 +1,12 @@
+from __future__ import annotations
+
 import os
 
 import click
 
-from plain.cli.runtime import without_runtime_setup
+from plain.cli.options import SettingOption
 
 
-def parse_workers(ctx: click.Context, param: click.Parameter, value: str) -> int:
-    """Parse workers value - accepts int or 'auto' for CPU count."""
-    if value == "auto":
-        return os.cpu_count() or 1
-    return int(value)
-
-
-@without_runtime_setup
 @click.command()
 @click.option(
     "--bind",
@@ -23,28 +17,26 @@ def parse_workers(ctx: click.Context, param: click.Parameter, value: str) -> int
 )
 @click.option(
     "--threads",
-    type=int,
-    default=1,
+    type=click.IntRange(min=1),
+    cls=SettingOption,
+    setting="SERVER_THREADS",
     help="Number of threads per worker",
-    show_default=True,
 )
 @click.option(
     "--workers",
     "-w",
-    type=str,
-    default="1",
-    envvar="WEB_CONCURRENCY",
-    callback=parse_workers,
-    help="Number of worker processes (or 'auto' for CPU count)",
-    show_default=True,
+    type=int,
+    cls=SettingOption,
+    setting="SERVER_WORKERS",
+    help="Number of worker processes (0=auto, based on CPU count)",
 )
 @click.option(
     "--timeout",
     "-t",
     type=int,
-    default=30,
+    cls=SettingOption,
+    setting="SERVER_TIMEOUT",
     help="Worker timeout in seconds",
-    show_default=True,
 )
 @click.option(
     "--certfile",
@@ -57,47 +49,22 @@ def parse_workers(ctx: click.Context, param: click.Parameter, value: str) -> int
     help="SSL key file",
 )
 @click.option(
-    "--log-level",
-    default="info",
-    type=click.Choice(["debug", "info", "warning", "error", "critical"]),
-    help="Logging level",
-    show_default=True,
-)
-@click.option(
     "--reload",
     is_flag=True,
     help="Restart workers when code changes (dev only)",
 )
 @click.option(
-    "--access-log",
-    default="-",
-    help="Access log file (use '-' for stdout)",
-    show_default=True,
-)
-@click.option(
-    "--error-log",
-    default="-",
-    help="Error log file (use '-' for stderr)",
-    show_default=True,
-)
-@click.option(
-    "--log-format",
-    default="%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
-    help="Log format string (applies to both error and access logs)",
-    show_default=True,
-)
-@click.option(
-    "--access-log-format",
-    help="Access log format string (HTTP request details)",
-    default='%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"',
-    show_default=True,
+    "--access-log/--no-access-log",
+    cls=SettingOption,
+    setting="SERVER_ACCESS_LOG",
+    help="Enable/disable access logging to stdout",
 )
 @click.option(
     "--max-requests",
     type=int,
-    default=0,
+    cls=SettingOption,
+    setting="SERVER_MAX_REQUESTS",
     help="Max requests before worker restart (0=disabled)",
-    show_default=True,
 )
 @click.option(
     "--pidfile",
@@ -111,16 +78,12 @@ def server(
     timeout: int,
     certfile: str | None,
     keyfile: str | None,
-    log_level: str,
     reload: bool,
-    access_log: str,
-    error_log: str,
-    log_format: str,
-    access_log_format: str,
+    access_log: bool,
     max_requests: int,
     pidfile: str | None,
 ) -> None:
-    """Production-ready WSGI server"""
+    """Production-ready HTTP server"""
     from plain.runtime import settings
 
     # Show settings loaded from environment
@@ -131,10 +94,13 @@ def server(
                 f"  {defn.env_var_name} -> {name}={defn.display_value()}", dim=True
             )
 
-    from plain.server import ServerApplication
-    from plain.server.config import Config
+    # 0 = auto (CPU count)
+    if workers == 0:
+        workers = os.cpu_count() or 1
 
-    cfg = Config(
+    from plain.server import ServerApplication
+
+    ServerApplication(
         bind=list(bind),
         threads=threads,
         workers=workers,
@@ -144,10 +110,5 @@ def server(
         pidfile=pidfile,
         certfile=certfile,
         keyfile=keyfile,
-        loglevel=log_level,
         accesslog=access_log,
-        errorlog=error_log,
-        log_format=log_format,
-        access_log_format=access_log_format,
-    )
-    ServerApplication(cfg=cfg).run()
+    ).run()

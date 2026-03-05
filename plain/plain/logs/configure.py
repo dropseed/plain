@@ -30,6 +30,19 @@ def attach_log_handlers(
     logger.addHandler(warning_handler)
 
 
+def create_log_formatter(log_format: str) -> logging.Formatter:
+    """Create a formatter based on the log format setting."""
+    match log_format:
+        case "json":
+            return JSONFormatter("%(json)s")
+        case "keyvalue":
+            return KeyValueFormatter("[%(levelname)s] %(message)s %(keyvalue)s")
+        case _:
+            raise ValueError(
+                f"Invalid LOG_FORMAT: {log_format!r}. Must be 'keyvalue' or 'json'."
+            )
+
+
 def configure_logging(
     *,
     plain_log_level: int | str,
@@ -66,13 +79,7 @@ def configure_logging(
     app_logger.propagate = False
 
     # Determine formatter based on app_log_format
-    match app_log_format:
-        case "json":
-            formatter = JSONFormatter("%(json)s")
-        case "keyvalue":
-            formatter = KeyValueFormatter("[%(levelname)s] %(message)s %(keyvalue)s")
-        case _:
-            formatter = logging.Formatter("[%(levelname)s] %(message)s")
+    formatter = create_log_formatter(app_log_format)
 
     attach_log_handlers(
         logger=app_logger,

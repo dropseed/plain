@@ -8,26 +8,23 @@ from __future__ import annotations
 # Vendored and modified for Plain.
 import io
 import re
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from ..util import bytes_to_str, split_request_uri
 from .body import Body, ChunkedReader, EOFReader, LengthReader
 from .errors import (
     InvalidHeader,
     InvalidHeaderName,
+    InvalidHostHeader,
     InvalidHTTPVersion,
     InvalidRequestLine,
     InvalidRequestMethod,
-    InvalidSchemeHeaders,
     LimitRequestHeaders,
     LimitRequestLine,
     NoMoreData,
     ObsoleteFolding,
     UnsupportedTransferCoding,
 )
-
-if TYPE_CHECKING:
-    from ..config import Config
 
 MAX_REQUEST_LINE = 8190
 MAX_HEADERS = 32768
@@ -48,8 +45,7 @@ RFC9110_5_5_INVALID_AND_DANGEROUS = re.compile(r"[\0\r\n]")
 
 
 class Message:
-    def __init__(self, cfg: Config, unreader: Any, peer_addr: tuple[str, int] | Any):
-        self.cfg = cfg
+    def __init__(self, is_ssl: bool, unreader: Any, peer_addr: tuple[str, int] | Any):
         self.unreader = unreader
         self.peer_addr = peer_addr
         self.remote_addr = peer_addr
@@ -57,7 +53,7 @@ class Message:
         self.headers: list[tuple[str, str]] = []
         self.trailers: list[tuple[str, str]] = []
         self.body: Body | None = None
-        self.scheme = "https" if cfg.is_ssl else "http"
+        self.scheme = "https" if is_ssl else "http"
         self.must_close = False
 
         # set headers limits
@@ -89,27 +85,10 @@ class Message:
     def parse_headers(
         self, data: bytes, from_trailer: bool = False
     ) -> list[tuple[str, str]]:
-        cfg = self.cfg
         headers = []
 
         # Split lines on \r\n
         lines = [bytes_to_str(line) for line in data.split(b"\r\n")]
-
-        # handle scheme headers
-        scheme_header = False
-        secure_scheme_headers = {}
-        forwarder_headers = []
-        if from_trailer:
-            # nonsense. either a request is https from the beginning
-            #  .. or we are just behind a proxy who does not remove conflicting trailers
-            pass
-        elif (
-            "*" in cfg.forwarded_allow_ips
-            or not isinstance(self.peer_addr, tuple)
-            or self.peer_addr[0] in cfg.forwarded_allow_ips
-        ):
-            secure_scheme_headers = cfg.secure_scheme_headers
-            forwarder_headers = cfg.forwarder_headers
 
         # Parse headers into key/value pairs paying attention
         # to continuation lines.
@@ -146,35 +125,11 @@ class Message:
             if header_length > self.limit_request_field_size > 0:
                 raise LimitRequestHeaders("limit request headers fields size")
 
-            if name in secure_scheme_headers:
-                secure = value == secure_scheme_headers[name]
-                scheme = "https" if secure else "http"
-                if scheme_header:
-                    if scheme != self.scheme:
-                        raise InvalidSchemeHeaders()
-                else:
-                    scheme_header = True
-                    self.scheme = scheme
-
-            # ambiguous mapping allows fooling downstream, e.g. merging non-identical headers:
-            # X-Forwarded-For: 2001:db8::ha:cc:ed
-            # X_Forwarded_For: 127.0.0.1,::1
-            # HTTP_X_FORWARDED_FOR = 2001:db8::ha:cc:ed,127.0.0.1,::1
-            # Only modify after fixing *ALL* header transformations; network to wsgi env
+            # Drop underscore-containing header names — they're ambiguous
+            # since they could collide with hyphenated names after
+            # normalization (e.g. X_Forwarded_For vs X-Forwarded-For).
             if "_" in name:
-                if name in forwarder_headers or "*" in forwarder_headers:
-                    # This forwarder may override our environment
-                    pass
-                elif self.cfg.header_map == "dangerous":
-                    # as if we did not know we cannot safely map this
-                    pass
-                elif self.cfg.header_map == "drop":
-                    # almost as if it never had been there
-                    # but still counts against resource limits
-                    continue
-                else:
-                    # fail-safe fallthrough: refuse
-                    raise InvalidHeaderName(name)
+                continue
 
             headers.append((name, value))
 
@@ -259,7 +214,7 @@ class Message:
 class Request(Message):
     def __init__(
         self,
-        cfg: Config,
+        is_ssl: bool,
         unreader: Any,
         peer_addr: tuple[str, int] | Any,
         req_number: int = 1,
@@ -276,7 +231,7 @@ class Request(Message):
             self.limit_request_line = MAX_REQUEST_LINE
 
         self.req_number = req_number
-        super().__init__(cfg, unreader, peer_addr)
+        super().__init__(is_ssl, unreader, peer_addr)
 
     def get_data(self, unreader: Any, buf: io.BytesIO, stop: bool = False) -> None:
         data = unreader.read()
@@ -316,11 +271,20 @@ class Request(Message):
 
         if done:
             self.unreader.unread(data[2:])
-            return b""
+            ret = b""
+        else:
+            self.headers = self.parse_headers(data[:idx], from_trailer=False)
+            ret = data[idx + 4 :]
 
-        self.headers = self.parse_headers(data[:idx], from_trailer=False)
+        if self.version >= (1, 1):
+            host_headers = [v for name, v in self.headers if name == "HOST"]
+            if not host_headers:
+                raise InvalidHostHeader("missing required Host header")
+            if len(host_headers) > 1:
+                raise InvalidHostHeader("multiple Host headers")
+            if " " in host_headers[0] or "\t" in host_headers[0]:
+                raise InvalidHostHeader("invalid whitespace in Host value")
 
-        ret = data[idx + 4 :]
         buf = None
         return ret
 

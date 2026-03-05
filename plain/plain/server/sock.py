@@ -7,6 +7,7 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import errno
+import logging
 import os
 import socket
 import ssl
@@ -18,8 +19,9 @@ from typing import TYPE_CHECKING
 from . import util
 
 if TYPE_CHECKING:
-    from .config import Config
-    from .glogging import Logger
+    from .app import ServerApplication
+
+log = logging.getLogger(__name__)
 
 # Maximum number of pending connections in the socket listen queue
 BACKLOG = 2048
@@ -31,13 +33,11 @@ class BaseSocket:
     def __init__(
         self,
         address: tuple[str, int] | str,
-        conf: Config,
-        log: Logger,
+        *,
+        is_ssl: bool = False,
         fd: int | None = None,
     ) -> None:
-        self.log = log
-        self.conf = conf
-
+        self.is_ssl = is_ssl
         self.cfg_addr = address
         if fd is None:
             sock = socket.socket(self.FAMILY, socket.SOCK_STREAM)
@@ -80,11 +80,6 @@ class BaseSocket:
         if not bound:
             self.bind(sock)
         sock.setblocking(False)
-
-        # make sure that the socket can be inherited
-        if hasattr(sock, "set_inheritable"):
-            sock.set_inheritable(True)
-
         sock.listen(BACKLOG)
         return sock
 
@@ -98,7 +93,7 @@ class BaseSocket:
         try:
             self.sock.close()
         except OSError as e:
-            self.log.info("Error while closing socket %s", str(e))
+            log.info("Error while closing socket %s", str(e))
 
         self.sock = None
         return None
@@ -108,10 +103,7 @@ class TCPSocket(BaseSocket):
     FAMILY = socket.AF_INET
 
     def __str__(self) -> str:
-        if self.conf.is_ssl:
-            scheme = "https"
-        else:
-            scheme = "http"
+        scheme = "https" if self.is_ssl else "http"
 
         assert self.sock is not None, "Socket is closed"
         addr = self.sock.getsockname()
@@ -137,8 +129,8 @@ class UnixSocket(BaseSocket):
     def __init__(
         self,
         addr: str,
-        conf: Config,
-        log: Logger,
+        *,
+        is_ssl: bool = False,
         fd: int | None = None,
     ):
         if fd is None:
@@ -152,7 +144,7 @@ class UnixSocket(BaseSocket):
                     os.remove(addr)
                 else:
                     raise ValueError(f"{addr!r} is not a socket")
-        super().__init__(addr, conf, log, fd=fd)
+        super().__init__(addr, is_ssl=is_ssl, fd=fd)
 
     def __str__(self) -> str:
         return f"unix:{self.cfg_addr}"
@@ -174,7 +166,7 @@ def _sock_type(addr: tuple[str, int] | str | bytes) -> type[BaseSocket]:
     return sock_type
 
 
-def create_sockets(conf: Config, log: Logger) -> list[BaseSocket]:
+def create_sockets(app: ServerApplication) -> list[BaseSocket]:
     """
     Create a new socket for the configured addresses.
 
@@ -186,18 +178,18 @@ def create_sockets(conf: Config, log: Logger) -> list[BaseSocket]:
 
     # check ssl config early to raise the error on startup
     # only the certfile is needed since it can contains the keyfile
-    if conf.certfile and not os.path.exists(conf.certfile):
-        raise ValueError(f'certfile "{conf.certfile}" does not exist')
+    if app.certfile and not os.path.exists(app.certfile):
+        raise ValueError(f'certfile "{app.certfile}" does not exist')
 
-    if conf.keyfile and not os.path.exists(conf.keyfile):
-        raise ValueError(f'keyfile "{conf.keyfile}" does not exist')
+    if app.keyfile and not os.path.exists(app.keyfile):
+        raise ValueError(f'keyfile "{app.keyfile}" does not exist')
 
-    for addr in conf.address:
+    for addr in app.address:
         sock_type = _sock_type(addr)
         sock = None
         for i in range(5):
             try:
-                sock = sock_type(addr, conf, log)
+                sock = sock_type(addr, is_ssl=app.is_ssl)
             except OSError as e:
                 if e.args[0] == errno.EADDRINUSE:
                     log.error("Connection in use: %s", str(addr))
@@ -229,12 +221,13 @@ def close_sockets(listeners: list[BaseSocket], unlink: bool = True) -> None:
             os.unlink(sock_name)
 
 
-def ssl_context(conf: Config) -> ssl.SSLContext:
+def ssl_context(certfile: str, keyfile: str | None) -> ssl.SSLContext:
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    assert conf.certfile is not None
-    context.load_cert_chain(certfile=conf.certfile, keyfile=conf.keyfile)
+    context.load_cert_chain(certfile=certfile, keyfile=keyfile)
     return context
 
 
-def ssl_wrap_socket(sock: socket.socket, conf: Config) -> ssl.SSLSocket:
-    return ssl_context(conf).wrap_socket(sock, server_side=True)
+def ssl_wrap_socket(
+    sock: socket.socket, certfile: str, keyfile: str | None
+) -> ssl.SSLSocket:
+    return ssl_context(certfile, keyfile).wrap_socket(sock, server_side=True)

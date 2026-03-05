@@ -36,7 +36,6 @@ class RedirectAdmin(AdminViewset):
         description = "URL redirect rules processed in order."
         fields = ["from_pattern", "to_pattern", "http_status", "order", "enabled"]
         search_fields = ["from_pattern", "to_pattern"]
-        allow_global_search = False
 
     class DetailView(AdminModelDetailView):
         model = Redirect
@@ -72,7 +71,6 @@ class RedirectLogAdmin(AdminViewset):
             "referrer",
         ]
         search_fields = ["from_url", "to_url", "user_agent", "ip_address", "referrer"]
-        allow_global_search = False
 
     class DetailView(AdminModelDetailView):
         model = RedirectLog
@@ -88,7 +86,6 @@ class NotFoundLogAdmin(AdminViewset):
         description = "URLs that returned 404 - useful for finding broken links."
         fields = ["created_at", "url", "user_agent", "ip_address", "referrer"]
         search_fields = ["url", "user_agent", "ip_address", "referrer"]
-        allow_global_search = False
 
     class DetailView(AdminModelDetailView):
         model = NotFoundLog

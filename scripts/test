@@ -21,6 +21,7 @@ plain-auth
 plain-api
 plain-elements
 plain-htmx
+plain-pages
 EOF
 )"
 
@@ -68,3 +69,9 @@ bold "Testing example"
 cd "example"
 uv run --isolated $WITH python -m pytest "$@"
 cd ..
+
+# HTTP/1.1 conformance tests (h1spec)
+echo
+bold "Running h1spec"
+scripts/h1spec
+

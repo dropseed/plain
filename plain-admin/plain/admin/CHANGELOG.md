@@ -1,5 +1,62 @@
 # plain-admin changelog
 
+## [0.70.2](https://github.com/dropseed/plain/releases/plain-admin@0.70.2) (2026-03-04)
+
+### What's changed
+
+- Added minimum `plain>=0.113.0` version constraint in dependencies ([217751b866](https://github.com/dropseed/plain/commit/217751b866))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.70.1](https://github.com/dropseed/plain/releases/plain-admin@0.70.1) (2026-03-04)
+
+### What's changed
+
+- Preflight badge in header and toolbar is now rendered inline in HTML instead of fetched via JavaScript, removing the async JSON endpoint and module-level cache ([2894abfc5d98](https://github.com/dropseed/plain/commit/2894abfc5d98))
+- Removed unused `type: ignore` comment in model search query ([ed086b376a11](https://github.com/dropseed/plain/commit/ed086b376a11))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.70.0](https://github.com/dropseed/plain/releases/plain-admin@0.70.0) (2026-03-03)
+
+### What's changed
+
+- Added **Settings view** — browse all framework and app settings with their values, sources, and environment variable names. Includes list view with search/filter and detail view for each setting ([7bd0064bdc](https://github.com/dropseed/plain/commit/7bd0064bdc))
+- Added **Preflight checks view** — run and display all preflight checks with a summary card, pass/warn/error counts, and expandable issue details ([58e62380dd](https://github.com/dropseed/plain/commit/58e62380dd))
+- Added async preflight badge to the admin header and toolbar that shows warning/error counts, fetched via JSON endpoint with a module-level cache ([58e62380dd](https://github.com/dropseed/plain/commit/58e62380dd))
+- Fixed breadcrumb separator (`/`) only appearing when an object detail was present — now shows correctly between parent views ([e1fc1909bb](https://github.com/dropseed/plain/commit/e1fc1909bb))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.69.0](https://github.com/dropseed/plain/releases/plain-admin@0.69.0) (2026-02-26)
+
+### What's changed
+
+- Admin global search is now opt-in — `AdminModelListView.allow_global_search` defaults to `False` instead of `True`, so model views must explicitly set `allow_global_search = True` to appear in global search results ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+- Added `plain admin icons` CLI command for searching available Bootstrap Icons by keyword ([22786347fc](https://github.com/dropseed/plain/commit/22786347fc))
+- Added `plain.elements` as a dependency ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+- Admin index now redirects to the first list view instead of the first searchable view ([05d6fa2764](https://github.com/dropseed/plain/commit/05d6fa2764))
+
+### Upgrade instructions
+
+- If you rely on model views appearing in global search, add `allow_global_search = True` to those views.
+
+## [0.68.1](https://github.com/dropseed/plain/releases/plain-admin@0.68.1) (2026-02-26)
+
+### What's changed
+
+- Auto-formatted JavaScript assets and config files with updated linter configuration ([028bb95c3ae3](https://github.com/dropseed/plain/commit/028bb95c3ae3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.68.0](https://github.com/dropseed/plain/releases/plain-admin@0.68.0) (2026-02-16)
 
 ### What's changed

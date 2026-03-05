@@ -7,7 +7,6 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import email.utils
-import errno
 import fcntl
 import html
 import io
@@ -15,18 +14,13 @@ import os
 import random
 import re
 import socket
-import sys
-import textwrap
 import time
 import urllib.parse
-import warnings
-from collections.abc import Callable
 from typing import Any
 
 # Server and Date aren't technically hop-by-hop
 # headers, but they are in the purview of the
-# origin server which the WSGI spec says we should
-# act like. So we drop them and add our own.
+# origin server, so we drop them and add our own.
 #
 # In the future, concatenation server header values
 # might be better, but nothing else does it and
@@ -38,62 +32,6 @@ hop_headers = set(
     server date
     """.split()
 )
-
-if sys.platform.startswith("win"):
-
-    def _waitfor(
-        func: Callable[[str], None], pathname: str, waitall: bool = False
-    ) -> None:
-        # Perform the operation
-        func(pathname)
-        # Now setup the wait loop
-        if waitall:
-            dirname = pathname
-        else:
-            dirname, name = os.path.split(pathname)
-            dirname = dirname or "."
-        # Check for `pathname` to be removed from the filesystem.
-        # The exponential backoff of the timeout amounts to a total
-        # of ~1 second after which the deletion is probably an error
-        # anyway.
-        # Testing on a i7@4.3GHz shows that usually only 1 iteration is
-        # required when contention occurs.
-        timeout = 0.001
-        while timeout < 1.0:
-            # Note we are only testing for the existence of the file(s) in
-            # the contents of the directory regardless of any security or
-            # access rights.  If we have made it this far, we have sufficient
-            # permissions to do that much using Python's equivalent of the
-            # Windows API FindFirstFile.
-            # Other Windows APIs can fail or give incorrect results when
-            # dealing with files that are pending deletion.
-            L = os.listdir(dirname)
-            if not L if waitall else name in L:
-                return None
-            # Increase the timeout and try again
-            time.sleep(timeout)
-            timeout *= 2
-        warnings.warn(
-            "tests may fail, delete still pending for " + pathname,
-            RuntimeWarning,
-            stacklevel=4,
-        )
-        return None
-
-    def _unlink(filename: str) -> None:
-        _waitfor(os.unlink, filename)
-        return None
-else:
-    _unlink = os.unlink
-
-
-def unlink(filename: str) -> None:
-    try:
-        _unlink(filename)
-    except OSError as error:
-        # The filename need not exist.
-        if error.errno not in (errno.ENOENT, errno.ENOTDIR):
-            raise
 
 
 def is_ipv6(addr: str) -> bool:
@@ -179,40 +117,25 @@ def write_nonblock(
 
 
 def write_error(sock: socket.socket, status_int: int, reason: str, mesg: str) -> None:
-    html_error = textwrap.dedent("""\
-    <html>
-      <head>
-        <title>%(reason)s</title>
-      </head>
-      <body>
-        <h1><p>%(reason)s</p></h1>
-        %(mesg)s
-      </body>
-    </html>
-    """) % {"reason": reason, "mesg": html.escape(mesg)}
+    body = (
+        "<html>\n"
+        f"  <head><title>{reason}</title></head>\n"
+        "  <body>\n"
+        f"    <h1><p>{reason}</p></h1>\n"
+        f"    {html.escape(mesg)}\n"
+        "  </body>\n"
+        "</html>\n"
+    )
 
-    http = textwrap.dedent("""\
-    HTTP/1.1 %s %s\r
-    Connection: close\r
-    Content-Type: text/html\r
-    Content-Length: %d\r
-    \r
-    %s""") % (str(status_int), reason, len(html_error), html_error)
-    write_nonblock(sock, http.encode("latin1"))
-
-
-def getcwd() -> str:
-    # get current path, try to use PWD env first
-    try:
-        a = os.stat(os.environ["PWD"])
-        b = os.stat(os.getcwd())
-        if a.st_ino == b.st_ino and a.st_dev == b.st_dev:
-            cwd = os.environ["PWD"]
-        else:
-            cwd = os.getcwd()
-    except Exception:
-        cwd = os.getcwd()
-    return cwd
+    response = (
+        f"HTTP/1.1 {status_int} {reason}\r\n"
+        f"Connection: close\r\n"
+        f"Content-Type: text/html\r\n"
+        f"Content-Length: {len(body)}\r\n"
+        f"\r\n"
+        f"{body}"
+    )
+    write_nonblock(sock, response.encode("latin1"))
 
 
 def http_date(timestamp: float | None = None) -> str:
@@ -232,14 +155,6 @@ def seed() -> None:
         random.seed(os.urandom(64))
     except NotImplementedError:
         random.seed(f"{time.time()}.{os.getpid()}")
-
-
-def check_is_writable(path: str) -> None:
-    try:
-        with open(path, "a") as f:
-            f.close()
-    except OSError as e:
-        raise RuntimeError(f"Error: '{path}' isn't writable [{e!r}]")
 
 
 def to_bytestring(value: str | bytes, encoding: str = "utf8") -> bytes:
@@ -265,17 +180,17 @@ def has_fileno(obj: Any) -> bool:
     return True
 
 
-def make_fail_app(msg: str | bytes) -> Callable[..., Any]:
+def make_fail_handler(msg: str | bytes) -> Any:
+    """Create a handler that returns a 500 error for all requests."""
     msg = to_bytestring(msg)
 
-    def app(environ: Any, start_response: Any) -> list[bytes]:
-        start_response(
-            "500 Internal Server Error",
-            [("Content-Type", "text/plain"), ("Content-Length", str(len(msg)))],
-        )
-        return [msg]
+    class FailHandler:
+        def get_response(self, request: Any) -> Any:
+            from plain.http import Response
 
-    return app
+            return Response(msg, status_code=500, content_type="text/plain")
+
+    return FailHandler()
 
 
 def split_request_uri(uri: str) -> urllib.parse.SplitResult:
@@ -290,28 +205,7 @@ def split_request_uri(uri: str) -> urllib.parse.SplitResult:
     return urllib.parse.urlsplit(uri)
 
 
-# From six.reraise
-def reraise(
-    tp: type[BaseException] | None, value: BaseException | None, tb: Any = None
-) -> None:
-    try:
-        if tp is None:
-            return
-        if value is None:
-            value = tp()
-        if value.__traceback__ is not tb:
-            raise value.with_traceback(tb)
-        raise value
-    finally:
-        value = None
-        tb = None
-
-
 def bytes_to_str(b: str | bytes) -> str:
     if isinstance(b, str):
         return b
     return str(b, "latin1")
-
-
-def unquote_to_wsgi_str(string: str) -> str:
-    return urllib.parse.unquote_to_bytes(string).decode("latin-1")

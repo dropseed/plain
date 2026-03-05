@@ -1,5 +1,29 @@
 # plain-code changelog
 
+## [0.21.1](https://github.com/dropseed/plain/releases/plain-code@0.21.1) (2026-03-04)
+
+### What's changed
+
+- Fixed `plain code update` failing with a 404 error when downloading oxlint/oxfmt — GitHub's "latest" release now points to `crates_v` tags which don't contain the binaries. The update command now queries the GitHub API to find the correct `apps_v` release. ([54298b724d3b](https://github.com/dropseed/plain/commit/54298b724d3b))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-code@0.21.0) (2026-02-25)
+
+### What's changed
+
+- Replaced Biome with oxc tools — JS/TS linting is now handled by [oxlint](https://oxc.rs/) and formatting by [oxfmt](https://oxc.rs/) ([5eb7ba6f6f7f](https://github.com/dropseed/plain/commit/5eb7ba6f6f7f))
+- The `--skip-biome` CLI flag is now `--skip-oxc` ([5eb7ba6f6f7f](https://github.com/dropseed/plain/commit/5eb7ba6f6f7f))
+- Configuration key changed from `[tool.plain.code.biome]` to `[tool.plain.code.oxc]` in pyproject.toml ([5eb7ba6f6f7f](https://github.com/dropseed/plain/commit/5eb7ba6f6f7f))
+
+### Upgrade instructions
+
+- If you have `[tool.plain.code.biome]` in your pyproject.toml, rename it to `[tool.plain.code.oxc]`.
+- Replace `--skip-biome` with `--skip-oxc` in any scripts or CI configuration.
+- The oxlint and oxfmt binaries will be downloaded automatically on first run.
+
 ## [0.20.3](https://github.com/dropseed/plain/releases/plain-code@0.20.3) (2026-02-04)
 
 ### What's changed

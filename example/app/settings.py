@@ -1,5 +1,6 @@
 SECRET_KEY = "test"
 DEBUG = True
+HEALTHCHECK_PATH = "/up/"
 URLS_ROUTER = "app.urls.AppRouter"
 
 INSTALLED_PACKAGES = [
