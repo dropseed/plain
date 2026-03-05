@@ -350,6 +350,7 @@ async def handle_websocket_connection(
 
         try:
             writer.close()
+            await writer.wait_closed()
         except OSError:
             pass
 

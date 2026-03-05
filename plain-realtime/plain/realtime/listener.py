@@ -32,6 +32,7 @@ class SharedListener:
         self._subscribers: dict[str, set[asyncio.Queue]] = {}
         self._lock = asyncio.Lock()
         self._reader_task: asyncio.Task | None = None
+        self._reconnecting = False
 
     @classmethod
     def get(cls) -> SharedListener:
@@ -73,7 +74,7 @@ class SharedListener:
                     pass
 
     async def _ensure_connected(self) -> None:
-        if self._conn is not None:
+        if self._conn is not None or self._reconnecting:
             return
 
         import psycopg
@@ -126,6 +127,7 @@ class SharedListener:
                 # Connection is dead — reconnect directly (don't use
                 # _ensure_connected which would spawn a duplicate reader task)
                 self._conn = None
+                self._reconnecting = True
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, max_backoff)
 
@@ -134,6 +136,8 @@ class SharedListener:
                 except Exception:
                     logger.warning("Reconnect failed, will retry in %.1fs", backoff)
                     continue
+                finally:
+                    self._reconnecting = False
 
     async def _reconnect(self) -> None:
         """Re-establish the Postgres connection and re-LISTEN all channels."""

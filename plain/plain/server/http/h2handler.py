@@ -501,7 +501,8 @@ async def _async_handle_stream(
         raise
     except Exception:
         log.exception("Error handling async HTTP/2 request %s", http_request.path_info)
-        await _async_send_h2_error(state, stream.stream_id, 500)
+        if stream.stream_id not in state.reset_streams:
+            await _async_send_h2_error(state, stream.stream_id, 500)
 
 
 async def _async_write_h2_response(
@@ -603,7 +604,16 @@ async def _async_send_h2_data(
     conn = state.conn
     offset = 0
 
+    # Pre-fetch window events so clears/waits are race-free
+    stream_event = state.get_window_event(stream_id)
+    conn_event = state.get_window_event(0)
+
     while offset < len(data):
+        # Clear events *before* checking the window so we never lose
+        # a WindowUpdated that arrives between the check and the wait.
+        stream_event.clear()
+        conn_event.clear()
+
         async with state.write_lock:
             max_size = conn.local_flow_control_window(stream_id)
             if max_size > 0:
@@ -621,11 +631,6 @@ async def _async_send_h2_data(
             await state.flush()
 
         # Wait for a window update (set by the read loop)
-        stream_event = state.get_window_event(stream_id)
-        conn_event = state.get_window_event(0)
-        stream_event.clear()
-        conn_event.clear()
-
         done, pending = await asyncio.wait(
             [
                 asyncio.ensure_future(stream_event.wait()),

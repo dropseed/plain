@@ -662,10 +662,7 @@ class Worker:
 
         # Set up async reader/writer
         conn.sock.setblocking(False)
-        reader = asyncio.StreamReader()
-        protocol = asyncio.StreamReaderProtocol(reader)
-        transport, _ = await loop.create_connection(lambda: protocol, sock=conn.sock)
-        writer = asyncio.StreamWriter(transport, protocol, reader, loop)
+        reader, writer = await asyncio.open_connection(sock=conn.sock)
 
         ws_view.bind_transport(reader, writer)
 

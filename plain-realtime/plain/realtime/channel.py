@@ -98,7 +98,10 @@ class SSEView(View):
 
         subscriptions = await loop.run_in_executor(None, self.subscribe)
         if not subscriptions:
-            raise ForbiddenError403
+            raise ValueError(
+                f"{self.__class__.__name__}.subscribe() returned no channels. "
+                "Override subscribe() to return a list of Postgres NOTIFY channel names."
+            )
 
         async def stream() -> AsyncGenerator[bytes, None]:
             async for channel_name, payload in pg_listen(*subscriptions):

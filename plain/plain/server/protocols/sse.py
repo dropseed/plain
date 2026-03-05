@@ -6,6 +6,11 @@ import json
 from typing import Any
 
 
+def _sanitize_field(value: str) -> str:
+    """Strip newlines from SSE field values to prevent field injection."""
+    return value.replace("\r\n", "").replace("\n", "").replace("\r", "")
+
+
 def format_sse_event(
     data: Any,
     event: str | None = None,
@@ -25,10 +30,10 @@ def format_sse_event(
     lines: list[str] = []
 
     if event is not None:
-        lines.append(f"event: {event}")
+        lines.append(f"event: {_sanitize_field(event)}")
 
     if event_id is not None:
-        lines.append(f"id: {event_id}")
+        lines.append(f"id: {_sanitize_field(event_id)}")
 
     if retry is not None:
         lines.append(f"retry: {retry}")
