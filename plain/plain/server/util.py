@@ -14,7 +14,6 @@ import os
 import random
 import re
 import socket
-import textwrap
 import time
 import urllib.parse
 from typing import Any
@@ -118,26 +117,25 @@ def write_nonblock(
 
 
 def write_error(sock: socket.socket, status_int: int, reason: str, mesg: str) -> None:
-    html_error = textwrap.dedent("""\
-    <html>
-      <head>
-        <title>%(reason)s</title>
-      </head>
-      <body>
-        <h1><p>%(reason)s</p></h1>
-        %(mesg)s
-      </body>
-    </html>
-    """) % {"reason": reason, "mesg": html.escape(mesg)}
+    body = (
+        "<html>\n"
+        f"  <head><title>{reason}</title></head>\n"
+        "  <body>\n"
+        f"    <h1><p>{reason}</p></h1>\n"
+        f"    {html.escape(mesg)}\n"
+        "  </body>\n"
+        "</html>\n"
+    )
 
-    http = textwrap.dedent("""\
-    HTTP/1.1 %s %s\r
-    Connection: close\r
-    Content-Type: text/html\r
-    Content-Length: %d\r
-    \r
-    %s""") % (str(status_int), reason, len(html_error), html_error)
-    write_nonblock(sock, http.encode("latin1"))
+    response = (
+        f"HTTP/1.1 {status_int} {reason}\r\n"
+        f"Connection: close\r\n"
+        f"Content-Type: text/html\r\n"
+        f"Content-Length: {len(body)}\r\n"
+        f"\r\n"
+        f"{body}"
+    )
+    write_nonblock(sock, response.encode("latin1"))
 
 
 def http_date(timestamp: float | None = None) -> str:
