@@ -19,34 +19,26 @@ async def pg_listen(
 ) -> AsyncGenerator[tuple[str | None, str], None]:
     """Async generator that yields (channel, payload) from Postgres NOTIFY.
 
-    Also sends periodic SSE heartbeat comments to keep connections alive.
+    Uses a shared per-worker Postgres connection instead of one per caller.
+    Also sends periodic heartbeats (None, "") to keep connections alive.
     """
-    import psycopg
-    import psycopg.sql
+    from .listener import SharedListener
 
-    from .listener import _get_connection_string
-
-    conninfo = _get_connection_string()
-    conn = await psycopg.AsyncConnection.connect(conninfo, autocommit=True)
+    listener = SharedListener.get()
+    queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
+    await listener.subscribe(queue, *channels)
 
     try:
-        for channel in channels:
-            await conn.execute(
-                psycopg.sql.SQL("LISTEN {}").format(psycopg.sql.Identifier(channel))
-            )
-
         while True:
-            async for notify in conn.notifies(timeout=heartbeat_interval):
-                yield notify.channel, notify.payload or ""
-            # Timeout — send heartbeat by yielding None
-            yield None, ""
-    except (psycopg.OperationalError, asyncio.CancelledError):
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
+                yield item
+            except TimeoutError:
+                yield None, ""
+    except asyncio.CancelledError:
         pass
     finally:
-        try:
-            await conn.close()
-        except Exception:
-            pass
+        await listener.unsubscribe(queue, *channels)
 
 
 class Channel(View):
