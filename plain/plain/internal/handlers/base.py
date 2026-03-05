@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import types
 from typing import TYPE_CHECKING, Any
@@ -136,8 +137,6 @@ class BaseHandler:
         When called from aget_response (via executor), async views are
         bridged back to the event loop via run_coroutine_threadsafe.
         """
-        import asyncio
-
         resolver_match = self.resolve_request(request)
         view_func = resolver_match.view
 
@@ -163,8 +162,6 @@ class BaseHandler:
         When the innermost handler encounters an async view, it bridges
         back to the event loop via run_coroutine_threadsafe.
         """
-        import asyncio
-
         assert self._middleware_chain is not None, (
             "load_middleware() must be called before aget_response()"
         )

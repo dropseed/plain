@@ -634,7 +634,9 @@ class Worker:
     ) -> None:
         """Handle a WebSocket upgrade and lifecycle."""
         from plain.realtime.websocket import (
+            CLOSE_MESSAGE_TOO_BIG,
             CLOSE_PROTOCOL_ERROR,
+            MAX_DATA_PAYLOAD,
             OP_BINARY,
             OP_CLOSE,
             OP_CONTINUATION,
@@ -722,6 +724,9 @@ class Worker:
                         )
                         break
                     frag_payload.extend(frame.payload)
+                    if len(frag_payload) > MAX_DATA_PAYLOAD:
+                        await ws_view.close(CLOSE_MESSAGE_TOO_BIG, "Message too large")
+                        break
                     if frame.fin:
                         await self._ws_dispatch(
                             ws_view, frag_opcode, bytes(frag_payload)
