@@ -341,7 +341,7 @@ Available methods for sending data back to the client:
 
 Server-push events arrive automatically when you `subscribe()` to Postgres NOTIFY channels. Clients receive them alongside messages sent via `send()`.
 
-For server-to-client push without bidirectional messaging, use [`Channel`](../realtime/README.md) (SSE) instead — it's simpler and works with the browser's `EventSource` API.
+For server-to-client push without bidirectional messaging, use [`SSEView`](../realtime/README.md) (SSE) instead — it's simpler and works with the browser's `EventSource` API.
 
 ## ResponseException
 

@@ -9,7 +9,7 @@ import struct
 
 import pytest
 
-from plain.realtime.channel import Channel
+from plain.realtime.channel import SSEView
 from plain.realtime.sse import SSE_HEADERS, format_sse_comment, format_sse_event
 from plain.realtime.websocket import (
     CLOSE_NORMAL,
@@ -78,17 +78,17 @@ class TestSSEFormatting:
         assert SSE_HEADERS["X-Accel-Buffering"] == "no"
 
 
-class TestChannelBaseClass:
+class TestSSEViewBaseClass:
     def test_default_authorize(self):
-        ch = Channel()
+        ch = SSEView()
         assert ch.authorize(None) is True  # type: ignore[arg-type]
 
     def test_default_subscribe(self):
-        ch = Channel()
+        ch = SSEView()
         assert ch.subscribe(None) == []  # type: ignore[arg-type]
 
     def test_default_transform(self):
-        ch = Channel()
+        ch = SSEView()
         assert ch.transform("chan", "payload") == "payload"
 
 

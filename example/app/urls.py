@@ -10,7 +10,7 @@ from plain.passwords.views import PasswordLoginView
 from plain.urls import Router, include, path
 from plain.views import TemplateView
 
-from .realtime import EchoChannel, EchoWebSocket  # type: ignore[unresolved-import]
+from .realtime import EchoSSE, EchoWebSocket  # type: ignore[unresolved-import]
 
 
 class LoginView(PasswordLoginView):
@@ -39,6 +39,6 @@ class AppRouter(Router):
         path("logout/", LogoutView, name="logout"),
         path("error/", ErrorView, name="error"),
         path("ws-echo/", EchoWebSocket, name="ws-echo"),
-        path("sse-echo/", EchoChannel, name="sse-echo"),
+        path("sse-echo/", EchoSSE, name="sse-echo"),
         path("", IndexView, name="index"),
     ]

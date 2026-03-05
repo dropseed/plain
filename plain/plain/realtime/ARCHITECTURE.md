@@ -51,13 +51,13 @@ The server needs to hold SSE/WebSocket connections open cheaply. Each idle conne
 
 The async thread is small and contained — it manages connections, Postgres LISTEN subscriptions, heartbeats, and event dispatch. Application code never touches it.
 
-### Sync Channel API, not async
+### Sync SSEView API, not async
 
 Django's approach to async was to make the entire stack async-capable: `async def` views, `aget()`/`afilter()` on querysets, `sync_to_async` wrappers everywhere. This created two parallel APIs, confused developers about which context they're in, and leaked complexity into every layer.
 
 Plain takes a different position: **async is infrastructure, not a programming model.**
 
-The `Channel` class methods — `authorize()`, `subscribe()`, `transform()`, `receive()` — are all sync. They have full access to the ORM, sessions, and everything else. The framework calls them via `run_in_executor()` from the async thread when needed. Developers never write `async def`, never import `sync_to_async`, never think about which context they're in.
+The `SSEView` class methods — `authorize()`, `subscribe()`, `transform()` — are all sync. They have full access to the ORM, sessions, and everything else. The framework calls them via `run_in_executor()` from the async thread when needed. Developers never write `async def`, never import `sync_to_async`, never think about which context they're in.
 
 The async code exists only inside the framework's internal `handler.py` and `listener.py`. It's invisible to application code.
 

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from plain.http import Request
-from plain.realtime import Channel
+from plain.realtime import SSEView
 from plain.views import WebSocketView
 
 
-class EchoChannel(Channel):
-    """SSE echo channel for testing."""
+class EchoSSE(SSEView):
+    """SSE echo endpoint for testing."""
 
     def authorize(self, request: Request) -> bool:
         return True

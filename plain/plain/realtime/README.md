@@ -3,7 +3,7 @@
 **Real-time server-to-client push using Postgres LISTEN/NOTIFY.**
 
 - [Overview](#overview)
-- [Defining a channel](#defining-a-channel)
+- [SSEView](#sseview)
 - [Sending events](#sending-events)
 - [Connecting from the browser](#connecting-from-the-browser)
 - [Authorization](#authorization)
@@ -13,15 +13,15 @@
 
 ## Overview
 
-The realtime module lets you push events to connected browsers. Define a `Channel` view with a URL, and the server handles SSE connections automatically. Events are sent from anywhere in your code using Postgres NOTIFY.
+The realtime module lets you push events to connected browsers. Define an `SSEView` with a URL, and the server handles SSE connections automatically. Events are sent from anywhere in your code using Postgres NOTIFY.
 
 ```python
 # app/realtime.py
-from plain.realtime import Channel, notify
+from plain.realtime import SSEView, notify
 from plain.http import Request
 
 
-class UserNotifications(Channel):
+class UserNotifications(SSEView):
     def authorize(self, request):
         return request.user.is_authenticated
 
@@ -58,20 +58,20 @@ events.onmessage = (e) => {
 };
 ```
 
-All channel methods are sync. You have full access to the ORM, sessions, and everything else — no `async def`, no `await`, no special wrappers.
+All `SSEView` methods are sync. You have full access to the ORM, sessions, and everything else — no `async def`, no `await`, no special wrappers.
 
 For bidirectional WebSocket communication, see [WebSocket views](#websocket-views) below.
 
-## Defining a channel
+## SSEView
 
-`Channel` is a `View` subclass. Register it in your URL router like any other view:
+`SSEView` is a `View` subclass for Server-Sent Events. Register it in your URL router like any other view:
 
 ```python
 # app/realtime.py
-from plain.realtime import Channel
+from plain.realtime import SSEView
 
 
-class DashboardUpdates(Channel):
+class DashboardUpdates(SSEView):
     def authorize(self, request):
         return request.user.is_staff
 
@@ -98,7 +98,7 @@ class AppRouter(Router):
     ]
 ```
 
-### Channel methods
+### SSEView methods
 
 | Method                             | Purpose                                                  | Required                |
 | ---------------------------------- | -------------------------------------------------------- | ----------------------- |
@@ -174,14 +174,14 @@ events.onerror = () => {
 
 ### WebSocket
 
-For bidirectional communication, use a `WebSocketView` (see [WebSocket views](#websocket-views)). For server-push only, SSE via `Channel` is simpler and recommended.
+For bidirectional communication, use a `WebSocketView` (see [WebSocket views](#websocket-views)). For server-push only, `SSEView` is simpler and recommended.
 
 ## Authorization
 
 `authorize()` runs in the sync request context with full access to cookies, sessions, and the ORM:
 
 ```python
-class ProjectEvents(Channel):
+class ProjectEvents(SSEView):
     def authorize(self, request):
         project_id = request.GET.get("project_id")
         if not project_id:
@@ -200,7 +200,7 @@ A failed `authorize()` returns a 403 response. An empty `subscribe()` list retur
 
 ## WebSocket views
 
-For bidirectional communication, use `WebSocketView` from `plain.views`. This is a separate view class from `Channel` — it handles the WebSocket protocol while `Channel` handles SSE.
+For bidirectional communication, use `WebSocketView` from `plain.views`. This is a separate view class from `SSEView` — it handles the WebSocket protocol while `SSEView` handles SSE.
 
 ```python
 from plain.views import WebSocketView
@@ -245,7 +245,7 @@ path("ws/chat/<room_id>/", ChatSocket)
 
 ### SSE vs WebSocket: which to use
 
-Most real-time use cases are **server-to-client push** (notifications, live updates, streaming AI). For these, use `Channel` with SSE:
+Most real-time use cases are **server-to-client push** (notifications, live updates, streaming AI). For these, use `SSEView`:
 
 - Works over regular HTTP — no upgrade handshake
 - Auth via cookies/headers, same as any request
@@ -261,7 +261,7 @@ Use `WebSocketView` when you genuinely need **high-frequency bidirectional messa
 ### Live notifications
 
 ```python
-class Notifications(Channel):
+class Notifications(SSEView):
     def authorize(self, request):
         return request.user.is_authenticated
 
@@ -288,7 +288,7 @@ def create_comment(request):
 ### Live dashboard
 
 ```python
-class Dashboard(Channel):
+class Dashboard(SSEView):
     def authorize(self, request):
         return request.user.is_staff
 
@@ -314,7 +314,7 @@ def compute_metrics():
 ### Chat (SSE + POST pattern)
 
 ```python
-class Chat(Channel):
+class Chat(SSEView):
     def authorize(self, request):
         room_id = request.GET.get("room")
         return ChatRoom.query.filter(
@@ -360,7 +360,7 @@ function sendMessage(text) {
 ### AI agent streaming
 
 ```python
-class AgentStream(Channel):
+class AgentStream(SSEView):
     def authorize(self, request):
         session_id = request.GET.get("session")
         return AgentSession.query.filter(
@@ -398,11 +398,11 @@ class EchoSocket(WebSocketView):
 
 ## How it works
 
-Channels use Postgres LISTEN/NOTIFY for event delivery and the server's built-in async infrastructure for connection management. No Redis, no external message broker, no separate process.
+SSE and WebSocket connections use Postgres LISTEN/NOTIFY for event delivery and the server's built-in async infrastructure for connection management. No Redis, no external message broker, no separate process.
 
-When a client connects to a channel URL:
+When a client connects to an SSE endpoint:
 
-1. The server matches the URL to a `Channel` view via the URL router
+1. The server matches the URL to an `SSEView` via the URL router
 2. `authorize()` and `subscribe()` run in the sync request context (full ORM access)
 3. The connection is handed off to a background async thread in the worker process
 4. The async thread subscribes to the specified Postgres channels via LISTEN

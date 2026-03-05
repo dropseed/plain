@@ -41,17 +41,17 @@ async def pg_listen(
         await listener.unsubscribe(queue, *channels)
 
 
-class Channel(View):
+class SSEView(View):
     """View subclass for Server-Sent Events (SSE) via Postgres LISTEN/NOTIFY.
 
     Register via URL router like any other view::
 
         # urls.py
-        path("events/user/", UserEventsChannel)
+        path("events/user/", UserEvents)
 
     Example::
 
-        class UserEventsChannel(Channel):
+        class UserEvents(SSEView):
             def authorize(self, request):
                 return request.user.is_authenticated
 

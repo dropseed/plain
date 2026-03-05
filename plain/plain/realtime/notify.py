@@ -16,7 +16,7 @@ def notify(channel: str, payload: Any = "") -> None:
     """Send a NOTIFY on a Postgres channel.
 
     Args:
-        channel: The channel name (must match what Channel.subscribe() returns).
+        channel: The channel name (must match what SSEView.subscribe() returns).
         payload: Data to send. Dicts/lists are JSON-serialized. Max 8000 bytes.
     """
     from plain.models import db_connection
