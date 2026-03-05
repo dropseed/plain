@@ -5,10 +5,8 @@ import os
 import click
 
 from plain.cli.options import SettingOption
-from plain.cli.runtime import without_runtime_setup
 
 
-@without_runtime_setup
 @click.command()
 @click.option(
     "--bind",

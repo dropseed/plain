@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 from plain.internal.reloader import Reloader
 
 from .. import sock, util
-from ..glogging import log_access
+from ..accesslog import log_access
 from ..http.errors import (
     ConfigurationProblem,
     InvalidHeader,
@@ -37,7 +37,7 @@ from ..http.errors import (
     UnsupportedTransferCoding,
 )
 from ..http.response import Response
-from .workertmp import WorkerTmp
+from .workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
     import socket
@@ -51,11 +51,13 @@ MAX_REQUESTS_JITTER = 50
 
 class Worker(ABC):
     SIGNALS = [
-        getattr(signal, f"SIG{x}")
-        for x in ("ABRT HUP QUIT INT TERM WINCH CHLD".split())
+        signal.SIGABRT,
+        signal.SIGHUP,
+        signal.SIGQUIT,
+        signal.SIGINT,
+        signal.SIGTERM,
+        signal.SIGWINCH,
     ]
-
-    PIPE = []
 
     def __init__(
         self,
@@ -65,12 +67,8 @@ class Worker(ABC):
         app: ServerApplication,
         timeout: int | float,
         log: logging.Logger,
+        heartbeat: WorkerHeartbeat,
     ):
-        """\
-        This is called pre-fork so it shouldn't do anything to the
-        current process. If there's a need to make process wide
-        changes you'll want to do that in ``self.init_process()``.
-        """
         self.age = age
         self.pid: str | int = "[booting]"
         self.ppid = ppid
@@ -78,7 +76,6 @@ class Worker(ABC):
         self.app = app
         self.timeout = timeout
         self.booted = False
-        self.aborted = False
         self.reloader: Any = None
 
         self.nr = 0
@@ -91,7 +88,7 @@ class Worker(ABC):
 
         self.alive = True
         self.log = log
-        self.tmp = WorkerTmp()
+        self.heartbeat = heartbeat
 
     def __str__(self) -> str:
         return f"<Worker {self.pid}>"
@@ -102,7 +99,7 @@ class Worker(ABC):
         once every ``self.timeout`` seconds. If you fail in accomplishing
         this task, the master process will murder your workers.
         """
-        self.tmp.notify()
+        self.heartbeat.notify()
 
     @abstractmethod
     def run(self) -> None:
@@ -124,15 +121,14 @@ class Worker(ABC):
         util.seed()
 
         # For waking ourselves up
-        self.PIPE = os.pipe()
+        self.PIPE: tuple[int, int] = os.pipe()
         for p in self.PIPE:
             util.set_non_blocking(p)
             util.close_on_exec(p)
 
-        # Prevent fd inheritance
+        # Prevent listener sockets from leaking into subprocesses
         for s in self.sockets:
             util.close_on_exec(s.fileno())
-        util.close_on_exec(self.tmp.fileno())
 
         self.wait_fds: list[sock.BaseSocket | int] = self.sockets + [self.PIPE[0]]
 

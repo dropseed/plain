@@ -1,18 +1,9 @@
 from __future__ import annotations
 
-#
-#
-# This file is part of gunicorn released under the MIT license.
-# See the LICENSE for more information.
-#
-# Vendored and modified for Plain.
 import datetime
 import logging
-import sys
 import traceback
 from typing import Any
-
-from plain.logs.formatters import KeyValueFormatter
 
 # Module-level loggers
 log = logging.getLogger("plain.server")
@@ -23,51 +14,6 @@ _HEADER_FIELDS = {
     "user_agent": "USER-AGENT",
     "referer": "REFERER",
 }
-
-
-def setup_bootstrap_logging(accesslog: bool) -> None:
-    """Set up minimal logging before fork.
-
-    Provides basic stderr/stdout handlers so the arbiter can log
-    before the full plain.logs configuration runs in worker processes.
-    """
-    log.setLevel(logging.INFO)
-    log.propagate = False
-    access_log.setLevel(logging.INFO)
-    access_log.propagate = False
-
-    # Error log always goes to stderr
-    _set_handler(
-        log,
-        logging.Formatter(
-            r"%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
-            r"[%Y-%m-%d %H:%M:%S %z]",
-        ),
-    )
-
-    # Access log goes to stdout when enabled
-    if accesslog:
-        _set_handler(
-            access_log,
-            KeyValueFormatter("[%(levelname)s] %(message)s %(keyvalue)s"),
-            stream=sys.stdout,
-        )
-
-
-def _set_handler(
-    logger: logging.Logger,
-    fmt: logging.Formatter,
-    stream: Any = None,
-) -> None:
-    """Replace any existing plain server handler on the logger."""
-    for h in logger.handlers[:]:
-        if getattr(h, "_plain_server", False):
-            logger.handlers.remove(h)
-
-    h = logging.StreamHandler(stream)
-    h.setFormatter(fmt)
-    h._plain_server = True  # type: ignore[attr-defined]
-    logger.addHandler(h)
 
 
 def _get_header(req: Any, header_name: str) -> str:

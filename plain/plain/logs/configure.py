@@ -30,16 +30,16 @@ def attach_log_handlers(
     logger.addHandler(warning_handler)
 
 
-def _create_app_formatter(app_log_format: str) -> logging.Formatter:
-    """Create a formatter based on the app log format setting."""
-    match app_log_format:
+def create_log_formatter(log_format: str) -> logging.Formatter:
+    """Create a formatter based on the log format setting."""
+    match log_format:
         case "json":
             return JSONFormatter("%(json)s")
         case "keyvalue":
             return KeyValueFormatter("[%(levelname)s] %(message)s %(keyvalue)s")
         case _:
             raise ValueError(
-                f"Invalid LOG_FORMAT: {app_log_format!r}. Must be 'keyvalue' or 'json'."
+                f"Invalid LOG_FORMAT: {log_format!r}. Must be 'keyvalue' or 'json'."
             )
 
 
@@ -79,7 +79,7 @@ def configure_logging(
     app_logger.propagate = False
 
     # Determine formatter based on app_log_format
-    formatter = _create_app_formatter(app_log_format)
+    formatter = create_log_formatter(app_log_format)
 
     attach_log_handlers(
         logger=app_logger,
@@ -90,20 +90,3 @@ def configure_logging(
 
     # Register the app_logger in the logging system so getLogger("app") returns it
     logging.root.manager.loggerDict["app"] = app_logger
-
-    # Reconfigure server loggers (post-fork in worker processes).
-    # Replace bootstrap handlers with propagation to the "plain" logger,
-    # keeping the access log on its own stdout handler.
-    server_logger = logging.getLogger("plain.server")
-    server_logger.handlers.clear()
-    server_logger.propagate = True  # inherit from "plain" logger
-
-    server_access_logger = logging.getLogger("plain.server.access")
-    # Replace bootstrap handler with a properly configured one
-    had_handlers = bool(server_access_logger.handlers)
-    server_access_logger.handlers.clear()
-    server_access_logger.propagate = False
-    if had_handlers:
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(_create_app_formatter(app_log_format))
-        server_access_logger.addHandler(handler)

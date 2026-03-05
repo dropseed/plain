@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Any
 from plain import signals
 
 from .. import http, sock, util
-from ..glogging import log_access
+from ..accesslog import log_access
 from ..http import response as server_response
 from . import base
 
@@ -395,7 +395,7 @@ class ThreadWorker(base.Worker):
                 return False
         except OSError:
             # pass to next try-except level
-            util.reraise(*sys.exc_info())
+            raise
         except Exception:
             if resp and resp.headers_sent:
                 # If the requests have already been sent, we should close the

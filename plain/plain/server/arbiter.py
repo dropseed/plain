@@ -8,26 +8,36 @@ from __future__ import annotations
 # Vendored and modified for Plain.
 import errno
 import logging
+import multiprocessing
 import os
-import random
-import select
 import signal
 import sys
+import threading
 import time
-import traceback
-from types import FrameType
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import plain.runtime
+from plain.runtime import settings
 
-from . import sock, util
-from .errors import AppImportError, HaltServer
-from .glogging import setup_bootstrap_logging
+from . import sock
+from .errors import APP_LOAD_ERROR, WORKER_BOOT_ERROR, HaltServer
 from .pidfile import Pidfile
+from .workers.entry import worker_main
 from .workers.thread import ThreadWorker
+from .workers.workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
     from .app import ServerApplication
+
+
+@dataclass
+class WorkerInfo:
+    process: multiprocessing.process.BaseProcess
+    heartbeat: WorkerHeartbeat
+    age: int
+    spawned_at: float = field(default_factory=time.monotonic)
+    aborted: bool = field(default=False)
 
 
 class Arbiter:
@@ -36,82 +46,68 @@ class Arbiter:
     kills them if needed.
     """
 
-    # A flag indicating if a worker failed to
-    # to boot. If a worker process exist with
-    # this error code, the arbiter will terminate.
-    WORKER_BOOT_ERROR: int = 3
-
-    # A flag indicating if an application failed to be loaded
-    APP_LOAD_ERROR: int = 4
-
-    START_CTX: dict[int | str, Any] = {}
-
-    LISTENERS: list[sock.BaseSocket] = []
-    WORKERS: dict[int, ThreadWorker] = {}
-    PIPE: list[int] = []
-
-    # I love dynamic languages
-    SIG_QUEUE: list[int] = []
-    SIGNALS: list[int] = [getattr(signal, f"SIG{x}") for x in "QUIT INT TERM".split()]
-    SIG_NAMES: dict[int, str] = {
-        getattr(signal, name): name[3:].lower()
-        for name in dir(signal)
-        if name[:3] == "SIG" and name[3] != "_"
-    }
-
     def __init__(self, app: ServerApplication):
         os.environ["SERVER_SOFTWARE"] = f"plain/{plain.runtime.__version__}"
 
-        self._num_workers: int | None = None
-        self._last_logged_active_worker_count: int | None = None
-
-        self.setup(app)
-
-        self.pidfile: Pidfile | None = None
-        self.worker_age: int = 0
-
-        cwd = util.getcwd()
-
-        args = sys.argv[:]
-        args.insert(0, sys.executable)
-
-        # init start context
-        self.START_CTX = {"args": args, "cwd": cwd, 0: sys.executable}
-
-    def _get_num_workers(self) -> int:
-        assert self._num_workers is not None, "num_workers not initialized"
-        return self._num_workers
-
-    def _set_num_workers(self, value: int) -> None:
-        self._num_workers = value
-
-    num_workers = property(_get_num_workers, _set_num_workers)
-
-    def setup(self, app: ServerApplication) -> None:
-        self.app: ServerApplication = app
-
-        if not hasattr(self, "log"):
-            setup_bootstrap_logging(self.app.accesslog)
-            self.log: logging.Logger = logging.getLogger("plain.server")
-
-        self.num_workers = self.app.workers
-        self.timeout: int = self.app.timeout
-
-    def start(self) -> None:
-        """\
-        Initialize the arbiter. Start listening and set pidfile if needed.
-        """
+        self.app = app
+        self.log: logging.Logger = logging.getLogger("plain.server")
+        self.num_workers: int = app.workers
+        self.timeout: int = app.timeout
         self.pid: int = os.getpid()
+        self.worker_age: int = 0
+        self.pidfile: Pidfile | None = None
+
+        self._workers: dict[int, WorkerInfo] = {}
+        self._listeners: list[sock.BaseSocket] = []
+        self._shutdown_event = threading.Event()
+        self._graceful_shutdown = True
+        self._halt_error: HaltServer | None = None
+        self._last_logged_active_worker_count: int | None = None
+        self._mp_context = multiprocessing.get_context("spawn")
+
+    def run(self) -> None:
+        """Main supervisor loop."""
+        self._start()
+
+        try:
+            self.manage_workers()
+
+            while not self._shutdown_event.is_set():
+                self.reap_workers()
+                if self._halt_error:
+                    raise self._halt_error
+                self.murder_workers()
+                self.manage_workers()
+                self._shutdown_event.wait(timeout=1.0)
+
+            self._halt(graceful=self._graceful_shutdown)
+        except KeyboardInterrupt:
+            self._halt(graceful=False)
+        except HaltServer as inst:
+            self._halt(reason=inst.reason, exit_status=inst.exit_status)
+        except SystemExit:
+            raise
+        except Exception:
+            self.log.error("Unhandled exception in main loop", exc_info=True)
+            self._stop(graceful=False)
+            if self.pidfile is not None:
+                self.pidfile.unlink()
+            sys.exit(-1)
+
+    def _start(self) -> None:
+        """Initialize the arbiter. Start listening and set pidfile if needed."""
         if self.app.pidfile is not None:
             self.pidfile = Pidfile(self.app.pidfile)
             self.pidfile.create(self.pid)
 
-        self.init_signals()
+        # SIGTERM = graceful shutdown, SIGINT/SIGQUIT = immediate shutdown
+        signal.signal(signal.SIGTERM, self._handle_signal)
+        signal.signal(signal.SIGINT, self._handle_hard_stop)
+        signal.signal(signal.SIGQUIT, self._handle_hard_stop)
 
-        if not self.LISTENERS:
-            self.LISTENERS = sock.create_sockets(self.app)
+        self._listeners = sock.create_sockets(self.app)
 
-        listeners_str = ",".join([str(lnr) for lnr in self.LISTENERS])
+        listeners_str = ",".join([str(lnr) for lnr in self._listeners])
         self.log.info(
             "Plain server started address=%s pid=%s version=%s",
             listeners_str,
@@ -121,104 +117,18 @@ class Arbiter:
 
         ThreadWorker.check_config(self.app.threads, self.log)
 
-    def init_signals(self) -> None:
-        """\
-        Initialize master signal handling. Most of the signals
-        are queued. Child signals only wake up the master.
-        """
-        # close old PIPE
-        for p in self.PIPE:
-            os.close(p)
+    def _handle_signal(self, sig: int, frame: object) -> None:
+        self._shutdown_event.set()
 
-        # initialize the pipe
-        pair = os.pipe()
-        self.PIPE = list(pair)
-        for p in pair:
-            util.set_non_blocking(p)
-            util.close_on_exec(p)
+    def _handle_hard_stop(self, sig: int, frame: object) -> None:
+        self._graceful_shutdown = False
+        self._shutdown_event.set()
 
-        # initialize all signals
-        for s in self.SIGNALS:
-            signal.signal(s, self.signal)
-        signal.signal(signal.SIGCHLD, self.handle_chld)
-
-    def signal(self, sig: int, frame: FrameType | None) -> None:
-        if len(self.SIG_QUEUE) < 5:
-            self.SIG_QUEUE.append(sig)
-            self.wakeup()
-
-    def run(self) -> None:
-        "Main master loop."
-        self.start()
-
-        try:
-            self.manage_workers()
-
-            while True:
-                sig = self.SIG_QUEUE.pop(0) if self.SIG_QUEUE else None
-                if sig is None:
-                    self.sleep()
-                    self.murder_workers()
-                    self.manage_workers()
-                    continue
-
-                if sig not in self.SIG_NAMES:
-                    self.log.info("Ignoring unknown signal: %s", sig)
-                    continue
-
-                signame = self.SIG_NAMES.get(sig)
-                handler = getattr(self, f"handle_{signame}", None)
-                if not handler:
-                    self.log.error("Unhandled signal: %s", signame)
-                    continue
-                self.log.info("Handling signal: %s", signame)
-                handler()
-                self.wakeup()
-        except (StopIteration, KeyboardInterrupt):
-            self.halt()
-        except HaltServer as inst:
-            self.halt(reason=inst.reason, exit_status=inst.exit_status)
-        except SystemExit:
-            raise
-        except Exception:
-            self.log.error("Unhandled exception in main loop", exc_info=True)
-            self.stop(False)
-            if self.pidfile is not None:
-                self.pidfile.unlink()
-            sys.exit(-1)
-
-    def handle_chld(self, sig: int, frame: FrameType | None) -> None:
-        "SIGCHLD handling"
-        self.reap_workers()
-        self.wakeup()
-
-    def handle_term(self) -> None:
-        "SIGTERM handling"
-        raise StopIteration
-
-    def handle_int(self) -> None:
-        "SIGINT handling"
-        self.stop(False)
-        raise StopIteration
-
-    def handle_quit(self) -> None:
-        "SIGQUIT handling"
-        self.stop(False)
-        raise StopIteration
-
-    def wakeup(self) -> None:
-        """\
-        Wake up the arbiter by writing to the PIPE
-        """
-        try:
-            os.write(self.PIPE[1], b".")
-        except OSError as e:
-            if e.errno not in [errno.EAGAIN, errno.EINTR]:
-                raise
-
-    def halt(self, reason: str | None = None, exit_status: int = 0) -> None:
-        """halt arbiter"""
-        self.stop()
+    def _halt(
+        self, reason: str | None = None, exit_status: int = 0, graceful: bool = True
+    ) -> None:
+        """Halt arbiter."""
+        self._stop(graceful=graceful)
 
         log_func = self.log.info if exit_status == 0 else self.log.error
         log_func("Shutting down: Master")
@@ -229,139 +139,107 @@ class Arbiter:
             self.pidfile.unlink()
         sys.exit(exit_status)
 
-    def sleep(self) -> None:
-        """\
-        Sleep until PIPE is readable or we timeout.
-        A readable PIPE means a signal occurred.
-        """
-        try:
-            ready = select.select([self.PIPE[0]], [], [], 1.0)
-            if not ready[0]:
-                return
-            while os.read(self.PIPE[0], 1):
-                pass
-        except OSError as e:
-            # TODO: select.error is a subclass of OSError since Python 3.3.
-            error_number = getattr(e, "errno", e.args[0])
-            if error_number not in [errno.EAGAIN, errno.EINTR]:
-                raise
-        except KeyboardInterrupt:
-            sys.exit()
+    def _stop(self, graceful: bool = True) -> None:
+        """Stop workers."""
+        sock.close_sockets(self._listeners, unlink=True)
+        self._listeners = []
 
-    def stop(self, graceful: bool = True) -> None:
-        """\
-        Stop workers
-
-        :attr graceful: boolean, If True (the default) workers will be
-        killed gracefully  (ie. trying to wait for the current connection)
-        """
-        sock.close_sockets(self.LISTENERS, unlink=True)
-
-        self.LISTENERS = []
-        sig = signal.SIGTERM
-        if not graceful:
-            sig = signal.SIGQUIT
-        from plain.runtime import settings
-
+        sig = signal.SIGTERM if graceful else signal.SIGQUIT
         limit = time.time() + settings.SERVER_GRACEFUL_TIMEOUT
-        # instruct the workers to exit
-        self.kill_workers(sig)
-        # wait until the graceful timeout
-        while self.WORKERS and time.time() < limit:
+
+        # Instruct the workers to exit
+        self._kill_workers(sig)
+
+        # Wait until the graceful timeout
+        while self._workers and time.time() < limit:
+            self.reap_workers()
             time.sleep(0.1)
 
-        self.kill_workers(signal.SIGKILL)
+        self._kill_workers(signal.SIGKILL)
+
+        # Join and close all remaining processes
+        for pid in list(self._workers):
+            info = self._workers.pop(pid)
+            info.process.join(timeout=5)
+            info.heartbeat.close()
+            info.process.close()
 
     def murder_workers(self) -> None:
-        """\
-        Kill unused/idle workers
-        """
+        """Kill workers that have stopped heartbeating."""
         if not self.timeout:
-            return None
-        workers = list(self.WORKERS.items())
-        for pid, worker in workers:
+            return
+
+        now = time.monotonic()
+        for pid, info in list(self._workers.items()):
+            # Don't kill workers that haven't had enough time to boot
+            # and start heartbeating (spawn is slower than fork).
+            if now - info.spawned_at < self.timeout:
+                continue
+
             try:
-                if time.monotonic() - worker.tmp.last_update() <= self.timeout:
+                if now - info.heartbeat.last_update() <= self.timeout:
                     continue
             except (OSError, ValueError):
                 continue
 
-            if not worker.aborted:
+            if not info.aborted:
                 self.log.critical("WORKER TIMEOUT (pid:%s)", pid)
-                worker.aborted = True
-                self.kill_worker(pid, signal.SIGABRT)
+                info.aborted = True
+                self._kill_worker(pid, signal.SIGABRT)
             else:
-                self.kill_worker(pid, signal.SIGKILL)
+                self._kill_worker(pid, signal.SIGKILL)
 
     def reap_workers(self) -> None:
-        """\
-        Reap workers to avoid zombie processes
         """
-        try:
-            while True:
-                wpid, status = os.waitpid(-1, os.WNOHANG)
-                if not wpid:
-                    break
+        Reap dead workers and log exit reasons.
+        Sets self._halt_error if a worker failed to boot.
+        """
+        for pid in list(self._workers):
+            info = self._workers[pid]
+            if info.process.is_alive():
+                continue
 
-                # A worker was terminated. If the termination reason was
-                # that it could not boot, we'll shut it down to avoid
-                # infinite start/stop cycles.
-                exitcode = status >> 8
-                if exitcode != 0:
-                    self.log.error(
-                        "Worker (pid:%s) exited with code %s", wpid, exitcode
-                    )
-                if exitcode == self.WORKER_BOOT_ERROR:
-                    reason = "Worker failed to boot."
-                    raise HaltServer(reason, self.WORKER_BOOT_ERROR)
-                if exitcode == self.APP_LOAD_ERROR:
-                    reason = "App failed to load."
-                    raise HaltServer(reason, self.APP_LOAD_ERROR)
+            exitcode = info.process.exitcode
+            if exitcode is None:
+                continue
 
-                if exitcode > 0:
-                    # If the exit code of the worker is greater than 0,
-                    # let the user know.
-                    self.log.error(
-                        "Worker (pid:%s) exited with code %s.", wpid, exitcode
-                    )
-                elif status > 0:
-                    # If the exit code of the worker is 0 and the status
-                    # is greater than 0, then it was most likely killed
-                    # via a signal.
-                    try:
-                        sig_name = signal.Signals(status).name
-                    except ValueError:
-                        sig_name = f"code {status}"
-                    msg = f"Worker (pid:{wpid}) was sent {sig_name}!"
+            if exitcode != 0:
+                self.log.error("Worker (pid:%s) exited with code %s", pid, exitcode)
 
-                    # Additional hint for SIGKILL
-                    if status == signal.SIGKILL:
-                        msg += " Perhaps out of memory?"
-                    self.log.error(msg)
+            if exitcode == WORKER_BOOT_ERROR and self._halt_error is None:
+                self._halt_error = HaltServer(
+                    "Worker failed to boot.", WORKER_BOOT_ERROR
+                )
+            elif exitcode == APP_LOAD_ERROR and self._halt_error is None:
+                self._halt_error = HaltServer("App failed to load.", APP_LOAD_ERROR)
+            elif exitcode < 0:
+                # Negative exit codes mean the worker was killed by a signal
+                try:
+                    sig_name = signal.Signals(-exitcode).name
+                except ValueError:
+                    sig_name = f"signal {-exitcode}"
+                msg = f"Worker (pid:{pid}) was sent {sig_name}!"
+                if -exitcode == signal.SIGKILL:
+                    msg += " Perhaps out of memory?"
+                self.log.error(msg)
 
-                worker = self.WORKERS.pop(wpid, None)
-                if not worker:
-                    continue
-                worker.tmp.close()
-        except OSError as e:
-            if e.errno != errno.ECHILD:
-                raise
+            info.heartbeat.close()
+            info.process.join(timeout=0)
+            info.process.close()
+            del self._workers[pid]
 
     def manage_workers(self) -> None:
-        """\
-        Maintain the number of workers by spawning or killing
-        as required.
-        """
-        if len(self.WORKERS) < self.num_workers:
-            self.spawn_workers()
+        """Maintain the number of workers by spawning or killing as required."""
+        while len(self._workers) < self.num_workers:
+            self._spawn_worker()
 
-        workers = self.WORKERS.items()
-        workers = sorted(workers, key=lambda w: w[1].age)
-        while len(workers) > self.num_workers:
-            (pid, _) = workers.pop(0)
-            self.kill_worker(pid, signal.SIGTERM)
+        if len(self._workers) > self.num_workers:
+            workers = sorted(self._workers.items(), key=lambda w: w[1].age)
+            while len(workers) > self.num_workers:
+                (pid, _) = workers.pop(0)
+                self._kill_worker(pid, signal.SIGTERM)
 
-        active_worker_count = len(workers)
+        active_worker_count = len(self._workers)
         if self._last_logged_active_worker_count != active_worker_count:
             self._last_logged_active_worker_count = active_worker_count
             self.log.debug(
@@ -373,89 +251,47 @@ class Arbiter:
                 },
             )
 
-    def spawn_worker(self) -> int:
+    def _spawn_worker(self) -> None:
         self.worker_age += 1
-        worker = ThreadWorker(
-            self.worker_age,
-            self.pid,
-            self.LISTENERS,
-            self.app,
-            self.timeout / 2.0,
-            self.log,
+        heartbeat = WorkerHeartbeat(self._mp_context)
+
+        # Serialize listener info for the spawned process.
+        # Raw socket objects are pickled via multiprocessing (SCM_RIGHTS on Unix).
+        listener_data = [
+            (listener.sock, listener.cfg_addr, listener.FAMILY, listener.is_ssl)
+            for listener in self._listeners
+        ]
+
+        process = self._mp_context.Process(
+            target=worker_main,
+            args=(
+                self.worker_age,
+                listener_data,
+                self.app,
+                self.timeout / 2.0,
+                heartbeat,
+            ),
         )
-        pid = os.fork()
-        if pid != 0:
-            worker.pid = pid
-            self.WORKERS[pid] = worker
-            return pid
+        process.start()
+        assert process.pid is not None
+        self._workers[process.pid] = WorkerInfo(process, heartbeat, self.worker_age)
 
-        # Do not inherit the temporary files of other workers
-        for sibling in self.WORKERS.values():
-            sibling.tmp.close()
+    def _kill_workers(self, sig: int) -> None:
+        """Kill all workers with the signal `sig`."""
+        for pid in list(self._workers.keys()):
+            self._kill_worker(pid, sig)
 
-        # Process Child
-        worker.pid = os.getpid()
-        try:
-            self.log.info("Server worker started pid=%s", worker.pid)
-            worker.init_process()
-            sys.exit(0)
-        except SystemExit:
-            raise
-        except AppImportError as e:
-            self.log.debug("Exception while loading the application", exc_info=True)
-            print(f"{e}", file=sys.stderr)
-            sys.stderr.flush()
-            sys.exit(self.APP_LOAD_ERROR)
-        except Exception:
-            self.log.exception("Exception in worker process")
-            if not worker.booted:
-                sys.exit(self.WORKER_BOOT_ERROR)
-            sys.exit(-1)
-        finally:
-            self.log.info("Server worker exiting (pid: %s)", worker.pid)
-            try:
-                worker.tmp.close()
-            except Exception:
-                self.log.warning(
-                    "Exception during worker exit:\n%s", traceback.format_exc()
-                )
-
-    def spawn_workers(self) -> None:
-        """\
-        Spawn new workers as needed.
-
-        This is where a worker process leaves the main loop
-        of the master process.
-        """
-
-        for _ in range(self.num_workers - len(self.WORKERS)):
-            self.spawn_worker()
-            time.sleep(0.1 * random.random())
-
-    def kill_workers(self, sig: int) -> None:
-        """\
-        Kill all workers with the signal `sig`
-        :attr sig: `signal.SIG*` value
-        """
-        worker_pids = list(self.WORKERS.keys())
-        for pid in worker_pids:
-            self.kill_worker(pid, sig)
-
-    def kill_worker(self, pid: int, sig: int) -> None:
-        """\
-        Kill a worker
-
-        :attr pid: int, worker pid
-        :attr sig: `signal.SIG*` value
-         """
+    def _kill_worker(self, pid: int, sig: int) -> None:
+        """Kill a worker."""
         try:
             os.kill(pid, sig)
         except OSError as e:
             if e.errno == errno.ESRCH:
                 try:
-                    worker = self.WORKERS.pop(pid)
-                    worker.tmp.close()
-                    return None
+                    info = self._workers.pop(pid)
+                    info.heartbeat.close()
+                    info.process.close()
                 except (KeyError, OSError):
-                    return None
+                    pass
+                return
             raise

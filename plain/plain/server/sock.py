@@ -80,11 +80,6 @@ class BaseSocket:
         if not bound:
             self.bind(sock)
         sock.setblocking(False)
-
-        # make sure that the socket can be inherited
-        if hasattr(sock, "set_inheritable"):
-            sock.set_inheritable(True)
-
         sock.listen(BACKLOG)
         return sock
 
