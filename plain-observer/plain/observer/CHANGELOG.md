@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-observer@0.28.0) (2026-03-04)
+
+### What's changed
+
+- Updated `Observer.__init__` to accept `Mapping` instead of `dict` for `cookies` and `headers` parameters, matching the new `RequestHeaders` type from plain 0.113.0 ([acec7dfd89be](https://github.com/dropseed/plain/commit/acec7dfd89be))
+
+### Upgrade instructions
+
+- Requires plain >= 0.113.0.
+
 ## [0.27.5](https://github.com/dropseed/plain/releases/plain-observer@0.27.5) (2026-02-26)
 
 ### What's changed
