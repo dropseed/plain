@@ -132,28 +132,46 @@ class BaseHandler:
         Resolve and call the view, then apply view, exception, and
         template_response middleware. This method is everything that happens
         inside the request/response middleware.
-        """
-        resolver_match = self.resolve_request(request)
 
-        response = resolver_match.view(
-            request, *resolver_match.args, **resolver_match.kwargs
-        )
+        When called from aget_response (via executor), async views are
+        bridged back to the event loop via run_coroutine_threadsafe.
+        """
+        import asyncio
+
+        resolver_match = self.resolve_request(request)
+        view_func = resolver_match.view
+
+        event_loop = getattr(request, "_event_loop", None)
+        if event_loop is not None and inspect.iscoroutinefunction(view_func):
+            coro = view_func(request, *resolver_match.args, **resolver_match.kwargs)
+            future = asyncio.run_coroutine_threadsafe(coro, event_loop)
+            response = future.result()
+        else:
+            response = view_func(request, *resolver_match.args, **resolver_match.kwargs)
 
         # Complain if the view returned None (a common error).
-        self.check_response(response, resolver_match.view)
+        self.check_response(response, view_func)
 
         return response
 
-    async def aget_response(self, request: Request) -> ResponseBase:
+    async def aget_response(
+        self, request: Request, executor: Any = None
+    ) -> ResponseBase:
         """Return a Response for the given Request, supporting async views.
 
-        Note: This bypasses the middleware chain because sync middleware
-        cannot call async views. Middleware support for async views
-        requires async-aware middleware wrapping (future work).
+        Runs the full sync middleware chain in an executor thread.
+        When the innermost handler encounters an async view, it bridges
+        back to the event loop via run_coroutine_threadsafe.
         """
+        import asyncio
+
         assert self._middleware_chain is not None, (
             "load_middleware() must be called before aget_response()"
         )
+
+        loop = asyncio.get_running_loop()
+        # Store loop on request so _get_response can bridge async views
+        request._event_loop = loop  # type: ignore[attr-defined]
 
         span_attributes, span_context = self._build_request_span(request)
 
@@ -163,27 +181,12 @@ class BaseHandler:
             attributes=span_attributes,
             kind=trace.SpanKind.SERVER,
         ) as span:
-            response = await self._aget_response(request)
+            response = await loop.run_in_executor(
+                executor, self._middleware_chain, request
+            )
             response._resource_closers.append(request.close)
             self._finish_span(span, response)
             return response
-
-    async def _aget_response(self, request: Request) -> ResponseBase:
-        """Async version of _get_response for async views."""
-        resolver_match = self.resolve_request(request)
-
-        view_func = resolver_match.view
-
-        if inspect.iscoroutinefunction(view_func):
-            response = await view_func(
-                request, *resolver_match.args, **resolver_match.kwargs
-            )
-        else:
-            response = view_func(request, *resolver_match.args, **resolver_match.kwargs)
-
-        self.check_response(response, view_func)
-
-        return response
 
     def resolve_request(self, request: Request) -> ResolverMatch:
         """

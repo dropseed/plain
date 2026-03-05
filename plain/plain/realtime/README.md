@@ -7,27 +7,39 @@
 - [Sending events](#sending-events)
 - [Connecting from the browser](#connecting-from-the-browser)
 - [Authorization](#authorization)
-- [WebSocket support](#websocket-support)
+- [WebSocket views](#websocket-views)
 - [Patterns](#patterns)
 - [How it works](#how-it-works)
 
 ## Overview
 
-The realtime module lets you push events to connected browsers. Define a `Channel` class with a path, and the server handles SSE and WebSocket connections automatically. Events are sent from anywhere in your code using Postgres NOTIFY.
+The realtime module lets you push events to connected browsers. Define a `Channel` view with a URL, and the server handles SSE connections automatically. Events are sent from anywhere in your code using Postgres NOTIFY.
 
 ```python
 # app/realtime.py
-from plain.realtime import Channel, realtime_registry, notify
+from plain.realtime import Channel, notify
+from plain.http import Request
 
-@realtime_registry.register
+
 class UserNotifications(Channel):
-    path = "/events/notifications/"
-
     def authorize(self, request):
         return request.user.is_authenticated
 
     def subscribe(self, request):
         return [f"user:{request.user.pk}"]
+```
+
+```python
+# app/urls.py
+from plain.urls import Router, path
+from .realtime import UserNotifications
+
+
+class AppRouter(Router):
+    namespace = ""
+    urls = [
+        path("events/notifications/", UserNotifications),
+    ]
 ```
 
 ```python
@@ -48,17 +60,18 @@ events.onmessage = (e) => {
 
 All channel methods are sync. You have full access to the ORM, sessions, and everything else — no `async def`, no `await`, no special wrappers.
 
+For bidirectional WebSocket communication, see [WebSocket views](#websocket-views) below.
+
 ## Defining a channel
 
-Create a `realtime.py` file in your app (it's autodiscovered). Subclass `Channel` and register it:
+`Channel` is a `View` subclass. Register it in your URL router like any other view:
 
 ```python
-from plain.realtime import Channel, realtime_registry
+# app/realtime.py
+from plain.realtime import Channel
 
-@realtime_registry.register
+
 class DashboardUpdates(Channel):
-    path = "/events/dashboard/"
-
     def authorize(self, request):
         return request.user.is_staff
 
@@ -72,14 +85,26 @@ class DashboardUpdates(Channel):
         return {"metric": channel_name, "value": payload}
 ```
 
+```python
+# app/urls.py
+from plain.urls import Router, path
+from .realtime import DashboardUpdates
+
+
+class AppRouter(Router):
+    namespace = ""
+    urls = [
+        path("events/dashboard/", DashboardUpdates),
+    ]
+```
+
 ### Channel methods
 
-| Method                             | Purpose                                                        | Required                |
-| ---------------------------------- | -------------------------------------------------------------- | ----------------------- |
-| `authorize(request)`               | Return `True` to allow the connection, `False` for 403         | No (defaults to `True`) |
-| `subscribe(request)`               | Return a list of Postgres channel names to listen on           | Yes                     |
-| `transform(channel_name, payload)` | Reshape the event before sending. Return `None` to skip.       | No (sends raw payload)  |
-| `receive(message)`                 | Handle incoming WebSocket messages. Return a value to respond. | No (WebSocket only)     |
+| Method                             | Purpose                                                  | Required                |
+| ---------------------------------- | -------------------------------------------------------- | ----------------------- |
+| `authorize(request)`               | Return `True` to allow the connection, `False` for 403   | No (defaults to `True`) |
+| `subscribe(request)`               | Return a list of Postgres channel names to listen on     | Yes                     |
+| `transform(channel_name, payload)` | Reshape the event before sending. Return `None` to skip. | No (sends raw payload)  |
 
 All methods receive the full `Request` object with access to `request.user`, the ORM, sessions, etc.
 
@@ -149,29 +174,14 @@ events.onerror = () => {
 
 ### WebSocket
 
-```javascript
-const ws = new WebSocket("wss://example.com/events/notifications/");
-
-ws.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    console.log(data);
-};
-
-// Send messages to the server (triggers channel.receive())
-ws.send("hello");
-```
-
-The same `Channel` class handles both SSE and WebSocket connections. The protocol is determined by the client's request headers.
+For bidirectional communication, use a `WebSocketView` (see [WebSocket views](#websocket-views)). For server-push only, SSE via `Channel` is simpler and recommended.
 
 ## Authorization
 
 `authorize()` runs in the sync request context with full access to cookies, sessions, and the ORM:
 
 ```python
-@realtime_registry.register
 class ProjectEvents(Channel):
-    path = "/events/project/"
-
     def authorize(self, request):
         project_id = request.GET.get("project_id")
         if not project_id:
@@ -186,46 +196,82 @@ class ProjectEvents(Channel):
         return [f"project:{project_id}"]
 ```
 
-A failed `authorize()` returns a 403 response. An empty `subscribe()` list returns a 400.
+A failed `authorize()` returns a 403 response. An empty `subscribe()` list returns a 403.
 
-## WebSocket support
+## WebSocket views
 
-For bidirectional communication, implement `receive()`:
+For bidirectional communication, use `WebSocketView` from `plain.views`. This is a separate view class from `Channel` — it handles the WebSocket protocol while `Channel` handles SSE.
 
 ```python
-@realtime_registry.register
-class ChatRoom(Channel):
-    path = "/ws/chat/"
+from plain.views import WebSocketView
 
-    def authorize(self, request):
-        return request.user.is_authenticated
 
-    def subscribe(self, request):
-        room_id = request.GET["room"]
-        return [f"chat:{room_id}"]
+class ChatSocket(WebSocketView):
+    async def authorize(self):
+        return self.request.user.is_authenticated
 
-    def receive(self, message):
+    async def connect(self):
+        room_id = self.url_kwargs["room_id"]
+        await self.subscribe(f"chat:{room_id}")
+
+    async def receive(self, message):
         # Called when the client sends a WebSocket message.
-        # Return a value to send a response back to the sender.
-        return f"echo: {message}"
+        await self.send(f"echo: {message}")
+
+    async def disconnect(self):
+        # Called when the connection closes. Optional.
+        pass
 ```
 
-For chat, the typical pattern is: client sends a message via HTTP POST (which saves to the database and calls `notify()`), and all connected clients receive it through their channel subscription. The `receive()` method is for cases where you need direct request/response over the WebSocket itself.
+```python
+# urls.py
+path("ws/chat/<room_id>/", ChatSocket)
+```
+
+### WebSocketView methods
+
+| Method                | Purpose                                                | Required |
+| --------------------- | ------------------------------------------------------ | -------- |
+| `authorize()`         | Return `True` to allow, `False` for 403                | No       |
+| `connect()`           | Called after connection established. Subscribe here.   | No       |
+| `receive(message)`    | Handle incoming messages (`str` or `bytes`)            | No       |
+| `disconnect()`        | Called on connection close. Cleanup here.              | No       |
+| `send(message)`       | Send a text or binary message to the client            | -        |
+| `send_json(data)`     | Send JSON data to the client                           | -        |
+| `subscribe(channel)`  | Subscribe to a Postgres NOTIFY channel for push events | -        |
+| `close(code, reason)` | Close the connection                                   | -        |
+
+**Note:** `WebSocketView` methods are `async`. This is the one place in Plain where you write async code, because WebSocket lifecycle management requires it. You still have access to `self.request` for auth checking.
+
+### SSE vs WebSocket: which to use
+
+Most real-time use cases are **server-to-client push** (notifications, live updates, streaming AI). For these, use `Channel` with SSE:
+
+- Works over regular HTTP — no upgrade handshake
+- Auth via cookies/headers, same as any request
+- Browser's `EventSource` auto-reconnects
+- Load balancers and proxies understand it natively
+
+For cases where the client needs to send data (form input, chat messages), pair SSE with a normal HTTP POST. The server saves and calls `notify()`, and all SSE listeners receive the event.
+
+Use `WebSocketView` when you genuinely need **high-frequency bidirectional messaging** — collaborative editing, multiplayer, or request/response patterns that would be too chatty over HTTP.
 
 ## Patterns
 
 ### Live notifications
 
 ```python
-@realtime_registry.register
 class Notifications(Channel):
-    path = "/events/notifications/"
-
     def authorize(self, request):
         return request.user.is_authenticated
 
     def subscribe(self, request):
         return [f"user:{request.user.pk}"]
+```
+
+```python
+# urls.py
+path("events/notifications/", Notifications)
 ```
 
 ```python
@@ -242,10 +288,7 @@ def create_comment(request):
 ### Live dashboard
 
 ```python
-@realtime_registry.register
 class Dashboard(Channel):
-    path = "/events/dashboard/"
-
     def authorize(self, request):
         return request.user.is_staff
 
@@ -268,13 +311,10 @@ def compute_metrics():
     notify("dashboard:metrics", metrics)
 ```
 
-### Chat
+### Chat (SSE + POST pattern)
 
 ```python
-@realtime_registry.register
 class Chat(Channel):
-    path = "/events/chat/"
-
     def authorize(self, request):
         room_id = request.GET.get("room")
         return ChatRoom.query.filter(
@@ -320,10 +360,7 @@ function sendMessage(text) {
 ### AI agent streaming
 
 ```python
-@realtime_registry.register
 class AgentStream(Channel):
-    path = "/events/agent/"
-
     def authorize(self, request):
         session_id = request.GET.get("session")
         return AgentSession.query.filter(
@@ -345,19 +382,35 @@ def run_agent(session_id, prompt):
         })
 ```
 
+### WebSocket echo
+
+```python
+from plain.views import WebSocketView
+
+
+class EchoSocket(WebSocketView):
+    async def authorize(self):
+        return True
+
+    async def receive(self, message):
+        await self.send(message)
+```
+
 ## How it works
 
 Channels use Postgres LISTEN/NOTIFY for event delivery and the server's built-in async infrastructure for connection management. No Redis, no external message broker, no separate process.
 
-When a client connects to a channel path:
+When a client connects to a channel URL:
 
-1. The server matches the path to a registered `Channel`
+1. The server matches the URL to a `Channel` view via the URL router
 2. `authorize()` and `subscribe()` run in the sync request context (full ORM access)
-3. The socket is handed off to a background async thread in the worker process
+3. The connection is handed off to a background async thread in the worker process
 4. The async thread subscribes to the specified Postgres channels via LISTEN
-5. When a NOTIFY arrives, `transform()` runs (in a threadpool) and the result is sent to the client
+5. When a NOTIFY arrives, `transform()` runs (in a threadpool) and the result is sent to the client as an SSE event
 6. Heartbeats detect dead connections; disconnected clients are cleaned up automatically
+
+For WebSocket views, the server performs the HTTP upgrade handshake, then runs the view's async lifecycle methods (`connect`, `receive`, `disconnect`) on the event loop.
 
 Each worker process maintains one Postgres connection for all LISTEN subscriptions, regardless of how many clients are connected. Events flow through Postgres to whichever worker holds the client's connection.
 
-Your application code is always sync. The async infrastructure is internal to the framework.
+Your application code is always sync (except `WebSocketView`, which is async by nature). The async infrastructure is internal to the framework.

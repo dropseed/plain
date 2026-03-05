@@ -412,7 +412,7 @@ class Worker:
                 # Socket is readable -- handle next request
                 keepalive = await self._dispatch_request(loop, conn)
         except Exception:
-            pass
+            self.log.debug("Connection error", exc_info=True)
         finally:
             self.nr_conns -= 1
             if not conn.handed_off:
@@ -578,8 +578,10 @@ class Worker:
             request_start = datetime.now()
             resp = self._prepare_request(req, conn, http_request)
 
-            # Use the async handler path
-            http_response = await self.handler.aget_response(http_request)
+            # Use the async handler path (with middleware, in executor)
+            http_response = await self.handler.aget_response(
+                http_request, executor=self.tpool
+            )
 
             # Check if this is a WebSocket upgrade
             if getattr(http_response, "is_websocket", False):
@@ -672,8 +674,7 @@ class Worker:
         transport, _ = await loop.create_connection(lambda: protocol, sock=conn.sock)
         writer = asyncio.StreamWriter(transport, protocol, reader, loop)
 
-        ws_view._reader = reader
-        ws_view._writer = writer
+        ws_view.bind_transport(reader, writer)
 
         listen_tasks = []
         try:

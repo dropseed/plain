@@ -4,10 +4,10 @@ import asyncio
 import io
 import logging
 import socket
-import threading
+import threading  # for reader thread only
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import unquote_to_bytes
 
 import h2.config
@@ -23,21 +23,22 @@ from ..accesslog import log_access
 from ..util import http_date
 from .response import FileWrapper, _decode_path
 
-if TYPE_CHECKING:
-    pass
-
 log = logging.getLogger("plain.server")
+
+# Maximum request body size per H2 stream (10 MiB)
+MAX_H2_REQUEST_BODY = 10 * 1024 * 1024
 
 
 class H2Stream:
     """Accumulates headers and data for a single HTTP/2 stream."""
 
-    __slots__ = ("stream_id", "headers", "data", "complete")
+    __slots__ = ("stream_id", "headers", "data", "data_size", "complete")
 
     def __init__(self, stream_id: int) -> None:
         self.stream_id = stream_id
         self.headers: list[tuple[str, str]] = []
         self.data = io.BytesIO()
+        self.data_size = 0
         self.complete = False
 
 
@@ -60,7 +61,6 @@ class H2Request:
         self.query = query
         self.headers = headers
         self.peer_addr = peer_addr
-        self.remote_addr = peer_addr
         self.version = (2, 0)
         self.scheme = scheme
 
@@ -73,128 +73,9 @@ class H2Response:
 
     def __init__(self) -> None:
         self.status: str | None = None
-        self.status_code: int | None = None
         self.sent: int = 0
         self.response_length: int | None = None
         self.headers_sent: bool = False
-
-
-class H2ConnectionState:
-    """Consolidated state for an HTTP/2 connection.
-
-    Owns the h2 connection, socket, write lock, and stream tracking.
-    """
-
-    def __init__(
-        self,
-        conn: h2.connection.H2Connection,
-        sock: socket.socket,
-    ) -> None:
-        self.conn = conn
-        self.sock = sock
-        self.write_lock = threading.Lock()
-        self.streams: dict[int, H2Stream] = {}
-
-
-def handle_h2_connection(
-    sock: socket.socket,
-    client: tuple[str, int] | Any,
-    server: tuple[str, int] | Any,
-    handler: Any,
-    is_ssl: bool,
-) -> None:
-    """Run the HTTP/2 connection loop on a single socket.
-
-    Reads frames from the socket, assembles complete requests per stream,
-    and dispatches each to the handler. Responses are serialized back
-    through the h2 state machine.
-
-    This function runs in a worker thread.
-    """
-    config = h2.config.H2Configuration(client_side=False)
-    conn = h2.connection.H2Connection(config=config)
-    conn.initiate_connection()
-    sock.sendall(conn.data_to_send())
-
-    state = H2ConnectionState(conn, sock)
-    scheme = "https" if is_ssl else "http"
-
-    try:
-        while True:
-            data = sock.recv(65535)
-            if not data:
-                return
-
-            h2_events = conn.receive_data(data)
-
-            for event in h2_events:
-                if isinstance(event, h2.events.RequestReceived):
-                    stream = H2Stream(event.stream_id)
-                    stream.headers = [
-                        (
-                            n.decode("utf-8") if isinstance(n, bytes) else n,
-                            v.decode("utf-8") if isinstance(v, bytes) else v,
-                        )
-                        for n, v in event.headers
-                    ]
-                    state.streams[event.stream_id] = stream
-
-                elif isinstance(event, h2.events.DataReceived):
-                    stream = state.streams.get(event.stream_id)
-                    if stream is not None:
-                        stream.data.write(event.data)
-                        conn.acknowledge_received_data(
-                            event.flow_controlled_length, event.stream_id
-                        )
-
-                elif isinstance(event, h2.events.StreamEnded):
-                    stream = state.streams.pop(event.stream_id, None)
-                    if stream is not None:
-                        stream.complete = True
-                        _handle_stream(
-                            state,
-                            stream,
-                            client,
-                            server,
-                            handler,
-                            scheme,
-                        )
-
-                elif isinstance(event, h2.events.StreamReset):
-                    state.streams.pop(event.stream_id, None)
-
-                elif isinstance(event, h2.events.WindowUpdated):
-                    pass  # h2 handles flow control internally
-
-                elif isinstance(event, h2.events.PriorityUpdated):
-                    pass  # advisory only; no action needed
-
-                elif isinstance(event, h2.events.ConnectionTerminated):
-                    return
-
-            # Send any pending data (ACKs, window updates, etc.)
-            outgoing = conn.data_to_send()
-            if outgoing:
-                sock.sendall(outgoing)
-
-    except h2.exceptions.ProtocolError:
-        log.debug("HTTP/2 protocol error on connection from %s", client)
-        # h2 queues a GOAWAY when it raises ProtocolError — flush it
-        try:
-            sock.sendall(conn.data_to_send())
-        except OSError:
-            pass
-    except OSError:
-        log.debug("HTTP/2 connection closed from %s", client)
-    except Exception:
-        log.exception("Unexpected error in HTTP/2 connection from %s", client)
-    finally:
-        try:
-            conn.close_connection()
-            sock.sendall(conn.data_to_send())
-        except Exception:
-            pass
-        _graceful_close(sock)
 
 
 def _graceful_close(sock: socket.socket) -> None:
@@ -316,10 +197,7 @@ def _prepare_stream_request(
     server: tuple[str, int] | Any,
     scheme: str,
 ) -> tuple[H2Request, HttpRequest, H2Response]:
-    """Build logging and HTTP request objects from a completed H2 stream.
-
-    Shared by both the sync and async stream handlers.
-    """
+    """Build logging and HTTP request objects from a completed H2 stream."""
     method, path, authority, scheme, raw_headers = _extract_headers_from_stream(
         stream, scheme
     )
@@ -352,10 +230,7 @@ def _prepare_stream_request(
 
 
 def _build_h2_response_headers(http_response: Any) -> list[tuple[str, str]]:
-    """Build HTTP/2 response headers from an http_response.
-
-    Shared by both the sync and async response writers.
-    """
+    """Build HTTP/2 response headers from an http_response."""
     status_code = http_response.status_code
     response_headers: list[tuple[str, str]] = [
         (":status", str(status_code)),
@@ -376,196 +251,7 @@ def _build_h2_response_headers(http_response: Any) -> list[tuple[str, str]]:
     return response_headers
 
 
-def _handle_stream(
-    state: H2ConnectionState,
-    stream: H2Stream,
-    client: tuple[str, int] | Any,
-    server: tuple[str, int] | Any,
-    handler: Any,
-    scheme: str,
-) -> None:
-    """Process a single completed HTTP/2 stream."""
-    request_start = datetime.now()
-
-    h2_req, http_request, h2_resp = _prepare_stream_request(
-        stream, client, server, scheme
-    )
-
-    try:
-        signals.request_started.send(sender=None, request=http_request)
-        http_response = handler.get_response(http_request)
-
-        try:
-            _write_h2_response(
-                state.conn,
-                state.sock,
-                state.write_lock,
-                stream.stream_id,
-                http_response,
-                h2_resp,
-            )
-        finally:
-            request_time = datetime.now() - request_start
-            if http_response.log_access:
-                log_access(h2_resp, h2_req, request_time)
-            if hasattr(http_response, "close"):
-                http_response.close()
-
-    except Exception:
-        log.exception("Error handling HTTP/2 request %s", http_request.path_info)
-        _send_h2_error(state.conn, state.sock, state.write_lock, stream.stream_id, 500)
-
-
-def _write_h2_response(
-    conn: h2.connection.H2Connection,
-    sock: socket.socket,
-    write_lock: threading.Lock,
-    stream_id: int,
-    http_response: Any,
-    h2_resp: H2Response,
-) -> None:
-    """Write a plain.http response as HTTP/2 frames."""
-    status_code = http_response.status_code
-    h2_resp.status = f"{status_code} {http_response.reason_phrase}"
-    h2_resp.status_code = status_code
-
-    response_headers = _build_h2_response_headers(http_response)
-
-    # Send headers
-    with write_lock:
-        if (
-            isinstance(http_response, FileResponse)
-            and http_response.file_to_stream is not None
-        ):
-            conn.send_headers(stream_id, response_headers)
-            sock.sendall(conn.data_to_send())
-
-            # Stream file data
-            file_wrapper = FileWrapper(
-                http_response.file_to_stream, http_response.block_size
-            )
-            _write_h2_file(conn, sock, write_lock, stream_id, file_wrapper, h2_resp)
-        else:
-            # Collect body chunks
-            body_parts: list[bytes] = []
-            for chunk in http_response:
-                if chunk:
-                    body_parts.append(chunk)
-
-            body = b"".join(body_parts)
-            h2_resp.sent = len(body)
-            h2_resp.response_length = len(body)
-
-            # Add content-length if not already set
-            has_cl = any(n == "content-length" for n, _ in response_headers)
-            if not has_cl and body:
-                response_headers.append(("content-length", str(len(body))))
-
-            if body:
-                conn.send_headers(stream_id, response_headers)
-                sock.sendall(conn.data_to_send())
-                _send_h2_data(conn, sock, stream_id, body, end_stream=True)
-            else:
-                conn.send_headers(stream_id, response_headers, end_stream=True)
-                sock.sendall(conn.data_to_send())
-
-
-def _write_h2_file(
-    conn: h2.connection.H2Connection,
-    sock: socket.socket,
-    write_lock: threading.Lock,
-    stream_id: int,
-    file_wrapper: FileWrapper,
-    h2_resp: H2Response,
-) -> None:
-    """Stream a file response over HTTP/2."""
-    try:
-        for chunk in file_wrapper:
-            if chunk:
-                h2_resp.sent += len(chunk)
-                with write_lock:
-                    _send_h2_data(conn, sock, stream_id, chunk, end_stream=False)
-    except IndexError:
-        pass  # FileWrapper raises IndexError when done
-
-    with write_lock:
-        conn.send_data(stream_id, b"", end_stream=True)
-        sock.sendall(conn.data_to_send())
-
-
-def _send_h2_data(
-    conn: h2.connection.H2Connection,
-    sock: socket.socket,
-    stream_id: int,
-    data: bytes,
-    *,
-    end_stream: bool = False,
-) -> None:
-    """Send data respecting HTTP/2 flow control windows."""
-    offset = 0
-    while offset < len(data):
-        # Check how much we're allowed to send
-        max_size = conn.local_flow_control_window(stream_id)
-        if max_size <= 0:
-            # Need to flush and wait for window update
-            sock.sendall(conn.data_to_send())
-            sock.settimeout(5.0)
-            try:
-                incoming = sock.recv(65535)
-            except TimeoutError:
-                return  # peer never sent WINDOW_UPDATE; give up
-            finally:
-                sock.settimeout(None)
-            if incoming:
-                conn.receive_data(incoming)
-            max_size = conn.local_flow_control_window(stream_id)
-            if max_size <= 0:
-                return  # window still exhausted after wait; give up
-
-        # Also respect max frame size
-        chunk_size = min(max_size, len(data) - offset, conn.max_outbound_frame_size)
-        chunk = data[offset : offset + chunk_size]
-        is_last = (offset + chunk_size >= len(data)) and end_stream
-        conn.send_data(stream_id, chunk, end_stream=is_last)
-        sock.sendall(conn.data_to_send())
-        offset += chunk_size
-
-    if end_stream and offset == 0:
-        # Empty body with end_stream
-        conn.send_data(stream_id, b"", end_stream=True)
-        sock.sendall(conn.data_to_send())
-
-
-def _send_h2_error(
-    conn: h2.connection.H2Connection,
-    sock: socket.socket,
-    write_lock: threading.Lock,
-    stream_id: int,
-    status_code: int,
-) -> None:
-    """Send a simple error response on an HTTP/2 stream."""
-    try:
-        body = f"<h1>{status_code}</h1>".encode()
-        headers = [
-            (":status", str(status_code)),
-            ("content-type", "text/html"),
-            ("content-length", str(len(body))),
-        ]
-        with write_lock:
-            conn.send_headers(stream_id, headers)
-            sock.sendall(conn.data_to_send())
-            conn.send_data(stream_id, body, end_stream=True)
-            sock.sendall(conn.data_to_send())
-    except Exception:
-        pass
-
-
-# ---------------------------------------------------------------------------
-# Async HTTP/2 handler
-# ---------------------------------------------------------------------------
-
-
-class AsyncH2ConnectionState:
+class H2ConnectionState:
     """State for an async HTTP/2 connection.
 
     Uses asyncio primitives instead of threading ones so the frame read loop
@@ -630,13 +316,11 @@ async def async_handle_h2_connection(
     conn.initiate_connection()
 
     scheme = "https" if is_ssl else "http"
-    state = AsyncH2ConnectionState(
-        conn, sock, client, server, handler, scheme, executor
-    )
+    state = H2ConnectionState(conn, sock, client, server, handler, scheme, executor)
     loop = asyncio.get_running_loop()
 
     # Send connection preface
-    sock.sendall(conn.data_to_send())
+    await loop.run_in_executor(executor, sock.sendall, conn.data_to_send())
 
     stream_tasks: dict[int, asyncio.Task[None]] = {}
 
@@ -680,6 +364,19 @@ async def async_handle_h2_connection(
                 elif isinstance(event, h2.events.DataReceived):
                     stream = state.streams.get(event.stream_id)
                     if stream is not None:
+                        stream.data_size += len(event.data)
+                        if stream.data_size > MAX_H2_REQUEST_BODY:
+                            conn.reset_stream(event.stream_id)
+                            conn.acknowledge_received_data(
+                                event.flow_controlled_length, event.stream_id
+                            )
+                            state.streams.pop(event.stream_id, None)
+                            log.warning(
+                                "H2 stream %d exceeded max body size (%d bytes)",
+                                event.stream_id,
+                                MAX_H2_REQUEST_BODY,
+                            )
+                            continue
                         stream.data.write(event.data)
                         conn.acknowledge_received_data(
                             event.flow_controlled_length, event.stream_id
@@ -728,12 +425,14 @@ async def async_handle_h2_connection(
             # Flush pending data (ACKs, window updates, etc.)
             outgoing = conn.data_to_send()
             if outgoing:
-                sock.sendall(outgoing)
+                await loop.run_in_executor(state.executor, sock.sendall, outgoing)
 
     except h2.exceptions.ProtocolError:
         log.debug("HTTP/2 protocol error on async connection from %s", client)
         try:
-            sock.sendall(conn.data_to_send())
+            await loop.run_in_executor(
+                state.executor, sock.sendall, conn.data_to_send()
+            )
         except OSError:
             pass
     except OSError:
@@ -749,7 +448,7 @@ async def async_handle_h2_connection(
 
         try:
             conn.close_connection()
-            sock.sendall(conn.data_to_send())
+            sock.sendall(conn.data_to_send())  # OK: cleanup after loop stopped
         except Exception:
             pass
 
@@ -758,11 +457,10 @@ async def async_handle_h2_connection(
 
 
 async def _async_handle_stream(
-    state: AsyncH2ConnectionState,
+    state: H2ConnectionState,
     stream: H2Stream,
 ) -> None:
     """Process a single completed HTTP/2 stream as an async task."""
-    loop = asyncio.get_running_loop()
     request_start = datetime.now()
 
     h2_req, http_request, h2_resp = _prepare_stream_request(
@@ -772,24 +470,12 @@ async def _async_handle_stream(
     try:
         signals.request_started.send(sender=None, request=http_request)
 
-        # Resolve URL to check if view is async
-        from plain.urls import get_resolver
-
-        view_is_async = False
-        try:
-            resolver_match = get_resolver().resolve(http_request.path_info)
-            http_request.resolver_match = resolver_match
-            view_func = resolver_match.view
-            view_is_async = getattr(view_func, "view_is_async", False)
-        except Exception:
-            pass  # middleware will handle 404
-
-        if view_is_async:
-            http_response = await state.handler.aget_response(http_request)
-        else:
-            http_response = await loop.run_in_executor(
-                state.executor, state.handler.get_response, http_request
-            )
+        # aget_response runs the full middleware chain in the executor.
+        # Async views bridge back to the event loop; sync views run
+        # in the executor thread.
+        http_response = await state.handler.aget_response(
+            http_request, executor=state.executor
+        )
 
         try:
             # Check if stream was reset while we were handling the request
@@ -814,7 +500,7 @@ async def _async_handle_stream(
 
 
 async def _async_write_h2_response(
-    state: AsyncH2ConnectionState,
+    state: H2ConnectionState,
     stream_id: int,
     http_response: Any,
     h2_resp: H2Response,
@@ -826,7 +512,6 @@ async def _async_write_h2_response(
     executor = state.executor
     status_code = http_response.status_code
     h2_resp.status = f"{status_code} {http_response.reason_phrase}"
-    h2_resp.status_code = status_code
 
     response_headers = _build_h2_response_headers(http_response)
 
@@ -835,51 +520,19 @@ async def _async_write_h2_response(
         and http_response.file_to_stream is not None
     )
 
-    async with state.write_lock:
-        if is_file:
+    if is_file:
+        # Send headers under lock, then stream file chunks outside it
+        async with state.write_lock:
             conn.send_headers(stream_id, response_headers)
             outgoing = conn.data_to_send()
             if outgoing:
                 await loop.run_in_executor(executor, sock.sendall, outgoing)
 
-            # Set up file wrapper (chunks read one at a time below)
-            file_wrapper = FileWrapper(
-                http_response.file_to_stream, http_response.block_size
-            )
-            file_iter = iter(file_wrapper)
+        file_wrapper = FileWrapper(
+            http_response.file_to_stream, http_response.block_size
+        )
+        file_iter = iter(file_wrapper)
 
-            # Release lock for per-chunk sending (flow control may need to wait)
-        else:
-            # Collect body in executor for sync responses
-            def _collect_body() -> bytes:
-                parts: list[bytes] = []
-                for chunk in http_response:
-                    if chunk:
-                        parts.append(chunk)
-                return b"".join(parts)
-
-            body = await loop.run_in_executor(executor, _collect_body)
-            h2_resp.sent = len(body)
-            h2_resp.response_length = len(body)
-
-            has_cl = any(n == "content-length" for n, _ in response_headers)
-            if not has_cl and body:
-                response_headers.append(("content-length", str(len(body))))
-
-            if body:
-                conn.send_headers(stream_id, response_headers)
-                outgoing = conn.data_to_send()
-                if outgoing:
-                    await loop.run_in_executor(executor, sock.sendall, outgoing)
-            else:
-                conn.send_headers(stream_id, response_headers, end_stream=True)
-                outgoing = conn.data_to_send()
-                if outgoing:
-                    await loop.run_in_executor(executor, sock.sendall, outgoing)
-                return
-
-    # Send body data with flow control (outside initial lock scope)
-    if is_file:
         while True:
             chunk = await loop.run_in_executor(executor, next, file_iter, None)
             if chunk is None:
@@ -894,11 +547,40 @@ async def _async_write_h2_response(
             if outgoing:
                 await loop.run_in_executor(executor, sock.sendall, outgoing)
     else:
-        await _async_send_h2_data(state, stream_id, body, end_stream=True)
+        # Collect body outside the lock so other streams can send concurrently
+        def _collect_body() -> bytes:
+            parts: list[bytes] = []
+            for chunk in http_response:
+                if chunk:
+                    parts.append(chunk)
+            return b"".join(parts)
+
+        body = await loop.run_in_executor(executor, _collect_body)
+        h2_resp.sent = len(body)
+        h2_resp.response_length = len(body)
+
+        has_cl = any(n == "content-length" for n, _ in response_headers)
+        if not has_cl and body:
+            response_headers.append(("content-length", str(len(body))))
+
+        # Send headers + body under lock (body already collected)
+        if body:
+            async with state.write_lock:
+                conn.send_headers(stream_id, response_headers)
+                outgoing = conn.data_to_send()
+                if outgoing:
+                    await loop.run_in_executor(executor, sock.sendall, outgoing)
+            await _async_send_h2_data(state, stream_id, body, end_stream=True)
+        else:
+            async with state.write_lock:
+                conn.send_headers(stream_id, response_headers, end_stream=True)
+                outgoing = conn.data_to_send()
+                if outgoing:
+                    await loop.run_in_executor(executor, sock.sendall, outgoing)
 
 
 async def _async_send_h2_data(
-    state: AsyncH2ConnectionState,
+    state: H2ConnectionState,
     stream_id: int,
     data: bytes,
     *,
@@ -962,12 +644,13 @@ async def _async_send_h2_data(
 
 
 async def _async_send_h2_error(
-    state: AsyncH2ConnectionState,
+    state: H2ConnectionState,
     stream_id: int,
     status_code: int,
 ) -> None:
     """Send a simple error response on an HTTP/2 stream (async)."""
     try:
+        loop = asyncio.get_running_loop()
         body = f"<h1>{status_code}</h1>".encode()
         headers = [
             (":status", str(status_code)),
@@ -977,6 +660,8 @@ async def _async_send_h2_error(
         async with state.write_lock:
             state.conn.send_headers(stream_id, headers)
             state.conn.send_data(stream_id, body, end_stream=True)
-            state.sock.sendall(state.conn.data_to_send())
+            outgoing = state.conn.data_to_send()
+            if outgoing:
+                await loop.run_in_executor(state.executor, state.sock.sendall, outgoing)
     except Exception:
         pass

@@ -198,6 +198,20 @@ return StreamingResponse(generate_data(), content_type="text/plain")
 
 For real-time server-to-client push (notifications, live updates, streaming AI responses), use [realtime](../realtime/README.md) instead of building SSE manually with `StreamingResponse`.
 
+**Async streaming responses:**
+
+```python
+from plain.http import AsyncStreamingResponse
+
+async def generate_data():
+    for i in range(1000):
+        yield f"Line {i}\n"
+
+return AsyncStreamingResponse(generate_data(), content_type="text/plain")
+```
+
+[`AsyncStreamingResponse`](./response.py#AsyncStreamingResponse) works like `StreamingResponse` but takes an async iterator. This is used internally by the [realtime](../realtime/README.md) module for SSE connections.
+
 Other response types include [`NotModifiedResponse`](./response.py#NotModifiedResponse) (304) and [`NotAllowedResponse`](./response.py#NotAllowedResponse) (405).
 
 ### Access log control

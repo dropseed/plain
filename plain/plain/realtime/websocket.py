@@ -63,10 +63,22 @@ def _apply_mask(data: bytes, mask: bytes) -> bytes:
     """Apply XOR masking to data (RFC 6455 Section 5.3)."""
     if len(mask) != 4:
         raise ValueError("Mask must be 4 bytes")
-    # Use int.from_bytes for fast XOR on 4-byte aligned chunks
     result = bytearray(data)
-    for i in range(len(result)):
-        result[i] ^= mask[i % 4]
+    n = len(result)
+
+    # XOR 8 bytes at a time using int operations
+    mask8 = int.from_bytes(mask * 2, "big")
+    i = 0
+    while i + 8 <= n:
+        chunk = int.from_bytes(result[i : i + 8], "big")
+        chunk ^= mask8
+        result[i : i + 8] = chunk.to_bytes(8, "big")
+        i += 8
+
+    # Handle remaining bytes
+    for j in range(i, n):
+        result[j] ^= mask[j % 4]
+
     return bytes(result)
 
 

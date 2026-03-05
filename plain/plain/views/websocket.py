@@ -46,6 +46,17 @@ class WebSocketView(View):
         self._closed = False
         self._subscriptions: list[str] = []
 
+    def bind_transport(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        """Bind the async transport after the WebSocket handshake completes.
+
+        Called by the server's connection handler. Provides the reader/writer
+        pair used by send() and close().
+        """
+        self._reader = reader
+        self._writer = writer
+
     async def authorize(self) -> bool:
         """Check if the WebSocket connection is allowed.
 

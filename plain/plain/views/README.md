@@ -14,6 +14,7 @@
     - [DeleteView](#deleteview)
     - [ListView](#listview)
 - [RedirectView](#redirectview)
+- [WebSocketView](#websocketview)
 - [ResponseException](#responseexception)
 - [Error views](#error-views)
 - [View patterns](#view-patterns)
@@ -299,6 +300,48 @@ class AppRouter(Router):
 ```
 
 You can also redirect to a named URL using `url_name`, or preserve query parameters with `preserve_query_params=True`.
+
+## WebSocketView
+
+[`WebSocketView`](./websocket.py#WebSocketView) handles bidirectional WebSocket connections. Unlike other views, its methods are `async`.
+
+```python
+from plain.views import WebSocketView
+
+
+class EchoView(WebSocketView):
+    async def authorize(self):
+        return self.request.user.is_authenticated
+
+    async def connect(self):
+        # Called after the WebSocket connection is established.
+        # Use self.subscribe() to listen for Postgres NOTIFY events.
+        await self.subscribe(f"room:{self.url_kwargs['room_id']}")
+
+    async def receive(self, message):
+        # Called when the client sends a message (str or bytes).
+        await self.send(f"echo: {message}")
+
+    async def disconnect(self):
+        # Called when the connection closes. Optional cleanup.
+        pass
+```
+
+Register it in your URL router like any other view:
+
+```python
+path("ws/echo/", EchoView)
+```
+
+Available methods for sending data back to the client:
+
+- `await self.send(message)` — send a text or binary message
+- `await self.send_json(data)` — send JSON-serialized data
+- `await self.close(code, reason)` — close the connection
+
+Server-push events arrive automatically when you `subscribe()` to Postgres NOTIFY channels. Clients receive them alongside messages sent via `send()`.
+
+For server-to-client push without bidirectional messaging, use [`Channel`](../realtime/README.md) (SSE) instead — it's simpler and works with the browser's `EventSource` API.
 
 ## ResponseException
 
