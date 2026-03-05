@@ -1,5 +1,20 @@
 # plain changelog
 
+## [0.114.0](https://github.com/dropseed/plain/releases/plain@0.114.0) (2026-03-04)
+
+### What's changed
+
+- **Lock-free thread worker event loop** — replaced `RLock` and `futures.wait()` with a pipe-based `PollableMethodQueue` that defers worker thread completions back to the main thread, eliminating all lock contention in the connection handling hot path ([d0ecd12bbe](https://github.com/dropseed/plain/commit/d0ecd12bbe))
+- **Unified event loop** — the main loop now uses a single `poller.select()` call for accepts, client data, and worker completions instead of splitting between `poller.select()` and `futures.wait()` ([d0ecd12bbe](https://github.com/dropseed/plain/commit/d0ecd12bbe))
+- **Backpressure on accept** — listener sockets are dynamically registered/unregistered from the poller when at connection capacity, preventing thread pool exhaustion under load ([d0ecd12bbe](https://github.com/dropseed/plain/commit/d0ecd12bbe))
+- **Slow client timeout** — new connections now get a read timeout during request parsing so slow or stalled clients can't hold a thread pool slot indefinitely ([d0ecd12bbe](https://github.com/dropseed/plain/commit/d0ecd12bbe))
+- **Graceful shutdown improvement** — shutdown now drains in-flight requests via the method queue instead of polling futures ([d0ecd12bbe](https://github.com/dropseed/plain/commit/d0ecd12bbe))
+- Added `HTTPS_PROXY_HEADER` upgrade warning to 0.113.0 changelog ([b1d63fda04](https://github.com/dropseed/plain/commit/b1d63fda04))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.113.0](https://github.com/dropseed/plain/releases/plain@0.113.0) (2026-03-04)
 
 ### What's changed
