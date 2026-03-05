@@ -42,4 +42,4 @@ version = "4.2.1"
 tunnel = { cmd = "plain tunnel $PLAIN_DEV_URL --subdomain plain-example --quiet" }
 
 [tool.plain.code.oxc]
-version = "1.50.0"
+version = "1.51.0"

@@ -103,16 +103,30 @@ class OxcTool:
             return "x86_64-apple-darwin"
         raise RuntimeError(f"Unsupported platform for Oxc: {system}/{arch}")
 
+    @staticmethod
+    def get_latest_version() -> str:
+        """Find the latest apps_v release tag via the GitHub API."""
+        resp = requests.get(
+            "https://api.github.com/repos/oxc-project/oxc/releases",
+            params={"per_page": 20},
+            headers={"Accept": "application/vnd.github+json"},
+        )
+        resp.raise_for_status()
+        for release in resp.json():
+            tag = release["tag_name"]
+            if tag.startswith(TAG_PREFIX):
+                return tag[len(TAG_PREFIX) :]
+        raise RuntimeError("No apps_v release found on GitHub")
+
     def download(self, version: str = "") -> str:
+        if not version:
+            version = self.get_latest_version()
+
         slug = self.detect_platform_slug()
         is_windows = platform.system() == "Windows"
         ext = "zip" if is_windows else "tar.gz"
         asset = f"{self.name}-{slug}.{ext}"
-
-        if version:
-            url = f"https://github.com/oxc-project/oxc/releases/download/{TAG_PREFIX}{version}/{asset}"
-        else:
-            url = f"https://github.com/oxc-project/oxc/releases/latest/download/{asset}"
+        url = f"https://github.com/oxc-project/oxc/releases/download/{TAG_PREFIX}{version}/{asset}"
 
         resp = requests.get(url, stream=True)
         resp.raise_for_status()
@@ -161,22 +175,7 @@ class OxcTool:
                     dst.write(extracted.read())
 
         os.chmod(self.standalone_path, 0o755)
-
-        # Determine resolved version for lockfile
-        if version:
-            resolved = version.lstrip("v")
-        else:
-            resolved = ""
-            if resp.history:
-                loc = resp.history[0].headers.get("Location", "")
-                if TAG_PREFIX in loc:
-                    remaining = loc.split(TAG_PREFIX, 1)[-1]
-                    resolved = remaining.split("/")[0]
-
-            if not resolved:
-                raise RuntimeError("Failed to determine resolved version from redirect")
-
-        return resolved
+        return version.lstrip("v")
 
     def invoke(self, *args: str, cwd: str | None = None) -> subprocess.CompletedProcess:
         config_path = os.path.join(
