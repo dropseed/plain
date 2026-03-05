@@ -28,7 +28,9 @@ from types import FrameType
 from typing import TYPE_CHECKING, Any
 
 from plain import signals
+from plain.http import AsyncStreamingResponse
 from plain.internal.reloader import Reloader
+from plain.views.websocket import WebSocketUpgradeResponse
 
 from .. import http, sock, util
 from ..accesslog import log_access
@@ -584,7 +586,7 @@ class Worker:
             )
 
             # Check if this is a WebSocket upgrade
-            if getattr(http_response, "is_websocket", False):
+            if isinstance(http_response, WebSocketUpgradeResponse):
                 await self._handle_websocket(
                     loop, req, conn, http_request, http_response
                 )
@@ -592,7 +594,7 @@ class Worker:
 
             try:
                 # Check if this is an async streaming response
-                if getattr(http_response, "is_async", False):
+                if isinstance(http_response, AsyncStreamingResponse):
                     await self._write_async_response(resp, http_response)
                 else:
                     # Write sync response (headers + body)
@@ -798,15 +800,7 @@ class Worker:
         """Write an AsyncStreamingResponse to the socket."""
         loop = asyncio.get_running_loop()
         status = f"{http_response.status_code} {http_response.reason_phrase}"
-        response_headers = [
-            *((k, v) for k, v in http_response.headers.items() if v is not None),
-            *(
-                ("Set-Cookie", c.output(header=""))
-                for c in http_response.cookies.values()
-            ),
-        ]
-
-        resp.set_status_and_headers(status, response_headers)
+        resp.set_status_and_headers(status, http_response.header_items())
         await loop.run_in_executor(self.tpool, resp.send_headers)
 
         # Iterate async streaming content, write chunks in executor

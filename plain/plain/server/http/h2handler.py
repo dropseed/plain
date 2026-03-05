@@ -16,7 +16,7 @@ import h2.events
 import h2.exceptions
 
 from plain import signals
-from plain.http import FileResponse
+from plain.http import FileResponse, StreamingResponse
 from plain.http import Request as HttpRequest
 
 from ..accesslog import log_access
@@ -27,6 +27,11 @@ log = logging.getLogger("plain.server")
 
 # Maximum request body size per H2 stream (10 MiB)
 MAX_H2_REQUEST_BODY = 10 * 1024 * 1024
+
+# HTTP/1.1 hop-by-hop headers that must not appear in HTTP/2 responses
+_H2_SKIP_HEADERS = frozenset(
+    ("connection", "transfer-encoding", "keep-alive", "upgrade")
+)
 
 
 class H2Stream:
@@ -230,22 +235,16 @@ def _prepare_stream_request(
 
 def _build_h2_response_headers(http_response: Any) -> list[tuple[str, str]]:
     """Build HTTP/2 response headers from an http_response."""
-    status_code = http_response.status_code
     response_headers: list[tuple[str, str]] = [
-        (":status", str(status_code)),
+        (":status", str(http_response.status_code)),
         ("server", "plain"),
         ("date", http_date()),
     ]
 
-    for key, value in http_response.headers.items():
-        if value is not None:
-            lkey = key.lower()
-            if lkey in ("connection", "transfer-encoding", "keep-alive", "upgrade"):
-                continue
+    for key, value in http_response.header_items():
+        lkey = key.lower()
+        if lkey not in _H2_SKIP_HEADERS:
             response_headers.append((lkey, value))
-
-    for cookie in http_response.cookies.values():
-        response_headers.append(("set-cookie", cookie.output(header="")))
 
     return response_headers
 
@@ -547,8 +546,26 @@ async def _async_write_h2_response(
         async with state.write_lock:
             conn.send_data(stream_id, b"", end_stream=True)
             await state.flush()
+    elif isinstance(http_response, StreamingResponse):
+        # Stream chunks without buffering the full body in memory
+        async with state.write_lock:
+            conn.send_headers(stream_id, response_headers)
+            await state.flush()
+
+        response_iter = iter(http_response)
+        while True:
+            chunk = await loop.run_in_executor(executor, next, response_iter, None)
+            if chunk is None:
+                break
+            if chunk:
+                h2_resp.sent += len(chunk)
+                await _async_send_h2_data(state, stream_id, chunk, end_stream=False)
+
+        async with state.write_lock:
+            conn.send_data(stream_id, b"", end_stream=True)
+            await state.flush()
     else:
-        # Collect body outside the lock so other streams can send concurrently
+        # Regular response — collect body (usually a single chunk) and send
         def _collect_body() -> bytes:
             parts: list[bytes] = []
             for chunk in http_response:
@@ -564,7 +581,6 @@ async def _async_write_h2_response(
         if not has_cl and body:
             response_headers.append(("content-length", str(len(body))))
 
-        # Send headers + body under lock (body already collected)
         if body:
             async with state.write_lock:
                 conn.send_headers(stream_id, response_headers)

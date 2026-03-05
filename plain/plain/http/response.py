@@ -113,7 +113,6 @@ class ResponseBase:
     """
 
     status_code = 200
-    is_async = False
     streaming = False
 
     def __init__(
@@ -155,6 +154,15 @@ class ResponseBase:
         self.exception: Exception | None = None
         # Whether the server should log this response in the access log
         self.log_access: bool = True
+
+    def header_items(self) -> list[tuple[str, str]]:
+        """Return all response headers including cookies as (name, value) pairs."""
+        items: list[tuple[str, str]] = [
+            (k, v) for k, v in self.headers.items() if v is not None
+        ]
+        for cookie in self.cookies.values():
+            items.append(("Set-Cookie", cookie.output(header="")))
+        return items
 
     @property
     def reason_phrase(self) -> str:
@@ -426,7 +434,6 @@ class AsyncStreamingResponse(ResponseBase):
     """
 
     streaming = True
-    is_async = True
 
     def __init__(self, streaming_content: Any = (), **kwargs: Any) -> None:
         super().__init__(**kwargs)

@@ -363,15 +363,7 @@ class Response:
     def write_response(self, http_response: Any) -> None:
         """Write a plain.http.ResponseBase directly to the socket."""
         status = f"{http_response.status_code} {http_response.reason_phrase}"
-        response_headers = [
-            *((k, v) for k, v in http_response.headers.items() if v is not None),
-            *(
-                ("Set-Cookie", c.output(header=""))
-                for c in http_response.cookies.values()
-            ),
-        ]
-
-        self.set_status_and_headers(status, response_headers)
+        self.set_status_and_headers(status, http_response.header_items())
 
         if (
             isinstance(http_response, FileResponse)
