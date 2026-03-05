@@ -476,14 +476,14 @@ class Worker:
         for s in self.sockets:
             s.close()
 
-        self.tpool.shutdown(False)
-
         # Wait for in-flight connections to finish
         from plain.runtime import settings
 
         deadline = time.monotonic() + settings.SERVER_GRACEFUL_TIMEOUT
         while self.nr_conns > 0 and time.monotonic() < deadline:
             await asyncio.sleep(0.5)
+
+        self.tpool.shutdown(False)
 
     def _parse_request(self, conn: TConn) -> Any:
         """Parse an HTTP request from the connection. Runs in executor.
@@ -583,7 +583,6 @@ class Worker:
 
             # Check if this is a WebSocket upgrade
             if getattr(http_response, "is_websocket", False):
-                conn.handed_off = True
                 await self._handle_websocket(
                     loop, req, conn, http_request, http_response
                 )
@@ -660,6 +659,9 @@ class Worker:
             )
             return
 
+        # Mark as handed off now that handshake is validated
+        conn.handed_off = True
+
         # Send the 101 Switching Protocols response
         conn.sock.sendall(build_accept_response(ws_key))
 
@@ -673,12 +675,12 @@ class Worker:
         ws_view._reader = reader
         ws_view._writer = writer
 
+        listen_tasks = []
         try:
             # Call connect()
             await ws_view.connect()
 
             # Start pg_listen tasks for subscriptions if any
-            listen_tasks = []
             if ws_view._subscriptions:
                 for sub_channel in ws_view._subscriptions:
                     task = loop.create_task(self._ws_pg_listen(ws_view, sub_channel))

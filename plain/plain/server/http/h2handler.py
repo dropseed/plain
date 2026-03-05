@@ -842,11 +842,11 @@ async def _async_write_h2_response(
             if outgoing:
                 await loop.run_in_executor(executor, sock.sendall, outgoing)
 
-            # Collect file data in executor
+            # Set up file wrapper (chunks read one at a time below)
             file_wrapper = FileWrapper(
                 http_response.file_to_stream, http_response.block_size
             )
-            chunks = await loop.run_in_executor(executor, list, file_wrapper)
+            file_iter = iter(file_wrapper)
 
             # Release lock for per-chunk sending (flow control may need to wait)
         else:
@@ -880,7 +880,10 @@ async def _async_write_h2_response(
 
     # Send body data with flow control (outside initial lock scope)
     if is_file:
-        for chunk in chunks:
+        while True:
+            chunk = await loop.run_in_executor(executor, next, file_iter, None)
+            if chunk is None:
+                break
             if chunk:
                 h2_resp.sent += len(chunk)
                 await _async_send_h2_data(state, stream_id, chunk, end_stream=False)
