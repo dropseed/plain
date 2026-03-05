@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-auth@0.26.0) (2026-03-04)
+
+### What's changed
+
+- Updated test helpers (`login_client`, `logout_client`) to pass required `method` and `path` arguments when constructing `Request` objects, matching the new `Request.__init__` signature in plain 0.113.0 ([f25f430f54b4](https://github.com/dropseed/plain/commit/f25f430f54b4))
+
+### Upgrade instructions
+
+- Requires plain >= 0.113.0.
+
 ## [0.25.4](https://github.com/dropseed/plain/releases/plain-auth@0.25.4) (2026-02-26)
 
 ### What's changed
