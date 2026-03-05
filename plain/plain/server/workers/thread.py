@@ -12,7 +12,6 @@ from __future__ import annotations
 # Keepalive connections are put back in the loop waiting for an event.
 # If no event happen after the keep alive timeout, the connection is
 # closed.
-# pylint: disable=no-else-break
 import errno
 import logging
 import os
@@ -23,11 +22,10 @@ import ssl
 import sys
 import time
 from collections import deque
-from concurrent import futures
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
 from random import randint
-from threading import RLock
 from types import FrameType
 from typing import TYPE_CHECKING, Any
 
@@ -53,6 +51,8 @@ from ..http.response import Response, create_request
 from .workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from ..app import ServerApplication
     from ..http.message import Request
 
@@ -83,6 +83,55 @@ def check_worker_config(threads: int, log: logging.Logger) -> None:
             "No keepalived connections can be handled. "
             "Check the number of worker connections and threads."
         )
+
+
+class PollableMethodQueue:
+    """Pipe-based queue for deferring method calls to the main thread.
+
+    Worker threads call defer() to queue a callback. The pipe write
+    wakes the poller so the main loop processes queued calls without
+    any locks — all poller and keepalive operations happen on one thread.
+    """
+
+    def __init__(self) -> None:
+        self._read_fd, self._write_fd = os.pipe()
+        # Non-blocking on both ends for BSD compatibility
+        util.set_non_blocking(self._read_fd)
+        util.set_non_blocking(self._write_fd)
+        util.close_on_exec(self._read_fd)
+        util.close_on_exec(self._write_fd)
+        # deque.append/popleft are atomic under CPython's GIL
+        self._queue: deque[tuple[Callable[..., Any], tuple[Any, ...]]] = deque()
+
+    def fileno(self) -> int:
+        return self._read_fd
+
+    def defer(self, fn: Callable[..., Any], *args: Any) -> None:
+        """Queue a function to run on the main thread."""
+        self._queue.append((fn, args))
+        try:
+            os.write(self._write_fd, b"\x00")
+        except OSError:
+            pass  # Pipe full — main loop will still drain the queue
+
+    def process(self, _fd: Any = None) -> None:
+        """Drain the pipe and run all queued callbacks. Called on the main thread."""
+        try:
+            while os.read(self._read_fd, 4096):
+                pass
+        except OSError:
+            pass
+
+        while True:
+            try:
+                fn, args = self._queue.popleft()
+            except IndexError:
+                break
+            fn(*args)
+
+    def close(self) -> None:
+        os.close(self._read_fd)
+        os.close(self._write_fd)
 
 
 class TConn:
@@ -163,11 +212,11 @@ class Worker:
         self.heartbeat = heartbeat
         self.handler = handler
 
-        self.worker_connections: int = WORKER_CONNECTIONS
         self.max_keepalived: int = WORKER_CONNECTIONS - self.app.threads
-        self.futures: deque[futures.Future[tuple[bool, TConn]]] = deque()
         self._keep: deque[TConn] = deque()
         self.nr_conns: int = 0
+        self._in_flight: int = 0
+        self._accepting: bool = False
 
     def __str__(self) -> str:
         return f"<Worker {self.pid}>"
@@ -176,17 +225,17 @@ class Worker:
         self.heartbeat.notify()
 
     def init_process(self) -> None:
-        # Thread pool and poller
-        self.tpool: futures.ThreadPoolExecutor = futures.ThreadPoolExecutor(
+        # Thread pool, poller, and method queue
+        self.tpool: ThreadPoolExecutor = ThreadPoolExecutor(
             max_workers=self.app.threads
         )
         self.poller: selectors.DefaultSelector = selectors.DefaultSelector()
-        self._lock: RLock = RLock()
+        self._method_queue: PollableMethodQueue = PollableMethodQueue()
 
         # Reseed the random number generator
         util.seed()
 
-        # For waking ourselves up
+        # For waking ourselves up (signals, reloader)
         self.PIPE: tuple[int, int] = os.pipe()
         for p in self.PIPE:
             util.set_non_blocking(p)
@@ -195,8 +244,6 @@ class Worker:
         # Prevent listener sockets from leaking into subprocesses
         for s in self.sockets:
             util.close_on_exec(s.fileno())
-
-        self.wait_fds: list[sock.BaseSocket | int] = self.sockets + [self.PIPE[0]]
 
         self.init_signals()
 
@@ -332,17 +379,42 @@ class Worker:
         except Exception:
             self.log.debug("Failed to send error message.")
 
-    def _wrap_future(self, fs: futures.Future[tuple[bool, TConn]], conn: TConn) -> None:
-        fs.conn = conn  # type: ignore[attr-defined]
-        self.futures.append(fs)
-        fs.add_done_callback(self.finish_request)
-
     def enqueue_req(self, conn: TConn) -> None:
         # conn.init() is called inside handle(), not here, so that SSL
         # handshake errors are caught in the worker thread instead of
         # crashing the main loop. (Ported from gunicorn PR #3440.)
-        fs = self.tpool.submit(self.handle, conn)
-        self._wrap_future(fs, conn)
+        self._in_flight += 1
+        try:
+            self.tpool.submit(self._run_handle, conn)
+        except RuntimeError:
+            # Pool shut down (e.g. during SIGQUIT) — clean up counters
+            self._in_flight -= 1
+            self.nr_conns -= 1
+            conn.close()
+
+    def _run_handle(self, conn: TConn) -> None:
+        """Run handle() in a worker thread, defer completion to main thread."""
+        keepalive, conn = self.handle(conn)
+        self._method_queue.defer(self.finish_request, keepalive, conn)
+
+    def set_accept_enabled(self, enabled: bool) -> None:
+        """Register or unregister listener sockets for accepting connections."""
+        if enabled == self._accepting:
+            return
+
+        for listener in self.sockets:
+            if enabled:
+                listener.setblocking(False)
+                server = listener.getsockname()
+                self.poller.register(
+                    listener,
+                    selectors.EVENT_READ,
+                    partial(self.accept, server),
+                )
+            else:
+                self.poller.unregister(listener)
+
+        self._accepting = enabled
 
     def accept(self, server: tuple[str, int], listener: socket.socket) -> None:
         try:
@@ -352,28 +424,25 @@ class Worker:
 
             self.nr_conns += 1
             # wait until socket is readable
-            with self._lock:
-                self.poller.register(
-                    conn.sock,
-                    selectors.EVENT_READ,
-                    partial(self.on_client_socket_readable, conn),
-                )
+            self.poller.register(
+                conn.sock,
+                selectors.EVENT_READ,
+                partial(self.on_client_socket_readable, conn),
+            )
         except OSError as e:
             if e.errno not in (errno.EAGAIN, errno.ECONNABORTED, errno.EWOULDBLOCK):
                 raise
 
     def on_client_socket_readable(self, conn: TConn, client: socket.socket) -> None:
-        with self._lock:
-            # unregister the client from the poller
-            self.poller.unregister(client)
+        # unregister the client from the poller
+        self.poller.unregister(client)
 
-            if conn.initialized:
-                # remove the connection from keepalive
-                try:
-                    self._keep.remove(conn)
-                except ValueError:
-                    # race condition
-                    return
+        if conn.initialized:
+            # remove the connection from keepalive
+            try:
+                self._keep.remove(conn)
+            except ValueError:
+                return
 
         # submit the connection to a worker
         self.enqueue_req(conn)
@@ -381,12 +450,11 @@ class Worker:
     def murder_keepalived(self) -> None:
         now = time.monotonic()
         while True:
-            with self._lock:
-                try:
-                    # remove the connection from the queue
-                    conn = self._keep.popleft()
-                except IndexError:
-                    break
+            try:
+                # remove the connection from the queue
+                conn = self._keep.popleft()
+            except IndexError:
+                break
 
             # Connections in _keep always have timeout set via set_timeout()
             assert conn.timeout is not None, (
@@ -395,24 +463,22 @@ class Worker:
             delta = conn.timeout - now
             if delta > 0:
                 # add the connection back to the queue
-                with self._lock:
-                    self._keep.appendleft(conn)
+                self._keep.appendleft(conn)
                 break
             else:
                 self.nr_conns -= 1
                 # remove the socket from the poller
-                with self._lock:
-                    try:
-                        self.poller.unregister(conn.sock)
-                    except OSError as e:
-                        if e.errno != errno.EBADF:
-                            raise
-                    except KeyError:
-                        # already removed by the system, continue
-                        pass
-                    except ValueError:
-                        # already removed by the system continue
-                        pass
+                try:
+                    self.poller.unregister(conn.sock)
+                except OSError as e:
+                    if e.errno != errno.EBADF:
+                        raise
+                except KeyError:
+                    # already removed by the system, continue
+                    pass
+                except ValueError:
+                    # already removed by the system continue
+                    pass
 
                 # close the socket
                 conn.close()
@@ -425,40 +491,30 @@ class Worker:
         return True
 
     def run(self) -> None:
-        # init listeners, add them to the event loop
-        for listener in self.sockets:
-            listener.setblocking(False)
-            # a race condition during graceful shutdown may make the listener
-            # name unavailable in the request handler so capture it once here
-            server = listener.getsockname()
-            acceptor = partial(self.accept, server)
-            self.poller.register(listener, selectors.EVENT_READ, acceptor)
+        # Register the method queue so worker thread completions
+        # wake up the poller
+        self.poller.register(
+            self._method_queue.fileno(),
+            selectors.EVENT_READ,
+            self._method_queue.process,
+        )
+
+        # Start accepting connections
+        self.set_accept_enabled(True)
 
         while self.alive:
             # notify the arbiter we are alive
             self.notify()
 
-            # can we accept more connections?
-            if self.nr_conns < self.worker_connections:
-                # wait for an event
-                events = self.poller.select(1.0)
-                for key, _ in events:
-                    callback = key.data
-                    callback(key.fileobj)
+            # Backpressure: stop accepting when at capacity
+            self.set_accept_enabled(self.nr_conns < WORKER_CONNECTIONS)
 
-                # check (but do not wait) for finished requests
-                result = futures.wait(
-                    self.futures, timeout=0, return_when=futures.FIRST_COMPLETED
-                )
-            else:
-                # wait for a request to finish
-                result = futures.wait(
-                    self.futures, timeout=1.0, return_when=futures.FIRST_COMPLETED
-                )
-
-            # clean up finished requests
-            for fut in result.done:
-                self.futures.remove(fut)
+            # Single unified event loop — handles accepts, client data,
+            # and worker thread completions (via method queue pipe)
+            events = self.poller.select(1.0)
+            for key, _ in events:
+                callback = key.data
+                callback(key.fileobj)
 
             if not self.is_parent_alive():
                 break
@@ -466,49 +522,47 @@ class Worker:
             # handle keepalive timeouts
             self.murder_keepalived()
 
+        self.set_accept_enabled(False)
         self.tpool.shutdown(False)
-        self.poller.close()
 
         for s in self.sockets:
             s.close()
 
+        # Graceful shutdown: keep processing completions until all
+        # in-flight requests finish or the timeout expires
         from plain.runtime import settings
 
-        futures.wait(self.futures, timeout=settings.SERVER_GRACEFUL_TIMEOUT)
+        deadline = time.monotonic() + settings.SERVER_GRACEFUL_TIMEOUT
+        while self._in_flight > 0 and time.monotonic() < deadline:
+            events = self.poller.select(0.5)
+            for key, _ in events:
+                callback = key.data
+                callback(key.fileobj)
 
-    def finish_request(self, fs: futures.Future[tuple[bool, TConn]]) -> None:
-        if fs.cancelled():
+        self.poller.close()
+        self._method_queue.close()
+
+    def finish_request(self, keepalive: bool, conn: TConn) -> None:
+        """Process a completed request. Runs on the main thread via method queue."""
+        self._in_flight -= 1
+
+        if keepalive and self.alive:
+            # flag the socket as non blocked
+            conn.sock.setblocking(False)
+
+            # register the connection
+            conn.set_timeout()
+            self._keep.append(conn)
+
+            # add the socket to the event loop
+            self.poller.register(
+                conn.sock,
+                selectors.EVENT_READ,
+                partial(self.on_client_socket_readable, conn),
+            )
+        else:
             self.nr_conns -= 1
-            fs.conn.close()  # type: ignore[attr-defined]
-            return
-
-        try:
-            (keepalive, conn) = fs.result()
-            # if the connection should be kept alived add it
-            # to the eventloop and record it
-            if keepalive and self.alive:
-                # flag the socket as non blocked
-                conn.sock.setblocking(False)
-
-                # register the connection
-                conn.set_timeout()
-                with self._lock:
-                    self._keep.append(conn)
-
-                    # add the socket to the event loop
-                    self.poller.register(
-                        conn.sock,
-                        selectors.EVENT_READ,
-                        partial(self.on_client_socket_readable, conn),
-                    )
-            else:
-                self.nr_conns -= 1
-                conn.close()
-        except Exception:
-            # an exception happened, make sure to close the
-            # socket.
-            self.nr_conns -= 1
-            fs.conn.close()  # type: ignore[attr-defined]
+            conn.close()
 
     def handle(self, conn: TConn) -> tuple[bool, TConn]:
         keepalive = False
@@ -517,9 +571,28 @@ class Worker:
             # Ensure blocking mode before init/parsing. Critical for keepalive
             # connections where finish_request sets non-blocking for the poller.
             conn.sock.setblocking(True)
+
+            # For new connections, set a read timeout so slow clients can't
+            # hold a thread indefinitely. Without this, a client that sends
+            # partial headers ties up a thread pool slot until the server
+            # timeout kills the whole worker. Keepalive connections are
+            # protected by murder_keepalived() while idle on the poller.
+            is_new = not conn.initialized
+            if is_new:
+                conn.sock.settimeout(KEEPALIVE)
+
             conn.init()
             assert conn.parser is not None
-            req = next(conn.parser)
+            try:
+                req = next(conn.parser)
+            except TimeoutError:
+                self.log.debug("Slow client timed out during request parsing")
+                return (False, conn)
+
+            if is_new:
+                # Clear the read timeout now that parsing is done.
+                conn.sock.settimeout(None)
+
             if not req:
                 return (False, conn)
 
