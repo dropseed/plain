@@ -26,6 +26,7 @@ dev = [
   "plain-pageviews",
   "plain-passwords",
   "plain-pytest",
+  "plain-realtime",
   "plain-redirection",
   "plain-scan",
   "plain-sessions",
@@ -69,6 +70,7 @@ dev = [
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }
 "plain-vendor" = { workspace = true }
+"plain-realtime" = { workspace = true }
 "plainx-dev" = { workspace = true }
 
 [tool.uv.workspace]

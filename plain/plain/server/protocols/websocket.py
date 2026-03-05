@@ -283,19 +283,11 @@ async def handle_websocket_connection(
 
     Runs the frame read loop, handling ping/pong, close, fragmentation,
     and dispatching data frames to the view's receive() method.
-    Also manages Postgres LISTEN subscriptions if any.
     """
-    listen_tasks: list[asyncio.Task] = []
     try:
-        # Call connect()
+        # Call connect() and optional post-connect hook
         await ws_view.connect()
-
-        # Start pg_listen tasks for subscriptions if any
-        if ws_view._subscriptions:
-            loop = asyncio.get_running_loop()
-            for sub_channel in ws_view._subscriptions:
-                task = loop.create_task(_ws_pg_listen(ws_view, sub_channel))
-                listen_tasks.append(task)
+        await ws_view._after_connect()
 
         # Read loop
         frag_opcode = None
@@ -352,13 +344,8 @@ async def handle_websocket_connection(
     except Exception:
         log.exception("WebSocket error")
     finally:
-        # Cancel listen tasks and wait for them to finish
-        for task in listen_tasks:
-            task.cancel()
-        if listen_tasks:
-            await asyncio.gather(*listen_tasks, return_exceptions=True)
-
         ws_view._closed = True
+        await ws_view._before_disconnect()
         await ws_view.disconnect()
 
         try:
@@ -379,18 +366,3 @@ async def _ws_dispatch(ws_view: Any, opcode: int, payload: bytes) -> None:
         message = payload
 
     await ws_view.receive(message)
-
-
-async def _ws_pg_listen(ws_view: Any, channel: str) -> None:
-    """Listen for Postgres NOTIFY and send to WebSocket client."""
-    from plain.realtime.channel import pg_listen
-
-    try:
-        async for channel_name, payload in pg_listen(channel):
-            if ws_view._closed:
-                break
-            if channel_name is None:
-                continue  # heartbeat
-            await ws_view.send(payload)
-    except asyncio.CancelledError:
-        pass

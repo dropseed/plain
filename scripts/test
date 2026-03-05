@@ -22,6 +22,7 @@ plain-api
 plain-elements
 plain-htmx
 plain-pages
+plain-realtime
 EOF
 )"
 

@@ -26,6 +26,7 @@ members = [
     "plain-pageviews",
     "plain-passwords",
     "plain-pytest",
+    "plain-realtime",
     "plain-redirection",
     "plain-scan",
     "plain-sessions",
@@ -187,6 +188,7 @@ dependencies = [
     { name = "plain-pageviews" },
     { name = "plain-passwords" },
     { name = "plain-pytest" },
+    { name = "plain-realtime" },
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
@@ -220,6 +222,7 @@ requires-dist = [
     { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-realtime", editable = "plain-realtime" },
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },
@@ -891,6 +894,31 @@ requires-dist = [
 ]
 
 [[package]]
+name = "plain-realtime"
+version = "0.1.0"
+source = { editable = "plain-realtime" }
+dependencies = [
+    { name = "plain" },
+    { name = "plain-models" },
+    { name = "psycopg", extra = ["binary"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-models", editable = "plain-models" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest" }]
+
+[[package]]
 name = "plain-redirection"
 version = "0.31.5"
 source = { editable = "plain-redirection" }
@@ -1073,6 +1101,7 @@ dev = [
     { name = "plain-pageviews" },
     { name = "plain-passwords" },
     { name = "plain-pytest" },
+    { name = "plain-realtime" },
     { name = "plain-redirection" },
     { name = "plain-scan" },
     { name = "plain-sessions" },
@@ -1110,6 +1139,7 @@ dev = [
     { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
     { name = "plain-pytest", editable = "plain-pytest" },
+    { name = "plain-realtime", editable = "plain-realtime" },
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
     { name = "plain-sessions", editable = "plain-sessions" },

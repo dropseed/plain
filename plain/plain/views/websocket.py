@@ -30,9 +30,6 @@ class WebSocketView(View):
             async def authorize(self):
                 return self.request.user.is_authenticated
 
-            async def connect(self):
-                await self.subscribe(f"chat:{self.url_kwargs['room_id']}")
-
             async def receive(self, message):
                 await self.send(f"echo: {message}")
     """
@@ -44,7 +41,6 @@ class WebSocketView(View):
         self._writer: asyncio.StreamWriter | None = None
         self._reader: asyncio.StreamReader | None = None
         self._closed = False
-        self._subscriptions: list[str] = []
 
     def bind_transport(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -86,6 +82,14 @@ class WebSocketView(View):
         """
         pass
 
+    async def _after_connect(self) -> None:
+        """Hook called after connect(). Override in subclasses for post-connect setup."""
+        pass
+
+    async def _before_disconnect(self) -> None:
+        """Hook called before disconnect(). Override in subclasses for pre-disconnect cleanup."""
+        pass
+
     async def send(self, message: str | bytes) -> None:
         """Send a message to the WebSocket client."""
         if self._closed or self._writer is None:
@@ -104,10 +108,6 @@ class WebSocketView(View):
     async def send_json(self, data: Any) -> None:
         """Send JSON data to the WebSocket client."""
         await self.send(json.dumps(data))
-
-    async def subscribe(self, channel: str) -> None:
-        """Subscribe to a Postgres NOTIFY channel for server-push events."""
-        self._subscriptions.append(channel)
 
     async def close(self, code: int = 1000, reason: str = "") -> None:
         """Close the WebSocket connection."""

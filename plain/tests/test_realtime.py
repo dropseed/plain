@@ -1,6 +1,5 @@
-"""Tests for the plain.realtime infrastructure.
+"""Tests for SSE formatting and WebSocket framing protocols.
 
-Tests are organized as unit tests for SSE formatting and WebSocket framing.
 Integration tests for the full SSE/WebSocket pipeline require a running server.
 """
 
@@ -9,7 +8,6 @@ import struct
 
 import pytest
 
-from plain.realtime.channel import SSEView
 from plain.server.protocols.sse import SSE_HEADERS, format_sse_comment, format_sse_event
 from plain.server.protocols.websocket import (
     CLOSE_NORMAL,
@@ -76,20 +74,6 @@ class TestSSEFormatting:
     def test_sse_headers(self):
         assert SSE_HEADERS["Cache-Control"] == "no-cache"
         assert SSE_HEADERS["X-Accel-Buffering"] == "no"
-
-
-class TestSSEViewBaseClass:
-    def test_default_authorize(self):
-        ch = SSEView()
-        assert ch.authorize() is True
-
-    def test_default_subscribe(self):
-        ch = SSEView()
-        assert ch.subscribe() == []
-
-    def test_default_transform(self):
-        ch = SSEView()
-        assert ch.transform("chan", "payload") == "payload"
 
 
 class TestWebSocketFrameProtocol:

@@ -1,0 +1,19 @@
+[project]
+name = "plain.realtime"
+version = "0.1.0"
+description = "Real-time server-to-client push using Postgres LISTEN/NOTIFY."
+authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.13"
+dependencies = ["plain<1.0.0", "plain-models<1.0.0", "psycopg[binary]>=3.2.0"]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
