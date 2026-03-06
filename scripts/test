@@ -12,6 +12,7 @@
 #
 # Flags:
 #   --skip-server  Skip server behavior and conformance tests (faster iteration)
+#   --python 3.14  Run with a specific Python version (sets UV_PYTHON)
 ALL_PACKAGES="$(cat <<EOF
 plain
 plain-models
@@ -30,12 +31,12 @@ EOF
 
 skip_server=false
 remaining=()
-for arg in "$@"; do
-  if [ "$arg" = "--skip-server" ]; then
-    skip_server=true
-  else
-    remaining+=("$arg")
-  fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --skip-server) skip_server=true; shift ;;
+    --python) [ -z "${2:-}" ] && echo "Error: --python requires a version argument" >&2 && exit 1; export UV_PYTHON="$2"; shift 2 ;;
+    *) remaining+=("$1"); shift ;;
+  esac
 done
 set -- "${remaining[@]}"
 
@@ -58,6 +59,9 @@ echo "Using DATABASE_URL: $DATABASE_URL"
 # PostgreSQL driver
 WITH="--with psycopg[binary]"
 
+if [ -n "$UV_PYTHON" ]; then
+  bold "Python: $UV_PYTHON"
+fi
 bold "Packages to test: $packages"
 
 for package in $packages; do
