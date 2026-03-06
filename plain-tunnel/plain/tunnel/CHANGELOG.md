@@ -1,5 +1,21 @@
 # plain-tunnel changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.0) (2026-03-06)
+
+### What's changed
+
+- **WebSocket proxy support** — the tunnel now proxies WebSocket connections between the browser and the local dev server. New `ws-open`, `ws-message`, and `ws-close` message types handle the full WebSocket lifecycle, including binary messages (base64-encoded) and message queuing during connection setup ([5d9cea8ff72f](https://github.com/dropseed/plain/commit/5d9cea8ff72f))
+- **Improved WebSocket proxy reliability** — fixed header forwarding to skip hop-by-hop and WebSocket handshake headers, rewrites `Host` to match the local server, and properly cleans up proxied connections on tunnel disconnect ([b55306047384](https://github.com/dropseed/plain/commit/b55306047384), [e3a3fc5019ba](https://github.com/dropseed/plain/commit/e3a3fc5019ba))
+- **Tunnel WebSocket endpoint moved** — the control WebSocket now connects to `/__tunnel__` path instead of the root, freeing the root path for WebSocket proxying ([5d9cea8ff72f](https://github.com/dropseed/plain/commit/5d9cea8ff72f))
+- **Fixed stream-end on cancel** — `stream-end` is no longer sent when a stream is cancelled by the server, preventing spurious messages ([b55306047384](https://github.com/dropseed/plain/commit/b55306047384))
+- **Styled error pages** — tunnel error responses now render as styled HTML pages when the browser accepts HTML ([5d9cea8ff72f](https://github.com/dropseed/plain/commit/5d9cea8ff72f))
+- **Protocol version bumped to 3** — both client and server now require protocol version 3 due to the new WebSocket proxy message types ([5d9cea8ff72f](https://github.com/dropseed/plain/commit/5d9cea8ff72f))
+
+### Upgrade instructions
+
+- The tunnel server must be updated alongside the client due to the protocol version bump to v3.
+- No application code changes required.
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.11.0) (2026-03-06)
 
 ### What's changed
