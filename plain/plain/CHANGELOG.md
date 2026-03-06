@@ -1,5 +1,20 @@
 # plain changelog
 
+## [0.116.0](https://github.com/dropseed/plain/releases/plain@0.116.0) (2026-03-06)
+
+### What's changed
+
+- **HTTP/2 support** — TLS connections now automatically negotiate HTTP/2 via ALPN. HTTP/2 requests are handled with full stream multiplexing using the `h2` library, while HTTP/1.1 clients continue to work as before. Each HTTP/2 stream is dispatched to the thread pool independently, and idle connections time out after 5 minutes ([c4d3a33671c6](https://github.com/dropseed/plain/commit/c4d3a33671c6))
+- **Middleware refactored to before/after phases** — `HttpMiddleware` no longer uses the onion/wrapper model with `process_request()` and `self.get_response()`. Instead, middleware now implements `before_request(request) -> Response | None` (return a response to short-circuit, or `None` to continue) and `after_response(request, response) -> Response` (modify and return the response). The middleware pipeline runs `before_request` forward through the chain, then `after_response` in reverse. Middleware `__init__` no longer receives `get_response` ([9a1477ee8fa8](https://github.com/dropseed/plain/commit/9a1477ee8fa8))
+- Updated server architecture diagram and README to document HTTP/2 and the new middleware model ([c4d3a33671c6](https://github.com/dropseed/plain/commit/c4d3a33671c6), [9a1477ee8fa8](https://github.com/dropseed/plain/commit/9a1477ee8fa8))
+
+### Upgrade instructions
+
+- Rename `process_request(self, request)` to `before_request(self, request)` in custom middleware. The method should return `None` to continue to the next middleware/view, or return a `Response` to short-circuit.
+- Move any post-response logic (code after `self.get_response(request)`) into a new `after_response(self, request, response)` method that returns the response.
+- Remove `self.get_response(request)` calls — the framework now handles calling the next middleware/view automatically.
+- Update `__init__` signatures: middleware `__init__` no longer receives `get_response`. Change `def __init__(self, get_response)` to `def __init__(self)` and remove `super().__init__(get_response)`.
+
 ## [0.115.0](https://github.com/dropseed/plain/releases/plain@0.115.0) (2026-03-05)
 
 ### What's changed
