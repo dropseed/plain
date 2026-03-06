@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.117.1](https://github.com/dropseed/plain/releases/plain@0.117.1) (2026-03-06)
+
+### What's changed
+
+- Fixed 500 error handling to pass the actual exception to `ErrorView` instead of `None`, allowing error views to access exception details ([463177c8f0fa](https://github.com/dropseed/plain/commit/463177c8f0fa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.117.0](https://github.com/dropseed/plain/releases/plain@0.117.0) (2026-03-06)
 
 ### What's changed
