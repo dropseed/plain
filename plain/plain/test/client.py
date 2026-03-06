@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from http import HTTPStatus
 from http.cookies import SimpleCookie
@@ -196,8 +197,42 @@ class ClientHandler(BaseHandler):
 
         request_started.send(sender=self.__class__, request=request)
 
-        # Request goes through middleware.
-        response = self.get_response(request)
+        if self.is_async_view(request):
+            from plain.http import AsyncStreamingResponse
+            from plain.http import Response as HttpResponse
+
+            async def _async_dispatch() -> ResponseBase:
+                resp = await self.get_response_async(request)
+
+                # Collect async streaming content so tests can inspect it.
+                if isinstance(resp, AsyncStreamingResponse):
+                    chunks = []
+                    async for chunk in resp:
+                        chunks.append(chunk)
+                    collected = b"".join(chunks)
+
+                    sync_response = HttpResponse(
+                        collected,
+                        status_code=resp.status_code,
+                        content_type=resp.headers.get("Content-Type"),
+                    )
+                    for key, value in resp.headers.items():
+                        if key != "Content-Type":
+                            sync_response.headers[key] = value
+                    sync_response.cookies = resp.cookies
+                    # Transfer resource closers (e.g. request.close) to the
+                    # sync response so they fire exactly once when
+                    # response.close() is called below.
+                    sync_response._resource_closers = resp._resource_closers
+                    resp._resource_closers = []
+                    await resp.aclose()
+                    return sync_response
+
+                return resp
+
+            response = asyncio.run(_async_dispatch())
+        else:
+            response = self.get_response(request)
 
         # Simulate behaviors of most web servers.
         _conditional_content_removal(request, response)

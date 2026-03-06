@@ -380,8 +380,11 @@ class Response:
             for item in respiter:
                 self.write(item)
 
-    def write_response(self, http_response: Any) -> None:
-        """Write a plain.http.ResponseBase directly to the socket."""
+    def prepare_response(self, http_response: Any) -> None:
+        """Set status and headers from a plain.http.ResponseBase without writing body.
+
+        After calling this, use write() to send body chunks and close() to finish.
+        """
         status = f"{http_response.status_code} {http_response.reason_phrase}"
         response_headers = [
             *((k, v) for k, v in http_response.headers.items() if v is not None),
@@ -390,8 +393,11 @@ class Response:
                 for c in http_response.cookies.values()
             ),
         ]
-
         self.set_status_and_headers(status, response_headers)
+
+    def write_response(self, http_response: Any) -> None:
+        """Write a plain.http.ResponseBase directly to the socket."""
+        self.prepare_response(http_response)
 
         if (
             isinstance(http_response, FileResponse)

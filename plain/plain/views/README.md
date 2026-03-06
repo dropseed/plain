@@ -14,6 +14,7 @@
     - [DeleteView](#deleteview)
     - [ListView](#listview)
 - [RedirectView](#redirectview)
+- [ServerSentEventsView](#serversenteventsview)
 - [ResponseException](#responseexception)
 - [Error views](#error-views)
 - [View patterns](#view-patterns)
@@ -299,6 +300,57 @@ class AppRouter(Router):
 ```
 
 You can also redirect to a named URL using `url_name`, or preserve query parameters with `preserve_query_params=True`.
+
+## ServerSentEventsView
+
+[`ServerSentEventsView`](./sse.py#ServerSentEventsView) provides [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) streaming. Subclass it and implement `stream()` as an async generator.
+
+```python
+import asyncio
+from datetime import datetime
+from plain.views import ServerSentEvent, ServerSentEventsView
+
+
+class ClockView(ServerSentEventsView):
+    async def stream(self):
+        while True:
+            yield ServerSentEvent(data={"time": datetime.now().isoformat()})
+            await asyncio.sleep(1)
+```
+
+The `stream()` method must yield `ServerSentEvent` instances. The `data` argument accepts strings, dicts, and lists (dicts/lists are JSON-serialized). You can also set optional `event`, `id`, and `retry` fields.
+
+```python
+from plain.views import ServerSentEvent
+
+
+class NotificationView(ServerSentEventsView):
+    async def stream(self):
+        yield ServerSentEvent(data="hello")                        # Simple string
+        yield ServerSentEvent(data={"count": 1})                   # JSON data
+        yield ServerSentEvent(data="update", event="status")       # Named event type
+        yield ServerSentEvent(data="msg", id="42", retry=5000)     # With id and retry
+        yield ServerSentEvent.comment("keepalive")                 # SSE comment (keepalive)
+```
+
+Connect from JavaScript using the standard [`EventSource`](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) API:
+
+```javascript
+const source = new EventSource("/events/");
+source.onmessage = (event) => {
+    console.log(event.data);
+};
+// Listen for named event types
+source.addEventListener("status", (event) => {
+    console.log("Status:", event.data);
+});
+```
+
+Send `ServerSentEvent.comment()` periodically as a keepalive to prevent proxies and browsers from closing idle connections.
+
+ServerSentEventsView only accepts GET requests. The `stream()` method runs on the event loop — use `await` for any I/O and avoid blocking calls. Use `await asyncio.sleep()` instead of `time.sleep()`, and `await loop.run_in_executor()` to wrap blocking operations.
+
+Note: browsers limit HTTP/1.1 to 6 SSE connections per domain. Use HTTP/2 to avoid this limit.
 
 ## ResponseException
 

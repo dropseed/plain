@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from plain.http import HttpMiddleware, Response
 from plain.urls import Router, path
-from plain.views import View
+from plain.views import ServerSentEvent, ServerSentEventsView, View
 
 # Shared log that tests can inspect and clear
 call_log: list[str] = []
@@ -114,4 +114,20 @@ class ErrorRouter(Router):
     namespace = ""
     urls = [
         path("", ErrorView, name="index"),
+    ]
+
+
+class FiniteServerSentEventsView(ServerSentEventsView):
+    """ServerSentEventsView that yields a few events and stops (for testing)."""
+
+    async def stream(self):
+        yield ServerSentEvent(data="hello")
+        yield ServerSentEvent(data={"count": 1})
+        yield ServerSentEvent(data="done", event="finish", id="msg-3")
+
+
+class SSERouter(Router):
+    namespace = ""
+    urls = [
+        path("", FiniteServerSentEventsView, name="index"),
     ]

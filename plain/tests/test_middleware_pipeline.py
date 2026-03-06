@@ -439,3 +439,71 @@ class TestMiddlewareUnwinding:
             settings.MIDDLEWARE = original_middleware
             settings.URLS_ROUTER = original_router
             _get_cached_resolver.cache_clear()
+
+
+class TestSSEViews:
+    """Tests for ServerSentEventsView async dispatch and streaming."""
+
+    def test_sse_view_streams_formatted_events(self):
+        """ServerSentEventsView should format and stream events."""
+        from plain.urls.resolvers import _get_cached_resolver
+
+        original_router = settings.URLS_ROUTER
+        try:
+            settings.URLS_ROUTER = "middleware_helpers.SSERouter"
+            _get_cached_resolver.cache_clear()
+
+            client = _fresh_client()
+            response = client.get("/")
+            assert response.status_code == 200
+            assert "text/event-stream" in response.headers["Content-Type"]
+            assert response.headers["Cache-Control"] == "no-cache"
+
+            body = response.content.decode()
+            # Three ServerSentEvent instances with different data types
+            assert "data: hello\n\n" in body
+            assert 'data: {"count": 1}\n\n' in body
+            assert "event: finish\nid: msg-3\ndata: done\n\n" in body
+        finally:
+            settings.URLS_ROUTER = original_router
+            _get_cached_resolver.cache_clear()
+
+    def test_sse_view_with_middleware_ordering(self):
+        """Middleware before/after still runs correctly with SSE views."""
+        from plain.urls.resolvers import _get_cached_resolver
+
+        original_middleware = settings.MIDDLEWARE
+        original_router = settings.URLS_ROUTER
+        try:
+            settings.MIDDLEWARE = ["middleware_helpers.TrackingMiddleware"]
+            settings.URLS_ROUTER = "middleware_helpers.SSERouter"
+            _get_cached_resolver.cache_clear()
+
+            client = _fresh_client()
+            response = client.get("/")
+            assert response.status_code == 200
+            assert call_log == ["before", "after"]
+        finally:
+            settings.MIDDLEWARE = original_middleware
+            settings.URLS_ROUTER = original_router
+            _get_cached_resolver.cache_clear()
+
+    def test_middleware_short_circuit_with_sse_view(self):
+        """Middleware short-circuit should work even when the route is an SSE view."""
+        from plain.urls.resolvers import _get_cached_resolver
+
+        original_middleware = settings.MIDDLEWARE
+        original_router = settings.URLS_ROUTER
+        try:
+            settings.MIDDLEWARE = ["middleware_helpers.BlockingMiddleware"]
+            settings.URLS_ROUTER = "middleware_helpers.SSERouter"
+            _get_cached_resolver.cache_clear()
+
+            client = _fresh_client()
+            response = client.get("/")
+            assert response.status_code == 403
+            assert response.content == b"blocked"
+        finally:
+            settings.MIDDLEWARE = original_middleware
+            settings.URLS_ROUTER = original_router
+            _get_cached_resolver.cache_clear()

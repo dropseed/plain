@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import NoReturn
 
+from app.views.sse import ClockView, StockTickerView
 from plain.admin.urls import AdminRouter
 from plain.assets.urls import AssetsRouter
 from plain.auth.views import LogoutView
@@ -13,6 +14,10 @@ from plain.views import TemplateView
 
 class LoginView(PasswordLoginView):
     template_name = "login.html"
+
+
+class SSEDemoView(TemplateView):
+    template_name = "sse.html"
 
 
 class IndexView(TemplateView):
@@ -36,5 +41,8 @@ class AppRouter(Router):
         path("login/", LoginView, name="login"),
         path("logout/", LogoutView, name="logout"),
         path("error/", ErrorView, name="error"),
+        path("sse/", SSEDemoView, name="sse_demo"),
+        path("sse/clock/", ClockView, name="sse_clock"),
+        path("sse/ticker/", StockTickerView, name="sse_ticker"),
         path("", IndexView, name="index"),
     ]

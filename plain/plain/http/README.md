@@ -196,6 +196,20 @@ def generate_data():
 return StreamingResponse(generate_data(), content_type="text/plain")
 ```
 
+**Async streaming responses:**
+
+```python
+from plain.http import AsyncStreamingResponse
+
+async def generate_data():
+    for i in range(1000):
+        yield f"Line {i}\n"
+
+return AsyncStreamingResponse(generate_data(), content_type="text/plain")
+```
+
+`AsyncStreamingResponse` streams data without occupying a thread pool slot. For Server-Sent Events, use [`ServerSentEventsView`](../views/README.md#serversenteventsview) which builds on this. You can also use `AsyncStreamingResponse` directly for other async streaming patterns like chunked JSON or log tailing.
+
 Other response types include [`NotModifiedResponse`](./response.py#NotModifiedResponse) (304) and [`NotAllowedResponse`](./response.py#NotAllowedResponse) (405).
 
 ### Access log control

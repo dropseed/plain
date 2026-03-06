@@ -16,7 +16,7 @@ import h2.events
 import h2.exceptions
 
 from plain import signals
-from plain.http import FileResponse, StreamingResponse
+from plain.http import AsyncStreamingResponse, FileResponse, StreamingResponse
 from plain.http import Request as HttpRequest
 
 from ..accesslog import log_access
@@ -403,7 +403,10 @@ async def async_handle_h2_connection(
                             )
                             conn.send_data(event.stream_id, body, end_stream=True)
                         except h2.exceptions.ProtocolError:
-                            conn.reset_stream(event.stream_id)
+                            try:
+                                conn.reset_stream(event.stream_id)
+                            except h2.exceptions.ProtocolError:
+                                pass
                         conn.acknowledge_received_data(
                             event.flow_controlled_length, event.stream_id
                         )
@@ -530,9 +533,22 @@ async def _async_handle_stream(
             sender=state.handler.__class__, request=http_request
         )
 
-        http_response = await loop.run_in_executor(
-            state.executor, state.handler.get_response, http_request
-        )
+        # Detect async views — resolve URL in executor to avoid blocking event loop
+        def _check_async() -> bool:
+            return hasattr(
+                state.handler, "is_async_view"
+            ) and state.handler.is_async_view(http_request)
+
+        is_async = await loop.run_in_executor(state.executor, _check_async)
+
+        if is_async:
+            http_response = await state.handler.get_response_async(
+                http_request, state.executor
+            )
+        else:
+            http_response = await loop.run_in_executor(
+                state.executor, state.handler.get_response, http_request
+            )
 
         try:
             if stream.stream_id in state.reset_streams:
@@ -545,6 +561,8 @@ async def _async_handle_stream(
             request_time = datetime.now() - request_start
             if http_response.log_access:
                 log_access(h2_resp, h2_req, request_time)
+            if isinstance(http_response, AsyncStreamingResponse):
+                await http_response.aclose()
             if hasattr(http_response, "close"):
                 http_response.close()
 
@@ -582,6 +600,23 @@ async def _async_write_h2_response(
     h2_resp.status = f"{status_code} {http_response.reason_phrase}"
 
     response_headers = _build_h2_response_headers(http_response)
+
+    # Async streaming (SSE, etc.) — iterate on event loop
+    if isinstance(http_response, AsyncStreamingResponse):
+        async with state.write_lock:
+            conn.send_headers(stream_id, response_headers)
+            await state.flush()
+            h2_resp.headers_sent = True
+
+        async for chunk in http_response:
+            if chunk:
+                h2_resp.sent += len(chunk)
+                await _async_send_h2_data(state, stream_id, chunk, end_stream=False)
+
+        async with state.write_lock:
+            conn.send_data(stream_id, b"", end_stream=True)
+            await state.flush()
+        return
 
     is_file = (
         isinstance(http_response, FileResponse)

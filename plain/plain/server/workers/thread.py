@@ -8,8 +8,12 @@ from __future__ import annotations
 # Vendored and modified for Plain.
 # design:
 # An asyncio event loop accepts connections and manages keepalive.
-# Each connection is handled as an async task that dispatches the
-# synchronous request handler to a thread pool via run_in_executor.
+# Each connection is handled as an async task. HTTP parsing always
+# runs in a thread pool. After parsing, URL resolution detects
+# whether the view has async handlers:
+#   Sync views:  full pipeline (middleware + view + write) in thread pool
+#   Async views: middleware in thread pool, view awaited on event loop,
+#                response written in thread pool
 # Keepalive waits use asyncio.wait_for with a timeout.
 import asyncio
 import errno
@@ -52,7 +56,12 @@ if TYPE_CHECKING:
     from ..app import ServerApplication
     from ..http.message import Request
 
-_H2_SENTINEL = object()
+
+class _H2Sentinel:
+    """Sentinel value returned by _parse_request for HTTP/2 connections."""
+
+
+_H2_SENTINEL = _H2Sentinel()
 
 # Maximum jitter to add to max_requests to stagger worker restarts
 MAX_REQUESTS_JITTER = 50
@@ -298,10 +307,12 @@ class Worker:
                 return
 
             while self.alive:
-                # Run the synchronous handle() in the thread pool
-                result, conn = await loop.run_in_executor(self.tpool, self.handle, conn)
+                # Parse HTTP in thread pool
+                parse_result: (
+                    tuple[Any, Any, Response, datetime] | _H2Sentinel | None
+                ) = await loop.run_in_executor(self.tpool, self._parse_request, conn)
 
-                if result is _H2_SENTINEL:
+                if isinstance(parse_result, _H2Sentinel):
                     remaining = self.max_requests - self.nr
                     if self.max_requests < sys.maxsize and remaining <= 0:
                         self.log.info("Autorestarting worker after current request.")
@@ -325,7 +336,32 @@ class Worker:
                         self.alive = False
                     return
 
-                keepalive = result
+                if parse_result is None:
+                    break
+
+                req, http_request, resp, request_start = parse_result
+
+                # Detect async views (fast, safe on event loop).
+                # FailHandler (from make_fail_handler) doesn't have this method.
+                is_async = hasattr(
+                    self.handler, "is_async_view"
+                ) and self.handler.is_async_view(http_request)
+
+                if is_async:
+                    keepalive = await self._dispatch_async(
+                        req, conn, http_request, resp, request_start
+                    )
+                else:
+                    keepalive = await loop.run_in_executor(
+                        self.tpool,
+                        self._dispatch_sync,
+                        req,
+                        conn,
+                        http_request,
+                        resp,
+                        request_start,
+                    )
+
                 if not keepalive or not self.alive:
                     break
 
@@ -488,9 +524,15 @@ class Worker:
             return False
         return True
 
-    def handle(self, conn: TConn) -> tuple[bool | object, TConn]:
-        keepalive = False
-        req = None
+    def _parse_request(
+        self, conn: TConn
+    ) -> tuple[Any, Any, Response, datetime] | _H2Sentinel | None:
+        """Parse HTTP and build request/response objects.
+
+        Returns (req, http_request, resp, request_start) or None on failure.
+        Returns _H2_SENTINEL if this is an HTTP/2 connection.
+        All parse/connection errors are handled internally.
+        """
         try:
             # Ensure blocking mode before init/parsing. Critical for keepalive
             # connections where _handle_connection sets non-blocking for readability waiting.
@@ -509,60 +551,23 @@ class Worker:
 
             if conn.is_h2:
                 conn.sock.settimeout(None)
-                return (_H2_SENTINEL, conn)
+                return _H2_SENTINEL
 
             assert conn.parser is not None
             try:
                 req = next(conn.parser)
             except TimeoutError:
                 self.log.debug("Slow client timed out during request parsing")
-                return (False, conn)
+                return None
 
             if is_new:
                 # Clear the read timeout now that parsing is done.
                 conn.sock.settimeout(None)
 
             if not req:
-                return (False, conn)
+                return None
 
-            # handle the request
-            keepalive = self.handle_request(req, conn)
-            if keepalive:
-                return (keepalive, conn)
-        except http.errors.NoMoreData as e:
-            self.log.debug("Ignored premature client disconnection. %s", e)
-
-        except StopIteration as e:
-            self.log.debug("Closing connection. %s", e)
-        except ssl.SSLError as e:
-            if e.args[0] == ssl.SSL_ERROR_EOF:
-                self.log.debug("ssl connection closed")
-                conn.sock.close()
-            else:
-                self.log.debug("Error processing SSL request.")
-                self.handle_error(req, conn.sock, conn.client, e)
-
-        except OSError as e:
-            if e.errno not in (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN):
-                self.log.exception("Socket error processing request.")
-            else:
-                if e.errno == errno.ECONNRESET:
-                    self.log.debug("Ignoring connection reset")
-                elif e.errno == errno.ENOTCONN:
-                    self.log.debug("Ignoring socket not connected")
-                else:
-                    self.log.debug("Ignoring connection epipe")
-        except Exception as e:
-            self.handle_error(req, conn.sock, conn.client, e)
-
-        return (False, conn)
-
-    def handle_request(self, req: Any, conn: TConn) -> bool:
-        resp: Response | None = None
-        try:
             request_start = datetime.now()
-
-            # Build Request directly from parsed HTTP message
             http_request = create_request(req, conn.sock, conn.client, conn.server)
 
             resp = Response(req, conn.sock, is_ssl=self.app.is_ssl)
@@ -578,35 +583,193 @@ class Worker:
             elif self.nr_conns >= self.max_keepalived:
                 resp.force_close()
 
+            return (req, http_request, resp, request_start)
+        except http.errors.NoMoreData as e:
+            self.log.debug("Ignored premature client disconnection. %s", e)
+        except StopIteration as e:
+            self.log.debug("Closing connection. %s", e)
+        except ssl.SSLError as e:
+            if e.args[0] == ssl.SSL_ERROR_EOF:
+                self.log.debug("ssl connection closed")
+                conn.sock.close()
+            else:
+                self.log.debug("Error processing SSL request.")
+                self.handle_error(None, conn.sock, conn.client, e)
+        except OSError as e:
+            if e.errno not in (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN):
+                self.log.exception("Socket error processing request.")
+            else:
+                if e.errno == errno.ECONNRESET:
+                    self.log.debug("Ignoring connection reset")
+                elif e.errno == errno.ENOTCONN:
+                    self.log.debug("Ignoring socket not connected")
+                else:
+                    self.log.debug("Ignoring connection epipe")
+        except Exception as e:
+            self.handle_error(None, conn.sock, conn.client, e)
+
+        return None
+
+    def _finish_request(
+        self,
+        req: Any,
+        resp: Response,
+        http_response: Any,
+        request_start: datetime,
+    ) -> bool:
+        """Write response, log access, and determine keepalive."""
+        try:
+            resp.write_response(http_response)
+        finally:
+            request_time = datetime.now() - request_start
+            if http_response.log_access:
+                log_access(resp, req, request_time)
+            if hasattr(http_response, "close"):
+                http_response.close()
+
+        if resp.should_close():
+            self.log.debug("Closing connection.")
+            return False
+
+        return True
+
+    def _handle_dispatch_error(
+        self, req: Any, resp: Response, conn: TConn, exc: BaseException
+    ) -> bool:
+        """Handle exceptions from dispatch methods. Returns False (no keepalive)."""
+        if isinstance(exc, OSError):
+            # Gracefully handle common client disconnects
+            if exc.errno in (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN):
+                self.log.debug("Client disconnected during dispatch: %s", exc)
+            else:
+                self.log.exception("Socket error during dispatch.")
+            return False
+
+        if resp.headers_sent:
+            self.log.exception("Error handling request")
+            try:
+                conn.sock.shutdown(socket.SHUT_RDWR)
+                conn.sock.close()
+            except OSError:
+                pass
+        else:
+            # Send a proper HTTP 500 to the client
+            self.handle_error(req, conn.sock, conn.client, exc)
+        return False
+
+    def _dispatch_sync(
+        self,
+        req: Any,
+        conn: TConn,
+        http_request: Any,
+        resp: Response,
+        request_start: datetime,
+    ) -> bool:
+        """Sync dispatch: signal + full middleware pipeline + write response."""
+        try:
             signals.request_started.send(sender=self.__class__, request=http_request)
             http_response = self.handler.get_response(http_request)
+            return self._finish_request(req, resp, http_response, request_start)
+        except Exception as exc:
+            return self._handle_dispatch_error(req, resp, conn, exc)
 
-            try:
-                resp.write_response(http_response)
-            finally:
-                request_time = datetime.now() - request_start
-                if http_response.log_access:
-                    log_access(resp, req, request_time)
-                if hasattr(http_response, "close"):
-                    http_response.close()
+    async def _dispatch_async(
+        self,
+        req: Any,
+        conn: TConn,
+        http_request: Any,
+        resp: Response,
+        request_start: datetime,
+    ) -> bool:
+        """Async dispatch: middleware in thread pool, async view on event loop."""
+        loop = asyncio.get_running_loop()
+        try:
+            # Send signal in thread pool (handlers may do sync work)
+            await loop.run_in_executor(
+                self.tpool,
+                lambda: signals.request_started.send(
+                    sender=self.__class__, request=http_request
+                ),
+            )
+            # Async middleware pipeline + view
+            http_response = await self.handler.get_response_async(
+                http_request, self.tpool
+            )
 
-            if resp.should_close():
-                self.log.debug("Closing connection.")
-                return False
-        except OSError:
-            # pass to next try-except level
-            raise
-        except Exception:
-            if resp and resp.headers_sent:
-                # If the requests have already been sent, we should close the
-                # connection to indicate the error.
-                self.log.exception("Error handling request")
+            # Check for async streaming response (SSE, etc.)
+            from plain.http import AsyncStreamingResponse
+
+            if isinstance(http_response, AsyncStreamingResponse):
+                return await self._stream_async_response(
+                    req, resp, http_response, request_start
+                )
+
+            # Write response in thread pool (blocking socket I/O)
+            return await loop.run_in_executor(
+                self.tpool,
+                self._finish_request,
+                req,
+                resp,
+                http_response,
+                request_start,
+            )
+        except Exception as exc:
+            # Run error handler in thread pool — it does blocking socket I/O
+            return await loop.run_in_executor(
+                self.tpool, self._handle_dispatch_error, req, resp, conn, exc
+            )
+
+    async def _stream_async_response(
+        self,
+        req: Any,
+        resp: Response,
+        http_response: Any,
+        request_start: datetime,
+    ) -> bool:
+        """Stream an async response (SSE, etc.) chunk by chunk.
+
+        Headers are sent immediately, then each chunk from the async iterator
+        is written as it arrives. This keeps the event loop free between chunks.
+        """
+        loop = asyncio.get_running_loop()
+
+        # Stream chunks: iterate on event loop, write in thread pool.
+        # Client disconnect (OSError) during write is normal for SSE.
+        client_disconnected = False
+        try:
+            # Prepare and send headers in thread pool
+            await loop.run_in_executor(
+                self.tpool,
+                lambda: (resp.prepare_response(http_response), resp.send_headers()),
+            )
+
+            async for chunk in http_response:
                 try:
-                    conn.sock.shutdown(socket.SHUT_RDWR)
-                    conn.sock.close()
+                    await loop.run_in_executor(self.tpool, resp.write, chunk)
+                except OSError:
+                    client_disconnected = True
+                    break
+        finally:
+            # Close the async iterator (e.g. async generator cleanup)
+            if hasattr(http_response, "aclose"):
+                await http_response.aclose()
+
+            # Finalize: close chunked encoding, log access, clean up
+            def _finalize() -> None:
+                try:
+                    if not client_disconnected:
+                        resp.close()
                 except OSError:
                     pass
-                raise StopIteration()
-            raise
+                finally:
+                    request_time = datetime.now() - request_start
+                    if http_response.log_access:
+                        log_access(resp, req, request_time)
+                    if hasattr(http_response, "close"):
+                        http_response.close()
 
+            await loop.run_in_executor(self.tpool, _finalize)
+
+        if client_disconnected or resp.should_close():
+            return False
         return True

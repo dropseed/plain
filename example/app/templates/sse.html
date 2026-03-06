@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}SSE Demo{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto p-8 space-y-8">
+    <h1 class="text-2xl font-bold">Server-Sent Events Demo</h1>
+
+    <div class="space-y-4">
+        <h2 class="text-lg font-semibold">Live Clock</h2>
+        <div id="clock" class="text-5xl font-mono tabular-nums">--:--:--</div>
+    </div>
+
+    <div class="space-y-4">
+        <h2 class="text-lg font-semibold">Stock Ticker</h2>
+        <div id="ticker" class="grid grid-cols-3 gap-4">
+            <div id="stock-ACME" class="border rounded p-4">
+                <div class="text-sm text-gray-500">ACME</div>
+                <div class="text-2xl font-mono price">--</div>
+                <div class="text-sm change">--</div>
+            </div>
+            <div id="stock-GLOB" class="border rounded p-4">
+                <div class="text-sm text-gray-500">GLOB</div>
+                <div class="text-2xl font-mono price">--</div>
+                <div class="text-sm change">--</div>
+            </div>
+            <div id="stock-WIDG" class="border rounded p-4">
+                <div class="text-sm text-gray-500">WIDG</div>
+                <div class="text-2xl font-mono price">--</div>
+                <div class="text-sm change">--</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-sm text-gray-400">
+        Open your browser's DevTools Network tab to see the SSE connections.
+    </div>
+</div>
+
+<script nonce="{{ request.csp_nonce }}">
+    const clockSource = new EventSource("/sse/clock/");
+    clockSource.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        document.getElementById("clock").textContent = data.time;
+    };
+
+    const tickerSource = new EventSource("/sse/ticker/");
+    tickerSource.addEventListener("tick", (e) => {
+        const data = JSON.parse(e.data);
+        const card = document.getElementById("stock-" + data.symbol);
+        if (!card) return;
+
+        card.querySelector(".price").textContent = "$" + data.price.toFixed(2);
+
+        const changeEl = card.querySelector(".change");
+        const sign = data.change >= 0 ? "+" : "";
+        changeEl.textContent = sign + data.change.toFixed(2);
+        changeEl.className = "text-sm " + (data.change >= 0 ? "text-green-600" : "text-red-600");
+    });
+</script>
+{% endblock %}
