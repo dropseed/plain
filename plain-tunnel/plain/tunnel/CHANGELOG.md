@@ -1,5 +1,19 @@
 # plain-tunnel changelog
 
+## [0.11.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.11.0) (2026-03-06)
+
+### What's changed
+
+- **Streaming response support** — the tunnel now forwards `text/event-stream` responses as a live stream instead of buffering the entire response. The client detects SSE responses, sends `stream-start`/`stream-end` messages over the WebSocket, and streams body chunks incrementally. The server resolves the HTTP response immediately with a `ReadableStream` so the browser receives events in real time ([dfa436ff5df7](https://github.com/dropseed/plain/commit/dfa436ff5df7))
+- **Stream cancellation** — when the browser disconnects from a streaming response, the server sends a `stream-cancel` message back to the client, which stops reading from the upstream response ([dfa436ff5df7](https://github.com/dropseed/plain/commit/dfa436ff5df7))
+- **Local development support** — the tunnel client now detects `localhost`/`127.0.0.1` hosts and uses `ws://`/`http://` instead of `wss://`/`https://`, enabling local testing with `wrangler dev`. Added a server README documenting the local dev workflow ([dfa436ff5df7](https://github.com/dropseed/plain/commit/dfa436ff5df7))
+- **Protocol version bumped to 2** — both client and server now require protocol version 2 due to the new streaming message types ([dfa436ff5df7](https://github.com/dropseed/plain/commit/dfa436ff5df7))
+
+### Upgrade instructions
+
+- The tunnel server must be updated alongside the client due to the protocol version bump to v2.
+- No application code changes required.
+
 ## [0.10.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.10.0) (2026-02-25)
 
 ### What's changed
