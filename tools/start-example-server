@@ -4,7 +4,7 @@
 # Exports PORT and SERVER_PID. Sets up cleanup trap.
 #
 # Usage:
-#   source scripts/start-example-server [extra server args...]
+#   source tools/start-example-server [extra server args...]
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

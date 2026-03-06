@@ -3,10 +3,10 @@
 # Run HTTP/1.1 conformance tests against the Plain server.
 #
 # Usage:
-#   ./scripts/h1spec                          # starts example server automatically
-#   ./scripts/h1spec host:port                # test against an already-running server
-#   ./scripts/h1spec --strict                 # auto-start server, strict mode
-#   ./scripts/h1spec --strict host:port       # strict mode against existing server
+#   ./tools/h1spec                          # starts example server automatically
+#   ./tools/h1spec host:port                # test against an already-running server
+#   ./tools/h1spec --strict                 # auto-start server, strict mode
+#   ./tools/h1spec --strict host:port       # strict mode against existing server
 
 H1SPEC="git+https://github.com/dropseed/h1spec"
 

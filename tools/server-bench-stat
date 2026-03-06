@@ -1,0 +1,30 @@
+#!/bin/bash -e
+
+# Run server-bench once, cache output, and extract a single stat.
+# Used by git-stats.yml to avoid running the benchmark twice.
+# Cache is keyed on HEAD commit so regen gets fresh results per commit.
+#
+# Usage:
+#   ./tools/server-bench-stat requests_per_sec
+#   ./tools/server-bench-stat avg_latency_ms
+
+COMMIT=$(git rev-parse HEAD)
+CACHE="/tmp/plain-server-bench-${COMMIT}"
+
+# Run benchmark if no cache for this commit
+if [ ! -f "$CACHE" ]; then
+    ./tools/server-bench > "$CACHE" 2>&1
+fi
+
+case "$1" in
+    requests_per_sec)
+        grep "Requests/sec:" "$CACHE" | awk '{print $2}'
+        ;;
+    avg_latency_ms)
+        grep "Latency" "$CACHE" | awk '{print $2}' | sed 's/ms//'
+        ;;
+    *)
+        echo "Unknown stat: $1" >&2
+        exit 1
+        ;;
+esac

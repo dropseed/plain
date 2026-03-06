@@ -5,9 +5,9 @@
 # Requires: h2spec (brew install h2spec)
 #
 # Usage:
-#   ./scripts/h2spec                          # starts example server automatically
-#   ./scripts/h2spec host:port                # test against an already-running TLS server
-#   ./scripts/h2spec -S section               # run specific test section (e.g. -S 6.1)
+#   ./tools/h2spec                          # starts example server automatically
+#   ./tools/h2spec host:port                # test against an already-running TLS server
+#   ./tools/h2spec -S section               # run specific test section (e.g. -S 6.1)
 
 if ! command -v h2spec &>/dev/null; then
     echo "h2spec not found. Install with: brew install h2spec" >&2

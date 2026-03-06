@@ -3,11 +3,11 @@
 # Memory benchmark for Plain framework requests using memray.
 #
 # Usage:
-#   ./scripts/bench-memory                    # Run benchmark and show stats
-#   ./scripts/bench-memory --flamegraph       # Generate flamegraph HTML
-#   ./scripts/bench-memory --table            # Generate allocation table HTML
-#   ./scripts/bench-memory --save-baseline    # Save current run as baseline
-#   ./scripts/bench-memory --compare          # Compare to saved baseline
+#   ./tools/bench-memory                    # Run benchmark and show stats
+#   ./tools/bench-memory --flamegraph       # Generate flamegraph HTML
+#   ./tools/bench-memory --table            # Generate allocation table HTML
+#   ./tools/bench-memory --save-baseline    # Save current run as baseline
+#   ./tools/bench-memory --compare          # Compare to saved baseline
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -35,7 +35,7 @@ fi
 
 if [ "$1" = "--compare" ]; then
   if [ ! -f "$BASELINE_FILE" ]; then
-    echo "Error: No baseline found. Run './scripts/bench-memory --save-baseline' first." >&2
+    echo "Error: No baseline found. Run './tools/bench-memory --save-baseline' first." >&2
     exit 1
   fi
 

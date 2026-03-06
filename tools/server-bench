@@ -3,8 +3,8 @@
 # Benchmark server throughput using wrk.
 #
 # Usage:
-#   ./scripts/server-bench                     # auto-start, default settings
-#   ./scripts/server-bench host:port           # existing server
+#   ./tools/server-bench                     # auto-start, default settings
+#   ./tools/server-bench host:port           # existing server
 
 WRK_CONNECTIONS=50
 WRK_DURATION=10s

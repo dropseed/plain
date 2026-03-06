@@ -3,7 +3,7 @@
 Simple benchmark script for memray profiling.
 
 Usage:
-    DATABASE_URL=postgres://postgres:postgres@localhost:5432/plain_example memray run -o bench.bin scripts/benchmark-request.py
+    DATABASE_URL=postgres://postgres:postgres@localhost:5432/plain_example memray run -o bench.bin tools/benchmark-request.py
     memray stats bench.bin
     memray flamegraph bench.bin
 """
@@ -29,7 +29,7 @@ plain.runtime.setup()
 from plain.test import Client  # noqa: E402
 
 
-def main():
+def main() -> None:
     client = Client()
 
     print("Warmup request...")

@@ -9,6 +9,9 @@
 # ---------------------------------------------------------------------------
 # A single package name may be supplied to limit the run; otherwise test all
 # first-party packages in a deterministic order.
+#
+# Flags:
+#   --skip-server  Skip server behavior and conformance tests (faster iteration)
 ALL_PACKAGES="$(cat <<EOF
 plain
 plain-models
@@ -24,6 +27,17 @@ plain-htmx
 plain-pages
 EOF
 )"
+
+skip_server=false
+remaining=()
+for arg in "$@"; do
+  if [ "$arg" = "--skip-server" ]; then
+    skip_server=true
+  else
+    remaining+=("$arg")
+  fi
+done
+set -- "${remaining[@]}"
 
 packages=$ALL_PACKAGES
 if [ $# -gt 0 ] && printf '%s\n' $ALL_PACKAGES | grep -x "$1" >/dev/null; then
@@ -70,22 +84,32 @@ cd "example"
 uv run --isolated $WITH python -m pytest "$@"
 cd ..
 
-# Server worker behavior tests
-echo
-bold "Running server-worker-test"
-scripts/server-worker-test
-
-# HTTP/1.1 conformance tests (h1spec)
-echo
-bold "Running h1spec"
-scripts/h1spec
-
-# HTTP/2 conformance tests (h2spec, requires: brew install h2spec)
-echo
-if command -v h2spec &>/dev/null; then
-  bold "Running h2spec"
-  scripts/h2spec
+if [ "$skip_server" = true ]; then
+  echo
+  bold "Skipping server tests (--skip-server)"
 else
-  bold "Skipping h2spec (not installed — brew install h2spec)"
+  # Server worker behavior tests
+  echo
+  bold "Running server-worker-test"
+  tools/server-worker-test
+
+  # HTTP/2 worker behavior tests
+  echo
+  bold "Running h2-worker-test"
+  tools/h2-worker-test
+
+  # HTTP/1.1 conformance tests (h1spec)
+  echo
+  bold "Running h1spec"
+  tools/h1spec
+
+  # HTTP/2 conformance tests (h2spec, requires: brew install h2spec)
+  echo
+  if command -v h2spec &>/dev/null; then
+    bold "Running h2spec"
+    tools/h2spec
+  else
+    bold "Skipping h2spec (not installed — brew install h2spec)"
+  fi
 fi
 
