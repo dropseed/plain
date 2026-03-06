@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.43.0](https://github.com/dropseed/plain/releases/plain-sessions@0.43.0) (2026-03-06)
+
+### What's changed
+
+- Adapted `SessionMiddleware` to the new middleware API — session loading moved to `before_request()` (returns `None` to continue), and session saving/cookie management moved to `after_response()`. Removed `self.get_response()` call ([9a1477ee8fa8](https://github.com/dropseed/plain/commit/9a1477ee8fa8))
+
+### Upgrade instructions
+
+- Requires `plain>=0.116.0`. No other changes required.
+
 ## [0.42.4](https://github.com/dropseed/plain/releases/plain-sessions@0.42.4) (2026-02-26)
 
 ### What's changed
