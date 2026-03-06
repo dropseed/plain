@@ -18,4 +18,5 @@ plain*/tests/.plain
 
 .vscode
 /.claude/settings.local.json
+/CLAUDE.local.md
 /.benchmarks
