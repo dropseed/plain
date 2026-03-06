@@ -892,7 +892,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-redirection"
-version = "0.31.5"
+version = "0.32.0"
 source = { editable = "plain-redirection" }
 dependencies = [
     { name = "plain" },

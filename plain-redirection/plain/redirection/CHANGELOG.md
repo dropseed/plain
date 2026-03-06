@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.32.0](https://github.com/dropseed/plain/releases/plain-redirection@0.32.0) (2026-03-06)
+
+### What's changed
+
+- Adapted `RedirectionMiddleware` to the new middleware API — replaced `process_request()` with `after_response()` since this middleware only acts on the response (checking for 404s to redirect). Removed `self.get_response()` call and simplified imports ([9a1477ee8fa8](https://github.com/dropseed/plain/commit/9a1477ee8fa8))
+
+### Upgrade instructions
+
+- Requires `plain>=0.116.0`. No other changes required.
+
 ## [0.31.5](https://github.com/dropseed/plain/releases/plain-redirection@0.31.5) (2026-02-26)
 
 ### What's changed
