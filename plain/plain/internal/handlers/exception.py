@@ -87,7 +87,7 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
 
     else:
         response = get_exception_response(
-            request=request, status_code=500, exception=None
+            request=request, status_code=500, exception=exc
         )
         request_logger.error(
             "%s: %s",
