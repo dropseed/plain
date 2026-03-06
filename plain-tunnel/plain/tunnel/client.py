@@ -433,6 +433,7 @@ class TunnelClient:
                 "sec-websocket-version",
                 "sec-websocket-extensions",
                 "sec-websocket-protocol",
+                "host",
             }
         )
         forward_headers = {}
