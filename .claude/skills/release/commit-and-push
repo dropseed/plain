@@ -71,6 +71,8 @@ def main():
         else:
             run(["git", "add", f"{name}/pyproject.toml"], cwd=root)
             for cl in root.glob(f"{name}/**/CHANGELOG.md"):
+                if "node_modules" in cl.parts:
+                    continue
                 run(["git", "add", str(cl.relative_to(root))], cwd=root)
             # Stage matching uv.lock hunks
             dot_name = name.replace("plain-", "plain.")
