@@ -1,3 +1,5 @@
+import { errorResponse } from "./errors.js";
+
 export default {
   async fetch(request, env, _context) {
     const url = new URL(request.url);
@@ -32,7 +34,7 @@ export default {
 
 // Bump when making breaking protocol changes.
 // Clients with a version below this will be rejected.
-const MIN_PROTOCOL_VERSION = 2;
+const MIN_PROTOCOL_VERSION = 3;
 
 // Response body chunks use a fixed-length UUID (36 bytes) as the ID prefix.
 const UUID_BYTE_LENGTH = 36;
@@ -41,14 +43,20 @@ export class Tunnel {
   constructor(_state, _env) {
     this.clientSocket = null;
     this.pendingRequests = new Map();
+    this.proxiedWebSockets = new Map();
     this.heartbeatInterval = null;
     this.heartbeatTimeout = null;
   }
 
   async fetch(request) {
     if (request.headers.get("Upgrade") === "websocket") {
-      console.debug("Received WebSocket upgrade request");
-      return this.handleWebSocket(request);
+      const url = new URL(request.url);
+      if (url.pathname === "/__tunnel__") {
+        console.debug("Received tunnel client WebSocket upgrade");
+        return this.handleWebSocket(request);
+      }
+      console.debug("Received browser WebSocket upgrade");
+      return this.handleWebSocketProxy(request);
     }
     console.debug("Received HTTP request");
     return this.handleHttpRequest(request);
@@ -100,9 +108,11 @@ export class Tunnel {
     const clientVersion = parseInt(url.searchParams.get("v") || "0", 10);
 
     if (clientVersion < MIN_PROTOCOL_VERSION) {
-      return new Response(
+      return errorResponse(
+        426,
+        "Upgrade Required",
         `Client protocol version ${clientVersion} is too old (minimum: ${MIN_PROTOCOL_VERSION}). Please upgrade: uv sync --upgrade-package plain.tunnel`,
-        { status: 426 },
+        request.headers.get("Accept"),
       );
     }
 
@@ -118,7 +128,14 @@ export class Tunnel {
         if (pending.streaming && pending.streamWriter) {
           pending.streamWriter.abort(new Error("Client reconnecting"));
         } else {
-          pending.resolve(new Response("Client reconnecting", { status: 503 }));
+          pending.resolve(
+            errorResponse(
+              503,
+              "Client Reconnecting",
+              "The tunnel client is reconnecting. Please try again in a moment.",
+              pending.accept,
+            ),
+          );
         }
         pending.cleanup();
       }
@@ -153,6 +170,12 @@ export class Tunnel {
             console.info("Received stream-error from client");
             this.handleStreamError(data);
             break;
+          case "ws-message":
+            this.handleProxiedWsMessage(data);
+            break;
+          case "ws-close":
+            this.handleProxiedWsClose(data);
+            break;
           default:
             console.warn(`Received unknown message type: ${data.type}`);
         }
@@ -168,13 +191,31 @@ export class Tunnel {
         this.stopHeartbeat();
         this.clientSocket = null;
 
+        // Close all proxied WebSockets
+        for (const [id, browserSocket] of this.proxiedWebSockets) {
+          console.info(`Closing proxied WebSocket ${id} due to tunnel client disconnect`);
+          try {
+            browserSocket.close(1001, "Tunnel client disconnected");
+          } catch {
+            /* ignore */
+          }
+        }
+        this.proxiedWebSockets.clear();
+
         // Abort any active streaming requests and reject pending buffered ones
         for (const [id, pending] of this.pendingRequests) {
           if (pending.streaming && pending.streamWriter) {
             console.info(`Aborting stream for request ${id} due to WebSocket close`);
             pending.streamWriter.abort(new Error("Client disconnected"));
           } else if (!pending.streaming) {
-            pending.resolve(new Response("Client disconnected", { status: 503 }));
+            pending.resolve(
+              errorResponse(
+                503,
+                "Client Disconnected",
+                "The tunnel client disconnected. Make sure your local dev server and tunnel client are running.",
+                pending.accept,
+              ),
+            );
           }
           pending.cleanup();
         }
@@ -323,15 +364,134 @@ export class Tunnel {
         }
       }
 
-      pendingRequest.resolve(new Response(responseBody, { status, headers }));
+      // If the client returned a 502 with no body, it means it couldn't
+      // connect to the local server. Generate a proper error page.
+      if (status === 502 && !has_body) {
+        pendingRequest.resolve(
+          errorResponse(
+            502,
+            "Bad Gateway",
+            "Could not connect to the local dev server. Make sure it is running.",
+            pendingRequest.accept,
+          ),
+        );
+      } else {
+        pendingRequest.resolve(new Response(responseBody, { status, headers }));
+      }
 
       pendingRequest.cleanup();
     }
   }
 
-  async handleHttpRequest(request) {
+  handleWebSocketProxy(request) {
+    const accept = request.headers.get("Accept");
+
     if (!this.clientSocket) {
-      return new Response("No client connected", { status: 503 });
+      return errorResponse(
+        503,
+        "No Client Connected",
+        "No tunnel client is connected to this subdomain.",
+        accept,
+      );
+    }
+
+    const id = crypto.randomUUID();
+    const [client, server] = Object.values(new WebSocketPair());
+
+    server.accept();
+    this.proxiedWebSockets.set(id, server);
+
+    // Tell the tunnel client to open a WebSocket to the local server
+    this.clientSocket.send(
+      JSON.stringify({
+        type: "ws-open",
+        id,
+        url: request.url,
+        headers: Object.fromEntries(request.headers),
+      }),
+    );
+
+    server.addEventListener("message", (event) => {
+      if (!this.clientSocket) return;
+      try {
+        if (typeof event.data === "string") {
+          this.clientSocket.send(JSON.stringify({ type: "ws-message", id, data: event.data }));
+        } else {
+          // Binary messages are base64-encoded in JSON
+          const bytes = new Uint8Array(event.data);
+          let binary = "";
+          for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          this.clientSocket.send(
+            JSON.stringify({ type: "ws-message", id, data: btoa(binary), binary: true }),
+          );
+        }
+      } catch (e) {
+        console.error(`Failed to forward browser WS message for ${id}:`, e);
+      }
+    });
+
+    server.addEventListener("close", () => {
+      this.proxiedWebSockets.delete(id);
+      if (this.clientSocket) {
+        try {
+          this.clientSocket.send(JSON.stringify({ type: "ws-close", id }));
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  handleProxiedWsMessage(data) {
+    const { id } = data;
+    const browserSocket = this.proxiedWebSockets.get(id);
+    if (!browserSocket) {
+      console.warn(`Received ws-message for unknown proxied WebSocket: ${id}`);
+      return;
+    }
+    try {
+      if (data.binary) {
+        const binaryStr = atob(data.data);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        browserSocket.send(bytes.buffer);
+      } else {
+        browserSocket.send(data.data);
+      }
+    } catch (e) {
+      console.error(`Failed to send to browser WebSocket ${id}:`, e);
+      this.proxiedWebSockets.delete(id);
+    }
+  }
+
+  handleProxiedWsClose(data) {
+    const { id, code, reason } = data;
+    const browserSocket = this.proxiedWebSockets.get(id);
+    if (!browserSocket) return;
+    this.proxiedWebSockets.delete(id);
+    try {
+      browserSocket.close(code || 1000, reason || "");
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async handleHttpRequest(request) {
+    const accept = request.headers.get("Accept");
+
+    if (!this.clientSocket) {
+      return errorResponse(
+        503,
+        "No Client Connected",
+        "No tunnel client is connected to this subdomain. Make sure your local dev server and tunnel client are running.",
+        accept,
+      );
     }
 
     const id = crypto.randomUUID();
@@ -361,7 +521,14 @@ export class Tunnel {
       const timeoutId = setTimeout(() => {
         console.debug(`Request with ID ${id} timed out`);
         cleanup();
-        resolve(new Response("Request timed out", { status: 504 }));
+        resolve(
+          errorResponse(
+            504,
+            "Request Timed Out",
+            "The tunnel client did not respond within 30 seconds. Your local server may be slow or unresponsive.",
+            accept,
+          ),
+        );
       }, 30000); // 30-second timeout
 
       const cleanup = () => {
@@ -376,6 +543,7 @@ export class Tunnel {
       const pendingEntry = {
         resolve,
         cleanup,
+        accept,
         timeoutId,
         responseMetadata: null,
         has_body: null,
@@ -392,7 +560,14 @@ export class Tunnel {
         if (pendingEntry.streaming && pendingEntry.streamWriter) {
           pendingEntry.streamWriter.abort(new Error("Client disconnected"));
         } else if (!pendingEntry.streaming) {
-          resolve(new Response("Client disconnected", { status: 503 }));
+          resolve(
+            errorResponse(
+              503,
+              "Client Disconnected",
+              "The tunnel client disconnected while processing your request. Make sure your local dev server and tunnel client are running.",
+              accept,
+            ),
+          );
         }
         cleanup();
       };
@@ -402,7 +577,14 @@ export class Tunnel {
         if (pendingEntry.streaming && pendingEntry.streamWriter) {
           pendingEntry.streamWriter.abort(new Error("WebSocket error"));
         } else if (!pendingEntry.streaming) {
-          resolve(new Response("WebSocket error", { status: 500 }));
+          resolve(
+            errorResponse(
+              500,
+              "Tunnel Error",
+              "An unexpected error occurred in the tunnel connection.",
+              accept,
+            ),
+          );
         }
         cleanup();
       };

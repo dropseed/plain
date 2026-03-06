@@ -2,14 +2,14 @@
   "name": "plaintunnel",
   "version": "0.0.0",
   "devDependencies": {
-    "oxlint": "^1.43.0",
     "oxfmt": "^0.28.0",
-    "wrangler": "3.84.0"
+    "oxlint": "^1.43.0",
+    "wrangler": "^4.71.0"
   },
   "private": true,
   "scripts": {
     "dev": "wrangler dev --var LOCALHOST_DEV:true",
     "deploy": "wrangler deploy",
-    "fix": "npx oxlint --fix-dangerously worker.js && npx oxfmt worker.js"
+    "fix": "npx oxlint --fix-dangerously worker.js errors.js && npx oxfmt worker.js errors.js"
   }
 }

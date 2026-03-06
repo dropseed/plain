@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import math
@@ -14,7 +15,7 @@ import websockets
 
 # Bump this when making breaking changes to the WebSocket protocol.
 # The server will reject clients with a version lower than its minimum.
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 
 
 class TunnelClient:
@@ -28,12 +29,12 @@ class TunnelClient:
         if "localhost" in tunnel_host or "127.0.0.1" in tunnel_host:
             self.tunnel_http_url = f"http://{subdomain}.{tunnel_host}"
             self.tunnel_websocket_url = (
-                f"ws://{subdomain}.{tunnel_host}?v={PROTOCOL_VERSION}"
+                f"ws://{subdomain}.{tunnel_host}/__tunnel__?v={PROTOCOL_VERSION}"
             )
         else:
             self.tunnel_http_url = f"https://{subdomain}.{tunnel_host}"
             self.tunnel_websocket_url = (
-                f"wss://{subdomain}.{tunnel_host}?v={PROTOCOL_VERSION}"
+                f"wss://{subdomain}.{tunnel_host}/__tunnel__?v={PROTOCOL_VERSION}"
             )
 
         self.logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ class TunnelClient:
 
         self.pending_requests: dict[str, dict[str, Any]] = {}
         self.active_streams: dict[str, asyncio.Event] = {}
+        self.proxied_websockets: dict[str, Any] = {}
         self.stop_event = asyncio.Event()
 
     async def connect(self) -> None:
@@ -119,6 +121,16 @@ class TunnelClient:
                         cancel_event = self.active_streams.get(request_id)
                         if cancel_event:
                             cancel_event.set()
+                    elif msg_type == "ws-open":
+                        self.logger.debug(f"Received ws-open for ID: {data['id']}")
+                        task = asyncio.create_task(
+                            self._handle_ws_open(websocket, data)
+                        )
+                        task.add_done_callback(self._handle_task_exception)
+                    elif msg_type == "ws-message":
+                        await self._handle_ws_message(data)
+                    elif msg_type == "ws-close":
+                        await self._handle_ws_close(data)
                     else:
                         self.logger.warning(
                             f"Received unknown message type: {msg_type}"
@@ -372,6 +384,121 @@ class TunnelClient:
                 pass
         finally:
             self.active_streams.pop(request_id, None)
+
+    async def _handle_ws_open(self, tunnel_ws: Any, data: dict[str, Any]) -> None:
+        ws_id = data["id"]
+        url = data["url"]
+        parsed = urlparse(url)
+        path = parsed.path
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+
+        # Build local WebSocket URL
+        dest_parsed = urlparse(self.destination_url)
+        if dest_parsed.scheme == "https":
+            ws_scheme = "wss"
+        else:
+            ws_scheme = "ws"
+        local_ws_url = f"{ws_scheme}://{dest_parsed.netloc}{path}"
+
+        self.logger.debug(f"Opening local WebSocket for {ws_id}: {local_ws_url}")
+
+        try:
+            import ssl
+
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            local_ws = await websockets.connect(
+                local_ws_url,
+                ssl=ssl_context if ws_scheme == "wss" else None,
+                max_size=None,
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to connect local WebSocket for {ws_id}: {e}")
+            try:
+                await tunnel_ws.send(
+                    json.dumps(
+                        {
+                            "type": "ws-close",
+                            "id": ws_id,
+                            "code": 1011,
+                            "reason": str(e),
+                        }
+                    )
+                )
+            except Exception:
+                pass
+            return
+
+        self.proxied_websockets[ws_id] = local_ws
+        self.logger.info(f"WebSocket proxy opened: {ws_id} -> {local_ws_url}")
+
+        # Relay messages from local server back to the tunnel
+        try:
+            async for message in local_ws:
+                if isinstance(message, str):
+                    await tunnel_ws.send(
+                        json.dumps({"type": "ws-message", "id": ws_id, "data": message})
+                    )
+                elif isinstance(message, bytes):
+                    await tunnel_ws.send(
+                        json.dumps(
+                            {
+                                "type": "ws-message",
+                                "id": ws_id,
+                                "data": base64.b64encode(message).decode("ascii"),
+                                "binary": True,
+                            }
+                        )
+                    )
+        except websockets.ConnectionClosed:
+            pass
+        except Exception as e:
+            self.logger.error(f"Error relaying WebSocket {ws_id}: {e}")
+        finally:
+            self.proxied_websockets.pop(ws_id, None)
+            close_code = local_ws.close_code or 1000
+            close_reason = local_ws.close_reason or ""
+            try:
+                await tunnel_ws.send(
+                    json.dumps(
+                        {
+                            "type": "ws-close",
+                            "id": ws_id,
+                            "code": close_code,
+                            "reason": close_reason,
+                        }
+                    )
+                )
+            except Exception:
+                pass
+
+    async def _handle_ws_message(self, data: dict[str, Any]) -> None:
+        ws_id = data["id"]
+        local_ws = self.proxied_websockets.get(ws_id)
+        if not local_ws:
+            self.logger.warning(f"Received ws-message for unknown WebSocket: {ws_id}")
+            return
+        try:
+            if data.get("binary"):
+                await local_ws.send(base64.b64decode(data["data"]))
+            else:
+                await local_ws.send(data["data"])
+        except Exception as e:
+            self.logger.error(
+                f"Failed to forward message to local WebSocket {ws_id}: {e}"
+            )
+
+    async def _handle_ws_close(self, data: dict[str, Any]) -> None:
+        ws_id = data["id"]
+        local_ws = self.proxied_websockets.pop(ws_id, None)
+        if not local_ws:
+            return
+        try:
+            await local_ws.close()
+        except Exception:
+            pass
 
     def run(self) -> None:
         try:

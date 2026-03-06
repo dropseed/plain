@@ -1,0 +1,44 @@
+#!/bin/bash -e
+# Start the local Cloudflare tunnel worker alongside the example dev server.
+# Useful for testing tunnel changes (including WebSocket proxy) locally.
+#
+# Usage: ./scripts/tunnel-dev
+#
+# This starts:
+#   1. The example app dev server (example.localhost:8443)
+#   2. The local Cloudflare worker (localhost:8787) pointing at it
+#
+# Browse to http://localhost:8787 to test through the local tunnel.
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+cleanup() {
+    echo ""
+    echo "Shutting down..."
+    kill $WORKER_PID 2>/dev/null
+    kill $DEV_PID 2>/dev/null
+    wait 2>/dev/null
+}
+trap cleanup EXIT INT TERM
+
+# Start the example dev server with the tunnel URL shown in the dev header
+echo "Starting example dev server..."
+cd "$REPO_ROOT/example"
+DEV_TUNNEL_URL=https://example.localhost:8443 uv run plain dev &
+DEV_PID=$!
+
+# Wait for the dev server to be ready
+sleep 3
+
+# Start the local Cloudflare worker
+echo "Starting local tunnel worker..."
+cd "$REPO_ROOT/plain-tunnel/server"
+npx wrangler dev --port 8787 &
+WORKER_PID=$!
+
+echo ""
+echo "Local tunnel: http://localhost:8787"
+echo "Dev server:   https://example.localhost:8443"
+echo ""
+
+wait
