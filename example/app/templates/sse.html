@@ -1,48 +1,178 @@
 {% extends "base.html" %}
 
-{% block title %}SSE Demo{% endblock %}
+{% block title %}SSE Demo — Live Terminal{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto p-8 space-y-8">
-    <h1 class="text-2xl font-bold">Server-Sent Events Demo</h1>
+<style nonce="{{ request.csp_nonce }}">
+    .terminal-bg {
+        background: #0a0e17;
+        background-image:
+            radial-gradient(ellipse at 20% 50%, rgba(16, 185, 129, 0.04) 0%, transparent 60%),
+            radial-gradient(ellipse at 80% 20%, rgba(59, 130, 246, 0.03) 0%, transparent 50%);
+        min-height: 100vh;
+    }
 
-    <div class="space-y-4">
-        <h2 class="text-lg font-semibold">Live Clock</h2>
-        <div id="clock" class="text-5xl font-mono tabular-nums">--:--:--</div>
-    </div>
+    .font-mono-terminal { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace; }
+    .font-display { font-family: 'SF Pro Display', 'Segoe UI', system-ui, sans-serif; }
 
-    <div class="space-y-4">
-        <h2 class="text-lg font-semibold">Stock Ticker</h2>
-        <div id="ticker" class="grid grid-cols-3 gap-4">
-            <div id="stock-ACME" class="border rounded p-4">
-                <div class="text-sm text-gray-500">ACME</div>
-                <div class="text-2xl font-mono price">--</div>
-                <div class="text-sm change">--</div>
+    .clock-glow {
+        text-shadow: 0 0 20px rgba(16, 185, 129, 0.5), 0 0 60px rgba(16, 185, 129, 0.2);
+    }
+
+    .card-surface {
+        background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+        border: 1px solid rgba(255,255,255,0.06);
+        backdrop-filter: blur(12px);
+    }
+
+    .card-surface:hover {
+        border-color: rgba(255,255,255,0.12);
+        background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+    }
+
+    @keyframes flash-green {
+        0% { background-color: rgba(16, 185, 129, 0.25); }
+        100% { background-color: transparent; }
+    }
+    @keyframes flash-red {
+        0% { background-color: rgba(239, 68, 68, 0.25); }
+        100% { background-color: transparent; }
+    }
+    .flash-up { animation: flash-green 0.6s ease-out; }
+    .flash-down { animation: flash-red 0.6s ease-out; }
+
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+    .live-dot {
+        animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes fade-in-up {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in {
+        animation: fade-in-up 0.5s ease-out both;
+    }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+
+    .price-bar {
+        height: 3px;
+        border-radius: 2px;
+        transition: width 0.4s ease-out, background-color 0.3s;
+    }
+
+    .separator {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 20%, rgba(255,255,255,0.08) 80%, transparent);
+    }
+</style>
+
+<div class="terminal-bg">
+    <div class="max-w-3xl mx-auto px-6 py-16 space-y-12">
+
+        <!-- Header -->
+        <div class="animate-in">
+            <div class="flex items-center justify-between mb-2">
+                <h1 class="font-display text-sm font-medium tracking-[0.2em] uppercase text-zinc-500">
+                    SSE Terminal
+                </h1>
+                <div class="flex items-center gap-2">
+                    <span class="live-dot inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span class="font-mono-terminal text-[10px] tracking-wider text-emerald-400/70 uppercase">Live</span>
+                </div>
             </div>
-            <div id="stock-GLOB" class="border rounded p-4">
-                <div class="text-sm text-gray-500">GLOB</div>
-                <div class="text-2xl font-mono price">--</div>
-                <div class="text-sm change">--</div>
+            <div class="separator"></div>
+        </div>
+
+        <!-- Clock -->
+        <div class="animate-in delay-1">
+            <div class="text-zinc-600 font-display text-xs tracking-[0.15em] uppercase mb-4">System Clock</div>
+            <div
+                id="clock"
+                class="font-mono-terminal text-6xl sm:text-7xl font-light tracking-tight text-emerald-400 clock-glow tabular-nums"
+            >--:--:--</div>
+        </div>
+
+        <div class="separator animate-in delay-2"></div>
+
+        <!-- Stock Ticker -->
+        <div class="animate-in delay-2">
+            <div class="flex items-center justify-between mb-6">
+                <div class="text-zinc-600 font-display text-xs tracking-[0.15em] uppercase">Market Feed</div>
+                <div class="font-mono-terminal text-[10px] text-zinc-600" id="update-counter">0 updates</div>
             </div>
-            <div id="stock-WIDG" class="border rounded p-4">
-                <div class="text-sm text-gray-500">WIDG</div>
-                <div class="text-2xl font-mono price">--</div>
-                <div class="text-sm change">--</div>
+
+            <div id="ticker" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div
+                    id="stock-ACME"
+                    class="card-surface rounded-xl p-5 transition-all duration-300 animate-in delay-2"
+                >
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="font-mono-terminal text-xs font-semibold text-zinc-300 tracking-wider">ACME</span>
+                        <span class="change font-mono-terminal text-xs text-zinc-600">--</span>
+                    </div>
+                    <div class="price font-mono-terminal text-3xl font-light text-white tabular-nums mb-3">--</div>
+                    <div class="price-bar w-0 bg-zinc-700" data-width="50"></div>
+                </div>
+
+                <div
+                    id="stock-GLOB"
+                    class="card-surface rounded-xl p-5 transition-all duration-300 animate-in delay-3"
+                >
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="font-mono-terminal text-xs font-semibold text-zinc-300 tracking-wider">GLOB</span>
+                        <span class="change font-mono-terminal text-xs text-zinc-600">--</span>
+                    </div>
+                    <div class="price font-mono-terminal text-3xl font-light text-white tabular-nums mb-3">--</div>
+                    <div class="price-bar w-0 bg-zinc-700" data-width="50"></div>
+                </div>
+
+                <div
+                    id="stock-WIDG"
+                    class="card-surface rounded-xl p-5 transition-all duration-300 animate-in delay-4"
+                >
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="font-mono-terminal text-xs font-semibold text-zinc-300 tracking-wider">WIDG</span>
+                        <span class="change font-mono-terminal text-xs text-zinc-600">--</span>
+                    </div>
+                    <div class="price font-mono-terminal text-3xl font-light text-white tabular-nums mb-3">--</div>
+                    <div class="price-bar w-0 bg-zinc-700" data-width="50"></div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="text-sm text-gray-400">
-        Open your browser's DevTools Network tab to see the SSE connections.
+        <div class="separator animate-in delay-3"></div>
+
+        <!-- Footer -->
+        <div class="animate-in delay-4 flex items-center justify-between">
+            <div class="font-mono-terminal text-[10px] text-zinc-700 tracking-wide">
+                EventSource &middot; Server-Sent Events
+            </div>
+            <div class="font-mono-terminal text-[10px] text-zinc-700 tracking-wide">
+                Open DevTools Network tab to inspect
+            </div>
+        </div>
     </div>
 </div>
 
 <script nonce="{{ request.csp_nonce }}">
+    let updateCount = 0;
+
+    // Clock
     const clockSource = new EventSource("/sse/clock/");
     clockSource.onmessage = (e) => {
         const data = JSON.parse(e.data);
         document.getElementById("clock").textContent = data.time;
     };
+
+    // Stock Ticker
+    const basePrices = { ACME: 142.50, GLOB: 89.30, WIDG: 213.75 };
 
     const tickerSource = new EventSource("/sse/ticker/");
     tickerSource.addEventListener("tick", (e) => {
@@ -50,12 +180,38 @@
         const card = document.getElementById("stock-" + data.symbol);
         if (!card) return;
 
-        card.querySelector(".price").textContent = "$" + data.price.toFixed(2);
+        updateCount++;
+        document.getElementById("update-counter").textContent = updateCount + " updates";
 
+        // Update price
+        const priceEl = card.querySelector(".price");
+        priceEl.textContent = "$" + data.price.toFixed(2);
+
+        // Update change badge
         const changeEl = card.querySelector(".change");
         const sign = data.change >= 0 ? "+" : "";
         changeEl.textContent = sign + data.change.toFixed(2);
-        changeEl.className = "text-sm " + (data.change >= 0 ? "text-green-600" : "text-red-600");
+
+        if (data.change >= 0) {
+            changeEl.className = "change font-mono-terminal text-xs text-emerald-400";
+        } else {
+            changeEl.className = "change font-mono-terminal text-xs text-red-400";
+        }
+
+        // Flash animation
+        card.classList.remove("flash-up", "flash-down");
+        void card.offsetWidth; // force reflow
+        card.classList.add(data.change >= 0 ? "flash-up" : "flash-down");
+
+        // Animate price bar (shows relative position from base price)
+        const base = basePrices[data.symbol];
+        const pctChange = ((data.price - base) / base) * 100;
+        const barWidth = Math.min(100, Math.max(5, 50 + pctChange * 5));
+        const bar = card.querySelector(".price-bar");
+        bar.style.width = barWidth + "%";
+        bar.style.backgroundColor = data.change >= 0
+            ? "rgba(16, 185, 129, 0.6)"
+            : "rgba(239, 68, 68, 0.5)";
     });
 </script>
 {% endblock %}
