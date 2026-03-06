@@ -11,7 +11,7 @@ from plain.test import RequestFactory
 def test_safe_methods_allowed(method):
     """Safe HTTP methods should always be allowed."""
     rf = RequestFactory()
-    csrf_middleware = CsrfViewMiddleware(lambda request: None)
+    csrf_middleware = CsrfViewMiddleware()
 
     request = rf.generic(method, "/test/")
     allowed, reason = csrf_middleware.should_allow_request(request)
@@ -42,7 +42,7 @@ def test_sec_fetch_site_header(
 ):
     """Test various Sec-Fetch-Site header values."""
     rf = RequestFactory()
-    csrf_middleware = CsrfViewMiddleware(lambda request: None)
+    csrf_middleware = CsrfViewMiddleware()
 
     request = rf.post("/test/", headers={"Sec-Fetch-Site": sec_fetch_site})
     allowed, reason = csrf_middleware.should_allow_request(request)
@@ -81,7 +81,7 @@ def test_trusted_origins(
 ):
     """Test trusted origins allow-list functionality."""
     rf = RequestFactory()
-    csrf_middleware = CsrfViewMiddleware(lambda request: None)
+    csrf_middleware = CsrfViewMiddleware()
 
     with patch("plain.csrf.middleware.settings") as mock_settings:
         mock_settings.CSRF_TRUSTED_ORIGINS = trusted_origins
@@ -103,7 +103,7 @@ def test_trusted_origins(
 def test_old_browser_fallback(headers):
     """Requests without proper headers should be allowed (old browsers)."""
     rf = RequestFactory()
-    csrf_middleware = CsrfViewMiddleware(lambda request: None)
+    csrf_middleware = CsrfViewMiddleware()
 
     request = rf.post("/test/", headers=headers)
     allowed, reason = csrf_middleware.should_allow_request(request)
@@ -140,7 +140,7 @@ def test_old_browser_fallback(headers):
 def test_origin_host_comparison(origin, expected_allowed, expected_reason_contains):
     """Test Origin vs Host header comparison scenarios."""
     rf = RequestFactory()
-    csrf_middleware = CsrfViewMiddleware(lambda request: None)
+    csrf_middleware = CsrfViewMiddleware()
 
     # Configure request based on the origin
     request_kwargs: dict[str, Any] = {"headers": {"Origin": origin}}
@@ -157,7 +157,7 @@ def test_origin_host_comparison(origin, expected_allowed, expected_reason_contai
 def test_invalid_origin_url():
     """Invalid Origin URLs should be rejected."""
     rf = RequestFactory()
-    csrf_middleware = CsrfViewMiddleware(lambda request: None)
+    csrf_middleware = CsrfViewMiddleware()
 
     request = rf.post("/test/", headers={"Origin": "not-a-valid-url"})
     allowed, reason = csrf_middleware.should_allow_request(request)
@@ -169,7 +169,7 @@ def test_invalid_origin_url():
 def test_sec_fetch_site_priority_over_origin_check():
     """Sec-Fetch-Site should take priority over Origin vs Host check."""
     rf = RequestFactory()
-    csrf_middleware = CsrfViewMiddleware(lambda request: None)
+    csrf_middleware = CsrfViewMiddleware()
 
     # This would normally match (same host) but Sec-Fetch-Site rejects it first
     request = rf.post(
@@ -268,7 +268,7 @@ def test_path_based_csrf_exemption(
 
         # Need to recreate middleware to compile new patterns
         rf = RequestFactory()
-        csrf_middleware = CsrfViewMiddleware(lambda request: None)
+        csrf_middleware = CsrfViewMiddleware()
 
         # Test path with malicious origin to ensure exemption works
         request = rf.post(test_path, headers={"Origin": "https://attacker.com"})
@@ -289,7 +289,7 @@ def test_request_factory_naturally_bypasses_csrf():
     because test clients naturally lack browser headers and thus bypass CSRF anyway.
     """
     rf = RequestFactory()
-    csrf_middleware = CsrfViewMiddleware(lambda request: None)
+    csrf_middleware = CsrfViewMiddleware()
 
     # Create a POST request with NO Origin or Sec-Fetch-Site headers (typical for test clients)
     request = rf.post("/test/")
@@ -308,23 +308,17 @@ def test_request_factory_naturally_bypasses_csrf():
 
 
 def test_middleware_integration_rejected_request():
-    """Rejected requests should raise SuspiciousOperationError400 without calling next."""
-    from unittest.mock import Mock
-
+    """Rejected requests should raise SuspiciousOperationError400."""
     from plain.http import SuspiciousOperationError400
 
     rf = RequestFactory()
-    mock_get_response = Mock()
-    csrf_middleware = CsrfViewMiddleware(mock_get_response)
+    csrf_middleware = CsrfViewMiddleware()
 
     request = rf.post("/test/", headers={"Origin": "https://attacker.com"})
 
     # Should raise SuspiciousOperationError400
     with pytest.raises(SuspiciousOperationError400) as exc_info:
-        csrf_middleware.process_request(request)
-
-    # Should not call next middleware
-    mock_get_response.assert_not_called()
+        csrf_middleware.before_request(request)
 
     # Exception message should contain the reason
     assert "does not match Host" in str(exc_info.value)

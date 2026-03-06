@@ -1,32 +1,31 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from plain.http import Request, Response
 
 
-class HttpMiddleware(ABC):
+class HttpMiddleware:
     """
-    Abstract base class for HTTP middleware.
+    Base class for HTTP middleware using before/after phases.
 
-    Subclasses must implement process_request() to handle the request/response cycle.
+    Subclasses override before_request() and/or after_response():
 
-    Example:
         class MyMiddleware(HttpMiddleware):
-            def process_request(self, request: Request) -> Response:
-                # Pre-processing
-                response = self.get_response(request)
-                # Post-processing
+            def before_request(self, request: Request) -> Response | None:
+                # Return Response to short-circuit, or None to continue
+                return None
+
+            def after_response(self, request: Request, response: Response) -> Response:
+                # Modify and return the response
                 return response
     """
 
-    def __init__(self, get_response: Callable[[Request], Response]):
-        self.get_response = get_response
+    def before_request(self, request: Request) -> Response | None:
+        """Return Response to short-circuit, or None to continue."""
+        return None
 
-    @abstractmethod
-    def process_request(self, request: Request) -> Response:
-        """Process the request and return a response. Must be implemented by subclasses."""
-        ...
+    def after_response(self, request: Request, response: Response) -> Response:
+        """Modify and return the response."""
+        return response

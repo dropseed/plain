@@ -6,5 +6,8 @@ from .impersonate.middleware import ImpersonateMiddleware
 class AdminMiddleware(HttpMiddleware):
     """All admin-related middleware in a single class."""
 
-    def process_request(self, request: Request) -> Response:
-        return ImpersonateMiddleware(self.get_response).process_request(request)
+    def __init__(self):
+        self._impersonate = ImpersonateMiddleware()
+
+    def before_request(self, request: Request) -> Response | None:
+        return self._impersonate.before_request(request)

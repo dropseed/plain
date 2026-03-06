@@ -13,13 +13,7 @@ if TYPE_CHECKING:
 
 
 class RedirectSlashMiddleware(HttpMiddleware):
-    def process_request(self, request: Request) -> Response:
-        """
-        Rewrite the URL based on settings.APPEND_SLASH
-        """
-
-        response = self.get_response(request)
-
+    def after_response(self, request: Request, response: Response) -> Response:
         """
         When the status code of the response is 404, it may redirect to a path
         with an appended slash if should_redirect_with_slash() returns True.

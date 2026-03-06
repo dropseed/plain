@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from functools import wraps
 from typing import TYPE_CHECKING
 
 from plain.forms.exceptions import FormFieldMissingError
@@ -17,39 +16,10 @@ from plain.runtime import settings
 from plain.views.errors import ErrorView
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from plain.http import Request, Response, ResponseBase
+    from plain.http import Request
 
 
 request_logger = logging.getLogger("plain.request")
-
-
-def convert_exception_to_response(
-    get_response: Callable[[Request], ResponseBase],
-) -> Callable[[Request], ResponseBase]:
-    """
-    Wrap the given get_response callable in exception-to-response conversion.
-
-    All exceptions will be converted. All known 4xx exceptions (NotFoundError404,
-    ForbiddenError403, MultiPartParserError, SuspiciousOperationError400) will be
-    converted to the appropriate response, and all other exceptions will be
-    converted to 500 responses.
-
-    This decorator is automatically applied to all middleware to ensure that
-    no middleware leaks an exception and that the next middleware in the stack
-    can rely on getting a response instead of an exception.
-    """
-
-    @wraps(get_response)
-    def inner(request: Request) -> ResponseBase:
-        try:
-            response = get_response(request)
-        except Exception as exc:
-            response = response_for_exception(request, exc)
-        return response
-
-    return inner
 
 
 def response_for_exception(request: Request, exc: Exception) -> Response:

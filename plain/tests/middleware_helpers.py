@@ -11,58 +11,66 @@ call_log: list[str] = []
 
 
 class TrackingMiddleware(HttpMiddleware):
-    def process_request(self, request):
+    def before_request(self, request):
         call_log.append("before")
-        response = self.get_response(request)
+        return None
+
+    def after_response(self, request, response):
         call_log.append("after")
         return response
 
 
 class FirstMiddleware(HttpMiddleware):
-    def process_request(self, request):
+    def before_request(self, request):
         call_log.append("first_before")
-        response = self.get_response(request)
+        return None
+
+    def after_response(self, request, response):
         call_log.append("first_after")
         return response
 
 
 class SecondMiddleware(HttpMiddleware):
-    def process_request(self, request):
+    def before_request(self, request):
         call_log.append("second_before")
-        response = self.get_response(request)
+        return None
+
+    def after_response(self, request, response):
         call_log.append("second_after")
         return response
 
 
 class BlockingMiddleware(HttpMiddleware):
-    def process_request(self, request):
+    def before_request(self, request):
         call_log.append("blocking")
         return Response("blocked", status_code=403)
 
 
 class InnerMiddleware(HttpMiddleware):
-    def process_request(self, request):
+    def before_request(self, request):
         call_log.append("inner")
-        return self.get_response(request)
+        return None
 
 
 class LoggingMiddleware(HttpMiddleware):
-    def process_request(self, request):
+    def before_request(self, request):
         call_log.append("user_middleware")
-        return self.get_response(request)
+        return None
 
 
 class ExplodingMiddleware(HttpMiddleware):
-    def process_request(self, request):
+    def before_request(self, request):
         raise RuntimeError("middleware boom")
 
 
 class OuterWrappingMiddleware(HttpMiddleware):
     """Outer middleware that logs before/after and records the response status."""
 
-    def process_request(self, request):
+    def before_request(self, request):
         call_log.append("outer_before")
-        response = self.get_response(request)
+        return None
+
+    def after_response(self, request, response):
         call_log.append(f"outer_after:{response.status_code}")
         return response
 
@@ -70,7 +78,7 @@ class OuterWrappingMiddleware(HttpMiddleware):
 class InnerExplodingMiddleware(HttpMiddleware):
     """Inner middleware that raises after logging."""
 
-    def process_request(self, request):
+    def before_request(self, request):
         call_log.append("inner_explode_before")
         raise RuntimeError("inner boom")
 
@@ -78,8 +86,7 @@ class InnerExplodingMiddleware(HttpMiddleware):
 class ResponseModifyingMiddleware(HttpMiddleware):
     """Middleware that adds a header after getting the response."""
 
-    def process_request(self, request):
-        response = self.get_response(request)
+    def after_response(self, request, response):
         response.headers["X-Modified-By"] = "ResponseModifyingMiddleware"
         return response
 
@@ -87,11 +94,13 @@ class ResponseModifyingMiddleware(HttpMiddleware):
 class SetupTeardownMiddleware(HttpMiddleware):
     """Middleware with both setup and teardown that can short-circuit."""
 
-    def process_request(self, request):
+    def before_request(self, request):
         call_log.append("setup")
         if request.headers.get("X-Block"):
             return Response("nope", status_code=403)
-        response = self.get_response(request)
+        return None
+
+    def after_response(self, request, response):
         call_log.append("teardown")
         return response
 

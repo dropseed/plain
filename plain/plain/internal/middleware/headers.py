@@ -30,10 +30,7 @@ class DefaultHeadersMiddleware(HttpMiddleware):
     the request's csp_nonce value. Headers without placeholders are used as-is.
     """
 
-    def process_request(self, request: Request) -> Response:
-        # Get the response from the view (and any inner middleware)
-        response = self.get_response(request)
-
+    def after_response(self, request: Request, response: Response) -> Response:
         # Apply default headers to the response
         for header, value in settings.DEFAULT_RESPONSE_HEADERS.items():
             if header not in response.headers:

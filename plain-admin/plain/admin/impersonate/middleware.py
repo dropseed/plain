@@ -20,7 +20,7 @@ def get_user_by_id(id: int) -> Any | None:
 
 
 class ImpersonateMiddleware(HttpMiddleware):
-    def process_request(self, request: Request) -> Response:
+    def before_request(self, request: Request) -> Response | None:
         session = get_request_session(request)
         user = get_request_user(request)
 
@@ -41,4 +41,4 @@ class ImpersonateMiddleware(HttpMiddleware):
                 set_request_impersonator(request, user)
                 set_request_user(request, user_to_impersonate)
 
-        return self.get_response(request)
+        return None

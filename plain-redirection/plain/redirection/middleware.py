@@ -1,17 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from plain.http import HttpMiddleware, RedirectResponse
-
-if TYPE_CHECKING:
-    from plain.http import Request, Response
+from plain.http import HttpMiddleware, RedirectResponse, Request, Response
 
 
 class RedirectionMiddleware(HttpMiddleware):
-    def process_request(self, request: Request) -> Response:
-        response = self.get_response(request)
-
+    def after_response(self, request: Request, response: Response) -> Response:
         if response.status_code == 404:
             from .models import NotFoundLog, Redirect, RedirectLog
 

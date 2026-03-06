@@ -299,22 +299,21 @@ class TestMiddlewareOrdering:
             settings.MIDDLEWARE = original
 
 
-class TestOnionUnwinding:
+class TestMiddlewareUnwinding:
     """
-    Tests for the onion model's unwinding behavior.
+    Tests for the two-phase middleware model's unwinding behavior.
 
-    In the current model, each middleware wraps the next as a callable chain.
-    The "after" code (after self.get_response()) only runs if get_response
-    was called. These tests document the exact current semantics so the
-    refactor can verify which behaviors change intentionally.
+    The pipeline runs before_request forward through each middleware, then
+    after_response in reverse. after_response ALWAYS runs for any middleware
+    whose before_request completed, even if that middleware (or a later one)
+    short-circuited.
     """
 
     def test_short_circuit_skips_outer_after(self):
         """
-        Current onion behavior: when inner middleware short-circuits (returns
-        without calling get_response), outer middleware's after code still runs
-        because it DID call get_response — it just got back a short-circuit
-        response.
+        Two-phase behavior: when inner middleware short-circuits by returning
+        a response from before_request, outer middleware's after_response still
+        runs because its before_request already completed.
         """
         original = settings.MIDDLEWARE
         try:
@@ -338,10 +337,9 @@ class TestOnionUnwinding:
 
     def test_exception_in_inner_middleware_is_converted_to_response(self):
         """
-        Current behavior: each middleware is wrapped in convert_exception_to_response.
-        When inner middleware raises, the exception is caught and converted to a
-        response BEFORE outer middleware sees it. Outer middleware's after code
-        runs normally with the error response.
+        When inner middleware raises in before_request, the exception is caught
+        and converted to an error response. Outer middleware's after_response
+        runs normally with that error response.
         """
         original = settings.MIDDLEWARE
         try:
@@ -364,8 +362,8 @@ class TestOnionUnwinding:
 
     def test_exception_in_view_seen_by_middleware_after(self):
         """
-        When the view raises, convert_exception_to_response converts it to
-        an error response, and all middleware's after code sees that response.
+        When the view raises, the exception is converted to an error response,
+        and all middleware's after_response sees that response.
         """
         from plain.urls.resolvers import _get_cached_resolver
 
@@ -390,15 +388,11 @@ class TestOnionUnwinding:
             settings.URLS_ROUTER = original_router
             _get_cached_resolver.cache_clear()
 
-    def test_short_circuit_skips_teardown_in_same_middleware(self):
+    def test_short_circuit_runs_teardown_in_same_middleware(self):
         """
-        Current onion behavior: when a middleware short-circuits (returns
-        without calling get_response), its own after-get_response code
-        never runs because the code path skips past it.
-
-        This is the key semantic difference with the before/after refactor,
-        where after_response ALWAYS runs for any middleware whose
-        before_request ran. Update this test when the refactor lands.
+        Two-phase behavior: after_response ALWAYS runs for any middleware
+        whose before_request completed. Even when before_request short-circuits
+        by returning a response, after_response still runs.
         """
         original = settings.MIDDLEWARE
         try:
@@ -414,11 +408,10 @@ class TestOnionUnwinding:
 
             call_log.clear()
 
-            # Short-circuit request — only setup runs, teardown skipped
+            # Short-circuit request — both setup and teardown run
             response = client.get("/", headers={"X-Block": "1"})
             assert response.status_code == 403
-            assert call_log == ["setup"]
-            assert "teardown" not in call_log
+            assert call_log == ["setup", "teardown"]
         finally:
             settings.MIDDLEWARE = original
 

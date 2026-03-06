@@ -6,32 +6,34 @@ from typing import TYPE_CHECKING
 from opentelemetry import baggage, trace
 from opentelemetry.semconv.attributes import http_attributes, url_attributes
 
-from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
 from plain.urls import get_resolver
 from plain.utils.module_loading import import_string
 
-from .exception import convert_exception_to_response
+from .exception import response_for_exception
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from plain.http import Request, Response, ResponseBase
+    from plain.http.middleware import HttpMiddleware
     from plain.urls import ResolverMatch
 
 
-# These middleware classes are always used by Plain.
+# Builtin middleware that runs before user middleware.
+# before_request runs top-down, after_response runs bottom-up (outermost).
 BUILTIN_BEFORE_MIDDLEWARE = [
-    "plain.internal.middleware.healthcheck.HealthcheckMiddleware",  # Respond to healthcheck before anything else
-    "plain.internal.middleware.hosts.HostValidationMiddleware",  # Validate Host header first
-    "plain.internal.middleware.headers.DefaultHeadersMiddleware",  # Runs after response, to set missing headers
-    "plain.internal.middleware.https.HttpsRedirectMiddleware",  # Runs before response, to redirect to HTTPS quickly
-    "plain.csrf.middleware.CsrfViewMiddleware",  # Runs before and after get_response...
+    "plain.internal.middleware.headers.DefaultHeadersMiddleware",
+    "plain.internal.middleware.healthcheck.HealthcheckMiddleware",
+    "plain.internal.middleware.hosts.HostValidationMiddleware",
+    "plain.internal.middleware.https.HttpsRedirectMiddleware",
+    "plain.csrf.middleware.CsrfViewMiddleware",
 ]
 
+# Builtin middleware that runs after user middleware (closest to the view).
+# after_response runs first, so replacements (e.g. slash redirect) happen
+# before user middleware modifies the response (e.g. session cookies).
 BUILTIN_AFTER_MIDDLEWARE = [
-    # Want this to run first (when reversed) so the slash middleware
-    # can immediately redirect to the slash-appended path if there is one.
     "plain.internal.middleware.slash.RedirectSlashMiddleware",
 ]
 
@@ -40,34 +42,27 @@ tracer = trace.get_tracer("plain")
 
 
 class BaseHandler:
-    _middleware_chain: Callable[[Request], ResponseBase] | None = None
+    _middleware_chain: list[HttpMiddleware] | None = None
 
     def load_middleware(self) -> None:
         """
-        Populate middleware lists from settings.MIDDLEWARE.
+        Populate middleware list from settings.MIDDLEWARE.
 
         Must be called after the environment is fixed (see __call__ in subclasses).
         """
-        handler = convert_exception_to_response(self._get_response)
-
-        middlewares = reversed(
+        middleware_paths = (
             BUILTIN_BEFORE_MIDDLEWARE + settings.MIDDLEWARE + BUILTIN_AFTER_MIDDLEWARE
         )
 
-        for middleware_path in middlewares:
-            middleware = import_string(middleware_path)
-            mw_instance = middleware(handler)
-
-            if mw_instance is None:
-                raise ImproperlyConfigured(
-                    f"Middleware factory {middleware_path} returned None."
-                )
-
-            handler = convert_exception_to_response(mw_instance.process_request)
+        chain: list[HttpMiddleware] = []
+        for middleware_path in middleware_paths:
+            middleware_class = import_string(middleware_path)
+            mw_instance = middleware_class()
+            chain.append(mw_instance)
 
         # We only assign to this when initialization is complete as it is used
         # as a flag for initialization being complete.
-        self._middleware_chain = handler
+        self._middleware_chain = chain
 
     def get_response(self, request: Request) -> ResponseBase:
         """Return a Response object for the given Request."""
@@ -103,7 +98,7 @@ class BaseHandler:
             attributes=span_attributes,
             kind=trace.SpanKind.SERVER,
         ) as span:
-            response = self._middleware_chain(request)
+            response = self._run_middleware(request)
             response._resource_closers.append(request.close)
 
             span.set_attribute(
@@ -121,10 +116,56 @@ class BaseHandler:
 
             return response
 
+    def _run_middleware(self, request: Request) -> ResponseBase:
+        """
+        Run the two-phase middleware pipeline:
+        1. before_request — forward through list, stop on first Response
+        2. View call (if no short-circuit)
+        3. after_response — reverse through middleware that ran before_request
+        """
+        chain = self._middleware_chain
+        assert chain is not None
+
+        response = None
+        # Track which middleware completed before_request (for unwinding)
+        ran_before: list[HttpMiddleware] = []
+
+        # Phase 1: before_request (forward)
+        for mw in chain:
+            try:
+                result = mw.before_request(request)
+            except Exception as exc:
+                response = response_for_exception(request, exc)
+                # This middleware's before_request raised, so it doesn't get
+                # after_response. Unwind only previously completed middleware.
+                break
+
+            ran_before.append(mw)
+
+            if result is not None:
+                # Short-circuit: this middleware returned a response
+                response = result
+                break
+
+        # Phase 2: View call (if no short-circuit)
+        if response is None:
+            try:
+                response = self._get_response(request)
+            except Exception as exc:
+                response = response_for_exception(request, exc)
+
+        # Phase 3: after_response (reverse through middleware that ran before_request)
+        for mw in reversed(ran_before):
+            try:
+                response = mw.after_response(request, response)  # type: ignore[arg-type]
+            except Exception as exc:
+                response = response_for_exception(request, exc)
+
+        return response
+
     def _get_response(self, request: Request) -> ResponseBase:
         """
-        Resolve and call the view, then apply view, exception, and
-        template_response middleware. This method is everything that happens
+        Resolve and call the view. This method is everything that happens
         inside the request/response middleware.
         """
         resolver_match = self.resolve_request(request)

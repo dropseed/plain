@@ -303,19 +303,23 @@ Use [Google's CSP Evaluator](https://csp-evaluator.withgoogle.com/) to analyze y
 
 ## Middleware
 
-Create custom middleware by subclassing [`HttpMiddleware`](./middleware.py#HttpMiddleware).
+Create custom middleware by subclassing [`HttpMiddleware`](./middleware.py#HttpMiddleware). Middleware has two phases:
+
+- **`before_request(request)`** — runs before the view. Return a `Response` to short-circuit (skip the view and remaining middleware), or `None` to continue.
+- **`after_response(request, response)`** — runs after the view returns. Modify and return the response. This always runs for any middleware whose `before_request` ran, even if another middleware short-circuited.
 
 ```python
 from plain.http import HttpMiddleware, Request, Response
 
 class TimingMiddleware(HttpMiddleware):
-    def process_request(self, request: Request) -> Response:
+    def before_request(self, request: Request) -> Response | None:
         import time
-        start = time.time()
+        request.timing_start = time.time()
+        return None
 
-        response = self.get_response(request)
-
-        duration = time.time() - start
+    def after_response(self, request: Request, response: Response) -> Response:
+        import time
+        duration = time.time() - request.timing_start
         response.headers["X-Request-Duration"] = f"{duration:.3f}s"
         return response
 ```

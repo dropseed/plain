@@ -2,14 +2,10 @@ from __future__ import annotations
 
 import ipaddress
 import logging
-from typing import TYPE_CHECKING
 
 from plain.http import HttpMiddleware, Request, Response
 from plain.runtime import settings
 from plain.utils.regex_helper import _lazy_re_compile
-
-if TYPE_CHECKING:
-    from plain.http import Response
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +23,7 @@ class HostValidationMiddleware(HttpMiddleware):
     host is not allowed.
     """
 
-    def process_request(self, request: Request) -> Response:
+    def before_request(self, request: Request) -> Response | None:
         if not is_host_valid(request):
             host = request.host
             msg = f"Invalid HTTP_HOST header: {host!r}."
@@ -47,7 +43,7 @@ class HostValidationMiddleware(HttpMiddleware):
 
             return Response(status_code=400)
 
-        return self.get_response(request)
+        return None
 
 
 def is_host_valid(request: Request) -> bool:

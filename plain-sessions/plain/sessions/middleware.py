@@ -17,7 +17,7 @@ __all__ = ["SessionMiddleware"]
 
 
 class SessionMiddleware(HttpMiddleware):
-    def process_request(self, request: Request) -> Response:
+    def before_request(self, request: Request) -> Response | None:
         session_key = request.cookies.get(settings.SESSION_COOKIE_NAME)
 
         session = SessionStore(session_key)
@@ -28,8 +28,9 @@ class SessionMiddleware(HttpMiddleware):
                 SESSION_ID, session.model_instance.id
             )
 
-        response = self.get_response(request)
+        return None
 
+    def after_response(self, request: Request, response: Response) -> Response:
         """
         If request.session was modified, or if the configuration is to save the
         session every time, save the changes and set a session cookie or delete

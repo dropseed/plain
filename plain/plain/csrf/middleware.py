@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -21,21 +20,19 @@ class CsrfViewMiddleware(HttpMiddleware):
     like subdomains can have different trust levels and are rejected.
     """
 
-    def __init__(self, get_response: Callable[[Request], Response]):
-        super().__init__(get_response)
-
+    def __init__(self):
         # Compile CSRF exempt patterns once for performance
         self.csrf_exempt_patterns: list[re.Pattern[str]] = [
             re.compile(r) for r in settings.CSRF_EXEMPT_PATHS
         ]
 
-    def process_request(self, request: Request) -> Response:
+    def before_request(self, request: Request) -> Response | None:
         allowed, reason = self.should_allow_request(request)
 
         if not allowed:
             raise SuspiciousOperationError400(reason)
 
-        return self.get_response(request)
+        return None
 
     def should_allow_request(self, request: Request) -> tuple[bool, str]:
         # 1. Allow safe methods (GET, HEAD, OPTIONS)
