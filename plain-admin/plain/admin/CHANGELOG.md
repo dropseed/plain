@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.71.0](https://github.com/dropseed/plain/releases/plain-admin@0.71.0) (2026-03-06)
+
+### What's changed
+
+- Adapted `ImpersonateMiddleware` and `AdminMiddleware` to the new `before_request`/`after_response` middleware API — replaced `process_request()` with `before_request()`, removed `self.get_response()` calls, and updated `__init__` to no longer accept `get_response` ([9a1477ee8fa8](https://github.com/dropseed/plain/commit/9a1477ee8fa8))
+
+### Upgrade instructions
+
+- Requires `plain>=0.116.0`. No other changes required.
+
 ## [0.70.2](https://github.com/dropseed/plain/releases/plain-admin@0.70.2) (2026-03-04)
 
 ### What's changed
