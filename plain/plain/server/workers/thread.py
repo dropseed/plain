@@ -44,12 +44,15 @@ from ..http.errors import (
     ObsoleteFolding,
     UnsupportedTransferCoding,
 )
+from ..http.h2handler import async_handle_h2_connection
 from ..http.response import Response, create_request
 from .workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
     from ..app import ServerApplication
     from ..http.message import Request
+
+_H2_SENTINEL = object()
 
 # Maximum jitter to add to max_requests to stagger worker restarts
 MAX_REQUESTS_JITTER = 50
@@ -95,6 +98,8 @@ class TConn:
 
         self.parser: http.RequestParser | None = None
         self.initialized: bool = False
+        self.is_h2: bool = False
+        self.handed_off: bool = False
 
         # set the socket to non blocking
         self.sock.setblocking(False)
@@ -110,6 +115,11 @@ class TConn:
                 self.sock = sock.ssl_wrap_socket(
                     self.sock, self.app.certfile, self.app.keyfile
                 )
+
+                if self.sock.selected_alpn_protocol() == "h2":
+                    self.is_h2 = True
+                    self.initialized = True
+                    return
 
             # initialize the parser
             self.parser = http.RequestParser(self.app.is_ssl, self.sock, self.client)
@@ -246,7 +256,7 @@ class Worker:
         loop = asyncio.get_running_loop()
         assert listener.sock is not None, "Listener socket is closed"
         listener_sock = listener.sock
-        server: tuple[str, int] = listener_sock.getsockname()  # type: ignore[assignment]
+        server: tuple[str, int] = listener_sock.getsockname()
         while self.alive:
             # Backpressure: wait when at capacity
             if self.nr_conns >= WORKER_CONNECTIONS:
@@ -289,10 +299,33 @@ class Worker:
 
             while self.alive:
                 # Run the synchronous handle() in the thread pool
-                keepalive, conn = await loop.run_in_executor(
-                    self.tpool, self.handle, conn
-                )
+                result, conn = await loop.run_in_executor(self.tpool, self.handle, conn)
 
+                if result is _H2_SENTINEL:
+                    remaining = self.max_requests - self.nr
+                    if self.max_requests < sys.maxsize and remaining <= 0:
+                        self.log.info("Autorestarting worker after current request.")
+                        self.alive = False
+                        return
+                    conn.handed_off = True
+                    h2_streams = await async_handle_h2_connection(
+                        conn.sock,
+                        conn.client,
+                        conn.server,
+                        self.handler,
+                        self.app.is_ssl,
+                        self.tpool,
+                        max_requests=remaining
+                        if self.max_requests < sys.maxsize
+                        else 0,
+                    )
+                    self.nr += h2_streams
+                    if self.nr >= self.max_requests:
+                        self.log.info("Autorestarting worker after current request.")
+                        self.alive = False
+                    return
+
+                keepalive = result
                 if not keepalive or not self.alive:
                     break
 
@@ -311,7 +344,8 @@ class Worker:
             self.nr_conns -= 1
             if self.nr_conns < WORKER_CONNECTIONS:
                 self._capacity_available.set()
-            conn.close()
+            if not conn.handed_off:
+                conn.close()
 
     async def _wait_readable(self, s: socket.socket) -> None:
         loop = asyncio.get_running_loop()
@@ -454,7 +488,7 @@ class Worker:
             return False
         return True
 
-    def handle(self, conn: TConn) -> tuple[bool, TConn]:
+    def handle(self, conn: TConn) -> tuple[bool | object, TConn]:
         keepalive = False
         req = None
         try:
@@ -472,6 +506,11 @@ class Worker:
                 conn.sock.settimeout(KEEPALIVE)
 
             conn.init()
+
+            if conn.is_h2:
+                conn.sock.settimeout(None)
+                return (_H2_SENTINEL, conn)
+
             assert conn.parser is not None
             try:
                 req = next(conn.parser)

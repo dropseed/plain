@@ -1,6 +1,6 @@
 # Server
 
-**A production-ready HTTP server, originally based on gunicorn.**
+**A production-ready HTTP server with HTTP/2 support, originally based on gunicorn.**
 
 - [Overview](#overview)
 - [Workers and threads](#workers-and-threads)
@@ -8,6 +8,7 @@
 - [Settings](#settings)
 - [Signals](#signals)
 - [FAQs](#faqs)
+- [Architecture](#architecture)
 - [Installation](#installation)
 
 ## Overview
@@ -38,6 +39,8 @@ Total concurrent requests = `workers × threads`. On a 4-core machine with the d
 **When to adjust workers:** Workers provide true parallelism since each is a separate process with its own Python GIL. More workers means more memory usage but better CPU utilization. Use `--workers 0` (the default) to match your CPU cores, or set an explicit number.
 
 **When to adjust threads:** Threads are efficient for I/O-bound work (database queries, external API calls) since they release the GIL while waiting. Most web applications are I/O-bound, so the default of 4 threads works well. Increase threads if your application spends a lot of time waiting on I/O. Decrease to 1 if you need to avoid thread-safety concerns.
+
+**Long-lived connections:** Async views (SSE, WebSocket) run on the worker's event loop instead of occupying a thread pool slot. This means long-lived connections don't reduce your capacity for regular requests.
 
 ```bash
 # Explicit worker count
@@ -156,6 +159,8 @@ Provide both `--certfile` and `--keyfile` options pointing to your certificate a
 plain server --certfile cert.pem --keyfile key.pem
 ```
 
+When TLS is enabled, the server automatically negotiates HTTP/2 with clients that support it via ALPN, while remaining compatible with HTTP/1.1 clients.
+
 #### How do I run behind a reverse proxy?
 
 Configure your proxy to pass the appropriate headers, then use these settings to tell Plain how to interpret them:
@@ -187,6 +192,23 @@ Or via the CLI:
 
 ```bash
 plain server --timeout 120
+```
+
+## Architecture
+
+```mermaid
+graph TD
+    A[Arbiter] -->|fork per core| W[Worker]
+    W --> EL[asyncio event loop]
+    EL -->|accept| C[Connection]
+    C -->|wait readable| EL
+    C -->|TLS ALPN| P{Protocol?}
+    P -->|h2| H2[HTTP/2 handler]
+    P -->|http/1.1| H1[Parse in thread pool]
+    H2 -->|"h2 codec (sans-I/O)"| STREAMS[Multiplexed streams]
+    STREAMS -->|per stream| TP[Thread pool]
+    H1 --> TP
+    TP --> MW[before_request + view + after_response]
 ```
 
 ## Installation

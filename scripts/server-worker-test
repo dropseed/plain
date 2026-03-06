@@ -1,0 +1,20 @@
+#!/bin/bash -e
+
+# Run server worker behavior tests against the Plain example app.
+#
+# Usage:
+#   ./scripts/server-worker-test                     # starts example server automatically
+#   ./scripts/server-worker-test host:port           # test against an already-running server
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ $# -gt 0 ] && [[ "$1" == *:* ]]; then
+    TARGET="$1"
+    shift
+    uv run python "$REPO_ROOT/scripts/server-worker-test.py" "$TARGET" "$@"
+    exit $?
+fi
+
+source "$(dirname "$0")/start-example-server"
+
+uv run python "$REPO_ROOT/scripts/server-worker-test.py" "127.0.0.1:$PORT" "$@"

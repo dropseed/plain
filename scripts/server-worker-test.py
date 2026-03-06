@@ -1,9 +1,9 @@
 """Server worker behavior tests.
 
 Tests concurrency, keepalive lifecycle, slow clients, and request body
-handling at the socket level. Run via ./scripts/server-test or directly:
+handling at the socket level. Run via ./scripts/server-worker-test or directly:
 
-    python scripts/server-test.py host:port [--threads N]
+    python scripts/server-worker-test.py host:port [--threads N]
 
 The --threads flag tells the test how many threads the server is running
 so the exhaustion test can saturate the pool. Defaults to 4 (the Plain default).

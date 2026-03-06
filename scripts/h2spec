@@ -1,0 +1,44 @@
+#!/bin/bash -e
+
+# Run HTTP/2 conformance tests against the Plain server using h2spec.
+#
+# Requires: h2spec (brew install h2spec)
+#
+# Usage:
+#   ./scripts/h2spec                          # starts example server automatically
+#   ./scripts/h2spec host:port                # test against an already-running TLS server
+#   ./scripts/h2spec -S section               # run specific test section (e.g. -S 6.1)
+
+if ! command -v h2spec &>/dev/null; then
+    echo "h2spec not found. Install with: brew install h2spec" >&2
+    exit 1
+fi
+
+TARGET=""
+H2SPEC_ARGS=()
+for arg in "$@"; do
+    if [ -z "$TARGET" ] && [[ "$arg" == *:* ]] && [[ "$arg" != -* ]]; then
+        TARGET="$arg"
+    else
+        H2SPEC_ARGS+=("$arg")
+    fi
+done
+
+if [ -n "$TARGET" ]; then
+    HOST="${TARGET%%:*}"
+    PORT="${TARGET##*:}"
+    h2spec --host "$HOST" --port "$PORT" --tls --insecure "${H2SPEC_ARGS[@]}"
+    exit $?
+fi
+
+# Generate a temporary self-signed certificate for TLS
+CERTDIR=$(mktemp -d)
+trap 'rm -rf "$CERTDIR"' EXIT
+
+openssl req -x509 -newkey rsa:2048 -keyout "$CERTDIR/key.pem" -out "$CERTDIR/cert.pem" \
+    -days 1 -nodes -subj "/CN=localhost" 2>/dev/null
+
+source "$(dirname "$0")/start-example-server" \
+    --certfile "$CERTDIR/cert.pem" --keyfile "$CERTDIR/key.pem"
+
+h2spec --host 127.0.0.1 --port "$PORT" --tls --insecure "${H2SPEC_ARGS[@]}"
