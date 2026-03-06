@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.115.0](https://github.com/dropseed/plain/releases/plain@0.115.0) (2026-03-05)
+
+### What's changed
+
+- **Asyncio worker event loop** — replaced the hand-rolled `selectors` event loop and `PollableMethodQueue` pipe with Python's `asyncio` as the worker's main loop. Connection acceptance, keepalive timeouts, and backpressure are now managed with native asyncio primitives (`create_task`, `wait_for`, `Event`, `add_reader`) while all request handling still runs synchronously in the thread pool via `run_in_executor` ([bc3f998f3fda](https://github.com/dropseed/plain/commit/bc3f998f3fda))
+- **Accept-loop crash detection** — if a listener socket hits an unexpected error (e.g. EMFILE), the worker now detects it and shuts down for the arbiter to restart, instead of silently losing that listener ([bc3f998f3fda](https://github.com/dropseed/plain/commit/bc3f998f3fda))
+- **Cleaner graceful shutdown** — uses `asyncio.wait()` with timeout and task cancellation, and cancels accept loops before closing listener sockets to avoid EBADF errors ([bc3f998f3fda](https://github.com/dropseed/plain/commit/bc3f998f3fda))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.114.1](https://github.com/dropseed/plain/releases/plain@0.114.1) (2026-03-04)
 
 ### What's changed
