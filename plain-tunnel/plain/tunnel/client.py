@@ -49,6 +49,7 @@ class TunnelClient:
         self.pending_requests: dict[str, dict[str, Any]] = {}
         self.active_streams: dict[str, asyncio.Event] = {}
         self.proxied_websockets: dict[str, Any] = {}
+        self.ws_pending_queues: dict[str, asyncio.Queue[dict[str, Any]]] = {}
         self.stop_event = asyncio.Event()
 
     async def connect(self) -> None:
@@ -67,7 +68,10 @@ class TunnelClient:
                         f"Connected to tunnel {self.tunnel_http_url}", fg="green"
                     )
                     retry_delay = 1.0
-                    await self.handle_messages(websocket)
+                    try:
+                        await self.handle_messages(websocket)
+                    finally:
+                        await self._cleanup_proxied_websockets()
             except asyncio.CancelledError:
                 self.logger.debug("Connection cancelled")
                 break
@@ -123,6 +127,7 @@ class TunnelClient:
                             cancel_event.set()
                     elif msg_type == "ws-open":
                         self.logger.debug(f"Received ws-open for ID: {data['id']}")
+                        self.ws_pending_queues[data["id"]] = asyncio.Queue()
                         task = asyncio.create_task(
                             self._handle_ws_open(websocket, data)
                         )
@@ -218,7 +223,17 @@ class TunnelClient:
 
     def _handle_task_exception(self, task: asyncio.Task[None]) -> None:
         if not task.cancelled() and task.exception():
-            self.logger.error(f"Error processing request: {task.exception()}")
+            self.logger.error("Error processing request", exc_info=task.exception())
+
+    async def _cleanup_proxied_websockets(self) -> None:
+        """Close all proxied WebSocket connections on tunnel disconnect."""
+        for ws_id, ws in list(self.proxied_websockets.items()):
+            try:
+                await ws.close()
+            except Exception:
+                pass
+        self.proxied_websockets.clear()
+        self.ws_pending_queues.clear()
 
     async def process_request(
         self,
@@ -364,13 +379,15 @@ class TunnelClient:
                     break
 
                 await websocket.send(id_bytes + chunk)
-
-            stream_end = {
-                "type": "stream-end",
-                "id": request_id,
-            }
-            self.logger.debug(f"Sending stream-end for ID: {request_id}")
-            await websocket.send(json.dumps(stream_end))
+            else:
+                # Only send stream-end if the loop completed naturally
+                # (not cancelled by the server via stream-cancel)
+                stream_end = {
+                    "type": "stream-end",
+                    "id": request_id,
+                }
+                self.logger.debug(f"Sending stream-end for ID: {request_id}")
+                await websocket.send(json.dumps(stream_end))
         except Exception as e:
             self.logger.error(f"Error streaming response for ID {request_id}: {e}")
             stream_error = {
@@ -403,6 +420,27 @@ class TunnelClient:
 
         self.logger.debug(f"Opening local WebSocket for {ws_id}: {local_ws_url}")
 
+        # Forward safe browser headers (cookies, auth, origin) to the local
+        # server. Skip hop-by-hop and WebSocket handshake headers since
+        # websockets.connect generates its own, and rewrite Host to match
+        # the local server.
+        skip_headers = frozenset(
+            {
+                "host",
+                "connection",
+                "upgrade",
+                "sec-websocket-key",
+                "sec-websocket-version",
+                "sec-websocket-extensions",
+                "sec-websocket-protocol",
+            }
+        )
+        forward_headers = {}
+        for name, value in data.get("headers", {}).items():
+            if name.lower() not in skip_headers:
+                forward_headers[name] = value
+        forward_headers["Host"] = dest_parsed.netloc
+
         try:
             import ssl
 
@@ -413,9 +451,11 @@ class TunnelClient:
                 local_ws_url,
                 ssl=ssl_context if ws_scheme == "wss" else None,
                 max_size=None,
+                additional_headers=forward_headers,
             )
         except Exception as e:
             self.logger.error(f"Failed to connect local WebSocket for {ws_id}: {e}")
+            self.ws_pending_queues.pop(ws_id, None)
             try:
                 await tunnel_ws.send(
                     json.dumps(
@@ -432,6 +472,22 @@ class TunnelClient:
             return
 
         self.proxied_websockets[ws_id] = local_ws
+
+        # Drain any messages that arrived while connecting
+        queue = self.ws_pending_queues.pop(ws_id, None)
+        if queue is not None:
+            while not queue.empty():
+                queued = queue.get_nowait()
+                try:
+                    if queued.get("binary"):
+                        await local_ws.send(base64.b64decode(queued["data"]))
+                    else:
+                        await local_ws.send(queued["data"])
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to forward queued message to local WebSocket {ws_id}: {e}"
+                    )
+
         self.logger.info(f"WebSocket proxy opened: {ws_id} -> {local_ws_url}")
 
         # Relay messages from local server back to the tunnel
@@ -478,6 +534,11 @@ class TunnelClient:
         ws_id = data["id"]
         local_ws = self.proxied_websockets.get(ws_id)
         if not local_ws:
+            # Connection still being established — buffer for later
+            queue = self.ws_pending_queues.get(ws_id)
+            if queue is not None:
+                await queue.put(data)
+                return
             self.logger.warning(f"Received ws-message for unknown WebSocket: {ws_id}")
             return
         try:
