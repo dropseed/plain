@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.117.0](https://github.com/dropseed/plain/releases/plain@0.117.0) (2026-03-06)
+
+### What's changed
+
+- **Async view dispatch** — views can now be `async`. The server detects async view methods and awaits them directly on the worker's asyncio event loop instead of dispatching to the thread pool, freeing thread pool slots for sync views ([b62c283ecd3d](https://github.com/dropseed/plain/commit/b62c283ecd3d))
+- **`AsyncStreamingResponse`** — new response class that streams from an `async` generator without occupying a thread pool slot. Available as `from plain.http import AsyncStreamingResponse` ([b62c283ecd3d](https://github.com/dropseed/plain/commit/b62c283ecd3d))
+- **`ServerSentEventsView`** — new view class for Server-Sent Events. Subclass it and implement an async `events()` generator that yields `SentEvent` objects. Handles SSE framing, `Cache-Control`, and `X-Accel-Buffering` headers automatically ([b62c283ecd3d](https://github.com/dropseed/plain/commit/b62c283ecd3d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.116.0](https://github.com/dropseed/plain/releases/plain@0.116.0) (2026-03-06)
 
 ### What's changed
