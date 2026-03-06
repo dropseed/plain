@@ -14,7 +14,7 @@ import websockets
 
 # Bump this when making breaking changes to the WebSocket protocol.
 # The server will reject clients with a version lower than its minimum.
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 
 
 class TunnelClient:
@@ -25,10 +25,16 @@ class TunnelClient:
         self.subdomain = subdomain
         self.tunnel_host = tunnel_host
 
-        self.tunnel_http_url = f"https://{subdomain}.{tunnel_host}"
-        self.tunnel_websocket_url = (
-            f"wss://{subdomain}.{tunnel_host}?v={PROTOCOL_VERSION}"
-        )
+        if "localhost" in tunnel_host or "127.0.0.1" in tunnel_host:
+            self.tunnel_http_url = f"http://{subdomain}.{tunnel_host}"
+            self.tunnel_websocket_url = (
+                f"ws://{subdomain}.{tunnel_host}?v={PROTOCOL_VERSION}"
+            )
+        else:
+            self.tunnel_http_url = f"https://{subdomain}.{tunnel_host}"
+            self.tunnel_websocket_url = (
+                f"wss://{subdomain}.{tunnel_host}?v={PROTOCOL_VERSION}"
+            )
 
         self.logger = logging.getLogger(__name__)
         level = getattr(logging, log_level.upper())
@@ -40,6 +46,7 @@ class TunnelClient:
         self.logger.addHandler(handler)
 
         self.pending_requests: dict[str, dict[str, Any]] = {}
+        self.active_streams: dict[str, asyncio.Event] = {}
         self.stop_event = asyncio.Event()
 
     async def connect(self) -> None:
@@ -104,6 +111,14 @@ class TunnelClient:
                     elif msg_type == "request":
                         self.logger.debug("Received request metadata from worker")
                         await self.handle_request_metadata(websocket, data)
+                    elif msg_type == "stream-cancel":
+                        request_id = data.get("id")
+                        self.logger.debug(
+                            f"Received stream-cancel for request ID: {request_id}"
+                        )
+                        cancel_event = self.active_streams.get(request_id)
+                        if cancel_event:
+                            cancel_event.set()
                     else:
                         self.logger.warning(
                             f"Received unknown message type: {msg_type}"
@@ -220,28 +235,57 @@ class TunnelClient:
 
         async with httpx.AsyncClient(follow_redirects=False, verify=False) as client:
             try:
-                response = await client.request(
+                async with client.stream(
                     method=request_metadata["method"],
                     url=forward_url,
                     headers=request_metadata["headers"],
                     content=body_data,
-                )
-                response_body = response.content
-                response_headers = dict(response.headers)
-                response_status = response.status_code
-                self.logger.debug(
-                    f"Received response with status code: {response_status}"
-                )
+                ) as response:
+                    response_status = response.status_code
+                    response_headers = dict(response.headers)
+
+                    self.logger.info(
+                        f"{click.style(request_metadata['method'], bold=True)} {request_metadata['url']} {response_status}"
+                    )
+
+                    if self._is_streaming_response(response):
+                        await self._handle_streaming_response(
+                            websocket,
+                            response,
+                            request_id,
+                            response_status,
+                            response_headers,
+                        )
+                    else:
+                        await response.aread()
+                        await self._handle_buffered_response(
+                            websocket,
+                            response.content,
+                            request_id,
+                            response_status,
+                            response_headers,
+                        )
             except httpx.ConnectError as e:
                 self.logger.error(f"Connection error forwarding request: {e}")
-                response_body = b""
-                response_headers = {}
-                response_status = 502
+                self.logger.info(
+                    f"{click.style(request_metadata['method'], bold=True)} {request_metadata['url']} 502"
+                )
+                await self._handle_buffered_response(
+                    websocket, b"", request_id, 502, {}
+                )
 
-        self.logger.info(
-            f"{click.style(request_metadata['method'], bold=True)} {request_metadata['url']} {response_status}"
-        )
+    def _is_streaming_response(self, response: httpx.Response) -> bool:
+        content_type = response.headers.get("content-type", "")
+        return "text/event-stream" in content_type
 
+    async def _handle_buffered_response(
+        self,
+        websocket: Any,
+        response_body: bytes,
+        request_id: str,
+        response_status: int,
+        response_headers: dict[str, str],
+    ) -> None:
         has_body = len(response_body) > 0
         max_chunk_size = 1_000_000
         total_body_chunks = (
@@ -275,6 +319,59 @@ class TunnelClient:
                 self.logger.debug(
                     f"Sent body chunk {i + 1}/{total_body_chunks} for ID: {request_id}"
                 )
+
+    async def _handle_streaming_response(
+        self,
+        websocket: Any,
+        response: httpx.Response,
+        request_id: str,
+        response_status: int,
+        response_headers: dict[str, str],
+    ) -> None:
+        cancel_event = asyncio.Event()
+        self.active_streams[request_id] = cancel_event
+
+        stream_start = {
+            "type": "stream-start",
+            "id": request_id,
+            "status": response_status,
+            "headers": list(response_headers.items()),
+        }
+
+        self.logger.debug(f"Sending stream-start for ID: {request_id}")
+        await websocket.send(json.dumps(stream_start))
+
+        id_bytes = request_id.encode("utf-8")
+
+        try:
+            async for chunk in response.aiter_bytes():
+                if cancel_event.is_set():
+                    self.logger.debug(
+                        f"Stream cancelled by browser for request ID: {request_id}"
+                    )
+                    break
+
+                await websocket.send(id_bytes + chunk)
+
+            stream_end = {
+                "type": "stream-end",
+                "id": request_id,
+            }
+            self.logger.debug(f"Sending stream-end for ID: {request_id}")
+            await websocket.send(json.dumps(stream_end))
+        except Exception as e:
+            self.logger.error(f"Error streaming response for ID {request_id}: {e}")
+            stream_error = {
+                "type": "stream-error",
+                "id": request_id,
+                "error": str(e),
+            }
+            try:
+                await websocket.send(json.dumps(stream_error))
+            except Exception:
+                pass
+        finally:
+            self.active_streams.pop(request_id, None)
 
     def run(self) -> None:
         try:

@@ -32,7 +32,7 @@ export default {
 
 // Bump when making breaking protocol changes.
 // Clients with a version below this will be rejected.
-const MIN_PROTOCOL_VERSION = 1;
+const MIN_PROTOCOL_VERSION = 2;
 
 // Response body chunks use a fixed-length UUID (36 bytes) as the ID prefix.
 const UUID_BYTE_LENGTH = 36;
@@ -115,7 +115,11 @@ export class Tunnel {
       // Resolve any pending requests targeting the old socket with 503
       for (const [id, pending] of this.pendingRequests) {
         console.info(`Resolving pending request ${id} due to reconnection`);
-        pending.resolve(new Response("Client reconnecting", { status: 503 }));
+        if (pending.streaming && pending.streamWriter) {
+          pending.streamWriter.abort(new Error("Client reconnecting"));
+        } else {
+          pending.resolve(new Response("Client reconnecting", { status: 503 }));
+        }
         pending.cleanup();
       }
     }
@@ -137,6 +141,18 @@ export class Tunnel {
             console.info("Received response metadata from client");
             this.handleResponseMetadata(data);
             break;
+          case "stream-start":
+            console.info("Received stream-start from client");
+            this.handleStreamStart(data);
+            break;
+          case "stream-end":
+            console.info("Received stream-end from client");
+            this.handleStreamEnd(data);
+            break;
+          case "stream-error":
+            console.info("Received stream-error from client");
+            this.handleStreamError(data);
+            break;
           default:
             console.warn(`Received unknown message type: ${data.type}`);
         }
@@ -151,6 +167,17 @@ export class Tunnel {
       if (this.clientSocket === server) {
         this.stopHeartbeat();
         this.clientSocket = null;
+
+        // Abort any active streaming requests and reject pending buffered ones
+        for (const [id, pending] of this.pendingRequests) {
+          if (pending.streaming && pending.streamWriter) {
+            console.info(`Aborting stream for request ${id} due to WebSocket close`);
+            pending.streamWriter.abort(new Error("Client disconnected"));
+          } else if (!pending.streaming) {
+            pending.resolve(new Response("Client disconnected", { status: 503 }));
+          }
+          pending.cleanup();
+        }
       }
     });
 
@@ -177,19 +204,91 @@ export class Tunnel {
     }
   }
 
+  handleStreamStart(data) {
+    const { id, status, headers } = data;
+    const pendingRequest = this.pendingRequests.get(id);
+    if (!pendingRequest) {
+      console.warn(`Received stream-start for unknown request ID: ${id}`);
+      return;
+    }
+
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+
+    pendingRequest.streaming = true;
+    pendingRequest.streamWriter = writer;
+
+    // Clear the request timeout since streaming can last indefinitely
+    if (pendingRequest.timeoutId) {
+      clearTimeout(pendingRequest.timeoutId);
+      pendingRequest.timeoutId = null;
+    }
+
+    // Resolve the HTTP response immediately with the readable stream
+    pendingRequest.resolve(new Response(readable, { status, headers }));
+  }
+
+  handleStreamEnd(data) {
+    const { id } = data;
+    const pendingRequest = this.pendingRequests.get(id);
+    if (!pendingRequest || !pendingRequest.streaming) {
+      console.warn(`Received stream-end for unknown or non-streaming request ID: ${id}`);
+      return;
+    }
+
+    console.debug(`Stream ended for request ID: ${id}`);
+    pendingRequest.streamWriter.close().catch(() => {});
+    pendingRequest.cleanup();
+  }
+
+  handleStreamError(data) {
+    const { id, error } = data;
+    const pendingRequest = this.pendingRequests.get(id);
+    if (!pendingRequest || !pendingRequest.streaming) {
+      console.warn(`Received stream-error for unknown or non-streaming request ID: ${id}`);
+      return;
+    }
+
+    console.error(`Stream error for request ID: ${id}: ${error}`);
+    pendingRequest.streamWriter.abort(new Error(error || "Stream error")).catch(() => {});
+    pendingRequest.cleanup();
+  }
+
   handleResponseBodyChunk(chunkData) {
     const id = new TextDecoder().decode(chunkData.slice(0, UUID_BYTE_LENGTH));
-    const headerEnd = UUID_BYTE_LENGTH + 8;
-    const [chunkIndex, totalChunks] = new Uint32Array(chunkData.slice(UUID_BYTE_LENGTH, headerEnd));
-    const bodyChunk = chunkData.slice(headerEnd);
-
     const pendingRequest = this.pendingRequests.get(id);
-    if (pendingRequest) {
+
+    if (!pendingRequest) {
+      console.warn(`Received body chunk for unknown or completed request ID: ${id}`);
+      return;
+    }
+
+    if (pendingRequest.streaming) {
+      // Streaming mode: remaining bytes after ID are the body data
+      const bodyData = chunkData.slice(UUID_BYTE_LENGTH);
+      pendingRequest.streamWriter.write(new Uint8Array(bodyData)).catch(() => {
+        // Write failed — browser likely disconnected
+        console.info(`Browser disconnected from stream for request ID: ${id}`);
+        if (this.clientSocket) {
+          try {
+            this.clientSocket.send(JSON.stringify({ type: "stream-cancel", id }));
+          } catch (e) {
+            console.error("Failed to send stream-cancel:", e);
+          }
+        }
+        pendingRequest.cleanup();
+      });
+    } else {
+      // Buffered mode: parse chunk_index and total_chunks after ID
+      const headerEnd = UUID_BYTE_LENGTH + 8;
+      const [chunkIndex, totalChunks] = new Uint32Array(
+        chunkData.slice(UUID_BYTE_LENGTH, headerEnd),
+      );
+      const bodyChunk = chunkData.slice(headerEnd);
+
       console.info(`Received body chunk ${chunkIndex + 1}/${totalChunks} for ID: ${id}`);
       pendingRequest.bodyChunks[chunkIndex] = bodyChunk;
       this.checkIfResponseComplete(id);
-    } else {
-      console.warn(`Received body chunk for unknown or completed request ID: ${id}`);
     }
   }
 
@@ -259,38 +358,53 @@ export class Tunnel {
     const socket = this.clientSocket;
 
     return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         console.debug(`Request with ID ${id} timed out`);
         cleanup();
         resolve(new Response("Request timed out", { status: 504 }));
       }, 30000); // 30-second timeout
 
       const cleanup = () => {
-        clearTimeout(timeout);
+        if (pendingEntry.timeoutId) {
+          clearTimeout(pendingEntry.timeoutId);
+        }
         this.pendingRequests.delete(id);
         socket.removeEventListener("close", onClose);
         socket.removeEventListener("error", onError);
       };
 
-      this.pendingRequests.set(id, {
+      const pendingEntry = {
         resolve,
         cleanup,
+        timeoutId,
         responseMetadata: null,
         has_body: null,
         totalBodyChunks: 0,
         bodyChunks: {},
-      });
+        streaming: false,
+        streamWriter: null,
+      };
+
+      this.pendingRequests.set(id, pendingEntry);
 
       const onClose = () => {
         console.debug("WebSocket connection closed while waiting for response");
+        if (pendingEntry.streaming && pendingEntry.streamWriter) {
+          pendingEntry.streamWriter.abort(new Error("Client disconnected"));
+        } else if (!pendingEntry.streaming) {
+          resolve(new Response("Client disconnected", { status: 503 }));
+        }
         cleanup();
-        resolve(new Response("Client disconnected", { status: 503 }));
       };
 
       const onError = (error) => {
         console.error("WebSocket error:", error);
+        if (pendingEntry.streaming && pendingEntry.streamWriter) {
+          pendingEntry.streamWriter.abort(new Error("WebSocket error"));
+        } else if (!pendingEntry.streaming) {
+          resolve(new Response("WebSocket error", { status: 500 }));
+        }
         cleanup();
-        resolve(new Response("WebSocket error", { status: 500 }));
       };
 
       socket.addEventListener("close", onClose);
