@@ -1,3 +1,10 @@
+---
+depends_on:
+- plain-models-consolidate-related-descriptors
+packages:
+- plain-models
+---
+
 # plain-models: Tie related_query_name to reverse descriptors
 
 **Make reverse ORM filtering use the explicit `ReverseForeignKey`/`ReverseManyToMany` descriptor name instead of an independent `related_query_name` parameter.**

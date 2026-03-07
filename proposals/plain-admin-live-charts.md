@@ -1,3 +1,11 @@
+---
+packages:
+- plain-admin
+related:
+- plain-metrics
+- plain-pageviews-dashboard
+---
+
 # plain-admin: Live-Updating Charts via SSE
 
 - Admin dashboard cards that update in realtime using Server-Sent Events

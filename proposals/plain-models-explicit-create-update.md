@@ -1,3 +1,10 @@
+---
+packages:
+- plain-models
+related:
+- plain-models-prevent-manual-pk
+---
+
 # plain-models: Explicit create() and persist() Methods
 
 **Replace the ambiguous `save()` method with explicit `create()` and `persist()` instance methods.**

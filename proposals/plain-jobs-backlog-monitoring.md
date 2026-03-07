@@ -1,3 +1,12 @@
+---
+depends_on:
+- plain-jobs-structured-logging
+packages:
+- plain-jobs
+related:
+- plain-jobs-worker-heartbeat
+---
+
 # plain-jobs: Worker backlog monitoring
 
 - Add backlog threshold checking to existing worker stats logging

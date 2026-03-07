@@ -1,3 +1,10 @@
+---
+packages:
+- plain-models
+related:
+- plain-models-postgres-options-settings
+---
+
 # plain-models: Native Connection Pooling
 
 - Add native PostgreSQL connection pooling via `psycopg_pool.ConnectionPool`

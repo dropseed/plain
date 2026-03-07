@@ -1,3 +1,12 @@
+---
+packages:
+- plain-elements
+- plain-toolbar
+related:
+- plain-dev-companion
+- plain-flags-toolbar-panel
+---
+
 # plain-elements: Development Toolbar Integration
 
 - Visual element inspection during development (inspired by Phoenix LiveView)

@@ -1,3 +1,10 @@
+---
+packages:
+- plain.preflight
+related:
+- plain-preflight-allowed-hosts-validation
+---
+
 # plain-preflight: Log warnings with `log.warning()`
 
 - Preflight warnings should actually use `log.warning()` so they appear in logs

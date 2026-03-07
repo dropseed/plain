@@ -1,3 +1,11 @@
+---
+packages:
+- plain-auth
+- plain-admin
+- plain-observer
+- plain-toolbar
+---
+
 # Simplify AuthView by Moving admin_required to AdminView
 
 ## Goal

@@ -1,3 +1,11 @@
+---
+packages:
+- plain-observer
+related:
+- plain-observer-geolocation
+- plain-observer-record-this-page
+---
+
 # plain-observer: Request Header Capture
 
 - Add a setting `OBSERVER_HEADERS` for explicitly listing headers to capture

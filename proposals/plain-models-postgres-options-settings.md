@@ -1,3 +1,10 @@
+---
+packages:
+- plain-models
+related:
+- plain-models-native-connection-pooling
+---
+
 # plain-models: Promote POSTGRES_OPTIONS keys to named settings
 
 - `POSTGRES_OPTIONS` is currently a catch-all dict passed to psycopg

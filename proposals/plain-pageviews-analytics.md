@@ -1,3 +1,12 @@
+---
+packages:
+- plain-pageviews
+- plain-admin
+related:
+- plain-observer-geolocation
+- plain-pageviews-dashboard
+---
+
 # plain-pageviews: Analytics Metrics Card
 
 - Add a metrics card to the Pageview admin showing key analytics out of the box

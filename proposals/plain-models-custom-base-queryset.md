@@ -1,3 +1,8 @@
+---
+packages:
+- plain-models
+---
+
 # plain-models: Custom Base QuerySet
 
 - Add `default_queryset()` classmethod to QuerySet that subclasses can override

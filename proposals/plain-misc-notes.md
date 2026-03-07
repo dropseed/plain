@@ -1,3 +1,18 @@
+---
+packages:
+- plain
+- plain-admin
+- plain-models
+- plain-flags
+- plain-pageviews
+- plain-support
+- plain-pytest
+- plain-start
+- plain-tunnel
+- plain-observer
+- plain-toolbar
+---
+
 # Miscellaneous Notes
 
 Random notes collected over time, investigated and categorized.

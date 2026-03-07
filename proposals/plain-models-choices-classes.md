@@ -1,3 +1,10 @@
+---
+packages:
+- plain-models
+related:
+- plain-models-field-choices-mixin
+---
+
 # plain-models: Evaluate custom Choices classes vs standard enums
 
 - `plain-models/plain/models/enums.py` defines `Choices`, `IntegerChoices`, and `TextChoices`

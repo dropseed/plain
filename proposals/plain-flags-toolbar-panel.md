@@ -1,3 +1,11 @@
+---
+packages:
+- plain-flags
+- plain-toolbar
+related:
+- plain-elements-dev-toolbar
+---
+
 # plain-flags: Toolbar Panel
 
 - Add dev toolbar panel showing flags evaluated on current request

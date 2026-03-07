@@ -1,3 +1,11 @@
+---
+packages:
+- plain-models
+related:
+- plain-models-choices-classes
+- plain-models-field-max-length
+---
+
 # plain-models: Extract choices parameter to ChoicesFieldMixin
 
 - The `choices` parameter currently lives on the base `Field` class, but not all field types meaningfully support choices

@@ -1,3 +1,12 @@
+---
+packages:
+- plain.urls
+- plain-elements
+- plain-observer
+- plain-redirection
+- plain-models
+---
+
 # Pre-compile regular expressions
 
 ## Problem

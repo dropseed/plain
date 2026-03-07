@@ -1,3 +1,9 @@
+---
+packages:
+- plain-models
+- plain-observer
+---
+
 # Plain Models Index Suggestions
 
 ## Overview

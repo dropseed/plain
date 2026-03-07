@@ -1,3 +1,9 @@
+---
+packages:
+- plain.signing
+- plain-passwords
+---
+
 # plain-signing: Remove `dumps`/`loads` convenience functions
 
 - The `dumps` and `loads` functions in `plain/plain/signing.py` are thin wrappers around `TimestampSigner`

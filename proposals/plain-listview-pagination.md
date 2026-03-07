@@ -1,3 +1,10 @@
+---
+depends_on:
+- plain-models-cursor-paginator
+packages:
+- plain.views
+---
+
 # plain: ListView pagination support
 
 - Add optional `paginator` parameter to [`ListView`](/plain/plain/views/objects.py#L148)

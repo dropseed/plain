@@ -1,3 +1,11 @@
+---
+packages:
+- plain.server
+related:
+- plain-server-httptools
+- plain-server-middleware-boundary
+---
+
 # Server Performance Optimizations
 
 Opportunities identified by benchmarking and auditing the hot path.

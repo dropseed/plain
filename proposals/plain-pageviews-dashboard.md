@@ -1,3 +1,13 @@
+---
+depends_on:
+- plain-pageviews-analytics
+packages:
+- plain-pageviews
+- plain-admin
+related:
+- plain-admin-live-charts
+---
+
 # plain-pageviews: Dashboard
 
 - Add a dashboard view to pageviews admin with key metrics and breakdowns

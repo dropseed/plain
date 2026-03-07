@@ -1,3 +1,11 @@
+---
+packages:
+- plain-jobs
+- plain.logs
+related:
+- plain-preflight-log-warnings
+---
+
 # Convert jobs worker to structured context logging
 
 ## Problem

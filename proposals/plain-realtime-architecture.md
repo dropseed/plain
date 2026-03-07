@@ -1,3 +1,13 @@
+---
+depends_on:
+- plain-server-h2-websockets
+packages:
+- plain.server
+- plain-models
+related:
+- plain-server-direction
+---
+
 # Realtime Architecture Plan
 
 Based on the probes/server spike branch. This captures what to keep, what to rearchitect, and the target package layout.

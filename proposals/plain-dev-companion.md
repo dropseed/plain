@@ -1,3 +1,10 @@
+---
+packages:
+- plain-dev
+related:
+- plain-elements-dev-toolbar
+---
+
 # plain-dev: WebSocket Development Companion
 
 - WebSocket server integrated into `plain dev` poncho processes

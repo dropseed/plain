@@ -1,3 +1,10 @@
+---
+packages:
+- plain-email
+related:
+- plain-email-filebased-viewing
+---
+
 # plain-email: Modern Python Email APIs
 
 - Replace legacy `email.mime.*` classes with modern `email.message.EmailMessage` (Python 3.6+)

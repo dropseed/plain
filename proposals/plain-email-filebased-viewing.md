@@ -1,3 +1,10 @@
+---
+packages:
+- plain-email
+related:
+- plain-email-modern-email-apis
+---
+
 # plain-email: Filebased Backend HTML/Text Viewing
 
 - Enhance filebased backend to save `.txt` and `.html` files alongside `.log` files

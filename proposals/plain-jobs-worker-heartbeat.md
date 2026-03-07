@@ -1,3 +1,11 @@
+---
+packages:
+- plain-jobs
+related:
+- plain-jobs-backlog-monitoring
+- plain-jobs-worker-intervals
+---
+
 # plain-jobs: Worker Process Heartbeat
 
 - Add periodic heartbeat from worker processes

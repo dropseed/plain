@@ -1,3 +1,8 @@
+---
+packages:
+- plain.assets
+---
+
 # plain-assets: Automatic WebP Conversion
 
 **Status:** Core feature, optional based on `cwebp` availability

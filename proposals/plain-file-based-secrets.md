@@ -1,3 +1,8 @@
+---
+packages:
+- plain.runtime
+---
+
 # plain: File-Based Secrets Loading
 
 - Extend settings loading to support Docker/Kubernetes file-based secrets pattern

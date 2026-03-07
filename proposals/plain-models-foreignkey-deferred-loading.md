@@ -1,3 +1,12 @@
+---
+depends_on:
+- plain-models-consolidate-related-descriptors
+packages:
+- plain-models
+related:
+- plain-models-related-query-name
+---
+
 # ForeignKeyField Redesign: Partial Instance with Deferred Loading
 
 ## Problem Statement

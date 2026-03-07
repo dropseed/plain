@@ -1,3 +1,11 @@
+---
+packages:
+- plain-observer
+related:
+- plain-observer-request-headers
+- plain-observer-testing
+---
+
 # plain-observer: Record This Page
 
 - Add a `PERSIST_ONCE` observer mode — persists one trace then auto-reverts to summary

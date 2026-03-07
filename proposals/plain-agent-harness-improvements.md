@@ -1,3 +1,8 @@
+---
+packages:
+- plain.agents
+---
+
 # plain: Agent Harness Improvements
 
 Ideas from OpenAI's "Harness Engineering" article (Feb 2026) about making codebases more agent-friendly. Mapped to what Plain already does and where there's opportunity.

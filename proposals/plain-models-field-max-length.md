@@ -1,3 +1,10 @@
+---
+packages:
+- plain-models
+related:
+- plain-models-field-choices-mixin
+---
+
 # plain-models: Move max_length to specific Field types
 
 - `max_length` is currently defined on the base `Field` class but only used by a few field types

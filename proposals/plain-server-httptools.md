@@ -1,3 +1,11 @@
+---
+packages:
+- plain.server
+related:
+- plain-server-direction
+- plain-server-performance
+---
+
 # Replace pure Python HTTP parser with a native parser
 
 ## Context

@@ -1,3 +1,11 @@
+---
+packages:
+- plain-observer
+related:
+- plain-observer-request-headers
+- plain-pageviews-analytics
+---
+
 # plain-observer: Geolocation for Pageviews
 
 - Add geographic location tracking to pageview observations

@@ -1,3 +1,11 @@
+---
+packages:
+- plain-models
+related:
+- plain-models-foreignkey-deferred-loading
+- plain-models-related-query-name
+---
+
 # plain-models: Consolidate Related Field Descriptors
 
 **Remove descriptor indirection by making ForeignKeyField and ManyToManyField act as their own descriptors.**

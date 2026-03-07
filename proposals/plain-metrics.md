@@ -1,3 +1,13 @@
+---
+packages:
+- plain.server
+- plain-observer
+related:
+- otel-spans-proposal
+- plain-admin-live-charts
+- plain-auth-otel-user-context
+---
+
 # plain: Framework-level metrics via OpenTelemetry
 
 - Plain already uses OTel for tracing in the core request handler — extend this to also record OTel metrics (counters, histograms)

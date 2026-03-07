@@ -1,3 +1,11 @@
+---
+packages:
+- plain-auth
+related:
+- plain-metrics
+- plain-observer-testing
+---
+
 # plain-auth: Restore OpenTelemetry User Context
 
 ## Background

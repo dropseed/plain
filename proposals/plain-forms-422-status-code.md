@@ -1,3 +1,9 @@
+---
+packages:
+- plain.views
+- plain-htmx
+---
+
 # plain-forms: Return 422 for Invalid Form Submissions
 
 - `FormView.form_invalid()` currently returns 200 OK when re-rendering forms with errors

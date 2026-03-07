@@ -1,3 +1,10 @@
+---
+packages:
+- plain-jobs
+related:
+- plain-jobs-worker-intervals
+---
+
 # plain-jobs: Batch Job Pickup
 
 - Fetch multiple jobs at once instead of one-by-one

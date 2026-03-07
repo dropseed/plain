@@ -1,3 +1,8 @@
+---
+packages:
+- plain.http
+---
+
 # plain: response.defer()
 
 - Run code after the HTTP response is sent to the client (like Laravel's `defer()`)

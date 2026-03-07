@@ -1,3 +1,10 @@
+---
+packages:
+- plain-models
+related:
+- plain-listview-pagination
+---
+
 # plain-models: CursorPaginator
 
 - Add `CursorPaginator` class in `plain-models/plain/models/paginator.py` (new file)

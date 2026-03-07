@@ -1,3 +1,11 @@
+---
+packages:
+- plain-observer
+related:
+- plain-metrics
+- plain-observer-record-this-page
+---
+
 # plain-observer
 
 ## Telemetry Capture for Tests

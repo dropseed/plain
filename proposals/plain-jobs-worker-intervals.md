@@ -1,3 +1,11 @@
+---
+packages:
+- plain-jobs
+related:
+- plain-jobs-batch-pickup
+- plain-jobs-worker-heartbeat
+---
+
 # plain-jobs: Configurable Worker Intervals
 
 - Make hardcoded timing intervals configurable via settings and CLI flags

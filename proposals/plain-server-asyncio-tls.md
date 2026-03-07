@@ -1,3 +1,11 @@
+---
+packages:
+- plain.server
+related:
+- fix-h2-reader-threads
+- plain-server-h2-websockets
+---
+
 # plain-server: asyncio-native TLS
 
 Move TLS handling from blocking `ssl.wrap_socket()` in `TConn.init()` to asyncio's SSL transport (`loop.start_tls()`), so the socket is never an `ssl.SSLSocket`.

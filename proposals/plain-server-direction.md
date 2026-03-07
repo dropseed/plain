@@ -1,3 +1,12 @@
+---
+packages:
+- plain.server
+related:
+- plain-server-httptools
+- plain-server-middleware-boundary
+- server-architecture-review
+---
+
 # Plain server direction
 
 ## Philosophy
@@ -16,6 +25,66 @@ The server is vertically integrated — one system from socket accept to view di
 - **View-type dispatch** at the server level — the worker resolves the URL, checks the view class, and picks the execution context
 
 No ASGI protocol layer. No protocol boundary between server and framework. Direct method calls.
+
+## Layers and boundaries
+
+Three layers, each with a clear responsibility:
+
+| Layer          | Owns                                                       | Runs on     |
+| -------------- | ---------------------------------------------------------- | ----------- |
+| **Server**     | Protocol correctness, resource protection                  | Event loop  |
+| **Handler**    | Orchestration (run middleware, resolve URL, dispatch view) | Thread pool |
+| **Middleware** | Application policy and state                               | Thread pool |
+
+### Server
+
+The server handles things that are about HTTP as a protocol and protecting the process from abuse:
+
+- Connection accept, TLS handshake, keep-alive
+- HTTP parsing and framing (request line, headers, body, chunked encoding)
+- Connection limits, header/body size limits, timeouts (slowloris)
+- Health check responses (pre-thread-pool)
+- Content-Length on response write
+- H2 multiplexing and flow control
+
+The server does not import application settings (beyond server configuration like bind/workers/threads/timeouts) and does not access application state.
+
+### Handler
+
+The handler is the bridge between server and application. It does as little as possible:
+
+- Create OTel span
+- Run before_request middleware chain
+- Resolve URL, instantiate view, dispatch
+- Run after_response middleware chain (reverse order)
+
+No business logic. No policy decisions. Just connect the pieces.
+
+### Middleware
+
+Middleware handles anything that requires application configuration, state, or routing:
+
+- Security policy (CSRF, host validation, HTTPS redirect)
+- Session management
+- Database connection lifecycle
+- Default response headers from settings
+- URL-based redirects (slash append, DB-backed redirects)
+- User-installed middleware (admin, auth, etc.)
+
+### Decision test
+
+**"If the thread pool is fully saturated, should this still work?"**
+
+- Yes — it belongs in the server (health checks, protocol handling, resource limits)
+- No — it belongs in middleware (anything needing settings, DB, routing, sessions)
+
+### Proxy deployment
+
+The server is designed to work correctly when directly exposed to the internet, but the common production deployment will have a reverse proxy (nginx, Caddy, cloud load balancer) in front.
+
+The principle is: **design for direct exposure, be harmlessly redundant when proxied.** No modes, no conditional behavior. If the proxy already handles HTTPS redirect, the server's redirect logic simply never fires. If the proxy validates hosts, the server validates too (defense in depth).
+
+The only proxy-specific concern is trusting forwarded headers (`X-Forwarded-Proto`, `X-Forwarded-For`, `X-Forwarded-Host`). This is a configuration knob (trusted proxy IPs), not an architectural mode switch, and belongs in request construction.
 
 ## The stack
 

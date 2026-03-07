@@ -1,3 +1,9 @@
+---
+packages:
+- plain-sessions
+- plain-auth
+---
+
 # plain-sessions: Multiple Session Support
 
 Allow users to maintain multiple authenticated sessions and switch between them.

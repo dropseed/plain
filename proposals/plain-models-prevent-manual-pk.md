@@ -1,3 +1,10 @@
+---
+packages:
+- plain-models
+related:
+- plain-models-explicit-create-update
+---
+
 # plain-models: Prevent Manual Primary Key Setting
 
 **Prevent users from setting auto-generated primary keys during `Model.__init__()`, forcing them to use query methods instead.**
