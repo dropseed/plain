@@ -191,6 +191,7 @@ SERVER_ACCESS_LOG_FIELDS: list[str] = [
 ]
 SERVER_GRACEFUL_TIMEOUT: int = 30
 SERVER_SENDFILE: bool = True
+SERVER_CONNECTIONS: int = 1000
 
 # MARK: Preflight Checks
 

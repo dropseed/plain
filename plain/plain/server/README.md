@@ -32,13 +32,13 @@ plain server --reload
 The server uses two levels of concurrency:
 
 - **Workers** are separate OS processes. Each worker runs independently with its own memory. The default is `0` (auto), which spawns one worker per CPU core.
-- **Threads** run inside each worker. Threads share memory within a worker and handle concurrent requests using a thread pool. The default is 4 threads per worker.
+- **Threads** run inside each worker. Threads handle application code (middleware and views) using a thread pool. All network I/O (accepting connections, reading requests, writing responses, TLS, keepalive) is handled asynchronously on the event loop without consuming threads. The default is 4 threads per worker.
 
 Total concurrent requests = `workers × threads`. On a 4-core machine with the defaults, that's `4 × 4 = 16` concurrent requests.
 
 **When to adjust workers:** Workers provide true parallelism since each is a separate process with its own Python GIL. More workers means more memory usage but better CPU utilization. Use `--workers 0` (the default) to match your CPU cores, or set an explicit number.
 
-**When to adjust threads:** Threads are efficient for I/O-bound work (database queries, external API calls) since they release the GIL while waiting. Most web applications are I/O-bound, so the default of 4 threads works well. Increase threads if your application spends a lot of time waiting on I/O. Decrease to 1 if you need to avoid thread-safety concerns.
+**When to adjust threads:** Threads are used exclusively for running your application code (middleware and views). This means `SERVER_THREADS` directly controls how many views can execute in parallel — it's not shared with I/O operations. Increase threads if your views spend a lot of time waiting on I/O (database queries, external API calls). Decrease to 1 if you need to avoid thread-safety concerns.
 
 **Long-lived connections:** Async views (SSE, WebSocket) run on the worker's event loop instead of occupying a thread pool slot. This means long-lived connections don't reduce your capacity for regular requests.
 
@@ -82,6 +82,7 @@ SERVER_ACCESS_LOG = True
 SERVER_ACCESS_LOG_FIELDS = ["method", "path", "query", "status", "duration_ms", "size", "ip", "user_agent", "referer"]
 SERVER_GRACEFUL_TIMEOUT = 30
 SERVER_SENDFILE = True
+SERVER_CONNECTIONS = 1000
 ```
 
 Settings can also be set via environment variables with the `PLAIN_` prefix (e.g., `PLAIN_SERVER_WORKERS=4`).
@@ -199,13 +200,17 @@ graph TD
     W --> EL[asyncio event loop]
     EL -->|accept| C[Connection]
     C -->|wait readable| EL
+    C -->|TLS handshake| EL
+    C -->|read headers async| EL
+    C -->|read body async| EL
     C -->|TLS ALPN| P{Protocol?}
     P -->|h2| H2[HTTP/2 handler]
-    P -->|http/1.1| H1[Parse in thread pool]
+    P -->|http/1.1| PARSE[Parse buffered request]
     H2 -->|"h2 codec (sans-I/O)"| STREAMS[Multiplexed streams]
     STREAMS -->|per stream| TP[Thread pool]
-    H1 --> TP
+    PARSE --> TP
     TP --> MW[before_request + view + after_response]
+    MW -->|write response async| EL
 ```
 
 ## Installation

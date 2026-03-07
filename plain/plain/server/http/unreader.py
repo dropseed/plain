@@ -86,3 +86,30 @@ class IterUnreader(Unreader):
         except StopIteration:
             self.iter = None
             return b""
+
+
+class BufferUnreader(Unreader):
+    """Unreader backed by pre-read bytes with no socket I/O.
+
+    Used when headers have been read asynchronously on the event loop
+    and the data is already in memory.  For request bodies, an optional
+    ``body_data`` is stored separately and made available after header
+    parsing via :meth:`remaining_body_data`.
+    """
+
+    def __init__(self, header_data: bytes, body_data: bytes = b"") -> None:
+        super().__init__()
+        self.buf.write(header_data)
+        self._body_data = body_data
+
+    def chunk(self) -> bytes:
+        # All header data is pre-buffered; nothing more to read.
+        return b""
+
+    def remaining_body_data(self) -> bytes:
+        """Return any body bytes that were read past the header boundary."""
+        # After parsing, the unreader's internal buffer may still hold
+        # data that was unread by the parser (the leftover after \r\n\r\n).
+        leftover = self.buf.getvalue()
+        self.buf = io.BytesIO()
+        return leftover + self._body_data

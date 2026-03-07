@@ -116,7 +116,7 @@ def write_nonblock(
         return write(sock, data, chunked)
 
 
-def write_error(sock: socket.socket, status_int: int, reason: str, mesg: str) -> None:
+def _error_response_bytes(status_int: int, reason: str, mesg: str) -> bytes:
     body = (
         "<html>\n"
         f"  <head><title>{reason}</title></head>\n"
@@ -135,7 +135,20 @@ def write_error(sock: socket.socket, status_int: int, reason: str, mesg: str) ->
         f"\r\n"
         f"{body}"
     )
-    write_nonblock(sock, response.encode("latin1"))
+    return response.encode("latin1")
+
+
+def write_error(sock: socket.socket, status_int: int, reason: str, mesg: str) -> None:
+    write_nonblock(sock, _error_response_bytes(status_int, reason, mesg))
+
+
+async def async_write_error(
+    sock: socket.socket, status_int: int, reason: str, mesg: str
+) -> None:
+    import asyncio
+
+    loop = asyncio.get_running_loop()
+    await loop.sock_sendall(sock, _error_response_bytes(status_int, reason, mesg))
 
 
 def http_date(timestamp: float | None = None) -> str:
