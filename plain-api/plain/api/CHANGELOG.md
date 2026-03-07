@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-api@0.27.0) (2026-03-06)
+
+### What's changed
+
+- Updated OpenAPI schema generator to access `view_class` directly on `URLPattern` instead of through `URLPattern.view.view_class`, adapting to the view API changes in plain 0.118.0 ([0d0c8a64cb45](https://github.com/dropseed/plain/commit/0d0c8a64cb45))
+
+### Upgrade instructions
+
+- Requires `plain>=0.118.0`.
+
 ## [0.26.3](https://github.com/dropseed/plain/releases/plain-api@0.26.3) (2026-02-26)
 
 ### What's changed
