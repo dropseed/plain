@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.43.0](https://github.com/dropseed/plain/releases/plain-oauth@0.43.0) (2026-03-07)
+
+### What's changed
+
+- Updated README template examples to use keyword arguments in `url()` calls instead of positional arguments (e.g., `url('oauth:login', provider='github')` instead of `url('oauth:login', 'github')`) ([6eecc35](https://github.com/dropseed/plain/commit/6eecc35ff197))
+
+### Upgrade instructions
+
+- Update any `url()` calls in templates that use positional arguments for OAuth URLs to use keyword arguments instead (e.g., `url('oauth:login', provider='github')`, `url('oauth:connect', provider=provider_key)`, `url('oauth:disconnect', provider=connection.provider_key)`).
+
 ## [0.42.4](https://github.com/dropseed/plain/releases/plain-oauth@0.42.4) (2026-02-26)
 
 ### What's changed
