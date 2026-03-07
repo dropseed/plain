@@ -239,12 +239,19 @@ class BaseHandler:
     ) -> ResponseBase:
         """Run after-middleware and send request_finished signal.
 
-        request_finished is sent here (on the same thread as request_started)
-        rather than from response.close(), which runs after the response body
-        is written and may land on a different thread. This means the signal
-        fires before streaming responses are iterated — handlers like
-        close_old_connections should not affect in-progress streams since
-        request_started on the next request also handles stale connections.
+        For sync views, this runs on the same thread as request_started
+        (part of the single _run_sync_pipeline call).
+
+        For async views, this runs in a separate executor call and may
+        land on a different thread than request_started. Thread-local
+        state from request_started is not guaranteed to be available.
+        In practice this is safe because close_old_connections (the main
+        signal handler) is idempotent per-thread.
+
+        The signal fires before streaming response bodies are transmitted.
+        Handlers like close_old_connections should not affect in-progress
+        streams since request_started on the next request also handles
+        stale connections.
         """
         response = self._run_after_response(request, response, ran_before)
         signals.request_finished.send(sender=self.__class__)

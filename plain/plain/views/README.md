@@ -301,6 +301,24 @@ class AppRouter(Router):
 
 You can also redirect to a named URL using `url_name`, or preserve query parameters with `preserve_query_params=True`.
 
+## Async views
+
+Any view method defined with `async def` runs directly on the worker's event loop. This enables non-blocking I/O patterns like SSE, WebSockets, and async HTTP clients.
+
+**Important:** Blocking calls in async views freeze the entire worker process — no other requests can be processed until the blocking call returns. Plain's ORM, sessions, and auth layers are all synchronous and must not be called directly from async views.
+
+Common mistakes:
+
+- `User.query.get(pk=1)` — blocks the event loop
+- `time.sleep(1)` — use `await asyncio.sleep(1)` instead
+- `requests.get(...)` — use an async HTTP client instead
+
+To wrap a blocking call safely: `await asyncio.get_running_loop().run_in_executor(None, blocking_fn)`
+
+Use async views only for true async I/O (SSE, async HTTP clients). For standard request/response views that use the ORM, use regular sync views — they run in the thread pool and don't block other connections.
+
+In development (`DEBUG=True`), the server enables asyncio debug mode which logs warnings when a callback blocks the event loop for more than 100ms.
+
 ## ServerSentEventsView
 
 [`ServerSentEventsView`](./sse.py#ServerSentEventsView) provides [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) streaming. Subclass it and implement `stream()` as an async generator.

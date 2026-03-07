@@ -144,6 +144,14 @@ class Worker:
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
 
+        # Enable asyncio debug mode in development to detect blocking calls
+        # in async views. Logs a warning when a callback takes > 0.1s.
+        from plain.runtime import settings
+
+        if settings.DEBUG:
+            loop.set_debug(True)
+            loop.slow_callback_duration = 0.1
+
         # Signal handlers
         loop.add_signal_handler(signal.SIGTERM, self._signal_exit)
         loop.add_signal_handler(signal.SIGINT, self._signal_quit)

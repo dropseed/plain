@@ -32,7 +32,9 @@ request_finished.connect(on_request_finished)
 Plain provides two built-in signals:
 
 - `request_started` - sent when a request begins processing
-- `request_finished` - sent when a request finishes processing
+- `request_finished` - sent when a request finishes processing (after middleware completes, before the response body is transmitted)
+
+Note: for streaming responses (SSE, large downloads), `request_finished` fires while data is still being sent. Use `response.close()` or `_resource_closers` if you need a hook that runs after transmission completes.
 
 Your receiver function must accept `**kwargs` because signals may pass additional arguments in the future.
 
