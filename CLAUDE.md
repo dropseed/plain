@@ -14,6 +14,7 @@ Always use `./scripts/` commands from the repo root — never run `uv run plain 
 | `./scripts/fix`              | Format and lint code       |
 | `./scripts/pre-commit`       | Full pre-commit validation |
 | `./scripts/test [package]`   | Run tests                  |
+| `./scripts/server-test`      | Server conformance, load, and resilience tests |
 | `./scripts/makemigrations`   | Create database migrations |
 | `./scripts/type-check <dir>` | Type check a directory     |
 | `uv run python`              | Open Python shell          |
