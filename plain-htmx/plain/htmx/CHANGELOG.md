@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-htmx@0.17.0) (2026-03-07)
+
+### What's changed
+
+- Updated README example to use keyword arguments in `url()` calls instead of positional arguments (e.g., `url('pullrequests:detail', uuid=pullrequest.uuid)` instead of `url('pullrequests:detail', pullrequest.uuid)`) ([6eecc35](https://github.com/dropseed/plain/commit/6eecc35ff197))
+
+### Upgrade instructions
+
+- Update any `url()` calls in templates that use positional arguments to use keyword arguments instead.
+
 ## [0.16.2](https://github.com/dropseed/plain/releases/plain-htmx@0.16.2) (2026-02-26)
 
 ### What's changed
