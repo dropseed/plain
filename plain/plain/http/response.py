@@ -14,7 +14,6 @@ from http.client import responses
 from http.cookies import SimpleCookie
 from typing import IO, Any
 
-from plain import signals
 from plain.http.cookie import sign_cookie_value
 from plain.json import PlainJSONEncoder
 from plain.utils import timezone
@@ -135,9 +134,6 @@ class ResponseBase:
                 "'content_type' parameter is provided."
             )
         self._resource_closers = []
-        # This parameter is set by the handler. It's necessary to preserve the
-        # historical behavior of request_finished.
-        self._handler_class = None
         self.cookies = SimpleCookie()
         self.closed = False
         if status_code is not None:
@@ -320,7 +316,6 @@ class ResponseBase:
         # Free resources that were still referenced.
         self._resource_closers.clear()
         self.closed = True
-        signals.request_finished.send(sender=self._handler_class)
 
 
 class Response(ResponseBase):

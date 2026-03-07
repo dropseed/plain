@@ -11,7 +11,6 @@ from urllib.parse import urljoin, urlparse, urlsplit
 from plain.http import QueryDict, Request
 from plain.internal.handlers.base import BaseHandler
 from plain.json import PlainJSONEncoder
-from plain.signals import request_started
 from plain.urls import get_resolver
 from plain.utils.encoding import force_bytes
 from plain.utils.functional import SimpleLazyObject
@@ -186,53 +185,25 @@ class ClientHandler(BaseHandler):
     Request attached to its ``request`` attribute.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-
     def __call__(self, request: Request) -> ResponseBase:
         # Set up middleware if needed. We couldn't do this earlier, because
         # settings weren't available.
         if self._middleware_chain is None:
             self.load_middleware()
 
-        request_started.send(sender=self.__class__, request=request)
+        from plain.internal.handlers.base import _AsyncViewPending
 
-        if self.is_async_view(request):
-            from plain.http import AsyncStreamingResponse
-            from plain.http import Response as HttpResponse
+        # Call the sync pipeline directly — no event loop needed for sync
+        # views. This keeps the test client usable from both sync tests and
+        # async tests (where asyncio.run() would raise).
+        result = self._run_sync_pipeline(request)
 
-            async def _async_dispatch() -> ResponseBase:
-                resp = await self.get_response_async(request)
-
-                # Collect async streaming content so tests can inspect it.
-                if isinstance(resp, AsyncStreamingResponse):
-                    chunks = []
-                    async for chunk in resp:
-                        chunks.append(chunk)
-                    collected = b"".join(chunks)
-
-                    sync_response = HttpResponse(
-                        collected,
-                        status_code=resp.status_code,
-                        content_type=resp.headers.get("Content-Type"),
-                    )
-                    for key, value in resp.headers.items():
-                        if key != "Content-Type":
-                            sync_response.headers[key] = value
-                    sync_response.cookies = resp.cookies
-                    # Transfer resource closers (e.g. request.close) to the
-                    # sync response so they fire exactly once when
-                    # response.close() is called below.
-                    sync_response._resource_closers = resp._resource_closers
-                    resp._resource_closers = []
-                    await resp.aclose()
-                    return sync_response
-
-                return resp
-
-            response = asyncio.run(_async_dispatch())
+        if isinstance(result, _AsyncViewPending):
+            response = self._handle_async_view(request, result)
         else:
-            response = self.get_response(request)
+            response = result
+
+        response._resource_closers.append(request.close)
 
         # Simulate behaviors of most web servers.
         _conditional_content_removal(request, response)
@@ -245,6 +216,47 @@ class ClientHandler(BaseHandler):
         response.close()
 
         return response
+
+    def _handle_async_view(self, request: Request, pending: Any) -> ResponseBase:
+        """Await an async view coroutine and run after-middleware."""
+        from plain.http import AsyncStreamingResponse
+        from plain.http import Response as HttpResponse
+        from plain.internal.handlers.exception import response_for_exception
+
+        async def _run() -> ResponseBase:
+            try:
+                resp = await pending.coroutine
+                self._check_response(resp, pending.view_class)
+            except Exception as exc:
+                resp = response_for_exception(request, exc)
+
+            # Collect async streaming content so tests can inspect it.
+            if isinstance(resp, AsyncStreamingResponse):
+                chunks = []
+                async for chunk in resp:
+                    chunks.append(chunk)
+                collected = b"".join(chunks)
+
+                sync_response = HttpResponse(
+                    collected,
+                    status_code=resp.status_code,
+                    content_type=resp.headers.get("Content-Type"),
+                )
+                for key, value in resp.headers.items():
+                    if key != "Content-Type":
+                        sync_response.headers[key] = value
+                sync_response.cookies = resp.cookies
+                sync_response._resource_closers = resp._resource_closers
+                resp._resource_closers = []
+                await resp.aclose()
+                return sync_response
+
+            return resp
+
+        response = asyncio.run(_run())
+
+        # Run after-middleware on the calling thread (same as before-middleware)
+        return self._finish_pipeline(request, response, pending.ran_before)
 
 
 class RequestFactory:

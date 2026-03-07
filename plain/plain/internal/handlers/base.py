@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import dataclasses
 import inspect
-import types
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry import baggage, context, trace
 from opentelemetry.semconv.attributes import http_attributes, url_attributes
 
+from plain import signals
 from plain.runtime import settings
 from plain.urls import get_resolver
 from plain.utils.module_loading import import_string
@@ -16,8 +17,6 @@ from plain.utils.module_loading import import_string
 from .exception import response_for_exception
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from plain.http import Request, ResponseBase
     from plain.http.middleware import HttpMiddleware
     from plain.urls import ResolverMatch
@@ -42,6 +41,15 @@ BUILTIN_AFTER_MIDDLEWARE = [
 
 
 tracer = trace.get_tracer("plain")
+
+
+@dataclasses.dataclass
+class _AsyncViewPending:
+    """Returned by _run_sync_pipeline when an async view needs to be awaited."""
+
+    coroutine: Any
+    view_class: type
+    ran_before: list[HttpMiddleware]
 
 
 class BaseHandler:
@@ -105,129 +113,166 @@ class BaseHandler:
         if response.exception:
             span.record_exception(response.exception)
 
-    def get_response(self, request: Request) -> ResponseBase:
-        """Return a Response object for the given Request."""
-        assert self._middleware_chain is not None, (
-            "load_middleware() must be called before get_response()"
-        )
-
-        span_attributes, span_context = self._build_request_span(request)
-
-        with tracer.start_as_current_span(
-            f"{request.method} {request.path_info}",
-            context=span_context,
-            attributes=span_attributes,
-            kind=trace.SpanKind.SERVER,
-        ) as span:
-            response = self._run_middleware(request)
-            response._resource_closers.append(request.close)
-            self._finalize_span(span, response)
-            return response
-
-    def is_async_view(self, request: Request) -> bool:
-        """Check whether the resolved view callable is async.
-
-        Returns False if resolution fails (e.g. 404) — the caller
-        should fall back to sync dispatch, where the 404 will be
-        raised and handled normally.
-        """
-        try:
-            resolver = get_resolver()
-            resolver_match = resolver.resolve(request.path_info)
-            return inspect.iscoroutinefunction(resolver_match.view)
-        except Exception:
-            return False
-
-    async def get_response_async(
-        self, request: Request, executor: concurrent.futures.Executor | None = None
-    ) -> ResponseBase:
-        """Async version of get_response for views with async handlers.
-
-        Runs middleware sync phases in the given executor (thread pool),
-        and awaits async view handlers on the event loop.
-        """
-        assert self._middleware_chain is not None, (
-            "load_middleware() must be called before get_response_async()"
-        )
-
-        span_attributes, span_context = self._build_request_span(request)
-
-        with tracer.start_as_current_span(
-            f"{request.method} {request.path_info}",
-            context=span_context,
-            attributes=span_attributes,
-            kind=trace.SpanKind.SERVER,
-        ) as span:
-            response = await self._run_middleware_async(request, executor)
-            response._resource_closers.append(request.close)
-            self._finalize_span(span, response)
-            return response
-
-    def _run_middleware(self, request: Request) -> ResponseBase:
-        """
-        Run the two-phase middleware pipeline:
-        1. before_request — forward through list, stop on first Response
-        2. View call (if no short-circuit)
-        3. after_response — reverse through middleware that ran before_request
-        """
-        response, ran_before = self.run_before_request(request)
-
-        # Phase 2: View call (if no short-circuit)
-        if response is None:
-            try:
-                response = self._get_response(request)
-            except Exception as exc:
-                response = response_for_exception(request, exc)
-
-        # Phase 3: after_response
-        response = self.run_after_response(request, response, ran_before)
-
-        return response
-
-    async def _run_middleware_async(
-        self, request: Request, executor: concurrent.futures.Executor | None = None
-    ) -> ResponseBase:
-        """Async middleware pipeline: sync phases in executor, async view on event loop."""
+    async def _run_in_executor(
+        self,
+        executor: concurrent.futures.Executor,
+        fn: Any,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Run a sync function in the executor, propagating OTel context."""
         loop = asyncio.get_running_loop()
-        # Capture OTel context so executor threads see the active span
         ctx = context.get_current()
 
-        def _run_before() -> tuple[ResponseBase | None, list[HttpMiddleware]]:
+        def _wrapper() -> Any:
             token = context.attach(ctx)
             try:
-                return self.run_before_request(request)
+                return fn(*args, **kwargs)
             finally:
                 context.detach(token)
 
-        # Phase 1: before_request in executor
-        response, ran_before = await loop.run_in_executor(executor, _run_before)
+        return await loop.run_in_executor(executor, _wrapper)
 
-        # Phase 2: View call (async on event loop, sync in executor)
+    async def handle(
+        self,
+        request: Request,
+        executor: concurrent.futures.Executor,
+    ) -> ResponseBase:
+        """Single entry point for handling a request.
+
+        Creates OTel span and runs the full pipeline: signal → before
+        middleware → resolve/dispatch view → after middleware → signal.
+
+        For sync views, the entire pipeline runs in a single executor call
+        so that signals, middleware, and the view all execute on the same
+        thread (preserving thread-local DB connection assumptions).
+
+        For async views, the sync portion (signal + before middleware +
+        URL resolution) runs in one executor call, the coroutine is awaited
+        on the event loop, then after-middleware + request_finished runs in
+        a second executor call.
+        """
+        assert self._middleware_chain is not None, (
+            "load_middleware() must be called before handle()"
+        )
+
+        span_attributes, span_context = self._build_request_span(request)
+
+        with tracer.start_as_current_span(
+            f"{request.method} {request.path_info}",
+            context=span_context,
+            attributes=span_attributes,
+            kind=trace.SpanKind.SERVER,
+        ) as span:
+            result = await self._run_in_executor(
+                executor, self._run_sync_pipeline, request
+            )
+
+            if isinstance(result, _AsyncViewPending):
+                # Async view: await the coroutine on the event loop, then
+                # run after-middleware + request_finished back in the executor.
+                try:
+                    response = await result.coroutine
+                    self._check_response(response, result.view_class)
+                except Exception as exc:
+                    response = response_for_exception(request, exc)
+
+                response = await self._run_in_executor(
+                    executor,
+                    self._finish_pipeline,
+                    request,
+                    response,
+                    result.ran_before,
+                )
+            else:
+                response = result
+
+            response._resource_closers.append(request.close)
+            self._finalize_span(span, response)
+            return response
+
+    def _run_sync_pipeline(self, request: Request) -> ResponseBase | _AsyncViewPending:
+        """Run the entire sync request pipeline on a single thread.
+
+        Sends request_started, runs before-middleware, resolves and dispatches
+        the view, runs after-middleware, and sends request_finished.
+
+        If the view is async, returns an _AsyncViewPending so the caller
+        can await the coroutine on the event loop.
+        """
+        signals.request_started.send(sender=self.__class__, request=request)
+
+        # 1. Before middleware
+        response, ran_before = self._run_before_request(request)
+
+        # 2. Resolve and dispatch the view
         if response is None:
             try:
-                response = await self._get_response_async(request, executor)
+                resolver_match = self._resolve_request(request)
+                view = resolver_match.view_class(
+                    request=request,
+                    url_args=resolver_match.args,
+                    url_kwargs=resolver_match.kwargs,
+                )
+                response = view.get_response()
+                view_class = type(view)
+
+                # Async views return a coroutine that must be awaited
+                if inspect.iscoroutine(response):
+                    return _AsyncViewPending(
+                        coroutine=response,
+                        view_class=view_class,
+                        ran_before=ran_before,
+                    )
+
+                self._check_response(response, view_class)
             except Exception as exc:
                 response = response_for_exception(request, exc)
 
-        def _run_after() -> ResponseBase:
-            token = context.attach(ctx)
-            try:
-                return self.run_after_response(request, response, ran_before)
-            finally:
-                context.detach(token)
+        # 3. After middleware + request_finished signal
+        return self._finish_pipeline(request, response, ran_before)
 
-        # Phase 3: after_response in executor
-        response = await loop.run_in_executor(executor, _run_after)
+    def _finish_pipeline(
+        self,
+        request: Request,
+        response: ResponseBase,
+        ran_before: list[HttpMiddleware],
+    ) -> ResponseBase:
+        """Run after-middleware and send request_finished signal.
 
+        request_finished is sent here (on the same thread as request_started)
+        rather than from response.close(), which runs after the response body
+        is written and may land on a different thread. This means the signal
+        fires before streaming responses are iterated — handlers like
+        close_old_connections should not affect in-progress streams since
+        request_started on the next request also handles stale connections.
+        """
+        response = self._run_after_response(request, response, ran_before)
+        signals.request_finished.send(sender=self.__class__)
         return response
 
-    def run_before_request(
+    def _resolve_request(self, request: Request) -> ResolverMatch:
+        """Resolve the URL, caching on request.resolver_match."""
+        if request.resolver_match is not None:
+            resolver_match = request.resolver_match
+        else:
+            resolver = get_resolver()
+            resolver_match = resolver.resolve(request.path_info)
+            request.resolver_match = resolver_match
+
+        # Update span with route info
+        span = trace.get_current_span()
+        if resolver_match.route:
+            route_with_slash = f"/{resolver_match.route}"
+            span.set_attribute(http_attributes.HTTP_ROUTE, route_with_slash)
+            span.update_name(f"{request.method} {route_with_slash}")
+
+        return resolver_match
+
+    def _run_before_request(
         self, request: Request
     ) -> tuple[ResponseBase | None, list[HttpMiddleware]]:
-        """
-        Phase 1: Run before_request forward through middleware chain.
-        Returns (response_or_none, list_of_middleware_that_completed).
-        """
+        """Run before_request forward through middleware chain."""
         chain = self._middleware_chain
         assert chain is not None
 
@@ -249,15 +294,13 @@ class BaseHandler:
 
         return response, ran_before
 
-    def run_after_response(
+    def _run_after_response(
         self,
         request: Request,
         response: ResponseBase,
         ran_before: list[HttpMiddleware],
     ) -> ResponseBase:
-        """
-        Phase 3: Run after_response in reverse through middleware that ran before_request.
-        """
+        """Run after_response in reverse through middleware that ran before_request."""
         for mw in reversed(ran_before):
             try:
                 response = mw.after_response(request, response)  # type: ignore[arg-type]
@@ -266,92 +309,14 @@ class BaseHandler:
 
         return response
 
-    def _get_response(self, request: Request) -> ResponseBase:
-        """
-        Resolve and call the view. This method is everything that happens
-        inside the request/response middleware.
-
-        Only handles sync views. Async views (e.g. ServerSentEventsView)
-        go through _get_response_async via the async dispatch path.
-        """
-        resolver_match = self.resolve_request(request)
-
-        view = resolver_match.view
-        response = view(request, *resolver_match.args, **resolver_match.kwargs)
-
-        # Complain if the view returned None (a common error).
-        self.check_response(response, view)
-
-        return response
-
-    async def _get_response_async(
-        self, request: Request, executor: concurrent.futures.Executor | None = None
-    ) -> ResponseBase:
-        """Resolve and call the view, dispatching async views on the event loop."""
-        loop = asyncio.get_running_loop()
-        resolver_match = self.resolve_request(request)
-
-        view = resolver_match.view
-        if inspect.iscoroutinefunction(view):
-            response = await view(
-                request, *resolver_match.args, **resolver_match.kwargs
-            )
-        else:
-            # Propagate OTel context so the sync view sees the active span
-            ctx = context.get_current()
-
-            def _call_view() -> ResponseBase:
-                token = context.attach(ctx)
-                try:
-                    return view(request, *resolver_match.args, **resolver_match.kwargs)
-                finally:
-                    context.detach(token)
-
-            response = await loop.run_in_executor(executor, _call_view)
-
-        self.check_response(response, view)
-        return response
-
-    def resolve_request(self, request: Request) -> ResolverMatch:
-        """
-        Retrieve/set the urlrouter for the request. Return the view resolved,
-        with its args and kwargs.
-
-        Caches the result on request.resolver_match so repeated calls
-        (e.g. early detection in the worker + later call inside the span)
-        only resolve once. Always updates the current span with route info.
-        """
-        if request.resolver_match is not None:
-            resolver_match = request.resolver_match
-        else:
-            resolver = get_resolver()
-            resolver_match = resolver.resolve(request.path_info)
-            request.resolver_match = resolver_match
-
-        # Always update span — may be called from different span contexts
-        span = trace.get_current_span()
-        if resolver_match.route:
-            route_with_slash = f"/{resolver_match.route}"
-            span.set_attribute(http_attributes.HTTP_ROUTE, route_with_slash)
-            span.update_name(f"{request.method} {route_with_slash}")
-
-        return resolver_match
-
-    def check_response(
+    def _check_response(
         self,
         response: ResponseBase | None,
-        callback: Callable[..., ResponseBase],
-        name: str | None = None,
+        view_class: type,
     ) -> None:
-        """
-        Raise an error if the view returned None or an uncalled coroutine.
-        """
-        if not name:
-            if isinstance(callback, types.FunctionType):  # FBV
-                name = f"The view {callback.__module__}.{callback.__name__}"
-            else:  # CBV
-                name = f"The view {callback.__module__}.{callback.__class__.__name__}.__call__"
+        """Raise an error if the view returned None."""
         if response is None:
+            name = f"{view_class.__module__}.{view_class.__qualname__}"
             raise ValueError(
-                f"{name} didn't return a Response object. It returned None instead."
+                f"The view {name} didn't return a Response object. It returned None instead."
             )
