@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.19.0) (2026-03-06)
+
+### What's changed
+
+- Updated URL patterns to pass view classes directly instead of calling `.as_view()`, adapting to the view API changes in plain 0.118.0 ([0d0c8a64cb45](https://github.com/dropseed/plain/commit/0d0c8a64cb45))
+
+### Upgrade instructions
+
+- Requires `plain>=0.118.0`.
+
 ## [0.18.1](https://github.com/dropseed/plain/releases/plain-loginlink@0.18.1) (2026-02-26)
 
 ### What's changed
