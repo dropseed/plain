@@ -252,7 +252,7 @@ def cmd_default(args, proposals):
         roots = [p for p in items if p["stem"] not in has_parent]
         roots.sort(key=lambda p: p["stem"])
 
-        tree = Tree(f"[bold]{pkg}[/bold]  [dim]({len(items)})[/dim]")
+        tree = Tree(f"[bold]{pkg}[/bold]")
 
         rendered = set()
 
@@ -263,16 +263,17 @@ def cmd_default(args, proposals):
             rendered.add(p["stem"])
 
             label = p["stem"]
-            extras = []
-            if p.get("all_related"):
-                extras.append(f"{len(p['all_related'])} related")
+            annotations = []
             # Show cross-package deps
             cross_deps = [d for d in p["depends_on"] if d not in stems_in_pkg]
             if cross_deps:
-                extras.append(f"after {', '.join(cross_deps)}")
+                annotations.append(f"[yellow]after {', '.join(cross_deps)}[/yellow]")
+            # Show related by name
+            if p.get("all_related"):
+                annotations.append(f"[dim]see {', '.join(p['all_related'])}[/dim]")
 
-            if extras:
-                label += f"  [dim]({', '.join(extras)})[/dim]"
+            if annotations:
+                label += "  " + "  ".join(annotations)
 
             # Children: things this blocks within the package
             children = sorted(
