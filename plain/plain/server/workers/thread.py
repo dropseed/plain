@@ -29,7 +29,6 @@ from datetime import datetime
 from types import FrameType
 from typing import TYPE_CHECKING, Any
 
-from plain import signals
 from plain.internal.reloader import Reloader
 
 from .. import http, sock, util
@@ -317,26 +316,9 @@ class Worker:
 
                 req, http_request, resp, request_start = parse_result
 
-                # Detect async views (fast, safe on event loop).
-                # FailHandler (from make_fail_handler) doesn't have this method.
-                is_async = hasattr(
-                    self.handler, "is_async_view"
-                ) and self.handler.is_async_view(http_request)
-
-                if is_async:
-                    keepalive = await self._dispatch_async(
-                        req, conn, http_request, resp, request_start
-                    )
-                else:
-                    keepalive = await loop.run_in_executor(
-                        self.tpool,
-                        self._dispatch_sync,
-                        req,
-                        conn,
-                        http_request,
-                        resp,
-                        request_start,
-                    )
+                keepalive = await self._dispatch(
+                    req, conn, http_request, resp, request_start
+                )
 
                 if not keepalive or not self.alive:
                     break
@@ -627,7 +609,7 @@ class Worker:
             self.handle_error(req, conn.sock, conn.client, exc)
         return False
 
-    def _dispatch_sync(
+    async def _dispatch(
         self,
         req: Any,
         conn: TConn,
@@ -635,36 +617,10 @@ class Worker:
         resp: Response,
         request_start: datetime,
     ) -> bool:
-        """Sync dispatch: signal + full middleware pipeline + write response."""
-        try:
-            signals.request_started.send(sender=self.__class__, request=http_request)
-            http_response = self.handler.get_response(http_request)
-            return self._finish_request(req, resp, http_response, request_start)
-        except Exception as exc:
-            return self._handle_dispatch_error(req, resp, conn, exc)
-
-    async def _dispatch_async(
-        self,
-        req: Any,
-        conn: TConn,
-        http_request: Any,
-        resp: Response,
-        request_start: datetime,
-    ) -> bool:
-        """Async dispatch: middleware in thread pool, async view on event loop."""
+        """Dispatch a request through the handler and write the response."""
         loop = asyncio.get_running_loop()
         try:
-            # Send signal in thread pool (handlers may do sync work)
-            await loop.run_in_executor(
-                self.tpool,
-                lambda: signals.request_started.send(
-                    sender=self.__class__, request=http_request
-                ),
-            )
-            # Async middleware pipeline + view
-            http_response = await self.handler.get_response_async(
-                http_request, self.tpool
-            )
+            http_response = await self.handler.handle(http_request, self.tpool)
 
             # Check for async streaming response (SSE, etc.)
             from plain.http import AsyncStreamingResponse

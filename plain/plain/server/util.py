@@ -185,7 +185,7 @@ def make_fail_handler(msg: str | bytes) -> Any:
     msg = to_bytestring(msg)
 
     class FailHandler:
-        def get_response(self, request: Any) -> Any:
+        async def handle(self, request: Any, executor: Any) -> Any:
             from plain.http import Response
 
             return Response(msg, status_code=500, content_type="text/plain")

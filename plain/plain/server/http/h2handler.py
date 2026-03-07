@@ -15,7 +15,6 @@ import h2.connection
 import h2.events
 import h2.exceptions
 
-from plain import signals
 from plain.http import AsyncStreamingResponse, FileResponse, StreamingResponse
 from plain.http import Request as HttpRequest
 
@@ -502,7 +501,6 @@ async def _async_handle_stream(
     stream: H2Stream,
 ) -> None:
     """Process a single completed HTTP/2 stream as an async task."""
-    loop = asyncio.get_running_loop()
     request_start = datetime.now()
 
     try:
@@ -515,26 +513,7 @@ async def _async_handle_stream(
         return
 
     try:
-        signals.request_started.send(
-            sender=state.handler.__class__, request=http_request
-        )
-
-        # Detect async views — resolve URL in executor to avoid blocking event loop
-        def _check_async() -> bool:
-            return hasattr(
-                state.handler, "is_async_view"
-            ) and state.handler.is_async_view(http_request)
-
-        is_async = await loop.run_in_executor(state.executor, _check_async)
-
-        if is_async:
-            http_response = await state.handler.get_response_async(
-                http_request, state.executor
-            )
-        else:
-            http_response = await loop.run_in_executor(
-                state.executor, state.handler.get_response, http_request
-            )
+        http_response = await state.handler.handle(http_request, state.executor)
 
         try:
             if stream.stream_id in state.reset_streams:
