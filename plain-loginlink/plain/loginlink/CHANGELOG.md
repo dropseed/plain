@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.20.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.20.0) (2026-03-07)
+
+### What's changed
+
+- Updated `generate_link_url()` to pass `token` as a keyword argument to `reverse()` instead of a positional argument ([6eecc35](https://github.com/dropseed/plain/commit/6eecc35ff197))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.19.0) (2026-03-06)
 
 ### What's changed
