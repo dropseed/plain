@@ -1,5 +1,23 @@
 # plain changelog
 
+## [0.119.0](https://github.com/dropseed/plain/releases/plain@0.119.0) (2026-03-07)
+
+### What's changed
+
+- **Removed `url_args` and positional URL arguments** — views no longer receive positional URL arguments via `self.url_args`. All URL parameters are now keyword-only via `self.url_kwargs`. `reverse()` and `reverse_absolute()` no longer accept `*args` — use keyword arguments instead. `RegexPattern` now rejects unnamed capture groups and requires named groups (`(?P<name>...)`) ([6eecc35ff197](https://github.com/dropseed/plain/commit/6eecc35ff197))
+- **Server I/O moved to async event loop** — all network I/O (TLS handshakes, reading requests, writing responses, keep-alive) now runs on the asyncio event loop. The thread pool is reserved exclusively for application code (middleware and views). This improves connection handling efficiency and eliminates H2 reader threads ([322fd51cf206](https://github.com/dropseed/plain/commit/322fd51cf206), [f60bcdd6f4d2](https://github.com/dropseed/plain/commit/f60bcdd6f4d2))
+- **New `SERVER_CONNECTIONS` setting** — controls the maximum number of concurrent connections per worker (default: 1000). Replaces implicit connection limits ([322fd51cf206](https://github.com/dropseed/plain/commit/322fd51cf206))
+- **New `SERVER_H2_MAX_CONCURRENT_STREAMS` setting** — optionally limits the number of concurrent HTTP/2 streams per connection ([322fd51cf206](https://github.com/dropseed/plain/commit/322fd51cf206))
+- **Asyncio debug mode in development** — when `DEBUG=True`, the server enables asyncio debug mode which logs warnings when a callback blocks the event loop for more than 100ms, helping catch blocking calls in async views ([3afdae32ef94](https://github.com/dropseed/plain/commit/3afdae32ef94))
+- Added documentation for async view safety, server request lifecycle, and three-layer architecture ([3afdae32ef94](https://github.com/dropseed/plain/commit/3afdae32ef94), [ca82fb46ad7e](https://github.com/dropseed/plain/commit/ca82fb46ad7e))
+
+### Upgrade instructions
+
+- Replace `self.url_args` with `self.url_kwargs` in all views. If you used positional URL arguments with unnamed regex groups, convert them to named groups (`(?P<name>...)`).
+- Replace any `reverse(name, arg1, arg2)` calls with `reverse(name, param1=arg1, param2=arg2)` using keyword arguments.
+- Replace any `reverse_absolute(name, arg1)` calls similarly.
+- No server configuration changes are required — the new settings have sensible defaults.
+
 ## [0.118.0](https://github.com/dropseed/plain/releases/plain@0.118.0) (2026-03-06)
 
 ### What's changed
