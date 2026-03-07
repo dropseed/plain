@@ -9,6 +9,7 @@ from plain.http import (
     ForbiddenError403,
     NotFoundError404,
     Response,
+    ResponseBase,
     SuspiciousOperationError400,
 )
 from plain.http.multipartparser import MultiPartParserError
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 request_logger = logging.getLogger("plain.request")
 
 
-def response_for_exception(request: Request, exc: Exception) -> Response:
+def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
     if isinstance(exc, NotFoundError404):
         response = get_exception_response(
             request=request, status_code=404, exception=None
@@ -102,10 +103,10 @@ def response_for_exception(request: Request, exc: Exception) -> Response:
 
 def get_exception_response(
     *, request: Request, status_code: int, exception: Exception | None
-) -> Response:
+) -> ResponseBase:
     try:
-        view_class = ErrorView.as_view(status_code=status_code, exception=exception)
-        response = view_class(request)
+        view = ErrorView(request=request, status_code=status_code, exception=exception)
+        response = view.get_response()
         if response.status_code >= 500 and exception is not None:
             # Attach the exception to the response for logging/observability
             response.exception = exception

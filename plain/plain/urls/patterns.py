@@ -206,11 +206,11 @@ class URLPattern:
         self,
         *,
         pattern: RegexPattern | RoutePattern,
-        view: Any,
+        view_class: type,
         name: str | None = None,
     ):
         self.pattern = pattern
-        self.view = view
+        self.view_class = view_class
         self.name = name
 
     def __repr__(self) -> str:
@@ -243,7 +243,7 @@ class URLPattern:
             from .resolvers import ResolverMatch
 
             return ResolverMatch(
-                view=self.view,
+                view_class=self.view_class,
                 args=args,
                 kwargs=captured_kwargs,
                 url_name=self.pattern.name,

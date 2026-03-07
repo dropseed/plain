@@ -10,7 +10,7 @@
 
     {% if request.resolver_match %}
     <dt>View</dt>
-    <dd class="text-sm text-white/50">{{ request.resolver_match.view.view_class|pprint }}</dd>
+    <dd class="text-sm text-white/50">{{ request.resolver_match.view_class|pprint }}</dd>
 
     <dt>URL pattern</dt>
     <dd class="text-sm text-white/50">

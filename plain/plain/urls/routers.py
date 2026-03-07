@@ -1,13 +1,9 @@
 import re
-from typing import TYPE_CHECKING
 
 from .patterns import RegexPattern, RoutePattern, URLPattern
 from .resolvers import (
     URLResolver,
 )
-
-if TYPE_CHECKING:
-    from plain.views import View
 
 
 class Router:
@@ -57,12 +53,10 @@ def include(
         )
 
 
-def path(route: str | re.Pattern, view: type["View"], *, name: str = "") -> URLPattern:
+def path(route: str | re.Pattern, view_class: type, *, name: str = "") -> URLPattern:
     """
-    Standard URL with a view.
+    Map a URL pattern to a view class.
     """
-    from plain.views import View
-
     if isinstance(route, str):
         pattern = RoutePattern(route, name=name, is_endpoint=True)
     elif isinstance(route, re.Pattern):
@@ -70,20 +64,9 @@ def path(route: str | re.Pattern, view: type["View"], *, name: str = "") -> URLP
     else:
         raise TypeError("path() route must be a string or regex")
 
-    # You can't pass a View() instance to path()
-    if isinstance(view, View):
-        view_cls_name = view.__class__.__name__
+    if not isinstance(view_class, type):
         raise TypeError(
-            f"view must be a callable, pass {view_cls_name} or {view_cls_name}.as_view(*args, **kwargs), not "
-            f"{view_cls_name}()."
+            f"path() requires a class, not an instance or callable: {view_class!r}"
         )
 
-    # You typically pass a View class and we call as_view() for you
-    if isinstance(view, type) and issubclass(view, View):
-        return URLPattern(pattern=pattern, view=view.as_view(), name=name)
-
-    # If you called View.as_view() yourself (or technically any callable)
-    if callable(view):
-        return URLPattern(pattern=pattern, view=view, name=name)
-
-    raise TypeError("view must be a View class or View.as_view()")
+    return URLPattern(pattern=pattern, view_class=view_class, name=name)

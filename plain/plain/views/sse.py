@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import functools
 import json
-from collections.abc import AsyncIterator, Callable, Coroutine
-from typing import Any, Self
+from collections.abc import AsyncIterator
+from typing import Any
 
-from plain.http import AsyncStreamingResponse, Request, Response, ResponseBase
-from plain.utils.decorators import classonlymethod
+from plain.http import AsyncStreamingResponse, Response
 
 from .base import View
 
@@ -23,25 +21,7 @@ class ServerSentEventsView(View):
                     await asyncio.sleep(1)
     """
 
-    @classonlymethod
-    def as_view(
-        cls: type[Self], *init_args: object, **init_kwargs: object
-    ) -> Callable[..., Coroutine[Any, Any, ResponseBase]]:
-        sync_view = super().as_view(*init_args, **init_kwargs)
-
-        # Wrap in an async function so the server detects this as an async
-        # view and runs it on the event loop. The inner sync_view call is
-        # cheap (just object construction) — the actual async work happens
-        # when the server iterates the AsyncStreamingResponse.
-        @functools.wraps(sync_view)
-        async def view(
-            request: Request, *url_args: object, **url_kwargs: object
-        ) -> ResponseBase:
-            return sync_view(request, *url_args, **url_kwargs)
-
-        return view
-
-    def get(self) -> AsyncStreamingResponse:
+    async def get(self) -> AsyncStreamingResponse:
         return AsyncStreamingResponse(
             streaming_content=self._format_events(),
             content_type="text/event-stream",

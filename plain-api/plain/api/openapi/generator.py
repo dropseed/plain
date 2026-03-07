@@ -73,7 +73,7 @@ class OpenAPISchemaGenerator:
     def operations_for_url_pattern(self, url_pattern: URLPattern) -> dict[str, Any]:
         operations = {}
 
-        for vc in reversed(url_pattern.view.view_class.__mro__):
+        for vc in reversed(url_pattern.view_class.__mro__):
             exclude_http_methods = [
                 HTTPMethod.TRACE,
                 HTTPMethod.OPTIONS,

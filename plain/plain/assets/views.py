@@ -31,16 +31,12 @@ class AssetView(View):
     This class could be subclassed to further tweak the responses or behavior.
     """
 
-    def __init__(self, asset_path: str | None = None):
-        # Allow a path to be passed in AssetView.as_view(path="...")
-        self.asset_path = asset_path
-
     def get_manifest(self) -> AssetsManifest:
         """Get the assets manifest. Override in tests to provide a custom manifest."""
         return get_manifest()
 
     def get_url_path(self) -> str | None:
-        return self.asset_path or self.url_kwargs["path"]
+        return self.url_kwargs["path"]
 
     def get(self) -> Response | FileResponse | StreamingResponse:
         url_path = self.get_url_path()

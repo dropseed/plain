@@ -17,8 +17,7 @@ def make_asset_view(manifest: AssetsManifest, path: str) -> AssetView:
 
     rf = RequestFactory()
     request = rf.get(f"/assets/{path}")
-    view = TestAssetView()
-    view.setup(request, path=path)
+    view = TestAssetView(request=request, url_kwargs={"path": path})
     return view
 
 

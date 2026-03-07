@@ -1,15 +1,10 @@
 from __future__ import annotations
 
+import inspect
 import logging
 from collections.abc import Callable
 from http import HTTPMethod
-from typing import Any, Self
-
-from opentelemetry import trace
-from opentelemetry.semconv._incubating.attributes.code_attributes import (
-    CODE_FUNCTION_NAME,
-    CODE_NAMESPACE,
-)
+from typing import Any
 
 from plain.http import (
     JsonResponse,
@@ -19,60 +14,30 @@ from plain.http import (
     Response,
     ResponseBase,
 )
-from plain.utils.decorators import classonlymethod
 
 from .exceptions import ResponseException
 
 logger = logging.getLogger("plain.request")
 
 
-tracer = trace.get_tracer("plain")
-
-
 class View:
     request: Request
-    url_args: tuple[Any, ...]
+    url_args: tuple
     url_kwargs: dict[str, Any]
 
-    # View.as_view(example="foo") usage can be customized by defining your own __init__ method.
-    # def __init__(self, *args, **kwargs):
-
-    def setup(self, request: Request, *url_args: object, **url_kwargs: object) -> None:
+    def __init__(
+        self,
+        *,
+        request: Request,
+        url_args: tuple = (),
+        url_kwargs: dict[str, Any] | None = None,
+    ) -> None:
         if hasattr(self, "get") and not hasattr(self, "head"):
             self.head = self.get
 
         self.request = request
         self.url_args = url_args
-        self.url_kwargs = url_kwargs
-
-    @classonlymethod
-    def as_view(
-        cls: type[Self], *init_args: object, **init_kwargs: object
-    ) -> Callable[[Request, Any, Any], ResponseBase]:
-        def view(
-            request: Request, *url_args: object, **url_kwargs: object
-        ) -> ResponseBase:
-            with tracer.start_as_current_span(
-                f"{cls.__name__}",
-                kind=trace.SpanKind.INTERNAL,
-                attributes={
-                    CODE_FUNCTION_NAME: "as_view",
-                    CODE_NAMESPACE: f"{cls.__module__}.{cls.__qualname__}",
-                },
-            ) as span:
-                v = cls(*init_args, **init_kwargs)
-                v.setup(request, *url_args, **url_kwargs)
-                response = v.get_response()
-                span.set_status(
-                    trace.StatusCode.OK
-                    if response.status_code < 400
-                    else trace.StatusCode.ERROR
-                )
-                return response
-
-        view.view_class = cls  # type: ignore[attr-defined]
-
-        return view
+        self.url_kwargs = url_kwargs or {}
 
     def get_request_handler(self) -> Callable[[], Any] | None:
         """Return the handler for the current request method."""
@@ -94,8 +59,19 @@ class View:
             )
             return NotAllowedResponse(self._allowed_methods())
 
+        if inspect.iscoroutinefunction(handler):
+            return self._dispatch_handler_async(handler)  # type: ignore[return-value]
+
         try:
             result: Any = handler()
+        except ResponseException as e:
+            return e.response
+
+        return self.convert_value_to_response(result)
+
+    async def _dispatch_handler_async(self, handler: Callable[[], Any]) -> ResponseBase:
+        try:
+            result = await handler()
         except ResponseException as e:
             return e.response
 

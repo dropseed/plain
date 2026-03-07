@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from plain.http import ResponseBase
+from plain.http import Request, ResponseBase
 from plain.templates import TemplateFileMissing
 
 from .templates import TemplateView
@@ -15,13 +15,14 @@ class ErrorView(TemplateView):
     status_code: int
 
     def __init__(
-        self, *, status_code: int | None = None, exception: Any | None = None
+        self,
+        *,
+        request: Request,
+        status_code: int | None = None,
+        exception: Any | None = None,
     ) -> None:
-        # Allow creating an ErrorView with a status code
-        # e.g. ErrorView.as_view(status_code=404)
+        super().__init__(request=request)
         self.status_code = status_code or self.status_code
-
-        # Allow creating an ErrorView with an exception
         self.exception = exception
 
     def get_template_context(self) -> dict:

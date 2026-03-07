@@ -33,14 +33,14 @@ class ResolverMatch:
     def __init__(
         self,
         *,
-        view: Any,
+        view_class: type,
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
         url_name: str | None = None,
         namespaces: list[str] | None = None,
         route: str | None = None,
     ):
-        self.view = view
+        self.view_class = view_class
         self.args = args
         self.kwargs = kwargs
         self.url_name = url_name
@@ -147,7 +147,7 @@ class URLResolver:
                 if isinstance(url_pattern, URLPattern):
                     bits = _normalize(url_pattern.pattern.regex.pattern)
                     lookups.appendlist(
-                        url_pattern.view,
+                        url_pattern.view_class,
                         (
                             bits,
                             p_pattern,
@@ -247,7 +247,7 @@ class URLResolver:
                             else str(pattern.pattern)
                         )
                         return ResolverMatch(
-                            view=sub_match.view,
+                            view_class=sub_match.view_class,
                             args=sub_match_args,
                             kwargs=sub_match_dict,
                             url_name=sub_match.url_name,
