@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.12.1](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.1) (2026-03-06)
+
+### What's changed
+
+- Fixed duplicate `Host` header in WebSocket proxy — the client was manually setting `Host` after forwarding headers, but `websockets.connect` already derives it from the URL. This caused connection failures with some servers ([83d1143a24bd](https://github.com/dropseed/plain/commit/83d1143a24bd))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.0) (2026-03-06)
 
 ### What's changed
