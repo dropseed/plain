@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.0) (2026-03-07)
+
+### What's changed
+
+- Removed the "URL args" display from the request detail panel since positional URL arguments are no longer supported ([6eecc35](https://github.com/dropseed/plain/commit/6eecc35ff197))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.11.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.11.0) (2026-03-06)
 
 ### What's changed
