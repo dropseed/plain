@@ -106,7 +106,9 @@ class Arbiter:
             plain.runtime.__version__,
         )
 
-        check_worker_config(self.app.threads, self.log)
+        from plain.runtime import settings
+
+        check_worker_config(self.app.threads, settings.SERVER_CONNECTIONS, self.log)
 
     def _handle_signal(self, sig: int, frame: object) -> None:
         self._shutdown_event.set()

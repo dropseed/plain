@@ -6,6 +6,7 @@ from __future__ import annotations
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
+import asyncio
 import email.utils
 import fcntl
 import html
@@ -14,6 +15,7 @@ import os
 import random
 import re
 import socket
+import ssl
 import time
 import urllib.parse
 from typing import Any
@@ -116,7 +118,7 @@ def write_nonblock(
         return write(sock, data, chunked)
 
 
-def write_error(sock: socket.socket, status_int: int, reason: str, mesg: str) -> None:
+def _error_response_bytes(status_int: int, reason: str, mesg: str) -> bytes:
     body = (
         "<html>\n"
         f"  <head><title>{reason}</title></head>\n"
@@ -135,7 +137,110 @@ def write_error(sock: socket.socket, status_int: int, reason: str, mesg: str) ->
         f"\r\n"
         f"{body}"
     )
-    write_nonblock(sock, response.encode("latin1"))
+    return response.encode("latin1")
+
+
+def write_error(sock: socket.socket, status_int: int, reason: str, mesg: str) -> None:
+    write_nonblock(sock, _error_response_bytes(status_int, reason, mesg))
+
+
+async def _async_wait_readable(sock: socket.socket) -> None:
+    """Wait until a socket's fd becomes readable."""
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future[None] = loop.create_future()
+    fd = sock.fileno()
+
+    def _on_readable() -> None:
+        if not fut.done():
+            loop.remove_reader(fd)
+            fut.set_result(None)
+
+    try:
+        loop.add_reader(fd, _on_readable)
+    except OSError:
+        return
+    try:
+        await fut
+    except asyncio.CancelledError:
+        loop.remove_reader(fd)
+        raise
+
+
+async def _async_wait_writable(sock: socket.socket) -> None:
+    """Wait until a socket's fd becomes writable."""
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future[None] = loop.create_future()
+    fd = sock.fileno()
+
+    def _on_writable() -> None:
+        if not fut.done():
+            loop.remove_writer(fd)
+            fut.set_result(None)
+
+    try:
+        loop.add_writer(fd, _on_writable)
+    except OSError:
+        return
+    try:
+        await fut
+    except asyncio.CancelledError:
+        loop.remove_writer(fd)
+        raise
+
+
+async def async_recv(sock: socket.socket, n: int) -> bytes:
+    """Async recv that handles both plain and SSL sockets.
+
+    Plain sockets use loop.sock_recv(). SSL sockets use manual
+    non-blocking recv() with add_reader/add_writer for retries,
+    since asyncio rejects SSLSocket in sock_recv().
+    """
+    if not isinstance(sock, ssl.SSLSocket):
+        loop = asyncio.get_running_loop()
+        return await loop.sock_recv(sock, n)
+
+    while True:
+        try:
+            return sock.recv(n)
+        except ssl.SSLWantReadError:
+            await _async_wait_readable(sock)
+        except ssl.SSLWantWriteError:
+            await _async_wait_writable(sock)
+        except BlockingIOError:
+            await _async_wait_readable(sock)
+
+
+async def async_sendall(sock: socket.socket, data: bytes) -> None:
+    """Async sendall that handles both plain and SSL sockets.
+
+    Plain sockets use loop.sock_sendall(). SSL sockets use manual
+    non-blocking send() with add_reader/add_writer for retries.
+    """
+    if not isinstance(sock, ssl.SSLSocket):
+        loop = asyncio.get_running_loop()
+        await loop.sock_sendall(sock, data)
+        return
+
+    sent = 0
+    total = len(data)
+    while sent < total:
+        try:
+            n = sock.send(data[sent:])
+            if n == 0:
+                raise OSError("SSL send returned 0 bytes (peer shutdown)")
+            sent += n
+        except ssl.SSLWantWriteError:
+            await _async_wait_writable(sock)
+        except ssl.SSLWantReadError:
+            await _async_wait_readable(sock)
+        except BlockingIOError:
+            await _async_wait_writable(sock)
+
+
+async def async_write_error(
+    sock: socket.socket, status_int: int, reason: str, mesg: str
+) -> None:
+    await async_sendall(sock, _error_response_bytes(status_int, reason, mesg))
 
 
 def http_date(timestamp: float | None = None) -> str:

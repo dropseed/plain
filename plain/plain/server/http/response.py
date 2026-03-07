@@ -6,6 +6,7 @@ from __future__ import annotations
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
+import asyncio
 import io
 import logging
 import os
@@ -107,13 +108,10 @@ def create_request(
 ) -> HttpRequest:
     """Build a plain.http.Request directly from the server's parsed HTTP message."""
 
-    # Handle 100-continue before merging headers
+    # Extract Host header (100-continue is handled during async body reading)
     host = None
     for hdr_name, hdr_value in req.headers:
-        if hdr_name == "EXPECT":
-            if hdr_value.lower() == "100-continue":
-                sock.send(b"HTTP/1.1 100 Continue\r\n\r\n")
-        elif hdr_name == "HOST":
+        if hdr_name == "HOST":
             host = hdr_value
 
     headers = _merge_headers(req.headers)
@@ -420,3 +418,76 @@ class Response:
             self.send_headers()
         if self.chunked:
             util.write_chunk(self.sock, b"")
+
+    # ------------------------------------------------------------------
+    # Async write methods — use loop.sock_sendall() instead of blocking
+    # sendall(). The socket must be non-blocking (managed by asyncio).
+    # ------------------------------------------------------------------
+
+    async def async_send_headers(self) -> None:
+        if self.headers_sent:
+            return
+        tosend = self.default_headers()
+        tosend.extend([f"{k}: {v}\r\n" for k, v in self.headers])
+        header_str = "{}\r\n".format("".join(tosend))
+        await util.async_sendall(self.sock, util.to_bytestring(header_str, "latin-1"))
+        self.headers_sent = True
+
+    async def async_write(self, arg: bytes) -> None:
+        await self.async_send_headers()
+        if not isinstance(arg, bytes):
+            raise TypeError(f"{arg!r} is not a byte")
+        arglen = len(arg)
+        tosend = arglen
+        if self.response_length is not None:
+            if self.sent >= self.response_length:
+                return
+            tosend = min(self.response_length - self.sent, tosend)
+            if tosend < arglen:
+                arg = arg[:tosend]
+
+        if self.chunked and tosend == 0:
+            return
+
+        self.sent += tosend
+        if self.chunked:
+            chunk_size = f"{len(arg):X}\r\n"
+            chunk = b"".join([chunk_size.encode("utf-8"), arg, b"\r\n"])
+            await util.async_sendall(self.sock, chunk)
+        else:
+            await util.async_sendall(self.sock, arg)
+
+    async def async_write_response(self, http_response: Any) -> None:
+        """Write a plain.http.ResponseBase using async I/O."""
+        self.prepare_response(http_response)
+
+        if (
+            isinstance(http_response, FileResponse)
+            and http_response.file_to_stream is not None
+        ):
+            file_wrapper = FileWrapper(
+                http_response.file_to_stream, http_response.block_size
+            )
+            http_response.file_to_stream.close = http_response.close
+            # Read file chunks in the default executor (not the app thread pool)
+            # to avoid blocking the event loop. File reads are fast and shouldn't
+            # contend with app threads.
+            loop = asyncio.get_running_loop()
+            while True:
+                chunk = await loop.run_in_executor(
+                    None, file_wrapper.filelike.read, file_wrapper.blksize
+                )
+                if not chunk:
+                    break
+                await self.async_write(chunk)
+        else:
+            for chunk in http_response:
+                await self.async_write(chunk)
+
+        await self.async_close()
+
+    async def async_close(self) -> None:
+        if not self.headers_sent:
+            await self.async_send_headers()
+        if self.chunked:
+            await util.async_sendall(self.sock, b"0\r\n\r\n")

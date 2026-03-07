@@ -7,14 +7,16 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 # design:
-# An asyncio event loop accepts connections and manages keepalive.
-# Each connection is handled as an async task. HTTP parsing always
-# runs in a thread pool. After parsing, URL resolution detects
-# whether the view has async handlers:
-#   Sync views:  full pipeline (middleware + view + write) in thread pool
-#   Async views: middleware in thread pool, view awaited on event loop,
-#                response written in thread pool
-# Keepalive waits use asyncio.wait_for with a timeout.
+# An asyncio event loop runs all I/O (accept, TLS, read, write).
+# A thread pool handles only application code (middleware + views).
+#   New connection:
+#     1. Accept (async) → wait readable (async) → TLS handshake (thread pool)
+#     2. Read header bytes (async, until \r\n\r\n)
+#     3. Parse headers from buffer (inline, no I/O)
+#     4. Read body bytes (async, based on Content-Length or chunked)
+#     5. Dispatch view (thread pool for sync, event loop for async)
+#     6. Write response (async)
+#   Keepalive waits use asyncio.wait_for with a timeout.
 import asyncio
 import errno
 import logging
@@ -47,25 +49,46 @@ from ..http.errors import (
     UnsupportedTransferCoding,
 )
 from ..http.h2handler import async_handle_h2_connection
+from ..http.message import LIMIT_REQUEST_FIELD_SIZE, LIMIT_REQUEST_FIELDS, Request
 from ..http.response import Response, create_request
+from ..http.unreader import AsyncBridgeUnreader, BufferUnreader
 from .workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:
     from ..app import ServerApplication
-    from ..http.message import Request
 
 
-class _H2Sentinel:
-    """Sentinel value returned by _parse_request for HTTP/2 connections."""
+class _ParseError(Exception):
+    """Raised for connection-level issues (EOF, disconnect) that don't need an error response."""
 
 
-_H2_SENTINEL = _H2Sentinel()
+class _IncompleteBody(Exception):
+    """Raised when the request body could not be fully read (timeout or disconnect)."""
+
+
+class _BodyTooLarge(Exception):
+    """Raised when a chunked body exceeds the pre-buffer limit.
+
+    Carries the partial data so the caller can fall back to bridge mode.
+    """
+
+    def __init__(self, partial_data: bytes) -> None:
+        self.partial_data = partial_data
+
 
 # Keep-alive connection timeout in seconds
 KEEPALIVE = 2
 
-# Maximum number of simultaneous client connections
-WORKER_CONNECTIONS = 1000
+# Total time allowed for reading all headers (slowloris protection).
+# Individual recv calls use KEEPALIVE as their timeout, but a client
+# could send one byte every ~1.9s to stay under the per-recv limit.
+# This bounds the total wall-clock time for the header phase.
+HEADER_READ_TIMEOUT = 10
+
+# Maximum total size of headers (request line + headers) in bytes.
+# This bounds the async read loop to prevent slow/malicious clients
+# from consuming unbounded memory.
+MAX_HEADER_SIZE = LIMIT_REQUEST_FIELDS * (LIMIT_REQUEST_FIELD_SIZE + 2) + 4
 
 SIGNALS = [
     signal.SIGABRT,
@@ -77,8 +100,90 @@ SIGNALS = [
 ]
 
 
-def check_worker_config(threads: int, log: logging.Logger) -> None:
-    max_keepalived = WORKER_CONNECTIONS - threads
+def _is_chunked_complete(data: bytes) -> bool:
+    """Check if a chunked transfer-encoded body is complete.
+
+    Properly parses chunk boundaries to avoid false matches in binary data.
+    """
+    pos = 0
+    n = len(data)
+    while pos < n:
+        # Find \r\n after chunk size
+        crlf = data.find(b"\r\n", pos)
+        if crlf < 0:
+            return False
+
+        # Parse chunk size (hex, ignore extensions after semicolon)
+        size_line = data[pos:crlf]
+        semi = size_line.find(b";")
+        if semi >= 0:
+            size_line = size_line[:semi]
+
+        try:
+            chunk_size = int(size_line.strip(), 16)
+        except ValueError:
+            return False
+
+        if chunk_size == 0:
+            # Last chunk — need trailing \r\n (no trailers) or trailers + \r\n\r\n
+            after_last = crlf + 2
+            if after_last >= n:
+                return False
+            if data[after_last : after_last + 2] == b"\r\n":
+                return True
+            return data.find(b"\r\n\r\n", after_last) >= 0
+
+        # Skip chunk data + \r\n
+        next_pos = crlf + 2 + chunk_size + 2
+        if next_pos > n:
+            return False
+        pos = next_pos
+
+    return False
+
+
+def _parse_body_headers(header_data: bytes) -> tuple[int, bool, bool]:
+    """Extract Content-Length, Transfer-Encoding, and Expect from raw headers.
+
+    Returns (content_length, is_chunked, expect_continue).
+    content_length is -1 if not present or invalid.
+    """
+    content_length = -1
+    is_chunked = False
+    expect_continue = False
+
+    header_str = header_data.decode("latin-1", errors="replace")
+    lines = header_str.split("\r\n")
+    for line in lines[1:]:  # skip request line
+        if not line:
+            break
+        if ":" not in line:
+            continue
+        name, _, value = line.partition(":")
+        name_upper = name.strip().upper()
+        if name_upper == "CONTENT-LENGTH":
+            try:
+                content_length = int(value.strip())
+            except ValueError:
+                content_length = -1
+        elif name_upper == "TRANSFER-ENCODING":
+            if "chunked" in value.lower():
+                is_chunked = True
+        elif name_upper == "EXPECT":
+            if "100-continue" in value.lower():
+                expect_continue = True
+
+    # RFC 9112 §6.1: If both Content-Length and Transfer-Encoding are
+    # present, Transfer-Encoding takes precedence. Ignore Content-Length
+    # to ensure the body strategy (pre-buffer vs bridge) uses chunked reading.
+    if is_chunked and content_length >= 0:
+        content_length = -1
+
+    return content_length, is_chunked, expect_continue
+
+
+def check_worker_config(threads: int, connections: int, log: logging.Logger) -> None:
+    max_keepalived = connections - threads
 
     if max_keepalived <= 0:
         log.warning(
@@ -100,35 +205,13 @@ class TConn:
         self.client = client
         self.server = server
 
-        self.parser: http.RequestParser | None = None
-        self.initialized: bool = False
         self.is_h2: bool = False
+        self.is_ssl: bool = False
         self.handed_off: bool = False
+        self.req_count: int = 0
 
         # set the socket to non blocking
         self.sock.setblocking(False)
-
-    def init(self) -> None:
-        if self.initialized:
-            return
-
-        if self.parser is None:
-            # wrap the socket if needed
-            if self.app.is_ssl:
-                assert self.app.certfile is not None
-                self.sock = sock.ssl_wrap_socket(
-                    self.sock, self.app.certfile, self.app.keyfile
-                )
-
-                if self.sock.selected_alpn_protocol() == "h2":
-                    self.is_h2 = True
-                    self.initialized = True
-                    return
-
-            # initialize the parser
-            self.parser = http.RequestParser(self.app.is_ssl, self.sock, self.client)
-
-        self.initialized = True
 
     def close(self) -> None:
         util.close(self.sock)
@@ -159,7 +242,11 @@ class Worker:
         self.heartbeat = heartbeat
         self.handler = handler
 
-        self.max_keepalived: int = WORKER_CONNECTIONS - self.app.threads
+        from plain.runtime import settings
+
+        self.max_connections: int = settings.SERVER_CONNECTIONS
+        self.max_keepalived: int = self.max_connections - self.app.threads
+        self.max_body: int = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or (10 * 1024 * 1024)
         self.nr_conns: int = 0
         self._connection_tasks: set[asyncio.Task] = set()
         self._capacity_available: asyncio.Event = asyncio.Event()
@@ -172,7 +259,7 @@ class Worker:
         self.heartbeat.notify()
 
     def init_process(self) -> None:
-        # Thread pool
+        # Thread pool — used only for application code (middleware + views)
         self.tpool: ThreadPoolExecutor = ThreadPoolExecutor(
             max_workers=self.app.threads
         )
@@ -255,7 +342,7 @@ class Worker:
         server: tuple[str, int] = listener_sock.getsockname()
         while self.alive:
             # Backpressure: wait when at capacity
-            if self.nr_conns >= WORKER_CONNECTIONS:
+            if self.nr_conns >= self.max_connections:
                 self._capacity_available.clear()
                 await self._capacity_available.wait()
                 continue
@@ -281,10 +368,8 @@ class Worker:
     async def _handle_connection(self, conn: TConn) -> None:
         loop = asyncio.get_running_loop()
         try:
-            # Wait for the socket to become readable before dispatching
-            # to the thread pool. Without this, slow/idle clients that
-            # connect but don't send data would occupy thread pool slots
-            # (up to the 2s parse timeout), starving real requests.
+            # Wait for the socket to become readable before doing anything.
+            # This prevents slow/idle clients from consuming resources.
             try:
                 await asyncio.wait_for(
                     self._wait_readable(conn.sock),
@@ -293,13 +378,23 @@ class Worker:
             except TimeoutError:
                 return
 
-            while self.alive:
-                # Parse HTTP in thread pool
-                parse_result: (
-                    tuple[Any, Any, Response, datetime] | _H2Sentinel | None
-                ) = await loop.run_in_executor(self.tpool, self._parse_request, conn)
+            # TLS handshake (requires blocking mode, so use thread pool briefly)
+            if self.app.is_ssl:
+                try:
+                    conn.sock = await loop.run_in_executor(
+                        self.tpool, self._do_tls_handshake, conn
+                    )
+                except (ssl.SSLError, OSError) as e:
+                    if isinstance(e, ssl.SSLError) and e.args[0] == ssl.SSL_ERROR_EOF:
+                        self.log.debug("ssl connection closed during handshake")
+                    else:
+                        self.log.debug("TLS handshake failed: %s", e)
+                    return
+                conn.is_ssl = True
+                conn.sock.setblocking(False)
 
-                if isinstance(parse_result, _H2Sentinel):
+                if conn.sock.selected_alpn_protocol() == "h2":
+                    conn.is_h2 = True
                     conn.handed_off = True
                     await async_handle_h2_connection(
                         conn.sock,
@@ -311,37 +406,299 @@ class Worker:
                     )
                     return
 
+            while self.alive:
+                # Read HTTP headers asynchronously on the event loop
+                try:
+                    header_data, body_start = await self._async_read_headers(conn.sock)
+                except (TimeoutError, OSError):
+                    break
+                except LimitRequestHeaders as e:
+                    await self._async_handle_error(None, conn.sock, conn.client, e)
+                    break
+                if not header_data:
+                    break
+
+                # Analyze headers to determine body handling strategy
+                max_body = self.max_body
+                content_length, is_chunked, expect_continue = _parse_body_headers(
+                    header_data
+                )
+
+                if expect_continue:
+                    try:
+                        await util.async_sendall(
+                            conn.sock, b"HTTP/1.1 100 Continue\r\n\r\n"
+                        )
+                    except OSError:
+                        break
+
+                # Large Content-Length bodies use the bridge for lazy streaming.
+                # Small bodies and chunked are pre-buffered (with fallback to
+                # bridge if a chunked body exceeds the pre-buffer limit).
+                use_bridge = content_length > max_body
+
+                if use_bridge:
+                    unreader = AsyncBridgeUnreader(
+                        header_data + body_start,
+                        conn.sock,
+                        loop,
+                        timeout=self.timeout,
+                    )
+                else:
+                    try:
+                        body_data = await self._async_read_body(
+                            conn.sock,
+                            body_start,
+                            content_length,
+                            is_chunked,
+                            max_body,
+                        )
+                    except _IncompleteBody:
+                        await util.async_write_error(
+                            conn.sock,
+                            408,
+                            "Request Timeout",
+                            "Incomplete request body",
+                        )
+                        break
+                    except _BodyTooLarge as e:
+                        # Chunked body exceeded pre-buffer limit — fall back
+                        # to bridge mode with the partially-read data.
+                        use_bridge = True
+                        unreader = AsyncBridgeUnreader(
+                            header_data + e.partial_data,
+                            conn.sock,
+                            loop,
+                            timeout=self.timeout,
+                        )
+                    else:
+                        unreader = BufferUnreader(header_data + body_data)
+
+                # Parse the request. For bridge unreaders, parsing runs in
+                # the thread pool since the body reader may call chunk()
+                # which bridges back to the event loop.
+                try:
+                    if use_bridge:
+                        parse_result = await loop.run_in_executor(
+                            self.tpool,
+                            self._parse_request,
+                            conn,
+                            unreader,
+                            True,
+                        )
+                    else:
+                        parse_result = self._parse_request(conn, unreader)
+                except _ParseError:
+                    break
+                except TimeoutError:
+                    # Bridge body read timed out — send 408 (not 500)
+                    await util.async_write_error(
+                        conn.sock,
+                        408,
+                        "Request Timeout",
+                        "Body read timed out",
+                    )
+                    break
+                except Exception as e:
+                    await self._async_handle_error(None, conn.sock, conn.client, e)
+                    break
+
                 if parse_result is None:
                     break
 
                 req, http_request, resp, request_start = parse_result
+                conn.req_count += 1
 
                 keepalive = await self._dispatch(
                     req, conn, http_request, resp, request_start
                 )
 
+                # For bridge connections with known Content-Length, drain
+                # unread body data so the client receives the response
+                # without TCP RST. Chunked-to-bridge fallback (content_length=-1)
+                # can't drain by length; force_close=True ensures the
+                # connection closes cleanly via Connection: close header.
+                if use_bridge and content_length > 0:
+                    remaining = (
+                        content_length - len(body_start) - unreader.socket_bytes_read
+                    )
+                    while remaining > 0:
+                        try:
+                            data = await asyncio.wait_for(
+                                util.async_recv(conn.sock, min(remaining, 65536)),
+                                timeout=KEEPALIVE,
+                            )
+                        except (TimeoutError, OSError):
+                            break
+                        if not data:
+                            break
+                        remaining -= len(data)
+
                 if not keepalive or not self.alive:
                     break
 
-                # Wait for the socket to become readable (next request)
-                # or timeout (keepalive expiry)
-                conn.sock.setblocking(False)
+                # Wait for the next request (keepalive)
                 try:
                     await asyncio.wait_for(
                         self._wait_readable(conn.sock),
                         timeout=KEEPALIVE,
                     )
                 except TimeoutError:
-                    # Keepalive timeout expired, close connection
                     break
         finally:
             self.nr_conns -= 1
-            if self.nr_conns < WORKER_CONNECTIONS:
+            if self.nr_conns < self.max_connections:
                 self._capacity_available.set()
             if not conn.handed_off:
                 conn.close()
 
+    def _do_tls_handshake(self, conn: TConn) -> ssl.SSLSocket:
+        """Perform TLS handshake in blocking mode. Runs in the thread pool."""
+        conn.sock.setblocking(True)
+        conn.sock.settimeout(KEEPALIVE)
+        assert conn.app.certfile is not None
+        ssl_sock = sock.ssl_wrap_socket(conn.sock, conn.app.certfile, conn.app.keyfile)
+        ssl_sock.settimeout(None)
+        return ssl_sock
+
+    async def _async_read_headers(self, s: socket.socket) -> tuple[bytes, bytes]:
+        """Read from the socket until the header delimiter \\r\\n\\r\\n.
+
+        Returns (header_data, body_start) where body_start contains any
+        bytes read past the header boundary.  Returns (b"", b"") on EOF.
+        Raises LimitRequestHeaders if headers exceed MAX_HEADER_SIZE.
+        Raises TimeoutError if total header read exceeds HEADER_READ_TIMEOUT.
+        """
+        buf = bytearray()
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + HEADER_READ_TIMEOUT
+        while True:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                self.log.debug(
+                    "Header read exceeded total timeout (%ss)", HEADER_READ_TIMEOUT
+                )
+                raise TimeoutError("Header read timeout exceeded")
+            try:
+                data = await asyncio.wait_for(
+                    util.async_recv(s, 8192),
+                    timeout=min(KEEPALIVE, remaining),
+                )
+            except TimeoutError:
+                if buf:
+                    self.log.debug("Slow client timed out during header read")
+                raise
+            if not data:
+                return b"", b""
+
+            buf.extend(data)
+
+            idx = buf.find(b"\r\n\r\n")
+            if idx >= 0:
+                header_end = idx + 4
+                return bytes(buf[:header_end]), bytes(buf[header_end:])
+
+            if len(buf) > MAX_HEADER_SIZE:
+                raise LimitRequestHeaders("Request headers exceeded max size")
+
+    async def _async_read_body(
+        self,
+        s: socket.socket,
+        body_start: bytes,
+        content_length: int,
+        is_chunked: bool,
+        max_body: int,
+    ) -> bytes:
+        """Pre-buffer the request body from the socket.
+
+        Called for small bodies that fit in max_body. Header analysis and
+        100-continue are handled by the caller.
+        Returns the full body bytes. Raises _IncompleteBody on failure.
+        """
+        if content_length == 0 or (content_length < 0 and not is_chunked):
+            return b""
+
+        body = bytearray(body_start)
+
+        if content_length > 0:
+            remaining = content_length - len(body)
+            while remaining > 0:
+                try:
+                    chunk = await asyncio.wait_for(
+                        util.async_recv(s, min(remaining, 65536)),
+                        timeout=KEEPALIVE,
+                    )
+                except (TimeoutError, OSError):
+                    raise _IncompleteBody(
+                        f"Expected {content_length} bytes, got {len(body)}"
+                    )
+                if not chunk:
+                    raise _IncompleteBody(
+                        f"Expected {content_length} bytes, got {len(body)}"
+                    )
+                body.extend(chunk)
+                remaining -= len(chunk)
+            return bytes(body)
+
+        if is_chunked:
+            return await self._async_read_chunked_body(s, body, max_body)
+
+        return bytes(body)
+
+    async def _async_read_chunked_body(
+        self,
+        s: socket.socket,
+        initial: bytearray,
+        max_body: int,
+    ) -> bytes:
+        """Read a chunked transfer-encoded body asynchronously.
+
+        Returns the raw chunked data (including chunk framing). The parser's
+        ChunkedReader will decode it properly.
+        Raises _IncompleteBody if the chunked message is not complete.
+        Raises _BodyTooLarge if the body exceeds max_body (caller should
+        fall back to bridge mode).
+        """
+        buf = initial
+
+        # Check if initial data already contains the complete chunked body
+        # (common when the entire request fits in one recv)
+        if (
+            len(buf) >= 5
+            and buf[-4:] == b"\r\n\r\n"
+            and _is_chunked_complete(bytes(buf))
+        ):
+            return bytes(buf)
+
+        complete = False
+        while len(buf) <= max_body:
+            try:
+                chunk = await asyncio.wait_for(
+                    util.async_recv(s, 65536),
+                    timeout=KEEPALIVE,
+                )
+            except (TimeoutError, OSError):
+                raise _IncompleteBody("Chunked body read timed out or disconnected")
+            if not chunk:
+                raise _IncompleteBody("Client disconnected during chunked body")
+            buf.extend(chunk)
+
+            # Only run the full parse when the buffer could contain the terminator
+            if buf[-4:] == b"\r\n\r\n" and _is_chunked_complete(bytes(buf)):
+                complete = True
+                break
+
+        if not complete:
+            raise _BodyTooLarge(bytes(buf))
+
+        return bytes(buf)
+
     async def _wait_readable(self, s: socket.socket) -> None:
+        # SSL sockets may have decrypted data buffered internally that
+        # won't trigger fd readability — check before waiting.
+        if isinstance(s, ssl.SSLSocket) and s.pending() > 0:
+            return
+
         loop = asyncio.get_running_loop()
         fut: asyncio.Future[None] = loop.create_future()
 
@@ -398,9 +755,14 @@ class Worker:
         # Ignore SIGWINCH in worker. Fixes a crash on OpenBSD.
         self.log.debug("worker: SIGWINCH ignored.")
 
-    def handle_error(
-        self, req: Request | None, client: socket.socket, addr: Any, exc: BaseException
+    async def _async_handle_error(
+        self,
+        req: Request | None,
+        client: socket.socket,
+        addr: Any,
+        exc: BaseException,
     ) -> None:
+        """Handle request errors, sending an appropriate HTTP error response."""
         request_start = datetime.now()
         addr = addr or ("", -1)  # unix socket case
         if isinstance(
@@ -471,7 +833,7 @@ class Worker:
             log_access(resp, req, request_time)
 
         try:
-            util.write_error(client, status_int, reason, mesg)
+            await util.async_write_error(client, status_int, reason, mesg)
         except Exception:
             self.log.debug("Failed to send error message.")
 
@@ -483,54 +845,44 @@ class Worker:
         return True
 
     def _parse_request(
-        self, conn: TConn
-    ) -> tuple[Any, Any, Response, datetime] | _H2Sentinel | None:
-        """Parse HTTP and build request/response objects.
+        self,
+        conn: TConn,
+        unreader: BufferUnreader | AsyncBridgeUnreader,
+        force_close: bool = False,
+    ) -> tuple[Any, Any, Response, datetime] | None:
+        """Parse an HTTP request from an unreader.
 
-        Returns (req, http_request, resp, request_start) or None on failure.
-        Returns _H2_SENTINEL if this is an HTTP/2 connection.
-        All parse/connection errors are handled internally.
+        Works with both BufferUnreader (pre-buffered) and AsyncBridgeUnreader
+        (lazy streaming for large bodies).
+
+        When force_close=True (bridge path), this runs in the thread pool.
+        Body reads via chunk() bridge back to the event loop and are safe here.
+        NOTE: Async views that read request.body on the event loop will
+        deadlock with bridge connections because chunk() blocks the calling
+        thread. This is an acceptable limitation — large uploads (> max_body)
+        should use sync views. Increase DATA_UPLOAD_MAX_MEMORY_SIZE to avoid
+        the bridge path if async body access is needed.
+
+        Returns (req, http_request, resp, request_start) or None on EOF/close.
+        Raises _ParseError for connection-level issues (EOF, disconnect).
+        Lets HTTP protocol errors propagate so the caller can send
+        async error responses.
         """
         try:
-            # Ensure blocking mode before init/parsing. Critical for keepalive
-            # connections where _handle_connection sets non-blocking for readability waiting.
-            conn.sock.setblocking(True)
-
-            # For new connections, set a read timeout so slow clients can't
-            # hold a thread indefinitely. Without this, a client that sends
-            # partial headers ties up a thread pool slot until the server
-            # timeout kills the whole worker. Keepalive connections are
-            # protected by asyncio.wait_for timeout while idle.
-            is_new = not conn.initialized
-            if is_new:
-                conn.sock.settimeout(KEEPALIVE)
-
-            conn.init()
-
-            if conn.is_h2:
-                conn.sock.settimeout(None)
-                return _H2_SENTINEL
-
-            assert conn.parser is not None
-            try:
-                req = next(conn.parser)
-            except TimeoutError:
-                self.log.debug("Slow client timed out during request parsing")
-                return None
-
-            if is_new:
-                # Clear the read timeout now that parsing is done.
-                conn.sock.settimeout(None)
+            req = Request(self.app.is_ssl, unreader, conn.client, conn.req_count + 1)
 
             if not req:
                 return None
 
             request_start = datetime.now()
+
+            # create_request sets _stream = req.body, which is the parser's
+            # body reader — it properly decodes chunked/length-delimited data.
             http_request = create_request(req, conn.sock, conn.client, conn.server)
 
             resp = Response(req, conn.sock, is_ssl=self.app.is_ssl)
 
-            if not self.alive:
+            if force_close or not self.alive:
                 resp.force_close()
             elif self.nr_conns >= self.max_keepalived:
                 resp.force_close()
@@ -538,40 +890,29 @@ class Worker:
             return (req, http_request, resp, request_start)
         except http.errors.NoMoreData as e:
             self.log.debug("Ignored premature client disconnection. %s", e)
+            raise _ParseError from e
         except StopIteration as e:
             self.log.debug("Closing connection. %s", e)
-        except ssl.SSLError as e:
-            if e.args[0] == ssl.SSL_ERROR_EOF:
-                self.log.debug("ssl connection closed")
-                conn.sock.close()
-            else:
-                self.log.debug("Error processing SSL request.")
-                self.handle_error(None, conn.sock, conn.client, e)
+            raise _ParseError from e
         except OSError as e:
             if e.errno not in (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN):
                 self.log.exception("Socket error processing request.")
             else:
-                if e.errno == errno.ECONNRESET:
-                    self.log.debug("Ignoring connection reset")
-                elif e.errno == errno.ENOTCONN:
-                    self.log.debug("Ignoring socket not connected")
-                else:
-                    self.log.debug("Ignoring connection epipe")
-        except Exception as e:
-            self.handle_error(None, conn.sock, conn.client, e)
+                self.log.debug("Ignoring connection %s", e)
+            raise _ParseError from e
+        # HTTP protocol errors (InvalidRequestLine, InvalidHeader, etc.)
+        # propagate to the caller for async error response handling.
 
-        return None
-
-    def _finish_request(
+    async def _async_finish_request(
         self,
         req: Any,
         resp: Response,
         http_response: Any,
         request_start: datetime,
     ) -> bool:
-        """Write response, log access, and determine keepalive."""
+        """Write response using async I/O, log access, and determine keepalive."""
         try:
-            resp.write_response(http_response)
+            await resp.async_write_response(http_response)
         finally:
             request_time = datetime.now() - request_start
             if http_response.log_access:
@@ -585,12 +926,19 @@ class Worker:
 
         return True
 
-    def _handle_dispatch_error(
+    async def _async_handle_dispatch_error(
         self, req: Any, resp: Response, conn: TConn, exc: BaseException
     ) -> bool:
-        """Handle exceptions from dispatch methods. Returns False (no keepalive)."""
+        """Handle exceptions from dispatch. Returns False (no keepalive)."""
+        # TimeoutError is a subclass of OSError but isn't a socket error —
+        # it's an app-level timeout (e.g., asyncio.wait_for in a view).
+        # Send a 500 response instead of silently dropping the connection.
+        if isinstance(exc, TimeoutError):
+            if not resp.headers_sent:
+                await self._async_handle_error(req, conn.sock, conn.client, exc)
+            return False
+
         if isinstance(exc, OSError):
-            # Gracefully handle common client disconnects
             if exc.errno in (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN):
                 self.log.debug("Client disconnected during dispatch: %s", exc)
             else:
@@ -605,8 +953,7 @@ class Worker:
             except OSError:
                 pass
         else:
-            # Send a proper HTTP 500 to the client
-            self.handle_error(req, conn.sock, conn.client, exc)
+            await self._async_handle_error(req, conn.sock, conn.client, exc)
         return False
 
     async def _dispatch(
@@ -618,7 +965,6 @@ class Worker:
         request_start: datetime,
     ) -> bool:
         """Dispatch a request through the handler and write the response."""
-        loop = asyncio.get_running_loop()
         try:
             http_response = await self.handler.handle(http_request, self.tpool)
 
@@ -630,20 +976,12 @@ class Worker:
                     req, resp, http_response, request_start
                 )
 
-            # Write response in thread pool (blocking socket I/O)
-            return await loop.run_in_executor(
-                self.tpool,
-                self._finish_request,
-                req,
-                resp,
-                http_response,
-                request_start,
+            # Write response using async I/O (no thread pool needed)
+            return await self._async_finish_request(
+                req, resp, http_response, request_start
             )
         except Exception as exc:
-            # Run error handler in thread pool — it does blocking socket I/O
-            return await loop.run_in_executor(
-                self.tpool, self._handle_dispatch_error, req, resp, conn, exc
-            )
+            return await self._async_handle_dispatch_error(req, resp, conn, exc)
 
     async def _stream_async_response(
         self,
@@ -654,47 +992,35 @@ class Worker:
     ) -> bool:
         """Stream an async response (SSE, etc.) chunk by chunk.
 
-        Headers are sent immediately, then each chunk from the async iterator
-        is written as it arrives. This keeps the event loop free between chunks.
+        Headers and chunks are written using async I/O. This keeps the
+        event loop free between chunks and doesn't consume thread pool slots.
         """
-        loop = asyncio.get_running_loop()
-
-        # Stream chunks: iterate on event loop, write in thread pool.
-        # Client disconnect (OSError) during write is normal for SSE.
         client_disconnected = False
         try:
-            # Prepare and send headers in thread pool
-            await loop.run_in_executor(
-                self.tpool,
-                lambda: (resp.prepare_response(http_response), resp.send_headers()),
-            )
+            resp.prepare_response(http_response)
+            await resp.async_send_headers()
 
             async for chunk in http_response:
                 try:
-                    await loop.run_in_executor(self.tpool, resp.write, chunk)
+                    await resp.async_write(chunk)
                 except OSError:
                     client_disconnected = True
                     break
         finally:
-            # Close the async iterator (e.g. async generator cleanup)
             if hasattr(http_response, "aclose"):
                 await http_response.aclose()
 
-            # Finalize: close chunked encoding, log access, clean up
-            def _finalize() -> None:
-                try:
-                    if not client_disconnected:
-                        resp.close()
-                except OSError:
-                    pass
-                finally:
-                    request_time = datetime.now() - request_start
-                    if http_response.log_access:
-                        log_access(resp, req, request_time)
-                    if hasattr(http_response, "close"):
-                        http_response.close()
-
-            await loop.run_in_executor(self.tpool, _finalize)
+            try:
+                if not client_disconnected:
+                    await resp.async_close()
+            except OSError:
+                pass
+            finally:
+                request_time = datetime.now() - request_start
+                if http_response.log_access:
+                    log_access(resp, req, request_time)
+                if hasattr(http_response, "close"):
+                    http_response.close()
 
         if client_disconnected or resp.should_close():
             return False

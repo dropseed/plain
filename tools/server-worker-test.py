@@ -330,6 +330,81 @@ def test_keepalive_after_chunked_body(
         s.close()
 
 
+def test_large_body_bridge(addr: tuple[str, int]) -> bool | tuple[bool, str]:
+    """Large POST body (3MB, above default 2.5MB limit) gets a response."""
+    s = connect(addr)
+    s.settimeout(30)
+    try:
+        body = b"x" * (3 * 1024 * 1024)  # 3MB
+        post = (
+            b"POST / HTTP/1.1\r\n"
+            b"Host: localhost\r\n"
+            b"Connection: close\r\n"
+            b"Content-Length: " + str(len(body)).encode() + b"\r\n"
+            b"\r\n" + body
+        )
+        s.sendall(post)
+        resp = recv_close_response(s)
+        status = parse_status(resp)
+        if is_valid(status):
+            return True
+        return False, f"Status: {status}"
+    finally:
+        s.close()
+
+
+def test_expect_100_continue(addr: tuple[str, int]) -> bool | tuple[bool, str]:
+    """Server handles Expect: 100-continue correctly."""
+    s = connect(addr)
+    s.settimeout(10)
+    try:
+        body = b"test body content"
+        post = (
+            b"POST / HTTP/1.1\r\n"
+            b"Host: localhost\r\n"
+            b"Connection: close\r\n"
+            b"Expect: 100-continue\r\n"
+            b"Content-Length: " + str(len(body)).encode() + b"\r\n"
+            b"\r\n"
+        )
+        s.sendall(post)
+
+        # Wait for 100 Continue interim response
+        buf = b""
+        while b"\r\n\r\n" not in buf:
+            chunk = s.recv(4096)
+            if not chunk:
+                return False, "Connection closed before 100 Continue"
+            buf += chunk
+
+        first_line = buf.split(b"\r\n")[0]
+        if b"100" not in first_line:
+            return False, f"Expected 100 Continue, got: {first_line!r}"
+
+        # Now send the body
+        s.sendall(body)
+
+        # Read the final response (after the 100 Continue)
+        resp = recv_close_response(s)
+
+        # Find the final status — skip any leading data from the 100 response
+        # that might still be in the buffer
+        all_data = buf + resp
+        # Look for the final HTTP status line (not the 100)
+        final_status = 0
+        for m in _STATUS_RE.finditer(all_data):
+            code = int(m.group(1))
+            if code != 100:
+                final_status = code
+                break
+
+        if is_valid(final_status):
+            return True
+        return False, f"Final status: {final_status}"
+    finally:
+        s.close()
+
+
 def test_keepalive_timeout(addr: tuple[str, int]) -> bool | tuple[bool, str]:
     """Server closes idle keep-alive connections after timeout (~2s)."""
     s = connect(addr)
@@ -389,6 +464,8 @@ def main() -> int:
         ("Keep-alive after POST body (1KB)", test_keepalive_after_post_body),
         ("Keep-alive after POST body (64KB)", test_keepalive_after_large_body),
         ("Keep-alive after chunked POST body", test_keepalive_after_chunked_body),
+        ("Large POST body (3MB, bridge path)", test_large_body_bridge),
+        ("Expect: 100-continue", test_expect_100_continue),
         ("Keep-alive timeout closes connection", test_keepalive_timeout),
     ]
 

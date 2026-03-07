@@ -6,14 +6,13 @@ from __future__ import annotations
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
+import asyncio
 import io
 import os
 import socket
 from collections.abc import Iterable, Iterator
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    pass
+from .. import util
 
 # Classes that can undo reading data from
 # a given type of data source.
@@ -86,3 +85,69 @@ class IterUnreader(Unreader):
         except StopIteration:
             self.iter = None
             return b""
+
+
+class BufferUnreader(Unreader):
+    """Unreader backed by pre-read bytes with no socket I/O.
+
+    Used when headers and body have been read asynchronously on the
+    event loop and the data is already in memory.  The parser reads
+    headers from the buffer and sets up body readers (ChunkedReader,
+    LengthReader) that also read from this buffer.
+    """
+
+    def __init__(self, data: bytes) -> None:
+        super().__init__()
+        self.buf.write(data)
+
+    def chunk(self) -> bytes:
+        # All data is pre-buffered; nothing more to read.
+        return b""
+
+
+class AsyncBridgeUnreader(Unreader):
+    """Unreader that bridges async socket reads to sync parser reads.
+
+    Used for large request bodies that shouldn't be fully pre-buffered.
+    Headers and any initial body bytes are in the buffer. When the buffer
+    is exhausted, chunk() bridges to the event loop via
+    run_coroutine_threadsafe for lazy socket reads.
+
+    IMPORTANT: chunk() blocks the calling thread, so this unreader must
+    only be used from a thread pool — never from the event loop thread.
+    """
+
+    def __init__(
+        self,
+        data: bytes,
+        sock: socket.socket,
+        loop: asyncio.AbstractEventLoop,
+        timeout: float = 30,
+    ) -> None:
+        super().__init__()
+        self.buf.write(data)
+        self._sock = sock
+        self._loop = loop
+        self._timeout = timeout
+        self._eof = False
+        self.socket_bytes_read = 0
+
+    def chunk(self) -> bytes:
+        if self._eof:
+            return b""
+        future = asyncio.run_coroutine_threadsafe(
+            util.async_recv(self._sock, 8192), self._loop
+        )
+        try:
+            # On Python 3.11+, concurrent.futures.TimeoutError is
+            # builtins.TimeoutError so this except clause catches it.
+            data = future.result(timeout=self._timeout)
+        except TimeoutError:
+            future.cancel()
+            self._eof = True
+            raise
+        if not data:
+            self._eof = True
+        else:
+            self.socket_bytes_read += len(data)
+        return data
