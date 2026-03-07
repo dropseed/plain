@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.11.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.11.0) (2026-03-06)
+
+### What's changed
+
+- Updated request detail template to access `view_class` directly on `resolver_match` instead of through `resolver_match.view.view_class`, adapting to the view API changes in plain 0.118.0 ([0d0c8a64cb45](https://github.com/dropseed/plain/commit/0d0c8a64cb45))
+
+### Upgrade instructions
+
+- Requires `plain>=0.118.0`.
+
 ## [0.10.3](https://github.com/dropseed/plain/releases/plain-toolbar@0.10.3) (2026-02-26)
 
 ### What's changed
