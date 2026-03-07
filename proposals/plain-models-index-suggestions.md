@@ -2,6 +2,8 @@
 packages:
 - plain-models
 - plain-observer
+related:
+- plain-observer-testing
 ---
 
 # Plain Models Index Suggestions

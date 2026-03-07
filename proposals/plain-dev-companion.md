@@ -3,6 +3,7 @@ packages:
 - plain-dev
 related:
 - plain-elements-dev-toolbar
+- plain-server-h2-websockets
 ---
 
 # plain-dev: WebSocket Development Companion

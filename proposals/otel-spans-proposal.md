@@ -2,6 +2,7 @@
 packages:
 - plain.server
 related:
+- plain-auth-otel-user-context
 - plain-metrics
 ---
 

@@ -1,6 +1,8 @@
 ---
 packages:
 - plain-admin
+depends_on:
+- plain-realtime-architecture
 related:
 - plain-metrics
 - plain-pageviews-dashboard

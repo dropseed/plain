@@ -1,7 +1,7 @@
 ---
 packages:
 - plain-models
-related:
+depends_on:
 - plain-models-explicit-create-update
 ---
 

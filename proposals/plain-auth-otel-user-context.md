@@ -2,6 +2,7 @@
 packages:
 - plain-auth
 related:
+- otel-spans-proposal
 - plain-metrics
 - plain-observer-testing
 ---
