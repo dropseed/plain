@@ -23,7 +23,7 @@ from plain.runtime import settings
 from . import sock
 from .errors import APP_LOAD_ERROR, WORKER_BOOT_ERROR, HaltServer
 from .workers.entry import worker_main
-from .workers.thread import check_worker_config
+from .workers.worker import check_worker_config
 from .workers.workertmp import WorkerHeartbeat
 
 if TYPE_CHECKING:

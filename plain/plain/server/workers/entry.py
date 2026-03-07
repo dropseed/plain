@@ -98,7 +98,7 @@ def worker_main(
 
             handler = util.make_fail_handler(traceback.format_exc())
 
-        from .thread import Worker
+        from .worker import Worker
 
         worker = Worker(age, os.getppid(), listeners, app, timeout, heartbeat, handler)
         worker.pid = os.getpid()

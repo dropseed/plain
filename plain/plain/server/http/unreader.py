@@ -114,7 +114,7 @@ class AsyncBridgeUnreader(Unreader):
     is exhausted, chunk() bridges to the event loop via
     run_coroutine_threadsafe for lazy reads.
 
-    Accepts either a TConn (which may have a StreamReader for TLS) or
+    Accepts either a Connection (which may have a StreamReader for TLS) or
     falls back to raw socket reads via util.async_recv.
 
     IMPORTANT: chunk() blocks the calling thread, so this unreader must

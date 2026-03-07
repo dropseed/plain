@@ -76,11 +76,6 @@ def close_on_exec(fd: int) -> None:
     fcntl.fcntl(fd, fcntl.F_SETFD, flags)
 
 
-def set_non_blocking(fd: int) -> None:
-    flags = fcntl.fcntl(fd, fcntl.F_GETFL) | os.O_NONBLOCK
-    fcntl.fcntl(fd, fcntl.F_SETFL, flags)
-
-
 def close(sock: socket.socket) -> None:
     try:
         sock.close()
@@ -138,10 +133,6 @@ def _error_response_bytes(status_int: int, reason: str, mesg: str) -> bytes:
         f"{body}"
     )
     return response.encode("latin1")
-
-
-def write_error(sock: socket.socket, status_int: int, reason: str, mesg: str) -> None:
-    write_nonblock(sock, _error_response_bytes(status_int, reason, mesg))
 
 
 async def _async_wait_readable(sock: socket.socket) -> None:
