@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-auth@0.27.0) (2026-03-07)
+
+### What's changed
+
+- Removed positional `*args` from `resolve_url()`, which now only accepts keyword arguments for URL resolution ([6eecc35](https://github.com/dropseed/plain/commit/6eecc35ff197))
+
+### Upgrade instructions
+
+- If you call `resolve_url()` with positional arguments for URL parameters, switch to keyword arguments (e.g., `resolve_url("myapp:detail", obj.pk)` becomes `resolve_url("myapp:detail", pk=obj.pk)`).
+
 ## [0.26.1](https://github.com/dropseed/plain/releases/plain-auth@0.26.1) (2026-03-04)
 
 ### What's changed
