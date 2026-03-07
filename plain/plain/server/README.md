@@ -194,6 +194,50 @@ plain server --timeout 120
 
 ## Architecture
 
+Plain's server is vertically integrated — there is no WSGI/ASGI boundary between the server and the framework. The server, handler, and middleware are all part of the same system.
+
+### Request lifecycle
+
+A request passes through three layers:
+
+1. **Server** — accepts the connection, handles TLS, parses HTTP, manages keep-alive. All network I/O runs on an asyncio event loop. The server's job is protocol correctness and resource protection (connection limits, timeouts, body size limits).
+
+2. **Handler** — dispatched in the thread pool, the handler orchestrates the application response. It runs the middleware chain, resolves the URL, and dispatches the view. The handler is a thin coordinator — it doesn't make policy decisions.
+
+3. **Middleware** — application-level logic that wraps request processing. Security policies (CSRF, host validation), session management, database connection lifecycle, and response headers all live here. Middleware uses two phases: `before_request` (can short-circuit with a response) and `after_response` (can modify the response). See the [HTTP middleware docs](../http/README.md#middleware) for details on writing custom middleware.
+
+```
+Client
+  │
+  ▼
+Server (event loop)
+  ├── Accept connection
+  ├── TLS handshake
+  ├── Parse HTTP headers + body
+  ├── Health check (responds directly, no thread pool)
+  │
+  ▼
+Handler (thread pool)
+  ├── before_request middleware chain
+  │     ├── Host validation
+  │     ├── HTTPS redirect
+  │     ├── CSRF check
+  │     ├── Session load
+  │     └── [user middleware]
+  ├── URL resolution → View dispatch
+  └── after_response middleware chain (reverse)
+        ├── [user middleware]
+        ├── Session save
+        ├── Slash redirect
+        └── Default headers
+  │
+  ▼
+Server (event loop)
+  └── Write response
+```
+
+### Connection handling
+
 Each worker process runs an asyncio event loop that handles all network I/O. A thread pool is reserved exclusively for application code.
 
 ```mermaid
