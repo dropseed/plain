@@ -22,21 +22,18 @@ logger = logging.getLogger("plain.request")
 
 class View:
     request: Request
-    url_args: tuple
     url_kwargs: dict[str, Any]
 
     def __init__(
         self,
         *,
         request: Request,
-        url_args: tuple = (),
         url_kwargs: dict[str, Any] | None = None,
     ) -> None:
         if hasattr(self, "get") and not hasattr(self, "head"):
             self.head = self.get
 
         self.request = request
-        self.url_args = url_args
         self.url_kwargs = url_kwargs or {}
 
     def get_request_handler(self) -> Callable[[], Any] | None:

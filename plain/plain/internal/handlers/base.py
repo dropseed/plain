@@ -211,7 +211,6 @@ class BaseHandler:
                 resolver_match = self._resolve_request(request)
                 view = resolver_match.view_class(
                     request=request,
-                    url_args=resolver_match.args,
                     url_kwargs=resolver_match.kwargs,
                 )
                 response = view.get_response()

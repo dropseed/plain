@@ -34,7 +34,7 @@ def generate_link_url(
     """
     token = signing.dumps({"user_id": user.id, "email": email}, expires_in=expires_in)
 
-    return request.build_absolute_uri(reverse("loginlink:login", token))
+    return request.build_absolute_uri(reverse("loginlink:login", token=token))
 
 
 def get_link_token_user(token: str) -> Model:

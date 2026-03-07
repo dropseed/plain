@@ -446,7 +446,7 @@ CSRF_EXEMPT_PATHS = [
 
 #### How do I access URL parameters?
 
-URL parameters are available via `self.url_kwargs` (keyword arguments) and `self.url_args` (positional arguments).
+URL parameters are available via `self.url_kwargs`.
 
 ```python
 class ExampleView(View):

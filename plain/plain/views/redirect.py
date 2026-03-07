@@ -21,7 +21,7 @@ class RedirectView(View):
         if self.url:
             url = self.url % self.url_kwargs
         elif self.url_name:
-            url = reverse(self.url_name, *self.url_args, **self.url_kwargs)
+            url = reverse(self.url_name, **self.url_kwargs)
         else:
             raise ValueError("RedirectView requires either url or url_name to be set")
 

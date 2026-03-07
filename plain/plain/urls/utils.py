@@ -9,7 +9,7 @@ from .exceptions import NoReverseMatch
 from .resolvers import get_ns_resolver, get_resolver
 
 
-def reverse(url_name: str, *args: Any, **kwargs: Any) -> str:
+def reverse(url_name: str, **kwargs: Any) -> str:
     resolver = get_resolver()
 
     *path, view = url_name.split(":")
@@ -42,7 +42,7 @@ def reverse(url_name: str, *args: Any, **kwargs: Any) -> str:
     if ns_pattern:
         resolver = get_ns_resolver(ns_pattern, resolver, tuple(ns_converters.items()))
 
-    return resolver.reverse(view, *args, **kwargs)
+    return resolver.reverse(view, **kwargs)
 
 
 reverse_lazy = lazy(reverse, str)
@@ -62,6 +62,6 @@ def absolute_url(path: str) -> str:
     return base + path
 
 
-def reverse_absolute(url_name: str, *args: Any, **kwargs: Any) -> str:
+def reverse_absolute(url_name: str, **kwargs: Any) -> str:
     """Reverse a URL name and return an absolute URL using the BASE_URL setting."""
-    return absolute_url(reverse(url_name, *args, **kwargs))
+    return absolute_url(reverse(url_name, **kwargs))

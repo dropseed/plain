@@ -236,7 +236,9 @@ class AssetView(View):
         from .urls import AssetsRouter
 
         return RedirectResponse(
-            redirect_to=reverse(f"{AssetsRouter.namespace}:asset", compiled_url_path),
+            redirect_to=reverse(
+                f"{AssetsRouter.namespace}:asset", path=compiled_url_path
+            ),
             headers={
                 "Cache-Control": "max-age=60",  # Can cache this for a short time, but the fingerprinted path can change
             },

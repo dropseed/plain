@@ -34,14 +34,12 @@ class ResolverMatch:
         self,
         *,
         view_class: type,
-        args: tuple[Any, ...],
         kwargs: dict[str, Any],
         url_name: str | None = None,
         namespaces: list[str] | None = None,
         route: str | None = None,
     ):
         self.view_class = view_class
-        self.args = args
         self.kwargs = kwargs
         self.url_name = url_name
         self.route = route
@@ -224,7 +222,7 @@ class URLResolver:
         path = str(path)  # path may be a reverse_lazy object
         match = self.pattern.match(path)
         if match:
-            new_path, args, kwargs = match
+            new_path, kwargs = match
             for pattern in self.url_patterns:
                 try:
                     sub_match = pattern.resolve(new_path)
@@ -232,15 +230,6 @@ class URLResolver:
                     pass
                 else:
                     if sub_match:
-                        # Merge captured arguments in match with submatch
-                        # Update the sub_match_dict with the kwargs from the sub_match.
-                        sub_match_dict = {**kwargs, **sub_match.kwargs}
-                        # If there are *any* named groups, ignore all non-named groups.
-                        # Otherwise, pass all non-named arguments as positional
-                        # arguments.
-                        sub_match_args = sub_match.args
-                        if not sub_match_dict:
-                            sub_match_args = args + sub_match.args
                         current_route = (
                             ""
                             if isinstance(pattern, URLPattern)
@@ -248,8 +237,7 @@ class URLResolver:
                         )
                         return ResolverMatch(
                             view_class=sub_match.view_class,
-                            args=sub_match_args,
-                            kwargs=sub_match_dict,
+                            kwargs={**kwargs, **sub_match.kwargs},
                             url_name=sub_match.url_name,
                             namespaces=[self.namespace] + sub_match.namespaces,
                             route=self._join_route(current_route, sub_match.route),
@@ -257,10 +245,7 @@ class URLResolver:
             raise Resolver404({"path": new_path})
         raise Resolver404({"path": path})
 
-    def reverse(self, lookup_view: Any, *args: Any, **kwargs: Any) -> str:
-        if args and kwargs:
-            raise ValueError("Don't mix *args and **kwargs in call to reverse()!")
-
+    def reverse(self, lookup_view: Any, **kwargs: Any) -> str:
         if not self._populated:
             self._populate()
 
@@ -268,14 +253,9 @@ class URLResolver:
 
         for possibility, pattern, converters in possibilities:
             for result, params in possibility:
-                if args:
-                    if len(args) != len(params):
-                        continue
-                    candidate_subs = dict(zip(params, args))
-                else:
-                    if set(kwargs).symmetric_difference(params):
-                        continue
-                    candidate_subs = kwargs
+                if set(kwargs).symmetric_difference(params):
+                    continue
+                candidate_subs = kwargs
                 # Convert the candidate subs to text using Converter.to_url().
                 text_candidate_subs = {}
                 match = True
@@ -323,9 +303,7 @@ class URLResolver:
 
         patterns = [pos[1] for pos in possibilities]
         if patterns:
-            if args:
-                arg_msg = f"arguments '{args}'"
-            elif kwargs:
+            if kwargs:
                 arg_msg = f"keyword arguments '{kwargs}'"
             else:
                 arg_msg = "no arguments"

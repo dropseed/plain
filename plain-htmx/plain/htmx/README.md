@@ -261,7 +261,7 @@ And then subsequent HTMX requests/actions on individual items can be handled by 
 
 ```html
 <!-- pullrequests/pullrequest_detail_htmx.html -->
-<div hx-url="{% url 'pullrequests:detail' pullrequest.uuid %}" hx-swap="outerHTML" hx-target="this">
+<div hx-url="{{ url('pullrequests:detail', uuid=pullrequest.uuid) }}" hx-swap="outerHTML" hx-target="this">
   <!-- Send all HTMX requests to a URL for single pull requests (works inside of a loop, or on a single detail page) -->
   <h2>{{ pullrequest.title }}</h2>
   <button hx-get>Refresh</button>

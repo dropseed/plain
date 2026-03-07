@@ -55,21 +55,22 @@ class RegexPattern(CheckURLMixin):
         self.name = name
         self.converters: dict[str, Any] = {}
         self.regex = self._compile(str(regex))
+        if self.regex.groups > len(self.regex.groupindex):
+            raise ImproperlyConfigured(
+                f"Regex pattern '{regex}' uses unnamed groups. "
+                "Use named groups (?P<name>...) instead."
+            )
 
-    def match(self, path: str) -> tuple[str, tuple[Any, ...], dict[str, Any]] | None:
+    def match(self, path: str) -> tuple[str, dict[str, Any]] | None:
         match = (
             self.regex.fullmatch(path)
             if self._is_endpoint and self.regex.pattern.endswith("$")
             else self.regex.search(path)
         )
         if match:
-            # If there are any named groups, use those as kwargs, ignoring
-            # non-named groups. Otherwise, pass all non-named arguments as
-            # positional arguments.
             kwargs = match.groupdict()
-            args = () if kwargs else match.groups()
             kwargs = {k: v for k, v in kwargs.items() if v is not None}
-            return path[match.end() :], args, kwargs
+            return path[match.end() :], kwargs
         return None
 
     def preflight(self) -> list[PreflightResult]:
@@ -165,10 +166,9 @@ class RoutePattern(CheckURLMixin):
         self.converters = _route_to_regex(str(route), is_endpoint)[1]
         self.regex = self._compile(str(route))
 
-    def match(self, path: str) -> tuple[str, tuple[()], dict[str, Any]] | None:
+    def match(self, path: str) -> tuple[str, dict[str, Any]] | None:
         match = self.regex.search(path)
         if match:
-            # RoutePattern doesn't allow non-named groups so args are ignored.
             kwargs = match.groupdict()
             for key, value in kwargs.items():
                 converter = self.converters[key]
@@ -176,7 +176,7 @@ class RoutePattern(CheckURLMixin):
                     kwargs[key] = converter.to_python(value)
                 except ValueError:
                     return None
-            return path[match.end() :], (), kwargs
+            return path[match.end() :], kwargs
         return None
 
     def preflight(self) -> list[PreflightResult]:
@@ -239,12 +239,11 @@ class URLPattern:
     def resolve(self, path: str) -> Any:
         match = self.pattern.match(path)
         if match:
-            new_path, args, captured_kwargs = match
+            new_path, captured_kwargs = match
             from .resolvers import ResolverMatch
 
             return ResolverMatch(
                 view_class=self.view_class,
-                args=args,
                 kwargs=captured_kwargs,
                 url_name=self.pattern.name,
                 route=str(self.pattern),

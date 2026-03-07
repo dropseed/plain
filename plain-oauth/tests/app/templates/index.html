@@ -8,7 +8,7 @@ Hello {{ user }}!
     {% for connection in user.oauth_connections.query.all() %}
     <li>
         {{ connection.provider_key }} [ID: {{ connection.provider_user_id }}]
-        <form action="{{ url('oauth:disconnect', connection.provider_key) }}" method="post">
+        <form action="{{ url('oauth:disconnect', provider=connection.provider_key) }}" method="post">
             <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
             <button type="submit">Disconnect</button>
         </form>
@@ -21,7 +21,7 @@ Hello {{ user }}!
     {% for provider_key in oauth_provider_keys %}
     <li>
         {{ provider_key}}
-        <form action="{{ url('oauth:connect', provider_key) }}" method="post">
+        <form action="{{ url('oauth:connect', provider=provider_key) }}" method="post">
             <button type="submit">Connect</button>
         </form>
     </li>

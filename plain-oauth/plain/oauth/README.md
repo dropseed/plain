@@ -93,7 +93,7 @@ OAUTH_LOGIN_PROVIDERS = {
 Add a login button in your template:
 
 ```html
-<form action="{% url 'oauth:login' 'github' %}" method="post">
+<form action="{{ url('oauth:login', provider='github') }}" method="post">
     <button type="submit">Login with GitHub</button>
 </form>
 ```
@@ -143,7 +143,7 @@ Authenticated users can connect additional OAuth providers or disconnect existin
     {% for connection in get_current_user().oauth_connections.all %}
     <li>
         {{ connection.provider_key }}
-        <form action="{% url 'oauth:disconnect' connection.provider_key %}" method="post">
+        <form action="{{ url('oauth:disconnect', provider=connection.provider_key) }}" method="post">
             <input type="hidden" name="provider_user_id" value="{{ connection.provider_user_id }}">
             <button type="submit">Disconnect</button>
         </form>
@@ -155,7 +155,7 @@ Authenticated users can connect additional OAuth providers or disconnect existin
 <ul>
     {% for provider_key in oauth_provider_keys %}
     <li>
-        <form action="{% url 'oauth:connect' provider_key %}" method="post">
+        <form action="{{ url('oauth:connect', provider=provider_key) }}" method="post">
             <button type="submit">Connect {{ provider_key }}</button>
         </form>
     </li>

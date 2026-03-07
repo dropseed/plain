@@ -6,7 +6,7 @@ from plain.urls import NoReverseMatch, reverse
 from plain.utils.functional import Promise
 
 
-def resolve_url(to: Any, *args: Any, **kwargs: Any) -> str:
+def resolve_url(to: Any, **kwargs: Any) -> str:
     """
     Return a URL appropriate for the arguments passed.
 
@@ -34,7 +34,7 @@ def resolve_url(to: Any, *args: Any, **kwargs: Any) -> str:
 
     # Next try a reverse URL resolution.
     try:
-        return reverse(to, *args, **kwargs)
+        return reverse(to, **kwargs)
     except NoReverseMatch:
         # If this is a callable, re-raise.
         if callable(to):

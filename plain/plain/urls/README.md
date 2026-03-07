@@ -246,7 +246,7 @@ from plain.urls import path
 path(re.compile(r"^articles/(?P<year>[0-9]{4})/$"), views.ArticleView, name="article")
 ```
 
-Named groups become keyword arguments. Unnamed groups become positional arguments accessible via `self.url_args`.
+Named groups become keyword arguments accessible via `self.url_kwargs`.
 
 ## FAQs
 
@@ -257,10 +257,6 @@ By default, Plain's `APPEND_SLASH` setting redirects URLs without a trailing sla
 #### How do I debug URL routing issues?
 
 Check that your URL patterns are in the correct order. Plain matches patterns top to bottom and uses the first match. More specific patterns should come before general ones.
-
-#### Can I access URL arguments as positional args instead of kwargs?
-
-If you use regex patterns with unnamed groups (no `?P<name>`), values are passed as positional arguments in `self.url_args`. Named groups always populate `self.url_kwargs`.
 
 ## Installation
 

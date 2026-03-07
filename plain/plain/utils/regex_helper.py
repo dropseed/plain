@@ -57,11 +57,6 @@ def _normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
         or '\w') in the pattern.
     (4) Ignore look-ahead and look-behind assertions.
     (5) Raise an error on any disjunctive ('|') constructs.
-
-    Plain's URLs for forward resolving are either all positional arguments or
-    all keyword arguments. That is assumed here, as well. Although reverse
-    resolving can be done using positional args when keyword args are
-    specified, the two cannot be mixed in the same reverse() call.
     """
     # Do a linear scan to work out the special features of this pattern. The
     # idea is that we scan once here and collect all the information we need to
@@ -70,7 +65,6 @@ def _normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
     non_capturing_groups = []
     consume_next = True
     pattern_iter = _next_char(iter(pattern))
-    num_args = 0
 
     # A "while" loop is used here because later on we need to be able to peek
     # at the next character and possibly go around without consuming another
@@ -115,10 +109,8 @@ def _normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
                 # Some kind of group.
                 ch, escaped = next(pattern_iter)
                 if ch != "?" or escaped:
-                    # A positional group
-                    name = "_%d" % num_args  # noqa: UP031
-                    num_args += 1
-                    result.append(Group(((f"%({name})s"), name)))
+                    # Unnamed groups are not supported (caught by
+                    # RegexPattern.__init__). Skip to the end.
                     _walk_to_end(ch, pattern_iter)
                 else:
                     ch, escaped = next(pattern_iter)
@@ -139,8 +131,8 @@ def _normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
                             raise ValueError(
                                 f"Non-reversible reg-exp portion: '(?P{ch}'"
                             )
-                        # We are in a named capturing group. Extra the name and
-                        # then skip to the end.
+                        # We are in a named capturing group. Extract the name
+                        # and then skip to the end.
                         if ch == "<":
                             terminal_char = ">"
                         # We are in a named backreference.
