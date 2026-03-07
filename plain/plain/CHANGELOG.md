@@ -16,6 +16,7 @@
 - Replace `self.url_args` with `self.url_kwargs` in all views. If you used positional URL arguments with unnamed regex groups, convert them to named groups (`(?P<name>...)`).
 - Replace any `reverse(name, arg1, arg2)` calls with `reverse(name, param1=arg1, param2=arg2)` using keyword arguments.
 - Replace any `reverse_absolute(name, arg1)` calls similarly.
+- In templates, replace `url("name", arg1)` with `url("name", param1=arg1)` using keyword arguments.
 - No server configuration changes are required — the new settings have sensible defaults.
 
 ## [0.118.0](https://github.com/dropseed/plain/releases/plain@0.118.0) (2026-03-06)
