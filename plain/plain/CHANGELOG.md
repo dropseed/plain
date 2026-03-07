@@ -1,5 +1,22 @@
 # plain changelog
 
+## [0.118.0](https://github.com/dropseed/plain/releases/plain@0.118.0) (2026-03-06)
+
+### What's changed
+
+- **Removed `as_view()` and `setup()` from View** — views are now passed as classes directly to URL patterns (e.g., `path("foo/", MyView)` instead of `path("foo/", MyView.as_view())`). The `setup()` method is removed; request, URL args, and URL kwargs are set directly on the view instance. `View.__init__` no longer accepts arguments. The `view_class` attribute moved from `URLPattern.view` to `URLPattern.view_class` directly ([0d0c8a64cb45](https://github.com/dropseed/plain/commit/0d0c8a64cb45))
+- **Removed `--pidfile` option from server** — the `--pidfile` CLI option and `SERVER_PIDFILE` setting have been removed ([3ac519e691b2](https://github.com/dropseed/plain/commit/3ac519e691b2))
+- **Removed `--max-requests` option from server** — the `--max-requests` CLI option and `SERVER_MAX_REQUESTS` setting have been removed ([b48cdbafad33](https://github.com/dropseed/plain/commit/b48cdbafad33))
+- Unified server dispatch through `handler.handle()`, consolidating the request pipeline for both HTTP/1.1 and HTTP/2 ([e47efeb99332](https://github.com/dropseed/plain/commit/e47efeb99332))
+- Fixed thread affinity in production request pipeline to ensure views run on the correct thread ([6827fe551702](https://github.com/dropseed/plain/commit/6827fe551702))
+
+### Upgrade instructions
+
+- Replace all `MyView.as_view()` calls in URL patterns with just `MyView`.
+- Remove any `**kwargs` passed to `as_view()` — set attributes on the class or override methods instead.
+- If you override `setup()` in a view, move that logic to `get()`, `post()`, or another view method.
+- Remove any `--pidfile` or `--max-requests` flags from server invocations and the `SERVER_PIDFILE` / `SERVER_MAX_REQUESTS` settings.
+
 ## [0.117.1](https://github.com/dropseed/plain/releases/plain@0.117.1) (2026-03-06)
 
 ### What's changed
