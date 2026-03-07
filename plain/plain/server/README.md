@@ -69,7 +69,6 @@ Most options can also be configured via settings (see below). CLI arguments take
 | `--reload`                       | -                   | Restart workers on code changes      |
 | `--certfile`                     | -                   | Path to SSL certificate file         |
 | `--keyfile`                      | -                   | Path to SSL key file                 |
-| `--pidfile`                      | -                   | PID file path                        |
 
 ## Settings
 

@@ -59,11 +59,6 @@ from plain.cli.options import SettingOption
     setting="SERVER_ACCESS_LOG",
     help="Enable/disable access logging to stdout",
 )
-@click.option(
-    "--pidfile",
-    type=click.Path(),
-    help="PID file path",
-)
 def server(
     bind: tuple[str, ...],
     threads: int,
@@ -73,7 +68,6 @@ def server(
     keyfile: str | None,
     reload: bool,
     access_log: bool,
-    pidfile: str | None,
 ) -> None:
     """Production-ready HTTP server"""
     from plain.runtime import settings
@@ -98,7 +92,6 @@ def server(
         workers=workers,
         timeout=timeout,
         reload=reload,
-        pidfile=pidfile,
         certfile=certfile,
         keyfile=keyfile,
         accesslog=access_log,

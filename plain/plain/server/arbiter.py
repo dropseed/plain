@@ -22,7 +22,6 @@ from plain.runtime import settings
 
 from . import sock
 from .errors import APP_LOAD_ERROR, WORKER_BOOT_ERROR, HaltServer
-from .pidfile import Pidfile
 from .workers.entry import worker_main
 from .workers.thread import check_worker_config
 from .workers.workertmp import WorkerHeartbeat
@@ -55,8 +54,6 @@ class Arbiter:
         self.timeout: int = app.timeout
         self.pid: int = os.getpid()
         self.worker_age: int = 0
-        self.pidfile: Pidfile | None = None
-
         self._workers: dict[int, WorkerInfo] = {}
         self._listeners: list[sock.BaseSocket] = []
         self._shutdown_event = threading.Event()
@@ -90,16 +87,10 @@ class Arbiter:
         except Exception:
             self.log.error("Unhandled exception in main loop", exc_info=True)
             self._stop(graceful=False)
-            if self.pidfile is not None:
-                self.pidfile.unlink()
             sys.exit(-1)
 
     def _start(self) -> None:
-        """Initialize the arbiter. Start listening and set pidfile if needed."""
-        if self.app.pidfile is not None:
-            self.pidfile = Pidfile(self.app.pidfile)
-            self.pidfile.create(self.pid)
-
+        """Initialize the arbiter. Start listening."""
         # SIGTERM = graceful shutdown, SIGINT/SIGQUIT = immediate shutdown
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_hard_stop)
@@ -135,8 +126,6 @@ class Arbiter:
         if reason is not None:
             log_func("Reason: %s", reason)
 
-        if self.pidfile is not None:
-            self.pidfile.unlink()
         sys.exit(exit_status)
 
     def _stop(self, graceful: bool = True) -> None:

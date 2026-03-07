@@ -25,7 +25,6 @@ class ServerApplication:
         threads: int,
         timeout: int,
         reload: bool,
-        pidfile: str | None,
         certfile: str | None,
         keyfile: str | None,
         accesslog: bool,
@@ -35,7 +34,6 @@ class ServerApplication:
         self.threads = threads
         self.timeout = timeout
         self.reload = reload
-        self.pidfile = pidfile
         self.certfile = certfile
         self.keyfile = keyfile
         self.accesslog = accesslog
