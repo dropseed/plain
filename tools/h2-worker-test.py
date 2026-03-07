@@ -427,7 +427,7 @@ def test_response_body_received(addr: tuple[str, int]) -> bool | tuple[bool, str
         responses = collect_responses(conn, sock, {sid})
         status = responses[sid]["status"]
         body = responses[sid]["data"]
-        if status == 200 and len(body) > 0:
+        if is_valid(status) and len(body) > 0:
             return True
         return False, f"Status: {status}, body length: {len(body)}"
     finally:
