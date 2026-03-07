@@ -297,15 +297,12 @@ async def async_handle_h2_connection(
     handler: Any,
     is_ssl: bool,
     executor: ThreadPoolExecutor,
-    max_requests: int = 0,
-) -> int:
+) -> None:
     """Async HTTP/2 connection loop.
 
     Reads frames from the socket in a dedicated thread (to avoid exhausting
     the shared executor pool), dispatches each completed stream as an
     independent asyncio task.
-
-    Returns the number of streams (requests) completed.
     """
     config = h2.config.H2Configuration(client_side=False)
     conn = h2.connection.H2Connection(config=config)
@@ -324,7 +321,6 @@ async def async_handle_h2_connection(
     sock.settimeout(30)
 
     stream_tasks: dict[int, asyncio.Task[None]] = {}
-    streams_completed = 0
 
     recv_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
     reader_stop = threading.Event()
@@ -432,10 +428,8 @@ async def async_handle_h2_connection(
                         def _on_stream_done(
                             t: asyncio.Task[None], sid: int = event.stream_id
                         ) -> None:
-                            nonlocal streams_completed
                             stream_tasks.pop(sid, None)
                             state.cleanup_stream(sid)
-                            streams_completed += 1
 
                         task.add_done_callback(_on_stream_done)
 
@@ -467,12 +461,6 @@ async def async_handle_h2_connection(
             else:
                 async with state.write_lock:
                     await state.flush()
-                if max_requests and streams_completed >= max_requests:
-                    log.info(
-                        "HTTP/2 connection reached max_requests (%d), closing",
-                        max_requests,
-                    )
-                    break
                 continue
             # break from for-loop reached — exit while-loop too
             break
@@ -507,8 +495,6 @@ async def async_handle_h2_connection(
         await loop.run_in_executor(executor, reader_thread.join, 7.0)
         if reader_thread.is_alive():
             log.warning("H2 reader thread did not exit cleanly")
-
-    return streams_completed
 
 
 async def _async_handle_stream(

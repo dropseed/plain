@@ -59,18 +59,17 @@ All options are available via the command line. Run `plain server --help` to see
 
 Most options can also be configured via settings (see below). CLI arguments take priority over settings.
 
-| Option                           | Setting               | Description                          |
-| -------------------------------- | --------------------- | ------------------------------------ |
-| `--bind` / `-b`                  | -                     | Address to bind (can repeat)         |
-| `--workers` / `-w`               | `SERVER_WORKERS`      | Worker processes (0=auto, CPU count) |
-| `--threads`                      | `SERVER_THREADS`      | Threads per worker                   |
-| `--timeout` / `-t`               | `SERVER_TIMEOUT`      | Worker timeout in seconds            |
-| `--access-log / --no-access-log` | `SERVER_ACCESS_LOG`   | Enable/disable access logging        |
-| `--max-requests`                 | `SERVER_MAX_REQUESTS` | Max requests before worker restart   |
-| `--reload`                       | -                     | Restart workers on code changes      |
-| `--certfile`                     | -                     | Path to SSL certificate file         |
-| `--keyfile`                      | -                     | Path to SSL key file                 |
-| `--pidfile`                      | -                     | PID file path                        |
+| Option                           | Setting             | Description                          |
+| -------------------------------- | ------------------- | ------------------------------------ |
+| `--bind` / `-b`                  | -                   | Address to bind (can repeat)         |
+| `--workers` / `-w`               | `SERVER_WORKERS`    | Worker processes (0=auto, CPU count) |
+| `--threads`                      | `SERVER_THREADS`    | Threads per worker                   |
+| `--timeout` / `-t`               | `SERVER_TIMEOUT`    | Worker timeout in seconds            |
+| `--access-log / --no-access-log` | `SERVER_ACCESS_LOG` | Enable/disable access logging        |
+| `--reload`                       | -                   | Restart workers on code changes      |
+| `--certfile`                     | -                   | Path to SSL certificate file         |
+| `--keyfile`                      | -                   | Path to SSL key file                 |
+| `--pidfile`                      | -                   | PID file path                        |
 
 ## Settings
 
@@ -80,7 +79,6 @@ Server behavior can be configured in your `settings.py` file. These are the defa
 SERVER_WORKERS = 0           # 0 = auto (one per CPU core)
 SERVER_THREADS = 4
 SERVER_TIMEOUT = 30
-SERVER_MAX_REQUESTS = 0      # 0 = disabled
 SERVER_ACCESS_LOG = True
 SERVER_ACCESS_LOG_FIELDS = ["method", "path", "query", "status", "duration_ms", "size", "ip", "user_agent", "referer"]
 SERVER_GRACEFUL_TIMEOUT = 30

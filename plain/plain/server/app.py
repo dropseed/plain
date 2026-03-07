@@ -24,7 +24,6 @@ class ServerApplication:
         workers: int,
         threads: int,
         timeout: int,
-        max_requests: int,
         reload: bool,
         pidfile: str | None,
         certfile: str | None,
@@ -35,7 +34,6 @@ class ServerApplication:
         self.workers = workers
         self.threads = threads
         self.timeout = timeout
-        self.max_requests = max_requests
         self.reload = reload
         self.pidfile = pidfile
         self.certfile = certfile

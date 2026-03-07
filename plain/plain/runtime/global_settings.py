@@ -177,7 +177,6 @@ ASSETS_LOG_304: bool = False
 SERVER_WORKERS: int = int(os.environ.get("WEB_CONCURRENCY", 0))  # 0 = auto (CPU count)
 SERVER_THREADS: int = 4
 SERVER_TIMEOUT: int = 30
-SERVER_MAX_REQUESTS: int = 0
 SERVER_ACCESS_LOG: bool = True
 SERVER_ACCESS_LOG_FIELDS: list[str] = [
     "method",

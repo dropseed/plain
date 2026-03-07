@@ -26,7 +26,6 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from random import randint
 from types import FrameType
 from typing import TYPE_CHECKING, Any
 
@@ -62,9 +61,6 @@ class _H2Sentinel:
 
 
 _H2_SENTINEL = _H2Sentinel()
-
-# Maximum jitter to add to max_requests to stagger worker restarts
-MAX_REQUESTS_JITTER = 50
 
 # Keep-alive connection timeout in seconds
 KEEPALIVE = 2
@@ -158,14 +154,6 @@ class Worker:
         self.timeout = timeout
         self.booted = False
         self.reloader: Any = None
-
-        self.nr = 0
-
-        if app.max_requests > 0:
-            jitter = randint(0, MAX_REQUESTS_JITTER)
-            self.max_requests = app.max_requests + jitter
-        else:
-            self.max_requests = sys.maxsize
 
         self.alive = True
         self.log = logging.getLogger("plain.server")
@@ -313,27 +301,15 @@ class Worker:
                 ) = await loop.run_in_executor(self.tpool, self._parse_request, conn)
 
                 if isinstance(parse_result, _H2Sentinel):
-                    remaining = self.max_requests - self.nr
-                    if self.max_requests < sys.maxsize and remaining <= 0:
-                        self.log.info("Autorestarting worker after current request.")
-                        self.alive = False
-                        return
                     conn.handed_off = True
-                    h2_streams = await async_handle_h2_connection(
+                    await async_handle_h2_connection(
                         conn.sock,
                         conn.client,
                         conn.server,
                         self.handler,
                         self.app.is_ssl,
                         self.tpool,
-                        max_requests=remaining
-                        if self.max_requests < sys.maxsize
-                        else 0,
                     )
-                    self.nr += h2_streams
-                    if self.nr >= self.max_requests:
-                        self.log.info("Autorestarting worker after current request.")
-                        self.alive = False
                     return
 
                 if parse_result is None:
@@ -571,12 +547,6 @@ class Worker:
             http_request = create_request(req, conn.sock, conn.client, conn.server)
 
             resp = Response(req, conn.sock, is_ssl=self.app.is_ssl)
-            self.nr += 1
-            if self.nr >= self.max_requests:
-                if self.alive:
-                    self.log.info("Autorestarting worker after current request.")
-                    self.alive = False
-                resp.force_close()
 
             if not self.alive:
                 resp.force_close()

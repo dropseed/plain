@@ -60,13 +60,6 @@ from plain.cli.options import SettingOption
     help="Enable/disable access logging to stdout",
 )
 @click.option(
-    "--max-requests",
-    type=int,
-    cls=SettingOption,
-    setting="SERVER_MAX_REQUESTS",
-    help="Max requests before worker restart (0=disabled)",
-)
-@click.option(
     "--pidfile",
     type=click.Path(),
     help="PID file path",
@@ -80,7 +73,6 @@ def server(
     keyfile: str | None,
     reload: bool,
     access_log: bool,
-    max_requests: int,
     pidfile: str | None,
 ) -> None:
     """Production-ready HTTP server"""
@@ -105,7 +97,6 @@ def server(
         threads=threads,
         workers=workers,
         timeout=timeout,
-        max_requests=max_requests,
         reload=reload,
         pidfile=pidfile,
         certfile=certfile,
