@@ -422,8 +422,7 @@ class TunnelClient:
 
         # Forward safe browser headers (cookies, auth, origin) to the local
         # server. Skip hop-by-hop and WebSocket handshake headers since
-        # websockets.connect generates its own, and rewrite Host to match
-        # the local server.
+        # websockets.connect generates its own (including Host from the URL).
         skip_headers = frozenset(
             {
                 "host",
@@ -440,7 +439,6 @@ class TunnelClient:
         for name, value in data.get("headers", {}).items():
             if name.lower() not in skip_headers:
                 forward_headers[name] = value
-        forward_headers["Host"] = dest_parsed.netloc
 
         try:
             import ssl
