@@ -210,11 +210,53 @@ class TConn:
         self.handed_off: bool = False
         self.req_count: int = 0
 
+        # Asyncio streams — set after TLS handshake via asyncio transport
+        self.reader: asyncio.StreamReader | None = None
+        self.writer: asyncio.StreamWriter | None = None
+
+        # Byte read during keepalive wait, prepended to next header read
+        self._keepalive_byte: bytes = b""
+
         # set the socket to non blocking
         self.sock.setblocking(False)
 
     def close(self) -> None:
-        util.close(self.sock)
+        if self.writer is not None:
+            if not self.writer.is_closing():
+                self.writer.close()
+        else:
+            util.close(self.sock)
+
+
+async def _conn_recv(conn: TConn, n: int) -> bytes:
+    """Read up to n bytes from a connection.
+
+    Uses StreamReader when available (TLS connections), otherwise
+    falls back to the raw socket via util.async_recv().
+    """
+    if conn.reader is not None:
+        return await conn.reader.read(n)
+    return await util.async_recv(conn.sock, n)
+
+
+async def _conn_sendall(conn: TConn, data: bytes) -> None:
+    """Send all bytes on a connection.
+
+    Uses StreamWriter when available (TLS connections), otherwise
+    falls back to the raw socket via util.async_sendall().
+    """
+    if conn.writer is not None:
+        conn.writer.write(data)
+        await conn.writer.drain()
+        return
+    await util.async_sendall(conn.sock, data)
+
+
+async def _conn_write_error(
+    conn: TConn, status_int: int, reason: str, mesg: str
+) -> None:
+    """Send an HTTP error response on a connection."""
+    await _conn_sendall(conn, util._error_response_bytes(status_int, reason, mesg))
 
 
 class Worker:
@@ -251,6 +293,11 @@ class Worker:
         self._connection_tasks: set[asyncio.Task] = set()
         self._capacity_available: asyncio.Event = asyncio.Event()
         self._capacity_available.set()
+        # Worker-level H2 stream budget — limits total in-flight H2 streams
+        # across all connections to avoid overwhelming the thread pool.
+        self._h2_stream_budget: asyncio.Semaphore = asyncio.Semaphore(
+            self.app.threads * 4
+        )
 
     def __str__(self) -> str:
         return f"<Worker {self.pid}>"
@@ -372,48 +419,65 @@ class Worker:
             # This prevents slow/idle clients from consuming resources.
             try:
                 await asyncio.wait_for(
-                    self._wait_readable(conn.sock),
+                    self._wait_readable(conn),
                     timeout=KEEPALIVE,
                 )
             except TimeoutError:
                 return
 
-            # TLS handshake (requires blocking mode, so use thread pool briefly)
+            # TLS handshake via asyncio transport layer.
+            # Uses loop.start_tls() which gives asyncio ownership of SSL state
+            # via memory BIO (ssl.SSLObject). This is required for reliable
+            # async I/O on long-lived H2 connections — raw ssl.SSLSocket +
+            # add_reader/add_writer silently loses data.
             if self.app.is_ssl:
                 try:
-                    conn.sock = await loop.run_in_executor(
-                        self.tpool, self._do_tls_handshake, conn
+                    conn.reader, conn.writer = await asyncio.wait_for(
+                        self._async_tls_handshake(conn),
+                        timeout=KEEPALIVE,
                     )
                 except (ssl.SSLError, OSError) as e:
+                    # asyncio took socket ownership via create_connection;
+                    # it closes the transport on failure, so prevent
+                    # conn.close() from double-closing the raw fd.
+                    conn.handed_off = True
                     if isinstance(e, ssl.SSLError) and e.args[0] == ssl.SSL_ERROR_EOF:
                         self.log.debug("ssl connection closed during handshake")
                     else:
                         self.log.debug("TLS handshake failed: %s", e)
                     return
+                except TimeoutError:
+                    conn.handed_off = True
+                    self.log.debug("TLS handshake timed out")
+                    return
                 conn.is_ssl = True
-                conn.sock.setblocking(False)
 
-                if conn.sock.selected_alpn_protocol() == "h2":
+                ssl_object = conn.writer.get_extra_info("ssl_object")
+                alpn = ssl_object.selected_alpn_protocol() if ssl_object else None
+
+                if alpn == "h2":
                     conn.is_h2 = True
                     conn.handed_off = True
                     await async_handle_h2_connection(
-                        conn.sock,
+                        conn.reader,
+                        conn.writer,
                         conn.client,
                         conn.server,
                         self.handler,
                         self.app.is_ssl,
                         self.tpool,
+                        stream_budget=self._h2_stream_budget,
                     )
                     return
 
             while self.alive:
                 # Read HTTP headers asynchronously on the event loop
                 try:
-                    header_data, body_start = await self._async_read_headers(conn.sock)
+                    header_data, body_start = await self._async_read_headers(conn)
                 except (TimeoutError, OSError):
                     break
                 except LimitRequestHeaders as e:
-                    await self._async_handle_error(None, conn.sock, conn.client, e)
+                    await self._async_handle_error(None, conn, e)
                     break
                 if not header_data:
                     break
@@ -426,9 +490,7 @@ class Worker:
 
                 if expect_continue:
                     try:
-                        await util.async_sendall(
-                            conn.sock, b"HTTP/1.1 100 Continue\r\n\r\n"
-                        )
+                        await _conn_sendall(conn, b"HTTP/1.1 100 Continue\r\n\r\n")
                     except OSError:
                         break
 
@@ -440,22 +502,22 @@ class Worker:
                 if use_bridge:
                     unreader = AsyncBridgeUnreader(
                         header_data + body_start,
-                        conn.sock,
+                        conn,
                         loop,
                         timeout=self.timeout,
                     )
                 else:
                     try:
                         body_data = await self._async_read_body(
-                            conn.sock,
+                            conn,
                             body_start,
                             content_length,
                             is_chunked,
                             max_body,
                         )
                     except _IncompleteBody:
-                        await util.async_write_error(
-                            conn.sock,
+                        await _conn_write_error(
+                            conn,
                             408,
                             "Request Timeout",
                             "Incomplete request body",
@@ -467,7 +529,7 @@ class Worker:
                         use_bridge = True
                         unreader = AsyncBridgeUnreader(
                             header_data + e.partial_data,
-                            conn.sock,
+                            conn,
                             loop,
                             timeout=self.timeout,
                         )
@@ -492,15 +554,15 @@ class Worker:
                     break
                 except TimeoutError:
                     # Bridge body read timed out — send 408 (not 500)
-                    await util.async_write_error(
-                        conn.sock,
+                    await _conn_write_error(
+                        conn,
                         408,
                         "Request Timeout",
                         "Body read timed out",
                     )
                     break
                 except Exception as e:
-                    await self._async_handle_error(None, conn.sock, conn.client, e)
+                    await self._async_handle_error(None, conn, e)
                     break
 
                 if parse_result is None:
@@ -520,12 +582,12 @@ class Worker:
                 # connection closes cleanly via Connection: close header.
                 if use_bridge and content_length > 0:
                     remaining = (
-                        content_length - len(body_start) - unreader.socket_bytes_read
+                        content_length - len(body_start) - unreader.socket_bytes_read  # type: ignore[union-attr]
                     )
                     while remaining > 0:
                         try:
                             data = await asyncio.wait_for(
-                                util.async_recv(conn.sock, min(remaining, 65536)),
+                                _conn_recv(conn, min(remaining, 65536)),
                                 timeout=KEEPALIVE,
                             )
                         except (TimeoutError, OSError):
@@ -540,7 +602,7 @@ class Worker:
                 # Wait for the next request (keepalive)
                 try:
                     await asyncio.wait_for(
-                        self._wait_readable(conn.sock),
+                        self._wait_readable(conn),
                         timeout=KEEPALIVE,
                     )
                 except TimeoutError:
@@ -552,17 +614,40 @@ class Worker:
             if not conn.handed_off:
                 conn.close()
 
-    def _do_tls_handshake(self, conn: TConn) -> ssl.SSLSocket:
-        """Perform TLS handshake in blocking mode. Runs in the thread pool."""
-        conn.sock.setblocking(True)
-        conn.sock.settimeout(KEEPALIVE)
-        assert conn.app.certfile is not None
-        ssl_sock = sock.ssl_wrap_socket(conn.sock, conn.app.certfile, conn.app.keyfile)
-        ssl_sock.settimeout(None)
-        return ssl_sock
+    async def _async_tls_handshake(
+        self, conn: TConn
+    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+        """Perform TLS handshake via asyncio transport layer.
 
-    async def _async_read_headers(self, s: socket.socket) -> tuple[bytes, bytes]:
-        """Read from the socket until the header delimiter \\r\\n\\r\\n.
+        Uses loop.create_connection() to wrap the raw socket in an asyncio
+        transport, then loop.start_tls() to perform the handshake using
+        asyncio's memory BIO (ssl.SSLObject). This avoids ssl.SSLSocket
+        entirely, giving asyncio full control of the SSL state.
+        """
+        loop = asyncio.get_running_loop()
+        assert conn.app.certfile is not None
+
+        ssl_ctx = sock.ssl_context(conn.app.certfile, conn.app.keyfile)
+
+        reader = asyncio.StreamReader()
+        protocol = asyncio.StreamReaderProtocol(reader)
+
+        # Wrap the accepted raw socket in an asyncio transport
+        transport, _ = await loop.create_connection(lambda: protocol, sock=conn.sock)
+
+        # Upgrade to TLS — asyncio uses ssl.SSLObject (memory BIO) internally
+        new_transport = await loop.start_tls(
+            transport, protocol, ssl_ctx, server_side=True
+        )
+
+        # Build the StreamWriter with the TLS-upgraded transport
+        assert new_transport is not None
+        writer = asyncio.StreamWriter(new_transport, protocol, reader, loop)
+
+        return reader, writer
+
+    async def _async_read_headers(self, conn: TConn) -> tuple[bytes, bytes]:
+        """Read from the connection until the header delimiter \\r\\n\\r\\n.
 
         Returns (header_data, body_start) where body_start contains any
         bytes read past the header boundary.  Returns (b"", b"") on EOF.
@@ -570,6 +655,10 @@ class Worker:
         Raises TimeoutError if total header read exceeds HEADER_READ_TIMEOUT.
         """
         buf = bytearray()
+        # Prepend any byte consumed during keepalive wait
+        if conn._keepalive_byte:
+            buf.extend(conn._keepalive_byte)
+            conn._keepalive_byte = b""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + HEADER_READ_TIMEOUT
         while True:
@@ -581,7 +670,7 @@ class Worker:
                 raise TimeoutError("Header read timeout exceeded")
             try:
                 data = await asyncio.wait_for(
-                    util.async_recv(s, 8192),
+                    _conn_recv(conn, 8192),
                     timeout=min(KEEPALIVE, remaining),
                 )
             except TimeoutError:
@@ -603,13 +692,13 @@ class Worker:
 
     async def _async_read_body(
         self,
-        s: socket.socket,
+        conn: TConn,
         body_start: bytes,
         content_length: int,
         is_chunked: bool,
         max_body: int,
     ) -> bytes:
-        """Pre-buffer the request body from the socket.
+        """Pre-buffer the request body from the connection.
 
         Called for small bodies that fit in max_body. Header analysis and
         100-continue are handled by the caller.
@@ -625,7 +714,7 @@ class Worker:
             while remaining > 0:
                 try:
                     chunk = await asyncio.wait_for(
-                        util.async_recv(s, min(remaining, 65536)),
+                        _conn_recv(conn, min(remaining, 65536)),
                         timeout=KEEPALIVE,
                     )
                 except (TimeoutError, OSError):
@@ -641,13 +730,13 @@ class Worker:
             return bytes(body)
 
         if is_chunked:
-            return await self._async_read_chunked_body(s, body, max_body)
+            return await self._async_read_chunked_body(conn, body, max_body)
 
         return bytes(body)
 
     async def _async_read_chunked_body(
         self,
-        s: socket.socket,
+        conn: TConn,
         initial: bytearray,
         max_body: int,
     ) -> bytes:
@@ -674,7 +763,7 @@ class Worker:
         while len(buf) <= max_body:
             try:
                 chunk = await asyncio.wait_for(
-                    util.async_recv(s, 65536),
+                    _conn_recv(conn, 65536),
                     timeout=KEEPALIVE,
                 )
             except (TimeoutError, OSError):
@@ -693,7 +782,18 @@ class Worker:
 
         return bytes(buf)
 
-    async def _wait_readable(self, s: socket.socket) -> None:
+    async def _wait_readable(self, conn: TConn) -> None:
+        # For asyncio stream connections, use a 1-byte read to wait for
+        # data, then prepend it to the reader's buffer so it's not lost.
+        if conn.reader is not None:
+            data = await conn.reader.read(1)
+            if data:
+                # Prepend the peeked byte back into the buffer
+                conn._keepalive_byte = data
+            return
+
+        s = conn.sock
+
         # SSL sockets may have decrypted data buffered internally that
         # won't trigger fd readability — check before waiting.
         if isinstance(s, ssl.SSLSocket) and s.pending() > 0:
@@ -758,13 +858,12 @@ class Worker:
     async def _async_handle_error(
         self,
         req: Request | None,
-        client: socket.socket,
-        addr: Any,
+        conn: TConn,
         exc: BaseException,
     ) -> None:
         """Handle request errors, sending an appropriate HTTP error response."""
         request_start = datetime.now()
-        addr = addr or ("", -1)  # unix socket case
+        addr = conn.client or ("", -1)  # unix socket case
         if isinstance(
             exc,
             InvalidRequestLine
@@ -827,13 +926,13 @@ class Worker:
 
         if req is not None:
             request_time = datetime.now() - request_start
-            resp = Response(req, client)
+            resp = Response(req, conn.sock, is_ssl=conn.is_ssl, writer=conn.writer)
             resp.status = f"{status_int} {reason}"
             resp.response_length = len(mesg)
             log_access(resp, req, request_time)
 
         try:
-            await util.async_write_error(client, status_int, reason, mesg)
+            await _conn_write_error(conn, status_int, reason, mesg)
         except Exception:
             self.log.debug("Failed to send error message.")
 
@@ -880,7 +979,7 @@ class Worker:
             # body reader — it properly decodes chunked/length-delimited data.
             http_request = create_request(req, conn.sock, conn.client, conn.server)
 
-            resp = Response(req, conn.sock, is_ssl=self.app.is_ssl)
+            resp = Response(req, conn.sock, is_ssl=self.app.is_ssl, writer=conn.writer)
 
             if force_close or not self.alive:
                 resp.force_close()
@@ -935,7 +1034,7 @@ class Worker:
         # Send a 500 response instead of silently dropping the connection.
         if isinstance(exc, TimeoutError):
             if not resp.headers_sent:
-                await self._async_handle_error(req, conn.sock, conn.client, exc)
+                await self._async_handle_error(req, conn, exc)
             return False
 
         if isinstance(exc, OSError):
@@ -948,12 +1047,11 @@ class Worker:
         if resp.headers_sent:
             self.log.exception("Error handling request")
             try:
-                conn.sock.shutdown(socket.SHUT_RDWR)
-                conn.sock.close()
+                conn.close()
             except OSError:
                 pass
         else:
-            await self._async_handle_error(req, conn.sock, conn.client, exc)
+            await self._async_handle_error(req, conn, exc)
         return False
 
     async def _dispatch(
@@ -1007,8 +1105,11 @@ class Worker:
                     client_disconnected = True
                     break
         finally:
-            if hasattr(http_response, "aclose"):
-                await http_response.aclose()
+            try:
+                if hasattr(http_response, "aclose"):
+                    await http_response.aclose()
+            except Exception:
+                self.log.debug("Error in aclose()")
 
             try:
                 if not client_disconnected:

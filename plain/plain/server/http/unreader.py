@@ -11,6 +11,7 @@ import io
 import os
 import socket
 from collections.abc import Iterable, Iterator
+from typing import Any
 
 from .. import util
 
@@ -106,12 +107,15 @@ class BufferUnreader(Unreader):
 
 
 class AsyncBridgeUnreader(Unreader):
-    """Unreader that bridges async socket reads to sync parser reads.
+    """Unreader that bridges async reads to sync parser reads.
 
     Used for large request bodies that shouldn't be fully pre-buffered.
     Headers and any initial body bytes are in the buffer. When the buffer
     is exhausted, chunk() bridges to the event loop via
-    run_coroutine_threadsafe for lazy socket reads.
+    run_coroutine_threadsafe for lazy reads.
+
+    Accepts either a TConn (which may have a StreamReader for TLS) or
+    falls back to raw socket reads via util.async_recv.
 
     IMPORTANT: chunk() blocks the calling thread, so this unreader must
     only be used from a thread pool — never from the event loop thread.
@@ -120,24 +124,30 @@ class AsyncBridgeUnreader(Unreader):
     def __init__(
         self,
         data: bytes,
-        sock: socket.socket,
+        conn: Any,
         loop: asyncio.AbstractEventLoop,
         timeout: float = 30,
     ) -> None:
         super().__init__()
         self.buf.write(data)
-        self._sock = sock
+        self._conn = conn
         self._loop = loop
         self._timeout = timeout
         self._eof = False
         self.socket_bytes_read = 0
 
+    async def _async_read(self) -> bytes:
+        """Read from the connection using streams or raw socket."""
+        conn = self._conn
+        if hasattr(conn, "reader") and conn.reader is not None:
+            return await conn.reader.read(8192)
+        sock = conn.sock if hasattr(conn, "sock") else conn
+        return await util.async_recv(sock, 8192)
+
     def chunk(self) -> bytes:
         if self._eof:
             return b""
-        future = asyncio.run_coroutine_threadsafe(
-            util.async_recv(self._sock, 8192), self._loop
-        )
+        future = asyncio.run_coroutine_threadsafe(self._async_read(), self._loop)
         try:
             # On Python 3.11+, concurrent.futures.TimeoutError is
             # builtins.TimeoutError so this except clause catches it.

@@ -3,9 +3,6 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
-import select
-import socket
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any
@@ -14,6 +11,7 @@ import h2.config
 import h2.connection
 import h2.events
 import h2.exceptions
+import h2.settings
 
 from plain.http import AsyncStreamingResponse, FileResponse, StreamingResponse
 from plain.http import Request as HttpRequest
@@ -85,32 +83,33 @@ class H2Response:
         self.headers_sent: bool = False
 
 
-def _graceful_close(sock: socket.socket) -> None:
-    """Close a socket gracefully to avoid TCP RST."""
+def _reject_h2_stream(
+    conn: h2.connection.H2Connection,
+    state: H2ConnectionState,
+    event: h2.events.DataReceived,
+    stream: H2Stream,
+    status_code: int,
+) -> None:
+    """Reject an H2 stream with an error response and clean up state."""
+    body = f"<h1>{status_code}</h1>".encode()
     try:
-        sock.shutdown(socket.SHUT_WR)
-    except OSError:
+        conn.send_headers(
+            event.stream_id,
+            [
+                (":status", str(status_code)),
+                ("content-type", "text/html"),
+                ("content-length", str(len(body))),
+            ],
+        )
+        conn.send_data(event.stream_id, body, end_stream=True)
+    except h2.exceptions.ProtocolError:
         try:
-            sock.close()
-        except OSError:
+            conn.reset_stream(event.stream_id)
+        except h2.exceptions.ProtocolError:
             pass
-        return
-
-    try:
-        sock.settimeout(1.0)
-        remaining = 128 * 1024
-        while remaining > 0:
-            chunk = sock.recv(min(remaining, 65535))
-            if not chunk:
-                break
-            remaining -= len(chunk)
-    except OSError:
-        pass
-
-    try:
-        sock.close()
-    except OSError:
-        pass
+    conn.acknowledge_received_data(event.flow_controlled_length, event.stream_id)
+    state.aggregate_body_size -= stream.data_size
+    state.streams.pop(event.stream_id, None)
 
 
 def _extract_headers_from_stream(
@@ -250,15 +249,18 @@ class H2ConnectionState:
     def __init__(
         self,
         conn: h2.connection.H2Connection,
-        sock: socket.socket,
+        writer: asyncio.StreamWriter,
         client: tuple[str, int] | Any,
         server: tuple[str, int] | Any,
         handler: Any,
         scheme: str,
         executor: ThreadPoolExecutor,
+        *,
+        stream_budget: asyncio.Semaphore | None = None,
+        max_aggregate_body: int = 0,
     ) -> None:
         self.conn = conn
-        self.sock = sock
+        self.writer = writer
         self.client = client
         self.server = server
         self.handler = handler
@@ -268,6 +270,9 @@ class H2ConnectionState:
         self.streams: dict[int, H2Stream] = {}
         self.reset_streams: set[int] = set()
         self.window_events: dict[int, asyncio.Event] = {}
+        self.stream_budget = stream_budget
+        self.aggregate_body_size: int = 0
+        self.max_aggregate_body = max_aggregate_body
 
     def get_window_event(self, stream_id: int) -> asyncio.Event:
         ev = self.window_events.get(stream_id)
@@ -277,11 +282,11 @@ class H2ConnectionState:
         return ev
 
     async def flush(self) -> None:
-        """Send any pending h2 data to the socket via the executor."""
+        """Send any pending h2 data via the asyncio stream writer."""
         outgoing = self.conn.data_to_send()
         if outgoing:
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(self.executor, self.sock.sendall, outgoing)
+            self.writer.write(outgoing)
+            await self.writer.drain()
 
     def cleanup_stream(self, stream_id: int) -> None:
         """Remove per-stream state after a stream task completes."""
@@ -290,18 +295,21 @@ class H2ConnectionState:
 
 
 async def async_handle_h2_connection(
-    sock: socket.socket,
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
     client: tuple[str, int] | Any,
     server: tuple[str, int] | Any,
     handler: Any,
     is_ssl: bool,
     executor: ThreadPoolExecutor,
+    stream_budget: asyncio.Semaphore | None = None,
 ) -> None:
     """Async HTTP/2 connection loop.
 
-    Reads frames from the socket in a dedicated thread (to avoid exhausting
-    the shared executor pool), dispatches each completed stream as an
-    independent asyncio task.
+    Reads frames from the asyncio StreamReader and dispatches each completed
+    stream as an independent asyncio task. All I/O goes through asyncio's
+    transport layer (memory BIO for TLS), eliminating the need for a
+    dedicated reader thread.
     """
     config = h2.config.H2Configuration(client_side=False)
     conn = h2.connection.H2Connection(config=config)
@@ -309,48 +317,40 @@ async def async_handle_h2_connection(
 
     from plain.runtime import settings
 
-    scheme = "https" if is_ssl else "http"
-    state = H2ConnectionState(conn, sock, client, server, handler, scheme, executor)
-    loop = asyncio.get_running_loop()
-    max_body = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or _H2_BODY_FALLBACK
+    # Configure max concurrent streams if set
+    max_streams = getattr(settings, "SERVER_H2_MAX_CONCURRENT_STREAMS", None)
+    if max_streams:
+        conn.update_settings(
+            {
+                h2.settings.SettingCodes.MAX_CONCURRENT_STREAMS: max_streams,
+            }
+        )
 
-    # Set a write timeout so sendall() doesn't block indefinitely if a
-    # peer stops reading. The reader thread uses select() for waiting
-    # (unaffected by socket timeout), so this only bounds writes.
-    sock.settimeout(30)
+    scheme = "https" if is_ssl else "http"
+    max_body = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or _H2_BODY_FALLBACK
+    state = H2ConnectionState(
+        conn,
+        writer,
+        client,
+        server,
+        handler,
+        scheme,
+        executor,
+        stream_budget=stream_budget,
+        max_aggregate_body=max_body * 10,
+    )
 
     stream_tasks: dict[int, asyncio.Task[None]] = {}
 
-    recv_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
-    reader_stop = threading.Event()
-
-    def _reader_thread() -> None:
-        try:
-            while not reader_stop.is_set():
-                # Use select() for read readiness so the socket timeout
-                # only affects sendall() calls from flush().
-                ready, _, _ = select.select([sock], [], [], 5.0)
-                if not ready:
-                    continue
-                data = sock.recv(65535)
-                loop.call_soon_threadsafe(recv_queue.put_nowait, data)
-                if not data:
-                    break
-        except OSError as e:
-            log.debug("H2 reader thread stopped: %s", e)
-            loop.call_soon_threadsafe(recv_queue.put_nowait, None)
-
-    reader_thread = threading.Thread(target=_reader_thread, daemon=True)
-    reader_thread.start()
-
     try:
         # Send connection preface
-        await loop.run_in_executor(executor, sock.sendall, conn.data_to_send())
+        async with state.write_lock:
+            await state.flush()
 
         while True:
             try:
                 data = await asyncio.wait_for(
-                    recv_queue.get(),
+                    reader.read(65535),
                     timeout=H2_IDLE_TIMEOUT,
                 )
             except TimeoutError:
@@ -379,40 +379,33 @@ async def async_handle_h2_connection(
 
                 elif isinstance(event, h2.events.DataReceived):
                     stream = state.streams.get(event.stream_id)
+                    data_len = len(event.data)
                     if stream is None:
                         # Stream already rejected/completed — still acknowledge
                         # the data to avoid leaking the connection flow-control window.
                         conn.acknowledge_received_data(
                             event.flow_controlled_length, event.stream_id
                         )
-                    elif stream.data_size + len(event.data) > max_body:
-                        try:
-                            body = b"<h1>413 Payload Too Large</h1>"
-                            conn.send_headers(
-                                event.stream_id,
-                                [
-                                    (":status", "413"),
-                                    ("content-type", "text/html"),
-                                    ("content-length", str(len(body))),
-                                ],
-                            )
-                            conn.send_data(event.stream_id, body, end_stream=True)
-                        except h2.exceptions.ProtocolError:
-                            try:
-                                conn.reset_stream(event.stream_id)
-                            except h2.exceptions.ProtocolError:
-                                pass
-                        conn.acknowledge_received_data(
-                            event.flow_controlled_length, event.stream_id
+                    elif (
+                        state.max_aggregate_body > 0
+                        and state.aggregate_body_size + data_len
+                        > state.max_aggregate_body
+                    ):
+                        _reject_h2_stream(conn, state, event, stream, 503)
+                        log.warning(
+                            "H2 aggregate body budget exceeded on stream %d",
+                            event.stream_id,
                         )
-                        state.streams.pop(event.stream_id, None)
+                    elif stream.data_size + data_len > max_body:
+                        _reject_h2_stream(conn, state, event, stream, 413)
                         log.warning(
                             "H2 stream %d exceeded max body size (%d bytes)",
                             event.stream_id,
                             max_body,
                         )
                     else:
-                        stream.data_size += len(event.data)
+                        stream.data_size += data_len
+                        state.aggregate_body_size += data_len
                         stream.data.write(event.data)
                         conn.acknowledge_received_data(
                             event.flow_controlled_length, event.stream_id
@@ -421,7 +414,9 @@ async def async_handle_h2_connection(
                 elif isinstance(event, h2.events.StreamEnded):
                     stream = state.streams.pop(event.stream_id, None)
                     if stream is not None:
-                        task = loop.create_task(_async_handle_stream(state, stream))
+                        task = asyncio.get_running_loop().create_task(
+                            _async_handle_stream(state, stream)
+                        )
                         stream_tasks[event.stream_id] = task
 
                         def _on_stream_done(
@@ -433,7 +428,9 @@ async def async_handle_h2_connection(
                         task.add_done_callback(_on_stream_done)
 
                 elif isinstance(event, h2.events.StreamReset):
-                    state.streams.pop(event.stream_id, None)
+                    stream = state.streams.pop(event.stream_id, None)
+                    if stream is not None:
+                        state.aggregate_body_size -= stream.data_size
                     state.reset_streams.add(event.stream_id)
                     task = stream_tasks.pop(event.stream_id, None)
                     if task is not None:
@@ -485,15 +482,19 @@ async def async_handle_h2_connection(
             conn.close_connection()
             goaway_data = conn.data_to_send()
             if goaway_data:
-                await loop.run_in_executor(executor, sock.sendall, goaway_data)
+                writer.write(goaway_data)
+                await writer.drain()
         except Exception:
             pass
 
-        reader_stop.set()
-        await loop.run_in_executor(executor, _graceful_close, sock)
-        await loop.run_in_executor(executor, reader_thread.join, 7.0)
-        if reader_thread.is_alive():
-            log.warning("H2 reader thread did not exit cleanly")
+        # Close the connection — writer.close() sends TLS close_notify
+        # and closes the underlying transport.
+        if not writer.is_closing():
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except OSError:
+                pass
 
 
 async def _async_handle_stream(
@@ -501,6 +502,26 @@ async def _async_handle_stream(
     stream: H2Stream,
 ) -> None:
     """Process a single completed HTTP/2 stream as an async task."""
+    budget = state.stream_budget
+    acquired = False
+    try:
+        if budget is not None:
+            await budget.acquire()
+            acquired = True
+        await _async_handle_stream_inner(state, stream)
+    finally:
+        # Always release aggregate body budget — it was incremented in
+        # DataReceived before this task was created.
+        state.aggregate_body_size -= stream.data_size
+        if acquired and budget is not None:
+            budget.release()
+
+
+async def _async_handle_stream_inner(
+    state: H2ConnectionState,
+    stream: H2Stream,
+) -> None:
+    """Inner stream handler — budget acquire/release is in the caller."""
     request_start = datetime.now()
 
     try:
@@ -588,7 +609,12 @@ async def _async_write_h2_response(
         and http_response.file_to_stream is not None
     )
 
-    if is_file or isinstance(http_response, StreamingResponse):
+    # Stream response when it's a file, streaming response, or has a
+    # declared Content-Length. Only buffer via _collect_body when the
+    # response size is unknown (no Content-Length).
+    has_content_length = any(n == "content-length" for n, _ in response_headers)
+
+    if is_file or isinstance(http_response, StreamingResponse) or has_content_length:
         if is_file:
             file_wrapper = FileWrapper(
                 http_response.file_to_stream, http_response.block_size
@@ -610,6 +636,8 @@ async def _async_write_h2_response(
                 h2_resp.sent += len(chunk)
                 await _async_send_h2_data(state, stream_id, chunk, end_stream=False)
 
+        h2_resp.response_length = h2_resp.sent
+
         async with state.write_lock:
             conn.send_data(stream_id, b"", end_stream=True)
             await state.flush()
@@ -624,19 +652,8 @@ async def _async_write_h2_response(
 
         body = await loop.run_in_executor(executor, _collect_body)
 
-        # Enforce Content-Length if declared, to match HTTP/1.1 behavior
-        # where the wire protocol naturally truncates.
-        for n, v in response_headers:
-            if n == "content-length":
-                try:
-                    declared = int(v)
-                    body = body[:declared]
-                except (ValueError, TypeError):
-                    pass
-                break
-        else:
-            if body:
-                response_headers.append(("content-length", str(len(body))))
+        if body:
+            response_headers.append(("content-length", str(len(body))))
 
         h2_resp.sent = len(body)
         h2_resp.response_length = len(body)
@@ -698,9 +715,12 @@ async def _async_send_h2_data(
         except asyncio.CancelledError:
             stream_waiter.cancel()
             conn_waiter.cancel()
+            await asyncio.gather(stream_waiter, conn_waiter, return_exceptions=True)
             raise
         for p in pending:
             p.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
 
         if not done:
             log.warning(

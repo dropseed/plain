@@ -237,12 +237,6 @@ async def async_sendall(sock: socket.socket, data: bytes) -> None:
             await _async_wait_writable(sock)
 
 
-async def async_write_error(
-    sock: socket.socket, status_int: int, reason: str, mesg: str
-) -> None:
-    await async_sendall(sock, _error_response_bytes(status_int, reason, mesg))
-
-
 def http_date(timestamp: float | None = None) -> str:
     """Return the current date and time formatted for a message header."""
     if timestamp is None:

@@ -178,11 +178,17 @@ def _decode_path(path_bytes: bytes) -> str:
 
 class Response:
     def __init__(
-        self, req: ServerRequest, sock: socket.socket, *, is_ssl: bool = False
+        self,
+        req: ServerRequest,
+        sock: socket.socket,
+        *,
+        is_ssl: bool = False,
+        writer: asyncio.StreamWriter | None = None,
     ) -> None:
         self.req = req
         self.sock = sock
         self.is_ssl = is_ssl
+        self._writer = writer
         self.version = "plain"
         self.status: str | None = None
         self.chunked = False
@@ -424,13 +430,21 @@ class Response:
     # sendall(). The socket must be non-blocking (managed by asyncio).
     # ------------------------------------------------------------------
 
+    async def _async_send(self, data: bytes) -> None:
+        """Send bytes using the writer (asyncio streams) or raw socket."""
+        if self._writer is not None:
+            self._writer.write(data)
+            await self._writer.drain()
+        else:
+            await util.async_sendall(self.sock, data)
+
     async def async_send_headers(self) -> None:
         if self.headers_sent:
             return
         tosend = self.default_headers()
         tosend.extend([f"{k}: {v}\r\n" for k, v in self.headers])
         header_str = "{}\r\n".format("".join(tosend))
-        await util.async_sendall(self.sock, util.to_bytestring(header_str, "latin-1"))
+        await self._async_send(util.to_bytestring(header_str, "latin-1"))
         self.headers_sent = True
 
     async def async_write(self, arg: bytes) -> None:
@@ -453,9 +467,9 @@ class Response:
         if self.chunked:
             chunk_size = f"{len(arg):X}\r\n"
             chunk = b"".join([chunk_size.encode("utf-8"), arg, b"\r\n"])
-            await util.async_sendall(self.sock, chunk)
+            await self._async_send(chunk)
         else:
-            await util.async_sendall(self.sock, arg)
+            await self._async_send(arg)
 
     async def async_write_response(self, http_response: Any) -> None:
         """Write a plain.http.ResponseBase using async I/O."""
@@ -490,4 +504,4 @@ class Response:
         if not self.headers_sent:
             await self.async_send_headers()
         if self.chunked:
-            await util.async_sendall(self.sock, b"0\r\n\r\n")
+            await self._async_send(b"0\r\n\r\n")
