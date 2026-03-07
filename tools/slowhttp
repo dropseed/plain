@@ -1,0 +1,69 @@
+#!/bin/bash -e
+
+# Test server resilience against slow HTTP attacks using slowhttptest.
+#
+# Requires: slowhttptest (brew install slowhttptest)
+#
+# Usage:
+#   ./tools/slowhttp                          # starts example server automatically
+#   ./tools/slowhttp host:port                # test against an already-running server
+#   ./tools/slowhttp --mode slow-headers      # slowloris (default)
+#   ./tools/slowhttp --mode slow-body         # slow POST / R.U.D.Y.
+#   ./tools/slowhttp --mode slow-read         # slow read attack
+
+if ! command -v slowhttptest &>/dev/null; then
+    echo "slowhttptest not found. Install with: brew install slowhttptest" >&2
+    exit 1
+fi
+
+MODE="slow-headers"
+TARGET=""
+
+for arg in "$@"; do
+    if [ "$prev" = "--mode" ]; then
+        MODE="$arg"
+        prev=""
+        continue
+    fi
+    if [ "$arg" = "--mode" ]; then
+        prev="$arg"
+        continue
+    fi
+    if [ -z "$TARGET" ] && [[ "$arg" == *:* ]] && [[ "$arg" != -* ]]; then
+        TARGET="$arg"
+    fi
+done
+
+# Map mode to slowhttptest flags
+case "$MODE" in
+    slow-headers)
+        ATTACK_ARGS=(-H -c 200 -r 100 -i 10 -l 30 -t GET)
+        ;;
+    slow-body)
+        ATTACK_ARGS=(-B -c 200 -r 100 -i 110 -l 30 -t POST)
+        ;;
+    slow-read)
+        ATTACK_ARGS=(-X -c 200 -r 100 -l 30 -k 3 -n 5 -w 1 -y 2)
+        ;;
+    *)
+        echo "Unknown mode: $MODE (use slow-headers, slow-body, or slow-read)" >&2
+        exit 1
+        ;;
+esac
+
+run_test() {
+    echo ""
+    echo "Running $MODE against $1:$2 (200 connections, 30s)..."
+    echo ""
+    slowhttptest "${ATTACK_ARGS[@]}" -u "http://$1:$2/" -p 3
+}
+
+if [ -n "$TARGET" ]; then
+    run_test "${TARGET%%:*}" "${TARGET##*:}"
+    exit $?
+fi
+
+set --
+source "$(dirname "$0")/start-example-server"
+
+run_test "127.0.0.1" "$PORT"

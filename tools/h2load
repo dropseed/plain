@@ -1,0 +1,44 @@
+#!/bin/bash -e
+
+# HTTP/2 load testing using h2load (from nghttp2).
+#
+# Requires: h2load (brew install nghttp2)
+#
+# Usage:
+#   ./tools/h2load                            # starts example server automatically
+#   ./tools/h2load host:port                  # test against an already-running TLS server
+
+if ! command -v h2load &>/dev/null; then
+    echo "h2load not found. Install with: brew install nghttp2" >&2
+    exit 1
+fi
+
+TARGET=""
+for arg in "$@"; do
+    if [ -z "$TARGET" ] && [[ "$arg" == *:* ]] && [[ "$arg" != -* ]]; then
+        TARGET="$arg"
+    fi
+done
+
+if [ -n "$TARGET" ]; then
+    echo ""
+    echo "h2load against $TARGET..."
+    echo ""
+    h2load -n 1000 -c 10 -m 10 "https://$TARGET"
+    exit $?
+fi
+
+# Generate a temporary self-signed certificate for TLS
+CERTDIR=$(mktemp -d)
+trap 'rm -rf "$CERTDIR"' EXIT
+
+openssl req -x509 -newkey rsa:2048 -keyout "$CERTDIR/key.pem" -out "$CERTDIR/cert.pem" \
+    -days 1 -nodes -subj "/CN=localhost" 2>/dev/null
+
+source "$(dirname "$0")/start-example-server" \
+    --certfile "$CERTDIR/cert.pem" --keyfile "$CERTDIR/key.pem"
+
+echo ""
+echo "h2load against 127.0.0.1:$PORT..."
+echo ""
+h2load -n 1000 -c 10 -m 10 "https://127.0.0.1:$PORT/"

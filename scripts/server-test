@@ -1,0 +1,95 @@
+#!/bin/bash -e
+
+# Run all server tests: conformance, worker behavior, load, and resilience.
+#
+# Each test starts its own server instance, so nothing needs to be running.
+#
+# Usage:
+#   ./scripts/server-test
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+PASSED=()
+FAILED=()
+SKIPPED=()
+
+run() {
+    local name="$1"
+    shift
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  $name"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    if "$@"; then
+        PASSED+=("$name")
+    else
+        FAILED+=("$name")
+    fi
+}
+
+skip() {
+    local name="$1"
+    local cmd="$2"
+    local install="$3"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  $name (skipped — $install)"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    SKIPPED+=("$name")
+}
+
+# Conformance
+run "H1 conformance (h1spec)"       "$REPO_ROOT/tools/h1spec"
+if command -v h2spec &>/dev/null; then
+    run "H2 conformance (h2spec)"   "$REPO_ROOT/tools/h2spec"
+else
+    skip "H2 conformance (h2spec)" h2spec "brew install h2spec"
+fi
+
+# Worker behavior
+run "H1 worker behavior"            "$REPO_ROOT/tools/server-worker-test"
+run "H2 worker behavior"            "$REPO_ROOT/tools/h2-worker-test"
+
+# Load
+if command -v wrk &>/dev/null; then
+    run "H1 throughput (wrk)"       "$REPO_ROOT/tools/server-bench"
+else
+    skip "H1 throughput (wrk)" wrk "brew install wrk"
+fi
+if command -v h2load &>/dev/null; then
+    run "H2 load (h2load)"         "$REPO_ROOT/tools/h2load"
+else
+    skip "H2 load (h2load)" h2load "brew install nghttp2"
+fi
+
+# Resilience
+if command -v slowhttptest &>/dev/null; then
+    run "Slow headers (slowloris)"  "$REPO_ROOT/tools/slowhttp" --mode slow-headers
+    run "Slow body (R.U.D.Y.)"     "$REPO_ROOT/tools/slowhttp" --mode slow-body
+    run "Slow read"                 "$REPO_ROOT/tools/slowhttp" --mode slow-read
+else
+    skip "Slow HTTP resilience" slowhttptest "brew install slowhttptest"
+fi
+
+# Summary
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Summary"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+for name in "${PASSED[@]}"; do
+    echo "  PASS  $name"
+done
+for name in "${FAILED[@]}"; do
+    echo "  FAIL  $name"
+done
+for name in "${SKIPPED[@]}"; do
+    echo "  SKIP  $name"
+done
+
+echo ""
+echo "${#PASSED[@]} passed, ${#FAILED[@]} failed, ${#SKIPPED[@]} skipped"
+
+[ ${#FAILED[@]} -eq 0 ]
