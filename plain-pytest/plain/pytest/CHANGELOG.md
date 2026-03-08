@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.16.5](https://github.com/dropseed/plain/releases/plain-pytest@0.16.5) (2026-03-08)
+
+### What's changed
+
+- Removed `--log-level` flag from the browser test server command, which was removed from the server CLI in plain 0.113.0 and caused browser tests to fail ([965682477739](https://github.com/dropseed/plain/commit/965682477739))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.16.4](https://github.com/dropseed/plain/releases/plain-pytest@0.16.4) (2026-02-26)
 
 ### What's changed
