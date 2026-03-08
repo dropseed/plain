@@ -1,10 +1,8 @@
 ---
-depends_on:
-- server-architecture-review
 packages:
-- plain.server
+  - plain.server
 related:
-- fix-worker-recycling
+  - fix-worker-recycling
 ---
 
 # Fix: Worker timeout misses executor starvation (Finding 10)
@@ -13,15 +11,15 @@ related:
 
 ## Problem
 
-The arbiter's `murder_workers()` (line 158-181 in `arbiter.py`) kills workers when their heartbeat stops updating. The heartbeat runs on the worker's asyncio event loop (line 310-322 in `thread.py`), ticking every 1 second via `asyncio.sleep(1.0)`.
+The arbiter's `murder_workers()` (`arbiter.py:158-181`) kills workers when their heartbeat stops updating. The heartbeat runs on the worker's asyncio event loop (`worker.py:171-184`), ticking every 1 second via `asyncio.sleep(1.0)`.
 
 If the thread pool is completely saturated (all threads blocked on slow DB queries, external HTTP calls, etc.), the event loop continues running and heartbeats continue. The arbiter sees a healthy worker even though no new requests can be processed.
 
 **Key code locations:**
 
-- `plain/plain/server/arbiter.py:158-181` - `murder_workers` checks heartbeat only
-- `plain/plain/server/workers/thread.py:290-322` - heartbeat loop on event loop
-- `plain/plain/server/workers/thread.py:257-259` - thread pool creation
+- `plain/plain/server/arbiter.py:158-181` — `murder_workers` checks heartbeat only
+- `plain/plain/server/workers/worker.py:171-184` — heartbeat loop on event loop
+- `plain/plain/server/workers/worker.py:109-113` — thread pool creation
 
 ## Impact
 
@@ -36,50 +34,40 @@ Add executor health monitoring to the heartbeat loop. Track whether the executor
 
 ### Changes
 
-**`plain/plain/server/workers/thread.py`** - Add executor health check to heartbeat:
+**`plain/plain/server/workers/worker.py`** — Add executor health check to heartbeat (around line 171):
 
 ```python
-async def run(self) -> None:
-    loop = asyncio.get_running_loop()
-    # ... signal handlers ...
+while self.alive:
+    self.notify()
+    if not self.is_parent_alive():
+        break
 
-    # Start accept loops
-    accept_tasks = [...]
+    # Check executor health: submit a no-op and see if it completes
+    # within a reasonable time. If not, the pool is stalled.
+    try:
+        await asyncio.wait_for(
+            loop.run_in_executor(self.tpool, lambda: None),
+            timeout=self.timeout,
+        )
+    except TimeoutError:
+        self.log.warning(
+            "Thread pool appears stalled (no-op didn't complete in %ss), "
+            "stopping heartbeat to trigger arbiter restart",
+            self.timeout,
+        )
+        # Stop heartbeating so the arbiter will kill us
+        break
 
-    # Heartbeat loop
-    while self.alive:
-        self.notify()
-        if not self.is_parent_alive():
-            break
+    # Surface accept-loop crashes
+    for task in accept_tasks:
+        if task.done() and not task.cancelled():
+            exc = task.exception()
+            if exc is not None:
+                self.log.error("Accept loop crashed: %s", exc)
+                self.alive = False
+                break
 
-        # Check executor health: submit a no-op and see if it completes
-        # within a reasonable time. If not, the pool is stalled.
-        try:
-            await asyncio.wait_for(
-                loop.run_in_executor(self.tpool, lambda: None),
-                timeout=self.timeout,
-            )
-        except TimeoutError:
-            self.log.warning(
-                "Thread pool appears stalled (no-op didn't complete in %ss), "
-                "stopping heartbeat to trigger arbiter restart",
-                self.timeout,
-            )
-            # Stop heartbeating so the arbiter will kill us
-            break
-
-        # Surface accept-loop crashes
-        for task in accept_tasks:
-            if task.done() and not task.cancelled():
-                exc = task.exception()
-                if exc is not None:
-                    self.log.error("Accept loop crashed: %s", exc)
-                    self.alive = False
-                    break
-
-        await asyncio.sleep(1.0)
-
-    # ... shutdown ...
+    await asyncio.sleep(1.0)
 ```
 
 ## Considerations

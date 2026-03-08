@@ -2,7 +2,7 @@
 packages:
 - plain-models
 related:
-- plain-models-native-connection-pooling
+- db-connection-pool
 ---
 
 # plain-models: Promote POSTGRES_OPTIONS keys to named settings

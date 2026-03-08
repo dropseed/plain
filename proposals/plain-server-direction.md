@@ -4,7 +4,6 @@ packages:
 related:
 - plain-server-httptools
 - plain-server-middleware-boundary
-- server-architecture-review
 ---
 
 # Plain server direction
@@ -95,7 +94,7 @@ The only proxy-specific concern is trusting forwarded headers (`X-Forwarded-Prot
 | HTTP/3           | Not needed — reverse proxies handle this                                                            |
 | SSE              | Implemented — `ServerSentEventsView` with `async def stream()`                                      |
 | WebSocket        | Not yet — `WebSocketView` with async lifecycle methods                                              |
-| TLS              | Python `ssl` module, required for HTTP/2 ALPN                                                       |
+| TLS              | asyncio transport (`loop.start_tls` with memory BIO), required for HTTP/2 ALPN                      |
 
 ## Key dependencies
 
@@ -146,3 +145,25 @@ Plain could expose an ASGI handler later for specific ecosystem compatibility ne
 - **HTTP/3 / QUIC** — reverse proxies (Nginx, Caddy, Cloudflare) handle HTTP/3 to the browser. Plain speaks HTTP/2 to the proxy. This is how most of the internet works.
 - **General async views** — async is for views that genuinely need the event loop (long-lived connections). Regular request-response views stay sync. No `async def get(self)` for a page that hits the database.
 - **ASGI compatibility** — not a goal for the core. Possible as an adapter layer if ecosystem tooling demands it.
+- **Async ORM / async psycopg** — sync ORM + `asyncio.to_thread()` covers the SSE use case. Free-threaded Python (when the ecosystem catches up) makes threads genuinely parallel, further reducing the case for async DB drivers.
+- **`a`-prefix queryset methods** (`acount()`, `alist()`, etc.) — sync methods work via `to_thread()` from async code. Querysets can add `__aiter__` for `async for` without duplicating the API.
+
+## Things that look concerning but are actually fine
+
+- **H2 `conn` object accessed without write_lock from the main loop:** Since asyncio is single-threaded, `conn.receive_data()` and the event processing happen atomically between `await` points. Stream tasks can only interleave at `await`s. The h2 library is a sans-I/O state machine designed for this usage pattern.
+
+- **`signal.signal()` for SIGABRT/SIGWINCH alongside asyncio:** These are intentional — SIGABRT needs immediate termination (not deferred to the event loop), and SIGWINCH is a no-op. Both are set on the main thread which is correct.
+
+- **Thread pool shared between H1 and H2:** This is by design. The thread pool is the concurrency limiter. H2 streams naturally queue in the executor like H1 requests. Worker-level `_h2_stream_budget` semaphore provides backpressure.
+
+- **Graceful shutdown with `tpool.shutdown(wait=False)`:** This is fine because `_graceful_shutdown` already waits for connection tasks (which wrap the executor calls) with a timeout before shutting down the pool.
+
+## Free-threaded Python
+
+Python 3.14 promotes free-threading to Phase II (officially supported, opt-in, 5-10% overhead). The asyncio + thread pool design works with or without the GIL:
+
+- Free-threading shifts deployment from many-workers-few-threads to fewer-workers-many-threads
+- `SERVER_WORKERS` and `SERVER_THREADS` become the primary concurrency tuning knobs
+- Strengthens the sync ORM + thread pool approach — no need for async psycopg
+
+**Current blockers:** psycopg 3 does not support free-threaded Python (open issue #1095). asyncio had thread-safety issues in 3.13; fixed in 3.14. No code changes needed now — the architecture naturally benefits when the ecosystem catches up.

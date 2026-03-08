@@ -4,6 +4,7 @@ packages:
 related:
 - plain-server-direction
 - plain-server-performance
+- plain-server-h2-websockets
 ---
 
 # Replace pure Python HTTP parser with a native parser
@@ -120,12 +121,16 @@ Separately:
 
 ## Current architecture fit
 
+TLS now uses asyncio transport (`loop.start_tls` with memory BIO). All connections (H1 and H2) have `asyncio.StreamReader`/`StreamWriter`. Headers are read async via `async_read_headers()` in `h1.py`, then the gunicorn parser processes the pre-buffered bytes synchronously. Small bodies parse inline on the event loop; large bodies use `AsyncBridgeUnreader` which bridges back via `asyncio.run_coroutine_threadsafe()`.
+
 The current parser couples socket reading with parsing (pull model via `Unreader`). Both httptools and httparse are push parsers (you feed them data). This requires restructuring:
 
-- **Current**: `Parser.__next__()` → `Request.__init__()` → reads from socket → parses inline
-- **Native**: read bytes from socket → feed to parser → get back method/path/headers
+- **Current**: `async_read_headers()` → buffer bytes → `parse_request()` → gunicorn parser on buffer
+- **Native**: `async_read_headers()` → feed bytes to parser → get back method/path/headers
 
-The boundary is clean — `_parse_request` in `thread.py` runs in the thread pool, builds a request, and returns it. The parser's internal model doesn't leak upward. The restructuring is contained within the parse layer.
+The boundary is clean — `parse_request` in `h1.py` runs in the thread pool (for bridge mode) or inline, builds a request, and returns it. The parser's internal model doesn't leak upward. The restructuring is contained within the parse layer.
+
+A native push parser also enables a fully feed-based model where headers are parsed incrementally as bytes arrive, rather than buffering until `\r\n\r\n`. This is a natural fit for the existing asyncio read loop.
 
 ## Recommendation
 

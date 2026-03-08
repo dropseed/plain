@@ -32,7 +32,7 @@ This means:
 
 ### H2 path
 
-Also handle in `h2handler.py` — when a new stream's headers match the health check path, respond immediately without dispatching to the thread pool.
+Also handle in `h2.py` — when a new stream's headers match the health check path, respond immediately without dispatching to the thread pool.
 
 ## Content-Length: move to response writer
 

@@ -1,10 +1,9 @@
 ---
-depends_on:
-- plain-server-asyncio-tls
 packages:
-- plain.server
+  - plain.server
 related:
-- plain-realtime-architecture
+  - plain-realtime-architecture
+  - plain-server-httptools
 ---
 
 # plain-server: HTTP/2 WebSocket support (RFC 8441)
@@ -19,7 +18,7 @@ The WebSocket protocol layer (`protocols/websocket.py`) and view API (`views/web
 
 ### 1. Enable Extended CONNECT in h2 config
 
-One line in `h2handler.py`: set `enable_connect_protocol=True` on `H2Configuration`. This advertises `SETTINGS_ENABLE_CONNECT_PROTOCOL=1` to clients.
+One line in `h2.py`: set `enable_connect_protocol=True` on `H2Configuration`. This advertises `SETTINGS_ENABLE_CONNECT_PROTOCOL=1` to clients.
 
 ### 2. Detect WebSocket CONNECT in the H2 event loop
 
@@ -55,7 +54,6 @@ Currently checks `Upgrade: websocket` header (line 268). H2 WebSocket requests u
 - **h2spec** covers HTTP/2 protocol compliance but not Extended CONNECT
 - Custom integration tests needed for: Extended CONNECT negotiation, WS frames inside H2 DATA frames, multiplexing WS + regular HTTP/2 on one connection
 
-## Relationship to other proposals
+## Prerequisites (done)
 
-- `plain-server-asyncio-tls.md`: Would simplify this since the reader/writer would already exist from TLS setup — no adapter needed
-- `plain-realtime-architecture.md`: WebSocket is already implemented per that plan; this extends it to H2
+Asyncio-native TLS is already implemented — all connections have `asyncio.StreamReader`/`StreamWriter` via `loop.start_tls()`. The WebSocket handler receives the same reader/writer used for HTTP. TLS is invisible. No thread bridge needed.

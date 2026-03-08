@@ -4,9 +4,9 @@ packages:
 - plain-models
 - plain-jobs
 related:
-- fix-async-view-thread-affinity
-- fix-request-finished-streaming
 - plain-response-defer
+- db-connection-pool-and-contextvars
+- db-connection-pool
 ---
 
 # Remove signals from Plain
@@ -64,6 +64,41 @@ The `/plain-install` skill adds it to `MIDDLEWARE` when installing `plain-models
 ### Delete plain.signals
 
 Remove the module entirely. No deprecation period — the upgrade agent can handle any third-party code that was using it (unlikely, since only `plain-models` used it).
+
+## Streaming response lifecycle
+
+Moving to middleware opens up something signals couldn't do: `after_response` can inspect the response object and adapt its behavior for streaming.
+
+Today, `request_finished` (and therefore `close_old_connections`) fires in `_finish_pipeline` before the response body is transmitted. For regular responses this is fine. For `AsyncStreamingResponse` (SSE), it means DB connections are cleaned up before `stream()` even starts iterating — so any DB access inside `stream()` would need its own connection management.
+
+As middleware, `DatabaseConnectionMiddleware.after_response` can detect streaming responses and defer cleanup:
+
+```python
+class DatabaseConnectionMiddleware(HttpMiddleware):
+    def before_request(self, request):
+        if db_connection.has_connection():
+            db_connection.queries_log.clear()
+            db_connection.close_if_unusable_or_obsolete()
+        return None
+
+    def after_response(self, request, response):
+        if isinstance(response, AsyncStreamingResponse):
+            # Defer cleanup to response.close() so the DB connection
+            # stays alive during streaming. The stream() coroutine can
+            # use sync_to_async() to access the DB on a thread that
+            # shares this connection.
+            response._resource_closers.append(
+                lambda: db_connection.close_if_unusable_or_obsolete()
+            )
+        else:
+            if db_connection.has_connection():
+                db_connection.close_if_unusable_or_obsolete()
+        return response
+```
+
+This doesn't fully solve DB access in SSE views — `stream()` runs on the event loop where there's no thread-local DB connection. A `sync_to_async` bridge is still needed to run queries on a thread pool thread. But deferred cleanup ensures the connection isn't prematurely closed while streaming is in progress.
+
+Once signals are gone, the two-executor-call split for async views simplifies. Middleware `before_request` and `after_response` both run in the executor, but no longer need to guarantee the same thread for signal handler thread-local state. The thread-affinity question is fully resolved by `db-connection-pool-and-contextvars.md` — with ContextVar storage, `after_response` sees the same connection regardless of which thread it runs on.
 
 ## Implementation
 
