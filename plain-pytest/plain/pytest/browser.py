@@ -228,8 +228,6 @@ class TestBrowser:
                 "2",
                 "--timeout",
                 "10",
-                "--log-level",
-                "warning",
             ],
             env=env,
         )
