@@ -2,8 +2,8 @@
 packages:
 - plain.server
 related:
-- plain-auth-otel-user-context
-- plain-metrics
+- auth-otel-user-context
+- metrics
 ---
 
 # OTel Span Proposal: View + WebSocket

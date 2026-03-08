@@ -4,7 +4,7 @@ packages:
 - plain-models
 - plain-jobs
 related:
-- plain-response-defer
+- response-defer
 - db-connection-pool-and-contextvars
 - db-connection-pool
 ---

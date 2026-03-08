@@ -13,7 +13,7 @@ packages:
 depends_on:
 - server-architecture-review
 related:
-- plain-server-performance
+- server-performance
 ---
 ```
 
@@ -28,6 +28,11 @@ related:
 - `scripts/proposals list -s <term>` — search by name/title
 - `scripts/proposals show <name>` — details with deps, blocks, and related (partial match works)
 - All commands accept `--json` for machine-readable output
+
+## Naming
+
+- Don't prefix filenames with `plain-` — use `models-cursor-paginator.md` not `plain-models-cursor-paginator.md`
+- `depends_on` and `related` reference other proposal filenames (without `.md`), not package names
 
 ## When working with proposals
 
