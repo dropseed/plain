@@ -7,7 +7,7 @@ import ssl
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from .. import http
+from .. import http, ws
 from ..accesslog import log_access
 from ..connection import KEEPALIVE, Connection
 from .errors import (
@@ -562,6 +562,43 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             break
         if not header_data:
             break
+
+        # WebSocket upgrade: detect early (before body reading) and
+        # dispatch to the WebSocket handler. WS upgrades have no body.
+        if ws.is_websocket_upgrade(header_data):
+            # Parse request with headers only (no body for WS upgrades)
+            unreader = BufferUnreader(header_data + body_start)
+            try:
+                parse_result = parse_request(worker, conn, unreader)
+            except _ParseError:
+                break
+            except Exception as e:
+                await async_handle_error(worker, None, conn, e)
+                break
+            if parse_result is None:
+                break
+
+            req, http_request, resp, request_start = parse_result
+            conn.req_count += 1
+
+            ws_handler_class = ws.resolve_websocket_handler(http_request)
+            if ws_handler_class is not None:
+                await ws.dispatch(
+                    worker, req, conn, http_request, request_start, ws_handler_class
+                )
+                return  # WebSocket connections don't keepalive
+
+            # Not a WebSocket view — fall through to normal dispatch
+            keepalive = await dispatch(
+                worker, req, conn, http_request, resp, request_start
+            )
+            if not keepalive or not worker.alive:
+                break
+            try:
+                await asyncio.wait_for(conn.wait_readable(), timeout=KEEPALIVE)
+            except TimeoutError:
+                break
+            continue
 
         # Analyze headers to determine body handling strategy
         max_body = worker.max_body

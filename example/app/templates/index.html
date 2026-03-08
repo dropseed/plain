@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="p-8">
-    Hey!
+<div class="p-8 space-y-4">
+    <h1 class="text-2xl font-bold">Plain Example App</h1>
+    <ul class="space-y-2">
+        <li><a href="/sse/" class="text-blue-600 hover:underline">SSE Demo</a> — Server-Sent Events (live clock + stock ticker)</li>
+        <li><a href="/websocket/" class="text-blue-600 hover:underline">WebSocket Demo</a> — Bidirectional chat terminal</li>
+        <li><a href="/admin/" class="text-blue-600 hover:underline">Admin</a></li>
+        <li><a href="/error/" class="text-blue-600 hover:underline">Error Page</a> — Test exception for toolbar</li>
+    </ul>
 </div>
 {% endblock %}

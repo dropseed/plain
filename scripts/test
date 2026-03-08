@@ -102,6 +102,11 @@ else
   bold "Running h2-worker-test"
   tools/h2-worker-test
 
+  # WebSocket worker behavior tests
+  echo
+  bold "Running ws-worker-test"
+  tools/ws-worker-test
+
   # HTTP/1.1 conformance tests (h1spec)
   echo
   bold "Running h1spec"

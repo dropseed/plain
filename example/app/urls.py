@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import NoReturn
 
 from app.views.sse import ClockView, StockTickerView
+from app.views.websocket import ChatWebSocket, EchoWebSocket
 from plain.admin.urls import AdminRouter
 from plain.assets.urls import AssetsRouter
 from plain.auth.views import LogoutView
@@ -18,6 +19,10 @@ class LoginView(PasswordLoginView):
 
 class SSEDemoView(TemplateView):
     template_name = "sse.html"
+
+
+class WebSocketDemoView(TemplateView):
+    template_name = "websocket.html"
 
 
 class IndexView(TemplateView):
@@ -44,5 +49,8 @@ class AppRouter(Router):
         path("sse/", SSEDemoView, name="sse_demo"),
         path("sse/clock/", ClockView, name="sse_clock"),
         path("sse/ticker/", StockTickerView, name="sse_ticker"),
+        path("websocket/", WebSocketDemoView, name="websocket_demo"),
+        path("websocket/echo/", EchoWebSocket, name="ws_echo"),
+        path("websocket/chat/", ChatWebSocket, name="ws_chat"),
         path("", IndexView, name="index"),
     ]

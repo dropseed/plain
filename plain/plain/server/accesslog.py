@@ -24,20 +24,15 @@ def _get_header(req: Any, header_name: str) -> str:
     return ""
 
 
-def log_access(
-    resp: Any,
+def _build_context(
     req: Any,
-    request_time: datetime.timedelta,
-) -> None:
-    """Log an access entry for a completed request."""
-    if not access_log.handlers or not access_log.isEnabledFor(logging.INFO):
-        return
-
+    *,
+    status: int | None = None,
+    request_time: datetime.timedelta | None = None,
+    resp: Any = None,
+) -> dict[str, Any]:
+    """Build a context dict from SERVER_ACCESS_LOG_FIELDS."""
     from plain.runtime import settings
-
-    status = resp.status
-    if isinstance(status, str):
-        status = status.split(None, 1)[0]
 
     context: dict[str, Any] = {}
 
@@ -47,11 +42,14 @@ def log_access(
         elif field == "path":
             context["path"] = req.path
         elif field == "status":
-            context["status"] = int(status)
+            if status is not None:
+                context["status"] = status
         elif field == "duration_ms":
-            context["duration_ms"] = int(request_time.total_seconds() * 1000)
+            if request_time is not None:
+                context["duration_ms"] = int(request_time.total_seconds() * 1000)
         elif field == "size":
-            context["size"] = getattr(resp, "sent", None) or 0
+            if resp is not None:
+                context["size"] = getattr(resp, "sent", None) or 0
         elif field == "ip":
             if isinstance(req.peer_addr, tuple):
                 context["ip"] = req.peer_addr[0]
@@ -71,7 +69,53 @@ def log_access(
         elif header_name := _HEADER_FIELDS.get(field):
             context[field] = _get_header(req, header_name)
 
+    return context
+
+
+def log_access(
+    resp: Any,
+    req: Any,
+    request_time: datetime.timedelta,
+) -> None:
+    """Log an access entry for a completed request."""
+    if not access_log.handlers or not access_log.isEnabledFor(logging.INFO):
+        return
+
+    raw_status = resp.status
+    if isinstance(raw_status, str):
+        raw_status = raw_status.split(None, 1)[0]
+    status_int = int(raw_status) if raw_status is not None else 0
+
+    context = _build_context(
+        req, status=status_int, request_time=request_time, resp=resp
+    )
+
     try:
         access_log.info("Request", extra={"context": context})
+    except Exception:
+        log.error(traceback.format_exc())
+
+
+def log_websocket(
+    req: Any,
+    event: str,
+    *,
+    request_time: datetime.timedelta | None = None,
+) -> None:
+    """Log a WebSocket lifecycle event (connect or disconnect)."""
+    if not access_log.handlers or not access_log.isEnabledFor(logging.INFO):
+        return
+
+    context: dict[str, Any] = {"event": event}
+    context.update(
+        _build_context(
+            req,
+            status=101 if event == "connect" else None,
+            request_time=request_time,
+        )
+    )
+
+    try:
+        access_log.info("WebSocket", extra={"context": context})
     except Exception:
         log.error(traceback.format_exc())
