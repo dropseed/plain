@@ -12,7 +12,7 @@ import base64
 import hashlib
 import struct
 import zlib
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any, NamedTuple
 
 # WebSocket opcodes (RFC 6455 Section 5.2)
@@ -314,9 +314,9 @@ async def read_messages(
     reader: asyncio.StreamReader,
     writer: Any,
     *,
-    is_closed: Any,
-    close: Any,
-    on_pong: Any = None,
+    is_closed: Callable[[], bool],
+    close: Callable[[int, str], Coroutine[Any, Any, None]],
+    on_pong: Callable[[], None] | None = None,
     max_message_size: int = MAX_DATA_PAYLOAD,
     permessage_deflate: bool = False,
 ) -> AsyncIterator[str | bytes]:
@@ -364,7 +364,7 @@ async def read_messages(
                 if close_reason.code == CLOSE_NO_STATUS
                 else close_reason.code
             )
-            await close(reply_code)
+            await close(reply_code, close_reason.reason)
             return
 
         if frame.opcode == OP_PING:

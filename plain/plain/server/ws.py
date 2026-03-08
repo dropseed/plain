@@ -142,7 +142,21 @@ async def dispatch(
             url_kwargs=match.kwargs,
         )
 
-        # Authorize
+        # Origin check (CSWSH prevention) then authorize
+        if not ws_handler.check_origin():
+            response = response_for_exception(
+                http_request,
+                ForbiddenError403(),
+            )
+            response = await loop.run_in_executor(
+                worker.tpool,
+                worker.handler._finish_pipeline,
+                http_request,
+                response,
+                ran_before,
+            )
+            return await _send_rejection(req, conn, response, request_start)
+
         authorized = await ws_handler.authorize()
         if not authorized:
             response = response_for_exception(

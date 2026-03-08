@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 from plain.http import Request
 
@@ -51,6 +52,41 @@ class WebSocketHandler:
     # Detects dead connections from network drops, proxy timeouts, etc.
     # Set to 0 to disable.
     ping_interval: float = 30.0
+
+    def check_origin(self) -> bool:
+        """Verify the WebSocket upgrade originates from the same origin.
+
+        Prevents cross-site WebSocket hijacking (CSWSH). WebSocket
+        upgrades use GET, so the CSRF middleware's safe-method exemption
+        lets them through — this method provides equivalent protection.
+
+        Uses the same Sec-Fetch-Site / Origin logic as Plain's CSRF
+        middleware. Override to allow specific cross-origin connections.
+        """
+        sec_fetch_site = self.request.headers.get("Sec-Fetch-Site", "").lower()
+
+        if sec_fetch_site in ("same-origin", "none"):
+            return True
+        if sec_fetch_site in ("cross-site", "same-site"):
+            return False
+
+        # No Sec-Fetch-Site header — fall back to Origin vs Host
+        origin = self.request.headers.get("Origin")
+        if not origin:
+            # No Origin header either — non-browser client, allow
+            return True
+
+        if origin == "null":
+            return False
+
+        parsed = urlparse(origin)
+        origin_host = (parsed.hostname or "").lower()
+        origin_port = parsed.port or (443 if parsed.scheme == "https" else 80)
+
+        request_host = (self.request.host or "").split(":")[0].lower()
+        request_port = int(self.request.port or 80)
+
+        return origin_host == request_host and origin_port == request_port
 
     async def authorize(self) -> bool:
         """Check if the WebSocket connection is allowed.
