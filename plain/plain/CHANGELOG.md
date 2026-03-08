@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.120.0](https://github.com/dropseed/plain/releases/plain@0.120.0) (2026-03-07)
+
+### What's changed
+
+- **Stalled thread pool detection in worker heartbeat** — the worker now submits a no-op to the thread pool during each heartbeat cycle and waits for it to complete within the timeout window. If the thread pool is stalled (all threads blocked), the heartbeat stops, causing the arbiter to kill and restart the worker automatically ([ce09f41a9db5](https://github.com/dropseed/plain/commit/ce09f41a9db5))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.119.0](https://github.com/dropseed/plain/releases/plain@0.119.0) (2026-03-07)
 
 ### What's changed
