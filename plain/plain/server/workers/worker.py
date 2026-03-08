@@ -173,6 +173,25 @@ class Worker:
             self.notify()
             if not self.is_parent_alive():
                 break
+
+            # Check executor health: submit a no-op and see if it completes
+            # within the timeout window. If not, the thread pool is stalled
+            # and we stop heartbeating so the arbiter will kill/restart us.
+            # (self.timeout is SERVER_TIMEOUT/2; the arbiter kills after
+            # SERVER_TIMEOUT, so this can't cause a false kill.)
+            try:
+                await asyncio.wait_for(
+                    loop.run_in_executor(self.tpool, lambda: None),
+                    timeout=self.timeout,
+                )
+            except TimeoutError:
+                self.log.warning(
+                    "Thread pool stalled (no-op didn't complete in %ss), "
+                    "stopping heartbeat to trigger restart",
+                    self.timeout,
+                )
+                break
+
             # Surface accept-loop crashes instead of silently losing a listener
             for task in accept_tasks:
                 if task.done() and not task.cancelled():
