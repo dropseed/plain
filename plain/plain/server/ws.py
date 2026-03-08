@@ -28,8 +28,16 @@ log = logging.getLogger("plain.server")
 
 
 def is_websocket_upgrade(header_data: bytes) -> bool:
-    """Quick check for WebSocket upgrade in raw header bytes."""
-    header_str = header_data.decode("latin-1", errors="replace")
+    """Quick check for WebSocket upgrade in raw header bytes.
+
+    Called on every HTTP/1.1 request, so the fast path (non-WS) must
+    be cheap: a single bytes.lower() + two substring checks.
+    """
+    lowered = header_data.lower()
+    if b"upgrade" not in lowered or b"websocket" not in lowered:
+        return False
+
+    header_str = header_data.decode("latin-1")
     has_upgrade = False
     has_connection_upgrade = False
     for line in header_str.split("\r\n"):
@@ -41,22 +49,30 @@ def is_websocket_upgrade(header_data: bytes) -> bool:
             has_upgrade = True
         elif name_upper == "CONNECTION" and "upgrade" in value.lower():
             has_connection_upgrade = True
-    return has_upgrade and has_connection_upgrade
+        if has_upgrade and has_connection_upgrade:
+            return True
+    return False
 
 
 def resolve_websocket_handler(
     http_request: HttpRequest,
 ) -> type[WebSocketHandler] | None:
-    """Check if the resolved URL maps to a WebSocketHandler subclass."""
+    """Check if the resolved URL maps to a WebSocketHandler subclass.
+
+    Caches the resolver match on the request so dispatch() doesn't
+    re-resolve the URL.
+    """
     from plain.urls import get_resolver
+    from plain.urls.exceptions import Resolver404
     from plain.websockets import WebSocketHandler
 
     try:
         resolver = get_resolver()
         match = resolver.resolve(http_request.path_info)
+        http_request.resolver_match = match
         if issubclass(match.view_class, WebSocketHandler):
             return match.view_class
-    except Exception:
+    except Resolver404:
         pass
     return None
 
@@ -92,7 +108,7 @@ async def dispatch(
     ws_handler_class: type[WebSocketHandler],
 ) -> bool:
     """WebSocket dispatch: before_request middleware, authorize, then handoff."""
-    from plain.http import BadRequestError400, ForbiddenError403
+    from plain.http import ForbiddenError403
     from plain.internal.handlers.exception import response_for_exception
 
     loop = asyncio.get_running_loop()
@@ -110,21 +126,6 @@ async def dispatch(
 
         # If middleware short-circuited, send that response normally
         if response is not None:
-            response = await loop.run_in_executor(
-                worker.tpool,
-                worker.handler._finish_pipeline,
-                http_request,
-                response,
-                ran_before,
-            )
-            return await _send_rejection(req, conn, response, request_start)
-
-        # Check Upgrade header
-        if http_request.headers.get("Upgrade", "").lower() != "websocket":
-            response = response_for_exception(
-                http_request,
-                BadRequestError400("Expected WebSocket upgrade"),
-            )
             response = await loop.run_in_executor(
                 worker.tpool,
                 worker.handler._finish_pipeline,
@@ -188,14 +189,7 @@ async def _handle_websocket(
     if not handshake.is_websocket or handshake.error:
         reason = handshake.error or "not upgrade"
         log.warning("Invalid WebSocket handshake: %s", reason)
-        body = f"400 Bad Request: {reason}\r\n".encode()
-        await conn.sendall(
-            b"HTTP/1.1 400 Bad Request\r\n"
-            b"Content-Type: text/plain\r\n"
-            b"Content-Length: " + str(len(body)).encode() + b"\r\n"
-            b"Connection: close\r\n"
-            b"\r\n" + body
-        )
+        await conn.write_error(400, "Bad Request", reason)
         return False
 
     # Send 101 Switching Protocols

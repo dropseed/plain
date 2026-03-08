@@ -76,16 +76,16 @@ def _apply_mask(data: bytes, mask: bytes) -> bytes:
         return b""
 
     result = bytearray(data)
-    mask8 = int.from_bytes(mask * 2, "big")
+    mask8 = (int.from_bytes(mask, "big") << 32) | int.from_bytes(mask, "big")
 
-    # Process 8 bytes at a time.  Use memoryview for reads to avoid
-    # repeated slicing copies on large payloads.
+    # Process 8 bytes at a time.  Use memoryview for reads and
+    # struct.pack_into for writes to avoid per-chunk allocations.
     mv = memoryview(result)
     i = 0
     while i + 8 <= n:
         chunk = int.from_bytes(mv[i : i + 8], "big")
         chunk ^= mask8
-        result[i : i + 8] = chunk.to_bytes(8, "big")
+        struct.pack_into("!Q", result, i, chunk)
         i += 8
 
     # Handle remaining bytes
@@ -393,12 +393,9 @@ async def read_messages(
                 payload = bytes(frag_payload)
                 if frag_compressed:
                     try:
-                        payload = _decompress(payload)
+                        payload = _decompress(payload, max_message_size)
                     except zlib.error:
                         await close(CLOSE_PROTOCOL_ERROR, "Decompression failed")
-                        return
-                    if len(payload) > max_message_size:
-                        await close(CLOSE_MESSAGE_TOO_BIG, "Message too large")
                         return
                 msg = _decode_payload(frag_opcode, payload)
                 if msg is None:
@@ -419,12 +416,9 @@ async def read_messages(
                 payload = frame.payload
                 if frame.rsv1:
                     try:
-                        payload = _decompress(payload)
+                        payload = _decompress(payload, max_message_size)
                     except zlib.error:
                         await close(CLOSE_PROTOCOL_ERROR, "Decompression failed")
-                        return
-                    if len(payload) > max_message_size:
-                        await close(CLOSE_MESSAGE_TOO_BIG, "Message too large")
                         return
                 msg = _decode_payload(frame.opcode, payload)
                 if msg is None:
@@ -457,12 +451,21 @@ def _compress(data: bytes) -> bytes:
     return compressed
 
 
-def _decompress(data: bytes) -> bytes:
-    """Decompress a message payload using raw deflate (RFC 7692)."""
+def _decompress(data: bytes, max_length: int = 0) -> bytes:
+    """Decompress a message payload using raw deflate (RFC 7692).
+
+    If max_length > 0, caps decompressed output to prevent zip-bomb
+    style attacks where small compressed data expands to huge output.
+    """
     # Re-append the tail bytes and decompress with raw inflate.
     # Must use decompressobj — one-shot decompress() rejects the
     # truncated stream even after re-appending the sync marker.
     d = zlib.decompressobj(-15)
+    if max_length > 0:
+        result = d.decompress(data + _DEFLATE_TAIL, max_length + 1)
+        if d.unconsumed_tail:
+            raise zlib.error("Decompressed data exceeds max_length")
+        return result
     return d.decompress(data + _DEFLATE_TAIL)
 
 

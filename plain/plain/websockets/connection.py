@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator
-from typing import Any, Protocol
+from collections.abc import AsyncIterator, Coroutine
+from typing import Any, Protocol, runtime_checkable
 
 from plain.server.protocols.websocket import (
     OP_BINARY,
@@ -19,11 +19,18 @@ from plain.server.protocols.websocket import (
 logger = logging.getLogger("plain.request")
 
 
+@runtime_checkable
 class _WebSocketWriter(Protocol):
+    """Minimal writer interface for WebSocket connections.
+
+    Matches asyncio.StreamWriter in production and allows test fakes.
+    """
+
     def write(self, data: bytes) -> None: ...
     def close(self) -> None: ...
-    async def drain(self) -> None: ...
-    async def wait_closed(self) -> None: ...
+    def is_closing(self) -> bool: ...
+    def drain(self) -> Coroutine[Any, Any, None]: ...
+    def wait_closed(self) -> Coroutine[Any, Any, None]: ...
 
 
 class WebSocketConnection:
@@ -55,7 +62,6 @@ class WebSocketConnection:
         self._pong_received = asyncio.Event()
         self._pong_received.set()  # no outstanding ping initially
         self._ping_task: asyncio.Task[None] | None = None
-        self._transport_closed = False
 
     @property
     def closed(self) -> bool:
@@ -148,7 +154,6 @@ class WebSocketConnection:
             if not self._pong_received.is_set():
                 logger.debug("WebSocket ping timeout (no pong received)")
                 await self.close(1001, "Ping timeout")
-                await self.close_transport()
                 break
 
             self._pong_received.clear()
@@ -160,11 +165,9 @@ class WebSocketConnection:
 
     async def close_transport(self) -> None:
         """Close the underlying transport (reader/writer)."""
-        if self._transport_closed:
-            return
-        self._transport_closed = True
         try:
-            self._writer.close()
-            await self._writer.wait_closed()
+            if not self._writer.is_closing():
+                self._writer.close()
+                await self._writer.wait_closed()
         except OSError:
             pass

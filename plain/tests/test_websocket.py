@@ -344,6 +344,9 @@ class _FakeWriter:
     def close(self) -> None:
         pass
 
+    def is_closing(self) -> bool:
+        return False
+
     async def drain(self) -> None:
         pass
 
