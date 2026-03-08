@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import socket
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote_to_bytes
 
@@ -64,7 +63,6 @@ def _resolve_path(raw_path: str) -> tuple[str, str]:
 
 def create_request(
     req: ServerRequest,
-    sock: socket.socket,
     client: str | bytes | tuple[str, int],
     server: str | tuple[str, int],
 ) -> HttpRequest:

@@ -94,7 +94,7 @@ The only proxy-specific concern is trusting forwarded headers (`X-Forwarded-Prot
 | HTTP/3           | Not needed — reverse proxies handle this                                                            |
 | SSE              | Implemented — `ServerSentEventsView` with `async def stream()`                                      |
 | WebSocket        | Not yet — `WebSocketView` with async lifecycle methods                                              |
-| TLS              | asyncio transport (`loop.start_tls` with memory BIO), required for HTTP/2 ALPN                      |
+| TLS              | `asyncio.start_server(ssl=...)` handles accept + TLS natively, required for HTTP/2 ALPN             |
 
 ## Key dependencies
 

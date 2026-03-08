@@ -7,6 +7,5 @@
 
 from . import errors
 from .message import Message, Request
-from .parser import RequestParser
 
-__all__ = ["Message", "Request", "RequestParser", "errors"]
+__all__ = ["Message", "Request", "errors"]

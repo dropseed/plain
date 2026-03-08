@@ -311,9 +311,9 @@ def parse_request(
 
         # create_request sets _stream = req.body, which is the parser's
         # body reader — it properly decodes chunked/length-delimited data.
-        http_request = create_request(req, conn.sock, conn.client, conn.server)
+        http_request = create_request(req, conn.client, conn.server)
 
-        resp = Response(req, conn.sock, is_ssl=worker.app.is_ssl, writer=conn.writer)
+        resp = Response(req, conn.writer, is_ssl=conn.is_ssl)
 
         if force_close or not worker.alive:
             resp.force_close()
@@ -408,7 +408,7 @@ async def async_handle_error(
 
     if req is not None:
         request_time = datetime.now() - request_start
-        resp = Response(req, conn.sock, is_ssl=conn.is_ssl, writer=conn.writer)
+        resp = Response(req, conn.writer, is_ssl=conn.is_ssl)
         resp.status = f"{status_int} {reason}"
         resp.response_length = len(mesg)
         log_access(resp, req, request_time)

@@ -6,16 +6,13 @@ from __future__ import annotations
 # See the LICENSE for more information.
 #
 # Vendored and modified for Plain.
-import asyncio
 import email.utils
 import fcntl
 import html
-import io
 import os
 import random
 import re
 import socket
-import ssl
 import time
 import urllib.parse
 from typing import Any
@@ -76,43 +73,6 @@ def close_on_exec(fd: int) -> None:
     fcntl.fcntl(fd, fcntl.F_SETFD, flags)
 
 
-def close(sock: socket.socket) -> None:
-    try:
-        sock.close()
-    except OSError:
-        pass
-
-
-def write_chunk(sock: socket.socket, data: str | bytes) -> None:
-    if isinstance(data, str):
-        data = data.encode("utf-8")
-    chunk_size = f"{len(data):X}\r\n"
-    chunk = b"".join([chunk_size.encode("utf-8"), data, b"\r\n"])
-    sock.sendall(chunk)
-
-
-def write(sock: socket.socket, data: str | bytes, chunked: bool = False) -> None:
-    if chunked:
-        return write_chunk(sock, data)
-    if isinstance(data, str):
-        data = data.encode("utf-8")
-    sock.sendall(data)
-
-
-def write_nonblock(
-    sock: socket.socket, data: str | bytes, chunked: bool = False
-) -> None:
-    timeout = sock.gettimeout()
-    if timeout != 0.0:
-        try:
-            sock.setblocking(False)
-            return write(sock, data, chunked)
-        finally:
-            sock.setblocking(True)
-    else:
-        return write(sock, data, chunked)
-
-
 def _error_response_bytes(status_int: int, reason: str, mesg: str) -> bytes:
     body = (
         "<html>\n"
@@ -133,99 +93,6 @@ def _error_response_bytes(status_int: int, reason: str, mesg: str) -> bytes:
         f"{body}"
     )
     return response.encode("latin1")
-
-
-async def _async_wait_readable(sock: socket.socket) -> None:
-    """Wait until a socket's fd becomes readable."""
-    loop = asyncio.get_running_loop()
-    fut: asyncio.Future[None] = loop.create_future()
-    fd = sock.fileno()
-
-    def _on_readable() -> None:
-        if not fut.done():
-            loop.remove_reader(fd)
-            fut.set_result(None)
-
-    try:
-        loop.add_reader(fd, _on_readable)
-    except OSError:
-        return
-    try:
-        await fut
-    except asyncio.CancelledError:
-        loop.remove_reader(fd)
-        raise
-
-
-async def _async_wait_writable(sock: socket.socket) -> None:
-    """Wait until a socket's fd becomes writable."""
-    loop = asyncio.get_running_loop()
-    fut: asyncio.Future[None] = loop.create_future()
-    fd = sock.fileno()
-
-    def _on_writable() -> None:
-        if not fut.done():
-            loop.remove_writer(fd)
-            fut.set_result(None)
-
-    try:
-        loop.add_writer(fd, _on_writable)
-    except OSError:
-        return
-    try:
-        await fut
-    except asyncio.CancelledError:
-        loop.remove_writer(fd)
-        raise
-
-
-async def async_recv(sock: socket.socket, n: int) -> bytes:
-    """Async recv that handles both plain and SSL sockets.
-
-    Plain sockets use loop.sock_recv(). SSL sockets use manual
-    non-blocking recv() with add_reader/add_writer for retries,
-    since asyncio rejects SSLSocket in sock_recv().
-    """
-    if not isinstance(sock, ssl.SSLSocket):
-        loop = asyncio.get_running_loop()
-        return await loop.sock_recv(sock, n)
-
-    while True:
-        try:
-            return sock.recv(n)
-        except ssl.SSLWantReadError:
-            await _async_wait_readable(sock)
-        except ssl.SSLWantWriteError:
-            await _async_wait_writable(sock)
-        except BlockingIOError:
-            await _async_wait_readable(sock)
-
-
-async def async_sendall(sock: socket.socket, data: bytes) -> None:
-    """Async sendall that handles both plain and SSL sockets.
-
-    Plain sockets use loop.sock_sendall(). SSL sockets use manual
-    non-blocking send() with add_reader/add_writer for retries.
-    """
-    if not isinstance(sock, ssl.SSLSocket):
-        loop = asyncio.get_running_loop()
-        await loop.sock_sendall(sock, data)
-        return
-
-    sent = 0
-    total = len(data)
-    while sent < total:
-        try:
-            n = sock.send(data[sent:])
-            if n == 0:
-                raise OSError("SSL send returned 0 bytes (peer shutdown)")
-            sent += n
-        except ssl.SSLWantWriteError:
-            await _async_wait_writable(sock)
-        except ssl.SSLWantReadError:
-            await _async_wait_readable(sock)
-        except BlockingIOError:
-            await _async_wait_writable(sock)
 
 
 def http_date(timestamp: float | None = None) -> str:
@@ -255,19 +122,6 @@ def to_bytestring(value: str | bytes, encoding: str = "utf8") -> bytes:
         raise TypeError(f"{value!r} is not a string")
 
     return value.encode(encoding)
-
-
-def has_fileno(obj: Any) -> bool:
-    if not hasattr(obj, "fileno"):
-        return False
-
-    # check BytesIO case and maybe others
-    try:
-        obj.fileno()
-    except (AttributeError, OSError, io.UnsupportedOperation):
-        return False
-
-    return True
 
 
 def make_fail_handler(msg: str | bytes) -> Any:

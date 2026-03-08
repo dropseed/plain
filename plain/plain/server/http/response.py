@@ -7,12 +7,8 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import asyncio
-import io
 import logging
-import os
 import re
-import socket
-from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 from plain.http import FileResponse
@@ -23,10 +19,6 @@ from .message import TOKEN_RE
 
 if TYPE_CHECKING:
     from .message import Request as ServerRequest
-
-# Send files in at most 1GB blocks as some operating systems can have problems
-# with sending files in blocks over 2GB.
-BLKSIZE = 0x3FFFFFFF
 
 # RFC9110 5.5: field-vchar = VCHAR / obs-text
 # RFC4234 B.1: VCHAR = 0x21-x07E = printable ASCII
@@ -53,15 +45,13 @@ class Response:
     def __init__(
         self,
         req: ServerRequest,
-        sock: socket.socket,
+        writer: asyncio.StreamWriter,
         *,
         is_ssl: bool = False,
-        writer: asyncio.StreamWriter | None = None,
     ) -> None:
         self.req = req
-        self.sock = sock
-        self.is_ssl = is_ssl
         self._writer = writer
+        self.is_ssl = is_ssl
         self.version = "plain"
         self.status: str | None = None
         self.chunked = False
@@ -175,92 +165,10 @@ class Response:
             headers.append("Transfer-Encoding: chunked\r\n")
         return headers
 
-    def send_headers(self) -> None:
-        if self.headers_sent:
-            return None
-        tosend = self.default_headers()
-        tosend.extend([f"{k}: {v}\r\n" for k, v in self.headers])
-
-        header_str = "{}\r\n".format("".join(tosend))
-        util.write(self.sock, util.to_bytestring(header_str, "latin-1"))
-        self.headers_sent = True
-        return None
-
-    def write(self, arg: bytes) -> None:
-        self.send_headers()
-        if not isinstance(arg, bytes):
-            raise TypeError(f"{arg!r} is not a byte")
-        arglen = len(arg)
-        tosend = arglen
-        if self.response_length is not None:
-            if self.sent >= self.response_length:
-                # Never write more than self.response_length bytes
-                return None
-
-            tosend = min(self.response_length - self.sent, tosend)
-            if tosend < arglen:
-                arg = arg[:tosend]
-
-        # Sending an empty chunk signals the end of the
-        # response and prematurely closes the response
-        if self.chunked and tosend == 0:
-            return None
-
-        self.sent += tosend
-        util.write(self.sock, arg, self.chunked)
-        return None
-
-    def can_sendfile(self) -> bool:
-        from plain.runtime import settings
-
-        return settings.SERVER_SENDFILE
-
-    def sendfile(self, respiter: FileWrapper) -> bool:
-        if self.is_ssl or not self.can_sendfile():
-            return False
-
-        if not util.has_fileno(respiter.filelike):
-            return False
-
-        fileno = respiter.filelike.fileno()
-        try:
-            offset = os.lseek(fileno, 0, os.SEEK_CUR)
-            if self.response_length is None:
-                filesize = os.fstat(fileno).st_size
-                nbytes = filesize - offset
-            else:
-                nbytes = self.response_length
-        except (OSError, io.UnsupportedOperation):
-            return False
-
-        self.send_headers()
-
-        if self.is_chunked():
-            chunk_size = f"{nbytes:X}\r\n"
-            self.sock.sendall(chunk_size.encode("utf-8"))
-        if nbytes > 0:
-            self.sock.sendfile(respiter.filelike, offset=offset, count=nbytes)
-
-        if self.is_chunked():
-            self.sock.sendall(b"\r\n")
-
-        os.lseek(fileno, offset, os.SEEK_SET)
-
-        return True
-
-    def write_file(self, respiter: FileWrapper | Iterator[bytes]) -> None:
-        if isinstance(respiter, FileWrapper):
-            if not self.sendfile(respiter):
-                for item in respiter:
-                    self.write(item)
-        else:
-            for item in respiter:
-                self.write(item)
-
     def prepare_response(self, http_response: Any) -> None:
         """Set status and headers from a plain.http.ResponseBase without writing body.
 
-        After calling this, use write() to send body chunks and close() to finish.
+        After calling this, use async_write() to send body chunks and async_close() to finish.
         """
         status = f"{http_response.status_code} {http_response.reason_phrase}"
         response_headers = [
@@ -272,44 +180,14 @@ class Response:
         ]
         self.set_status_and_headers(status, response_headers)
 
-    def write_response(self, http_response: Any) -> None:
-        """Write a plain.http.ResponseBase directly to the socket."""
-        self.prepare_response(http_response)
-
-        if (
-            isinstance(http_response, FileResponse)
-            and http_response.file_to_stream is not None
-        ):
-            file_wrapper = FileWrapper(
-                http_response.file_to_stream, http_response.block_size
-            )
-            # Patch close so the response gets properly cleaned up
-            http_response.file_to_stream.close = http_response.close
-            self.write_file(file_wrapper)
-        else:
-            for chunk in http_response:
-                self.write(chunk)
-
-        self.close()
-
-    def close(self) -> None:
-        if not self.headers_sent:
-            self.send_headers()
-        if self.chunked:
-            util.write_chunk(self.sock, b"")
-
     # ------------------------------------------------------------------
-    # Async write methods — use loop.sock_sendall() instead of blocking
-    # sendall(). The socket must be non-blocking (managed by asyncio).
+    # Async write methods — use asyncio StreamWriter for all I/O.
     # ------------------------------------------------------------------
 
     async def _async_send(self, data: bytes) -> None:
-        """Send bytes using the writer (asyncio streams) or raw socket."""
-        if self._writer is not None:
-            self._writer.write(data)
-            await self._writer.drain()
-        else:
-            await util.async_sendall(self.sock, data)
+        """Send bytes using the writer (asyncio streams)."""
+        self._writer.write(data)
+        await self._writer.drain()
 
     async def async_send_headers(self) -> None:
         if self.headers_sent:

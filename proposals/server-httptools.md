@@ -121,7 +121,7 @@ Separately:
 
 ## Current architecture fit
 
-TLS now uses asyncio transport (`loop.start_tls` with memory BIO). All connections (H1 and H2) have `asyncio.StreamReader`/`StreamWriter`. Headers are read async via `async_read_headers()` in `h1.py`, then the gunicorn parser processes the pre-buffered bytes synchronously. Small bodies parse inline on the event loop; large bodies use `AsyncBridgeUnreader` which bridges back via `asyncio.run_coroutine_threadsafe()`.
+TLS is handled by `asyncio.start_server(ssl=...)` which performs accept + TLS in one step. All connections (H1 and H2) have `asyncio.StreamReader`/`StreamWriter` from the start. Headers are read async via `async_read_headers()` in `h1.py`, then the gunicorn parser processes the pre-buffered bytes synchronously. Small bodies parse inline on the event loop; large bodies use `AsyncBridgeUnreader` which bridges back via `asyncio.run_coroutine_threadsafe()`.
 
 The current parser couples socket reading with parsing (pull model via `Unreader`). Both httptools and httparse are push parsers (you feed them data). This requires restructuring:
 

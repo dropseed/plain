@@ -10,7 +10,7 @@ from __future__ import annotations
 # An asyncio event loop runs all I/O (accept, TLS, read, write).
 # A thread pool handles only application code (middleware + views).
 #   New connection:
-#     1. Accept (async) → wait readable (async) → TLS handshake (thread pool)
+#     1. Accept + TLS via asyncio.start_server(ssl=...) → reader/writer
 #     2. Read header bytes (async, until \r\n\r\n)
 #     3. Parse headers from buffer (inline, no I/O)
 #     4. Read body bytes (async, based on Content-Length or chunked)
@@ -18,11 +18,9 @@ from __future__ import annotations
 #     6. Write response (async)
 #   Keepalive waits use asyncio.wait_for with a timeout.
 import asyncio
-import errno
 import logging
 import os
 import signal
-import ssl
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -32,7 +30,7 @@ from typing import TYPE_CHECKING, Any
 from plain.internal.reloader import Reloader
 
 from .. import sock, util
-from ..connection import KEEPALIVE, Connection
+from ..connection import Connection
 from ..http import h1
 from ..http.h2 import async_handle_h2_connection
 from .workertmp import WorkerHeartbeat
@@ -92,8 +90,6 @@ class Worker:
         self.max_body: int = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or (10 * 1024 * 1024)
         self.nr_conns: int = 0
         self._connection_tasks: set[asyncio.Task] = set()
-        self._capacity_available: asyncio.Event = asyncio.Event()
-        self._capacity_available.set()
         # Worker-level H2 stream budget — limits total in-flight H2 streams
         # across all connections to avoid overwhelming the thread pool.
         self._h2_stream_budget: asyncio.Semaphore = asyncio.Semaphore(
@@ -162,11 +158,29 @@ class Worker:
         signal.signal(signal.SIGWINCH, self.handle_winch)
         signal.siginterrupt(signal.SIGTERM, False)
 
-        # Start accept loops (one task per listener)
-        accept_tasks = []
+        # Build SSL context once for all listeners
+        ssl_ctx = None
+        if self.app.is_ssl:
+            assert self.app.certfile is not None
+            ssl_ctx = sock.ssl_context(self.app.certfile, self.app.keyfile)
+
+        # Capacity semaphore for backpressure
+        self._capacity_semaphore: asyncio.Semaphore = asyncio.Semaphore(
+            self.max_connections
+        )
+
+        # Start servers (one per listener socket)
+        servers: list[asyncio.Server] = []
         for listener in self.sockets:
-            listener.setblocking(False)
-            accept_tasks.append(loop.create_task(self._accept_loop(listener)))
+            assert listener.sock is not None, "Listener socket is closed"
+            listener.sock.setblocking(False)
+            server = await asyncio.start_server(
+                self._on_connection,
+                sock=listener.sock,
+                ssl=ssl_ctx,
+                ssl_handshake_timeout=10 if ssl_ctx else None,
+            )
+            servers.append(server)
 
         # Heartbeat loop
         while self.alive:
@@ -192,157 +206,78 @@ class Worker:
                 )
                 break
 
-            # Surface accept-loop crashes instead of silently losing a listener
-            for task in accept_tasks:
-                if task.done() and not task.cancelled():
-                    exc = task.exception()
-                    if exc is not None:
-                        self.log.error("Accept loop crashed: %s", exc)
-                        self.alive = False
-                        break
+            # Surface server crashes
+            for server in servers:
+                if not server.is_serving():
+                    self.log.error("Server stopped serving unexpectedly")
+                    self.alive = False
+                    break
             await asyncio.sleep(1.0)
 
-        # Cancel accept loops before closing listener sockets to avoid
-        # EBADF from sock_accept on an already-closed socket
-        for task in accept_tasks:
-            task.cancel()
-        await asyncio.gather(*accept_tasks, return_exceptions=True)
+        # Stop accepting new connections (don't await wait_closed() —
+        # it blocks until all connection tasks finish, bypassing
+        # _graceful_shutdown's timeout enforcement)
+        for server in servers:
+            server.close()
 
         await self._graceful_shutdown()
 
-    async def _accept_loop(self, listener: sock.BaseSocket) -> None:
-        loop = asyncio.get_running_loop()
-        assert listener.sock is not None, "Listener socket is closed"
-        listener_sock = listener.sock
-        server: tuple[str, int] = listener_sock.getsockname()
-        while self.alive:
-            # Backpressure: wait when at capacity
-            if self.nr_conns >= self.max_connections:
-                self._capacity_available.clear()
-                await self._capacity_available.wait()
-                continue
+    async def _on_connection(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        """Callback for each new connection from asyncio.start_server."""
+        # Reject immediately if at capacity — the connection is already
+        # accepted (and TLS-negotiated for SSL) by the time we get here,
+        # so queuing behind a semaphore would just waste resources.
+        if self._capacity_semaphore.locked():
+            self.log.debug("Connection rejected: at capacity")
+            writer.close()
+            await writer.wait_closed()
+            return
+        await self._capacity_semaphore.acquire()
 
-            try:
-                client_sock, client_addr = await loop.sock_accept(listener_sock)
-            except OSError as e:
-                if e.errno not in (
-                    errno.EAGAIN,
-                    errno.ECONNABORTED,
-                    errno.EWOULDBLOCK,
-                ):
-                    raise
-                continue
+        client = writer.get_extra_info("peername")
+        server_addr = writer.get_extra_info("sockname")
+        is_ssl = writer.get_extra_info("ssl_object") is not None
 
-            conn = Connection(self.app, client_sock, client_addr, server)
-            self.nr_conns += 1
+        conn = Connection(self.app, reader, writer, client, server_addr, is_ssl=is_ssl)
+        self.nr_conns += 1
 
-            task = loop.create_task(self._handle_connection(conn))
-            self._connection_tasks.add(task)
-            task.add_done_callback(self._connection_tasks.discard)
+        task = asyncio.current_task()
+        assert task is not None
+        self._connection_tasks.add(task)
+        task.add_done_callback(self._connection_tasks.discard)
+
+        try:
+            await self._handle_connection(conn)
+        finally:
+            self._capacity_semaphore.release()
+            self.nr_conns -= 1
+            conn.close()
 
     async def _handle_connection(self, conn: Connection) -> None:
-        try:
-            # Wait for the socket to become readable before doing anything.
-            # This prevents slow/idle clients from consuming resources.
-            try:
-                await asyncio.wait_for(
-                    conn.wait_readable(),
-                    timeout=KEEPALIVE,
+        if conn.is_ssl:
+            ssl_object = conn.writer.get_extra_info("ssl_object")
+            alpn = ssl_object.selected_alpn_protocol() if ssl_object else None
+
+            if alpn == "h2":
+                conn.is_h2 = True
+                await async_handle_h2_connection(
+                    conn.reader,
+                    conn.writer,
+                    conn.client,
+                    conn.server,
+                    self.handler,
+                    self.app.is_ssl,
+                    self.tpool,
+                    stream_budget=self._h2_stream_budget,
                 )
-            except TimeoutError:
                 return
 
-            # TLS handshake via asyncio transport layer.
-            # Uses loop.start_tls() which gives asyncio ownership of SSL state
-            # via memory BIO (ssl.SSLObject). This is required for reliable
-            # async I/O on long-lived H2 connections — raw ssl.SSLSocket +
-            # add_reader/add_writer silently loses data.
-            if self.app.is_ssl:
-                try:
-                    conn.reader, conn.writer = await asyncio.wait_for(
-                        self._async_tls_handshake(conn),
-                        timeout=KEEPALIVE,
-                    )
-                except (ssl.SSLError, OSError) as e:
-                    # asyncio took socket ownership via create_connection;
-                    # it closes the transport on failure, so prevent
-                    # conn.close() from double-closing the raw fd.
-                    conn.handed_off = True
-                    if isinstance(e, ssl.SSLError) and e.args[0] == ssl.SSL_ERROR_EOF:
-                        self.log.debug("ssl connection closed during handshake")
-                    else:
-                        self.log.debug("TLS handshake failed: %s", e)
-                    return
-                except TimeoutError:
-                    conn.handed_off = True
-                    self.log.debug("TLS handshake timed out")
-                    return
-                conn.is_ssl = True
-
-                ssl_object = conn.writer.get_extra_info("ssl_object")
-                alpn = ssl_object.selected_alpn_protocol() if ssl_object else None
-
-                if alpn == "h2":
-                    conn.is_h2 = True
-                    conn.handed_off = True
-                    await async_handle_h2_connection(
-                        conn.reader,
-                        conn.writer,
-                        conn.client,
-                        conn.server,
-                        self.handler,
-                        self.app.is_ssl,
-                        self.tpool,
-                        stream_budget=self._h2_stream_budget,
-                    )
-                    return
-
-            # HTTP/1.1
-            await h1.handle_connection(self, conn)
-        finally:
-            self.nr_conns -= 1
-            if self.nr_conns < self.max_connections:
-                self._capacity_available.set()
-            if not conn.handed_off:
-                conn.close()
-
-    async def _async_tls_handshake(
-        self, conn: Connection
-    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        """Perform TLS handshake via asyncio transport layer.
-
-        Uses loop.create_connection() to wrap the raw socket in an asyncio
-        transport, then loop.start_tls() to perform the handshake using
-        asyncio's memory BIO (ssl.SSLObject). This avoids ssl.SSLSocket
-        entirely, giving asyncio full control of the SSL state.
-        """
-        loop = asyncio.get_running_loop()
-        assert conn.app.certfile is not None
-
-        ssl_ctx = sock.ssl_context(conn.app.certfile, conn.app.keyfile)
-
-        reader = asyncio.StreamReader()
-        protocol = asyncio.StreamReaderProtocol(reader)
-
-        # Wrap the accepted raw socket in an asyncio transport
-        transport, _ = await loop.create_connection(lambda: protocol, sock=conn.sock)
-
-        # Upgrade to TLS — asyncio uses ssl.SSLObject (memory BIO) internally
-        new_transport = await loop.start_tls(
-            transport, protocol, ssl_ctx, server_side=True
-        )
-
-        # Build the StreamWriter with the TLS-upgraded transport
-        assert new_transport is not None
-        writer = asyncio.StreamWriter(new_transport, protocol, reader, loop)
-
-        return reader, writer
+        # HTTP/1.1
+        await h1.handle_connection(self, conn)
 
     async def _graceful_shutdown(self) -> None:
-        # Close listener sockets
-        for s in self.sockets:
-            s.close()
-
         # Wait for in-flight connections with timeout
         if self._connection_tasks:
             from plain.runtime import settings

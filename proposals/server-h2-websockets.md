@@ -56,4 +56,4 @@ Currently checks `Upgrade: websocket` header (line 268). H2 WebSocket requests u
 
 ## Prerequisites (done)
 
-Asyncio-native TLS is already implemented — all connections have `asyncio.StreamReader`/`StreamWriter` via `loop.start_tls()`. The WebSocket handler receives the same reader/writer used for HTTP. TLS is invisible. No thread bridge needed.
+Asyncio-native TLS is already implemented — `asyncio.start_server(ssl=...)` handles accept + TLS, giving all connections `asyncio.StreamReader`/`StreamWriter` from the start. The WebSocket handler receives the same reader/writer used for HTTP. TLS is invisible. No thread bridge needed.

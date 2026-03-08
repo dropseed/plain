@@ -226,9 +226,3 @@ def ssl_context(certfile: str, keyfile: str | None) -> ssl.SSLContext:
     context.load_cert_chain(certfile=certfile, keyfile=keyfile)
     context.set_alpn_protocols(["h2", "http/1.1"])
     return context
-
-
-def ssl_wrap_socket(
-    sock: socket.socket, certfile: str, keyfile: str | None
-) -> ssl.SSLSocket:
-    return ssl_context(certfile, keyfile).wrap_socket(sock, server_side=True)
