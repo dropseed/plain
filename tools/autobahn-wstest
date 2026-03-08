@@ -1,0 +1,104 @@
+#!/bin/bash -e
+
+# Run the Autobahn WebSocket fuzzing testsuite against Plain's WebSocket server.
+#
+# Uses Docker to run the crossbario/autobahn-testsuite image as a fuzzing client
+# that connects to Plain's echo channel and runs hundreds of RFC 6455 compliance
+# tests including edge cases for fragmentation, UTF-8 validation, close codes,
+# control frames, and more.
+#
+# Usage:
+#   ./tools/autobahn-wstest                    # starts server automatically
+#   ./tools/autobahn-wstest host:port          # test against running server
+#   ./tools/autobahn-wstest --cases "1.*,2.*"  # run specific test case groups
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Parse args
+TARGET=""
+CASES="*"
+EXCLUDE_CASES=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --cases=*) CASES="${1#--cases=}" ;;
+        --cases)   shift; CASES="$1" ;;
+        --exclude=*) EXCLUDE_CASES="${1#--exclude=}" ;;
+        --exclude)   shift; EXCLUDE_CASES="$1" ;;
+        *:*)       TARGET="$1" ;;
+    esac
+    shift
+done
+
+# Check Docker is available
+if ! command -v docker &>/dev/null; then
+    echo "Error: Docker is required for autobahn-wstest" >&2
+    exit 1
+fi
+
+# Results directory
+RESULTS_DIR="$REPO_ROOT/scratch/autobahn-results"
+rm -rf "$RESULTS_DIR"
+mkdir -p "$RESULTS_DIR"
+
+if [ -z "$TARGET" ]; then
+    # Disable HTTPS redirect — WebSocket tests use plain HTTP
+    export PLAIN_HTTPS_REDIRECT_ENABLED=false
+
+    SAVED_ARGS=("$@")
+    set --
+    source "$REPO_ROOT/tools/start-example-server"
+    set -- "${SAVED_ARGS[@]}"
+    # Docker on macOS uses host.docker.internal to reach host
+    WS_HOST="host.docker.internal"
+    WS_PORT="$PORT"
+else
+    WS_HOST="${TARGET%%:*}"
+    WS_PORT="${TARGET##*:}"
+fi
+
+echo ""
+echo "Autobahn WebSocket Fuzzing Testsuite"
+echo "====================================="
+echo "Target: ws://$WS_HOST:$WS_PORT/websocket/echo/"
+echo "Cases: $CASES"
+echo ""
+
+# Generate fuzzingclient config
+cat > "$RESULTS_DIR/fuzzingclient.json" <<EOF
+{
+    "outdir": "/results",
+    "servers": [
+        {
+            "agent": "Plain",
+            "url": "ws://$WS_HOST:$WS_PORT/websocket/echo/"
+        }
+    ],
+    "cases": ["$CASES"],
+    "exclude-cases": ["$EXCLUDE_CASES"],
+    "exclude-agent-cases": {}
+}
+EOF
+
+# Handle comma-separated cases by converting to JSON array
+python3 -c "
+import json, sys
+with open('$RESULTS_DIR/fuzzingclient.json') as f:
+    config = json.load(f)
+# Split comma-separated into list
+config['cases'] = config['cases'][0].split(',')
+config['exclude-cases'] = [x for x in config['exclude-cases'][0].split(',') if x]
+with open('$RESULTS_DIR/fuzzingclient.json', 'w') as f:
+    json.dump(config, f, indent=2)
+"
+
+# Run autobahn fuzzing client via Docker
+docker run --rm \
+    -v "$RESULTS_DIR:/results" \
+    --add-host=host.docker.internal:host-gateway \
+    crossbario/autobahn-testsuite \
+    wstest -m fuzzingclient -s /results/fuzzingclient.json
+
+# Parse results
+echo ""
+uv run python "$REPO_ROOT/tools/autobahn-report.py" "$RESULTS_DIR"

@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}WebSocket Demo — Chat Terminal{% endblock %}
+
+{% block content %}
+<style nonce="{{ request.csp_nonce }}">
+    .terminal-bg {
+        background: #0a0e17;
+        background-image:
+            radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.04) 0%, transparent 60%),
+            radial-gradient(ellipse at 80% 20%, rgba(59, 130, 246, 0.03) 0%, transparent 50%);
+        min-height: 100vh;
+    }
+
+    .font-mono-terminal { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace; }
+    .font-display { font-family: 'SF Pro Display', 'Segoe UI', system-ui, sans-serif; }
+
+    .card-surface {
+        background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+        border: 1px solid rgba(255,255,255,0.06);
+        backdrop-filter: blur(12px);
+    }
+
+    .separator {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 20%, rgba(255,255,255,0.08) 80%, transparent);
+    }
+
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+    .live-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+    @keyframes fade-in-up {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in { animation: fade-in-up 0.4s ease-out both; }
+
+    #messages {
+        max-height: 400px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,0.1) transparent;
+    }
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+    .msg-enter {
+        animation: fade-in-up 0.3s ease-out both;
+    }
+</style>
+
+<div class="terminal-bg">
+    <div class="max-w-2xl mx-auto px-6 py-16 space-y-8">
+
+        <!-- Header -->
+        <div class="animate-in">
+            <div class="flex items-center justify-between mb-2">
+                <h1 class="font-display text-sm font-medium tracking-[0.2em] uppercase text-zinc-500">
+                    WebSocket Terminal
+                </h1>
+                <div class="flex items-center gap-2">
+                    <span
+                        id="status-dot"
+                        class="inline-block w-1.5 h-1.5 rounded-full bg-zinc-600"
+                    ></span>
+                    <span
+                        id="status-text"
+                        class="font-mono-terminal text-[10px] tracking-wider text-zinc-600 uppercase"
+                    >Connecting</span>
+                </div>
+            </div>
+            <div class="separator"></div>
+        </div>
+
+        <!-- Messages -->
+        <div class="card-surface rounded-xl p-6">
+            <div
+                id="messages"
+                class="space-y-3 mb-6 min-h-[200px]"
+            >
+                <div class="font-mono-terminal text-xs text-zinc-600 text-center py-8">
+                    Waiting for connection...
+                </div>
+            </div>
+
+            <div class="separator mb-4"></div>
+
+            <!-- Input -->
+            <form id="send-form" class="flex gap-3">
+                <input
+                    id="message-input"
+                    type="text"
+                    placeholder="Type a message..."
+                    autocomplete="off"
+                    disabled
+                    class="flex-1 bg-transparent border border-zinc-800 rounded-lg px-4 py-2.5
+                           font-mono-terminal text-sm text-zinc-300 placeholder-zinc-700
+                           focus:outline-none focus:border-indigo-500/50 transition-colors
+                           disabled:opacity-40"
+                >
+                <button
+                    type="submit"
+                    disabled
+                    class="px-5 py-2.5 bg-indigo-600/20 border border-indigo-500/30 rounded-lg
+                           font-mono-terminal text-xs tracking-wider text-indigo-400 uppercase
+                           hover:bg-indigo-600/30 transition-colors
+                           disabled:opacity-40 disabled:cursor-not-allowed"
+                >Send</button>
+            </form>
+        </div>
+
+        <!-- Stats -->
+        <div class="flex items-center justify-between">
+            <div class="font-mono-terminal text-[10px] text-zinc-700 tracking-wide">
+                <span id="msg-count">0</span> messages &middot;
+                <span id="client-count">0</span> connected
+            </div>
+            <div class="font-mono-terminal text-[10px] text-zinc-700 tracking-wide">
+                WebSocket &middot; Bidirectional
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ request.csp_nonce }}">
+    const messagesEl = document.getElementById('messages');
+    const input = document.getElementById('message-input');
+    const form = document.getElementById('send-form');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const msgCountEl = document.getElementById('msg-count');
+    const clientCountEl = document.getElementById('client-count');
+
+    let msgCount = 0;
+    let ws;
+
+    function setStatus(state) {
+        if (state === 'connected') {
+            statusDot.className = 'live-dot inline-block w-1.5 h-1.5 rounded-full bg-indigo-400';
+            statusText.className = 'font-mono-terminal text-[10px] tracking-wider text-indigo-400/70 uppercase';
+            statusText.textContent = 'Live';
+            input.disabled = false;
+            form.querySelector('button').disabled = false;
+            input.focus();
+        } else if (state === 'disconnected') {
+            statusDot.className = 'inline-block w-1.5 h-1.5 rounded-full bg-red-500';
+            statusText.className = 'font-mono-terminal text-[10px] tracking-wider text-red-400/70 uppercase';
+            statusText.textContent = 'Disconnected';
+            input.disabled = true;
+            form.querySelector('button').disabled = true;
+        } else {
+            statusDot.className = 'inline-block w-1.5 h-1.5 rounded-full bg-zinc-600';
+            statusText.className = 'font-mono-terminal text-[10px] tracking-wider text-zinc-600 uppercase';
+            statusText.textContent = 'Connecting';
+        }
+    }
+
+    function addMessage(text, type) {
+        // Clear placeholder on first message
+        if (msgCount === 0) {
+            messagesEl.innerHTML = '';
+        }
+
+        const div = document.createElement('div');
+        div.className = 'msg-enter';
+
+        const time = document.createElement('span');
+        time.className = 'font-mono-terminal text-[10px] text-zinc-700 mr-2';
+        const now = new Date();
+        time.textContent = now.toLocaleTimeString('en-US', { hour12: false });
+
+        const content = document.createElement('span');
+        content.className = 'font-mono-terminal text-sm';
+
+        if (type === 'system') {
+            content.className += ' text-zinc-500 italic';
+        } else if (type === 'sent') {
+            content.className += ' text-indigo-400';
+            text = '→ ' + text;
+        } else {
+            content.className += ' text-zinc-300';
+            text = '← ' + text;
+        }
+
+        content.textContent = text;
+        div.appendChild(time);
+        div.appendChild(content);
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        msgCount++;
+        msgCountEl.textContent = msgCount;
+    }
+
+    function connect() {
+        setStatus('connecting');
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(protocol + '//' + location.host + '/websocket/chat/');
+
+        ws.onopen = () => {
+            setStatus('connected');
+            addMessage('Connected to server', 'system');
+        };
+
+        ws.onmessage = (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                if (data.type === 'system') {
+                    addMessage(data.message, 'system');
+                    // Extract client count from system messages
+                    const match = data.message.match(/(\d+) connected/);
+                    if (match) clientCountEl.textContent = match[1];
+                } else {
+                    addMessage(data.message, 'received');
+                }
+            } catch {
+                addMessage(e.data, 'received');
+            }
+        };
+
+        ws.onclose = () => {
+            setStatus('disconnected');
+            addMessage('Connection closed. Reconnecting...', 'system');
+            setTimeout(connect, 2000);
+        };
+
+        ws.onerror = () => {
+            // onclose will fire after this
+        };
+    }
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+        ws.send(JSON.stringify({ message: text }));
+        addMessage(text, 'sent');
+        input.value = '';
+    });
+
+    connect();
+</script>
+{% endblock %}
