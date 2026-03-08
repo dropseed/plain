@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.120.1](https://github.com/dropseed/plain/releases/plain@0.120.1) (2026-03-08)
+
+### What's changed
+
+- **Simplified TLS handling using `asyncio.start_server(ssl=...)`** — TLS is now handled at connection accept time by asyncio instead of a manual two-step process (accept raw socket, then handshake). This eliminates the `_async_tls_handshake` method, the `handed_off` flag, and all raw socket I/O fallback paths. `Connection` now always receives `asyncio.StreamReader`/`StreamWriter` instead of a raw socket, removing dual-path code in `recv`, `sendall`, `wait_readable`, `close`, and `Response._async_send` ([c1e172eec835](https://github.com/dropseed/plain/commit/c1e172eec835))
+- Removed `RequestParser`, `SocketUnreader`, `IterUnreader`, and several raw socket utility functions (`close`, `write`, `write_chunk`, `write_nonblock`, `async_recv`, `async_sendall`, `has_fileno`, `ssl_wrap_socket`) that are no longer needed ([c1e172eec835](https://github.com/dropseed/plain/commit/c1e172eec835))
+- Removed synchronous `Response` write methods (`send_headers`, `write`, `sendfile`, `write_file`, `write_response`, `close`) and the `SERVER_SENDFILE` setting — all response writing now uses the async path ([c1e172eec835](https://github.com/dropseed/plain/commit/c1e172eec835))
+- Connection backpressure now uses `asyncio.Semaphore` instead of a manual `asyncio.Event` with count checks ([c1e172eec835](https://github.com/dropseed/plain/commit/c1e172eec835))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.120.0](https://github.com/dropseed/plain/releases/plain@0.120.0) (2026-03-07)
 
 ### What's changed
