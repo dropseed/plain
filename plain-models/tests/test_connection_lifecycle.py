@@ -21,7 +21,7 @@ from plain.http import Response
 from plain.models.connections import _create_connection as _original_create_connection
 from plain.models.connections import _db_conn, get_connection, has_connection
 from plain.models.db import close_old_connections
-from plain.models.postgres.wrapper import DatabaseConnection
+from plain.models.postgres.connection import DatabaseConnection
 from plain.runtime import settings
 from plain.signals import request_finished, request_started
 from plain.test import Client

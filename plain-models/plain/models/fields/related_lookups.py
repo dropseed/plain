@@ -14,7 +14,7 @@ from plain.models.lookups import (
 )
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 

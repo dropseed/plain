@@ -14,7 +14,7 @@ from plain.models.sql.constants import INNER, LOUTER
 if TYPE_CHECKING:
     from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ForeignObjectRel
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 

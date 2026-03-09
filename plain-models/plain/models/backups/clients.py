@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from plain.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
 
 
 class PostgresBackupClient:

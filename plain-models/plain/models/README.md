@@ -821,7 +821,7 @@ graph TB
 2. **QuerySet** methods like `.filter()` modify the internal [`Query`](./sql/query.py#Query) object
 3. When results are needed, **Query.get_compiler()** creates the appropriate [`SQLCompiler`](./sql/compiler.py#SQLCompiler)
 4. **SQLCompiler.as_sql()** renders the Query to SQL
-5. **SQLCompiler.execute_sql()** runs the SQL via [`DatabaseConnection`](./postgres/wrapper.py#DatabaseConnection) and returns results
+5. **SQLCompiler.execute_sql()** runs the SQL via [`DatabaseConnection`](./postgres/connection.py#DatabaseConnection) and returns results
 
 **Key components:**
 
@@ -829,7 +829,7 @@ graph TB
 - [`QuerySet`](./query.py#QuerySet) - Chainable API (`.filter()`, `.exclude()`, `.order_by()`) that builds a Query
 - [`Query`](./sql/query.py#Query) - Internal representation of a query's logical structure (tables, joins, filters)
 - [`SQLCompiler`](./sql/compiler.py#SQLCompiler) - Transforms a Query into executable SQL
-- [`DatabaseConnection`](./postgres/wrapper.py#DatabaseConnection) - PostgreSQL connection and query execution
+- [`DatabaseConnection`](./postgres/connection.py#DatabaseConnection) - PostgreSQL connection and query execution
 
 ## Settings
 

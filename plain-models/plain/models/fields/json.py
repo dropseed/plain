@@ -19,7 +19,7 @@ from plain.models.postgres.sql import adapt_json_value
 from . import Field
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
     from plain.preflight.results import PreflightResult
 

@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     from plain.models.fields.related import RelatedField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.meta import Meta
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import (
         SQLAggregateCompiler,
         SQLCompiler,

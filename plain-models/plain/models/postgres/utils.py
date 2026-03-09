@@ -16,7 +16,7 @@ from plain.models.otel import db_span
 from plain.utils.dateparse import parse_time
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
 
 logger = logging.getLogger("plain.models.postgres")
 

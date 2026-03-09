@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from plain.models.fields import Field
     from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ManyToManyRel
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
 
 logger = logging.getLogger("plain.models.postgres.schema")
 

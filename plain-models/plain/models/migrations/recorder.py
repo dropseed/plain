@@ -14,7 +14,7 @@ from .exceptions import MigrationSchemaMissing
 MIGRATION_TABLE_NAME = "plainmigrations"
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
 
 
 class MigrationRecorder:

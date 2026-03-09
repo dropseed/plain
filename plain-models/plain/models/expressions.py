@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
     from plain.models.fields import Field
     from plain.models.lookups import Lookup, Transform
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.query import QuerySet
     from plain.models.sql.compiler import SQLCompilable, SQLCompiler
     from plain.models.sql.query import Query

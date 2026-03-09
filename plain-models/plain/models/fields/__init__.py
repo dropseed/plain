@@ -60,7 +60,7 @@ if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.expressions import Col
     from plain.models.fields.reverse_related import ForeignObjectRel
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 

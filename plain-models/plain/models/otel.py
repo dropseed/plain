@@ -12,7 +12,7 @@ from opentelemetry import trace
 if TYPE_CHECKING:
     from opentelemetry.trace import Span
 
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
 
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,

@@ -8,7 +8,7 @@ from plain.models.fields import DecimalField, Field, FloatField, IntegerField
 from plain.models.functions import Cast
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 

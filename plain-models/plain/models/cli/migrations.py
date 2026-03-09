@@ -32,7 +32,7 @@ from ..registry import models_registry
 
 if TYPE_CHECKING:
     from ..migrations.operations.base import Operation
-    from ..postgres.wrapper import DatabaseConnection
+    from ..postgres.connection import DatabaseConnection
 
 
 @register_cli("migrations")

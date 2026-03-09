@@ -33,7 +33,7 @@ from plain.models.postgres.sql import (
 from plain.utils import timezone
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseConnection
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 

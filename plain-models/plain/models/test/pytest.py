@@ -11,7 +11,7 @@ from plain.signals import request_finished, request_started
 
 from .. import transaction
 from ..db import close_old_connections, get_connection
-from ..postgres.wrapper import DatabaseConnection
+from ..postgres.connection import DatabaseConnection
 from .utils import (
     setup_database,
     teardown_database,
