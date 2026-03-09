@@ -21,13 +21,9 @@ psycopg3's `cursor.stream(query, params)` replaces all of that with a lazy gener
 
 Removes: `chunked_cursor()`, `cursor_iter()`, named cursor index tracking, sentinel value.
 
-### Savepoint SQL → `connection.transaction()`
+### ~~Savepoint SQL → `connection.transaction()`~~ ✅
 
-Currently `_savepoint()`, `_savepoint_rollback()`, `_savepoint_commit()` execute raw SQL strings plus manual savepoint ID generation with thread ident formatting.
-
-psycopg3's `connection.transaction()` handles nested savepoints natively. The `Atomic` class can't be fully replaced — it manages `needs_rollback` propagation, on-commit hooks, `closed_in_transaction`, durable block validation — but it could use `connection.transaction()` internally instead of issuing raw SQL and managing IDs. The state tracking stays, the SQL mechanics go away.
-
-This is a meaningful refactor, not a drop-in swap.
+Done. `_savepoint()`, `_savepoint_rollback()`, `_savepoint_commit()` replaced with psycopg3 `Transaction` objects. `Atomic` still manages `needs_rollback`, on-commit hooks, `closed_in_transaction`, durable blocks — but savepoint SQL and ID generation are gone. Key detail: when `autocommit=False` and `transaction_status == IDLE`, an empty `execute("")` forces the implicit transaction so `Transaction` creates a savepoint instead of managing the outer transaction.
 
 ### `connection.execute()` for internal one-off queries
 
