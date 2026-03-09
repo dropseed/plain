@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from threading import local
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from plain.exceptions import ImproperlyConfigured
@@ -23,13 +23,16 @@ class DatabaseConfig(TypedDict, total=False):
     USER: str
 
 
+# Module-level ContextVar for per-task/per-thread connection storage.
+# Each asyncio.Task gets its own copy (since Python 3.7.1), and
+# asyncio.to_thread() propagates the context to the worker thread.
+_db_conn: ContextVar[DatabaseWrapper | None] = ContextVar("_db_conn", default=None)
+
+
 class DatabaseConnection:
     """Lazy access to the single configured database connection."""
 
-    __slots__ = ("_local",)
-
-    def __init__(self) -> None:
-        self._local = local()
+    __slots__ = ()
 
     def configure_settings(self) -> DatabaseConfig:
         if plain_settings.POSTGRES_DATABASE == "":
@@ -63,20 +66,17 @@ class DatabaseConnection:
         return DatabaseWrapper(database_config)
 
     def has_connection(self) -> bool:
-        return hasattr(self._local, "conn")
+        return _db_conn.get() is not None
+
+    def _get_or_create_connection(self) -> DatabaseWrapper:
+        conn = _db_conn.get()
+        if conn is None:
+            conn = self.create_connection()
+            _db_conn.set(conn)
+        return conn
 
     def __getattr__(self, attr: str) -> Any:
-        if not self.has_connection():
-            self._local.conn = self.create_connection()
-
-        return getattr(self._local.conn, attr)
+        return getattr(self._get_or_create_connection(), attr)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if name.startswith("_"):
-            super().__setattr__(name, value)
-            return
-
-        if not self.has_connection():
-            self._local.conn = self.create_connection()
-
-        setattr(self._local.conn, name, value)
+        setattr(self._get_or_create_connection(), name, value)

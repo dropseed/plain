@@ -4,6 +4,8 @@ packages:
 related:
   - remove-signals
   - db-connection-pool
+  - models-remove-db-connection-proxy
+  - models-remove-thread-sharing-validation
 ---
 
 # DB connections: `threading.local()` → `contextvars.ContextVar`
@@ -14,9 +16,7 @@ Plain's database layer uses `threading.local()` for per-thread connection storag
 
 1. **Incompatible with async tasks.** Two concurrent async tasks on the same event loop thread share the same `threading.local()` state — same DB connection, same transaction state. If one starts a transaction, the other sees it.
 
-2. **Thread affinity bug.** For async views, `before_request` and `after_response` run in separate `run_in_executor` calls with no guarantee they land on the same thread. With `threading.local()`, `after_response` may check/close a different thread's connection than the one the request actually used. (With ContextVar, both calls see the same connection regardless of thread.)
-
-3. **Manual context propagation.** `loop.run_in_executor()` does NOT propagate `contextvars` (the CPython PR to add this was rejected). `asyncio.to_thread()` does (since Python 3.9). Plain's `BaseHandler._run_in_executor` already does manual OTel context propagation for this reason. With `threading.local()`, there's no context to propagate — each thread just gets whatever state it had from its last request.
+2. **Blocks async DB access.** With `threading.local()`, there's no mechanism for async views to access the DB. ContextVars enable `loop.run_in_executor()` to run ORM code on thread pool threads, where each thread maintains its own persistent connection via its native ContextVar context.
 
 ## Proposed change
 
@@ -44,8 +44,7 @@ class DatabaseConnection:
 **What this fixes:**
 
 - Async task isolation — each `asyncio.Task` gets its own context copy (since Python 3.7.1)
-- Thread affinity — `before_request` and `after_response` see the same ContextVar values regardless of which thread they run on
-- `asyncio.to_thread()` automatically propagates context to the worker thread, enabling SSE DB access
+- Enables async DB access — async views can call `loop.run_in_executor(None, User.query.count)` to run ORM code on thread pool threads that maintain their own persistent connections
 
 **What doesn't change:**
 
@@ -53,32 +52,33 @@ class DatabaseConnection:
 - `transaction.atomic()` works identically — it reads/writes `db_connection.in_atomic_block` etc., which now resolve through the ContextVar instead of threading.local
 - Sync views (99% of usage) see no difference — one task per thread, one ContextVar value per thread
 
-**Gotcha:** Changes to ContextVars inside `to_thread()` do NOT propagate back to the caller. The thread gets a snapshot. This is fine for DB connections — the connection lifecycle is managed by the middleware, not the thread.
-
-**Gotcha:** `loop.run_in_executor()` does NOT copy context. Plain must continue to do manual propagation (as `BaseHandler._run_in_executor` already does for OTel) or switch to `asyncio.to_thread()`.
+**Key behavior:** `loop.run_in_executor()` does NOT copy the calling context to the worker thread (the CPython PR to add this was rejected in favor of `asyncio.to_thread()`). Each `ThreadPoolExecutor` worker thread maintains its own native ContextVar context that persists across work items. This means ContextVar values set during one request persist for the next request on the same thread — matching the old `threading.local()` behavior and preserving CONN_MAX_AGE connection reuse. `_run_in_executor` propagates only OTel context explicitly — DB connections are intentionally left on the thread's native context.
 
 ## SSE / async view DB access
 
-With ContextVar-based connections, SSE views can access the DB via `asyncio.to_thread()`:
+With ContextVar-based connections, SSE views can access the DB via `loop.run_in_executor()`:
 
 ```python
 class DashboardEventsView(ServerSentEventsView):
     async def stream(self):
+        loop = asyncio.get_running_loop()
         while True:
-            count = await asyncio.to_thread(User.query.count)
+            count = await loop.run_in_executor(None, User.query.count)
             yield ServerSentEvent(data=str(count))
             await asyncio.sleep(5)
 ```
 
-`to_thread()` copies the current context (including the ContextVar holding the DB connection) to the worker thread. The ORM executes synchronously on that thread, using the connection from the context.
+`run_in_executor()` dispatches the ORM call to a thread pool thread. That thread has its own native ContextVar context with a persistent DB connection (created on first access, reused across calls via CONN_MAX_AGE). No context copying, no connection lifecycle issues.
 
-The middleware's `after_response` defers cleanup for `AsyncStreamingResponse` (see `remove-signals.md`), so the connection stays alive during streaming.
+**Why `run_in_executor()` and not `asyncio.to_thread()`:** `to_thread()` copies the calling context to the worker thread via `copy_context().run()`. The async task's context has `_db_conn=None`, so each `to_thread()` call would create a new connection that's orphaned when the copied context is discarded. `run_in_executor()` avoids this by letting each thread maintain its own persistent connection.
+
+**Note:** With this pattern, SSE polls share the existing `SERVER_THREADS` thread pool with regular requests. Connection count stays bounded at `SERVER_WORKERS × SERVER_THREADS`. The thread pool is the concurrency limit, not the connection count.
 
 ## Non-goals
 
-- **Async psycopg (`AsyncConnection`)** — not needed for the sync-first architecture. The sync `to_thread()` bridge covers the SSE use case. Free-threaded Python (when psycopg supports it) makes threads genuinely parallel, further reducing the case for async DB drivers.
+- **Async psycopg (`AsyncConnection`)** — not needed for the sync-first architecture. The sync `run_in_executor()` bridge covers the SSE use case. Free-threaded Python (when psycopg supports it) makes threads genuinely parallel, further reducing the case for async DB drivers.
 
-- **`a`-prefix queryset methods** (`acount()`, `alist()`, etc.) — not needed. Sync methods work via `to_thread()` from async code. Querysets can add `__aiter__` for `async for` iteration without duplicating the API.
+- **`a`-prefix queryset methods** (`acount()`, `alist()`, etc.) — not needed. Sync methods work via `run_in_executor()` from async code. A `db_thread()` helper or queryset `__aiter__` could provide ergonomic wrappers without duplicating the API.
 
 ## Independence
 

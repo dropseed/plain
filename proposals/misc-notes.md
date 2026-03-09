@@ -61,7 +61,7 @@ Possible type mismatch in unique constraint validation. In `constraints.py`, val
 
 ### db_connection proxy typing
 
-`DatabaseConnection` uses `__getattr__` to proxy all attribute access to the underlying `DatabaseWrapper`. Type checkers can't see through this, so multiple files use `cast("DatabaseWrapper", db_connection)` as a workaround. A `.pyi` stub or `Protocol` class could fix this systematically.
+`DatabaseConnection` uses `__getattr__` to proxy all attribute access to the underlying `DatabaseWrapper`. Type checkers can't see through this, so multiple files use `cast("DatabaseWrapper", db_connection)` as a workaround. See `models-remove-db-connection-proxy` proposal for the fix: replace the proxy class with a `get_connection()` function that returns `DatabaseWrapper` directly.
 
 ## Resolved
 

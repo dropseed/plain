@@ -2,8 +2,10 @@
 packages:
   - plain-models
 depends_on:
-  - remove-signals
   - db-connection-pool-and-contextvars
+related:
+  - remove-signals
+  - models-remove-thread-sharing-validation
 ---
 
 # DB connection pooling
@@ -15,26 +17,36 @@ Each thread creates and holds its own persistent DB connection. No sharing, no b
 ## Current behavior
 
 - `DatabaseConnection.__getattr__` lazily creates a `DatabaseWrapper` (which holds a psycopg connection) on first access
-- The connection lives on the thread (via `threading.local()`, or after the contextvars proposal, via `ContextVar`) until explicitly closed
+- The connection lives on the thread (via ContextVar) until explicitly closed
 - `close_old_connections()` runs at request start/finish: checks `CONN_MAX_AGE` (default 600s), closes if stale or broken
+- Every request that touches the DB pays a `SELECT 1` health check (via `CONN_HEALTH_CHECKS=True`) on the first cursor access
 - No pool, no sharing, no aggregate limit across threads
 
-## Is this even needed?
+## What pooling replaces
 
-With Plain's fixed thread count, the current model is reasonable:
+Pooling subsumes several pieces of existing connection lifecycle machinery:
 
-- Total connections = `SERVER_WORKERS` x `SERVER_THREADS` (predictable, small)
-- pgbouncer in front handles connection limits when scaling to many workers/pods, with no code changes
+| Current mechanism | What it does | Pooling replacement |
+|---|---|---|
+| `CONN_MAX_AGE` (default 600s) | Close connections older than N seconds | Pool `max_lifetime` option |
+| `CONN_HEALTH_CHECKS` + `SELECT 1` per request | Detect broken connections | Pool health checks on checkout |
+| `close_old_connections` signal handler | Run lifecycle checks at request boundaries | Pool manages lifecycle internally |
+| `close_if_unusable_or_obsolete()` | Close stale/broken connections | Pool handles automatically |
 
-What the current model lacks:
+This is a code simplification win — the pool handles connection lifecycle instead of hand-rolled logic spread across signals, middleware, and wrapper methods.
 
-- **No connection sharing** — if a thread is rendering a template, its connection sits idle
-- **No aggregate limit** — 8 workers x 8 threads = 64 connections (Postgres default max is 100)
-- **No health checking between requests** — stale connections detected only at request boundaries
+## Async DB access and SSE/websockets
 
-pgbouncer solves all of these externally. In-process pooling (Django-style) solves sharing and health checks but not cross-worker limits.
+After the ContextVar migration, async views can access the DB via `loop.run_in_executor()`. Thread pool threads maintain their own persistent connections. This works without pooling — connection count is bounded by `SERVER_THREADS`.
 
-## Proposed change (if pursued)
+Pooling adds value for SSE/websocket patterns by enabling connections to be shared rather than pinned to threads:
+
+- **Without pooling:** Each of the `SERVER_THREADS` threads holds a persistent connection. SSE polls share the thread pool with regular requests. Works well — connection count stays at `SERVER_THREADS`.
+- **With pooling:** Idle threads don't hold connections. Connections are checked out on demand and returned when idle. Useful when `SERVER_THREADS` is increased for I/O-bound workloads but you want fewer DB connections.
+
+For most Plain deployments (few workers, fixed threads), the current per-thread model is adequate. Pooling becomes more valuable at higher thread counts or when external connection limits are tight (managed Postgres services with low connection caps).
+
+## Proposed change
 
 Replace one-connection-per-thread with `psycopg_pool.ConnectionPool`:
 
@@ -47,17 +59,26 @@ pool = ConnectionPool(
     min_size=4,
     max_size=settings.SERVER_THREADS * 2,
 )
+```
 
-# In DatabaseConnectionMiddleware:
+Connection lifecycle for sync views can work through the existing signal handlers or through middleware (if `remove-signals` is done first):
+
+```python
+# Signal-based (works today):
+def close_old_connections(**kwargs):
+    conn = _db_conn.get()
+    if conn is not None:
+        pool.putconn(unwrap(conn))
+        _db_conn.set(None)
+
+# Or middleware-based (after remove-signals):
 def before_request(self, request):
-    conn = pool.getconn()
-    _db_conn.set(wrap_connection(conn))
-    return None
+    pass  # lazy checkout on first DB access
 
 def after_response(self, request, response):
     conn = _db_conn.get()
     if conn is not None:
-        pool.putconn(unwrap_connection(conn))
+        pool.putconn(unwrap(conn))
         _db_conn.set(None)
     return response
 ```
@@ -67,7 +88,7 @@ def after_response(self, request, response):
 - Bounded connection count per worker
 - Health checks and stale connection cleanup built into the pool
 - Connections shared across threads instead of one-per-thread
-- `CONN_MAX_AGE` logic moves to pool configuration
+- Removes `CONN_MAX_AGE`, `CONN_HEALTH_CHECKS`, and `close_old_connections` complexity
 
 **New dependency:** `psycopg_pool` (separate install via `pip install psycopg_pool` or `psycopg[pool]`)
 
@@ -103,7 +124,7 @@ This replaced their identical pattern — `threading.local()` holding one connec
 
 - Add `POSTGRES_POOL` setting (bool or dict of psycopg_pool options like `min_size`, `max_size`, `timeout`)
 - Incompatible with `POSTGRES_CONN_MAX_AGE != 0` — raise `ImproperlyConfigured`
-- Pool uses `configure` callback to run `_configure_timezone` and `_configure_role` on each checkout
+- Pool uses `configure` callback to run `ensure_timezone` and `ensure_role` on each checkout
 - `_close()` calls `putconn()` instead of `connection.close()` when pooling
 - Requires `psycopg[pool]` or `psycopg-pool` package
 
@@ -120,5 +141,5 @@ This replaced their identical pattern — `threading.local()` holding one connec
 
 ## Dependencies
 
-- **`remove-signals`**: Middleware-based lifecycle is needed so `before_request` / `after_response` can check out and return connections.
-- **`db-connection-pool-and-contextvars`**: ContextVar storage is needed so the checked-out connection is visible regardless of which thread runs the middleware. Without it, returning a connection in `after_response` on a different thread than `before_request` would return the wrong connection.
+- **`db-connection-pool-and-contextvars`**: ContextVar storage is needed so the pool checkout is visible to whichever thread runs the ORM code.
+- **`remove-signals`** (optional): Middleware-based lifecycle is cleaner but not required — the pool can also work through signal handlers.

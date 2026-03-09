@@ -118,16 +118,22 @@ class BaseHandler:
         executor: concurrent.futures.Executor,
         fn: Any,
         *args: Any,
-        **kwargs: Any,
     ) -> Any:
-        """Run a sync function in the executor, propagating OTel context."""
+        """Run a sync function in the executor, propagating OTel context.
+
+        Propagates the OpenTelemetry span context so traces from the event
+        loop continue into the executor thread.  Other ContextVars (e.g. the
+        DB connection) are intentionally NOT copied — they live on the
+        executor thread's native context so connections persist across
+        requests (honoring CONN_MAX_AGE).
+        """
         loop = asyncio.get_running_loop()
         ctx = context.get_current()
 
         def _wrapper() -> Any:
             token = context.attach(ctx)
             try:
-                return fn(*args, **kwargs)
+                return fn(*args)
             finally:
                 context.detach(token)
 
@@ -145,7 +151,7 @@ class BaseHandler:
 
         For sync views, the entire pipeline runs in a single executor call
         so that signals, middleware, and the view all execute on the same
-        thread (preserving thread-local DB connection assumptions).
+        thread (sharing the same DB connection via ContextVar).
 
         For async views, the sync portion (signal + before middleware +
         URL resolution) runs in one executor call, the coroutine is awaited
@@ -243,10 +249,11 @@ class BaseHandler:
         (part of the single _run_sync_pipeline call).
 
         For async views, this runs in a separate executor call and may
-        land on a different thread than request_started. Thread-local
-        state from request_started is not guaranteed to be available.
-        In practice this is safe because close_old_connections (the main
-        signal handler) is idempotent per-thread.
+        land on a different thread than request_started. The DB connection
+        ContextVar on each thread is independent, so this thread may see
+        a different (or no) connection. This is safe because
+        close_old_connections is idempotent — it only acts on whatever
+        connection exists on the current thread.
 
         The signal fires before streaming response bodies are transmitted.
         Handlers like close_old_connections should not affect in-progress
