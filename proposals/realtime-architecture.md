@@ -1,9 +1,8 @@
 ---
-depends_on:
-- server-h2-websockets
 packages:
 - plain.server
 - plain-models
+after: server-h2-websockets
 related:
 - server-direction
 ---

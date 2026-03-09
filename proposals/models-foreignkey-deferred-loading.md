@@ -1,8 +1,7 @@
 ---
-depends_on:
-- models-consolidate-related-descriptors
 packages:
 - plain-models
+after: models-consolidate-related-descriptors
 related:
 - models-related-query-name
 ---

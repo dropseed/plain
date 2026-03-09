@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from rich.tree import Tree
 
 PROPOSALS_DIR = Path(__file__).resolve().parent.parent / "proposals"
 SKIP_FILES = {"README.md", "CLAUDE.md"}
+NUMBER_RE = re.compile(r"^(\d+)-(.+)")
 
 
 def parse_frontmatter(path):
@@ -54,6 +56,12 @@ def as_list(val):
     return list(val)
 
 
+def parse_number(stem):
+    """Extract the number prefix from a proposal stem, or None."""
+    m = NUMBER_RE.match(stem)
+    return int(m.group(1)) if m else None
+
+
 def load_proposals():
     """Load all proposals with metadata."""
     proposals = []
@@ -62,33 +70,25 @@ def load_proposals():
             continue
         fm = parse_frontmatter(path)
         created, updated = file_dates(path)
+        number = parse_number(path.stem)
         proposals.append(
             {
                 "path": path,
                 "stem": path.stem,
                 "title": get_title(path),
                 "packages": as_list(fm.get("packages")),
-                "depends_on": as_list(fm.get("depends_on")),
+                "after": fm.get("after"),
                 "related": as_list(fm.get("related")),
                 "created": created,
                 "updated": updated,
+                "number": number,
             }
         )
     return proposals
 
 
 def build_graph(proposals):
-    """Build dependency and relationship graphs."""
-    by_stem = {p["stem"]: p for p in proposals}
-
-    for p in proposals:
-        p["blocks"] = []
-
-    for p in proposals:
-        for dep in p["depends_on"]:
-            if dep in by_stem:
-                by_stem[dep]["blocks"].append(p["stem"])
-
+    """Build relationship graph."""
     neighbors = {p["stem"]: set() for p in proposals}
     for p in proposals:
         for rel in p["related"]:
@@ -108,10 +108,10 @@ def serializable(p):
         "created": str(p["created"]),
         "updated": str(p["updated"]),
     }
-    if p["depends_on"]:
-        d["depends_on"] = p["depends_on"]
-    if p.get("blocks"):
-        d["blocks"] = p["blocks"]
+    if p["number"] is not None:
+        d["number"] = p["number"]
+    if p.get("after"):
+        d["after"] = p["after"]
     if p.get("all_related"):
         d["related"] = p["all_related"]
     return d
@@ -136,21 +136,17 @@ def cmd_list(args, proposals):
 
     console = Console()
     table = Table(show_lines=False, pad_edge=False, box=None)
+    table.add_column("#", style="bold yellow", justify="right")
     table.add_column("Proposal", style="bold", no_wrap=True)
     table.add_column("Packages", style="cyan")
     table.add_column("Updated", style="green")
-    table.add_column("Deps", style="yellow", justify="right")
-    table.add_column("Blocks", style="red", justify="right")
 
     for p in proposals:
-        deps = len(p["depends_on"])
-        blocks = len(p.get("blocks", []))
         table.add_row(
+            str(p["number"]) if p["number"] is not None else "",
             p["stem"],
             ", ".join(p["packages"]) or "-",
             str(p["updated"]),
-            str(deps) if deps else "",
-            str(blocks) if blocks else "",
         )
 
     console.print(table)
@@ -187,26 +183,17 @@ def cmd_show(args, proposals):
         return
 
     console = Console()
-    console.print(f"[bold]{p['title']}[/bold]")
+    if p["number"] is not None:
+        console.print(
+            f"[bold yellow]#{p['number']}[/bold yellow]  [bold]{p['title']}[/bold]"
+        )
+    else:
+        console.print(f"[bold]{p['title']}[/bold]")
     console.print(f"[dim]File:[/dim] proposals/{p['stem']}.md")
     if p["packages"]:
         console.print(f"[dim]Packages:[/dim] {', '.join(p['packages'])}")
     console.print(f"[dim]Created:[/dim] {p['created']}")
     console.print(f"[dim]Updated:[/dim] {p['updated']}")
-
-    if p["depends_on"]:
-        console.print("\n[bold yellow]Depends on:[/bold yellow]")
-        for dep in p["depends_on"]:
-            if dep in by_stem:
-                console.print(f"  [yellow]{dep}[/yellow]  {by_stem[dep]['title']}")
-            else:
-                console.print(f"  [red]{dep}[/red]  (not found)")
-
-    if p.get("blocks"):
-        console.print("\n[bold red]Blocks:[/bold red]")
-        for b in sorted(p["blocks"]):
-            if b in by_stem:
-                console.print(f"  [red]{b}[/red]  {by_stem[b]['title']}")
 
     if p.get("all_related"):
         console.print("\n[bold]Related:[/bold]")
@@ -218,79 +205,55 @@ def cmd_show(args, proposals):
 
 
 def cmd_default(args, proposals):
-    """Default view: dependency trees by package."""
-    by_stem = {p["stem"]: p for p in proposals}
+    """Default view: numbered roadmap first, then backlog by package."""
+    numbered = sorted(
+        [p for p in proposals if p["number"] is not None],
+        key=lambda p: p["number"],
+    )
+    backlog = [p for p in proposals if p["number"] is None]
 
     if args.json:
-        pkg_groups = {}
-        for p in proposals:
+        result = {
+            "roadmap": [serializable(p) for p in numbered],
+            "backlog": {},
+        }
+        for p in backlog:
             pkg = p["packages"][0] if p["packages"] else "(other)"
-            pkg_groups.setdefault(pkg, []).append(serializable(p))
-        print(json.dumps(pkg_groups, indent=2))
+            result["backlog"].setdefault(pkg, []).append(serializable(p))
+        print(json.dumps(result, indent=2))
         return
 
     console = Console()
 
-    # Group by primary package
+    if numbered:
+        tree = Tree("[bold yellow]Roadmap[/bold yellow]")
+        for p in numbered:
+            label = f"[bold yellow]{p['number']:03d}[/bold yellow]  {p['stem']}"
+            if p.get("all_related"):
+                label += f"  [dim]see {', '.join(p['all_related'])}[/dim]"
+            tree.add(label)
+        console.print(tree)
+        console.print()
+
+    # Backlog grouped by package
     pkg_groups = {}
-    for p in proposals:
+    for p in backlog:
         pkg = p["packages"][0] if p["packages"] else "(other)"
         pkg_groups.setdefault(pkg, []).append(p)
 
     for pkg in sorted(pkg_groups):
-        items = pkg_groups[pkg]
-        stems_in_pkg = {p["stem"] for p in items}
-
-        # Roots: proposals that have no depends_on within this package
-        roots = []
-        has_parent = set()
-        for p in items:
-            for dep in p["depends_on"]:
-                if dep in stems_in_pkg:
-                    has_parent.add(p["stem"])
-
-        roots = [p for p in items if p["stem"] not in has_parent]
-        roots.sort(key=lambda p: p["stem"])
-
+        items = sorted(pkg_groups[pkg], key=lambda p: p["stem"])
         tree = Tree(f"[bold]{pkg}[/bold]")
-
-        rendered = set()
-
-        def add_node(parent, p):
-            if p["stem"] in rendered:
-                parent.add(f"[dim]{p['stem']}  (see above)[/dim]")
-                return
-            rendered.add(p["stem"])
-
+        for p in items:
             label = p["stem"]
             annotations = []
-            # Show cross-package deps
-            cross_deps = [d for d in p["depends_on"] if d not in stems_in_pkg]
-            if cross_deps:
-                annotations.append(f"[yellow]after {', '.join(cross_deps)}[/yellow]")
-            # Show related by name
+            if p.get("after"):
+                annotations.append(f"[yellow]after {p['after']}[/yellow]")
             if p.get("all_related"):
                 annotations.append(f"[dim]see {', '.join(p['all_related'])}[/dim]")
-
             if annotations:
                 label += "  " + "  ".join(annotations)
-
-            # Children: things this blocks within the package
-            children = sorted(
-                [by_stem[b] for b in p.get("blocks", []) if b in stems_in_pkg],
-                key=lambda x: x["stem"],
-            )
-
-            if children:
-                node = parent.add(label)
-                for child in children:
-                    add_node(node, child)
-            else:
-                parent.add(label)
-
-        for p in roots:
-            add_node(tree, p)
-
+            tree.add(label)
         console.print(tree)
         console.print()
 

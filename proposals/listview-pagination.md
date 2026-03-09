@@ -1,8 +1,7 @@
 ---
-depends_on:
-- models-cursor-paginator
 packages:
 - plain.views
+after: models-cursor-paginator
 ---
 
 # plain: ListView pagination support

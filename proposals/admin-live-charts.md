@@ -1,8 +1,7 @@
 ---
-depends_on:
-- realtime-architecture
 packages:
 - plain-admin
+after: realtime-architecture
 related:
 - metrics
 - pageviews-dashboard

@@ -1,9 +1,8 @@
 ---
-depends_on:
-- pageviews-analytics
 packages:
 - plain-pageviews
 - plain-admin
+after: pageviews-analytics
 related:
 - admin-live-charts
 ---

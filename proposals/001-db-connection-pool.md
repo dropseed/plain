@@ -1,11 +1,9 @@
 ---
 packages:
   - plain-models
-depends_on:
-  - db-connection-pool-and-contextvars
 related:
   - remove-signals
-  - models-remove-thread-sharing-validation
+  - 002-models-rename-to-postgres
 ---
 
 # DB connection pooling
@@ -16,7 +14,7 @@ Each thread creates and holds its own persistent DB connection. No sharing, no b
 
 ## Current behavior
 
-- `DatabaseConnection.__getattr__` lazily creates a `DatabaseWrapper` (which holds a psycopg connection) on first access
+- `get_connection()` lazily creates a `DatabaseConnection` (which holds a psycopg connection) on first access and stores it in a module-level `ContextVar`
 - The connection lives on the thread (via ContextVar) until explicitly closed
 - `close_old_connections()` runs at request start/finish: checks `CONN_MAX_AGE` (default 600s), closes if stale or broken
 - Every request that touches the DB pays a `SELECT 1` health check (via `CONN_HEALTH_CHECKS=True`) on the first cursor access
@@ -26,12 +24,12 @@ Each thread creates and holds its own persistent DB connection. No sharing, no b
 
 Pooling subsumes several pieces of existing connection lifecycle machinery:
 
-| Current mechanism | What it does | Pooling replacement |
-|---|---|---|
-| `CONN_MAX_AGE` (default 600s) | Close connections older than N seconds | Pool `max_lifetime` option |
-| `CONN_HEALTH_CHECKS` + `SELECT 1` per request | Detect broken connections | Pool health checks on checkout |
-| `close_old_connections` signal handler | Run lifecycle checks at request boundaries | Pool manages lifecycle internally |
-| `close_if_unusable_or_obsolete()` | Close stale/broken connections | Pool handles automatically |
+| Current mechanism                             | What it does                               | Pooling replacement               |
+| --------------------------------------------- | ------------------------------------------ | --------------------------------- |
+| `CONN_MAX_AGE` (default 600s)                 | Close connections older than N seconds     | Pool `max_lifetime` option        |
+| `CONN_HEALTH_CHECKS` + `SELECT 1` per request | Detect broken connections                  | Pool health checks on checkout    |
+| `close_old_connections` signal handler        | Run lifecycle checks at request boundaries | Pool manages lifecycle internally |
+| `close_if_unusable_or_obsolete()`             | Close stale/broken connections             | Pool handles automatically        |
 
 This is a code simplification win — the pool handles connection lifecycle instead of hand-rolled logic spread across signals, middleware, and wrapper methods.
 
@@ -45,6 +43,44 @@ Pooling adds value for SSE/websocket patterns by enabling connections to be shar
 - **With pooling:** Idle threads don't hold connections. Connections are checked out on demand and returned when idle. Useful when `SERVER_THREADS` is increased for I/O-bound workloads but you want fewer DB connections.
 
 For most Plain deployments (few workers, fixed threads), the current per-thread model is adequate. Pooling becomes more valuable at higher thread counts or when external connection limits are tight (managed Postgres services with low connection caps).
+
+### Pooling requires a `db_thread()` helper for async views
+
+Signal/middleware-based return only works for sync views. For async views, `request_finished` fires on a different thread than the one holding the connection (the split pipeline in `BaseHandler`). That thread's ContextVar has its own connection (or none) — it can't return a different thread's connection.
+
+For SSE/websockets, DB calls via `run_in_executor()` check out connections on thread pool threads, but no `request_finished` fires during the stream to return them. Without explicit return, pooling degrades to per-thread persistent connections — defeating the purpose.
+
+The fix is a `db_thread()` helper that returns the connection after each call:
+
+```python
+async def db_thread(fn, *args):
+    """Run sync DB code in executor, returning connection to pool after."""
+    def wrapper():
+        try:
+            return fn(*args)
+        finally:
+            conn = _db_conn.get()
+            if conn is not None:
+                pool.putconn(conn.connection)
+                _db_conn.set(None)
+    return await asyncio.get_running_loop().run_in_executor(None, wrapper)
+```
+
+Usage:
+
+```python
+# SSE view
+count = await db_thread(User.query.count)  # checkout → query → return
+
+# Transactions: wrap in a single db_thread call
+await db_thread(lambda: atomic_update(order_id, status))
+```
+
+This helper is **required** for pooling to work correctly with async views — it's not optional.
+
+### Transaction state validation on pool return
+
+Before returning a connection to the pool, validate that no transaction is in progress. If `in_atomic_block` is True or `savepoint_ids` is non-empty, the connection is dirty — it should be rolled back and discarded, not returned to the pool for another request.
 
 ## Proposed change
 
@@ -61,24 +97,23 @@ pool = ConnectionPool(
 )
 ```
 
-Connection lifecycle for sync views can work through the existing signal handlers or through middleware (if `remove-signals` is done first):
+Connection return at request end replaces `close_old_connections`:
 
 ```python
 # Signal-based (works today):
-def close_old_connections(**kwargs):
+def return_connection(**kwargs):
     conn = _db_conn.get()
     if conn is not None:
-        pool.putconn(unwrap(conn))
+        pool.putconn(conn.connection)
         _db_conn.set(None)
 
-# Or middleware-based (after remove-signals):
-def before_request(self, request):
-    pass  # lazy checkout on first DB access
+signals.request_finished.connect(return_connection)
 
+# Or middleware-based (after remove-signals):
 def after_response(self, request, response):
     conn = _db_conn.get()
     if conn is not None:
-        pool.putconn(unwrap(conn))
+        pool.putconn(conn.connection)
         _db_conn.set(None)
     return response
 ```
@@ -90,7 +125,7 @@ def after_response(self, request, response):
 - Connections shared across threads instead of one-per-thread
 - Removes `CONN_MAX_AGE`, `CONN_HEALTH_CHECKS`, and `close_old_connections` complexity
 
-**New dependency:** `psycopg_pool` (separate install via `pip install psycopg_pool` or `psycopg[pool]`)
+**New dependency:** `psycopg-pool` (pure Python, no platform issues)
 
 ## Relationship to pgbouncer
 
@@ -120,13 +155,57 @@ DATABASES = {
 
 This replaced their identical pattern — `threading.local()` holding one connection per thread. It's a sync pool; threads block waiting for a connection if exhausted.
 
+## What gets removed
+
+**From `DatabaseConnection` (wrapper.py):**
+
+- `close_if_unusable_or_obsolete()` — pool handles stale/broken detection
+- `close_if_health_check_failed()` — pool health checks on checkout
+- `is_usable()` / `SELECT 1` probe — pool handles this internally
+- `health_check_done` flag and gating logic in `_cursor()` / `set_autocommit()`
+- `close_at` timestamp (set in `connect()`, checked in `close_if_unusable_or_obsolete`)
+- `errors_occurred` flag and recovery logic
+
+**From `db.py`:**
+
+- `close_old_connections()` signal handler — replaced by pool return at request end
+- `reset_queries()` stays (query log clearing still needed), or moves to middleware
+
+**Settings removed:**
+
+- `POSTGRES_CONN_MAX_AGE` — replaced by pool's `max_lifetime`
+- `POSTGRES_CONN_HEALTH_CHECKS` — replaced by pool's built-in health checks
+
+**Settings added:**
+
+- `POSTGRES_POOL` — bool or dict of psycopg_pool options (`min_size`, `max_size`, `max_lifetime`, `timeout`)
+
+## psycopg dependency changes
+
+Currently `psycopg` is not declared as a dependency of plain-models (users install it separately). This proposal also fixes that:
+
+**plain-models dependencies:**
+
+```toml
+dependencies = [
+    "plain<1.0.0",
+    "sqlparse>=0.3.1",
+    "psycopg>=3.2.12",
+    "psycopg-pool>=3.2",
+]
+```
+
+- `psycopg` (base) — pure Python, works on all platforms (Alpine, ARM, etc.)
+- `psycopg-pool` — pure Python, no platform issues
+- `plain start` templates include `psycopg[binary]` in the project's own dependencies for speed
+
+psycopg auto-detects at runtime: prefers `psycopg-c` (compiled from source), falls back to `psycopg-binary` (pre-compiled wheels), falls back to pure Python. So `plain-models` depending on the base package guarantees the driver exists, and users layer on `psycopg[binary]` or `psycopg[c]` in their project for performance. No conflicts — they coexist.
+
 ## Implementation details
 
-- Add `POSTGRES_POOL` setting (bool or dict of psycopg_pool options like `min_size`, `max_size`, `timeout`)
-- Incompatible with `POSTGRES_CONN_MAX_AGE != 0` — raise `ImproperlyConfigured`
 - Pool uses `configure` callback to run `ensure_timezone` and `ensure_role` on each checkout
-- `_close()` calls `putconn()` instead of `connection.close()` when pooling
-- Requires `psycopg[pool]` or `psycopg-pool` package
+- `close()` calls `pool.putconn()` instead of `connection.close()` when pooling
+- Connection return at request end: signal handler (today) or middleware `after_response` (after `remove-signals`)
 
 ## Managed Postgres services (Neon, Supabase, etc.)
 
@@ -141,5 +220,5 @@ This replaced their identical pattern — `threading.local()` holding one connec
 
 ## Dependencies
 
-- **`db-connection-pool-and-contextvars`**: ContextVar storage is needed so the pool checkout is visible to whichever thread runs the ORM code.
+- **ContextVar migration** (done): ContextVar storage is needed so the pool checkout is visible to whichever thread runs the ORM code.
 - **`remove-signals`** (optional): Middleware-based lifecycle is cleaner but not required — the pool can also work through signal handlers.

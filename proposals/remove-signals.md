@@ -5,8 +5,7 @@ packages:
 - plain-jobs
 related:
 - response-defer
-- db-connection-pool-and-contextvars
-- db-connection-pool
+- 001-db-connection-pool
 ---
 
 # Remove signals from Plain
@@ -98,7 +97,7 @@ class DatabaseConnectionMiddleware(HttpMiddleware):
 
 This doesn't fully solve DB access in SSE views — `stream()` runs on the event loop where there's no thread-local DB connection. A `sync_to_async` bridge is still needed to run queries on a thread pool thread. But deferred cleanup ensures the connection isn't prematurely closed while streaming is in progress.
 
-Once signals are gone, the two-executor-call split for async views simplifies. Middleware `before_request` and `after_response` both run in the executor, but no longer need to guarantee the same thread for signal handler thread-local state. The thread-affinity question is fully resolved by `db-connection-pool-and-contextvars.md` — with ContextVar storage, `after_response` sees the same connection regardless of which thread it runs on.
+Once signals are gone, the two-executor-call split for async views simplifies. Middleware `before_request` and `after_response` both run in the executor, but no longer need to guarantee the same thread for signal handler thread-local state. The thread-affinity question is already resolved — with ContextVar storage (done), `after_response` sees the same connection regardless of which thread it runs on.
 
 ## Implementation
 

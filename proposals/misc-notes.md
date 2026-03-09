@@ -59,11 +59,11 @@ Possible type mismatch in unique constraint validation. In `constraints.py`, val
 
 `plain/test/client.py` — the test client soft-imports `plain.auth` and attaches the request's authenticated user onto the _response_ object. This leaks request context into the response, creates a hidden dependency on `plain.auth`, and is conceptually wrong (responses don't have users). Cleaner access would be `response.request.user`.
 
+## Resolved
+
 ### db_connection proxy typing
 
-`DatabaseConnection` uses `__getattr__` to proxy all attribute access to the underlying `DatabaseWrapper`. Type checkers can't see through this, so multiple files use `cast("DatabaseWrapper", db_connection)` as a workaround. See `models-remove-db-connection-proxy` proposal for the fix: replace the proxy class with a `get_connection()` function that returns `DatabaseWrapper` directly.
-
-## Resolved
+Resolved: replaced `DatabaseConnection` proxy with `get_connection()` function that returns `DatabaseConnection` directly. All `cast()` workarounds removed.
 
 ### "raw" on admin detail
 

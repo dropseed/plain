@@ -1,8 +1,7 @@
 ---
-depends_on:
-- models-consolidate-related-descriptors
 packages:
 - plain-models
+after: models-consolidate-related-descriptors
 ---
 
 # plain-models: Tie related_query_name to reverse descriptors
