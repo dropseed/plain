@@ -355,10 +355,9 @@ class DatabaseConnection:
         conn_timezone_name = self.connection.info.parameter_status("TimeZone")
         timezone_name = self.timezone_name
         if timezone_name and conn_timezone_name != timezone_name:
-            with self.connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT set_config('TimeZone', %s, false)", [timezone_name]
-                )
+            self.connection.execute(
+                "SELECT set_config('TimeZone', %s, false)", [timezone_name]
+            )
             return True
         return False
 
@@ -366,9 +365,8 @@ class DatabaseConnection:
         if self.connection is None:
             return False
         if new_role := self.settings_dict.get("OPTIONS", {}).get("assume_role"):
-            with self.connection.cursor() as cursor:
-                sql_str = self.compose_sql("SET ROLE %s", [new_role])
-                cursor.execute(sql_str)  # type: ignore[arg-type]
+            sql_str = self.compose_sql("SET ROLE %s", [new_role])
+            self.connection.execute(sql_str)  # type: ignore[arg-type]
             return True
         return False
 
@@ -417,9 +415,8 @@ class DatabaseConnection:
         """
         assert self.connection is not None
         try:
-            # Use a psycopg cursor directly, bypassing Plain's utilities.
-            with self.connection.cursor() as cursor:
-                cursor.execute("SELECT 1")
+            # Use psycopg directly, bypassing Plain's utilities.
+            self.connection.execute("SELECT 1")
         except Database.Error:
             return False
         else:
