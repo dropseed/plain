@@ -1,5 +1,21 @@
 # plain-oauth changelog
 
+## [0.44.0](https://github.com/dropseed/plain/releases/plain-oauth@0.44.0) (2026-03-09)
+
+### What's changed
+
+- OAuth exceptions now carry `provider_key` so error pages know which provider failed ([3590f47193e8](https://github.com/dropseed/plain/commit/3590f47193e8))
+- `OAuthUserAlreadyExistsError` includes `user_model_fields` for richer error page customization ([3590f47193e8](https://github.com/dropseed/plain/commit/3590f47193e8))
+- Each exception subclass defines a `template_name` (e.g. `oauth/user_already_exists.html`) enabling per-error-type template overrides with automatic fallback to `oauth/error.html` ([3590f47193e8](https://github.com/dropseed/plain/commit/3590f47193e8))
+- Renamed default error template from `oauth/callback.html` to `oauth/error.html` ([3590f47193e8](https://github.com/dropseed/plain/commit/3590f47193e8))
+- Fixed transaction scope in `get_or_create_user` — user creation is now wrapped in a nested savepoint so `IntegrityError` is caught correctly without breaking the outer transaction ([3590f47193e8](https://github.com/dropseed/plain/commit/3590f47193e8))
+
+### Upgrade instructions
+
+- If you have a custom `oauth/callback.html` template, rename it to `oauth/error.html`.
+- The `oauth_error` template context variable now exposes `.provider_key` and (for `OAuthUserAlreadyExistsError`) `.user_model_fields` — no action needed, but you can use these for richer error pages.
+- You can optionally create error-specific templates (`oauth/state_missing.html`, `oauth/state_mismatch.html`, `oauth/user_already_exists.html`) for targeted error pages.
+
 ## [0.43.0](https://github.com/dropseed/plain/releases/plain-oauth@0.43.0) (2026-03-07)
 
 ### What's changed
