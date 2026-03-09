@@ -681,5 +681,5 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
                 conn.wait_readable(),
                 timeout=KEEPALIVE,
             )
-        except TimeoutError:
+        except (TimeoutError, OSError):
             break

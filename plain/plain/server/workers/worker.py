@@ -250,6 +250,8 @@ class Worker:
 
         try:
             await self._handle_connection(conn)
+        except ConnectionError:
+            pass
         finally:
             self._capacity_semaphore.release()
             self.nr_conns -= 1
