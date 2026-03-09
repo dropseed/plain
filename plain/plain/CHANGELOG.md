@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.121.0](https://github.com/dropseed/plain/releases/plain@0.121.0) (2026-03-09)
+
+### What's changed
+
+- **Replaced `threading.local()` with `ContextVar` for async compatibility** — timezone activation (`plain.utils.timezone`) and URL resolver population tracking now use `ContextVar` instead of `threading.local()`, making them safe for use in async contexts where multiple coroutines share a thread ([e5c4073cafbc](https://github.com/dropseed/plain/commit/e5c4073cafbc))
+- **Graceful handling of client disconnects** — the server now catches `OSError` during keepalive waits (e.g. client TCP reset) and `ConnectionError` during connection handling, preventing noisy tracebacks from abrupt client disconnects ([e3aee49b32ac](https://github.com/dropseed/plain/commit/e3aee49b32ac))
+- Updated `BaseHandler._run_in_executor` to propagate only the OpenTelemetry span context into executor threads, intentionally leaving DB connection ContextVars on their native thread context so connections persist across requests honoring `CONN_MAX_AGE` ([cc2469b1260a](https://github.com/dropseed/plain/commit/cc2469b1260a))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.120.1](https://github.com/dropseed/plain/releases/plain@0.120.1) (2026-03-08)
 
 ### What's changed
