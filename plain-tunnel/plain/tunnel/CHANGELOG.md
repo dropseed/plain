@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.12.2](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.2) (2026-03-09)
+
+### What's changed
+
+- Set explicit 30-second timeout on the httpx client used for forwarding requests to the local dev server, matching the `SERVER_TIMEOUT` default and preventing requests from hanging indefinitely ([6acd42948fee](https://github.com/dropseed/plain/commit/6acd42948fee))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.1](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.1) (2026-03-06)
 
 ### What's changed
