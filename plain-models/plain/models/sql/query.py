@@ -557,8 +557,12 @@ class Query(BaseExpression):
         if result is None:
             result = empty_set_result
         else:
-            converters = compiler.get_converters(outer_query.annotation_select.values())
-            result = next(compiler.apply_converters((result,), converters))
+            from plain.models.sql.compiler import apply_converters, get_converters
+
+            converters = get_converters(
+                outer_query.annotation_select.values(), compiler.connection
+            )
+            result = next(apply_converters((result,), converters, compiler.connection))
 
         return dict(zip(outer_query.annotation_select, result))
 

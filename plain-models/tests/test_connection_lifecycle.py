@@ -34,7 +34,9 @@ def _sync_db_query():
     """Sync helper that runs a DB query — used by async views via to_thread."""
     with get_connection().cursor() as cursor:
         cursor.execute("SELECT 1")
-        return cursor.fetchone()[0]
+        row = cursor.fetchone()
+        assert row is not None
+        return row[0]
 
 
 class DBQueryView(View):

@@ -218,7 +218,7 @@ def test_executor_connection_persists_across_calls_on_same_thread():
             _db_conn.set(conn)  # type: ignore[arg-type]
             return threading.get_ident(), id(conn)
 
-        def request_2() -> tuple[int, int | None]:
+        def request_2() -> tuple[int, int]:
             val = _db_conn.get()
             return threading.get_ident(), id(val) if val is not None else -1
 

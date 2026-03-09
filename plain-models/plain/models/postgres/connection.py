@@ -200,7 +200,7 @@ class DatabaseConnection:
         # Increment to generate unique savepoint ids.
         self.savepoint_state: int = 0
         # List of savepoints created by 'atomic'.
-        self.savepoint_ids: list[str] = []
+        self.savepoint_ids: list[str | None] = []
         # Stack of active 'atomic' blocks.
         self.atomic_blocks: list[Any] = []
         # Tracks if the transaction should be rolled back to the next
@@ -219,7 +219,7 @@ class DatabaseConnection:
         # Each entry is an (sids, func, robust) tuple, where sids is a set of
         # the active savepoint IDs when this function was registered and robust
         # specifies whether it's allowed for the function to fail.
-        self.run_on_commit: list[tuple[set[str], Any, bool]] = []
+        self.run_on_commit: list[tuple[set[str | None], Any, bool]] = []
 
         # Should we run the on-commit hooks the next time set_autocommit(True)
         # is called?

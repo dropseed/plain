@@ -147,13 +147,11 @@ class RawModelIterable(BaseIterable):
     queryset: RawQuerySet
 
     def __iter__(self) -> Iterator[Model]:
-        # Cache some things for performance reasons outside the loop.
-        # RawQuery is not a Query subclass, so we directly get SQLCompiler
-        from plain.models.sql.compiler import SQLCompiler
+        from plain.models.sql.compiler import apply_converters, get_converters
 
         query = self.queryset.sql_query
-        compiler = SQLCompiler(query, get_connection(), True)
-        query_iterator = iter(query)
+        connection = get_connection()
+        query_iterator: Iterator[Any] = iter(query)
 
         try:
             (
@@ -166,14 +164,17 @@ class RawModelIterable(BaseIterable):
             if "id" not in model_init_names:
                 raise FieldDoesNotExist("Raw query must include the primary key")
             fields = [self.queryset.model_fields.get(c) for c in self.queryset.columns]
-            converters = compiler.get_converters(
+            converters = get_converters(
                 [
                     f.get_col(f.model.model_options.db_table) if f else None
                     for f in fields
-                ]
+                ],
+                connection,
             )
             if converters:
-                query_iterator = compiler.apply_converters(query_iterator, converters)
+                query_iterator = apply_converters(
+                    query_iterator, converters, connection
+                )
             for values in query_iterator:
                 # Associate fields to values
                 model_init_values = [values[pos] for pos in model_init_pos]
