@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import functools
 import re
-from threading import local
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
@@ -22,6 +22,10 @@ from plain.utils.regex_helper import _normalize
 
 from .exceptions import NoReverseMatch, Resolver404
 from .patterns import RegexPattern, RoutePattern, URLPattern
+
+# Tracks which URLResolver instances are currently inside _populate(),
+# to prevent infinite recursion when resolvers reference each other.
+_populating: ContextVar[frozenset[int]] = ContextVar("_populating", default=frozenset())
 
 if TYPE_CHECKING:
     from plain.preflight import PreflightResult
@@ -111,7 +115,6 @@ class URLResolver:
         self._reverse_dict: MultiValueDict = MultiValueDict()
         self._namespace_dict: dict[str, tuple[str, URLResolver]] = {}
         self._populated = False
-        self._local = local()
 
         # Set these immediately, in part so we can find routers
         # where the attributes weren't set correctly.
@@ -129,14 +132,15 @@ class URLResolver:
         return messages
 
     def _populate(self) -> None:
-        # Short-circuit if called recursively in this thread to prevent
-        # infinite recursion. Concurrent threads may call this at the same
-        # time and will need to continue, so set 'populating' on a
-        # thread-local variable.
-        if getattr(self._local, "populating", False):
+        # Short-circuit if called recursively in this context to prevent
+        # infinite recursion. Concurrent contexts may call this at the same
+        # time and will need to continue, so track populating resolvers in a
+        # context variable.
+        current = _populating.get()
+        if id(self) in current:
             return
+        token = _populating.set(current | {id(self)})
         try:
-            self._local.populating = True
             lookups = MultiValueDict()
             namespaces = {}
             for url_pattern in reversed(self.url_patterns):
@@ -196,7 +200,7 @@ class URLResolver:
             self._reverse_dict = lookups
             self._populated = True
         finally:
-            self._local.populating = False
+            _populating.reset(token)
 
     @property
     def reverse_dict(self) -> MultiValueDict:

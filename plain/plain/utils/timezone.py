@@ -7,8 +7,8 @@ from __future__ import annotations
 import functools
 import zoneinfo
 from contextlib import ContextDecorator
+from contextvars import ContextVar
 from datetime import UTC, datetime, time, timedelta, timezone, tzinfo
-from threading import local
 from types import TracebackType
 
 from plain.runtime import settings
@@ -59,12 +59,13 @@ def get_default_timezone_name() -> str:
     return _get_timezone_name(get_default_timezone())
 
 
-_active = local()
+_active: ContextVar[tzinfo | None] = ContextVar("_active", default=None)
 
 
 def get_current_timezone() -> tzinfo:
     """Return the currently active time zone as a tzinfo instance."""
-    return getattr(_active, "value", get_default_timezone())
+    tz = _active.get()
+    return tz if tz is not None else get_default_timezone()
 
 
 def get_current_timezone_name() -> str:
@@ -88,32 +89,31 @@ def _get_timezone_name(timezone: tzinfo) -> str:
 
 def activate(timezone: tzinfo | str) -> None:
     """
-    Set the time zone for the current thread.
+    Set the time zone for the current context.
 
     The ``timezone`` argument must be an instance of a tzinfo subclass or a
     time zone name.
     """
     if isinstance(timezone, tzinfo):
-        _active.value = timezone
+        _active.set(timezone)
     elif isinstance(timezone, str):
-        _active.value = zoneinfo.ZoneInfo(timezone)
+        _active.set(zoneinfo.ZoneInfo(timezone))
     else:
         raise ValueError(f"Invalid timezone: {timezone!r}")
 
 
 def deactivate() -> None:
     """
-    Unset the time zone for the current thread.
+    Unset the time zone for the current context.
 
     Plain will then use the time zone defined by settings.TIME_ZONE.
     """
-    if hasattr(_active, "value"):
-        del _active.value
+    _active.set(None)
 
 
 class override(ContextDecorator):
     """
-    Temporarily set the time zone for the current thread.
+    Temporarily set the time zone for the current context.
 
     This is a context manager that uses plain.utils.timezone.activate()
     to set the timezone on entry and restores the previously active timezone
@@ -126,14 +126,14 @@ class override(ContextDecorator):
 
     def __init__(self, timezone: tzinfo | str | None) -> None:
         self.timezone = timezone
-        self.old_timezone: tzinfo | None = None
 
     def __enter__(self) -> None:
-        self.old_timezone = getattr(_active, "value", None)
         if self.timezone is None:
-            deactivate()
+            self._token = _active.set(None)
+        elif isinstance(self.timezone, str):
+            self._token = _active.set(zoneinfo.ZoneInfo(self.timezone))
         else:
-            activate(self.timezone)
+            self._token = _active.set(self.timezone)
 
     def __exit__(
         self,
@@ -141,10 +141,7 @@ class override(ContextDecorator):
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        if self.old_timezone is None:
-            deactivate()
-        else:
-            _active.value = self.old_timezone
+        _active.reset(self._token)
 
 
 # Utilities
