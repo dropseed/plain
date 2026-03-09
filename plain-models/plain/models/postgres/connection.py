@@ -7,7 +7,6 @@ import os
 import signal
 import subprocess
 import sys
-import threading
 import time
 import warnings
 import zoneinfo
@@ -172,9 +171,6 @@ class DatabaseConnection:
 
     index_default_access_method = "btree"
     ignored_tables: list[str] = []
-
-    # PostgreSQL backend-specific attributes.
-    _named_cursor_idx = 0
 
     def __init__(self, settings_dict: DatabaseConfig):
         # Connection related attributes.
@@ -384,45 +380,16 @@ class DatabaseConnection:
         # can be the case when using temporary or ephemeral credentials.
         self.ensure_role()
 
-    def create_cursor(self, name: str | None = None) -> Any:
+    def create_cursor(self) -> Any:
         """Create a cursor. Assume that a connection is established."""
         assert self.connection is not None
-        if name:
-            # In autocommit mode, the cursor will be used outside of a
-            # transaction, hence use a holdable cursor.
-            cursor = self.connection.cursor(
-                name, scrollable=False, withhold=self.connection.autocommit
-            )
-        else:
-            cursor = self.connection.cursor()
+        cursor = self.connection.cursor()
 
         # Register the cursor timezone only if the connection disagrees, to avoid copying the adapter map.
         tzloader = self.connection.adapters.get_loader(TIMESTAMPTZ_OID, Format.TEXT)
         if self.timezone != tzloader.timezone:  # type: ignore[union-attr]
             register_tzloader(self.timezone, cursor)
         return cursor
-
-    def chunked_cursor(self) -> utils.CursorWrapper:
-        """
-        Return a server-side cursor that avoids caching results in memory.
-        """
-        self._named_cursor_idx += 1
-        # Get the current async task
-        # Note that right now this is behind @async_unsafe, so this is
-        # unreachable, but in future we'll start loosening this restriction.
-        # For now, it's here so that every use of "threading" is
-        # also async-compatible.
-        task_ident = "sync"
-        # Use that and the thread ident to get a unique name
-        return self._cursor(
-            name="_plain_curs_%d_%s_%d"  # noqa: UP031
-            % (
-                # Avoid reusing name in other threads / tasks
-                threading.current_thread().ident,
-                task_ident,
-                self._named_cursor_idx,
-            )
-        )
 
     def _set_autocommit(self, autocommit: bool) -> None:
         """Backend-specific implementation to enable or disable autocommit."""
@@ -545,11 +512,11 @@ class DatabaseConnection:
             wrapped_cursor = self.make_cursor(cursor)
         return wrapped_cursor
 
-    def _cursor(self, name: str | None = None) -> utils.CursorWrapper:
+    def _cursor(self) -> utils.CursorWrapper:
         self.close_if_health_check_failed()
         self.ensure_connection()
         with self.wrap_database_errors:
-            return self._prepare_cursor(self.create_cursor(name))
+            return self._prepare_cursor(self.create_cursor())
 
     def _commit(self) -> None:
         if self.connection is not None:

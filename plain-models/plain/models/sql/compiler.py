@@ -36,7 +36,6 @@ from plain.models.postgres.sql import (
 from plain.models.query_utils import select_related_descend
 from plain.models.sql.constants import (
     CURSOR,
-    GET_ITERATOR_CHUNK_SIZE,
     MULTI,
     NO_RESULTS,
     ORDER_DIR,
@@ -1337,17 +1336,14 @@ class SQLCompiler:
         results: Any = None,
         tuple_expected: bool = False,
         chunked_fetch: bool = False,
-        chunk_size: int = GET_ITERATOR_CHUNK_SIZE,
     ) -> Iterable[Any]:
         """Return an iterator over the results from executing this query."""
         if results is None:
-            results = self.execute_sql(
-                MULTI, chunked_fetch=chunked_fetch, chunk_size=chunk_size
-            )
+            results = self.execute_sql(MULTI, chunked_fetch=chunked_fetch)
         assert self.select is not None  # Set during query execution
         fields = [s[0] for s in self.select[0 : self.col_count]]
         converters = get_converters(fields, self.connection)
-        rows = chain.from_iterable(results)
+        rows = results
         if converters:
             rows = apply_converters(rows, converters, self.connection)
             if tuple_expected:
@@ -1362,14 +1358,14 @@ class SQLCompiler:
         self,
         result_type: str = MULTI,
         chunked_fetch: bool = False,
-        chunk_size: int = GET_ITERATOR_CHUNK_SIZE,
     ) -> Any:
         """
         Run the query against the database and return the result(s). The
-        return value is a single data item if result_type is SINGLE, or an
-        iterator over the results if the result_type is MULTI.
+        return value is a single data item if result_type is SINGLE, or a
+        flat iterable of rows if the result_type is MULTI.
 
-        result_type is either MULTI (use fetchmany() to retrieve all rows),
+        result_type is either MULTI (returns a list from fetchall(), or a
+        streaming generator from cursor.stream() when chunked_fetch=True),
         SINGLE (only retrieve a single row), or None. In this last case, the
         cursor is returned if any query is executed, since it's used by
         subclasses such as InsertQuery). It's possible, however, that no query
@@ -1390,14 +1386,18 @@ class SQLCompiler:
                 return iter([])
             else:
                 return
+        cursor = self.connection.cursor()
         if chunked_fetch:
-            cursor = self.connection.chunked_cursor()
-        else:
-            cursor = self.connection.cursor()
+            # Use psycopg3's cursor.stream() for server-side cursor iteration.
+            result = cursor.stream(sql, params)
+            if self.has_extra_select:
+                col_count = self.col_count
+                result = (r[:col_count] for r in result)
+            return result
+
         try:
             cursor.execute(sql, params)
         except Exception:
-            # Might fail for server-side cursors (e.g. connection closed)
             cursor.close()
             raise
 
@@ -1417,18 +1417,13 @@ class SQLCompiler:
             cursor.close()
             return
 
-        result = cursor_iter(
-            cursor,
-            [],  # empty_fetchmany_value for PostgreSQL
-            self.col_count if self.has_extra_select else None,
-            chunk_size,
-        )
-        if not chunked_fetch:
-            # If we are using non-chunked reads, we return the same data
-            # structure as normally, but ensure it is all read into memory
-            # before going any further.
-            return list(result)
-        return result
+        try:
+            rows = cursor.fetchall()
+        finally:
+            cursor.close()
+        if self.has_extra_select:
+            rows = [r[: self.col_count] for r in rows]
+        return rows
 
     def as_subquery_condition(
         self, alias: str, columns: list[str], compiler: SQLCompiler
@@ -1445,13 +1440,13 @@ class SQLCompiler:
         return f"EXISTS ({sql})", params
 
     def explain_query(self) -> Generator[str, None, None]:
-        result = list(self.execute_sql())
+        result = self.execute_sql()
         explain_info = self.query.explain_info
         # PostgreSQL may return tuples with integers and strings depending on
         # the EXPLAIN format. Flatten them out into strings.
         format_ = explain_info.format if explain_info is not None else None
         output_formatter = json.dumps if format_ and format_.lower() == "json" else str
-        for row in result[0]:
+        for row in result:
             if not isinstance(row, str):
                 yield " ".join(output_formatter(c) for c in row)
             else:
@@ -1833,10 +1828,10 @@ class SQLUpdateCompiler(SQLCompiler):
             # don't want them to change).
             idents = []
             related_ids = collections.defaultdict(list)
-            for rows in query.get_compiler().execute_sql(MULTI):
-                idents.extend(r[0] for r in rows)
+            for row in query.get_compiler().execute_sql(MULTI):
+                idents.append(row[0])
                 for parent, index in related_ids_index:
-                    related_ids[parent].extend(r[index] for r in rows)
+                    related_ids[parent].append(row[index])
             self.query.add_filter("id__in", idents)
             self.query.related_ids = related_ids  # type: ignore[assignment]
         else:
@@ -1872,17 +1867,3 @@ class SQLAggregateCompiler(SQLCompiler):
         sql = f"SELECT {sql} FROM ({inner_query_sql}) subquery"
         params += inner_query_params
         return sql, params
-
-
-def cursor_iter(
-    cursor: Any, sentinel: Any, col_count: int | None, itersize: int
-) -> Generator[list, None, None]:
-    """
-    Yield blocks of rows from a cursor and ensure the cursor is closed when
-    done.
-    """
-    try:
-        for rows in iter((lambda: cursor.fetchmany(itersize)), sentinel):
-            yield rows if col_count is None else [r[:col_count] for r in rows]
-    finally:
-        cursor.close()

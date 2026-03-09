@@ -36,7 +36,6 @@ from plain.models.query_utils import FilteredRelation, Q
 from plain.models.sql import (
     AND,
     CURSOR,
-    GET_ITERATOR_CHUNK_SIZE,
     OR,
     XOR,
     DeleteQuery,
@@ -69,11 +68,9 @@ class BaseIterable:
         self,
         queryset: QuerySet[Any],
         chunked_fetch: bool = False,
-        chunk_size: int = GET_ITERATOR_CHUNK_SIZE,
     ):
         self.queryset = queryset
         self.chunked_fetch = chunked_fetch
-        self.chunk_size = chunk_size
 
     def __iter__(self) -> Iterator[Any]:
         raise NotImplementedError(
@@ -89,9 +86,7 @@ class ModelIterable(BaseIterable):
         compiler = queryset.sql_query.get_compiler()
         # Execute the query. This will also fill compiler.select, klass_info,
         # and annotations.
-        results = compiler.execute_sql(
-            chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
-        )
+        results = compiler.execute_sql(chunked_fetch=self.chunked_fetch)
         select, klass_info, annotation_col_map = (
             compiler.select,
             compiler.klass_info,
@@ -206,9 +201,7 @@ class ValuesIterable(BaseIterable):
             *query.annotation_select,
         ]
         indexes = range(len(names))
-        for row in compiler.results_iter(
-            chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
-        ):
+        for row in compiler.results_iter(chunked_fetch=self.chunked_fetch):
             yield {names[i]: row[i] for i in indexes}
 
 
@@ -240,15 +233,12 @@ class ValuesListIterable(BaseIterable):
                 rowfactory = operator.itemgetter(*[index_map[f] for f in fields])
                 return map(
                     rowfactory,
-                    compiler.results_iter(
-                        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
-                    ),
+                    compiler.results_iter(chunked_fetch=self.chunked_fetch),
                 )
         return iter(
             compiler.results_iter(
                 tuple_expected=True,
                 chunked_fetch=self.chunked_fetch,
-                chunk_size=self.chunk_size,
             )
         )
 
@@ -262,9 +252,7 @@ class FlatValuesListIterable(BaseIterable):
     def __iter__(self) -> Iterator[Any]:
         queryset = self.queryset
         compiler = queryset.sql_query.get_compiler()
-        for row in compiler.results_iter(
-            chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
-        ):
+        for row in compiler.results_iter(chunked_fetch=self.chunked_fetch):
             yield row[0]
 
 
@@ -409,13 +397,13 @@ class QuerySet(Generic[T]):
         The queryset iterator protocol uses three nested iterators in the
         default case:
             1. sql.compiler.execute_sql()
-               - Returns 100 rows at time (constants.GET_ITERATOR_CHUNK_SIZE)
-                 using cursor.fetchmany(). This part is responsible for
-                 doing some column masking, and returning the rows in chunks.
+               - Returns a flat iterable of rows: a list from fetchall()
+                 for regular queries, or a streaming generator from
+                 cursor.stream() when using .iterator().
             2. sql.compiler.results_iter()
-               - Returns one row at time. At this point the rows are still just
-                 tuples. In some cases the return values are converted to
-                 Python values at this location.
+               - Returns one row at a time. At this point the rows are still
+                 just tuples. In some cases the return values are converted
+                 to Python values at this location.
             3. self.iterator()
                - Responsible for turning the rows into model objects.
         """
@@ -532,7 +520,6 @@ class QuerySet(Generic[T]):
         iterable = self._iterable_class(
             self,
             chunked_fetch=use_chunked_fetch,
-            chunk_size=chunk_size or 2000,
         )
         if not self._prefetch_related_lookups or chunk_size is None:
             yield from iterable

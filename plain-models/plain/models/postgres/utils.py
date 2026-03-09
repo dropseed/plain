@@ -70,6 +70,23 @@ class CursorWrapper:
         except psycopg.Error:
             pass
 
+    def stream(
+        self, sql: str, params: Sequence[Any] | None = None
+    ) -> Generator[tuple[Any, ...], None, None]:
+        self.db.validate_no_broken_transaction()
+        with db_span(self.db, sql, params=params):
+            with self.db.wrap_database_errors:
+                try:
+                    if params is None:
+                        yield from self.cursor.stream(sql)
+                    else:
+                        yield from self.cursor.stream(sql, params)
+                finally:
+                    try:
+                        self.close()
+                    except psycopg.Error:
+                        pass
+
     # The following methods cannot be implemented in __getattr__, because the
     # code must run when the method is invoked, not just when it is accessed.
 
@@ -133,6 +150,12 @@ class CursorWrapper:
 
 class CursorDebugWrapper(CursorWrapper):
     # XXX callproc isn't instrumented at this time.
+
+    def stream(
+        self, sql: str, params: Sequence[Any] | None = None
+    ) -> Generator[tuple[Any, ...], None, None]:
+        with self.debug_sql(sql, params, use_last_executed_query=True):
+            yield from super().stream(sql, params)
 
     def execute(
         self, sql: str, params: Sequence[Any] | Mapping[str, Any] | None = None
