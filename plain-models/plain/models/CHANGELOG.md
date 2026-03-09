@@ -1,5 +1,15 @@
 # plain-models changelog
 
+## [0.81.1](https://github.com/dropseed/plain/releases/plain-models@0.81.1) (2026-03-09)
+
+### What's changed
+
+- Use `connection.execute()` instead of opening a cursor for internal one-off queries (timezone configuration, role assumption, connection health checks) ([828d665979df](https://github.com/dropseed/plain/commit/828d665979df))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.81.0](https://github.com/dropseed/plain/releases/plain-models@0.81.0) (2026-03-09)
 
 ### What's changed
