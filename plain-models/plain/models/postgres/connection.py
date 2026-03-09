@@ -31,7 +31,6 @@ from plain.exceptions import ImproperlyConfigured
 from plain.models.db import (
     DatabaseError,
     DatabaseErrorWrapper,
-    NotSupportedError,
 )
 from plain.models.indexes import Index
 from plain.models.postgres import utils
@@ -47,8 +46,6 @@ if TYPE_CHECKING:
 
     from plain.models.connections import DatabaseConfig
     from plain.models.fields import Field
-
-RAN_DB_VERSION_CHECK = False
 
 logger = logging.getLogger("plain.models.postgres")
 
@@ -270,17 +267,6 @@ class DatabaseConnection:
             )
         return list(self.queries_log)
 
-    def check_database_version_supported(self) -> None:
-        """
-        Raise an error if the database version isn't supported by this
-        version of Plain. PostgreSQL 12+ is required.
-        """
-        major, minor = divmod(self.pg_version, 10000)
-        if major < 12:
-            raise NotSupportedError(
-                f"PostgreSQL 12 or later is required (found {major}.{minor})."
-            )
-
     # ##### Connection and cursor methods #####
 
     def get_connection_params(self) -> dict[str, Any]:
@@ -392,11 +378,6 @@ class DatabaseConnection:
 
     def init_connection_state(self) -> None:
         """Initialize the database connection settings."""
-        global RAN_DB_VERSION_CHECK
-        if not RAN_DB_VERSION_CHECK:
-            self.check_database_version_supported()
-            RAN_DB_VERSION_CHECK = True
-
         self.ensure_timezone()
         # Set the role on the connection. This is useful if the credential used
         # to login is not the same as the role that owns database resources. As

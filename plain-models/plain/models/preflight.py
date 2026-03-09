@@ -211,6 +211,25 @@ class CheckLazyReferences(PreflightCheck):
         return _check_lazy_references(models_registry, packages_registry)
 
 
+@register_check("models.postgres_version")
+class CheckPostgresVersion(PreflightCheck):
+    """Checks that the PostgreSQL server meets the minimum version requirement."""
+
+    MINIMUM_VERSION = 16
+
+    def run(self) -> list[PreflightResult]:
+        conn = get_connection()
+        major, minor = divmod(conn.pg_version, 10000)
+        if major < self.MINIMUM_VERSION:
+            return [
+                PreflightResult(
+                    fix=f"PostgreSQL {self.MINIMUM_VERSION} or later is required (found {major}.{minor}).",
+                    id="models.postgres_version_too_old",
+                )
+            ]
+        return []
+
+
 @register_check("models.database_tables")
 class CheckDatabaseTables(PreflightCheck):
     """Checks for unknown tables in the database when plain.models is available."""
