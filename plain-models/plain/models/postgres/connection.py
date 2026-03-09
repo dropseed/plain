@@ -7,7 +7,6 @@ import os
 import signal
 import subprocess
 import sys
-import threading
 import warnings
 import zoneinfo
 from collections import deque
