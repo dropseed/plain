@@ -152,6 +152,23 @@ window.addEventListener("load", () => {
     });
   }
 
+  // Mobile version pill toggle
+  const bar = document.getElementById("plaintoolbar-bar");
+  const mobileToggle = document.getElementById("plaintoolbar-mobile-toggle");
+  const items = document.getElementById("plaintoolbar-items");
+  if (bar && mobileToggle && items) {
+    mobileToggle.addEventListener("click", () => {
+      if (window.innerWidth >= 640) return; // desktop: no-op
+      items.classList.toggle("hidden");
+    });
+    // Outside click dismiss
+    document.addEventListener("click", (e) => {
+      if (!items.classList.contains("hidden") && !bar.contains(e.target)) {
+        items.classList.add("hidden");
+      }
+    });
+  }
+
   // Enable manual resize of the expanded toolbar via drag handle
   const details = document.getElementById("plaintoolbar-details");
   if (details) {
