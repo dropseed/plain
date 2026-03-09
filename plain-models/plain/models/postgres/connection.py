@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import _thread
 import datetime
 import logging
 import os
@@ -17,7 +16,15 @@ from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, Any, LiteralString, NamedTuple, cast
 
 import psycopg as Database
-from psycopg import ClientCursor, IsolationLevel, adapt, adapters, errors
+from psycopg import (
+    ClientCursor,
+    IsolationLevel,
+    Rollback,
+    Transaction,
+    adapt,
+    adapters,
+    errors,
+)
 from psycopg import sql as psycopg_sql
 from psycopg.abc import Buffer, PyFormat
 from psycopg.postgres import types as pg_types
@@ -190,10 +197,10 @@ class DatabaseConnection:
         self.autocommit: bool = False
         # Tracks if the connection is in a transaction managed by 'atomic'.
         self.in_atomic_block: bool = False
-        # Increment to generate unique savepoint ids.
-        self.savepoint_state: int = 0
-        # List of savepoints created by 'atomic'.
-        self.savepoint_ids: list[str | None] = []
+        # List of savepoints created by 'atomic'. Stores psycopg3
+        # Transaction objects that manage savepoint lifecycle, or None
+        # when a savepoint was skipped (savepoint=False or needs_rollback).
+        self.savepoint_ids: list[Transaction | None] = []
         # Stack of active 'atomic' blocks.
         self.atomic_blocks: list[Any] = []
         # Tracks if the transaction should be rolled back to the next
@@ -573,69 +580,59 @@ class DatabaseConnection:
 
     # ##### Savepoint management #####
 
-    def _savepoint(self, sid: str) -> None:
-        with self.cursor() as cursor:
-            cursor.execute(f"SAVEPOINT {quote_name(sid)}")
-
-    def _savepoint_rollback(self, sid: str) -> None:
-        with self.cursor() as cursor:
-            cursor.execute(f"ROLLBACK TO SAVEPOINT {quote_name(sid)}")
-
-    def _savepoint_commit(self, sid: str) -> None:
-        with self.cursor() as cursor:
-            cursor.execute(f"RELEASE SAVEPOINT {quote_name(sid)}")
-
-    # ##### Generic savepoint management methods #####
-
-    def savepoint(self) -> str | None:
+    def savepoint(self) -> Transaction | None:
         """
-        Create a savepoint inside the current transaction. Return an
-        identifier for the savepoint that will be used for the subsequent
-        rollback or commit. Return None if in autocommit mode (no transaction).
+        Create a savepoint inside the current transaction using psycopg3's
+        native Transaction. Return a Transaction object that will be used
+        for subsequent rollback or commit. Return None if in autocommit
+        mode (no transaction).
         """
         if self.get_autocommit():
             return None
 
-        thread_ident = _thread.get_ident()
-        tid = str(thread_ident).replace("-", "")
+        assert self.connection is not None
+        tx = Transaction(self.connection)
+        tx.__enter__()
+        return tx
 
-        self.savepoint_state += 1
-        sid = "s%s_x%d" % (tid, self.savepoint_state)  # noqa: UP031
-
-        self._savepoint(sid)
-
-        return sid
-
-    def savepoint_rollback(self, sid: str) -> None:
+    def savepoint_rollback(self, tx: Transaction) -> None:
         """
         Roll back to a savepoint. Do nothing if in autocommit mode.
+
+        If the Transaction has already been exited (e.g. savepoint_commit
+        failed), falls back to issuing ROLLBACK TO + RELEASE via
+        connection.execute().
         """
         if self.get_autocommit():
             return
 
-        self._savepoint_rollback(sid)
+        if tx._exited:
+            # Transaction already exited (e.g. savepoint_commit raised).
+            # Fall back to direct SQL using the savepoint name.
+            assert self.connection is not None
+            name = psycopg_sql.Identifier(tx.savepoint_name)
+            self.connection.execute(psycopg_sql.SQL("ROLLBACK TO {}").format(name))
+            self.connection.execute(psycopg_sql.SQL("RELEASE {}").format(name))
+        else:
+            # Use Rollback exception to trigger rollback without propagating.
+            tx.__exit__(Rollback, Rollback(), None)
 
         # Remove any callbacks registered while this savepoint was active.
         self.run_on_commit = [
             (sids, func, robust)
             for (sids, func, robust) in self.run_on_commit
-            if sid not in sids
+            if tx not in sids
         ]
 
-    def savepoint_commit(self, sid: str) -> None:
+    def savepoint_commit(self, tx: Transaction) -> None:
         """
         Release a savepoint. Do nothing if in autocommit mode.
+        Uses psycopg3 Transaction's commit which issues RELEASE <savepoint>.
         """
         if self.get_autocommit():
             return
 
-        self._savepoint_commit(sid)
-
-    def clean_savepoints(self) -> None:
-        """
-        Reset the counter used to generate unique savepoint ids in this thread.
-        """
-        self.savepoint_state = 0
+        tx.__exit__(None, None, None)
 
     # ##### Generic transaction management methods #####
 

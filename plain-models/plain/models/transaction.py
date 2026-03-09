@@ -73,8 +73,8 @@ class Atomic(ContextDecorator):
     It's possible to disable the creation of savepoints if the goal is to
     ensure that some code runs within a transaction without creating overhead.
 
-    A stack of savepoints identifiers is maintained as an attribute of the
-    connection. None denotes the absence of a savepoint.
+    A stack of psycopg3 Transaction objects is maintained as an attribute of
+    the connection. None denotes the absence of a savepoint.
 
     This allows reentrancy even if the same AtomicWrapper is reused. For
     example, it's possible to define `oa = atomic('other')` and use `@oa` or
@@ -114,8 +114,8 @@ class Atomic(ContextDecorator):
             # second condition avoids creating useless savepoints and prevents
             # overwriting needs_rollback until the rollback is performed.
             if self.savepoint and not conn.needs_rollback:
-                sid = conn.savepoint()
-                conn.savepoint_ids.append(sid)
+                tx = conn.savepoint()
+                conn.savepoint_ids.append(tx)
             else:
                 conn.savepoint_ids.append(None)
         else:
@@ -136,8 +136,9 @@ class Atomic(ContextDecorator):
             conn.atomic_blocks.pop()
 
         if conn.savepoint_ids:
-            sid = conn.savepoint_ids.pop()
+            tx = conn.savepoint_ids.pop()
         else:
+            tx = None
             # Prematurely unset this flag to allow using commit or rollback.
             conn.in_atomic_block = False
 
@@ -150,15 +151,12 @@ class Atomic(ContextDecorator):
             elif exc_type is None and not conn.needs_rollback:
                 if conn.in_atomic_block:
                     # Release savepoint if there is one
-                    if sid is not None:
+                    if tx is not None:
                         try:
-                            conn.savepoint_commit(sid)
+                            conn.savepoint_commit(tx)
                         except DatabaseError:
                             try:
-                                conn.savepoint_rollback(sid)
-                                # The savepoint won't be reused. Release it to
-                                # minimize overhead for the database server.
-                                conn.savepoint_commit(sid)
+                                conn.savepoint_rollback(tx)
                             except Error:
                                 # If rolling back to a savepoint fails, mark for
                                 # rollback at a higher level and avoid shadowing
@@ -184,14 +182,11 @@ class Atomic(ContextDecorator):
                 if conn.in_atomic_block:
                     # Roll back to savepoint if there is one, mark for rollback
                     # otherwise.
-                    if sid is None:
+                    if tx is None:
                         conn.needs_rollback = True
                     else:
                         try:
-                            conn.savepoint_rollback(sid)
-                            # The savepoint won't be reused. Release it to
-                            # minimize overhead for the database server.
-                            conn.savepoint_commit(sid)
+                            conn.savepoint_rollback(tx)
                         except Error:
                             # If rolling back to a savepoint fails, mark for
                             # rollback at a higher level and avoid shadowing
