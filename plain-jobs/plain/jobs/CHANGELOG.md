@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.45.3](https://github.com/dropseed/plain/releases/plain-jobs@0.45.3) (2026-03-09)
+
+### What's changed
+
+- Updated advisory lock code to use `get_connection()` instead of the removed `db_connection` proxy ([4a79279d01dd](https://github.com/dropseed/plain/commit/4a79279d01dd))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.45.2](https://github.com/dropseed/plain/releases/plain-jobs@0.45.2) (2026-02-26)
 
 ### What's changed
