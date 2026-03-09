@@ -1,11 +1,14 @@
 """Lightweight proposal tracker for the proposals/ directory."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import yaml
 from rich.console import Console
@@ -213,13 +216,14 @@ def cmd_default(args, proposals):
     backlog = [p for p in proposals if p["number"] is None]
 
     if args.json:
-        result = {
-            "roadmap": [serializable(p) for p in numbered],
-            "backlog": {},
-        }
+        backlog_by_pkg: dict[str, list[Any]] = {}
         for p in backlog:
             pkg = p["packages"][0] if p["packages"] else "(other)"
-            result["backlog"].setdefault(pkg, []).append(serializable(p))
+            backlog_by_pkg.setdefault(pkg, []).append(serializable(p))
+        result = {
+            "roadmap": [serializable(p) for p in numbered],
+            "backlog": backlog_by_pkg,
+        }
         print(json.dumps(result, indent=2))
         return
 
