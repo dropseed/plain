@@ -1,9 +1,9 @@
 <div class="px-6 py-4" data-exception-container>
-    <div class="flex justify-between items-center mb-4">
-        <div class="text-amber-400" data-exception-message>
+    <div class="flex justify-between items-start mb-4">
+        <div class="text-amber-400 min-w-0 break-words" data-exception-message>
             <span class="font-semibold">{{ exception_context.exception.__class__.__name__ }}</span>: {{ exception_context.exception }}
         </div>
-        <div class="flex items-center space-x-2 ml-4">
+        <div class="flex items-center space-x-2 ml-4 shrink-0">
             <button data-toggle-raw class="flex items-center space-x-1 px-2 py-0.5 text-sm text-stone-300 rounded bg-white/10 hover:bg-white/20 transition-colors cursor-pointer">
                 <span>View raw</span>
             </button>
