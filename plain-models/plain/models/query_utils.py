@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.lookups import Lookup, Transform
     from plain.models.meta import Meta
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
     from plain.models.sql.where import WhereNode
 
@@ -438,7 +438,7 @@ class FilteredRelation:
         clone.path = self.path[:]
         return clone
 
-    def as_sql(self, compiler: SQLCompiler, connection: DatabaseWrapper) -> Any:
+    def as_sql(self, compiler: SQLCompiler, connection: DatabaseConnection) -> Any:
         # Resolve the condition in Join.filtered_relation.
         query = compiler.query
         where = query.build_filtered_relation_q(self.condition, reuse=set(self.path))

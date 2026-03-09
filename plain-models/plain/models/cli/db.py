@@ -4,23 +4,15 @@ import subprocess
 import sys
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, cast
 
 import click
 
 from plain.cli import register_cli
 
 from ..backups.cli import cli as backups_cli
-from ..db import OperationalError
-from ..db import db_connection as _db_connection
+from ..db import OperationalError, get_connection
 from ..migrations.recorder import MIGRATION_TABLE_NAME
 from ..postgres.sql import quote_name
-
-if TYPE_CHECKING:
-    from ..postgres.wrapper import DatabaseWrapper
-
-# Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
-db_connection = cast("DatabaseWrapper", _db_connection)
 
 
 @register_cli("db")
@@ -36,15 +28,16 @@ cli.add_command(backups_cli)
 @click.argument("parameters", nargs=-1)
 def shell(parameters: tuple[str, ...]) -> None:
     """Open an interactive database shell"""
+    conn = get_connection()
     try:
-        db_connection.runshell(list(parameters))
+        conn.runshell(list(parameters))
     except FileNotFoundError:
         # Note that we're assuming the FileNotFoundError relates to the
         # command missing. It could be raised for some other reason, in
         # which case this error message would be inaccurate. Still, this
         # message catches the common case.
         click.secho(
-            f"You appear not to have the {db_connection.executable_name!r} program installed or on your path.",
+            f"You appear not to have the {conn.executable_name!r} program installed or on your path.",
             fg="red",
             err=True,
         )
@@ -69,8 +62,9 @@ def shell(parameters: tuple[str, ...]) -> None:
 )
 def drop_unknown_tables(yes: bool) -> None:
     """Drop all tables not associated with a Plain model"""
-    db_tables = set(db_connection.table_names())
-    model_tables = set(db_connection.plain_table_names())
+    conn = get_connection()
+    db_tables = set(conn.table_names())
+    model_tables = set(conn.plain_table_names())
     unknown_tables = sorted(db_tables - model_tables - {MIGRATION_TABLE_NAME})
 
     if not unknown_tables:
@@ -83,7 +77,7 @@ def drop_unknown_tables(yes: bool) -> None:
 
     # Find foreign key constraints from kept tables that reference unknown tables
     cascade_warnings: defaultdict[str, list[tuple[str, str]]] = defaultdict(list)
-    with db_connection.cursor() as cursor:
+    with conn.cursor() as cursor:
         for table in unknown_tables:
             cursor.execute(
                 """
@@ -113,7 +107,7 @@ def drop_unknown_tables(yes: bool) -> None:
         if not click.confirm(f"Drop {tables_label} (CASCADE)? This cannot be undone."):
             return
 
-    with db_connection.cursor() as cursor:
+    with conn.cursor() as cursor:
         for table in unknown_tables:
             click.echo(f"  Dropping {table}...", nl=False)
             cursor.execute(f"DROP TABLE IF EXISTS {quote_name(table)} CASCADE")
@@ -131,7 +125,7 @@ def wait() -> None:
         waiting_for = False
 
         try:
-            db_connection.ensure_connection()
+            get_connection().ensure_connection()
         except OperationalError:
             waiting_for = True
 

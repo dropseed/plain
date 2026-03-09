@@ -4,8 +4,6 @@ from collections.abc import Callable
 from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
-from plain.models.connections import DatabaseConnection
-
 from ..transaction import atomic
 from .loader import MigrationLoader
 from .migration import Migration
@@ -13,7 +11,7 @@ from .recorder import MigrationRecorder
 from .state import ProjectState
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
 
 
 class MigrationExecutor:
@@ -24,7 +22,7 @@ class MigrationExecutor:
 
     def __init__(
         self,
-        connection: DatabaseWrapper | DatabaseConnection,
+        connection: DatabaseConnection,
         progress_callback: Callable[..., Any] | None = None,
     ) -> None:
         self.connection = connection

@@ -32,7 +32,6 @@ from plain.models.db import (
     DatabaseError,
     DatabaseErrorWrapper,
     NotSupportedError,
-    db_connection,
 )
 from plain.models.indexes import Index
 from plain.models.postgres import utils
@@ -73,7 +72,7 @@ def get_migratable_models() -> Generator[Any, None, None]:
 
 
 class TableInfo(NamedTuple):
-    """Structure returned by DatabaseWrapper.get_table_list()."""
+    """Structure returned by DatabaseConnection.get_table_list()."""
 
     name: str
     type: str
@@ -164,9 +163,9 @@ def _psql_settings_to_cmd_args_env(
     return args, (env or None)
 
 
-class DatabaseWrapper:
+class DatabaseConnection:
     """
-    PostgreSQL database connection wrapper.
+    PostgreSQL database connection.
 
     This is the only database backend supported by Plain.
     """
@@ -201,7 +200,7 @@ class DatabaseWrapper:
         # Increment to generate unique savepoint ids.
         self.savepoint_state: int = 0
         # List of savepoints created by 'atomic'.
-        self.savepoint_ids: list[str] = []
+        self.savepoint_ids: list[str | None] = []
         # Stack of active 'atomic' blocks.
         self.atomic_blocks: list[Any] = []
         # Tracks if the transaction should be rolled back to the next
@@ -216,16 +215,11 @@ class DatabaseWrapper:
         self.health_check_enabled: bool = False
         self.health_check_done: bool = False
 
-        # Thread-safety related attributes.
-        self._thread_sharing_lock: threading.Lock = threading.Lock()
-        self._thread_sharing_count: int = 0
-        self._thread_ident: int = _thread.get_ident()
-
         # A list of no-argument functions to run when the transaction commits.
         # Each entry is an (sids, func, robust) tuple, where sids is a set of
         # the active savepoint IDs when this function was registered and robust
         # specifies whether it's allowed for the function to fail.
-        self.run_on_commit: list[tuple[set[str], Any, bool]] = []
+        self.run_on_commit: list[tuple[set[str | None], Any, bool]] = []
 
         # Should we run the on-commit hooks the next time set_autocommit(True)
         # is called?
@@ -511,12 +505,7 @@ class DatabaseWrapper:
                 "and will use the first PostgreSQL database instead.",
                 RuntimeWarning,
             )
-            conn = self.__class__(
-                {
-                    **self.settings_dict,
-                    "DATABASE": db_connection.settings_dict["DATABASE"],
-                },
-            )
+            conn = self.__class__(self.settings_dict)
             try:
                 with conn.cursor() as cursor:
                     yield cursor
@@ -569,7 +558,6 @@ class DatabaseWrapper:
         """
         Validate the connection is usable and perform database cursor wrapping.
         """
-        self.validate_thread_sharing()
         if self.queries_logged:
             wrapped_cursor = self.make_debug_cursor(cursor)
         else:
@@ -605,7 +593,6 @@ class DatabaseWrapper:
 
     def commit(self) -> None:
         """Commit a transaction and reset the dirty flag."""
-        self.validate_thread_sharing()
         self.validate_no_atomic_block()
         self._commit()
         # A successful commit means that the database connection works.
@@ -614,7 +601,6 @@ class DatabaseWrapper:
 
     def rollback(self) -> None:
         """Roll back a transaction and reset the dirty flag."""
-        self.validate_thread_sharing()
         self.validate_no_atomic_block()
         self._rollback()
         # A successful rollback means that the database connection works.
@@ -624,7 +610,6 @@ class DatabaseWrapper:
 
     def close(self) -> None:
         """Close the connection to the database."""
-        self.validate_thread_sharing()
         self.run_on_commit = []
 
         # Don't call validate_no_atomic_block() to avoid making it difficult
@@ -672,7 +657,6 @@ class DatabaseWrapper:
         self.savepoint_state += 1
         sid = "s%s_x%d" % (tid, self.savepoint_state)  # noqa: UP031
 
-        self.validate_thread_sharing()
         self._savepoint(sid)
 
         return sid
@@ -684,7 +668,6 @@ class DatabaseWrapper:
         if self.get_autocommit():
             return
 
-        self.validate_thread_sharing()
         self._savepoint_rollback(sid)
 
         # Remove any callbacks registered while this savepoint was active.
@@ -701,7 +684,6 @@ class DatabaseWrapper:
         if self.get_autocommit():
             return
 
-        self.validate_thread_sharing()
         self._savepoint_commit(sid)
 
     def clean_savepoints(self) -> None:
@@ -812,27 +794,6 @@ class DatabaseWrapper:
             if self.close_at is not None and time.monotonic() >= self.close_at:
                 self.close()
                 return
-
-    # ##### Thread safety handling #####
-
-    @property
-    def allow_thread_sharing(self) -> bool:
-        with self._thread_sharing_lock:
-            return self._thread_sharing_count > 0
-
-    def validate_thread_sharing(self) -> None:
-        """
-        Validate that the connection isn't accessed by another thread than the
-        one which originally created it. Raise an exception if the validation
-        fails.
-        """
-        if not (self.allow_thread_sharing or self._thread_ident == _thread.get_ident()):
-            raise DatabaseError(
-                "DatabaseWrapper objects created in a "
-                "thread can only be used in that same thread. The connection "
-                f"was created in thread id {self._thread_ident} and this is "
-                f"thread id {_thread.get_ident()}."
-            )
 
     # ##### Miscellaneous #####
 

@@ -50,7 +50,7 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.models.expressions import BaseExpression
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.query import InsertQuery
 
 # Type aliases for SQL compilation results
@@ -62,7 +62,7 @@ class SQLCompilable(Protocol):
     """Protocol for objects that can be compiled to SQL."""
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, Sequence[Any]]:
         """Return SQL string and parameters for this object."""
         ...
@@ -74,9 +74,34 @@ class PositionRef(Ref):
         super().__init__(refs, source)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         return str(self.ordinal), []
+
+
+def get_converters(
+    expressions: Iterable[Any], connection: DatabaseConnection
+) -> dict[int, tuple[list[Any], Any]]:
+    converters = {}
+    for i, expression in enumerate(expressions):
+        if expression:
+            field_converters = expression.get_db_converters(connection)
+            if field_converters:
+                converters[i] = (field_converters, expression)
+    return converters
+
+
+def apply_converters(
+    rows: Iterable, converters: dict, connection: DatabaseConnection
+) -> Generator[list, None, None]:
+    converters_list = list(converters.items())
+    for row in map(list, rows):
+        for pos, (convs, expression) in converters_list:
+            value = row[pos]
+            for converter in convs:
+                value = converter(value, expression, connection)
+            row[pos] = value
+        yield row
 
 
 class SQLCompiler:
@@ -87,7 +112,7 @@ class SQLCompiler:
     )
 
     def __init__(
-        self, query: Query, connection: DatabaseWrapper, elide_empty: bool = True
+        self, query: Query, connection: DatabaseConnection, elide_empty: bool = True
     ):
         self.query = query
         self.connection = connection
@@ -1307,30 +1332,6 @@ class SQLCompiler:
             )
         return result
 
-    def get_converters(
-        self, expressions: Iterable[Any]
-    ) -> dict[int, tuple[list[Any], Any]]:
-        converters = {}
-        for i, expression in enumerate(expressions):
-            if expression:
-                field_converters = expression.get_db_converters(self.connection)
-                if field_converters:
-                    converters[i] = (field_converters, expression)
-        return converters
-
-    def apply_converters(
-        self, rows: Iterable, converters: dict
-    ) -> Generator[list, None, None]:
-        connection = self.connection
-        converters_list = list(converters.items())
-        for row in map(list, rows):
-            for pos, (convs, expression) in converters_list:
-                value = row[pos]
-                for converter in convs:
-                    value = converter(value, expression, connection)
-                row[pos] = value
-            yield row
-
     def results_iter(
         self,
         results: Any = None,
@@ -1345,10 +1346,10 @@ class SQLCompiler:
             )
         assert self.select is not None  # Set during query execution
         fields = [s[0] for s in self.select[0 : self.col_count]]
-        converters = self.get_converters(fields)
+        converters = get_converters(fields, self.connection)
         rows = chain.from_iterable(results)
         if converters:
-            rows = self.apply_converters(rows, converters)
+            rows = apply_converters(rows, converters, self.connection)
             if tuple_expected:
                 rows = map(tuple, rows)
         return rows
@@ -1639,9 +1640,9 @@ class SQLInsertCompiler(SQLCompiler):
             else:
                 rows = [cursor.fetchone()]
         cols = [field.get_col(options.db_table) for field in self.returning_fields]
-        converters = self.get_converters(cols)
+        converters = get_converters(cols, self.connection)
         if converters:
-            rows = list(self.apply_converters(rows, converters))
+            rows = list(apply_converters(rows, converters, self.connection))
         return rows
 
 

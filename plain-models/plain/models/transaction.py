@@ -4,7 +4,7 @@ from collections.abc import Callable, Generator
 from contextlib import ContextDecorator, contextmanager
 from typing import Any, TypeVar
 
-from plain.models.db import DatabaseError, Error, ProgrammingError, db_connection
+from plain.models.db import DatabaseError, Error, ProgrammingError, get_connection
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -25,7 +25,7 @@ def mark_for_rollback_on_error() -> Generator[None, None, None]:
 
     It's equivalent to:
 
-        if db_connection.get_autocommit():
+        if get_connection().get_autocommit():
             yield
         else:
             with transaction.atomic(savepoint=False):
@@ -36,9 +36,10 @@ def mark_for_rollback_on_error() -> Generator[None, None, None]:
     try:
         yield
     except Exception as exc:
-        if db_connection.in_atomic_block:
-            db_connection.needs_rollback = True
-            db_connection.rollback_exc = exc
+        conn = get_connection()
+        if conn.in_atomic_block:
+            conn.needs_rollback = True
+            conn.rollback_exc = exc
         raise
 
 
@@ -47,7 +48,7 @@ def on_commit(func: Callable[[], Any], robust: bool = False) -> None:
     Register `func` to be called when the current transaction is committed.
     If the current transaction is rolled back, `func` will not be called.
     """
-    db_connection.on_commit(func, robust)
+    get_connection().on_commit(func, robust)
 
 
 #################################
@@ -73,13 +74,13 @@ class Atomic(ContextDecorator):
     ensure that some code runs within a transaction without creating overhead.
 
     A stack of savepoints identifiers is maintained as an attribute of the
-    db_connection. None denotes the absence of a savepoint.
+    connection. None denotes the absence of a savepoint.
 
     This allows reentrancy even if the same AtomicWrapper is reused. For
     example, it's possible to define `oa = atomic('other')` and use `@oa` or
     `with oa:` multiple times.
 
-    Since database connections are thread-local, this is thread-safe.
+    Since database connections are stored per-context (ContextVar), this is thread-safe.
 
     An atomic block can be tagged as durable. In this case, raise a
     RuntimeError if it's nested within another atomic block. This guarantees
@@ -95,33 +96,34 @@ class Atomic(ContextDecorator):
         self._from_testcase = False
 
     def __enter__(self) -> None:
+        conn = get_connection()
         if (
             self.durable
-            and db_connection.atomic_blocks
-            and not db_connection.atomic_blocks[-1]._from_testcase
+            and conn.atomic_blocks
+            and not conn.atomic_blocks[-1]._from_testcase
         ):
             raise RuntimeError(
                 "A durable atomic block cannot be nested within another atomic block."
             )
-        if not db_connection.in_atomic_block:
+        if not conn.in_atomic_block:
             # Reset state when entering an outermost atomic block.
-            db_connection.needs_rollback = False
-        if db_connection.in_atomic_block:
+            conn.needs_rollback = False
+        if conn.in_atomic_block:
             # We're already in a transaction; create a savepoint, unless we
             # were told not to or we're already waiting for a rollback. The
             # second condition avoids creating useless savepoints and prevents
             # overwriting needs_rollback until the rollback is performed.
-            if self.savepoint and not db_connection.needs_rollback:
-                sid = db_connection.savepoint()
-                db_connection.savepoint_ids.append(sid)
+            if self.savepoint and not conn.needs_rollback:
+                sid = conn.savepoint()
+                conn.savepoint_ids.append(sid)
             else:
-                db_connection.savepoint_ids.append(None)
+                conn.savepoint_ids.append(None)
         else:
-            db_connection.set_autocommit(False)
-            db_connection.in_atomic_block = True
+            conn.set_autocommit(False)
+            conn.in_atomic_block = True
 
-        if db_connection.in_atomic_block:
-            db_connection.atomic_blocks.append(self)
+        if conn.in_atomic_block:
+            conn.atomic_blocks.append(self)
 
     def __exit__(
         self,
@@ -129,87 +131,88 @@ class Atomic(ContextDecorator):
         exc_value: BaseException | None,
         traceback: Any,
     ) -> None:
-        if db_connection.in_atomic_block:
-            db_connection.atomic_blocks.pop()
+        conn = get_connection()
+        if conn.in_atomic_block:
+            conn.atomic_blocks.pop()
 
-        if db_connection.savepoint_ids:
-            sid = db_connection.savepoint_ids.pop()
+        if conn.savepoint_ids:
+            sid = conn.savepoint_ids.pop()
         else:
             # Prematurely unset this flag to allow using commit or rollback.
-            db_connection.in_atomic_block = False
+            conn.in_atomic_block = False
 
         try:
-            if db_connection.closed_in_transaction:
+            if conn.closed_in_transaction:
                 # The database will perform a rollback by itself.
                 # Wait until we exit the outermost block.
                 pass
 
-            elif exc_type is None and not db_connection.needs_rollback:
-                if db_connection.in_atomic_block:
+            elif exc_type is None and not conn.needs_rollback:
+                if conn.in_atomic_block:
                     # Release savepoint if there is one
                     if sid is not None:
                         try:
-                            db_connection.savepoint_commit(sid)
+                            conn.savepoint_commit(sid)
                         except DatabaseError:
                             try:
-                                db_connection.savepoint_rollback(sid)
+                                conn.savepoint_rollback(sid)
                                 # The savepoint won't be reused. Release it to
                                 # minimize overhead for the database server.
-                                db_connection.savepoint_commit(sid)
+                                conn.savepoint_commit(sid)
                             except Error:
                                 # If rolling back to a savepoint fails, mark for
                                 # rollback at a higher level and avoid shadowing
                                 # the original exception.
-                                db_connection.needs_rollback = True
+                                conn.needs_rollback = True
                             raise
                 else:
                     # Commit transaction
                     try:
-                        db_connection.commit()
+                        conn.commit()
                     except DatabaseError:
                         try:
-                            db_connection.rollback()
+                            conn.rollback()
                         except Error:
                             # An error during rollback means that something
-                            # went wrong with the db_connection. Drop it.
-                            db_connection.close()
+                            # went wrong with the connection. Drop it.
+                            conn.close()
                         raise
             else:
                 # This flag will be set to True again if there isn't a savepoint
                 # allowing to perform the rollback at this level.
-                db_connection.needs_rollback = False
-                if db_connection.in_atomic_block:
+                conn.needs_rollback = False
+                if conn.in_atomic_block:
                     # Roll back to savepoint if there is one, mark for rollback
                     # otherwise.
                     if sid is None:
-                        db_connection.needs_rollback = True
+                        conn.needs_rollback = True
                     else:
                         try:
-                            db_connection.savepoint_rollback(sid)
+                            conn.savepoint_rollback(sid)
                             # The savepoint won't be reused. Release it to
                             # minimize overhead for the database server.
-                            db_connection.savepoint_commit(sid)
+                            conn.savepoint_commit(sid)
                         except Error:
                             # If rolling back to a savepoint fails, mark for
                             # rollback at a higher level and avoid shadowing
                             # the original exception.
-                            db_connection.needs_rollback = True
+                            conn.needs_rollback = True
                 else:
                     # Roll back transaction
                     try:
-                        db_connection.rollback()
+                        conn.rollback()
                     except Error:
                         # An error during rollback means that something
-                        # went wrong with the db_connection. Drop it.
-                        db_connection.close()
+                        # went wrong with the connection. Drop it.
+                        conn.close()
 
         finally:
             # Outermost block exit when autocommit was enabled.
-            if not db_connection.in_atomic_block:
-                if db_connection.closed_in_transaction:
-                    db_connection.connection = None
+            if not conn.in_atomic_block:
+                if conn.closed_in_transaction:
+                    conn.connection = None
                 else:
-                    db_connection.set_autocommit(True)
+                    conn.set_autocommit(True)
 
 
 def atomic(

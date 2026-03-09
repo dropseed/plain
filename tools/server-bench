@@ -6,6 +6,10 @@
 #   ./tools/server-bench                     # auto-start, default settings
 #   ./tools/server-bench host:port           # existing server
 
+# Disable debug mode so asyncio debug mode is off — it adds significant
+# overhead by tracking coroutine creation and logging slow callbacks.
+export PLAIN_DEBUG=false
+
 WRK_CONNECTIONS=50
 WRK_DURATION=10s
 

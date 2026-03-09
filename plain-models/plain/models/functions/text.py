@@ -8,7 +8,7 @@ from plain.models.functions import Cast, Coalesce
 from plain.models.lookups import Transform
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -18,7 +18,7 @@ class SHAMixin(Transform):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -47,7 +47,7 @@ class ConcatPair(Func):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,

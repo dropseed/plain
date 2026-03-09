@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 from plain.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
 
 
 class PostgresBackupClient:
-    def __init__(self, connection: DatabaseWrapper) -> None:
+    def __init__(self, connection: DatabaseConnection) -> None:
         self.connection = connection
 
     def get_env(self) -> dict[str, str]:

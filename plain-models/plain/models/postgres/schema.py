@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from plain.models.fields import Field
     from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ManyToManyRel
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
 
 logger = logging.getLogger("plain.models.postgres.schema")
 
@@ -427,7 +427,7 @@ class DatabaseSchemaEditor:
 
     def __init__(
         self,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         atomic: bool = True,
         collect_sql: bool = False,
     ):

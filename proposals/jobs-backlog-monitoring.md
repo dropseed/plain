@@ -1,8 +1,7 @@
 ---
-depends_on:
-- jobs-structured-logging
 packages:
 - plain-jobs
+after: jobs-structured-logging
 related:
 - jobs-worker-heartbeat
 ---

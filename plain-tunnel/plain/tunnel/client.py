@@ -260,7 +260,9 @@ class TunnelClient:
 
         self.logger.debug(f"Forwarding request to: {forward_url}")
 
-        async with httpx.AsyncClient(follow_redirects=False, verify=False) as client:
+        async with httpx.AsyncClient(
+            follow_redirects=False, verify=False, timeout=30
+        ) as client:
             try:
                 async with client.stream(
                     method=request_metadata["method"],

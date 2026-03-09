@@ -1,8 +1,7 @@
 ---
-depends_on:
-- models-explicit-create-update
 packages:
 - plain-models
+after: models-explicit-create-update
 ---
 
 # plain-models: Prevent Manual Primary Key Setting

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 import psycopg
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -166,7 +166,7 @@ class DatabaseErrorWrapper:
     exceptions using Plain's common wrappers.
     """
 
-    def __init__(self, wrapper: DatabaseWrapper) -> None:
+    def __init__(self, wrapper: DatabaseConnection) -> None:
         """
         wrapper is a database wrapper.
 

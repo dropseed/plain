@@ -31,7 +31,7 @@ from typing import (
 
 from plain.models.aggregates import Count
 from plain.models.constants import LOOKUP_SEP, OnConflict
-from plain.models.db import NotSupportedError, db_connection
+from plain.models.db import NotSupportedError, get_connection
 from plain.models.exceptions import FieldDoesNotExist, FieldError
 from plain.models.expressions import (
     BaseExpression,
@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     from plain.models.fields.related import RelatedField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.meta import Meta
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import (
         SQLAggregateCompiler,
         SQLCompiler,
@@ -168,7 +168,7 @@ class RawQuery:
         return self.sql % self.params_type(self.params)
 
     def _execute_query(self) -> None:
-        self.cursor = db_connection.cursor()
+        self.cursor = get_connection().cursor()
         self.cursor.execute(self.sql, self.params)
 
 
@@ -337,9 +337,7 @@ class Query(BaseExpression):
         # Import compilers here to avoid circular imports at module load time
         from plain.models.sql.compiler import SQLCompiler as Compiler
 
-        # db_connection is a proxy that acts as DatabaseWrapper
-        connection = cast("DatabaseWrapper", db_connection)
-        return Compiler(self, connection, elide_empty)
+        return Compiler(self, get_connection(), elide_empty)
 
     def clone(self) -> Self:
         """
@@ -559,8 +557,12 @@ class Query(BaseExpression):
         if result is None:
             result = empty_set_result
         else:
-            converters = compiler.get_converters(outer_query.annotation_select.values())
-            result = next(compiler.apply_converters((result,), converters))
+            from plain.models.sql.compiler import apply_converters, get_converters
+
+            converters = get_converters(
+                outer_query.annotation_select.values(), compiler.connection
+            )
+            result = next(apply_converters((result,), converters, compiler.connection))
 
         return dict(zip(outer_query.annotation_select, result))
 
@@ -1170,7 +1172,7 @@ class Query(BaseExpression):
         return cast(list[BaseExpression], external_cols)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> SqlWithParams:
         sql, params = self.get_compiler().as_sql()
         if self.subquery:
@@ -2747,8 +2749,7 @@ class DeleteQuery(Query):
     def get_compiler(self, *, elide_empty: bool = True) -> SQLDeleteCompiler:
         from plain.models.sql.compiler import SQLDeleteCompiler
 
-        connection = cast("DatabaseWrapper", db_connection)
-        return SQLDeleteCompiler(self, connection, elide_empty)
+        return SQLDeleteCompiler(self, get_connection(), elide_empty)
 
     def do_query(self, table: str, where: Any) -> int:
         from plain.models.sql.constants import CURSOR
@@ -2791,8 +2792,7 @@ class UpdateQuery(Query):
     def get_compiler(self, *, elide_empty: bool = True) -> SQLUpdateCompiler:
         from plain.models.sql.compiler import SQLUpdateCompiler
 
-        connection = cast("DatabaseWrapper", db_connection)
-        return SQLUpdateCompiler(self, connection, elide_empty)
+        return SQLUpdateCompiler(self, get_connection(), elide_empty)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -2894,8 +2894,7 @@ class InsertQuery(Query):
     def get_compiler(self, *, elide_empty: bool = True) -> SQLInsertCompiler:
         from plain.models.sql.compiler import SQLInsertCompiler
 
-        connection = cast("DatabaseWrapper", db_connection)
-        return SQLInsertCompiler(self, connection, elide_empty)
+        return SQLInsertCompiler(self, get_connection(), elide_empty)
 
     def __str__(self) -> str:
         raise NotImplementedError(
@@ -2941,8 +2940,7 @@ class AggregateQuery(Query):
     def get_compiler(self, *, elide_empty: bool = True) -> SQLAggregateCompiler:
         from plain.models.sql.compiler import SQLAggregateCompiler
 
-        connection = cast("DatabaseWrapper", db_connection)
-        return SQLAggregateCompiler(self, connection, elide_empty)
+        return SQLAggregateCompiler(self, get_connection(), elide_empty)
 
     def __init__(self, model: Any, inner_query: Any) -> None:
         self.inner_query = inner_query

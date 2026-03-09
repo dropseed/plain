@@ -60,7 +60,7 @@ if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.expressions import Col
     from plain.models.fields.reverse_related import ForeignObjectRel
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -714,7 +714,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         return DATA_TYPES_SUFFIX.get(self.get_internal_type())
 
     def get_db_converters(
-        self, connection: DatabaseWrapper
+        self, connection: DatabaseConnection
     ) -> list[Callable[..., Any]]:
         if from_db_value := getattr(self, "from_db_value", None):
             return [from_db_value]
@@ -838,7 +838,7 @@ class Field(RegisterLookupMixin, Generic[T]):
         return value
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         """
         Return field's value prepared for interacting with the database backend.
@@ -849,7 +849,7 @@ class Field(RegisterLookupMixin, Generic[T]):
             value = self.get_prep_value(value)
         return value
 
-    def get_db_prep_save(self, value: Any, connection: DatabaseWrapper) -> Any:
+    def get_db_prep_save(self, value: Any, connection: DatabaseConnection) -> Any:
         """Return field's value prepared for saving into a database."""
         if hasattr(value, "as_sql"):
             return value
@@ -1221,7 +1221,7 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
         return self.to_python(value)
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
@@ -1339,7 +1339,7 @@ class DateTimeField(DateField):
         return value
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
@@ -1485,7 +1485,7 @@ class DecimalField(Field[decimal.Decimal]):
         return decimal_value
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
@@ -1528,13 +1528,13 @@ class DurationField(Field[datetime.timedelta]):
         )
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         # PostgreSQL has native interval (duration) type
         return value
 
     def get_db_converters(
-        self, connection: DatabaseWrapper
+        self, connection: DatabaseConnection
     ) -> list[Callable[..., Any]]:
         # PostgreSQL has native duration field, no converters needed
         return super().get_db_converters(connection)
@@ -1666,7 +1666,7 @@ class IntegerField(Field[int]):
             ) from e
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
         return adapt_integerfield_value(value, self.get_internal_type())
@@ -1769,7 +1769,7 @@ class GenericIPAddressField(Field[str]):
         return value
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
@@ -1949,7 +1949,7 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
         return self.to_python(value)
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)
@@ -2003,7 +2003,7 @@ class BinaryField(Field[bytes | memoryview]):
         return "BinaryField"
 
     def get_placeholder(
-        self, value: Any, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, value: Any, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> Any:
         return "%s"
 
@@ -2016,7 +2016,7 @@ class BinaryField(Field[bytes | memoryview]):
         return default
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         value = super().get_db_prep_value(value, connection, prepared)
         if value is not None:
@@ -2061,7 +2061,7 @@ class UUIDField(Field[uuid.UUID]):
         return self.to_python(value)
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> uuid.UUID | None:
         # PostgreSQL has native UUID type
         if value is None:
@@ -2111,7 +2111,7 @@ class PrimaryKeyField(BigIntegerField):
         pass
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         if not prepared:
             value = self.get_prep_value(value)

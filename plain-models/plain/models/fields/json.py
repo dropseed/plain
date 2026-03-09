@@ -19,7 +19,7 @@ from plain.models.postgres.sql import adapt_json_value
 from . import Field
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
     from plain.preflight.results import PreflightResult
 
@@ -90,7 +90,7 @@ class JSONField(Field):
         return name, path, args, kwargs
 
     def from_db_value(
-        self, value: Any, expression: Any, connection: DatabaseWrapper
+        self, value: Any, expression: Any, connection: DatabaseConnection
     ) -> Any:
         if value is None:
             return value
@@ -106,7 +106,7 @@ class JSONField(Field):
         return "JSONField"
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         if isinstance(value, expressions.Value) and isinstance(
             value.output_field, JSONField
@@ -116,7 +116,7 @@ class JSONField(Field):
             return value
         return adapt_json_value(value, self.encoder)
 
-    def get_db_prep_save(self, value: Any, connection: DatabaseWrapper) -> Any:
+    def get_db_prep_save(self, value: Any, connection: DatabaseConnection) -> Any:
         if value is None:
             return value
         return self.get_db_prep_value(value, connection)
@@ -163,7 +163,7 @@ class HasKeyLookup(OperatorLookup):
     logical_operator: str | None = None
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, tuple[Any, ...]]:
         # Handle KeyTransform on RHS by expanding it into LHS chain.
         if isinstance(self.rhs, KeyTransform):
@@ -202,7 +202,7 @@ class JSONExact(lookups.Exact):
     can_use_none_as_rhs = True
 
     def process_rhs(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
         rhs, rhs_params = super().process_rhs(compiler, connection)
         if isinstance(rhs, str):
@@ -238,7 +238,7 @@ class KeyTransform(Transform):
         self.key_name = str(key_name)
 
     def preprocess_lhs(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, tuple[Any, ...], list[str]]:
         key_transforms = [self.key_name]
         previous = self.lhs
@@ -251,7 +251,7 @@ class KeyTransform(Transform):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -317,7 +317,7 @@ class KeyTransformIn(lookups.In):
     def resolve_expression_parameter(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         sql: str,
         param: Any,
     ) -> tuple[str, list[Any]]:
@@ -332,7 +332,7 @@ class KeyTransformIn(lookups.In):
 
 class KeyTransformExact(JSONExact):
     def process_rhs(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
         if isinstance(self.rhs, KeyTransform):
             return super(lookups.Exact, self).process_rhs(compiler, connection)

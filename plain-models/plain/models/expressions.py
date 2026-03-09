@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
     from plain.models.fields import Field
     from plain.models.lookups import Lookup, Transform
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.query import QuerySet
     from plain.models.sql.compiler import SQLCompilable, SQLCompiler
     from plain.models.sql.query import Query
@@ -241,7 +241,7 @@ class BaseExpression:
         return state
 
     def get_db_converters(
-        self, connection: DatabaseWrapper
+        self, connection: DatabaseConnection
     ) -> list[Callable[..., Any]]:
         converters = []
         if self.convert_value is not self._convert_value_noop:
@@ -264,7 +264,7 @@ class BaseExpression:
         ]
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, Sequence[Any]]:
         """
         Return a (sql, params) tuple to be included in the current query.
@@ -395,7 +395,7 @@ class BaseExpression:
 
     @staticmethod
     def _convert_value_noop(
-        value: Any, expression: Any, connection: DatabaseWrapper
+        value: Any, expression: Any, connection: DatabaseConnection
     ) -> Any:
         return value
 
@@ -737,7 +737,7 @@ class CombinedExpression(Expression):
         return combined_type()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         expressions = []
         expression_params = []
@@ -802,7 +802,7 @@ class TemporalSubtraction(CombinedExpression):
         super().__init__(lhs, self.SUB, rhs)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         lhs = compiler.compile(self.lhs)
         rhs = compiler.compile(self.rhs)
@@ -970,7 +970,7 @@ class Func(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -1036,7 +1036,7 @@ class Value(Expression):
         return f"{self.__class__.__name__}({self.value!r})"
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         val = self.value
         output_field = self._output_field_or_none
@@ -1108,7 +1108,7 @@ class RawSQL(Expression):
         return f"{self.__class__.__name__}({self.sql}, {self.params})"
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, Sequence[Any]]:
         return f"({self.sql})", self.params
 
@@ -1121,7 +1121,7 @@ class Star(Expression):
         return "'*'"
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         return "*", []
 
@@ -1144,7 +1144,7 @@ class Col(Expression):
         return "{}({})".format(self.__class__.__name__, ", ".join(identifiers))
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         alias, column = self.alias, self.target.column
         identifiers = (alias, column) if alias else (column,)
@@ -1162,7 +1162,7 @@ class Col(Expression):
         return [self]
 
     def get_db_converters(
-        self, connection: DatabaseWrapper
+        self, connection: DatabaseConnection
     ) -> list[Callable[..., Any]]:
         if self.target == self.output_field:
             return self.output_field.get_db_converters(connection)
@@ -1209,7 +1209,7 @@ class Ref(Expression):
         return self
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         return quote_name(self.refs), []
 
@@ -1291,7 +1291,7 @@ class ExpressionWrapper(Expression):
         return super().get_group_by_cols()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, Sequence[Any]]:
         return compiler.compile(self.expression)
 
@@ -1309,7 +1309,7 @@ class NegatedExpression(ExpressionWrapper):
         return self.expression.copy()
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, Sequence[Any]]:
         try:
             sql, params = super().as_sql(compiler, connection)
@@ -1408,7 +1408,7 @@ class When(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
@@ -1507,7 +1507,7 @@ class Case(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         template: str | None = None,
         case_joiner: str | None = None,
         **extra_context: Any,
@@ -1602,7 +1602,7 @@ class Subquery(BaseExpression, Combinable):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
@@ -1669,7 +1669,7 @@ class OrderBy(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         template: str | None = None,
         **extra_context: Any,
     ) -> tuple[str, tuple[Any, ...]]:
@@ -1771,7 +1771,7 @@ class Window(Expression):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         template: str | None = None,
     ) -> tuple[str, tuple[Any, ...]]:
         expr_sql, params = compiler.compile(self.source_expression)
@@ -1846,7 +1846,7 @@ class WindowFrame(Expression):
         return [self.start, self.end]
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         start, end = self.window_frame_start_end(
             connection, self.start.value, self.end.value
@@ -1888,7 +1888,7 @@ class WindowFrame(Expression):
         }
 
     def window_frame_start_end(
-        self, connection: DatabaseWrapper, start: int | None, end: int | None
+        self, connection: DatabaseConnection, start: int | None, end: int | None
     ) -> tuple[str, str]:
         """Return the window frame start and end for the given connection."""
         raise NotImplementedError("Subclasses must implement window_frame_start_end()")
@@ -1898,7 +1898,7 @@ class RowRange(WindowFrame):
     frame_type = "ROWS"
 
     def window_frame_start_end(
-        self, connection: DatabaseWrapper, start: int | None, end: int | None
+        self, connection: DatabaseConnection, start: int | None, end: int | None
     ) -> tuple[str, str]:
         return window_frame_rows_start_end(start, end)
 
@@ -1907,6 +1907,6 @@ class ValueRange(WindowFrame):
     frame_type = "RANGE"
 
     def window_frame_start_end(
-        self, connection: DatabaseWrapper, start: int | None, end: int | None
+        self, connection: DatabaseConnection, start: int | None, end: int | None
     ) -> tuple[str, str]:
         return window_frame_range_start_end(start, end)

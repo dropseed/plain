@@ -5,7 +5,6 @@ import sys
 from importlib import import_module, reload
 from typing import TYPE_CHECKING, Any
 
-from plain.models.connections import DatabaseConnection
 from plain.models.migrations.graph import MigrationGraph
 from plain.models.migrations.recorder import MigrationRecorder
 from plain.packages import packages_registry
@@ -19,7 +18,7 @@ from .exceptions import (
 
 if TYPE_CHECKING:
     from plain.models.migrations.migration import Migration
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
 
 MIGRATIONS_MODULE_NAME = "migrations"
 
@@ -51,7 +50,7 @@ class MigrationLoader:
 
     def __init__(
         self,
-        connection: DatabaseWrapper | DatabaseConnection | None,
+        connection: DatabaseConnection | None,
         load: bool = True,
         ignore_no_migrations: bool = False,
         replace_migrations: bool = True,
@@ -321,9 +320,7 @@ class MigrationLoader:
             raise
         self.graph.ensure_not_cyclic()
 
-    def check_consistent_history(
-        self, connection: DatabaseWrapper | DatabaseConnection
-    ) -> None:
+    def check_consistent_history(self, connection: DatabaseConnection) -> None:
         """
         Raise InconsistentMigrationHistory if any applied migrations have
         unapplied dependencies.

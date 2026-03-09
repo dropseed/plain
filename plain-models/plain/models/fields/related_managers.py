@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 import builtins
 
 from plain.models import transaction
-from plain.models.db import db_connection
+from plain.models.db import get_connection
 from plain.models.expressions import Window
 from plain.models.functions import RowNumber
 from plain.models.lookups import GreaterThan, LessThanOrEqual
@@ -430,6 +430,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
                 for f in fk.local_related_fields
             }
         )
+        conn = get_connection()
         return (
             queryset,
             lambda result: tuple(
@@ -437,7 +438,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
                 for f in fk.local_related_fields
             ),
             lambda inst: tuple(
-                f.get_db_prep_value(getattr(inst, f.attname), db_connection)
+                f.get_db_prep_value(getattr(inst, f.attname), conn)
                 for f in fk.foreign_related_fields
             ),
             False,

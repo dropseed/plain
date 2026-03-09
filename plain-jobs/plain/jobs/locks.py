@@ -25,7 +25,7 @@ def postgres_advisory_lock(job: Job, concurrency_key: str) -> Iterator[None]:
         concurrency_key: Job grouping key
     """
     from plain.jobs.registry import jobs_registry
-    from plain.models.db import db_connection
+    from plain.models.db import get_connection
 
     # Generate lock key from job class + concurrency_key
     job_class_name = jobs_registry.get_job_class_name(job.__class__)
@@ -36,7 +36,7 @@ def postgres_advisory_lock(job: Job, concurrency_key: str) -> Iterator[None]:
     lock_id = int.from_bytes(hash_bytes[:8], "big", signed=True)
 
     # Acquire advisory lock (auto-released on transaction end)
-    with db_connection.cursor() as cursor:
+    with get_connection().cursor() as cursor:
         cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_id])
 
     yield  # Lock is held here

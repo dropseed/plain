@@ -5,11 +5,11 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 
 from plain.runtime import PLAIN_TEMP_PATH
 
-from .. import db_connection as _db_connection
+from ..db import get_connection
 from .clients import PostgresBackupClient
 
 
@@ -39,13 +39,6 @@ def get_git_commit() -> str | None:
         return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
-
-
-if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
-
-# Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
-db_connection = cast("DatabaseWrapper", _db_connection)
 
 
 class DatabaseBackups:
@@ -126,7 +119,7 @@ class DatabaseBackup:
 
         backup_path = self.path / "default.backup"
 
-        PostgresBackupClient(db_connection).create_backup(
+        PostgresBackupClient(get_connection()).create_backup(
             backup_path,
             pg_dump=pg_dump,
         )
@@ -147,7 +140,7 @@ class DatabaseBackup:
     def restore(self, *, pg_restore: str = "pg_restore") -> None:
         backup_file = self.path / "default.backup"
 
-        PostgresBackupClient(db_connection).restore_backup(
+        PostgresBackupClient(get_connection()).restore_backup(
             backup_file,
             pg_restore=pg_restore,
         )

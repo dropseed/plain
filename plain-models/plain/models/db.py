@@ -4,7 +4,7 @@ from typing import Any
 
 from plain import signals
 
-from .connections import DatabaseConnection
+from .connections import get_connection, has_connection
 from .exceptions import (
     DatabaseError,
     DatabaseErrorWrapper,
@@ -21,13 +21,10 @@ from .exceptions import (
 PLAIN_VERSION_PICKLE_KEY = "_plain_version"
 
 
-db_connection = DatabaseConnection()
-
-
 # Register an event to reset saved queries when a Plain request is started.
 def reset_queries(**kwargs: Any) -> None:
-    if db_connection.has_connection():
-        db_connection.queries_log.clear()
+    if has_connection():
+        get_connection().queries_log.clear()
 
 
 signals.request_started.connect(reset_queries)
@@ -36,8 +33,8 @@ signals.request_started.connect(reset_queries)
 # Register an event to reset transaction state and close connections past
 # their lifetime.
 def close_old_connections(**kwargs: Any) -> None:
-    if db_connection.has_connection():
-        db_connection.close_if_unusable_or_obsolete()
+    if has_connection():
+        get_connection().close_if_unusable_or_obsolete()
 
 
 signals.request_started.connect(close_old_connections)
@@ -45,7 +42,8 @@ signals.request_finished.connect(close_old_connections)
 
 
 __all__ = [
-    "db_connection",
+    "get_connection",
+    "has_connection",
     "PLAIN_VERSION_PICKLE_KEY",
     "Error",
     "InterfaceError",

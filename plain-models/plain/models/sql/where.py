@@ -15,7 +15,7 @@ from plain.utils import tree
 
 if TYPE_CHECKING:
     from plain.models.lookups import Lookup
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 # Connection types
@@ -122,7 +122,7 @@ class WhereNode(tree.Node):
         return where_node, having_node, qualify_node
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         """
         Return the SQL version of the where clause and the value to be
@@ -304,7 +304,7 @@ class WhereNode(tree.Node):
         # Boolean expressions work directly in SELECT
         return sql, params
 
-    def get_db_converters(self, connection: DatabaseWrapper) -> list[Any]:
+    def get_db_converters(self, connection: DatabaseConnection) -> list[Any]:
         return self.output_field.get_db_converters(connection)
 
     def get_lookup(self, lookup: str) -> type[Lookup] | None:
@@ -327,7 +327,7 @@ class NothingNode:
     def as_sql(
         self,
         compiler: SQLCompiler | None = None,
-        connection: DatabaseWrapper | None = None,
+        connection: DatabaseConnection | None = None,
     ) -> tuple[str, list[Any]]:
         raise EmptyResultSet
 
@@ -344,7 +344,7 @@ class ExtraWhere:
     def as_sql(
         self,
         compiler: SQLCompiler | None = None,
-        connection: DatabaseWrapper | None = None,
+        connection: DatabaseConnection | None = None,
     ) -> tuple[str, list[Any]]:
         sqls = [f"({sql})" for sql in self.sqls]
         return " AND ".join(sqls), list(self.params or ())
@@ -366,7 +366,7 @@ class SubqueryConstraint:
         self.query_object = query_object
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         query = self.query_object
         query.set_values(self.targets)
