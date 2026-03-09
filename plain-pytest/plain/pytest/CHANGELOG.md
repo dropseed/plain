@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.16.6](https://github.com/dropseed/plain/releases/plain-pytest@0.16.6) (2026-03-09)
+
+### What's changed
+
+- Updated test browser fixture to use `get_connection()` instead of the removed `db_connection` proxy ([4a79279d01dd](https://github.com/dropseed/plain/commit/4a79279d01dd))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.16.5](https://github.com/dropseed/plain/releases/plain-pytest@0.16.5) (2026-03-08)
 
 ### What's changed
