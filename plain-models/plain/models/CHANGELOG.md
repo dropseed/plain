@@ -1,5 +1,23 @@
 # plain-models changelog
 
+## [0.81.0](https://github.com/dropseed/plain/releases/plain-models@0.81.0) (2026-03-09)
+
+### What's changed
+
+- **psycopg3 `cursor.stream()` for iterator queries** — `QuerySet.iterator()` now uses psycopg3's native server-side streaming instead of `fetchmany()` chunking, reducing memory overhead for large result sets ([49f4d1d996b4](https://github.com/dropseed/plain/commit/49f4d1d996b4))
+- **Minimum PostgreSQL 16 enforced** — a preflight check now validates the connected PostgreSQL version is 16 or higher ([e1f21c4b251a](https://github.com/dropseed/plain/commit/e1f21c4b251a))
+- **Renamed `DatabaseWrapper` → `DatabaseConnection`** and moved from `postgres/wrapper.py` to `postgres/connection.py` to better reflect the class's purpose ([7f17a96a7f8e](https://github.com/dropseed/plain/commit/7f17a96a7f8e), [4a79279d01dd](https://github.com/dropseed/plain/commit/4a79279d01dd))
+- **Replaced `db_connection` proxy with `get_connection()`** — the stateless `DatabaseConnection` proxy class is removed in favor of module-level `get_connection()` and `has_connection()` functions, giving type checkers direct access to the real `DatabaseConnection` class and eliminating proxy overhead ([4a79279d01dd](https://github.com/dropseed/plain/commit/4a79279d01dd))
+- **Replaced `threading.local()` with `ContextVar` for DB connection storage** — database connections are now stored per-context instead of per-thread, enabling proper async support ([cc2469b1260a](https://github.com/dropseed/plain/commit/cc2469b1260a))
+- Removed `validate_thread_sharing()` from `DatabaseConnection` — thread sharing validation is no longer needed with ContextVar-based connection storage ([3a6d6efd09d2](https://github.com/dropseed/plain/commit/3a6d6efd09d2))
+- Extracted `get_converters()` and `apply_converters()` as standalone functions from `SQLCompiler` and added type annotations ([ed18d3c97142](https://github.com/dropseed/plain/commit/ed18d3c97142))
+
+### Upgrade instructions
+
+- Replace `from plain.models import db_connection` with `from plain.models import get_connection`, and change `db_connection.cursor()` to `get_connection().cursor()` (and similar attribute access).
+- If you imported `DatabaseWrapper`, it is now `DatabaseConnection` from `plain.models.postgres.connection`.
+- PostgreSQL 16 or higher is now required.
+
 ## [0.80.0](https://github.com/dropseed/plain/releases/plain-models@0.80.0) (2026-02-25)
 
 ### What's changed
