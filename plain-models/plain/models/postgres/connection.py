@@ -28,7 +28,7 @@ from psycopg import (
 from psycopg import sql as psycopg_sql
 from psycopg.abc import Buffer, PyFormat
 from psycopg.postgres import types as pg_types
-from psycopg.pq import Format
+from psycopg.pq import Format, TransactionStatus
 from psycopg.types.datetime import TimestamptzLoader
 from psycopg.types.range import BaseRangeDumper, Range, RangeDumper
 from psycopg.types.string import TextLoader
@@ -217,9 +217,10 @@ class DatabaseConnection:
 
         # A list of no-argument functions to run when the transaction commits.
         # Each entry is an (sids, func, robust) tuple, where sids is a set of
-        # the active savepoint IDs when this function was registered and robust
-        # specifies whether it's allowed for the function to fail.
-        self.run_on_commit: list[tuple[set[str | None], Any, bool]] = []
+        # the active savepoint Transaction objects when this function was
+        # registered and robust specifies whether it's allowed for the function
+        # to fail.
+        self.run_on_commit: list[tuple[set[Transaction | None], Any, bool]] = []
 
         # Should we run the on-commit hooks the next time set_autocommit(True)
         # is called?
@@ -591,6 +592,18 @@ class DatabaseConnection:
             return None
 
         assert self.connection is not None
+
+        # psycopg3's Transaction checks pgconn.transaction_status to decide
+        # whether it's the outer transaction (issuing BEGIN/COMMIT) or an
+        # inner savepoint (issuing SAVEPOINT/RELEASE). When autocommit is
+        # off, the implicit transaction doesn't start until the first query,
+        # so transaction_status can be IDLE even though we're inside an
+        # atomic block. Force the implicit transaction to start so the
+        # Transaction correctly creates a savepoint instead of managing
+        # the outer transaction.
+        if self.connection.pgconn.transaction_status == TransactionStatus.IDLE:
+            self.connection.execute("")
+
         tx = Transaction(self.connection)
         tx.__enter__()
         return tx
