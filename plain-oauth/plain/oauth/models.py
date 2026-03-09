@@ -110,16 +110,20 @@ class OAuthConnection(models.Model):
             connection.save()
             return connection
         except cls.DoesNotExist:
+            # If email needs to be unique, then we expect
+            # that to be taken care of on the user model itself
             with transaction.atomic():
-                # If email needs to be unique, then we expect
-                # that to be taken care of on the user model itself
                 try:
-                    user = get_user_model()(
-                        **oauth_user.user_model_fields,
-                    )
-                    user.save()
+                    with transaction.atomic():
+                        user = get_user_model()(
+                            **oauth_user.user_model_fields,
+                        )
+                        user.save()
                 except (IntegrityError, ValidationError):
-                    raise OAuthUserAlreadyExistsError()
+                    raise OAuthUserAlreadyExistsError(
+                        provider_key=provider_key,
+                        user_model_fields=oauth_user.user_model_fields,
+                    )
 
                 return cls.connect(
                     user=user,

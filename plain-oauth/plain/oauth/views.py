@@ -29,7 +29,7 @@ class OAuthCallbackView(TemplateView):
     The callback view is used for signup, login, and connect.
     """
 
-    template_name = "oauth/callback.html"
+    template_name = "oauth/error.html"
 
     def get(self) -> Response:
         provider = self.url_kwargs["provider"]
@@ -43,6 +43,14 @@ class OAuthCallbackView(TemplateView):
             response = super().get()
             response.status_code = 400
             return response
+
+    def get_template_names(self) -> list[str]:
+        names = []
+        if oauth_error := getattr(self, "oauth_error", None):
+            if oauth_error.template_name:
+                names.append(oauth_error.template_name)
+        names.append(self.template_name)
+        return names
 
     def get_template_context(self) -> dict:
         context = super().get_template_context()

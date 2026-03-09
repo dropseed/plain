@@ -115,20 +115,20 @@ class OAuthProvider(ABC):
 
     def check_request_state(self, *, request: Request) -> None:
         if error := request.query_params.get("error"):
-            raise OAuthError(error)
+            raise OAuthError(error, provider_key=self.provider_key)
 
         try:
             state = request.query_params["state"]
         except KeyError as e:
-            raise OAuthStateMissingError() from e
+            raise OAuthStateMissingError(provider_key=self.provider_key) from e
 
         session = get_request_session(request)
         if SESSION_STATE_KEY not in session:
-            raise OAuthStateMissingError()
+            raise OAuthStateMissingError(provider_key=self.provider_key)
         expected_state = session.pop(SESSION_STATE_KEY)
         session.save()  # Make sure the pop is saved (won't save on an exception)
         if not secrets.compare_digest(state, expected_state):
-            raise OAuthStateMismatchError()
+            raise OAuthStateMismatchError(provider_key=self.provider_key)
 
     def handle_login_request(
         self, *, request: Request, redirect_to: str = ""
