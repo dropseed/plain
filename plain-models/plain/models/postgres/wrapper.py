@@ -32,7 +32,6 @@ from plain.models.db import (
     DatabaseError,
     DatabaseErrorWrapper,
     NotSupportedError,
-    db_connection,
 )
 from plain.models.indexes import Index
 from plain.models.postgres import utils
@@ -73,7 +72,7 @@ def get_migratable_models() -> Generator[Any, None, None]:
 
 
 class TableInfo(NamedTuple):
-    """Structure returned by DatabaseWrapper.get_table_list()."""
+    """Structure returned by DatabaseConnection.get_table_list()."""
 
     name: str
     type: str
@@ -164,9 +163,9 @@ def _psql_settings_to_cmd_args_env(
     return args, (env or None)
 
 
-class DatabaseWrapper:
+class DatabaseConnection:
     """
-    PostgreSQL database connection wrapper.
+    PostgreSQL database connection.
 
     This is the only database backend supported by Plain.
     """
@@ -506,12 +505,7 @@ class DatabaseWrapper:
                 "and will use the first PostgreSQL database instead.",
                 RuntimeWarning,
             )
-            conn = self.__class__(
-                {
-                    **self.settings_dict,
-                    "DATABASE": db_connection.settings_dict["DATABASE"],
-                },
-            )
+            conn = self.__class__(self.settings_dict)
             try:
                 with conn.cursor() as cursor:
                     yield cursor

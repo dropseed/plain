@@ -207,9 +207,9 @@ users = users.prefetch_related("posts")
 For queries that don't map to a model, use the database cursor directly:
 
 ```python
-from plain.models import db_connection
+from plain.models import get_connection
 
-with db_connection.cursor() as cursor:
+with get_connection().cursor() as cursor:
     cursor.execute("SELECT COUNT(*) FROM users WHERE is_admin = %s", [True])
     count = cursor.fetchone()[0]
 ```
@@ -801,7 +801,7 @@ graph TB
     end
 
     subgraph "Database"
-        Connection["DatabaseWrapper"]
+        Connection["DatabaseConnection"]
         DB[(Database)]
     end
 
@@ -821,7 +821,7 @@ graph TB
 2. **QuerySet** methods like `.filter()` modify the internal [`Query`](./sql/query.py#Query) object
 3. When results are needed, **Query.get_compiler()** creates the appropriate [`SQLCompiler`](./sql/compiler.py#SQLCompiler)
 4. **SQLCompiler.as_sql()** renders the Query to SQL
-5. **SQLCompiler.execute_sql()** runs the SQL via [`DatabaseWrapper`](./postgres/wrapper.py#DatabaseWrapper) and returns results
+5. **SQLCompiler.execute_sql()** runs the SQL via [`DatabaseConnection`](./postgres/wrapper.py#DatabaseConnection) and returns results
 
 **Key components:**
 
@@ -829,7 +829,7 @@ graph TB
 - [`QuerySet`](./query.py#QuerySet) - Chainable API (`.filter()`, `.exclude()`, `.order_by()`) that builds a Query
 - [`Query`](./sql/query.py#Query) - Internal representation of a query's logical structure (tables, joins, filters)
 - [`SQLCompiler`](./sql/compiler.py#SQLCompiler) - Transforms a Query into executable SQL
-- [`DatabaseWrapper`](./postgres/wrapper.py#DatabaseWrapper) - PostgreSQL connection and query execution
+- [`DatabaseConnection`](./postgres/wrapper.py#DatabaseConnection) - PostgreSQL connection and query execution
 
 ## Settings
 

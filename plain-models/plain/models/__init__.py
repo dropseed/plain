@@ -6,7 +6,7 @@ from . import (
 # Imports that would create circular imports if sorted
 from .base import Model
 from .constraints import CheckConstraint, UniqueConstraint
-from .db import IntegrityError, db_connection
+from .db import IntegrityError, get_connection
 from .deletion import CASCADE, DO_NOTHING, PROTECT, RESTRICT, SET, SET_DEFAULT, SET_NULL
 from .enums import IntegerChoices, TextChoices
 from .fields import (
@@ -110,7 +110,7 @@ __all__ = [
     "ReverseForeignKey",
     "ReverseManyToMany",
     # From db
-    "db_connection",
+    "get_connection",
     "IntegrityError",
     # From registry
     "register_model",

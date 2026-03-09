@@ -16,13 +16,13 @@ from plain.models.otel import db_span
 from plain.utils.dateparse import parse_time
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseConnection
 
 logger = logging.getLogger("plain.models.postgres")
 
 
 class CursorWrapper:
-    def __init__(self, cursor: Any, db: DatabaseWrapper) -> None:
+    def __init__(self, cursor: Any, db: DatabaseConnection) -> None:
         self.cursor = cursor
         self.db = db
 
@@ -188,7 +188,7 @@ class CursorDebugWrapper(CursorWrapper):
 
 @contextmanager
 def debug_transaction(
-    connection: DatabaseWrapper, sql: str
+    connection: DatabaseConnection, sql: str
 ) -> Generator[None, None, None]:
     start = time.monotonic()
     try:

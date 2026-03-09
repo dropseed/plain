@@ -50,7 +50,7 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.models.expressions import BaseExpression
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseConnection
     from plain.models.sql.query import InsertQuery
 
 # Type aliases for SQL compilation results
@@ -62,7 +62,7 @@ class SQLCompilable(Protocol):
     """Protocol for objects that can be compiled to SQL."""
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, Sequence[Any]]:
         """Return SQL string and parameters for this object."""
         ...
@@ -74,7 +74,7 @@ class PositionRef(Ref):
         super().__init__(refs, source)
 
     def as_sql(
-        self, compiler: SQLCompiler, connection: DatabaseWrapper
+        self, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
         return str(self.ordinal), []
 
@@ -87,7 +87,7 @@ class SQLCompiler:
     )
 
     def __init__(
-        self, query: Query, connection: DatabaseWrapper, elide_empty: bool = True
+        self, query: Query, connection: DatabaseConnection, elide_empty: bool = True
     ):
         self.query = query
         self.connection = connection

@@ -19,7 +19,7 @@ from plain.models.constants import LOOKUP_SEP, OnConflict
 from plain.models.db import (
     PLAIN_VERSION_PICKLE_KEY,
     IntegrityError,
-    db_connection,
+    get_connection,
 )
 from plain.models.exceptions import (
     FieldDoesNotExist,
@@ -152,7 +152,7 @@ class RawModelIterable(BaseIterable):
         from plain.models.sql.compiler import SQLCompiler
 
         query = self.queryset.sql_query
-        compiler = SQLCompiler(query, db_connection, True)  # type: ignore[arg-type]
+        compiler = SQLCompiler(query, get_connection(), True)
         query_iterator = iter(query)
 
         try:

@@ -33,7 +33,7 @@ from plain.models.postgres.sql import (
 from plain.utils import timezone
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -72,7 +72,7 @@ class Extract(TimezoneMixin, Transform):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -258,7 +258,7 @@ class TruncBase(TimezoneMixin, Transform):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -345,7 +345,7 @@ class TruncBase(TimezoneMixin, Transform):
         return copy
 
     def convert_value(
-        self, value: Any, expression: Any, connection: DatabaseWrapper
+        self, value: Any, expression: Any, connection: DatabaseConnection
     ) -> Any:
         if isinstance(self.output_field, DateTimeField):
             if value is not None:
@@ -404,7 +404,7 @@ class TruncDate(TruncBase):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -425,7 +425,7 @@ class TruncTime(TruncBase):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,

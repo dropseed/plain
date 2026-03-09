@@ -5,7 +5,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
 
-from plain.models.db import db_connection
+from plain.models.db import get_connection
 from plain.models.migrations.recorder import MIGRATION_TABLE_NAME
 from plain.models.registry import ModelsRegistry, models_registry
 from plain.packages import packages_registry
@@ -216,9 +216,10 @@ class CheckDatabaseTables(PreflightCheck):
     """Checks for unknown tables in the database when plain.models is available."""
 
     def run(self) -> list[PreflightResult]:
+        conn = get_connection()
         unknown_tables = (
-            set(db_connection.table_names())
-            - set(db_connection.plain_table_names())
+            set(conn.table_names())
+            - set(conn.plain_table_names())
             - {MIGRATION_TABLE_NAME}
         )
 
@@ -249,8 +250,9 @@ class CheckPrunableMigrations(PreflightCheck):
         errors = []
 
         # Load migrations from disk and database
-        loader = MigrationLoader(db_connection, ignore_no_migrations=True)
-        recorder = MigrationRecorder(db_connection)
+        conn = get_connection()
+        loader = MigrationLoader(conn, ignore_no_migrations=True)
+        recorder = MigrationRecorder(conn)
         recorded_migrations = recorder.applied_migrations()
 
         # disk_migrations should not be None after MigrationLoader initialization,

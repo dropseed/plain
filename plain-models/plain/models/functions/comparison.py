@@ -9,7 +9,7 @@ from plain.models.fields import Field, TextField
 from plain.models.fields.json import JSONField
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -26,7 +26,7 @@ class Cast(Func):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,
@@ -87,7 +87,7 @@ class JSONObject(Func):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,

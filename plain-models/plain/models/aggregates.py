@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from plain.models.expressions import Expression
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseConnection
     from plain.models.query_utils import Q
     from plain.models.sql.compiler import SQLCompiler
 
@@ -130,7 +130,7 @@ class Aggregate(Func):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import time
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -15,7 +15,7 @@ from plain.utils.text import Truncator
 
 from .. import migrations
 from ..backups.core import DatabaseBackups
-from ..db import db_connection as _db_connection
+from ..db import get_connection
 from ..migrations.autodetector import MigrationAutodetector
 from ..migrations.executor import MigrationExecutor
 from ..migrations.loader import AmbiguityError, MigrationLoader
@@ -32,10 +32,7 @@ from ..registry import models_registry
 
 if TYPE_CHECKING:
     from ..migrations.operations.base import Operation
-    from ..postgres.wrapper import DatabaseWrapper
-
-# Cast for type checkers; runtime value is _db_connection (DatabaseConnection)
-db_connection = cast("DatabaseWrapper", _db_connection)
+    from ..postgres.wrapper import DatabaseConnection
 
 
 @register_cli("migrations")
@@ -99,7 +96,7 @@ def make(
         project_state: ProjectState,
     ) -> tuple[list[str], ProjectState]:
         """Apply a migration in collect mode and return the SQL statements."""
-        with db_connection.schema_editor(collect_sql=True) as editor:
+        with get_connection().schema_editor(collect_sql=True) as editor:
             new_state = migration.apply(project_state, editor)
             return list(editor.executed_sql), new_state
 
@@ -194,8 +191,7 @@ def make(
     loader = MigrationLoader(None, ignore_no_migrations=True)
 
     # Raise an error if any migrations are applied before their dependencies.
-    # Only the default db_connection is supported.
-    loader.check_consistent_history(db_connection)
+    loader.check_consistent_history(get_connection())
 
     # Check for conflicts
     conflicts = loader.detect_conflicts()
@@ -413,10 +409,10 @@ def apply(
         return prefix + operation.describe() + truncated.chars(40), is_error
 
     # Work out which packages have migrations and which do not
-    executor = MigrationExecutor(db_connection, migration_progress_callback)
+    executor = MigrationExecutor(get_connection(), migration_progress_callback)
 
     # Raise an error if any migrations are applied before their dependencies.
-    executor.loader.check_consistent_history(db_connection)
+    executor.loader.check_consistent_history(executor.connection)
 
     # Before anything else, see if there's conflicting packages and drop out
     # hard if there are any
@@ -664,14 +660,16 @@ def list_migrations(
         if has_bad_names:
             sys.exit(2)
 
-    def show_list(db_connection: Any, package_names: tuple[str, ...]) -> None:
+    def show_list(
+        connection: DatabaseConnection, package_names: tuple[str, ...]
+    ) -> None:
         """
         Show a list of all migrations on the system, or only those of
         some named packages.
         """
         # Load migrations from disk/DB
-        loader = MigrationLoader(db_connection, ignore_no_migrations=True)
-        recorder = MigrationRecorder(db_connection)
+        loader = MigrationLoader(connection, ignore_no_migrations=True)
+        recorder = MigrationRecorder(connection)
         recorded_migrations = recorder.applied_migrations()
 
         graph = loader.graph
@@ -720,13 +718,15 @@ def list_migrations(
             if not shown:
                 click.secho(" (no migrations)", fg="red")
 
-    def show_plan(db_connection: Any, package_names: tuple[str, ...]) -> None:
+    def show_plan(
+        connection: DatabaseConnection, package_names: tuple[str, ...]
+    ) -> None:
         """
         Show all known migrations (or only those of the specified package_names)
         in the order they will be applied.
         """
         # Load migrations from disk/DB
-        loader = MigrationLoader(db_connection)
+        loader = MigrationLoader(connection)
         assert loader.applied_migrations is not None
         graph = loader.graph
         if package_names:
@@ -767,10 +767,11 @@ def list_migrations(
 
     # Get the database we're operating from
 
+    conn = get_connection()
     if format == "plan":
-        show_plan(db_connection, package_labels)
+        show_plan(conn, package_labels)
     else:
-        show_list(db_connection, package_labels)
+        show_list(conn, package_labels)
 
 
 @cli.command("prune")
@@ -782,9 +783,10 @@ def list_migrations(
 def prune(yes: bool) -> None:
     """Remove stale migration records from the database"""
     # Load migrations from disk and database
-    loader = MigrationLoader(db_connection, ignore_no_migrations=True)
+    conn = get_connection()
+    loader = MigrationLoader(conn, ignore_no_migrations=True)
     assert loader.disk_migrations is not None
-    recorder = MigrationRecorder(db_connection)
+    recorder = MigrationRecorder(conn)
     recorded_migrations = recorder.applied_migrations()
 
     # Find all prunable migrations (recorded but not on disk)
@@ -933,7 +935,7 @@ def squash(
         raise click.ClickException(str(err))
 
     # Load the current graph state, check the app and migration they asked for exists
-    loader = MigrationLoader(db_connection)
+    loader = MigrationLoader(get_connection())
     if package_label not in loader.migrated_packages:
         raise click.ClickException(
             f"Package '{package_label}' does not have migrations (so squashmigrations on it makes no sense)"

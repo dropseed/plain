@@ -6,7 +6,7 @@ middleware/signal/view pipeline and verify that database connections are
 properly created, reused, and cleaned up via the ContextVar storage.
 
 Unlike test_connection_isolation.py (which uses FakeConn and manipulates the
-ContextVar directly), these tests exercise the real DatabaseWrapper against
+ContextVar directly), these tests exercise the real DatabaseConnection against
 a real database.
 """
 
@@ -18,9 +18,10 @@ from unittest.mock import patch
 import pytest
 
 from plain.http import Response
-from plain.models.connections import DatabaseConnection, _db_conn
-from plain.models.db import close_old_connections, db_connection
-from plain.models.postgres.wrapper import DatabaseWrapper
+from plain.models.connections import _create_connection as _original_create_connection
+from plain.models.connections import _db_conn, get_connection, has_connection
+from plain.models.db import close_old_connections
+from plain.models.postgres.wrapper import DatabaseConnection
 from plain.runtime import settings
 from plain.signals import request_finished, request_started
 from plain.test import Client
@@ -31,13 +32,13 @@ from plain.views import ServerSentEvent, ServerSentEventsView, View
 
 def _sync_db_query():
     """Sync helper that runs a DB query — used by async views via to_thread."""
-    with db_connection.cursor() as cursor:
+    with get_connection().cursor() as cursor:
         cursor.execute("SELECT 1")
         return cursor.fetchone()[0]
 
 
 class DBQueryView(View):
-    """Sync view that executes a real DB query via db_connection."""
+    """Sync view that executes a real DB query via get_connection()."""
 
     def get(self):
         return Response(str(_sync_db_query()))
@@ -71,7 +72,7 @@ class TestRouter(Router):
 @pytest.fixture
 def _unblock_cursor():
     """Restore the real cursor method (blocked by the autouse _db_disabled fixture)."""
-    DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
+    DatabaseConnection.cursor = getattr(DatabaseConnection, "_enabled_cursor")
 
 
 @pytest.fixture
@@ -91,9 +92,9 @@ def _clean_connection():
     # Async views create connections on worker threads (via asyncio.to_thread)
     # that we can't reach from this thread. Terminate them from PostgreSQL so
     # they don't block session teardown (DROP DATABASE).
-    if db_connection.has_connection():
+    if has_connection():
         try:
-            with db_connection.cursor() as cursor:
+            with get_connection().cursor() as cursor:
                 cursor.execute(
                     "SELECT pg_terminate_backend(pid) "
                     "FROM pg_stat_activity "
@@ -127,38 +128,36 @@ class TestConnectionLifecycle:
 
     @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection", "_test_router")
     def test_single_request_creates_exactly_one_connection(self, setup_db):
-        """A request should create exactly one DatabaseWrapper, stored in the ContextVar."""
-        assert not db_connection.has_connection()
+        """A request should create exactly one DatabaseConnection, stored in the ContextVar."""
+        assert not has_connection()
 
-        original_create = DatabaseConnection.create_connection
         create_count = 0
 
-        def counting_create(self):
+        def counting_create():
             nonlocal create_count
             create_count += 1
-            return original_create(self)
+            return _original_create_connection()
 
-        with patch.object(DatabaseConnection, "create_connection", counting_create):
+        with patch("plain.models.connections._create_connection", counting_create):
             client = _fresh_client()
             response = client.get("/db-query/")
 
         assert response.status_code == 200
         assert response.content == b"1"
         assert create_count == 1, f"Expected 1 connection created, got {create_count}"
-        assert isinstance(_db_conn.get(), DatabaseWrapper)
+        assert isinstance(_db_conn.get(), DatabaseConnection)
 
     @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection", "_test_router")
     def test_multiple_requests_create_one_connection_total(self, setup_db):
         """Three sequential requests should create exactly one connection, reused across all."""
-        original_create = DatabaseConnection.create_connection
         create_count = 0
 
-        def counting_create(self):
+        def counting_create():
             nonlocal create_count
             create_count += 1
-            return original_create(self)
+            return _original_create_connection()
 
-        with patch.object(DatabaseConnection, "create_connection", counting_create):
+        with patch("plain.models.connections._create_connection", counting_create):
             client = _fresh_client()
 
             response1 = client.get("/db-query/")
@@ -185,18 +184,17 @@ class TestConnectionLifecycle:
         works correctly with ContextVar storage: connections are kept alive
         within CONN_MAX_AGE and reused across requests.
         """
-        original_create = DatabaseConnection.create_connection
         create_count = 0
 
-        def counting_create(self):
+        def counting_create():
             nonlocal create_count
             create_count += 1
-            return original_create(self)
+            return _original_create_connection()
 
         request_started.connect(close_old_connections)
         request_finished.connect(close_old_connections)
         try:
-            with patch.object(DatabaseConnection, "create_connection", counting_create):
+            with patch("plain.models.connections._create_connection", counting_create):
                 client = _fresh_client()
 
                 response1 = client.get("/db-query/")
@@ -231,7 +229,7 @@ class TestConnectionLifecycle:
         seen_connections: list[int | None] = []
 
         def track_connection(**kwargs):
-            if db_connection.has_connection():
+            if has_connection():
                 seen_connections.append(id(_db_conn.get()))
             else:
                 seen_connections.append(None)
@@ -268,15 +266,14 @@ class TestAsyncViewConnectionLifecycle:
         An async view that accesses the DB via asyncio.to_thread() should
         work correctly — to_thread propagates the ContextVar context.
         """
-        original_create = DatabaseConnection.create_connection
         create_count = 0
 
-        def counting_create(self):
+        def counting_create():
             nonlocal create_count
             create_count += 1
-            return original_create(self)
+            return _original_create_connection()
 
-        with patch.object(DatabaseConnection, "create_connection", counting_create):
+        with patch("plain.models.connections._create_connection", counting_create):
             client = _fresh_client()
             response = client.get("/async-db-query/")
 
@@ -292,15 +289,14 @@ class TestAsyncViewConnectionLifecycle:
         An SSE view that accesses the DB via asyncio.to_thread() during
         streaming should work correctly.
         """
-        original_create = DatabaseConnection.create_connection
         create_count = 0
 
-        def counting_create(self):
+        def counting_create():
             nonlocal create_count
             create_count += 1
-            return original_create(self)
+            return _original_create_connection()
 
-        with patch.object(DatabaseConnection, "create_connection", counting_create):
+        with patch("plain.models.connections._create_connection", counting_create):
             client = _fresh_client()
             response = client.get("/sse-db-query/")
 
@@ -325,7 +321,7 @@ class TestAsyncViewConnectionLifecycle:
         seen_connections: list[int | None] = []
 
         def track_connection(**kwargs):
-            if db_connection.has_connection():
+            if has_connection():
                 seen_connections.append(id(_db_conn.get()))
             else:
                 seen_connections.append(None)

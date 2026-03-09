@@ -1,7 +1,7 @@
 """
 Tests for database connection isolation across threads and async tasks.
 
-These tests validate that DatabaseConnection properly isolates connections:
+These tests validate that get_connection/has_connection properly isolate connections:
 - Different threads get different connections
 - Different asyncio tasks get different connections
 - Context propagation via copy_context().run() works (for asyncio.to_thread)
@@ -19,11 +19,11 @@ import threading
 
 import pytest
 
-from plain.models.connections import DatabaseConnection, _db_conn
+from plain.models.connections import _db_conn, has_connection
 
 
 class FakeConn:
-    """Lightweight stand-in for DatabaseWrapper to test storage isolation."""
+    """Lightweight stand-in for DatabaseConnection to test storage isolation."""
 
     pass
 
@@ -36,8 +36,8 @@ def _reset_db_conn():
     _db_conn.reset(token)
 
 
-def _store_fake(db: DatabaseConnection) -> FakeConn:
-    """Store a FakeConn in the DatabaseConnection's ContextVar."""
+def _store_fake() -> FakeConn:
+    """Store a FakeConn in the ContextVar."""
     conn = FakeConn()
     _db_conn.set(conn)  # type: ignore[arg-type]
     return conn
@@ -45,12 +45,11 @@ def _store_fake(db: DatabaseConnection) -> FakeConn:
 
 def test_each_thread_gets_its_own_connection():
     """Different threads must get different connection instances."""
-    db = DatabaseConnection()
     results: dict[str, int] = {}
     barrier = threading.Barrier(2)
 
     def access_connection(name: str) -> None:
-        conn = _store_fake(db)
+        conn = _store_fake()
         results[name] = id(conn)
         barrier.wait()
 
@@ -68,14 +67,13 @@ def test_each_thread_gets_its_own_connection():
 
 def test_main_thread_connection_not_visible_to_child_thread():
     """A connection created on the main thread must not leak to a child thread."""
-    db = DatabaseConnection()
-    _store_fake(db)
-    assert db.has_connection()
+    _store_fake()
+    assert has_connection()
 
     visible_in_child = []
 
     def check_child() -> None:
-        visible_in_child.append(db.has_connection())
+        visible_in_child.append(has_connection())
 
     t = threading.Thread(target=check_child)
     t.start()
@@ -93,15 +91,14 @@ def test_async_tasks_get_isolated_connections():
     Each asyncio.Task gets its own context copy, so two tasks on the same
     event loop thread should see different connections.
     """
-    db = DatabaseConnection()
 
     async def get_connection_id() -> int:
-        conn = _store_fake(db)
+        conn = _store_fake()
         conn_id = id(conn)
         # Yield control so both tasks interleave
         await asyncio.sleep(0)
         # Verify we still see our own connection after yielding
-        assert db.has_connection()
+        assert has_connection()
         assert id(_db_conn.get()) == conn_id, "Connection changed mid-task"
         return conn_id
 
@@ -116,15 +113,14 @@ def test_async_tasks_get_isolated_connections():
 
 def test_async_task_connection_does_not_leak_to_next_task():
     """A connection created in one async task must not be visible to the next."""
-    db = DatabaseConnection()
 
     async def run() -> bool:
         async def set_connection() -> None:
-            _store_fake(db)
-            assert db.has_connection()
+            _store_fake()
+            assert has_connection()
 
         async def check_connection() -> bool:
-            return db.has_connection()
+            return has_connection()
 
         # First task creates a connection
         await asyncio.create_task(set_connection())
@@ -145,10 +141,9 @@ def test_executor_sees_connection_with_context_propagation():
     This validates the mechanism asyncio.to_thread() uses (it copies context
     automatically), which enables future SSE views to access the DB.
     """
-    db = DatabaseConnection()
 
     async def run() -> tuple[bool, int, int | None]:
-        conn = _store_fake(db)
+        conn = _store_fake()
         caller_id = id(conn)
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -156,7 +151,7 @@ def test_executor_sees_connection_with_context_propagation():
         ctx = contextvars.copy_context()
 
         def check_in_thread() -> tuple[bool, int | None]:
-            has = db.has_connection()
+            has = has_connection()
             if has:
                 return has, id(_db_conn.get())
             return has, None
@@ -184,17 +179,16 @@ def test_executor_without_context_does_not_see_connection():
     propagates OTel context, not DB connections, so executor threads
     keep their own persistent connections (honoring CONN_MAX_AGE).
     """
-    db = DatabaseConnection()
 
     async def run() -> bool:
-        _store_fake(db)
-        assert db.has_connection()
+        _store_fake()
+        assert has_connection()
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         loop = asyncio.get_running_loop()
 
         # Run WITHOUT context propagation
-        has_conn = await loop.run_in_executor(executor, db.has_connection)
+        has_conn = await loop.run_in_executor(executor, has_connection)
         executor.shutdown(wait=True)
         return has_conn
 

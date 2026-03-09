@@ -8,7 +8,7 @@ from plain.models.fields import DecimalField, Field, FloatField, IntegerField
 from plain.models.functions import Cast
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 
@@ -24,7 +24,7 @@ class FixDecimalInputMixin(Func):
     def as_sql(
         self,
         compiler: SQLCompiler,
-        connection: DatabaseWrapper,
+        connection: DatabaseConnection,
         function: str | None = None,
         template: str | None = None,
         arg_joiner: str | None = None,

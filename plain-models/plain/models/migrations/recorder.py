@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain import models
-from plain.models.connections import DatabaseConnection
 from plain.models.db import DatabaseError
 from plain.models.meta import Meta
 from plain.models.registry import ModelsRegistry
@@ -15,7 +14,7 @@ from .exceptions import MigrationSchemaMissing
 MIGRATION_TABLE_NAME = "plainmigrations"
 
 if TYPE_CHECKING:
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseConnection
 
 
 class MigrationRecorder:
@@ -62,7 +61,7 @@ class MigrationRecorder:
             cls._migration_class = Migration
         return cls._migration_class
 
-    def __init__(self, connection: DatabaseWrapper | DatabaseConnection) -> None:
+    def __init__(self, connection: DatabaseConnection) -> None:
         self.connection = connection
 
     @property

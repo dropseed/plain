@@ -34,7 +34,7 @@ from .reverse_related import ForeignKeyRel, ManyToManyRel
 if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.fields.reverse_related import ForeignObjectRel
-    from plain.models.postgres.wrapper import DatabaseWrapper
+    from plain.models.postgres.wrapper import DatabaseConnection
 
 RECURSIVE_RELATIONSHIP_CONSTANT = "self"
 
@@ -622,7 +622,7 @@ class ForeignKeyField(RelatedField):
             return getattr(field_default, self.target_field.attname)
         return field_default
 
-    def get_db_prep_save(self, value: Any, connection: DatabaseWrapper) -> Any:
+    def get_db_prep_save(self, value: Any, connection: DatabaseConnection) -> Any:
         if value is None or (
             value == "" and not self.target_field.empty_strings_allowed
         ):
@@ -631,7 +631,7 @@ class ForeignKeyField(RelatedField):
             return self.target_field.get_db_prep_save(value, connection=connection)
 
     def get_db_prep_value(
-        self, value: Any, connection: DatabaseWrapper, prepared: bool = False
+        self, value: Any, connection: DatabaseConnection, prepared: bool = False
     ) -> Any:
         return self.target_field.get_db_prep_value(value, connection, prepared)
 

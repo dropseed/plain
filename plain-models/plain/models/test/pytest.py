@@ -10,8 +10,8 @@ from plain.models.otel import suppress_db_tracing
 from plain.signals import request_finished, request_started
 
 from .. import transaction
-from ..db import close_old_connections, db_connection
-from ..postgres.wrapper import DatabaseWrapper
+from ..db import close_old_connections, get_connection
+from ..postgres.wrapper import DatabaseConnection
 from .utils import (
     setup_database,
     teardown_database,
@@ -29,13 +29,13 @@ def _db_disabled() -> Generator[None, None, None]:
         pytest.fail("Database access not allowed without the `db` fixture")
 
     # Save original cursor method and replace with disabled version
-    setattr(DatabaseWrapper, "_enabled_cursor", DatabaseWrapper.cursor)
-    DatabaseWrapper.cursor = cursor_disabled  # type: ignore[assignment]
+    setattr(DatabaseConnection, "_enabled_cursor", DatabaseConnection.cursor)
+    DatabaseConnection.cursor = cursor_disabled  # type: ignore[assignment]
 
     yield
 
     # Restore original cursor method
-    DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
+    DatabaseConnection.cursor = getattr(DatabaseConnection, "_enabled_cursor")
 
 
 @pytest.fixture(scope="session")
@@ -69,7 +69,7 @@ def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
 
     # Set .cursor() back to the original implementation to unblock it
-    DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
+    DatabaseConnection.cursor = getattr(DatabaseConnection, "_enabled_cursor")
 
     with suppress_db_tracing():
         atomic = transaction.atomic()
@@ -79,14 +79,15 @@ def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
     yield
 
     with suppress_db_tracing():
+        conn = get_connection()
         # PostgreSQL can defer constraint checks
-        if not db_connection.needs_rollback and db_connection.is_usable():
-            db_connection.check_constraints()
+        if not conn.needs_rollback and conn.is_usable():
+            conn.check_constraints()
 
-        db_connection.set_rollback(True)
+        conn.set_rollback(True)
         atomic.__exit__(None, None, None)
 
-        db_connection.close()
+        conn.close()
 
 
 @pytest.fixture
@@ -99,7 +100,7 @@ def isolated_db(request: Any) -> Generator[None, None, None]:
     if "db" in request.fixturenames:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")
     # Set .cursor() back to the original implementation to unblock it
-    DatabaseWrapper.cursor = getattr(DatabaseWrapper, "_enabled_cursor")
+    DatabaseConnection.cursor = getattr(DatabaseConnection, "_enabled_cursor")
 
     verbosity = 1
 
