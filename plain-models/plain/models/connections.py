@@ -11,8 +11,6 @@ if TYPE_CHECKING:
 
 
 class DatabaseConfig(TypedDict, total=False):
-    CONN_MAX_AGE: int | None
-    CONN_HEALTH_CHECKS: bool
     HOST: str
     DATABASE: str | None
     OPTIONS: dict[str, Any]
@@ -26,7 +24,9 @@ class DatabaseConfig(TypedDict, total=False):
 # Module-level ContextVar for per-task/per-thread connection storage.
 # Each asyncio.Task gets its own copy (since Python 3.7.1).
 # Thread pool threads maintain their own native context across work items,
-# so connections persist across requests (honoring CONN_MAX_AGE).
+# so the wrapper persists across requests. Between requests, the wrapper's
+# connection is returned to the pool (connection=None) and re-checked out
+# on next use.
 _db_conn: ContextVar[DatabaseConnection | None] = ContextVar("_db_conn", default=None)
 
 
@@ -48,8 +48,6 @@ def _configure_settings() -> DatabaseConfig:
         "PASSWORD": plain_settings.POSTGRES_PASSWORD,
         "HOST": plain_settings.POSTGRES_HOST,
         "PORT": plain_settings.POSTGRES_PORT,
-        "CONN_MAX_AGE": plain_settings.POSTGRES_CONN_MAX_AGE,
-        "CONN_HEALTH_CHECKS": plain_settings.POSTGRES_CONN_HEALTH_CHECKS,
         "OPTIONS": plain_settings.POSTGRES_OPTIONS,
         "TIME_ZONE": plain_settings.POSTGRES_TIME_ZONE,
         "TEST": {"DATABASE": None},
@@ -75,3 +73,17 @@ def get_connection() -> DatabaseConnection:
 def has_connection() -> bool:
     """Check if a database connection exists in the current context."""
     return _db_conn.get() is not None
+
+
+def return_connection() -> None:
+    """Return the current context's connection to the pool."""
+    conn = _db_conn.get()
+    if conn is not None and conn.connection is not None:
+        conn.close()
+
+
+def close_pool() -> None:
+    """Close and discard the connection pool (for test DB switching)."""
+    from plain.models.postgres.pool import PostgresPool
+
+    PostgresPool.close()

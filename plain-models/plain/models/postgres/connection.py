@@ -7,7 +7,7 @@ import os
 import signal
 import subprocess
 import sys
-import time
+import threading
 import warnings
 import zoneinfo
 from collections import deque
@@ -33,6 +33,13 @@ from plain.models.db import (
 )
 from plain.models.indexes import Index
 from plain.models.postgres import utils
+from plain.models.postgres.pool import (
+    PostgresPool,
+    _build_connection_params,
+    _configure_connection_role,
+    _configure_connection_timezone,
+    _resolve_isolation_level,
+)
 from plain.models.postgres.schema import DatabaseSchemaEditor
 from plain.models.postgres.sql import MAX_NAME_LENGTH, quote_name
 from plain.models.postgres.utils import CursorDebugWrapper as BaseCursorDebugWrapper
@@ -172,7 +179,10 @@ class DatabaseConnection:
     index_default_access_method = "btree"
     ignored_tables: list[str] = []
 
-    def __init__(self, settings_dict: DatabaseConfig):
+    # PostgreSQL backend-specific attributes.
+    _named_cursor_idx = 0
+
+    def __init__(self, settings_dict: DatabaseConfig, *, _use_pool: bool = True):
         # Connection related attributes.
         # The underlying database connection (from the database library, not a wrapper).
         self.connection: PsycopgConnection[Any] | None = None
@@ -183,6 +193,9 @@ class DatabaseConnection:
         # Query logging in debug mode or when explicitly enabled.
         self.queries_log: deque[dict[str, Any]] = deque(maxlen=self.queries_limit)
         self.force_debug_cursor: bool = False
+
+        # Whether to use the connection pool for checkout/return.
+        self._use_pool: bool = _use_pool
 
         # Transaction related attributes.
         # Tracks if the connection is in autocommit mode. Per PEP 249, by
@@ -202,11 +215,7 @@ class DatabaseConnection:
         self.rollback_exc: Exception | None = None
 
         # Connection termination related attributes.
-        self.close_at: float | None = None
         self.closed_in_transaction: bool = False
-        self.errors_occurred: bool = False
-        self.health_check_enabled: bool = False
-        self.health_check_done: bool = False
 
         # A list of no-argument functions to run when the transaction commits.
         # Each entry is an (sids, func, robust) tuple, where sids is a set of
@@ -268,7 +277,6 @@ class DatabaseConnection:
     def get_connection_params(self) -> dict[str, Any]:
         """Return a dict of parameters suitable for get_new_connection."""
         settings_dict = self.settings_dict
-        options = settings_dict.get("OPTIONS", {})
         db_name = settings_dict.get("DATABASE")
         if db_name == "":
             raise ImproperlyConfigured(
@@ -286,30 +294,7 @@ class DatabaseConnection:
                     MAX_NAME_LENGTH,
                 )
             )
-        if db_name is None:
-            # None is used to connect to the default 'postgres' db.
-            db_name = "postgres"
-        conn_params: dict[str, Any] = {
-            "dbname": db_name,
-            **options,
-        }
-
-        conn_params.pop("assume_role", None)
-        conn_params.pop("isolation_level", None)
-        conn_params.pop("server_side_binding", None)
-        if settings_dict["USER"]:
-            conn_params["user"] = settings_dict["USER"]
-        if settings_dict["PASSWORD"]:
-            conn_params["password"] = settings_dict["PASSWORD"]
-        if settings_dict["HOST"]:
-            conn_params["host"] = settings_dict["HOST"]
-        if settings_dict["PORT"]:
-            conn_params["port"] = settings_dict["PORT"]
-        conn_params["context"] = get_adapters_template(self.timezone)
-        # Disable prepared statements by default to keep connection poolers
-        # working. Can be reenabled via OPTIONS in the settings dict.
-        conn_params["prepare_threshold"] = conn_params.pop("prepare_threshold", None)
-        return conn_params
+        return _build_connection_params(settings_dict, self.timezone)
 
     def get_new_connection(self, conn_params: dict[str, Any]) -> PsycopgConnection[Any]:
         """Open a connection to the database."""
@@ -319,24 +304,11 @@ class DatabaseConnection:
         # - before calling _set_autocommit() because if autocommit is on, that
         #   will set connection.isolation_level to ISOLATION_LEVEL_AUTOCOMMIT.
         options = self.settings_dict.get("OPTIONS", {})
-        set_isolation_level = False
-        try:
-            isolation_level_value = options["isolation_level"]
-        except KeyError:
-            self.isolation_level = IsolationLevel.READ_COMMITTED
-        else:
-            # Set the isolation level to the value from OPTIONS.
-            try:
-                self.isolation_level = IsolationLevel(isolation_level_value)
-                set_isolation_level = True
-            except ValueError:
-                raise ImproperlyConfigured(
-                    f"Invalid transaction isolation level {isolation_level_value} "
-                    f"specified. Use one of the psycopg.IsolationLevel values."
-                )
+        isolation_level = _resolve_isolation_level(options)
+        self.isolation_level = isolation_level or IsolationLevel.READ_COMMITTED
         connection = Database.connect(**conn_params)
-        if set_isolation_level:
-            connection.isolation_level = self.isolation_level
+        if isolation_level is not None:
+            connection.isolation_level = isolation_level
         # Use server-side binding cursor if requested, otherwise standard cursor
         connection.cursor_factory = (
             ServerBindingCursor
@@ -345,38 +317,25 @@ class DatabaseConnection:
         )
         return connection
 
-    def ensure_timezone(self) -> bool:
-        """
-        Ensure the connection's timezone is set to `self.timezone_name` and
-        return whether it changed or not.
-        """
-        if self.connection is None:
-            return False
-        conn_timezone_name = self.connection.info.parameter_status("TimeZone")
-        timezone_name = self.timezone_name
-        if timezone_name and conn_timezone_name != timezone_name:
-            self.connection.execute(
-                "SELECT set_config('TimeZone', %s, false)", [timezone_name]
-            )
-            return True
-        return False
+    def ensure_timezone(self) -> None:
+        """Ensure the connection's timezone matches settings."""
+        if self.connection is not None:
+            _configure_connection_timezone(self.connection, self.timezone_name)
 
-    def ensure_role(self) -> bool:
-        if self.connection is None:
-            return False
-        if new_role := self.settings_dict.get("OPTIONS", {}).get("assume_role"):
-            sql_str = self.compose_sql("SET ROLE %s", [new_role])
-            self.connection.execute(sql_str)  # type: ignore[arg-type]
-            return True
-        return False
+    def ensure_role(self) -> None:
+        """Set the connection's role if configured."""
+        if self.connection is not None:
+            _configure_connection_role(
+                self.connection, self.settings_dict.get("OPTIONS", {})
+            )
 
     def init_connection_state(self) -> None:
         """Initialize the database connection settings."""
-        self.ensure_timezone()
-        # Set the role on the connection. This is useful if the credential used
-        # to login is not the same as the role that owns database resources. As
-        # can be the case when using temporary or ephemeral credentials.
-        self.ensure_role()
+        if not self._use_pool:
+            # For non-pooled connections, set timezone and role here.
+            # Pooled connections have these configured by the pool's configure callback.
+            self.ensure_timezone()
+            self.ensure_role()
 
     def create_cursor(self) -> Any:
         """Create a cursor. Assume that a connection is established."""
@@ -433,7 +392,9 @@ class DatabaseConnection:
         """
         cursor = None
         try:
-            conn = self.__class__({**self.settings_dict, "DATABASE": None})
+            conn = self.__class__(
+                {**self.settings_dict, "DATABASE": None}, _use_pool=False
+            )
             try:
                 with conn.cursor() as cursor:
                     yield cursor
@@ -450,7 +411,7 @@ class DatabaseConnection:
                 "and will use the first PostgreSQL database instead.",
                 RuntimeWarning,
             )
-            conn = self.__class__(self.settings_dict)
+            conn = self.__class__(self.settings_dict, _use_pool=False)
             try:
                 with conn.cursor() as cursor:
                     yield cursor
@@ -475,17 +436,19 @@ class DatabaseConnection:
         self.savepoint_ids = []
         self.atomic_blocks = []
         self.needs_rollback = False
-        # Reset parameters defining when to close/health-check the connection.
-        self.health_check_enabled = self.settings_dict["CONN_HEALTH_CHECKS"]
-        max_age = self.settings_dict["CONN_MAX_AGE"]
-        self.close_at = None if max_age is None else time.monotonic() + max_age
         self.closed_in_transaction = False
-        self.errors_occurred = False
-        # New connections are healthy.
-        self.health_check_done = True
-        # Establish the connection
-        conn_params = self.get_connection_params()
-        self.connection = self.get_new_connection(conn_params)
+        self.execute_wrappers = []
+        self.run_commit_hooks_on_set_autocommit_on = False
+        self.force_debug_cursor = False
+
+        if self._use_pool:
+            # Check out a connection from the pool
+            self.connection = PostgresPool.get_pool().getconn()
+        else:
+            # Direct connection (for _nodb_cursor and other admin ops)
+            conn_params = self.get_connection_params()
+            self.connection = self.get_new_connection(conn_params)
+
         self.set_autocommit(True)
         self.init_connection_state()
 
@@ -510,7 +473,6 @@ class DatabaseConnection:
         return wrapped_cursor
 
     def _cursor(self) -> utils.CursorWrapper:
-        self.close_if_health_check_failed()
         self.ensure_connection()
         with self.wrap_database_errors:
             return self._prepare_cursor(self.create_cursor())
@@ -528,7 +490,10 @@ class DatabaseConnection:
     def _close(self) -> None:
         if self.connection is not None:
             with self.wrap_database_errors:
-                return self.connection.close()
+                if self._use_pool:
+                    PostgresPool.return_connection(self.connection)
+                else:
+                    self.connection.close()
 
     # ##### Generic wrappers for PEP-249 connection methods #####
 
@@ -540,21 +505,17 @@ class DatabaseConnection:
         """Commit a transaction and reset the dirty flag."""
         self.validate_no_atomic_block()
         self._commit()
-        # A successful commit means that the database connection works.
-        self.errors_occurred = False
         self.run_commit_hooks_on_set_autocommit_on = True
 
     def rollback(self) -> None:
         """Roll back a transaction and reset the dirty flag."""
         self.validate_no_atomic_block()
         self._rollback()
-        # A successful rollback means that the database connection works.
-        self.errors_occurred = False
         self.needs_rollback = False
         self.run_on_commit = []
 
     def close(self) -> None:
-        """Close the connection to the database."""
+        """Close the connection to the database (or return it to the pool)."""
         self.run_on_commit = []
 
         # Don't call validate_no_atomic_block() to avoid making it difficult
@@ -563,6 +524,10 @@ class DatabaseConnection:
         if self.closed_in_transaction or self.connection is None:
             return
         try:
+            # For non-pooled connections, rollback before closing.
+            # Pooled connections are cleaned up by the pool's reset callback.
+            if not self._use_pool and not self.autocommit:
+                self._rollback()
             self._close()
         finally:
             if self.in_atomic_block:
@@ -652,7 +617,6 @@ class DatabaseConnection:
         directly — use atomic() instead.
         """
         self.validate_no_atomic_block()
-        self.close_if_health_check_failed()
         self.ensure_connection()
 
         if autocommit:
@@ -697,48 +661,6 @@ class DatabaseConnection:
                 "An error occurred in the current transaction. You can't "
                 "execute queries until the end of the 'atomic' block."
             ) from self.rollback_exc
-
-    # ##### Connection termination handling #####
-
-    def close_if_health_check_failed(self) -> None:
-        """Close existing connection if it fails a health check."""
-        if (
-            self.connection is None
-            or not self.health_check_enabled
-            or self.health_check_done
-        ):
-            return
-
-        if not self.is_usable():
-            self.close()
-        self.health_check_done = True
-
-    def close_if_unusable_or_obsolete(self) -> None:
-        """
-        Close the current connection if unrecoverable errors have occurred
-        or if it outlived its maximum age.
-        """
-        if self.connection is not None:
-            self.health_check_done = False
-            # If autocommit was not restored (e.g. a transaction was not
-            # properly closed), don't take chances, drop the connection.
-            if not self.get_autocommit():
-                self.close()
-                return
-
-            # If an exception other than DataError or IntegrityError occurred
-            # since the last commit / rollback, check if the connection works.
-            if self.errors_occurred:
-                if self.is_usable():
-                    self.errors_occurred = False
-                    self.health_check_done = True
-                else:
-                    self.close()
-                    return
-
-            if self.close_at is not None and time.monotonic() >= self.close_at:
-                self.close()
-                return
 
     # ##### Miscellaneous #####
 
@@ -1140,6 +1062,10 @@ class DatabaseConnection:
         )
 
         self.close()
+
+        # Close the pool so it gets recreated pointing to the test database
+        PostgresPool.close()
+
         settings.POSTGRES_DATABASE = test_database_name
         self.settings_dict["DATABASE"] = test_database_name
 
@@ -1233,7 +1159,9 @@ class DatabaseConnection:
                                 f"Destroying old test database '{test_database_name}'..."
                             )
                         cursor.execute(
-                            "DROP DATABASE {dbname}".format(**test_db_params)
+                            "DROP DATABASE {dbname} WITH (FORCE)".format(
+                                **test_db_params
+                            )
                         )
                         self._execute_create_test_db(cursor, test_db_params)
                     except Exception as e:
@@ -1254,6 +1182,9 @@ class DatabaseConnection:
         """
         self.close()
 
+        # Close the pool before switching databases
+        PostgresPool.close()
+
         test_database_name = self.settings_dict["DATABASE"]
         if test_database_name is None:
             raise ValueError("Test POSTGRES_DATABASE must be set")
@@ -1271,12 +1202,14 @@ class DatabaseConnection:
         """
         Internal implementation - remove the test db tables.
         """
-        # Remove the test database to clean up after
-        # ourselves. Connect to the previous database (not the test database)
-        # to do so, because it's not allowed to delete a database while being
-        # connected to it.
+        # Connect to the default database (not the test database) since
+        # you can't drop a database while connected to it.
+        # WITH (FORCE) terminates any remaining connections to the database
+        # (e.g. orphaned connections from pool recreation during tests).
         with self._nodb_cursor() as cursor:
-            cursor.execute(f"DROP DATABASE {quote_name(test_database_name)}")
+            cursor.execute(
+                f"DROP DATABASE {quote_name(test_database_name)} WITH (FORCE)"
+            )
 
     def sql_table_creation_suffix(self) -> str:
         """

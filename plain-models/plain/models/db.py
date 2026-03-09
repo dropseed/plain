@@ -4,7 +4,7 @@ from typing import Any
 
 from plain import signals
 
-from .connections import get_connection, has_connection
+from .connections import get_connection, has_connection, return_connection
 from .exceptions import (
     DatabaseError,
     DatabaseErrorWrapper,
@@ -30,15 +30,12 @@ def reset_queries(**kwargs: Any) -> None:
 signals.request_started.connect(reset_queries)
 
 
-# Register an event to reset transaction state and close connections past
-# their lifetime.
-def close_old_connections(**kwargs: Any) -> None:
-    if has_connection():
-        get_connection().close_if_unusable_or_obsolete()
+# Return the connection to the pool when a request finishes.
+def return_connection_to_pool(**kwargs: Any) -> None:
+    return_connection()
 
 
-signals.request_started.connect(close_old_connections)
-signals.request_finished.connect(close_old_connections)
+signals.request_finished.connect(return_connection_to_pool)
 
 
 __all__ = [
@@ -55,5 +52,5 @@ __all__ = [
     "ProgrammingError",
     "NotSupportedError",
     "DatabaseErrorWrapper",
-    "close_old_connections",
+    "return_connection_to_pool",
 ]

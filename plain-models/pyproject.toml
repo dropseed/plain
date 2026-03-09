@@ -6,7 +6,7 @@ authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
-dependencies = ["plain<1.0.0", "sqlparse>=0.3.1"]
+dependencies = ["plain<1.0.0", "sqlparse>=0.3.1", "psycopg>=3.2.12", "psycopg-pool>=3.2"]
 
 [project.entry-points."plain.setup"]
 "models-setup" = "plain.models.entrypoints:setup"

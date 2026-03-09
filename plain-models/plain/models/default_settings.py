@@ -6,10 +6,9 @@ from . import database_url
 
 # Connection behavior (always have defaults)
 POSTGRES_PORT: int | None = None
-POSTGRES_CONN_MAX_AGE: int = 600
-POSTGRES_CONN_HEALTH_CHECKS: bool = True
 POSTGRES_OPTIONS: dict = {}
 POSTGRES_TIME_ZONE: str | None = None
+POSTGRES_POOL: dict = {}
 
 if "DATABASE_URL" in environ:
     _db_url = environ["DATABASE_URL"]

@@ -201,10 +201,6 @@ class DatabaseErrorWrapper:
                 plain_exc_value = (
                     plain_exc_type(*exc_value.args) if exc_value else plain_exc_type()
                 )
-                # Only set the 'errors_occurred' flag for errors that may make
-                # the connection unusable.
-                if plain_exc_type not in (DataError, IntegrityError):
-                    self.wrapper.errors_occurred = True
                 raise plain_exc_value.with_traceback(traceback) from exc_value
 
     def __call__(self, func: F) -> F:

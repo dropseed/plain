@@ -123,9 +123,9 @@ class BaseHandler:
 
         Propagates the OpenTelemetry span context so traces from the event
         loop continue into the executor thread.  Other ContextVars (e.g. the
-        DB connection) are intentionally NOT copied — they live on the
-        executor thread's native context so connections persist across
-        requests (honoring CONN_MAX_AGE).
+        DB connection wrapper) are intentionally NOT copied — they live on
+        the executor thread's native context. Between requests, connections
+        are returned to the pool and re-checked out on next use.
         """
         loop = asyncio.get_running_loop()
         ctx = context.get_current()
@@ -252,13 +252,8 @@ class BaseHandler:
         land on a different thread than request_started. The DB connection
         ContextVar on each thread is independent, so this thread may see
         a different (or no) connection. This is safe because
-        close_old_connections is idempotent — it only acts on whatever
+        return_connection_to_pool is idempotent — it only acts on whatever
         connection exists on the current thread.
-
-        The signal fires before streaming response bodies are transmitted.
-        Handlers like close_old_connections should not affect in-progress
-        streams since request_started on the next request also handles
-        stale connections.
         """
         response = self._run_after_response(request, response, ran_before)
         signals.request_finished.send(sender=self.__class__)

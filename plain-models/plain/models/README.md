@@ -839,17 +839,16 @@ When `DATABASE_URL` is set, it is parsed into the individual connection settings
 
 Set `DATABASE_URL=none` to explicitly disable the database (e.g. during Docker image builds).
 
-| Setting                       | Type          | Default | Env var                             |
-| ----------------------------- | ------------- | ------- | ----------------------------------- |
-| `POSTGRES_HOST`               | `str`         | —       | `PLAIN_POSTGRES_HOST`               |
-| `POSTGRES_PORT`               | `int \| None` | `None`  | `PLAIN_POSTGRES_PORT`               |
-| `POSTGRES_DATABASE`           | `str`         | —       | `PLAIN_POSTGRES_DATABASE`           |
-| `POSTGRES_USER`               | `str`         | —       | `PLAIN_POSTGRES_USER`               |
-| `POSTGRES_PASSWORD`           | `Secret[str]` | —       | `PLAIN_POSTGRES_PASSWORD`           |
-| `POSTGRES_CONN_MAX_AGE`       | `int`         | `600`   | `PLAIN_POSTGRES_CONN_MAX_AGE`       |
-| `POSTGRES_CONN_HEALTH_CHECKS` | `bool`        | `True`  | `PLAIN_POSTGRES_CONN_HEALTH_CHECKS` |
-| `POSTGRES_OPTIONS`            | `dict`        | `{}`    | —                                   |
-| `POSTGRES_TIME_ZONE`          | `str \| None` | `None`  | `PLAIN_POSTGRES_TIME_ZONE`          |
+| Setting              | Type          | Default | Env var                    |
+| -------------------- | ------------- | ------- | -------------------------- |
+| `POSTGRES_HOST`      | `str`         | —       | `PLAIN_POSTGRES_HOST`      |
+| `POSTGRES_PORT`      | `int \| None` | `None`  | `PLAIN_POSTGRES_PORT`      |
+| `POSTGRES_DATABASE`  | `str`         | —       | `PLAIN_POSTGRES_DATABASE`  |
+| `POSTGRES_USER`      | `str`         | —       | `PLAIN_POSTGRES_USER`      |
+| `POSTGRES_PASSWORD`  | `Secret[str]` | —       | `PLAIN_POSTGRES_PASSWORD`  |
+| `POSTGRES_OPTIONS`   | `dict`        | `{}`    | —                          |
+| `POSTGRES_TIME_ZONE` | `str \| None` | `None`  | `PLAIN_POSTGRES_TIME_ZONE` |
+| `POSTGRES_POOL`      | `dict`        | `{}`    | —                          |
 
 See [`default_settings.py`](./default_settings.py) for more details.
 

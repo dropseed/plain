@@ -19,8 +19,12 @@ import pytest
 
 from plain.http import Response
 from plain.models.connections import _create_connection as _original_create_connection
-from plain.models.connections import _db_conn, get_connection, has_connection
-from plain.models.db import close_old_connections
+from plain.models.connections import (
+    _db_conn,
+    get_connection,
+    has_connection,
+)
+from plain.models.db import return_connection_to_pool
 from plain.models.postgres.connection import DatabaseConnection
 from plain.runtime import settings
 from plain.signals import request_finished, request_started
@@ -72,24 +76,9 @@ class TestRouter(Router):
 
 
 @pytest.fixture
-def _unblock_cursor():
-    """Restore the real cursor method (blocked by the autouse _db_disabled fixture)."""
-    DatabaseConnection.cursor = getattr(DatabaseConnection, "_enabled_cursor")
-
-
-@pytest.fixture
-def _clean_connection():
-    """Ensure the ContextVar starts empty and clean up any connection afterward."""
-    token = _db_conn.set(None)
+def _clean_connection(_clean_connection):
+    """Extended version that also terminates orphaned async worker connections."""
     yield
-    # Close the connection on this thread (if any)
-    conn = _db_conn.get()
-    if conn is not None:
-        try:
-            conn.close()
-        except Exception:
-            pass
-    _db_conn.reset(token)
 
     # Async views create connections on worker threads (via asyncio.to_thread)
     # that we can't reach from this thread. Terminate them from PostgreSQL so
@@ -180,11 +169,11 @@ class TestConnectionLifecycle:
         )
 
     @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection", "_test_router")
-    def test_close_old_connections_with_contextvar(self, setup_db):
+    def test_pool_return_on_request_finished(self, setup_db):
         """
-        With close_old_connections signals connected, the connection lifecycle
-        works correctly with ContextVar storage: connections are kept alive
-        within CONN_MAX_AGE and reused across requests.
+        With return_connection_to_pool connected to request_finished, the
+        connection is returned to the pool after each request, and a new
+        checkout happens on the next request.
         """
         create_count = 0
 
@@ -193,8 +182,7 @@ class TestConnectionLifecycle:
             create_count += 1
             return _original_create_connection()
 
-        request_started.connect(close_old_connections)
-        request_finished.connect(close_old_connections)
+        request_finished.connect(return_connection_to_pool)
         try:
             with patch("plain.models.connections._create_connection", counting_create):
                 client = _fresh_client()
@@ -202,24 +190,23 @@ class TestConnectionLifecycle:
                 response1 = client.get("/db-query/")
                 assert response1.status_code == 200
 
-                # CONN_MAX_AGE=600s — connection stays alive
+                # Connection returned to pool, wrapper still in ContextVar
+                # but connection is None
                 conn = _db_conn.get()
                 assert conn is not None
-                assert conn.connection is not None, (
-                    "Connection should be alive within CONN_MAX_AGE"
+                assert conn.connection is None, (
+                    "Connection should be returned to pool after request"
                 )
 
-                # Second request — close_old_connections on request_started
-                # checks the connection, keeps it, view reuses it
+                # Second request — wrapper re-checks out from pool
                 response2 = client.get("/db-query/")
                 assert response2.status_code == 200
 
             assert create_count == 1, (
-                f"Expected 1 connection with signals connected, got {create_count}"
+                f"Expected 1 wrapper created with pool, got {create_count}"
             )
         finally:
-            request_started.disconnect(close_old_connections)
-            request_finished.disconnect(close_old_connections)
+            request_finished.disconnect(return_connection_to_pool)
 
     @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection", "_test_router")
     def test_view_and_signals_see_same_contextvar(self, setup_db):
@@ -317,7 +304,7 @@ class TestAsyncViewConnectionLifecycle:
         calling context. This is correct: each thread owns its connection.
 
         request_started and request_finished both fire on the calling thread,
-        which never had a connection. close_old_connections handles this
+        which never had a connection. return_connection_to_pool handles this
         gracefully (it's a no-op when has_connection() is False).
         """
         seen_connections: list[int | None] = []

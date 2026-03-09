@@ -177,7 +177,7 @@ def test_executor_without_context_does_not_see_connection():
 
     This matches how BaseHandler._run_in_executor works — it only
     propagates OTel context, not DB connections, so executor threads
-    keep their own persistent connections (honoring CONN_MAX_AGE).
+    keep their own persistent connection wrappers.
     """
 
     async def run() -> bool:
@@ -203,10 +203,11 @@ def test_executor_connection_persists_across_calls_on_same_thread():
     A ContextVar set inside an executor thread persists for subsequent
     run_in_executor calls that land on the same thread.
 
-    This is the CONN_MAX_AGE behavior: ThreadPoolExecutor worker threads
-    maintain a persistent context across work items, so a DB connection
-    created during request 1 is reused by request 2 on the same thread.
-    Without this, connections would be orphaned after every request.
+    ThreadPoolExecutor worker threads maintain a persistent context across
+    work items, so the DB connection wrapper set during request 1 is still
+    visible during request 2 on the same thread. Between requests, the
+    wrapper's connection is returned to the pool and re-checked out on
+    next use.
     """
 
     async def run() -> tuple[int, int, int, int]:
@@ -230,6 +231,5 @@ def test_executor_connection_persists_across_calls_on_same_thread():
     tid1, tid2, conn_id1, conn_id2 = asyncio.run(run())
     assert tid1 == tid2, "Both calls should run on the same executor thread"
     assert conn_id1 == conn_id2, (
-        "Connection set in request 1 should persist for request 2 on the same thread "
-        "(CONN_MAX_AGE behavior)"
+        "Connection wrapper set in request 1 should persist for request 2 on the same thread"
     )

@@ -7,10 +7,11 @@ from typing import Any
 import pytest
 
 from plain.models.otel import suppress_db_tracing
-from plain.signals import request_finished, request_started
+from plain.signals import request_finished
 
 from .. import transaction
-from ..db import close_old_connections, get_connection
+from ..connections import close_pool
+from ..db import get_connection, return_connection_to_pool
 from ..postgres.connection import DatabaseConnection
 from .utils import (
     setup_database,
@@ -49,15 +50,13 @@ def setup_db(request: Any) -> Generator[None, None, None]:
     # Set up the test db across the entire session
     _old_db_name = setup_database(verbosity=verbosity)
 
-    # Keep connections open during request client / testing
-    request_started.disconnect(close_old_connections)
-    request_finished.disconnect(close_old_connections)
+    # Keep connections checked out during test requests (don't return to pool)
+    request_finished.disconnect(return_connection_to_pool)
 
     yield
 
-    # Put the signals back...
-    request_started.connect(close_old_connections)
-    request_finished.connect(close_old_connections)
+    # Put the signal back
+    request_finished.connect(return_connection_to_pool)
 
     # When the test session is done, tear down the test db
     teardown_database(_old_db_name, verbosity=verbosity)
@@ -115,3 +114,6 @@ def isolated_db(request: Any) -> Generator[None, None, None]:
 
     # Tear down the test database created for this test
     teardown_database(_old_db_name, verbosity=verbosity)
+
+    # Force pool recreation to reconnect to the main test DB
+    close_pool()
