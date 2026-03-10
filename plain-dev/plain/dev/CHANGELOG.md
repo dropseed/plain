@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.58.3](https://github.com/dropseed/plain/releases/plain-dev@0.58.3) (2026-03-10)
+
+### What's changed
+
+- Removed redundant "Pre-commit Checks" section from AI rules ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.58.2](https://github.com/dropseed/plain/releases/plain-dev@0.58.2) (2026-03-10)
 
 ### What's changed
