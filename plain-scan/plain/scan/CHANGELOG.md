@@ -1,5 +1,15 @@
 # plain-scan changelog
 
+## [0.6.3](https://github.com/dropseed/plain/releases/plain-scan@0.6.3) (2026-03-10)
+
+### What's changed
+
+- Added explicit type annotations to `to_dict()` return value dicts in `CookieMetadata`, `ResponseMetadata`, and `ScanResult` ([f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.6.2](https://github.com/dropseed/plain/releases/plain-scan@0.6.2) (2026-02-26)
 
 ### What's changed
