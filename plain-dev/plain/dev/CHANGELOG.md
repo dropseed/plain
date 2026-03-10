@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.58.2](https://github.com/dropseed/plain/releases/plain-dev@0.58.2) (2026-03-10)
+
+### What's changed
+
+- Fixed `AliasManager.is_installed_in_shell()` crashing when `self.shell` is `None` ([f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+- Used `signal.Signals` enum for signal name lookup in poncho manager instead of raw int keys ([f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.58.1](https://github.com/dropseed/plain/releases/plain-dev@0.58.1) (2026-03-04)
 
 ### What's changed
