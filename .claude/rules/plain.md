@@ -8,20 +8,19 @@ Plain is a Python web framework.
 - Use the `/plain-install` skill to add new Plain packages.
 - Use the `/plain-upgrade` skill to upgrade Plain packages.
 
+## After making code changes
+
+- Run `uv run plain check` to verify changes — this runs linting, preflight, migration, and test checks. Add `--skip-test` for faster iteration during development.
+- Use `uv run plain request /path` to smoke-test changed GET views — errors and stacktraces surface immediately, making for fast iteration. Supports `--user`, `--status`, `--contains`, `--not-contains`.
+
 ## Key Differences from Django
 
-Claude's training data contains a lot of Django code. These are the most common patterns that differ in Plain:
+Plain is a Django fork but has different APIs. Package-specific differences are in their respective rules (plain-models, plain-templates, plain-test). These are the core framework differences:
 
-- **Querysets**: Use `Model.query` not `Model.objects` (e.g., `User.query.filter(is_active=True)`)
-- **Field types**: Import from `plain.models.types` not `plain.models.fields`
-- **Templates**: Plain uses Jinja2, not Django's template engine. Most syntax is similar but filters use `|` with function call syntax (e.g., `{{ name|title }}` works, but custom filters differ)
-- **URLs**: Use `Router` with `urls` list, not Django's `urlpatterns`
-- **Tests**: Use `plain.test.Client`, not `django.test.Client`
 - **Settings**: Use `plain.runtime.settings`, not `django.conf.settings`
-- **Model options**: Use `model_options = models.Options(...)` not `class Meta`. Fields don't accept `unique=True` — use `UniqueConstraint` in constraints.
-- **CSRF**: Automatic header-based (Sec-Fetch-Site). No tokens in templates — no `{{ csrf_input }}` or `{% csrf_token %}`.
-- **Forms**: Headless — no `as_p()`, `as_table()`, or `as_elements()`. Render fields manually with `form.field.html_name`, `form.field.html_id`, `form.field.value()`, `form.field.errors`.
-- **Middleware**: No `AuthMiddleware` exists. Auth works through sessions + view-level checks (`AuthViewMixin`). Middleware uses short imports (`plain.admin.AdminMiddleware` not `plain.admin.middleware.AdminMiddleware`). Middleware uses `before_request(self, request) -> Response | None` and `after_response(self, request, response) -> Response` — not Django's `__init__(self, get_response)` / `__call__` pattern.
+- **URLs**: Use `Router` with `urls` list, not Django's `urlpatterns`
+- **Request data**: Use `request.query_params` not `request.GET`, `request.form_data` not `request.POST`, `request.json_data` not `json.loads(request.body)`, `request.files` not `request.FILES`
+- **Middleware**: Middleware uses `before_request(self, request) -> Response | None` and `after_response(self, request, response) -> Response` — not Django's `__init__(self, get_response)` / `__call__` pattern. No `AuthMiddleware` exists — auth works through sessions + view-level checks (`AuthViewMixin`).
 
 When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
@@ -60,16 +59,3 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 - `uv run plain request /path` — test HTTP request against dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`)
 - `uv run plain settings list` — list all settings with their current values and sources
 - `uv run plain settings get <SETTING_NAME>` — get the value of a specific setting
-
-## Views
-
-- Don't evaluate querysets at class level — queries belong in view methods
-- Always paginate list views — unbounded queries get slower as data grows
-- Wrap multi-step writes in `transaction.atomic()`
-
-Run `uv run plain docs views --section "view-patterns"` for full patterns with code examples.
-
-## Security
-
-- Validate at form/model level, not just in views
-- Never format raw SQL strings — always use parameterized queries

@@ -130,6 +130,7 @@ You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specializ
 
 ```python
 from typing import Self
+from plain.models import types
 
 class PublishedQuerySet(models.QuerySet["Article"]):
     def published_only(self) -> Self:
@@ -140,8 +141,8 @@ class PublishedQuerySet(models.QuerySet["Article"]):
 
 @models.register_model
 class Article(models.Model):
-    title = models.CharField(max_length=200)
-    status = models.CharField(max_length=20)
+    title: str = types.CharField(max_length=200)
+    status: str = types.CharField(max_length=20)
 
     query = PublishedQuerySet()
 
@@ -449,23 +450,27 @@ Use this when migrations have already been committed or deployed to other enviro
 You can use many field types for different data:
 
 ```python
+from decimal import Decimal
+from datetime import datetime
+
 from plain import models
+from plain.models import types
 
 class Product(models.Model):
     # Text fields
-    name = models.CharField(max_length=200)
-    description = models.TextField()
+    name: str = types.CharField(max_length=200)
+    description: str = types.TextField()
 
     # Numeric fields
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    quantity = models.IntegerField(default=0)
+    price: Decimal = types.DecimalField(max_digits=10, decimal_places=2)
+    quantity: int = types.IntegerField(default=0)
 
     # Boolean fields
-    is_active = models.BooleanField(default=True)
+    is_active: bool = types.BooleanField(default=True)
 
     # Date and time fields
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    updated_at: datetime = types.DateTimeField(auto_now=True)
 ```
 
 **Text fields:**
@@ -511,55 +516,41 @@ See [Encrypted fields](#encrypted-fields) for details.
 
 For relationship fields, see [Relationships](#relationships).
 
-### Typed fields
-
-For better IDE support and type checking, use `plain.models.types` with type annotations:
-
-```python
-from plain import models
-from plain.models import types
-
-@models.register_model
-class User(models.Model):
-    email: str = types.EmailField()
-    username: str = types.CharField(max_length=150)
-    is_admin: bool = types.BooleanField(default=False)
-```
-
-For nullable fields, add `| None` to the annotation:
+For nullable fields, use `| None` in the annotation:
 
 ```python
 published_at: datetime | None = types.DateTimeField(allow_null=True, required=False)
 ```
-
-All field types listed above are available through [`types`](./types.py). Typed and untyped fields can be mixed in the same model. The database behavior is identical — typed fields only add type checking.
 
 ### Sharing fields across models
 
 To share common fields across multiple models, use Python classes as mixins. The final, registered model must inherit directly from `models.Model` and the mixins should not.
 
 ```python
+from datetime import datetime
+
 from plain import models
+from plain.models import types
 
 
 # Regular Python class for shared fields
 class TimestampedMixin:
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    updated_at: datetime = types.DateTimeField(auto_now=True)
 
 
 # Models inherit from the mixin AND models.Model
 @models.register_model
 class User(TimestampedMixin, models.Model):
-    email = models.EmailField()
+    email: str = types.EmailField()
     password = PasswordField()
-    is_admin = models.BooleanField(default=False)
+    is_admin: bool = types.BooleanField(default=False)
 
 
 @models.register_model
 class Note(TimestampedMixin, models.Model):
-    content = models.TextField(max_length=1024)
-    liked = models.BooleanField(default=False)
+    content: str = types.TextField(max_length=1024)
+    liked: bool = types.BooleanField(default=False)
 ```
 
 ### Encrypted fields
@@ -605,20 +596,13 @@ Use [`ForeignKeyField`](./fields/related.py#ForeignKeyField) for many-to-one and
 
 ```python
 from plain import models
+from plain.models import types
 
 @models.register_model
 class Book(models.Model):
-    title = models.CharField(max_length=200)
-    author = models.ForeignKeyField("Author", on_delete=models.CASCADE)
-    tags = models.ManyToManyField("Tag")
-```
-
-Foreign keys are typed with the related model:
-
-```python
-from plain.models import types
-
-author: Author = types.ForeignKeyField(Author, on_delete=models.CASCADE)
+    title: str = types.CharField(max_length=200)
+    author: Author = types.ForeignKeyField("Author", on_delete=models.CASCADE)
+    tags = types.ManyToManyField("Tag")
 ```
 
 ### Reverse relationships
@@ -627,17 +611,18 @@ When you define a `ForeignKey` or `ManyToManyField`, Plain automatically creates
 
 ```python
 from plain import models
+from plain.models import types
 
 @models.register_model
 class Author(models.Model):
-    name = models.CharField(max_length=200)
+    name: str = types.CharField(max_length=200)
     # Explicit reverse accessor for all books by this author
-    books = models.ReverseForeignKey(to="Book", field="author")
+    books = types.ReverseForeignKey(to="Book", field="author")
 
 @models.register_model
 class Book(models.Model):
-    title = models.CharField(max_length=200)
-    author = models.ForeignKeyField(Author, on_delete=models.CASCADE)
+    title: str = types.CharField(max_length=200)
+    author: Author = types.ForeignKeyField(Author, on_delete=models.CASCADE)
 
 # Usage
 author = Author.query.get(name="Jane Doe")
@@ -653,14 +638,14 @@ For many-to-many relationships:
 ```python
 @models.register_model
 class Feature(models.Model):
-    name = models.CharField(max_length=100)
+    name: str = types.CharField(max_length=100)
     # Explicit reverse accessor for all cars with this feature
-    cars = models.ReverseManyToMany(to="Car", field="features")
+    cars = types.ReverseManyToMany(to="Car", field="features")
 
 @models.register_model
 class Car(models.Model):
-    model = models.CharField(max_length=100)
-    features = models.ManyToManyField(Feature)
+    model: str = types.CharField(max_length=100)
+    features = types.ManyToManyField(Feature)
 
 # Usage
 feature = Feature.query.get(name="Sunroof")
@@ -676,8 +661,6 @@ for car in feature.cars.all():
 - **Control**: You choose the accessor name instead of relying on automatic `_set` naming
 
 Reverse relations are optional — if you don't declare them, the automatic `{model}_set` accessor still works.
-
-### Typing reverse relationships
 
 To get type checking for custom QuerySet methods on reverse relations, specify the QuerySet type as a second parameter:
 
@@ -701,8 +684,8 @@ You can validate models before saving:
 ```python
 @models.register_model
 class User(models.Model):
-    email = models.EmailField()
-    age = models.IntegerField()
+    email: str = types.EmailField()
+    age: int = types.IntegerField()
 
     model_options = models.Options(
         constraints=[
@@ -727,9 +710,9 @@ You can optimize queries and ensure data integrity with indexes and constraints:
 
 ```python
 class User(models.Model):
-    email = models.EmailField()
-    username = models.CharField(max_length=150)
-    age = models.IntegerField()
+    email: str = types.EmailField()
+    username: str = types.CharField(max_length=150)
+    age: int = types.IntegerField()
 
     model_options = models.Options(
         indexes=[
@@ -752,13 +735,13 @@ Add indexes for columns that appear in `.filter()`, `.order_by()`, or `.exclude(
 ```python
 # Bad — full table scan on every filtered query
 class Order(models.Model):
-    status = models.CharField(max_length=20)
-    created_at = models.DateTimeField()
+    status: str = types.CharField(max_length=20)
+    created_at: datetime = types.DateTimeField()
 
 # Good — indexed for common queries
 class Order(models.Model):
-    status = models.CharField(max_length=20)
-    created_at = models.DateTimeField()
+    status: str = types.CharField(max_length=20)
+    created_at: datetime = types.DateTimeField()
 
     model_options = models.Options(
         indexes=[models.Index(fields=["status", "-created_at"])],
@@ -787,10 +770,10 @@ CASCADE for owned children, PROTECT for referenced data, SET_NULL for optional r
 
 ```python
 # Bad — blindly using CASCADE everywhere
-company = models.ForeignKeyField("Company", on_delete=models.CASCADE)  # deleting company deletes invoices!
+company: Company = types.ForeignKeyField("Company", on_delete=models.CASCADE)  # deleting company deletes invoices!
 
 # Good — protect referenced data
-company = models.ForeignKeyField("Company", on_delete=models.PROTECT)
+company: Company = types.ForeignKeyField("Company", on_delete=models.PROTECT)
 ```
 
 #### No `allow_null` on string fields
@@ -799,10 +782,10 @@ Use `default=""` instead of `allow_null=True` to avoid two representations of "e
 
 ```python
 # Bad — NULL and "" both mean "empty"
-nickname = models.CharField(max_length=50, allow_null=True)
+nickname: str = types.CharField(max_length=50, allow_null=True)
 
 # Good — single empty representation
-nickname = models.CharField(max_length=50, default="")
+nickname: str = types.CharField(max_length=50, default="")
 ```
 
 ## Forms

@@ -455,11 +455,12 @@ Your User model is expected to have an `is_admin` field (or attribute) for check
 ```python
 # app/users/models.py
 from plain import models
+from plain.models import types
 
 
 @models.register_model
 class User(models.Model):
-    is_admin = models.BooleanField(default=False)
+    is_admin: bool = types.BooleanField(default=False)
     # other fields...
 ```
 

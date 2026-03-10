@@ -114,11 +114,12 @@ for validator in validators:
 
 ```python
 from plain import models
+from plain.models import types
 from plain.passwords.models import PasswordField
 
 @models.register_model
 class User(models.Model):
-    email = models.EmailField()
+    email: str = types.EmailField()
     password = PasswordField()
 
     model_options = models.Options(
@@ -297,11 +298,12 @@ Add the `password` field to your User model:
 ```python
 # app/models.py
 from plain import models
+from plain.models import types
 from plain.passwords.models import PasswordField
 
 @models.register_model
 class User(models.Model):
-    email = models.EmailField()
+    email: str = types.EmailField()
     password = PasswordField()
 
     model_options = models.Options(

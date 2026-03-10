@@ -69,16 +69,19 @@ You can create your own user model using `plain create users` or manually:
 
 ```python
 # app/users/models.py
+from datetime import datetime
+
 from plain import models
+from plain.models import types
 from plain.passwords.models import PasswordField
 
 
 @models.register_model
 class User(models.Model):
-    email = models.EmailField()
+    email: str = types.EmailField()
     password = PasswordField()
-    is_admin = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    is_admin: bool = types.BooleanField(default=False)
+    created_at: datetime = types.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.email

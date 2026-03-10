@@ -224,13 +224,14 @@ Associating an `APIKey` with a user (or team, for example) is up to you. Most li
 ```python
 # app/users/models.py
 from plain import models
+from plain.models import types
 from plain.api.models import APIKey
 
 
 @models.register_model
 class User(models.Model):
     # other fields...
-    api_key = models.ForeignKeyField(
+    api_key: APIKey = types.ForeignKeyField(
         APIKey,
         on_delete=models.CASCADE,
         allow_null=True,
