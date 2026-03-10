@@ -41,6 +41,10 @@ from plain.models.fields import (
     URLField,
     UUIDField,
 )
+from plain.models.fields.encrypted import (
+    EncryptedJSONField,
+    EncryptedTextField,
+)
 from plain.models.fields.json import JSONField
 from plain.models.fields.related import ForeignKeyField, ManyToManyField
 from plain.models.fields.related_managers import (
@@ -63,6 +67,8 @@ __all__ = [
     "DecimalField",
     "DurationField",
     "EmailField",
+    "EncryptedJSONField",
+    "EncryptedTextField",
     "FloatField",
     "ForeignKeyField",
     "GenericIPAddressField",

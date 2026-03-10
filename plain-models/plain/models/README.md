@@ -502,6 +502,13 @@ class Product(models.Model):
 - [`JSONField`](./fields/json.py#JSONField) - JSON data
 - [`GenericIPAddressField`](./fields/__init__.py#GenericIPAddressField) - IPv4 or IPv6 address
 
+**Encrypted fields:**
+
+- [`EncryptedTextField`](./fields/encrypted.py#EncryptedTextField) - Text encrypted at rest
+- [`EncryptedJSONField`](./fields/encrypted.py#EncryptedJSONField) - JSON encrypted at rest
+
+See [Encrypted fields](#encrypted-fields) for details.
+
 For relationship fields, see [Relationships](#relationships).
 
 ### Typed fields
@@ -554,6 +561,43 @@ class Note(TimestampedMixin, models.Model):
     content = models.TextField(max_length=1024)
     liked = models.BooleanField(default=False)
 ```
+
+### Encrypted fields
+
+Encrypted fields transparently encrypt values before writing to the database and decrypt on read. Use them for third-party credentials, API keys, OAuth tokens, and other secrets your application needs back in plaintext.
+
+This is **not** for passwords or tokens you issue — those should be hashed (one-way). This is for secrets you receive from others and need to use later.
+
+```python
+from plain import models
+from plain.models import types
+
+@models.register_model
+class Integration(models.Model):
+    name: str = types.CharField(max_length=100)
+    api_key: str = types.EncryptedTextField(max_length=200)
+    credentials: dict = types.EncryptedJSONField(required=False, allow_null=True)
+```
+
+Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived from `SECRET_KEY`. The `cryptography` package is required — install it with `pip install cryptography`.
+
+**Available fields:**
+
+- `EncryptedTextField` — encrypts text, stored as `text` in the database regardless of `max_length` (ciphertext is longer than plaintext). `max_length` is enforced on the plaintext value during validation.
+- `EncryptedJSONField` — serializes to JSON, encrypts, and stores as `text`. Supports custom `encoder` and `decoder` parameters (same as `JSONField`).
+
+**Limitations:**
+
+- **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported.
+- **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
+
+**Key rotation:**
+
+Encryption uses `SECRET_KEY`. When rotating keys, add the old key to `SECRET_KEY_FALLBACKS` — the field will decrypt with any fallback key and re-encrypt with the current key on save.
+
+**Gradual migration:**
+
+If you add encryption to an existing plaintext column, old unencrypted values are returned as-is on read (the field detects whether a value is encrypted by its `$fernet$` prefix). They'll be encrypted on the next save.
 
 ## Relationships
 

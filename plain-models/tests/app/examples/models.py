@@ -179,3 +179,15 @@ class MixinTestModel(TimestampMixin, models.Model):
     model_options = models.Options(
         ordering=["-created_at"],
     )
+
+
+@models.register_model
+class SecretStore(models.Model):
+    """Model for testing encrypted fields."""
+
+    name: str = types.CharField(max_length=100)
+    api_key: str = types.EncryptedTextField(max_length=200)
+    notes: str = types.EncryptedTextField(required=False)
+    config: dict = types.EncryptedJSONField(required=False, allow_null=True)
+
+    query: models.QuerySet[SecretStore] = models.QuerySet()

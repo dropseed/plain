@@ -575,6 +575,56 @@ def JSONField(
     error_messages: dict[str, str] | None = None,
 ) -> Any: ...
 
+# Encrypted fields
+@overload
+def EncryptedTextField(
+    *,
+    max_length: int | None = None,
+    required: bool = True,
+    allow_null: Literal[True],
+    default: Any = ...,
+    choices: Any = None,
+    validators: Sequence[Callable[..., Any]] = (),
+    error_messages: dict[str, str] | None = None,
+) -> str | None: ...
+@overload
+def EncryptedTextField(
+    *,
+    max_length: int | None = None,
+    required: bool = True,
+    allow_null: Literal[False] = False,
+    default: Any = ...,
+    choices: Any = None,
+    validators: Sequence[Callable[..., Any]] = (),
+    error_messages: dict[str, str] | None = None,
+) -> str: ...
+@overload
+def EncryptedJSONField(
+    *,
+    encoder: type[JSONEncoder] | None = None,
+    decoder: type[JSONDecoder] | None = None,
+    max_length: int | None = None,
+    required: bool = True,
+    allow_null: Literal[True],
+    default: Any = ...,
+    choices: Any = None,
+    validators: Sequence[Callable[..., Any]] = (),
+    error_messages: dict[str, str] | None = None,
+) -> Any: ...
+@overload
+def EncryptedJSONField(
+    *,
+    encoder: type[JSONEncoder] | None = None,
+    decoder: type[JSONDecoder] | None = None,
+    max_length: int | None = None,
+    required: bool = True,
+    allow_null: Literal[False] = False,
+    default: Any = ...,
+    choices: Any = None,
+    validators: Sequence[Callable[..., Any]] = (),
+    error_messages: dict[str, str] | None = None,
+) -> Any: ...
+
 # Related fields
 @overload
 def ForeignKeyField(
@@ -681,6 +731,8 @@ __all__ = [
     "DecimalField",
     "DurationField",
     "EmailField",
+    "EncryptedJSONField",
+    "EncryptedTextField",
     "FloatField",
     "ForeignKeyField",
     "GenericIPAddressField",
