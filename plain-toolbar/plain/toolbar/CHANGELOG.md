@@ -1,5 +1,16 @@
 # plain-toolbar changelog
 
+## [0.12.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.1) (2026-03-09)
+
+### What's changed
+
+- Mobile toolbar now shows a compact floating version pill instead of a full-width bar, with tap-to-expand for toolbar items ([0e6a05649e00](https://github.com/dropseed/plain/commit/0e6a05649e00))
+- Fixed exception panel layout breaking with long exception strings by adding word wrapping and preventing the action buttons from shrinking ([b7be62ff74ed](https://github.com/dropseed/plain/commit/b7be62ff74ed))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.0](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.0) (2026-03-07)
 
 ### What's changed
