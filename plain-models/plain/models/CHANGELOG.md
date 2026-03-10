@@ -1,5 +1,18 @@
 # plain-models changelog
 
+## [0.82.2](https://github.com/dropseed/plain/releases/plain-models@0.82.2) (2026-03-10)
+
+### What's changed
+
+- Updated all README code examples to use `types.*` with Python type annotations as the default pattern ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+- Removed separate "Typed fields" and "Typing reverse relationships" doc sections — typed fields are now the default in all examples ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+- Added "Field Imports" section and "Differences from Django" section to AI rules ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+- Broadened AI rules to apply to all Python files, not just model files ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.82.1](https://github.com/dropseed/plain/releases/plain-models@0.82.1) (2026-03-10)
 
 ### What's changed
