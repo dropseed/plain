@@ -194,7 +194,7 @@ class Arbiter:
             if exitcode is None:
                 continue
 
-            if exitcode != 0:
+            if exitcode > 0:
                 self.log.error("Worker (pid:%s) exited with code %s", pid, exitcode)
 
             if exitcode == WORKER_BOOT_ERROR and self._halt_error is None:
@@ -212,7 +212,10 @@ class Arbiter:
                 msg = f"Worker (pid:{pid}) was sent {sig_name}!"
                 if -exitcode == signal.SIGKILL:
                     msg += " Perhaps out of memory?"
-                self.log.error(msg)
+                if -exitcode == signal.SIGTERM:
+                    self.log.info(msg)
+                else:
+                    self.log.error(msg)
 
             info.heartbeat.close()
             info.process.join(timeout=0)
