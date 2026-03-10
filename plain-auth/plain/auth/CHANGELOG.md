@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.27.1](https://github.com/dropseed/plain/releases/plain-auth@0.27.1) (2026-03-10)
+
+### What's changed
+
+- Updated README code examples to use typed fields (`types.EmailField`, `types.BooleanField`, `types.DateTimeField` with type annotations) ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-auth@0.27.0) (2026-03-07)
 
 ### What's changed
