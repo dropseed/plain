@@ -1,5 +1,15 @@
 # plain-elements changelog
 
+## [0.11.2](https://github.com/dropseed/plain/releases/plain-elements@0.11.2) (2026-03-10)
+
+### What's changed
+
+- Type annotation fix for `Element` global assignment in Jinja2 environment ([f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.11.1](https://github.com/dropseed/plain/releases/plain-elements@0.11.1) (2026-02-26)
 
 ### What's changed
