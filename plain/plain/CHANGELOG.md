@@ -1,5 +1,19 @@
 # plain changelog
 
+## [0.121.1](https://github.com/dropseed/plain/releases/plain@0.121.1) (2026-03-10)
+
+### What's changed
+
+- **Worker SIGTERM exits logged at info instead of error** — during graceful shutdown (e.g. Heroku deploy), workers exit with SIGTERM which is expected behavior. These are now logged at `info` level instead of `error`, preventing false alerts in error tracking ([1c3908d27aea](https://github.com/dropseed/plain/commit/1c3908d27aea))
+- **Removed duplicate log messages for signal-killed workers** — workers killed by a signal previously produced two error log lines (generic exit code + signal name). Now only the more descriptive signal-specific message is logged ([1c3908d27aea](https://github.com/dropseed/plain/commit/1c3908d27aea))
+- **Removed stack traces from intentional 4xx exception logging** — `PermissionDenied`, `MultiPartParserError`, and `BadRequestError400` exceptions no longer include `exc_info` in their log entries, reducing noise in error tracking ([c395232acdb9](https://github.com/dropseed/plain/commit/c395232acdb9))
+- **Handle asyncio `ConnectionResetError` without errno** — asyncio's `_drain_helper` raises `ConnectionResetError('Connection lost')` without an errno, which bypassed the existing errno-based check. Now caught explicitly before the `OSError` errno check ([b623d4f78667](https://github.com/dropseed/plain/commit/b623d4f78667))
+- Removed `type: ignore` comments across multiple modules with proper type fixes ([cda461b1b4f6](https://github.com/dropseed/plain/commit/cda461b1b4f6), [f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.121.0](https://github.com/dropseed/plain/releases/plain@0.121.0) (2026-03-09)
 
 ### What's changed
