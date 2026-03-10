@@ -1,5 +1,19 @@
 # plain-email changelog
 
+## [0.16.0](https://github.com/dropseed/plain/releases/plain-email@0.16.0) (2026-03-10)
+
+### What's changed
+
+- **Removed `fail_silently` parameter** from `get_connection()`, `send_mail()`, `send_mass_mail()`, and `BaseEmailBackend.__init__()` — email errors now always raise exceptions instead of being silently swallowed ([d08315532ace](https://github.com/dropseed/plain/commit/d08315532ace))
+- **`BaseEmailBackend.open()` return type changed** from `bool | None` to `bool` ([d08315532ace](https://github.com/dropseed/plain/commit/d08315532ace))
+- Simplified console and file-based email backends by removing try/except wrappers that relied on `fail_silently` ([d08315532ace](https://github.com/dropseed/plain/commit/d08315532ace))
+- Cleaned up backend `__init__` signatures — removed `**kwargs` passthrough and unused `Any` imports ([d08315532ace](https://github.com/dropseed/plain/commit/d08315532ace))
+
+### Upgrade instructions
+
+- Remove any `fail_silently=True/False` arguments from `send_mail()`, `send_mass_mail()`, and `get_connection()` calls.
+- If you have a custom email backend subclass, remove `fail_silently` from `__init__` and update `open()` to return `bool` instead of `bool | None`.
+
 ## [0.15.4](https://github.com/dropseed/plain/releases/plain-email@0.15.4) (2026-02-28)
 
 ### What's changed
