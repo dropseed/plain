@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.44.1](https://github.com/dropseed/plain/releases/plain-oauth@0.44.1) (2026-03-09)
+
+### What's changed
+
+- Added type annotations to `OAuthError.__init__` and `OAuthUserAlreadyExistsError.__init__` for better IDE support ([26077db4719d](https://github.com/dropseed/plain/commit/26077db4719d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.44.0](https://github.com/dropseed/plain/releases/plain-oauth@0.44.0) (2026-03-09)
 
 ### What's changed
