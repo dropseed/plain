@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.71.1](https://github.com/dropseed/plain/releases/plain-admin@0.71.1) (2026-03-10)
+
+### What's changed
+
+- Narrowed return types of `get_list_views()` and `get_searchable_views()` in the admin registry from `list[type]` to `list[type[AdminView]]` ([f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.71.0](https://github.com/dropseed/plain/releases/plain-admin@0.71.0) (2026-03-06)
 
 ### What's changed
