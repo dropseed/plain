@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.71.2](https://github.com/dropseed/plain/releases/plain-admin@0.71.2) (2026-03-10)
+
+### What's changed
+
+- Updated README code examples to use typed fields (`types.BooleanField` with type annotations) ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.71.1](https://github.com/dropseed/plain/releases/plain-admin@0.71.1) (2026-03-10)
 
 ### What's changed
