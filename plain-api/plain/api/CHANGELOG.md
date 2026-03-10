@@ -1,5 +1,16 @@
 # plain-api changelog
 
+## [0.27.1](https://github.com/dropseed/plain/releases/plain-api@0.27.1) (2026-03-10)
+
+### What's changed
+
+- Refactored OpenAPI `request_form` decorator to build the JSON schema using named intermediate dicts instead of deeply nested access, eliminating `type: ignore` comments ([f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+- Added explicit type annotations to `response_schema`, `field_mappings`, and `api_versions` ([f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-api@0.27.0) (2026-03-06)
 
 ### What's changed
