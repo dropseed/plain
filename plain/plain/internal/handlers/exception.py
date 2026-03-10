@@ -37,7 +37,6 @@ def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
             "Forbidden (Permission denied): %s",
             request.path,
             extra={"status_code": response.status_code, "request": request},
-            exc_info=exc,
         )
 
     elif isinstance(exc, MultiPartParserError):
@@ -48,7 +47,6 @@ def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
             "Bad request (Unable to parse request body): %s",
             request.path,
             extra={"status_code": response.status_code, "request": request},
-            exc_info=exc,
         )
 
     elif isinstance(exc, BadRequestError400):
@@ -60,7 +58,6 @@ def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
             str(exc),
             request.path,
             extra={"status_code": response.status_code, "request": request},
-            exc_info=exc,
         )
     elif isinstance(exc, SuspiciousOperationError400):
         # The request logger receives events for any problematic request
