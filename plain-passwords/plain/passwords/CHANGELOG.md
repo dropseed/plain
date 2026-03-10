@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.23.5](https://github.com/dropseed/plain/releases/plain-passwords@0.23.5) (2026-03-10)
+
+### What's changed
+
+- Updated README code examples to use typed fields (`types.EmailField` with type annotations) ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.23.4](https://github.com/dropseed/plain/releases/plain-passwords@0.23.4) (2026-02-26)
 
 ### What's changed
