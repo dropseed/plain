@@ -68,7 +68,6 @@ class DevProcess(ProcessManager):
 
         self.plain_env = {
             "PYTHONUNBUFFERED": "true",
-            "PLAIN_DEV": "true",
             "PLAIN_SERVER_ACCESS_LOG_FIELDS": '["method", "url", "status", "duration_ms", "size"]',
             "FORCE_COLOR": "1",
             "PYTHONWARNINGS": "default::DeprecationWarning,default::PendingDeprecationWarning",
@@ -82,7 +81,7 @@ class DevProcess(ProcessManager):
         self.custom_process_env = {
             **self.plain_env,
             "PORT": str(self.port),
-            "PLAIN_DEV_URL": self.url,
+            "DEV_URL": self.url,
         }
 
         if self.tunnel_url:

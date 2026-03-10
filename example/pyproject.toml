@@ -39,7 +39,7 @@ dependencies = [
 version = "4.2.1"
 
 [tool.plain.dev.run]
-tunnel = { cmd = "plain tunnel $PLAIN_DEV_URL --subdomain plain-example --quiet" }
+tunnel = { cmd = "plain tunnel $DEV_URL --subdomain plain-example --quiet" }
 
 [tool.plain.code.oxc]
 version = "1.51.0"

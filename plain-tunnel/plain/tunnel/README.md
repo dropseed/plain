@@ -35,10 +35,10 @@ You can run the tunnel automatically alongside your development server by adding
 
 ```toml
 [tool.plain.dev.run]
-tunnel = {cmd = "plain tunnel $PLAIN_DEV_URL --subdomain myapp --quiet"}
+tunnel = {cmd = "plain tunnel $DEV_URL --subdomain myapp --quiet"}
 ```
 
-The `$PLAIN_DEV_URL` variable is automatically set to your local server URL. The `--quiet` flag reduces log output so it does not clutter your terminal.
+The `$DEV_URL` variable is automatically set to your local server URL. The `--quiet` flag reduces log output so it does not clutter your terminal.
 
 To display the tunnel URL in the `plain dev` header, add `DEV_TUNNEL_URL` to your `.env` file:
 

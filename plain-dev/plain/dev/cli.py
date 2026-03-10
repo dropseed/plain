@@ -78,7 +78,7 @@ def cli(
             "You cannot use both --start and --stop at the same time."
         )
 
-    os.environ["PLAIN_DEV_SERVICES_AUTO"] = "false"
+    os.environ["DEV_SERVICES_AUTO"] = "false"
 
     dev = DevProcess()
 
