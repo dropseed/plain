@@ -1,5 +1,17 @@
 # plain-models changelog
 
+## [0.82.0](https://github.com/dropseed/plain/releases/plain-models@0.82.0) (2026-03-09)
+
+### What's changed
+
+- Added `EncryptedTextField` and `EncryptedJSONField` for transparent encryption at rest using Fernet (AES-128-CBC + HMAC-SHA256) with keys derived from `SECRET_KEY` ([73f3534f9334](https://github.com/dropseed/plain/commit/73f3534f9334))
+- Encrypted fields support key rotation via `SECRET_KEY_FALLBACKS` and gradual migration from plaintext columns ([73f3534f9334](https://github.com/dropseed/plain/commit/73f3534f9334))
+- Preflight checks prevent encrypted fields from being used in indexes or constraints ([73f3534f9334](https://github.com/dropseed/plain/commit/73f3534f9334))
+
+### Upgrade instructions
+
+- No changes required. Install the `cryptography` package to use the new encrypted fields.
+
 ## [0.81.1](https://github.com/dropseed/plain/releases/plain-models@0.81.1) (2026-03-09)
 
 ### What's changed
