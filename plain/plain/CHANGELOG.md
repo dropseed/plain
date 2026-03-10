@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.121.2](https://github.com/dropseed/plain/releases/plain@0.121.2) (2026-03-10)
+
+### What's changed
+
+- Added prescriptive "After making code changes" section to AI rules with `plain check` and `plain request` guidance ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+- Distributed Django differences into package-specific rules (plain-models, plain-templates) instead of one monolithic list ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+- Added `request.query_params`, `request.form_data`, `request.json_data`, `request.files` to Django differences ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.121.1](https://github.com/dropseed/plain/releases/plain@0.121.1) (2026-03-10)
 
 ### What's changed
