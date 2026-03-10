@@ -1,5 +1,16 @@
 # plain-htmx changelog
 
+## [0.17.1](https://github.com/dropseed/plain/releases/plain-htmx@0.17.1) (2026-03-10)
+
+### What's changed
+
+- Fixed `CallBlock.set_lineno()` return value assumption — `set_lineno` returns `None`, so the node is now assigned before calling it ([cda461b1b4f6](https://github.com/dropseed/plain/commit/cda461b1b4f6))
+- Added `None` check for template references in fragment discovery to prevent `TypeError` ([cda461b1b4f6](https://github.com/dropseed/plain/commit/cda461b1b4f6))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-htmx@0.17.0) (2026-03-07)
 
 ### What's changed
