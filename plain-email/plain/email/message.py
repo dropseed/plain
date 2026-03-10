@@ -273,11 +273,11 @@ class EmailMessage:
         self.extra_headers = headers or {}
         self.connection = connection
 
-    def get_connection(self, fail_silently: bool = False) -> BaseEmailBackend:
+    def get_connection(self) -> BaseEmailBackend:
         from . import get_connection
 
         if not self.connection:
-            self.connection = get_connection(fail_silently=fail_silently)
+            self.connection = get_connection()
         return self.connection
 
     def message(self) -> SafeMIMEText | SafeMIMEMultipart:
@@ -314,13 +314,13 @@ class EmailMessage:
         """
         return [email for email in (self.to + self.cc + self.bcc) if email]
 
-    def send(self, fail_silently: bool = False) -> int:
+    def send(self) -> int:
         """Send the email message."""
         if not self.recipients():
             # Don't bother creating the network connection if there's nobody to
             # send to.
             return 0
-        return self.get_connection(fail_silently).send_messages([self])
+        return self.get_connection().send_messages([self])
 
     def attach(
         self,

@@ -32,18 +32,15 @@ __all__ = [
 ]
 
 
-def get_connection(
-    backend: str | None = None, fail_silently: bool = False, **kwds: Any
-) -> BaseEmailBackend:
+def get_connection(backend: str | None = None, **kwds: Any) -> BaseEmailBackend:
     """Load an email backend and return an instance of it.
 
     If backend is None (default), use settings.EMAIL_BACKEND.
 
-    Both fail_silently and other keyword arguments are used in the
-    constructor of the backend.
+    Keyword arguments are passed to the constructor of the backend.
     """
     klass = import_string(backend or settings.EMAIL_BACKEND)
-    return klass(fail_silently=fail_silently, **kwds)
+    return klass(**kwds)
 
 
 def send_mail(
@@ -51,7 +48,6 @@ def send_mail(
     message: str,
     from_email: str | None,
     recipient_list: list[str],
-    fail_silently: bool = False,
     auth_user: str | None = None,
     auth_password: str | None = None,
     connection: BaseEmailBackend | None = None,
@@ -71,7 +67,6 @@ def send_mail(
     connection = connection or get_connection(
         username=auth_user,
         password=auth_password,
-        fail_silently=fail_silently,
     )
     mail = EmailMultiAlternatives(
         subject, message, from_email, recipient_list, connection=connection
@@ -84,7 +79,6 @@ def send_mail(
 
 def send_mass_mail(
     datatuple: tuple[tuple[str, str, str, list[str]], ...],
-    fail_silently: bool = False,
     auth_user: str | None = None,
     auth_password: str | None = None,
     connection: BaseEmailBackend | None = None,
@@ -104,7 +98,6 @@ def send_mass_mail(
     connection = connection or get_connection(
         username=auth_user,
         password=auth_password,
-        fail_silently=fail_silently,
     )
     messages = [
         EmailMessage(subject, message, sender, recipient, connection=connection)

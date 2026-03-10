@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import datetime
 import os
-from typing import TYPE_CHECKING, Any
+from io import BufferedWriter
+from typing import TYPE_CHECKING
 
 from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings
@@ -17,8 +18,9 @@ if TYPE_CHECKING:
 
 class EmailBackend(ConsoleEmailBackend):
     file_path: str  # Set during __init__, validated to be non-None
+    stream: BufferedWriter | None
 
-    def __init__(self, *args: Any, file_path: str | None = None, **kwargs: Any) -> None:
+    def __init__(self, *, file_path: str | None = None) -> None:
         self._fname: str | None = None
         _file_path: str | None = file_path or getattr(settings, "EMAIL_FILE_PATH", None)
         if not _file_path:
@@ -41,11 +43,8 @@ class EmailBackend(ConsoleEmailBackend):
             raise ImproperlyConfigured(
                 f"Could not write to directory: {self.file_path}"
             )
-        # Finally, call super().
-        # Since we're using the console-based backend as a base,
-        # force the stream to be None, so we don't default to stdout
-        kwargs["stream"] = None
-        super().__init__(*args, **kwargs)
+        super().__init__()
+        self.stream = None
 
     def write_message(self, message: EmailMessage) -> None:
         assert self.stream is not None, "stream should be opened before writing"

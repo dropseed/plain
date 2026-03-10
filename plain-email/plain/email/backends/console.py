@@ -15,10 +15,9 @@ if TYPE_CHECKING:
 
 
 class EmailBackend(BaseEmailBackend):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.stream = kwargs.pop("stream", sys.stdout)
+    def __init__(self, *, stream: Any = None) -> None:
+        self.stream = stream or sys.stdout
         self._lock = threading.RLock()
-        super().__init__(*args, **kwargs)
 
     def write_message(self, message: EmailMessage) -> None:
         msg = message.message()
@@ -41,15 +40,11 @@ class EmailBackend(BaseEmailBackend):
             return 0
         msg_count = 0
         with self._lock:
-            try:
-                stream_created = self.open()
-                for message in email_messages:
-                    self.write_message(message)
-                    self.stream.flush()  # flush after each message
-                    msg_count += 1
-                if stream_created:
-                    self.close()
-            except Exception:
-                if not self.fail_silently:
-                    raise
+            stream_created = self.open()
+            for message in email_messages:
+                self.write_message(message)
+                self.stream.flush()  # flush after each message
+                msg_count += 1
+            if stream_created:
+                self.close()
         return msg_count

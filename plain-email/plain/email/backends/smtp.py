@@ -30,14 +30,11 @@ class EmailBackend(BaseEmailBackend):
         username: str | None = None,
         password: str | None = None,
         use_tls: bool | None = None,
-        fail_silently: bool = False,
         use_ssl: bool | None = None,
         timeout: int | None = None,
         ssl_keyfile: str | None = None,
         ssl_certfile: str | None = None,
-        **kwargs: Any,
     ) -> None:
-        super().__init__(fail_silently=fail_silently)
         self.host = host or settings.EMAIL_HOST
         self.port = port or settings.EMAIL_PORT
         self.username = settings.EMAIL_HOST_USER if username is None else username
@@ -72,11 +69,10 @@ class EmailBackend(BaseEmailBackend):
         else:
             return ssl.create_default_context()
 
-    def open(self) -> bool | None:
+    def open(self) -> bool:
         """
         Ensure an open connection to the email server. Return whether or not a
-        new connection was required (True or False) or None if an exception
-        passed silently.
+        new connection was required (True or False).
         """
         if self.connection:
             # Nothing to do if the connection is already open.
@@ -89,26 +85,22 @@ class EmailBackend(BaseEmailBackend):
             connection_params["timeout"] = self.timeout
         if self.use_ssl:
             connection_params["context"] = self.ssl_context
-        try:
-            self.connection = self.connection_class(
-                self.host, self.port, **connection_params
-            )
+        self.connection = self.connection_class(
+            self.host, self.port, **connection_params
+        )
 
-            # TLS/SSL are mutually exclusive, so only attempt TLS over
-            # non-secure connections.
-            if not self.use_ssl and self.use_tls:
-                self.connection.starttls(context=self.ssl_context)
-            if self.username and self.password:
-                self.connection.login(self.username, self.password)
-            return True
-        except OSError:
-            if not self.fail_silently:
-                raise
+        # TLS/SSL are mutually exclusive, so only attempt TLS over
+        # non-secure connections.
+        if not self.use_ssl and self.use_tls:
+            self.connection.starttls(context=self.ssl_context)
+        if self.username and self.password:
+            self.connection.login(self.username, self.password)
+        return True
 
     def close(self) -> None:
         """Close the connection to the email server."""
         if self.connection is None:
-            return None
+            return
         try:
             try:
                 self.connection.quit()
@@ -117,10 +109,6 @@ class EmailBackend(BaseEmailBackend):
                 # sometimes, or when the connection was already disconnected
                 # by the server.
                 self.connection.close()
-            except smtplib.SMTPException:
-                if self.fail_silently:
-                    return None
-                raise
         finally:
             self.connection = None
 
@@ -133,10 +121,6 @@ class EmailBackend(BaseEmailBackend):
             return 0
         with self._lock:
             new_conn_created = self.open()
-            if not self.connection or new_conn_created is None:
-                # We failed silently on open().
-                # Trying to send would be pointless.
-                return 0
             num_sent = 0
             try:
                 for message in email_messages:
@@ -159,12 +143,7 @@ class EmailBackend(BaseEmailBackend):
         ]
         message = email_message.message()
         assert self.connection is not None, "connection should be open before sending"
-        try:
-            self.connection.sendmail(
-                from_email, recipients, message.as_bytes(linesep="\r\n")
-            )
-        except smtplib.SMTPException:
-            if not self.fail_silently:
-                raise
-            return False
+        self.connection.sendmail(
+            from_email, recipients, message.as_bytes(linesep="\r\n")
+        )
         return True

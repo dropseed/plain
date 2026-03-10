@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -27,10 +27,7 @@ class BaseEmailBackend(ABC):
            pass
     """
 
-    def __init__(self, fail_silently: bool = False, **kwargs: Any) -> None:
-        self.fail_silently = fail_silently
-
-    def open(self) -> bool | None:
+    def open(self) -> bool:
         """
         Open a network connection.
 
@@ -47,7 +44,7 @@ class BaseEmailBackend(ABC):
 
         The default implementation does nothing.
         """
-        pass
+        return False
 
     def close(self) -> None:
         """Close a network connection."""
