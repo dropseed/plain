@@ -454,6 +454,12 @@ async def async_handle_dispatch_error(
             await async_handle_error(worker, req, conn, exc)
         return False
 
+    if isinstance(exc, ConnectionResetError):
+        # asyncio's _drain_helper raises ConnectionResetError('Connection lost')
+        # without an errno, so we handle it before the errno-based OSError check.
+        worker.log.debug("Client disconnected during dispatch: %s", exc)
+        return False
+
     if isinstance(exc, OSError):
         if exc.errno in (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN):
             worker.log.debug("Client disconnected during dispatch: %s", exc)
