@@ -1029,10 +1029,10 @@ class Query(BaseExpression):
         """
         if self.alias_map:
             alias = self.base_table
-            self.ref_alias(alias)
+            self.ref_alias(alias)  # type: ignore[invalid-argument-type]
         elif self.model:
             alias = self.join(
-                self.base_table_class(self.model.model_options.db_table, None)
+                self.base_table_class(self.model.model_options.db_table, None)  # type: ignore[invalid-argument-type]
             )
         else:
             alias = None
@@ -1882,7 +1882,7 @@ class Query(BaseExpression):
             connection = self.join_class(
                 meta.model.model_options.db_table,
                 alias,
-                table_alias,
+                table_alias,  # type: ignore[invalid-argument-type]
                 INNER,
                 join.join_field,
                 nullable,
@@ -1897,7 +1897,7 @@ class Query(BaseExpression):
             joins.append(alias)
             if filtered_relation:
                 filtered_relation.path = joins[:]
-        return JoinInfo(final_field, targets, meta, joins, path, final_transformer)
+        return JoinInfo(final_field, targets, meta, joins, path, final_transformer)  # type: ignore[invalid-argument-type]
 
     def trim_joins(
         self, targets: tuple[Field, ...], joins: list[str], path: list[Any]

@@ -108,8 +108,9 @@ class Manager:
         """
 
         def _terminate(signum: int, frame: FrameType | None) -> None:
-            self._system_print("{} received\n".format(SIGNALS[signum]["name"]))
-            self.returncode = SIGNALS[signum]["rc"]
+            sig = signal.Signals(signum)
+            self._system_print("{} received\n".format(SIGNALS[sig]["name"]))
+            self.returncode = SIGNALS[sig]["rc"]
             self.terminate()
 
         signal.signal(signal.SIGTERM, _terminate)

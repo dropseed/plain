@@ -288,7 +288,7 @@ class RelatedField(FieldCacheMixin, Field):
         returned.
         """
         if callable(self.remote_field.limit_choices_to):
-            return self.remote_field.limit_choices_to()
+            return self.remote_field.limit_choices_to()  # type: ignore[call-top-callable]
         return self.remote_field.limit_choices_to
 
     def related_query_name(self) -> str:

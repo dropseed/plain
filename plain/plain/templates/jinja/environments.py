@@ -60,5 +60,5 @@ class DefaultEnvironment(Environment):
         )
 
         # Load the top-level defaults
-        self.globals.update(default_globals)
+        self.globals.update(default_globals)  # type: ignore[no-matching-overload]
         self.filters.update(default_filters)

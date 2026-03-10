@@ -802,7 +802,7 @@ class ModelState:
         return self.__class__(
             package_label=self.package_label,
             name=self.name,
-            fields=dict(self.fields),
+            fields=list(self.fields.items()),
             # Since options are shallow-copied here, operations such as
             # AddIndex must replace their option (e.g 'indexes') rather
             # than mutating it.
@@ -828,7 +828,9 @@ class ModelState:
                 f"Cannot resolve one or more bases from {self.bases!r}"
             )
         # Clone fields for the body, add other bits.
-        body = {name: field.clone() for name, field in self.fields.items()}
+        body: dict[str, Any] = {
+            name: field.clone() for name, field in self.fields.items()
+        }
         body["model_options"] = meta_options
         body["_model_meta"] = Meta(
             models_registry=models_registry

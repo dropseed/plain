@@ -151,7 +151,7 @@ def _normalize(pattern: str) -> list[tuple[str, list[str | None]]]:
                             _walk_to_end(ch, pattern_iter)
                         else:
                             result.append(Group(((f"%({param})s"), None)))
-            elif ch in "*?+{":
+            elif ch is not None and ch in "*?+{":
                 # Quantifiers affect the previous item in the result list.
                 count, ch = _get_quantifier(ch, pattern_iter)
                 if ch:

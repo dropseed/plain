@@ -135,7 +135,7 @@ class ScanResult:
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        result = {
+        result: dict[str, str | bool | list[dict] | dict] = {
             "url": self.url,
             "passed": self.passed,
             "audits": [audit.to_dict() for audit in self.audits],

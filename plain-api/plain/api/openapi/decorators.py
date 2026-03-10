@@ -25,7 +25,7 @@ def response_typed_dict(
         # TODO if return_type is a list/tuple,
         # then use anyOf or oneOf?
 
-        response_schema = {
+        response_schema: dict[str, Any] = {
             "description": description or HTTPStatus(int(status_code)).phrase,
         }
 
@@ -84,7 +84,7 @@ def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
     """
 
     def decorator(func: F) -> F:
-        field_mappings = {
+        field_mappings: dict[type[fields.Field], dict[str, str]] = {
             fields.IntegerField: {
                 "type": "integer",
             },
@@ -137,28 +137,27 @@ def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
                 "format": "email",
             },
         }
-        _schema = {
-            "requestBody": {
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "type": "object",
-                            "properties": {},
-                        }
-                    }
-                    # could add application/x-www-form-urlencoded?
+        json_schema: dict[str, Any] = {
+            "type": "object",
+            "properties": {},
+        }
+        request_body: dict[str, Any] = {
+            "content": {
+                "application/json": {
+                    "schema": json_schema,
                 }
             }
+            # could add application/x-www-form-urlencoded?
+        }
+        _schema: dict[str, Any] = {
+            "requestBody": request_body,
         }
 
         required_fields = []
 
         for field_name, field in form_class.base_fields.items():
             field_schema = field_mappings[field.__class__].copy()
-            # Complex nested dict access - type checker can't verify structure
-            _schema["requestBody"]["content"]["application/json"]["schema"][  # type: ignore[index]
-                "properties"
-            ][field_name] = field_schema
+            json_schema["properties"][field_name] = field_schema
 
             if field.required:
                 required_fields.append(field_name)
@@ -168,11 +167,9 @@ def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
             # TODO add default to the schema
 
         if required_fields:
-            _schema["requestBody"]["content"]["application/json"]["schema"][
-                "required"
-            ] = required_fields
+            json_schema["required"] = required_fields
             # The body is required if any field is
-            _schema["requestBody"]["required"] = True
+            request_body["required"] = True
 
         func.openapi_schema = merge_data(
             getattr(func, "openapi_schema", {}),

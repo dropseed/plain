@@ -174,7 +174,7 @@ def test_raw_query(db):
     assert all(isinstance(c, Car) for c in cars)
 
     # Verify the data is correct
-    makes = [c.make for c in cars]
+    makes = [c.make for c in cars]  # type: ignore[unresolved-attribute]
     assert makes == ["Ford", "Honda", "Toyota"]
 
 
@@ -189,9 +189,9 @@ def test_raw_query_with_params(db):
         Car.query.raw("SELECT * FROM examples_car WHERE make = %s", ("Toyota",))
     )
     assert len(cars) == 2
-    assert all(c.make == "Toyota" for c in cars)
+    assert all(c.make == "Toyota" for c in cars)  # type: ignore[unresolved-attribute]
 
     # Test with list params (user-friendly - converted to tuple internally)
     cars = list(Car.query.raw("SELECT * FROM examples_car WHERE make = %s", ["Honda"]))
     assert len(cars) == 1
-    assert cars[0].make == "Honda"
+    assert cars[0].make == "Honda"  # type: ignore[unresolved-attribute]

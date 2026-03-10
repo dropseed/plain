@@ -1285,7 +1285,7 @@ class SQLCompiler:
                     yield LOOKUP_SEP.join(path)
                 if klass_info is not None:
                     queue.extend(
-                        (path, related_klass_info)
+                        (path, related_klass_info)  # type: ignore[invalid-argument-type]
                         for related_klass_info in klass_info.get(
                             "related_klass_infos", []
                         )
@@ -1669,7 +1669,7 @@ class SQLDeleteCompiler(SQLCompiler):
         )
 
     def _as_sql(self, query: Query) -> SqlWithParams:
-        delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"
+        delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"  # type: ignore[invalid-argument-type]
         try:
             where, params = self.compile(query.where)
         except FullResultSet:
@@ -1752,7 +1752,7 @@ class SQLUpdateCompiler(SQLCompiler):
                 values.append(f"{qn(name)} = NULL")
         table = self.query.base_table
         result = [
-            f"UPDATE {qn(table)} SET",
+            f"UPDATE {qn(table)} SET",  # type: ignore[invalid-argument-type]
             ", ".join(values),
         ]
         try:

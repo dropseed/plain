@@ -1473,7 +1473,7 @@ class QuerySet(Generic[T]):
         self._for_write = True
         query = InsertQuery(
             self.model,
-            on_conflict=on_conflict.value if on_conflict else None,
+            on_conflict=on_conflict if on_conflict else None,
             update_fields=update_fields,
             unique_fields=unique_fields,
         )

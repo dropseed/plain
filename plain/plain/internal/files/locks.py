@@ -39,7 +39,7 @@ if os.name == "nt":
         POINTER,
         Structure,
         Union,
-        WinDLL,  # type: ignore[attr-defined]
+        WinDLL,
         byref,
         c_int64,
         c_ulong,
@@ -89,13 +89,13 @@ if os.name == "nt":
     UnlockFileEx.argtypes = [HANDLE, DWORD, DWORD, DWORD, LPOVERLAPPED]
 
     def lock(f: IO[bytes] | int, flags: int) -> bool:
-        hfile = msvcrt.get_osfhandle(_fd(f))  # type: ignore[attr-defined]
+        hfile = msvcrt.get_osfhandle(_fd(f))
         overlapped = OVERLAPPED()
         ret = LockFileEx(hfile, flags, 0, 0, 0xFFFF0000, byref(overlapped))
         return bool(ret)
 
     def unlock(f: IO[bytes] | int) -> bool:
-        hfile = msvcrt.get_osfhandle(_fd(f))  # type: ignore[attr-defined]
+        hfile = msvcrt.get_osfhandle(_fd(f))
         overlapped = OVERLAPPED()
         ret = UnlockFileEx(hfile, 0, 0, 0xFFFF0000, byref(overlapped))
         return bool(ret)

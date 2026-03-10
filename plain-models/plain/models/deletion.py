@@ -150,7 +150,7 @@ class Collector:
         if not objs:
             return []
         new_objs = []
-        model = objs[0].__class__
+        model = objs[0].__class__  # type: ignore[index]
         instances = self.data[model]
         for obj in objs:
             if obj not in instances:
@@ -182,7 +182,7 @@ class Collector:
 
     def add_restricted_objects(self, field: RelatedField, objs: Iterable[Any]) -> None:
         if objs:
-            model = objs[0].__class__
+            model = objs[0].__class__  # type: ignore[index]
             self.restricted_objects[model][field].update(objs)
 
     def clear_restricted_objects_from_set(self, model: Any, objs: set[Any]) -> None:

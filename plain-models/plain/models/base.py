@@ -743,7 +743,7 @@ class Model(metaclass=ModelBase):
 
         if len(unique_check) == 1:
             field = meta.get_forward_field(unique_check[0])
-            params["field_label"] = field.name
+            params["field_label"] = field.name  # type: ignore[assignment]
             return ValidationError(
                 message=field.error_messages["unique"],
                 code="unique",
@@ -772,7 +772,9 @@ class Model(metaclass=ModelBase):
             )
 
     def get_constraints(self) -> list[tuple[type[Model], list[Any]]]:
-        constraints = [(self.__class__, list(self.model_options.constraints))]
+        constraints: list[tuple[type[Model], list[Any]]] = [
+            (self.__class__, list(self.model_options.constraints))
+        ]
         return constraints
 
     def validate_constraints(self, exclude: set[str] | None = None) -> None:
@@ -1212,7 +1214,7 @@ class Model(metaclass=ModelBase):
             fld = None
             for part in field.split(LOOKUP_SEP):
                 try:
-                    fld = _cls._model_meta.get_field(part)
+                    fld = _cls._model_meta.get_field(part)  # type: ignore[unresolved-attribute]
                     if isinstance(fld, RelatedField):
                         _cls = fld.path_infos[-1].to_meta.model
                     else:

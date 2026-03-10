@@ -331,7 +331,7 @@ class RenameModel(ModelOperation):
             schema_editor.alter_field(
                 model,
                 related_object.field,
-                to_field,
+                to_field,  # type: ignore[invalid-argument-type]
             )
 
     def references_model(self, name: str, package_label: str) -> bool:

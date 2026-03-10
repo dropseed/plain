@@ -432,7 +432,7 @@ class BaseExpression:
         return self.output_field.get_lookup(lookup)
 
     def get_transform(self, name: str) -> type[Transform] | None:
-        return self.output_field.get_transform(name)
+        return self.output_field.get_transform(name)  # type: ignore[return-type]
 
     def relabeled_clone(self, change_map: dict[str, str]) -> Self:
         clone = self.copy()
@@ -1046,7 +1046,7 @@ class Value(Expression):
             else:
                 val = output_field.get_db_prep_value(val, connection=connection)
             if hasattr(output_field, "get_placeholder"):
-                return output_field.get_placeholder(val, compiler, connection), [val]
+                return output_field.get_placeholder(val, compiler, connection), [val]  # type: ignore[call-non-callable]
         if val is None:
             return "NULL", []
         return "%s", [val]

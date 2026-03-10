@@ -16,7 +16,7 @@ class InclusionTagExtension(Extension):
 
     def parse(self, parser: Any) -> nodes.Node:
         lineno = next(parser.stream).lineno
-        args = [
+        args: list[nodes.Expr] = [
             nodes.DerivedContextReference(),
         ]
         kwargs = []

@@ -37,7 +37,7 @@ class CookieMetadata:
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        result = {
+        result: dict[str, str | None | bool | int] = {
             "name": self.name,
             "value": self.value,
             "domain": self.domain,
@@ -116,7 +116,7 @@ class ResponseMetadata:
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        result = {
+        result: dict[str, str | int | dict[str, str] | list[dict]] = {
             "url": self.url,
             "status_code": self.status_code,
             "headers": self.headers,

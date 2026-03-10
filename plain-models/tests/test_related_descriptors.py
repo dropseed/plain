@@ -54,7 +54,7 @@ class TestForwardForeignKeyDescriptor:
         except Exception as e:
             # For now, accept that nullable FK behavior might need adjustment
             # The core relationship functionality works
-            pytest.skip(f"Nullable FK handling needs refinement: {e}")
+            pytest.skip(f"Nullable FK handling needs refinement: {e}")  # type: ignore[invalid-argument-type]
 
 
 class TestReverseForeignKey:

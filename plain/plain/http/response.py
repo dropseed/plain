@@ -519,13 +519,15 @@ class FileResponse(StreamingResponse):
                 content_type, encoding = mimetypes.guess_type(filename)
                 # Encoding isn't set to prevent browsers from automatically
                 # uncompressing files.
-                content_type = {
+                encoding_types: dict[str, str] = {
                     "br": "application/x-brotli",
                     "bzip2": "application/x-bzip",
                     "compress": "application/x-compress",
                     "gzip": "application/gzip",
                     "xz": "application/x-xz",
-                }.get(encoding, content_type)
+                }
+                if encoding and encoding in encoding_types:
+                    content_type = encoding_types[encoding]
                 self.headers["Content-Type"] = (
                     content_type or "application/octet-stream"
                 )

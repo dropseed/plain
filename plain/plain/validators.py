@@ -268,7 +268,7 @@ class EmailValidator:
 validate_email = EmailValidator()
 
 
-def validate_ipv4_address(value: str) -> None:
+def validate_ipv4_address(value: str, /) -> None:
     try:
         ipaddress.IPv4Address(value)
     except ValueError:
@@ -277,14 +277,14 @@ def validate_ipv4_address(value: str) -> None:
         )
 
 
-def validate_ipv6_address(value: str) -> None:
+def validate_ipv6_address(value: str, /) -> None:
     if not is_valid_ipv6_address(value):
         raise ValidationError(
             "Enter a valid IPv6 address.", code="invalid", params={"value": value}
         )
 
 
-def validate_ipv46_address(value: str) -> None:
+def validate_ipv46_address(value: str, /) -> None:
     try:
         validate_ipv4_address(value)
     except ValidationError:
@@ -298,7 +298,7 @@ def validate_ipv46_address(value: str) -> None:
             )
 
 
-ip_address_validator_map = {
+ip_address_validator_map: dict[str, tuple[list[Callable[[str], None]], str]] = {
     "both": ([validate_ipv46_address], "Enter a valid IPv4 or IPv6 address."),
     "ipv4": ([validate_ipv4_address], "Enter a valid IPv4 address."),
     "ipv6": ([validate_ipv6_address], "Enter a valid IPv6 address."),

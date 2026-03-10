@@ -104,16 +104,16 @@ class AdminViewRegistry:
 
         return urls
 
-    def get_list_views(self) -> list[type]:
+    def get_list_views(self) -> list[type[AdminView]]:
         from plain.admin.views.objects import AdminListView
 
-        views = [
+        views: list[type[AdminView]] = [
             view for view in self.registered_views if issubclass(view, AdminListView)
         ]
         views.sort(key=lambda v: v.get_slug())
         return views
 
-    def get_searchable_views(self) -> list[type]:
+    def get_searchable_views(self) -> list[type[AdminView]]:
         views = [
             view
             for view in self.registered_views

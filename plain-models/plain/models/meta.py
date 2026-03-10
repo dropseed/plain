@@ -376,7 +376,7 @@ class Meta:
             )
 
         try:
-            return self.fields_map[field_name]
+            return self.fields_map[field_name]  # type: ignore[return-type]
         except KeyError:
             raise FieldDoesNotExist(
                 f"{self.model} has no reverse relation named '{field_name}'"
@@ -536,7 +536,7 @@ class Meta:
             # the current model (reverse relations).
             all_fields = self._relation_tree
             for field in all_fields:
-                fields.append(field.remote_field)
+                fields.append(field.remote_field)  # type: ignore[unresolved-attribute]
 
         if forward:
             fields += self.local_fields

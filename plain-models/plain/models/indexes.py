@@ -77,7 +77,7 @@ class Index:
         self.opclasses: tuple[str, ...] = tuple(opclasses)
         self.condition = condition
         self.include = tuple(include) if include else ()
-        self.expressions: tuple[Expression, ...] = tuple(
+        self.expressions: tuple[Expression, ...] = tuple(  # type: ignore[assignment]
             F(expression) if isinstance(expression, str) else expression
             for expression in expressions
         )

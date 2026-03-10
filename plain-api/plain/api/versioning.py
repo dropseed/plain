@@ -36,7 +36,7 @@ class APIVersionChange:
 
 class VersionedAPIView(View):
     # API versions from newest to oldest
-    api_versions: dict[str, list[APIVersionChange]] = {}
+    api_versions: dict[str, list[type[APIVersionChange]]] = {}
     api_version_header = "API-Version"
     default_api_version: str = ""
 

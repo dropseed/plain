@@ -71,7 +71,11 @@ class PageView(PageViewMixin, TemplateView):
 
         # HTML page -- only serve markdown if a companion exists and is explicitly preferred.
         # Type order matters: text/html first so HTML wins ties.
-        companion = pages_registry.get_markdown_companion(self.page.get_url_name())
+        url_name = self.page.get_url_name()
+        if not url_name:
+            return super().get()
+
+        companion = pages_registry.get_markdown_companion(url_name)
         if not companion:
             return super().get()
 

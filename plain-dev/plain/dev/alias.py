@@ -61,6 +61,8 @@ class AliasManager:
 
         # Check if alias is defined in shell
         try:
+            if not self.shell:
+                return False
             # Try to run the alias to see if it exists
             result = subprocess.run(
                 [self.shell, "-i", "-c", f"alias {self.ALIAS_NAME}"],

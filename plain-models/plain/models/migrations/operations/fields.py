@@ -119,13 +119,13 @@ class AddField(FieldOperation):
         field = to_model._model_meta.get_field(self.name)
         assert self.field is not None
         if not self.preserve_default:
-            field.default = self.field.default
+            field.default = self.field.default  # type: ignore[assignment]
         schema_editor.add_field(
             from_model,
-            field,
+            field,  # type: ignore[invalid-argument-type]
         )
         if not self.preserve_default:
-            field.default = NOT_PROVIDED
+            field.default = NOT_PROVIDED  # type: ignore[assignment]
 
     def describe(self) -> str:
         return f"Add field {self.name} to {self.model_name}"
@@ -187,7 +187,8 @@ class RemoveField(FieldOperation):
             package_label, self.model_name
         )
         schema_editor.remove_field(
-            from_model, from_model._model_meta.get_field(self.name)
+            from_model,
+            from_model._model_meta.get_field(self.name),  # type: ignore[invalid-argument-type]
         )
 
     def describe(self) -> str:
@@ -256,10 +257,10 @@ class AlterField(FieldOperation):
         to_field = to_model._model_meta.get_field(self.name)
         assert self.field is not None
         if not self.preserve_default:
-            to_field.default = self.field.default
-        schema_editor.alter_field(from_model, from_field, to_field)
+            to_field.default = self.field.default  # type: ignore[assignment]
+        schema_editor.alter_field(from_model, from_field, to_field)  # type: ignore[invalid-argument-type]
         if not self.preserve_default:
-            to_field.default = NOT_PROVIDED
+            to_field.default = NOT_PROVIDED  # type: ignore[assignment]
 
     def describe(self) -> str:
         return f"Alter field {self.name} on {self.model_name}"
@@ -333,8 +334,8 @@ class RenameField(FieldOperation):
         )
         schema_editor.alter_field(
             from_model,
-            from_model._model_meta.get_field(self.old_name),
-            to_model._model_meta.get_field(self.new_name),
+            from_model._model_meta.get_field(self.old_name),  # type: ignore[invalid-argument-type]
+            to_model._model_meta.get_field(self.new_name),  # type: ignore[invalid-argument-type]
         )
 
     def describe(self) -> str:
