@@ -1,5 +1,18 @@
 # plain-models changelog
 
+## [0.82.1](https://github.com/dropseed/plain/releases/plain-models@0.82.1) (2026-03-10)
+
+### What's changed
+
+- Replaced `SET()` closure with a `_SetOnDelete` class to eliminate `type: ignore` comments for dynamic attribute assignment (`deconstruct`, `lazy_sub_objs`) ([cda461b1b4f6](https://github.com/dropseed/plain/commit/cda461b1b4f6))
+- Replaced `lazy_sub_objs` function attribute on `SET_NULL` and `SET_DEFAULT` with a module-level `_LAZY_ON_DELETE` set ([cda461b1b4f6](https://github.com/dropseed/plain/commit/cda461b1b4f6))
+- Narrowed `_relation_tree` type and used `get_forward_field` in migration operations ([eb5af6a525b5](https://github.com/dropseed/plain/commit/eb5af6a525b5))
+- Type annotation improvements across expressions, indexes, related fields, and deletion modules ([f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.82.0](https://github.com/dropseed/plain/releases/plain-models@0.82.0) (2026-03-09)
 
 ### What's changed
