@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.19.1](https://github.com/dropseed/plain/releases/plain-pages@0.19.1) (2026-03-10)
+
+### What's changed
+
+- Fixed potential `TypeError` when `get_url_name()` returns `None` for a page — now falls back to the standard template response instead of passing `None` to `get_markdown_companion()` ([f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-pages@0.19.0) (2026-03-03)
 
 ### What's changed
