@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.27.2](https://github.com/dropseed/plain/releases/plain-api@0.27.2) (2026-03-10)
+
+### What's changed
+
+- Updated README code examples to use typed fields (`types.ForeignKeyField` with type annotations) ([772345d4e1f1](https://github.com/dropseed/plain/commit/772345d4e1f1))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.1](https://github.com/dropseed/plain/releases/plain-api@0.27.1) (2026-03-10)
 
 ### What's changed
