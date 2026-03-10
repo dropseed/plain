@@ -116,16 +116,16 @@ class AddField(FieldOperation):
         from_model = from_state.models_registry.get_model(
             package_label, self.model_name
         )
-        field = to_model._model_meta.get_field(self.name)
+        field = to_model._model_meta.get_forward_field(self.name)
         assert self.field is not None
         if not self.preserve_default:
-            field.default = self.field.default  # type: ignore[assignment]
+            field.default = self.field.default
         schema_editor.add_field(
             from_model,
-            field,  # type: ignore[invalid-argument-type]
+            field,
         )
         if not self.preserve_default:
-            field.default = NOT_PROVIDED  # type: ignore[assignment]
+            field.default = NOT_PROVIDED
 
     def describe(self) -> str:
         return f"Add field {self.name} to {self.model_name}"
@@ -188,7 +188,7 @@ class RemoveField(FieldOperation):
         )
         schema_editor.remove_field(
             from_model,
-            from_model._model_meta.get_field(self.name),  # type: ignore[invalid-argument-type]
+            from_model._model_meta.get_forward_field(self.name),
         )
 
     def describe(self) -> str:
@@ -253,14 +253,14 @@ class AlterField(FieldOperation):
         from_model = from_state.models_registry.get_model(
             package_label, self.model_name
         )
-        from_field = from_model._model_meta.get_field(self.name)
-        to_field = to_model._model_meta.get_field(self.name)
+        from_field = from_model._model_meta.get_forward_field(self.name)
+        to_field = to_model._model_meta.get_forward_field(self.name)
         assert self.field is not None
         if not self.preserve_default:
-            to_field.default = self.field.default  # type: ignore[assignment]
-        schema_editor.alter_field(from_model, from_field, to_field)  # type: ignore[invalid-argument-type]
+            to_field.default = self.field.default
+        schema_editor.alter_field(from_model, from_field, to_field)
         if not self.preserve_default:
-            to_field.default = NOT_PROVIDED  # type: ignore[assignment]
+            to_field.default = NOT_PROVIDED
 
     def describe(self) -> str:
         return f"Alter field {self.name} on {self.model_name}"
@@ -334,8 +334,8 @@ class RenameField(FieldOperation):
         )
         schema_editor.alter_field(
             from_model,
-            from_model._model_meta.get_field(self.old_name),  # type: ignore[invalid-argument-type]
-            to_model._model_meta.get_field(self.new_name),  # type: ignore[invalid-argument-type]
+            from_model._model_meta.get_forward_field(self.old_name),
+            to_model._model_meta.get_forward_field(self.new_name),
         )
 
     def describe(self) -> str:

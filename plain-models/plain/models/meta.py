@@ -15,7 +15,7 @@ from plain.utils.datastructures import ImmutableList
 if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.fields import Field
-    from plain.models.fields.related import ManyToManyField
+    from plain.models.fields.related import ManyToManyField, RelatedField
     from plain.models.fields.reverse_related import ForeignObjectRel
 
 EMPTY_RELATION_TREE = ()
@@ -382,7 +382,7 @@ class Meta:
                 f"{self.model} has no reverse relation named '{field_name}'"
             )
 
-    def _populate_directed_relation_graph(self) -> list[Field]:
+    def _populate_directed_relation_graph(self) -> list[RelatedField]:
         from plain.models.fields.related import RelatedField
 
         """
@@ -420,7 +420,7 @@ class Meta:
         return self.__dict__.get("_relation_tree", EMPTY_RELATION_TREE)
 
     @cached_property
-    def _relation_tree(self) -> list[Field]:
+    def _relation_tree(self) -> list[RelatedField]:
         return self._populate_directed_relation_graph()
 
     def _expire_cache(self, forward: bool = True, reverse: bool = True) -> None:
@@ -536,7 +536,7 @@ class Meta:
             # the current model (reverse relations).
             all_fields = self._relation_tree
             for field in all_fields:
-                fields.append(field.remote_field)  # type: ignore[unresolved-attribute]
+                fields.append(field.remote_field)
 
         if forward:
             fields += self.local_fields

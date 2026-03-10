@@ -327,11 +327,11 @@ class RenameModel(ModelOperation):
                 )
             to_field = to_state.models_registry.get_model(
                 *related_key
-            )._model_meta.get_field(related_object.field.name)
+            )._model_meta.get_forward_field(related_object.field.name)
             schema_editor.alter_field(
                 model,
                 related_object.field,
-                to_field,  # type: ignore[invalid-argument-type]
+                to_field,
             )
 
     def references_model(self, name: str, package_label: str) -> bool:
