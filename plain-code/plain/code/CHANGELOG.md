@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.21.2](https://github.com/dropseed/plain/releases/plain-code@0.21.2) (2026-03-10)
+
+### What's changed
+
+- Bumped minimum `ty` dependency from `>=0.0.11` to `>=0.0.21` ([f56c6454b164](https://github.com/dropseed/plain/commit/f56c6454b164))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.1](https://github.com/dropseed/plain/releases/plain-code@0.21.1) (2026-03-04)
 
 ### What's changed
