@@ -166,14 +166,14 @@ def _conditional_content_removal(
     compliance with RFC 9112 Section 6.3.
     """
     if 100 <= response.status_code < 200 or response.status_code in (204, 304):
-        if response.streaming:  # type: ignore[attr-defined]
+        if hasattr(response, "streaming") and response.streaming:
             response.streaming_content = []  # type: ignore[attr-defined]
-        else:
+        elif hasattr(response, "content"):
             response.content = b""  # type: ignore[attr-defined]
     if request.method == "HEAD":
-        if response.streaming:  # type: ignore[attr-defined]
+        if hasattr(response, "streaming") and response.streaming:
             response.streaming_content = []  # type: ignore[attr-defined]
-        else:
+        elif hasattr(response, "content"):
             response.content = b""  # type: ignore[attr-defined]
     return response
 
@@ -210,7 +210,7 @@ class ClientHandler(BaseHandler):
 
         # Attach the originating request to the response so that it could be
         # later retrieved.
-        response.request = request  # type: ignore[attr-defined]
+        setattr(response, "request", request)
 
         # Emulate a server by calling the close method on completion.
         response.close()

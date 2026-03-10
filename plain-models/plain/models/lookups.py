@@ -213,6 +213,7 @@ class Transform(RegisterLookupMixin, Func):
     first examine self and then check output_field.
     """
 
+    lookup_name: str | None = None
     bilateral: bool = False
     arity: int = 1
 

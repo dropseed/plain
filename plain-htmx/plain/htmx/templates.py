@@ -61,14 +61,15 @@ class HTMXFragmentExtension(Extension):
             kwargs=kwargs,
         )
 
-        node = CallBlock(call, [], [], body).set_lineno(lineno)
+        callblock = CallBlock(call, [], [], body)
+        callblock.set_lineno(lineno)
 
         # Store a reference to the node for later
         self.environment.htmx_fragment_nodes.setdefault(parser.name, {})[  # type: ignore[attr-defined]
             fragment_name.value  # type: ignore[attr-defined]
-        ] = node
+        ] = callblock
 
-        return node
+        return callblock
 
     def _render_htmx_fragment(
         self, fragment_name: str, context: dict[str, Any], caller: Any, **kwargs: Any
@@ -141,7 +142,10 @@ def find_template_fragment(
                     )[0]
                 )
                 for ref in meta.find_referenced_templates(ast):
-                    if ref not in template.environment.htmx_fragment_nodes:  # type: ignore[attr-defined]
+                    if (
+                        ref is not None
+                        and ref not in template.environment.htmx_fragment_nodes  # type: ignore[attr-defined]
+                    ):
                         # Trigger them to parse
                         template.environment.get_template(ref)
 

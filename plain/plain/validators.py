@@ -78,10 +78,13 @@ class RegexValidator:
             raise ValidationError(self.message, code=self.code, params={"value": value})
 
     def __eq__(self, other: object) -> bool:
+        if not isinstance(other, RegexValidator):
+            return NotImplemented
+        self_regex = cast(re.Pattern[str], self.regex)
+        other_regex = cast(re.Pattern[str], other.regex)
         return (
-            isinstance(other, RegexValidator)
-            and self.regex.pattern == other.regex.pattern  # type: ignore[union-attr]
-            and self.regex.flags == other.regex.flags  # type: ignore[union-attr]
+            self_regex.pattern == other_regex.pattern
+            and self_regex.flags == other_regex.flags
             and (self.message == other.message)
             and (self.code == other.code)
             and (self.inverse_match == other.inverse_match)

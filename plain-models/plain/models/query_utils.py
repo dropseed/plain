@@ -12,7 +12,7 @@ import functools
 import inspect
 import logging
 from collections.abc import Callable, Generator
-from typing import TYPE_CHECKING, Any, NamedTuple, Self
+from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self
 
 from plain.models.constants import LOOKUP_SEP
 from plain.models.db import DatabaseError
@@ -200,6 +200,8 @@ class class_or_instance_method:
 
 
 class RegisterLookupMixin:
+    class_lookups: ClassVar[dict[str, type[Lookup | Transform]]]
+
     def _get_lookup(self, lookup_name: str) -> type[Lookup | Transform] | None:
         return self.get_lookups().get(lookup_name, None)
 
@@ -217,7 +219,9 @@ class RegisterLookupMixin:
         return class_lookups
 
     get_lookups = class_or_instance_method(get_class_lookups, get_instance_lookups)
-    get_class_lookups = classmethod(get_class_lookups)  # type: ignore[assignment]
+    get_class_lookups: ClassVar[classmethod[Any, ..., Any]] = classmethod(
+        get_class_lookups
+    )
 
     def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
         from plain.models.lookups import Lookup
@@ -261,7 +265,8 @@ class RegisterLookupMixin:
     @classmethod
     def _clear_cached_class_lookups(cls: type[Self]) -> None:
         for subclass in subclasses(cls):
-            subclass.get_class_lookups.cache_clear()  # type: ignore[attr-defined]
+            if cached := getattr(subclass, "get_class_lookups", None):
+                cached.cache_clear()
 
     def register_class_lookup(
         cls: type[Self],
@@ -269,10 +274,11 @@ class RegisterLookupMixin:
         lookup_name: str | None = None,
     ) -> type[Lookup | Transform]:
         if lookup_name is None:
-            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
+            lookup_name = lookup.lookup_name
+        assert lookup_name is not None, "lookup_name must be set on the lookup class"
         if "class_lookups" not in cls.__dict__:
-            cls.class_lookups = {}  # type: ignore[misc]
-        cls.class_lookups[lookup_name] = lookup  # type: ignore[attr-defined]
+            cls.class_lookups = {}
+        cls.class_lookups[lookup_name] = lookup
         cls._clear_cached_class_lookups()
         return lookup
 
@@ -280,7 +286,7 @@ class RegisterLookupMixin:
         self, lookup: type[Lookup | Transform], lookup_name: str | None = None
     ) -> type[Lookup | Transform]:
         if lookup_name is None:
-            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
+            lookup_name = lookup.lookup_name
         if "instance_lookups" not in self.__dict__:
             self.instance_lookups = {}
         self.instance_lookups[lookup_name] = lookup
@@ -289,7 +295,9 @@ class RegisterLookupMixin:
     register_lookup = class_or_instance_method(
         register_class_lookup, register_instance_lookup
     )
-    register_class_lookup = classmethod(register_class_lookup)  # type: ignore[assignment]
+    register_class_lookup: ClassVar[classmethod[Any, ..., Any]] = classmethod(
+        register_class_lookup
+    )
 
     def _unregister_class_lookup(
         cls: type[Self],
@@ -301,8 +309,9 @@ class RegisterLookupMixin:
         not thread-safe.
         """
         if lookup_name is None:
-            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
-        del cls.class_lookups[lookup_name]  # type: ignore[attr-defined]
+            lookup_name = lookup.lookup_name
+        assert lookup_name is not None, "lookup_name must be set on the lookup class"
+        del cls.class_lookups[lookup_name]
         cls._clear_cached_class_lookups()
 
     def _unregister_instance_lookup(
@@ -313,13 +322,15 @@ class RegisterLookupMixin:
         it's not thread-safe.
         """
         if lookup_name is None:
-            lookup_name = lookup.lookup_name  # type: ignore[attr-defined]
+            lookup_name = lookup.lookup_name
         del self.instance_lookups[lookup_name]
 
     _unregister_lookup = class_or_instance_method(
         _unregister_class_lookup, _unregister_instance_lookup
     )
-    _unregister_class_lookup = classmethod(_unregister_class_lookup)  # type: ignore[assignment]
+    _unregister_class_lookup: ClassVar[classmethod[Any, ..., Any]] = classmethod(
+        _unregister_class_lookup
+    )
 
 
 def select_related_descend(

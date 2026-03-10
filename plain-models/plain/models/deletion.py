@@ -21,6 +21,12 @@ if TYPE_CHECKING:
     from plain.models.fields.related import RelatedField
     from plain.models.fields.reverse_related import ForeignKeyRel
 
+# Handlers in this set skip the sub_objs emptiness check in Collector.collect,
+# allowing the handler to run even when there are no related objects.  External
+# on_delete handlers can still opt-in by setting ``lazy_sub_objs = True`` as an
+# attribute — the Collector checks both this set and getattr as a fallback.
+_LAZY_ON_DELETE: set[Callable[..., Any]] = set()
+
 
 class ProtectedError(IntegrityError):
     def __init__(self, msg: str, protected_objects: Iterable[Any]) -> None:
@@ -56,38 +62,41 @@ def RESTRICT(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     collector.add_dependency(field.remote_field.model, field.model)
 
 
-def SET(value: Any) -> Callable[[Collector, RelatedField, Any], None]:
-    if callable(value):
+class _SetOnDelete:
+    """On-delete handler returned by :func:`SET`."""
 
-        def set_on_delete(
-            collector: Collector, field: RelatedField, sub_objs: Any
-        ) -> None:
-            collector.add_field_update(field, value(), sub_objs)
+    lazy_sub_objs: bool = True
 
-    else:
+    def __init__(self, value: Any) -> None:
+        self._value = value
+        self._resolve = callable(value)
 
-        def set_on_delete(
-            collector: Collector, field: RelatedField, sub_objs: Any
-        ) -> None:
-            collector.add_field_update(field, value, sub_objs)
+    def __call__(
+        self, collector: Collector, field: RelatedField, sub_objs: Any
+    ) -> None:
+        resolved = self._value() if self._resolve else self._value
+        collector.add_field_update(field, resolved, sub_objs)
 
-    set_on_delete.deconstruct = lambda: ("plain.models.SET", (value,), {})  # type: ignore[attr-defined]
-    set_on_delete.lazy_sub_objs = True  # type: ignore[attr-defined]
-    return set_on_delete
+    def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
+        return ("plain.models.SET", (self._value,), {})
+
+
+def SET(value: Any) -> _SetOnDelete:
+    return _SetOnDelete(value)
 
 
 def SET_NULL(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     collector.add_field_update(field, None, sub_objs)
 
 
-SET_NULL.lazy_sub_objs = True  # type: ignore[attr-defined]
+_LAZY_ON_DELETE.add(SET_NULL)
 
 
 def SET_DEFAULT(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     collector.add_field_update(field, field.get_default(), sub_objs)
 
 
-SET_DEFAULT.lazy_sub_objs = True  # type: ignore[attr-defined]
+_LAZY_ON_DELETE.add(SET_DEFAULT)
 
 
 def DO_NOTHING(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
@@ -313,7 +322,11 @@ class Collector:
                     )
                 )
                 sub_objs = sub_objs.only(*tuple(referenced_fields))
-            if getattr(on_delete, "lazy_sub_objs", False) or sub_objs:
+            if (
+                on_delete in _LAZY_ON_DELETE
+                or getattr(on_delete, "lazy_sub_objs", False)
+                or sub_objs
+            ):
                 try:
                     on_delete(self, field, sub_objs)
                 except ProtectedError as error:

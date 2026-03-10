@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from typing import Any
 
@@ -35,15 +35,15 @@ class AppLogger(logging.Logger):
         """Return context manager for temporarily enabling DEBUG level logging."""
         return self.debug_mode
 
-    # Override logging methods with explicit parameters for IDE support
-    def debug(  # type: ignore[override]
+    # Override logging methods to add context parameter for IDE support
+    def debug(
         self,
         msg: object,
         *args: object,
         exc_info: Any = None,
-        extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
+        extra: Mapping[str, object] | None = None,
         context: dict[str, Any] | None = None,
     ) -> None:
         if self.isEnabledFor(logging.DEBUG):
@@ -58,14 +58,14 @@ class AppLogger(logging.Logger):
                 context=context,
             )
 
-    def info(  # type: ignore[override]
+    def info(
         self,
         msg: object,
         *args: object,
         exc_info: Any = None,
-        extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
+        extra: Mapping[str, object] | None = None,
         context: dict[str, Any] | None = None,
     ) -> None:
         if self.isEnabledFor(logging.INFO):
@@ -80,14 +80,14 @@ class AppLogger(logging.Logger):
                 context=context,
             )
 
-    def warning(  # type: ignore[override]
+    def warning(
         self,
         msg: object,
         *args: object,
         exc_info: Any = None,
-        extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
+        extra: Mapping[str, object] | None = None,
         context: dict[str, Any] | None = None,
     ) -> None:
         if self.isEnabledFor(logging.WARNING):
@@ -102,14 +102,14 @@ class AppLogger(logging.Logger):
                 context=context,
             )
 
-    def error(  # type: ignore[override]
+    def error(
         self,
         msg: object,
         *args: object,
         exc_info: Any = None,
-        extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
+        extra: Mapping[str, object] | None = None,
         context: dict[str, Any] | None = None,
     ) -> None:
         if self.isEnabledFor(logging.ERROR):
@@ -124,14 +124,14 @@ class AppLogger(logging.Logger):
                 context=context,
             )
 
-    def critical(  # type: ignore[override]
+    def critical(
         self,
         msg: object,
         *args: object,
         exc_info: Any = None,
-        extra: dict[str, Any] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
+        extra: Mapping[str, object] | None = None,
         context: dict[str, Any] | None = None,
     ) -> None:
         if self.isEnabledFor(logging.CRITICAL):
@@ -146,18 +146,19 @@ class AppLogger(logging.Logger):
                 context=context,
             )
 
-    def _log(  # type: ignore[override]
+    def _log(
         self,
         level: int,
         msg: object,
-        args: tuple[object, ...],
+        args: tuple[object, ...] | Mapping[str, object],
         exc_info: Any = None,
-        extra: dict[str, Any] | None = None,
+        extra: Mapping[str, object] | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
         context: dict[str, Any] | None = None,
     ) -> None:
         """Low-level logging routine which creates a LogRecord and then calls all handlers."""
+
         # Check if extra already has a 'context' key
         if extra and "context" in extra:
             raise ValueError(
@@ -165,11 +166,11 @@ class AppLogger(logging.Logger):
             )
 
         # Build final extra with context
-        extra = extra.copy() if extra else {}
+        merged_extra: dict[str, object] = dict(extra) if extra else {}
 
         # Add our context (persistent + passed context) to extra["context"]
         if self.context or context:
-            extra["context"] = {**self.context, **(context or {})}
+            merged_extra["context"] = {**self.context, **(context or {})}
 
         # Call the parent logger's _log method with explicit parameters
         super()._log(
@@ -177,7 +178,7 @@ class AppLogger(logging.Logger):
             msg=msg,
             args=args,
             exc_info=exc_info,
-            extra=extra or None,
+            extra=merged_extra or None,
             stack_info=stack_info,
             stacklevel=stacklevel,
         )
