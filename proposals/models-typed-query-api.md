@@ -244,6 +244,16 @@ User.query.where(
 
 The trend across ecosystems is clear: stringly-typed ORMs are being replaced by type-safe alternatives. Python's type checking ecosystem (pyright, mypy) is mature enough to support this now.
 
+## Future: PEP 827 (Type Manipulation)
+
+[PEP 827](https://peps.python.org/pep-0827/) (draft, targeting Python 3.15) proposes TypeScript-style type manipulation — conditional types, mapped types, type-level introspection via `Members`/`Attrs`, and construction via `NewProtocol`/`NewTypedDict`. If accepted, it could enable:
+
+- **Return type narrowing for `.sql()`** — deriving result types from `{User.*}` or `{User.email}` references
+- **Model type derivation** — `Create[User]` that omits PK and applies defaults, without hand-written types
+- **Field constraint protocols** — `Indexable`, `Filterable` etc. checked at the type level via `IsAssignable`
+
+None of this changes the near-term design (the typed Python API works with today's typing), but it's worth watching for the SQL layer and model derivation use cases.
+
 ## Open questions
 
 - **Migration path**: Can `filter()` and `where()` coexist during transition? Or is it a clean break?
