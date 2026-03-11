@@ -90,7 +90,7 @@ class Settings:
         settings = dir(module)
 
         for setting in settings:
-            if setting.isupper():
+            if setting.isupper() and setting not in self._IGNORED_NAMES:
                 if setting in self._settings:
                     self._errors.append(f"Duplicate setting '{setting}'.")
                     continue
@@ -150,9 +150,12 @@ class Settings:
                 except ImproperlyConfigured as e:
                     self._errors.append(str(e))
 
+    # Uppercase names that are not settings (Python builtins, typing constants, etc.)
+    _IGNORED_NAMES = frozenset({"TYPE_CHECKING"})
+
     def _load_explicit_settings(self, settings_module: types.ModuleType) -> None:
         for setting in dir(settings_module):
-            if setting.isupper():
+            if setting.isupper() and setting not in self._IGNORED_NAMES:
                 setting_value = getattr(settings_module, setting)
 
                 if setting in self._settings:
