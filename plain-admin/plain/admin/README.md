@@ -7,6 +7,7 @@
     - [Model views](#model-views)
     - [Object views](#object-views)
     - [Navigation](#navigation)
+- [Links](#links)
 - [Admin cards](#admin-cards)
     - [Basic cards](#basic-cards)
     - [Trend cards](#trend-cards)
@@ -165,6 +166,37 @@ uv run plain admin icons cart    # Search by keyword
 ```
 
 Setting `nav_section = None` hides a view from the navigation entirely.
+
+## Links
+
+Admin views can display action links in their title bar. There are two types: **links** appear as visible buttons, while **extra links** are tucked into a three-dots overflow dropdown.
+
+On mobile, both link types are combined into a single dropdown menu.
+
+```python
+from plain.urls import reverse
+
+
+@register_viewset
+class OrderAdmin(AdminViewset):
+    class ListView(AdminModelListView):
+        model = Order
+
+        def get_extra_links(self):
+            extra_links = super().get_extra_links()
+            extra_links["Import"] = reverse("orders:import")
+            return extra_links
+
+    class DetailView(AdminModelDetailView):
+        model = Order
+
+        def get_extra_links(self):
+            extra_links = super().get_extra_links()
+            extra_links["Export PDF"] = reverse("orders:export", pk=self.object.pk)
+            return extra_links
+```
+
+Viewsets already populate `links` automatically — list views get a "New" link if a `CreateView` exists, and detail views get "Edit" and "Delete" links for their respective views. Use `get_extra_links()` for additional actions that don't need primary button visibility.
 
 ## Admin cards
 
