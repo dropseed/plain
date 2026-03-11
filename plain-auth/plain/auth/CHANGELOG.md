@@ -1,5 +1,16 @@
 # plain-auth changelog
 
+## [0.27.2](https://github.com/dropseed/plain/releases/plain-auth@0.27.2) (2026-03-10)
+
+### What's changed
+
+- Typed user parameters as `Model | None` instead of `Any | None` across `get_request_user()`, `set_request_user()`, auth session functions, and `AuthView.user` ([8b2f42444f01](https://github.com/dropseed/plain/commit/8b2f42444f01))
+- Adopted PEP 695 type parameter syntax ([aa5b2db6e8ed](https://github.com/dropseed/plain/commit/aa5b2db6e8ed))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.1](https://github.com/dropseed/plain/releases/plain-auth@0.27.1) (2026-03-10)
 
 ### What's changed
