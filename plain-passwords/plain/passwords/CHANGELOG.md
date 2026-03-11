@@ -1,5 +1,16 @@
 # plain-passwords changelog
 
+## [0.23.6](https://github.com/dropseed/plain/releases/plain-passwords@0.23.6) (2026-03-10)
+
+### What's changed
+
+- Typed user parameters as `Model` instead of `Any` in password reset forms and views ([8b2f42444f01](https://github.com/dropseed/plain/commit/8b2f42444f01))
+- Adopted PEP 695 type parameter syntax ([aa5b2db6e8ed](https://github.com/dropseed/plain/commit/aa5b2db6e8ed))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.23.5](https://github.com/dropseed/plain/releases/plain-passwords@0.23.5) (2026-03-10)
 
 ### What's changed
