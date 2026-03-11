@@ -9,16 +9,9 @@ Release Plain packages with version bumping, changelog generation, and git taggi
 
 ## Arguments
 
-```
-/release [packages...] [--major|--minor|--patch] [--force]
-```
-
 - No args: discover all packages with changes, prompt for each
 - Package names: only release specified packages
-- `--major`: auto-select major release for all packages with changes
-- `--minor`: auto-select minor release for all packages with changes
-- `--patch`: auto-select patch release for all packages with changes
-- `--force`: ignore dirty git status
+- The user may also specify a release type (major/minor/patch) to auto-select for all packages
 
 ## Scripts
 
@@ -33,26 +26,22 @@ All mechanical operations are handled by scripts in this skill directory:
 
 ## Workflow
 
-### Phase 1: Check Preconditions
+### Phase 1: Discover Packages with Changes
 
-1. Check git status is clean (unless `--force`):
+1. Run `git status --porcelain` to check for uncommitted changes.
+
+2. Run discover-changes:
 
     ```
-    git status --porcelain
+    ./.claude/skills/release/discover-changes
     ```
 
-    If not clean, stop and ask user to commit or stash changes.
+    This outputs JSON with each package's name, current version, and commits since last release.
+    If specific packages were requested, filter the results to only those packages.
 
-### Phase 2: Discover Packages with Changes
+3. For each package that has changes to release, check if any of its files appear in the git status output. If so, **stop and warn the user** — uncommitted changes in a package being released could mean the release misses work or includes an inconsistent state. Ask them to commit or discard before proceeding. Changes in other directories (e.g. `proposals/`, `scripts/`) are fine to ignore.
 
-```
-./.claude/skills/release/discover-changes
-```
-
-This outputs JSON with each package's name, current version, and commits since last release.
-If specific packages were requested, filter the results to only those packages.
-
-### Phase 2b: First Release Detection
+### Phase 1b: First Release Detection
 
 For any package with `current_version` of `0.0.0`:
 
@@ -62,7 +51,7 @@ For any package with `current_version` of `0.0.0`:
     - **1.0.0** - First stable release
 3. Use `uv version <version>` in the package directory to set the version directly (instead of bump)
 
-### Phase 3: Collect Release Decisions
+### Phase 2: Collect Release Decisions
 
 For each package with changes:
 
@@ -71,10 +60,10 @@ For each package with changes:
     - **Minor**: new features, breaking changes, significant additions, new APIs
     - **Patch**: small bugfixes, minor tweaks, documentation updates, refactors
 3. Ask user to confirm or adjust (minor/patch/skip)
-    - If `--minor` or `--patch` was passed, auto-select that type
+    - If user specified a release type, auto-select that type
     - Default to skip if user just presses Enter
 
-### Phase 4: Bump Versions
+### Phase 3: Bump Versions
 
 ```
 ./.claude/skills/release/bump-versions <package>:<type> [<package>:<type> ...]
@@ -82,7 +71,7 @@ For each package with changes:
 
 Example: `./.claude/skills/release/bump-versions plain-admin:patch plain-dev:minor`
 
-### Phase 4b: Update Cross-Package Dependency Minimums
+### Phase 3b: Update Cross-Package Dependency Minimums
 
 When a package is being released because it depends on changes in another package being released in the same batch, update its minimum version constraint in `pyproject.toml`.
 
@@ -95,7 +84,7 @@ Example: if `plain-auth` is being released because it adapted to `plain` 0.113.0
 
 Only update constraints when there's an actual compatibility requirement — don't add minimums for packages whose changes are independent. Use the commit analysis from Phase 3 to determine this.
 
-### Phase 5: Generate Release Notes
+### Phase 4: Generate Release Notes
 
 For each package to release, sequentially:
 
@@ -124,7 +113,7 @@ For each package to release, sequentially:
 - If no changes required: "- No changes required."
 ```
 
-### Phase 6: Commit, Tag, and Push
+### Phase 5: Commit, Tag, and Push
 
 ```
 ./.claude/skills/release/commit-and-push <package>:<version> [<package>:<version> ...]
