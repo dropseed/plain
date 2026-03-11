@@ -18,13 +18,13 @@ if "DATABASE_URL" in environ:
         POSTGRES_HOST: str = ""
         POSTGRES_DATABASE: str = ""
         POSTGRES_USER: str = ""
-        POSTGRES_PASSWORD: Secret[str] = ""  # type: ignore[assignment]
+        POSTGRES_PASSWORD: Secret[str] = ""
     else:
         _parsed = database_url.parse_database_url(_db_url)
         POSTGRES_HOST: str = _parsed["HOST"]
         POSTGRES_DATABASE: str = _parsed["DATABASE"] or ""
         POSTGRES_USER: str = _parsed["USER"]
-        POSTGRES_PASSWORD: Secret[str] = _parsed["PASSWORD"]  # type: ignore[assignment]
+        POSTGRES_PASSWORD: Secret[str] = _parsed["PASSWORD"]
         if _parsed["PORT"]:
             POSTGRES_PORT = _parsed["PORT"]
         if _parsed.get("OPTIONS"):

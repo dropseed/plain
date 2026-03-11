@@ -85,7 +85,7 @@ SECRET_KEY: Secret[str]
 
 # List of secret keys used to verify the validity of signatures. This allows
 # secret key rotation.
-SECRET_KEY_FALLBACKS: Secret[list[str]] = []  # type: ignore[assignment]
+SECRET_KEY_FALLBACKS: Secret[list[str]] = []
 
 # MARK: Internationalization
 

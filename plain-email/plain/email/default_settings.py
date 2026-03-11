@@ -21,7 +21,7 @@ EMAIL_USE_LOCALTIME: bool = False
 
 # Optional SMTP authentication information for EMAIL_HOST.
 EMAIL_HOST_USER: str = ""
-EMAIL_HOST_PASSWORD: Secret[str] = ""  # type: ignore[assignment]
+EMAIL_HOST_PASSWORD: Secret[str] = ""
 EMAIL_USE_TLS: bool = True
 EMAIL_USE_SSL: bool = False
 EMAIL_SSL_CERTFILE: str | None = None
