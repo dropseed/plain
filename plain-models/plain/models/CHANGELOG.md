@@ -1,5 +1,17 @@
 # plain-models changelog
 
+## [0.82.3](https://github.com/dropseed/plain/releases/plain-models@0.82.3) (2026-03-10)
+
+### What's changed
+
+- Removed `type: ignore` comments on `POSTGRES_PASSWORD` default values, now that `Secret` is type-transparent ([997afd9a558f](https://github.com/dropseed/plain/commit/997afd9a558f))
+- Adopted PEP 695 type parameter syntax across `Field`, `QuerySet`, `register_model`, type stubs, and other generics ([aa5b2db6e8ed](https://github.com/dropseed/plain/commit/aa5b2db6e8ed))
+- Added migration docs reminder to AI rules ([09deb5d5a382](https://github.com/dropseed/plain/commit/09deb5d5a382))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.82.2](https://github.com/dropseed/plain/releases/plain-models@0.82.2) (2026-03-10)
 
 ### What's changed
