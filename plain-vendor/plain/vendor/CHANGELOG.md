@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.11.2](https://github.com/dropseed/plain/releases/plain-vendor@0.11.2) (2026-03-10)
+
+### What's changed
+
+- Adopted PEP 695 `Generator` syntax in `iter_next_version` return type ([aa5b2db6e8ed](https://github.com/dropseed/plain/commit/aa5b2db6e8ed))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.11.1](https://github.com/dropseed/plain/releases/plain-vendor@0.11.1) (2026-02-26)
 
 ### What's changed
