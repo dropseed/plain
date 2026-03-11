@@ -76,23 +76,43 @@
                         {% endblock %}
                         <h1 class="font-semibold text-2xl truncate">{% block title %}{{ title }}{% endblock %}</h1>
                     </div>
-                    {# Desktop actions #}
+                    {# Desktop actions: links as buttons, extra_links in dropdown #}
+                    {% macro link_dropdown_items(items) %}
+                    <div class="py-1">
+                        {% for link, url in items %}
+                        <a href="{{ url }}" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
+                            {{ link }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endmacro %}
                     <div class="hidden sm:flex items-center space-x-2 text-sm flex-shrink-0">
                         {% block actions %}{% endblock %}
                         {% for link, url in links.items() %}
                         <a href="{{ url }}" class="plain-btn">{{ link }}</a>
                         {% endfor %}
+                        {% if extra_links %}
+                        <button type="button" data-dropdown class="plain-btn">
+                            <admin.Icon name="three-dots" />
+                            <template>
+                                {{ link_dropdown_items(extra_links.items()) }}
+                            </template>
+                        </button>
+                        {% endif %}
                     </div>
                     {# Mobile actions dropdown #}
-                    {% if links %}
+                    {% if links or extra_links %}
                     <div class="sm:hidden flex-shrink-0">
                         <button type="button" data-dropdown class="flex items-center justify-center w-8 h-8 rounded hover:bg-stone-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="text-stone-600" viewBox="0 0 16 16">
-                                <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3"/>
-                            </svg>
+                            <admin.Icon name="three-dots" class="text-stone-600" />
                             <template>
                                 <div class="py-1">
                                     {% for link, url in links.items() %}
+                                    <a href="{{ url }}" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
+                                        {{ link }}
+                                    </a>
+                                    {% endfor %}
+                                    {% for link, url in extra_links.items() %}
                                     <a href="{{ url }}" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
                                         {{ link }}
                                     </a>

@@ -61,6 +61,7 @@ class AdminView(AuthView, TemplateView):
     nav_icon = ""  # Bootstrap Icons name (e.g., "cart", "person", "flag")
 
     links: dict[str, str] = {}
+    extra_links: dict[str, str] = {}
 
     parent_view_class: AdminView | None = None
 
@@ -89,6 +90,7 @@ class AdminView(AuthView, TemplateView):
         context["image"] = self.get_image()
         context["slug"] = self.get_slug()
         context["links"] = self.get_links()
+        context["extra_links"] = self.get_extra_links()
         context["parent_view_classes"] = self.get_parent_view_classes()
         context["admin_registry"] = registry
         context["cards"] = self.get_cards()
@@ -161,6 +163,9 @@ class AdminView(AuthView, TemplateView):
 
     def get_links(self) -> dict[str, str]:
         return self.links.copy()
+
+    def get_extra_links(self) -> dict[str, str]:
+        return self.extra_links.copy()
 
     def get_cards(self) -> list[Card]:
         return self.cards.copy()
