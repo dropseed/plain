@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.58.4](https://github.com/dropseed/plain/releases/plain-dev@0.58.4) (2026-03-10)
+
+### What's changed
+
+- Renamed env vars to avoid preflight settings warnings: `PLAIN_DEV_SERVICES_AUTO` → `DEV_SERVICES_AUTO`, `PLAIN_DEV_URL` → `DEV_URL`, and removed the unused `PLAIN_DEV` variable ([4ce989e42ece](https://github.com/dropseed/plain/commit/4ce989e42ece))
+
+### Upgrade instructions
+
+- If you reference `PLAIN_DEV_URL` in custom dev process commands (e.g. `pyproject.toml` `[tool.plain.dev.run]`), rename it to `DEV_URL`.
+- If you check `PLAIN_DEV_SERVICES_AUTO`, rename it to `DEV_SERVICES_AUTO`.
+
 ## [0.58.3](https://github.com/dropseed/plain/releases/plain-dev@0.58.3) (2026-03-10)
 
 ### What's changed
