@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.21.3](https://github.com/dropseed/plain/releases/plain-code@0.21.3) (2026-03-10)
+
+### What's changed
+
+- Updated default ruff target version from `py311` to `py313` ([aa5b2db6e8ed](https://github.com/dropseed/plain/commit/aa5b2db6e8ed))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.2](https://github.com/dropseed/plain/releases/plain-code@0.21.2) (2026-03-10)
 
 ### What's changed
