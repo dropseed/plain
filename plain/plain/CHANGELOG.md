@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.122.0](https://github.com/dropseed/plain/releases/plain@0.122.0) (2026-03-10)
+
+### What's changed
+
+- **`Secret` is now type-transparent** — `Secret[str]` is a type alias for `Annotated[str, _SecretMarker()]`, so type checkers see the underlying type directly. No more `type: ignore` comments needed on default values ([a90197b95315](https://github.com/dropseed/plain/commit/a90197b95315), [997afd9a558f](https://github.com/dropseed/plain/commit/997afd9a558f))
+- **`TYPE_CHECKING` ignored in settings modules** — settings loading now skips `TYPE_CHECKING` (and other uppercase non-setting names) so you can use `from __future__ import annotations` and `if TYPE_CHECKING:` blocks in settings files without triggering duplicate-setting errors ([f20869e0bd2b](https://github.com/dropseed/plain/commit/f20869e0bd2b))
+- Adopted PEP 695 type parameter syntax (`def foo[T]()` instead of `TypeVar`) across the codebase ([aa5b2db6e8ed](https://github.com/dropseed/plain/commit/aa5b2db6e8ed))
+
+### Upgrade instructions
+
+- If you previously had `type: ignore[assignment]` comments on `Secret` default values, you can remove them.
+- No other changes required.
+
 ## [0.121.2](https://github.com/dropseed/plain/releases/plain@0.121.2) (2026-03-10)
 
 ### What's changed
