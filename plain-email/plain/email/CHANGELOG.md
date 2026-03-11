@@ -1,5 +1,15 @@
 # plain-email changelog
 
+## [0.16.1](https://github.com/dropseed/plain/releases/plain-email@0.16.1) (2026-03-10)
+
+### What's changed
+
+- Removed `type: ignore` comment on `EMAIL_HOST_PASSWORD` default value, now that `Secret` is type-transparent ([997afd9a558f](https://github.com/dropseed/plain/commit/997afd9a558f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.16.0](https://github.com/dropseed/plain/releases/plain-email@0.16.0) (2026-03-10)
 
 ### What's changed
