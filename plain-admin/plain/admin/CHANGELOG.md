@@ -1,5 +1,22 @@
 # plain-admin changelog
 
+## [0.72.0](https://github.com/dropseed/plain/releases/plain-admin@0.72.0) (2026-03-10)
+
+### What's changed
+
+- **Reworked access control** — added `has_permission(cls, user)` class method on `AdminView` for per-view permission checks, and `ADMIN_HAS_PERMISSION` setting for global access control across all admin views including package-provided ones ([460b2033a018](https://github.com/dropseed/plain/commit/460b2033a018))
+- **Added `extra_links`** — views can now define overflow action links via `get_extra_links()`, displayed in a three-dots dropdown menu. On mobile, both `links` and `extra_links` are combined into a single dropdown ([020e1d56cb3a](https://github.com/dropseed/plain/commit/020e1d56cb3a))
+- **Customizable header branding** — the top-left admin header is now an overridable `admin/header_branding.html` template ([321828707feb](https://github.com/dropseed/plain/commit/321828707feb))
+- **User avatar via `get_avatar_url()`** — replaced built-in Gravatar with a `get_avatar_url()` method on your User model. If not defined, a generic icon is shown ([460b2033a018](https://github.com/dropseed/plain/commit/460b2033a018))
+- **User menu items template** — added `admin/user_menu_items.html` include for adding custom items to the user dropdown ([460b2033a018](https://github.com/dropseed/plain/commit/460b2033a018))
+- **`admin_url()` template function** — resolves admin view URLs by their `path` attribute ([460b2033a018](https://github.com/dropseed/plain/commit/460b2033a018))
+- Navigation and search now respect `has_permission` — views a user can't access are hidden from the menu, tabs, and search ([460b2033a018](https://github.com/dropseed/plain/commit/460b2033a018))
+
+### Upgrade instructions
+
+- The built-in Gravatar integration has been removed. If you want avatar images, add a `get_avatar_url()` method to your User model.
+- No other changes required. The new `ADMIN_HAS_PERMISSION` setting defaults to `None` (all admin users have access, same as before).
+
 ## [0.71.2](https://github.com/dropseed/plain/releases/plain-admin@0.71.2) (2026-03-10)
 
 ### What's changed
