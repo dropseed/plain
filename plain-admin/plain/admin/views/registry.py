@@ -10,6 +10,7 @@ from plain.urls import path, reverse_lazy
 
 if TYPE_CHECKING:
     from plain.http import Request
+    from plain.models import Model
 
     from .base import AdminView
     from .viewsets import AdminViewset
@@ -54,7 +55,9 @@ class AdminViewRegistry:
         else:
             return inner
 
-    def get_nav_sections(self, *, plain_packages: bool) -> dict[str, list[type]]:
+    def get_nav_sections(
+        self, *, plain_packages: bool, user: Model | None
+    ) -> dict[str, list[type]]:
         """Returns nav sections filtered by package type."""
         sections: dict[str, list[type]] = {}
 
@@ -64,6 +67,9 @@ class AdminViewRegistry:
                 continue
 
             if view.nav_section is None:
+                continue
+
+            if view.restrict_admin_view(user):
                 continue
 
             sections.setdefault(view.nav_section, []).append(view)
@@ -104,20 +110,23 @@ class AdminViewRegistry:
 
         return urls
 
-    def get_list_views(self) -> list[type[AdminView]]:
+    def get_list_views(self, user: Model | None) -> list[type[AdminView]]:
         from plain.admin.views.objects import AdminListView
 
         views: list[type[AdminView]] = [
-            view for view in self.registered_views if issubclass(view, AdminListView)
+            view
+            for view in self.registered_views
+            if issubclass(view, AdminListView) and not view.restrict_admin_view(user)
         ]
         views.sort(key=lambda v: v.get_slug())
         return views
 
-    def get_searchable_views(self) -> list[type[AdminView]]:
+    def get_searchable_views(self, user: Model | None) -> list[type[AdminView]]:
         views = [
             view
             for view in self.registered_views
             if getattr(view, "allow_global_search", False)
+            and not view.restrict_admin_view(user)
         ]
         views.sort(key=lambda v: v.get_slug())
         return views
@@ -178,6 +187,8 @@ class AdminViewRegistry:
             if view := self.get_view_by_slug(slug):
                 if view.nav_section is None:
                     continue
+                if view.restrict_admin_view(user):
+                    continue
                 tabs.append({"view": view, "pinned": True})
                 used_slugs.add(slug)
 
@@ -188,6 +199,8 @@ class AdminViewRegistry:
             if slug not in used_slugs:
                 if view := self.get_view_by_slug(slug):
                     if view.nav_section is None:
+                        continue
+                    if view.restrict_admin_view(user):
                         continue
                     tabs.append({"view": view, "pinned": False})
                     used_slugs.add(slug)

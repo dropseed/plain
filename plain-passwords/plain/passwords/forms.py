@@ -49,7 +49,7 @@ class PasswordResetForm(forms.Form):
         resetting their password.
         """
         active_users = get_user_model().query.filter(email__iexact=email)
-        return (u for u in active_users if unicode_ci_compare(email, u.email))
+        return (u for u in active_users if unicode_ci_compare(email, u.email))  # type: ignore[unresolved-attribute]
 
     def save(
         self,

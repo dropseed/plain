@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain.auth.views import AuthView
+from plain.http import ForbiddenError403
 from plain.preflight import get_check_counts
 from plain.runtime import settings
 from plain.urls import reverse
@@ -18,6 +19,7 @@ from .types import Img
 
 if TYPE_CHECKING:
     from plain.http import ResponseBase
+    from plain.models import Model
 
     from ..cards import Card
     from .viewsets import AdminViewset
@@ -28,6 +30,21 @@ _URL_NAMESPACE = "admin"
 
 class AdminView(AuthView, TemplateView):
     admin_required = True
+
+    # True for framework-provided views (index, search, settings, etc.)
+    # Available for use in ADMIN_RESTRICT_VIEWS to make per-view decisions.
+    is_builtin = False
+
+    def check_auth(self) -> None:
+        super().check_auth()
+        if self.restrict_admin_view(self.user):
+            raise ForbiddenError403("You don't have access to this page.")
+
+    @classmethod
+    def restrict_admin_view(cls, user: Model | None) -> bool:
+        if restriction := settings.ADMIN_RESTRICT_VIEWS:
+            return restriction(cls, user)
+        return False
 
     title: str = ""
     description: str = ""  # Optional description shown below the title

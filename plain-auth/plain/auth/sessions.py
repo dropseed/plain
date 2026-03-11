@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hmac
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from plain.exceptions import ImproperlyConfigured
 from plain.models import models_registry
@@ -15,19 +15,20 @@ from .requests import get_request_user, set_request_user
 
 if TYPE_CHECKING:
     from plain.http import Request
+    from plain.models import Model
 
 _USER_ID_SESSION_KEY = "_auth_user_id"
 _USER_HASH_SESSION_KEY = "_auth_user_hash"
 
 
-def get_session_auth_hash(user: Any) -> str:
+def get_session_auth_hash(user: Model) -> str:
     """
     Return an HMAC of the password field.
     """
     return _get_session_auth_hash(user)
 
 
-def update_session_auth_hash(request: Request, user: Any) -> None:
+def update_session_auth_hash(request: Request, user: Model) -> None:
     """
     Updating a user's password (for example) logs out all sessions for the user.
 
@@ -43,12 +44,12 @@ def update_session_auth_hash(request: Request, user: Any) -> None:
         session[_USER_HASH_SESSION_KEY] = get_session_auth_hash(user)
 
 
-def _get_session_auth_fallback_hash(user: Any) -> Generator[str]:
+def _get_session_auth_fallback_hash(user: Model) -> Generator[str]:
     for fallback_secret in settings.SECRET_KEY_FALLBACKS:
         yield _get_session_auth_hash(user, secret=fallback_secret)
 
 
-def _get_session_auth_hash(user: Any, secret: str | None = None) -> str:
+def _get_session_auth_hash(user: Model, secret: str | None = None) -> str:
     key_salt = "plain.auth.get_session_auth_hash"
     return salted_hmac(
         key_salt,
@@ -58,7 +59,7 @@ def _get_session_auth_hash(user: Any, secret: str | None = None) -> str:
     ).hexdigest()
 
 
-def login(request: Request, user: Any) -> None:
+def login(request: Request, user: Model) -> None:
     """
     Persist a user id and a backend in the request. This way a user doesn't
     have to reauthenticate on every request. Note that data set during
@@ -106,7 +107,7 @@ def logout(request: Request) -> None:
     set_request_user(request, None)
 
 
-def get_user_model() -> type[Any]:
+def get_user_model() -> type[Model]:
     """
     Return the User model that is active in this project.
     """
@@ -122,7 +123,7 @@ def get_user_model() -> type[Any]:
         )
 
 
-def get_user(request: Request) -> Any | None:
+def get_user(request: Request) -> Model | None:
     """
     Return the user model instance associated with the given request session.
     If no user is retrieved, return None.

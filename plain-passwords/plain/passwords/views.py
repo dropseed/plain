@@ -84,12 +84,13 @@ class PasswordResetView(AuthView, FormView):
         # If the password has changed since the token was generated, the token is invalid.
         # (These are the hashed passwords, not the raw passwords.)
         if not hmac.compare_digest(
-            force_bytes(user.password), force_bytes(data["password"])
+            force_bytes(user.password),  # type: ignore[unresolved-attribute]
+            force_bytes(data["password"]),
         ):
             return None
 
         # If the email has changed since the token was generated, the token is invalid.
-        if not hmac.compare_digest(force_bytes(user.email), force_bytes(data["email"])):
+        if not hmac.compare_digest(force_bytes(user.email), force_bytes(data["email"])):  # type: ignore[unresolved-attribute]
             return None
 
         return user
