@@ -873,7 +873,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-pytest"
-version = "0.16.6"
+version = "0.16.7"
 source = { editable = "plain-pytest" }
 dependencies = [
     { name = "click" },
