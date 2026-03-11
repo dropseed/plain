@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.12.2](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.2) (2026-03-10)
+
+### What's changed
+
+- Adopted PEP 695 type parameter syntax for `register_toolbar_item` ([aa5b2db6e8ed](https://github.com/dropseed/plain/commit/aa5b2db6e8ed))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.1](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.1) (2026-03-09)
 
 ### What's changed
