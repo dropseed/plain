@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.12.3](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.3) (2026-03-10)
+
+### What's changed
+
+- Updated README to use renamed `DEV_URL` env var (was `PLAIN_DEV_URL`) ([4ce989e42ece](https://github.com/dropseed/plain/commit/4ce989e42ece))
+
+### Upgrade instructions
+
+- If you reference `$PLAIN_DEV_URL` in your tunnel configuration, rename it to `$DEV_URL`.
+
 ## [0.12.2](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.2) (2026-03-09)
 
 ### What's changed
