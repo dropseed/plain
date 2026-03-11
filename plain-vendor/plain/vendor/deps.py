@@ -17,7 +17,7 @@ from .exceptions import (
 VENDOR_DIR = _APP_ASSETS_DIR / "vendor"
 
 
-def iter_next_version(version: str) -> Generator[str, None, None]:
+def iter_next_version(version: str) -> Generator[str]:
     if len(version.split(".")) == 2:
         major, minor = version.split(".")
         yield f"{int(major) + 1}.0"

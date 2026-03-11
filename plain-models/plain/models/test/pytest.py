@@ -19,7 +19,7 @@ from .utils import (
 
 
 @pytest.fixture(autouse=True)
-def _db_disabled() -> Generator[None, None, None]:
+def _db_disabled() -> Generator[None]:
     """
     Every test should use this fixture by default to prevent
     access to the normal database.
@@ -39,7 +39,7 @@ def _db_disabled() -> Generator[None, None, None]:
 
 
 @pytest.fixture(scope="session")
-def setup_db(request: Any) -> Generator[None, None, None]:
+def setup_db(request: Any) -> Generator[None]:
     """
     This fixture is called automatically by `db`,
     so a test database will only be setup if the `db` fixture is used.
@@ -64,7 +64,7 @@ def setup_db(request: Any) -> Generator[None, None, None]:
 
 
 @pytest.fixture
-def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
+def db(setup_db: Any, request: Any) -> Generator[None]:
     if "isolated_db" in request.fixturenames:
         pytest.fail("The 'db' and 'isolated_db' fixtures cannot be used together")  # type: ignore[invalid-argument-type]
 
@@ -91,7 +91,7 @@ def db(setup_db: Any, request: Any) -> Generator[None, None, None]:
 
 
 @pytest.fixture
-def isolated_db(request: Any) -> Generator[None, None, None]:
+def isolated_db(request: Any) -> Generator[None]:
     """
     Create and destroy a unique test database for each test, using a prefix
     derived from the test function name to ensure isolation from the default

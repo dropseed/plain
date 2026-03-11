@@ -14,11 +14,9 @@ from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
-    Generic,
     Protocol,
     Self,
     TypedDict,
-    TypeVar,
     cast,
     overload,
 )
@@ -145,11 +143,7 @@ def return_None() -> None:
     return None
 
 
-# TypeVar for Field's generic type parameter
-T = TypeVar("T")
-
-
-class Field(RegisterLookupMixin, Generic[T]):
+class Field[T](RegisterLookupMixin):
     """Base class for all field types"""
 
     # Instance attributes set during field lifecycle

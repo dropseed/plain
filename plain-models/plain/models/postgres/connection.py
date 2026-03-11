@@ -53,7 +53,7 @@ logger = logging.getLogger("plain.models.postgres")
 TEST_DATABASE_PREFIX = "test_"
 
 
-def get_migratable_models() -> Generator[Any, None, None]:
+def get_migratable_models() -> Generator[Any]:
     """Return all models that should be included in migrations."""
     from plain.models import models_registry
     from plain.packages import packages_registry
@@ -423,7 +423,7 @@ class DatabaseConnection:
             return True
 
     @contextmanager
-    def _nodb_cursor(self) -> Generator[utils.CursorWrapper, None, None]:
+    def _nodb_cursor(self) -> Generator[utils.CursorWrapper]:
         """
         Return a cursor from an alternative connection to be used when there is
         no need to access the main database, specifically for test db
@@ -755,7 +755,7 @@ class DatabaseConnection:
         return utils.CursorWrapper(cursor, self)
 
     @contextmanager
-    def temporary_connection(self) -> Generator[utils.CursorWrapper, None, None]:
+    def temporary_connection(self) -> Generator[utils.CursorWrapper]:
         """
         Context manager that ensures that a connection is established, and
         if it opened one, closes it to avoid leaving a dangling connection.
@@ -828,7 +828,7 @@ class DatabaseConnection:
                 func()
 
     @contextmanager
-    def execute_wrapper(self, wrapper: Any) -> Generator[None, None, None]:
+    def execute_wrapper(self, wrapper: Any) -> Generator[None]:
         """
         Return a context manager under which the wrapper is applied to suitable
         database query executions.

@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Callable, Iterator, Sequence
 from functools import cached_property
 from itertools import chain, islice
-from typing import TYPE_CHECKING, Any, Generic, Never, Self, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Never, Self, overload
 
 import plain.runtime
 from plain.exceptions import ValidationError
@@ -52,9 +52,6 @@ __all__ = ["F", "Q", "QuerySet", "RawQuerySet", "Prefetch", "FilteredRelation"]
 
 if TYPE_CHECKING:
     from plain.models import Model
-
-# Type variable for QuerySet generic
-T = TypeVar("T", bound="Model")
 
 # The maximum number of results to fetch in a get() query.
 MAX_GET_RESULTS = 21
@@ -256,7 +253,7 @@ class FlatValuesListIterable(BaseIterable):
             yield row[0]
 
 
-class QuerySet(Generic[T]):
+class QuerySet[T: "Model"]:
     """
     Represent a lazy database lookup for a set of objects.
 

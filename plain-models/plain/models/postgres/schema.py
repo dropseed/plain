@@ -313,7 +313,7 @@ def _all_related_fields(model: type[Model]) -> list[ForeignObjectRel]:
 
 def _related_non_m2m_objects(
     old_field: Field, new_field: Field
-) -> Generator[tuple[ForeignObjectRel, ForeignObjectRel], None, None]:
+) -> Generator[tuple[ForeignObjectRel, ForeignObjectRel]]:
     # Filter out m2m objects from reverse relations.
     # Return (old_relation, new_relation) tuples.
     related_fields = zip(
@@ -543,7 +543,7 @@ class DatabaseSchemaEditor:
         field: Field,
         field_db_params: DbParameters,
         include_default: bool,
-    ) -> Generator[str, None, None]:
+    ) -> Generator[str]:
         yield column_db_type
         # Work out nullability.
         null = field.allow_null

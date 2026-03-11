@@ -43,7 +43,7 @@ def update_session_auth_hash(request: Request, user: Any) -> None:
         session[_USER_HASH_SESSION_KEY] = get_session_auth_hash(user)
 
 
-def _get_session_auth_fallback_hash(user: Any) -> Generator[str, None, None]:
+def _get_session_auth_fallback_hash(user: Any) -> Generator[str]:
     for fallback_secret in settings.SECRET_KEY_FALLBACKS:
         yield _get_session_auth_hash(user, secret=fallback_secret)
 

@@ -49,7 +49,7 @@ class PathInfo(NamedTuple):
     filtered_relation: FilteredRelation | None
 
 
-def subclasses(cls: type) -> Generator[type, None, None]:
+def subclasses(cls: type) -> Generator[type]:
     yield cls
     for subclass in cls.__subclasses__():
         yield from subclasses(subclass)
@@ -129,7 +129,7 @@ class Q(tree.Node):
         query.promote_joins(joins)
         return clause
 
-    def flatten(self) -> Generator[Any, None, None]:
+    def flatten(self) -> Generator[Any]:
         """
         Recursively yield this Q object and all subexpressions, in depth-first
         order.

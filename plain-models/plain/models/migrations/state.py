@@ -608,7 +608,7 @@ class StateModelsRegistry(ModelsRegistry):
             raise ValueError("\n".join(error.fix for error in errors))
 
     @contextmanager
-    def bulk_update(self) -> Generator[None, None, None]:
+    def bulk_update(self) -> Generator[None]:
         # Avoid clearing each model's cache for each change. Instead, clear
         # all caches when we're finished updating the model instances.
         ready = self.ready

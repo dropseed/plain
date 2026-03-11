@@ -92,7 +92,7 @@ def get_converters(
 
 def apply_converters(
     rows: Iterable, converters: dict, connection: DatabaseConnection
-) -> Generator[list, None, None]:
+) -> Generator[list]:
     converters_list = list(converters.items())
     for row in map(list, rows):
         for pos, (convs, expression) in converters_list:
@@ -369,7 +369,7 @@ class SQLCompiler:
             ret.append((col, (sql, params), alias))
         return ret, klass_info, annotations
 
-    def _order_by_pairs(self) -> Generator[tuple[OrderBy, bool], None, None]:
+    def _order_by_pairs(self) -> Generator[tuple[OrderBy, bool]]:
         if self.query.extra_order_by:
             ordering = self.query.extra_order_by
         elif not self.query.default_ordering:
@@ -1268,7 +1268,7 @@ class SQLCompiler:
                     return self.select[select_index][0]
             return None
 
-        def _get_field_choices() -> Generator[str, None, None]:
+        def _get_field_choices() -> Generator[str]:
             """Yield all allowed field paths in breadth-first search order."""
             queue = collections.deque([(None, self.klass_info)])
             while queue:
@@ -1439,7 +1439,7 @@ class SQLCompiler:
         sql, params = self.as_sql()
         return f"EXISTS ({sql})", params
 
-    def explain_query(self) -> Generator[str, None, None]:
+    def explain_query(self) -> Generator[str]:
         result = self.execute_sql()
         explain_info = self.query.explain_info
         # PostgreSQL may return tuples with integers and strings depending on

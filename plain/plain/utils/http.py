@@ -110,7 +110,7 @@ def escape_leading_slashes(url: str) -> str:
     return url
 
 
-def _parseparam(s: str) -> Generator[str, None, None]:
+def _parseparam(s: str) -> Generator[str]:
     while s[:1] == ";":
         s = s[1:]
         end = s.find(";")

@@ -9,11 +9,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any
 
 from plain.utils.functional import keep_lazy
-
-_T = TypeVar("_T")
 
 
 class SafeData:
@@ -50,11 +48,11 @@ class SafeString(str, SafeData):
         return self
 
 
-def _safety_decorator(
-    safety_marker: Callable[[Any], _T], func: Callable[..., Any]
-) -> Callable[..., _T]:
+def _safety_decorator[T](
+    safety_marker: Callable[[Any], T], func: Callable[..., Any]
+) -> Callable[..., T]:
     @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> _T:
+    def wrapper(*args: Any, **kwargs: Any) -> T:
         return safety_marker(func(*args, **kwargs))
 
     return wrapper

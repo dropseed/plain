@@ -5,7 +5,7 @@ import inspect
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 from plain.models.exceptions import FieldDoesNotExist
 from plain.models.query import QuerySet
@@ -25,10 +25,8 @@ IMMUTABLE_WARNING = (
     "list for your own use, make a copy first."
 )
 
-T = TypeVar("T")
 
-
-def make_immutable_fields_list(name: str, data: Iterable[T]) -> ImmutableList[T]:
+def make_immutable_fields_list[T](name: str, data: Iterable[T]) -> ImmutableList[T]:
     return ImmutableList(data, warning=IMMUTABLE_WARNING % name)
 
 

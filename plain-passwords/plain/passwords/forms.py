@@ -41,7 +41,7 @@ class PasswordResetForm(forms.Form):
 
         email.send()
 
-    def get_users(self, email: str) -> Generator[Model, None, None]:
+    def get_users(self, email: str) -> Generator[Model]:
         """Given an email, return matching user(s) who should receive a reset.
 
         This allows subclasses to more easily customize the default policies

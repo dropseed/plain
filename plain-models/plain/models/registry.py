@@ -5,13 +5,10 @@ import warnings
 from collections import defaultdict
 from collections.abc import Callable
 from functools import partial
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from plain.models.base import Model
-
-# Model classes are registered, not instances.
-M = TypeVar("M", bound="Model")
 
 
 class ModelsRegistryNotReady(Exception):
@@ -212,7 +209,7 @@ models_registry = ModelsRegistry()
 
 
 # Decorator to register a model (using the internal registry for the correct state).
-def register_model(model_class: type[M]) -> type[M]:
+def register_model[M: "Model"](model_class: type[M]) -> type[M]:
     model_class._model_meta.models_registry.register_model(
         model_class.model_options.package_label,
         model_class,

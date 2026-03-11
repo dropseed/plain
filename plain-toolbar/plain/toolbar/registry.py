@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .toolbar import ToolbarItem
-
-
-T = TypeVar("T", bound=type["ToolbarItem"])
 
 
 class ToolbarItemRegistry:
@@ -24,7 +21,7 @@ class ToolbarItemRegistry:
 registry = ToolbarItemRegistry()
 
 
-def register_toolbar_item(item_class: T) -> T:
+def register_toolbar_item[T: type["ToolbarItem"]](item_class: T) -> T:
     """Decorator to register a toolbar item."""
     registry.register_item(item_class)
     return item_class

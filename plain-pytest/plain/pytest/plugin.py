@@ -44,14 +44,14 @@ class SettingsProxy:
 
 
 @pytest.fixture
-def settings() -> Generator[SettingsProxy, None, None]:
+def settings() -> Generator[SettingsProxy]:
     proxy = SettingsProxy()
     yield proxy
     proxy._restore()
 
 
 @pytest.fixture
-def testbrowser(browser: Any, request: Any) -> Generator[TestBrowser, None, None]:
+def testbrowser(browser: Any, request: Any) -> Generator[TestBrowser]:
     """Use playwright and pytest-playwright to run browser tests against a test server."""
     try:
         # Check if isolated_db fixture is available from the plain-models package.

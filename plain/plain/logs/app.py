@@ -17,7 +17,7 @@ class AppLogger(logging.Logger):
         self.debug_mode = DebugMode(self)
 
     @contextmanager
-    def include_context(self, **kwargs: Any) -> Generator[None, None, None]:
+    def include_context(self, **kwargs: Any) -> Generator[None]:
         """Context manager for temporary context."""
         # Store original context
         original_context = self.context.copy()

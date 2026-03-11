@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from contextlib import ContextDecorator, contextmanager
-from typing import Any, TypeVar
+from typing import Any
 
 from plain.models.db import DatabaseError, Error, ProgrammingError, get_connection
-
-F = TypeVar("F", bound=Callable[..., Any])
 
 
 class TransactionManagementError(ProgrammingError):
@@ -16,7 +14,7 @@ class TransactionManagementError(ProgrammingError):
 
 
 @contextmanager
-def mark_for_rollback_on_error() -> Generator[None, None, None]:
+def mark_for_rollback_on_error() -> Generator[None]:
     """
     Internal low-level utility to mark a transaction as "needs rollback" when
     an exception is raised while not enforcing the enclosed block to be in a
@@ -215,7 +213,7 @@ class Atomic(ContextDecorator):
                     conn.set_autocommit(True)
 
 
-def atomic(
+def atomic[F: Callable[..., Any]](
     func: F | None = None, *, savepoint: bool = True, durable: bool = False
 ) -> F | Atomic:
     """Create an atomic transaction context or decorator."""

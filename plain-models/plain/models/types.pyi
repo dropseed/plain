@@ -16,7 +16,7 @@ from collections.abc import Callable, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from json import JSONDecoder, JSONEncoder
-from typing import Any, Generic, Literal, TypeVar, overload
+from typing import Any, Literal, overload
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -27,11 +27,6 @@ from plain.models.fields.related_managers import (
     ReverseForeignKeyManager,
 )
 from plain.models.query import QuerySet
-
-# TypeVar for generic ForeignKey/ManyToManyField support
-_T = TypeVar("_T", bound=Model)
-# TypeVar for custom QuerySet types (defaults to QuerySet[Any] when not specified)
-_QS = TypeVar("_QS", bound=QuerySet[Any], default=QuerySet[Any])
 
 # String fields
 @overload
@@ -627,8 +622,8 @@ def EncryptedJSONField(
 
 # Related fields
 @overload
-def ForeignKeyField(
-    to: type[_T] | str,
+def ForeignKeyField[T: Model](
+    to: type[T] | str,
     on_delete: Any,
     *,
     related_query_name: str | None = None,
@@ -642,10 +637,10 @@ def ForeignKeyField(
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-) -> _T | None: ...
+) -> T | None: ...
 @overload
-def ForeignKeyField(
-    to: type[_T] | str,
+def ForeignKeyField[T: Model](
+    to: type[T] | str,
     on_delete: Any,
     *,
     related_query_name: str | None = None,
@@ -659,9 +654,9 @@ def ForeignKeyField(
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-) -> _T: ...
-def ManyToManyField(
-    to: type[_T] | str,
+) -> T: ...
+def ManyToManyField[T: Model](
+    to: type[T] | str,
     *,
     through: Any,
     through_fields: tuple[str, str] | None = None,
@@ -675,10 +670,10 @@ def ManyToManyField(
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
-) -> ManyToManyManager[_T]: ...
+) -> ManyToManyManager[T]: ...
 
 # Reverse relation descriptors
-class ReverseForeignKey(Generic[_T, _QS]):
+class ReverseForeignKey[T: Model, QS: QuerySet[Any] = QuerySet[Any]]:
     """
     Descriptor for the reverse side of a ForeignKeyField.
 
@@ -692,18 +687,18 @@ class ReverseForeignKey(Generic[_T, _QS]):
 
         # Usage: org.repos.query.enabled()  # .enabled() is now recognized
     """
-    def __init__(self, *, to: type[_T] | str, field: str) -> None: ...
+    def __init__(self, *, to: type[T] | str, field: str) -> None: ...
     @overload
-    def __get__(self, instance: None, owner: type) -> ReverseForeignKey[_T, _QS]: ...
+    def __get__(self, instance: None, owner: type) -> ReverseForeignKey[T, QS]: ...
     @overload
     def __get__(
         self, instance: Model, owner: type
-    ) -> ReverseForeignKeyManager[_T, _QS]: ...
+    ) -> ReverseForeignKeyManager[T, QS]: ...
     def __get__(
         self, instance: Model | None, owner: type
-    ) -> ReverseForeignKey[_T, _QS] | ReverseForeignKeyManager[_T, _QS]: ...
+    ) -> ReverseForeignKey[T, QS] | ReverseForeignKeyManager[T, QS]: ...
 
-class ReverseManyToMany(Generic[_T, _QS]):
+class ReverseManyToMany[T: Model, QS: QuerySet[Any] = QuerySet[Any]]:
     """
     Descriptor for the reverse side of a ManyToManyField.
 
@@ -711,14 +706,14 @@ class ReverseManyToMany(Generic[_T, _QS]):
         _T: The related model type
         _QS: The QuerySet type (use the model's custom QuerySet for proper method typing)
     """
-    def __init__(self, *, to: type[_T] | str, field: str) -> None: ...
+    def __init__(self, *, to: type[T] | str, field: str) -> None: ...
     @overload
-    def __get__(self, instance: None, owner: type) -> ReverseManyToMany[_T, _QS]: ...
+    def __get__(self, instance: None, owner: type) -> ReverseManyToMany[T, QS]: ...
     @overload
-    def __get__(self, instance: Model, owner: type) -> ManyToManyManager[_T, _QS]: ...
+    def __get__(self, instance: Model, owner: type) -> ManyToManyManager[T, QS]: ...
     def __get__(
         self, instance: Model | None, owner: type
-    ) -> ReverseManyToMany[_T, _QS] | ManyToManyManager[_T, _QS]: ...
+    ) -> ReverseManyToMany[T, QS] | ManyToManyManager[T, QS]: ...
 
 # Export all types (should match types.py)
 __all__ = [

@@ -32,7 +32,7 @@ def make_model_tuple(model: Any) -> tuple[str, str]:
 
 def resolve_callables(
     mapping: dict[str, Any],
-) -> Generator[tuple[str, Any], None, None]:
+) -> Generator[tuple[str, Any]]:
     """
     Generate key/value pairs for the given mapping where the values are
     evaluated if they're callable.

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class ChunkedReader:
     def __init__(self, req: Message, unreader: Unreader) -> None:
         self.req = req
-        self.parser: Generator[bytes, None, None] | None = self.parse_chunked(unreader)
+        self.parser: Generator[bytes] | None = self.parse_chunked(unreader)
         self.buf = io.BytesIO()
 
     def read(self, size: int) -> bytes:
@@ -65,7 +65,7 @@ class ChunkedReader:
         unreader.unread(buf.getvalue()[idx + 4 :])
         return None
 
-    def parse_chunked(self, unreader: Unreader) -> Generator[bytes, None, None]:
+    def parse_chunked(self, unreader: Unreader) -> Generator[bytes]:
         (size, rest) = self.parse_chunk_size(unreader)
         while size > 0:
             while size > len(rest):

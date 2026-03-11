@@ -120,7 +120,7 @@ def field_references(
 
 def get_references(
     state: Any, model_tuple: tuple[str, str], field_tuple: tuple[Any, ...] = ()
-) -> Generator[tuple[Any, str, Field, FieldReference], None, None]:
+) -> Generator[tuple[Any, str, Field, FieldReference]]:
     """
     Generator of (model_state, name, field, reference) referencing
     provided context.

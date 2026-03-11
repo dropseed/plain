@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 from .parameters import JobParameters
 
 if TYPE_CHECKING:
     from .jobs import Job
-
-T = TypeVar("T", bound=type["Job"])
 
 
 class JobsRegistry:
@@ -41,7 +39,7 @@ class JobsRegistry:
 jobs_registry = JobsRegistry()
 
 
-def register_job(
+def register_job[T: type["Job"]](
     job_class: T | None = None, *, alias: str = ""
 ) -> T | Callable[[T], T]:
     """

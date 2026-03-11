@@ -5,12 +5,9 @@ This module provides decorators and utilities for CLI commands.
 """
 
 from collections.abc import Callable
-from typing import TypeVar
-
-F = TypeVar("F", bound=Callable)
 
 
-def without_runtime_setup(f: F) -> F:
+def without_runtime_setup[F: Callable](f: F) -> F:
     """
     Decorator to mark commands that don't need plain.runtime.setup().
 
@@ -28,7 +25,7 @@ def without_runtime_setup(f: F) -> F:
     return f
 
 
-def common_command(f: F) -> F:
+def common_command[F: Callable](f: F) -> F:
     """
     Decorator to mark commands as commonly used.
 

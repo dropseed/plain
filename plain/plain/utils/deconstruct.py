@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from importlib import import_module
-from typing import Any, TypeVar
-
-T = TypeVar("T")
+from typing import Any
 
 
-def deconstructible(
+def deconstructible[T](
     *args: type[T], path: str | None = None
 ) -> Callable[[type[T]], type[T]] | type[T]:
     """

@@ -1,4 +1,4 @@
-target-version = "py311"
+target-version = "py313"
 
 [lint]
 ignore = [

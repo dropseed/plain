@@ -105,7 +105,7 @@ def DO_NOTHING(collector: Collector, field: RelatedField, sub_objs: Any) -> None
 
 def get_candidate_relations_to_delete(
     meta: Meta,
-) -> Generator[ForeignKeyRel, None, None]:
+) -> Generator[ForeignKeyRel]:
     from plain.models.fields.reverse_related import ForeignKeyRel
 
     # The candidate relations are the ones that come from N-1 and 1-1 relations.

@@ -101,7 +101,7 @@ def _clean_identifier(identifier: str) -> str:
 @contextmanager
 def db_span(
     db: DatabaseConnection, sql: Any, *, many: bool = False, params: Any = None
-) -> Generator[Span | None, None, None]:
+) -> Generator[Span | None]:
     """Open an OpenTelemetry CLIENT span for a database query.
 
     All common attributes (`db.*`, `network.*`, etc.) are set automatically.
@@ -179,7 +179,7 @@ def db_span(
 
 
 @contextmanager
-def suppress_db_tracing() -> Generator[None, None, None]:
+def suppress_db_tracing() -> Generator[None]:
     token = otel_context.attach(otel_context.set_value(_SUPPRESS_KEY, True))
     try:
         yield

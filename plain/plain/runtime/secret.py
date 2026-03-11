@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
 
-T = TypeVar("T")
-
-
-class Secret(Generic[T]):
+class Secret[T]:
     """
     Marker type for sensitive settings. Values are masked in output/logs.
 

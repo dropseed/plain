@@ -72,7 +72,7 @@ class CursorWrapper:
 
     def stream(
         self, sql: str, params: Sequence[Any] | None = None
-    ) -> Generator[tuple[Any, ...], None, None]:
+    ) -> Generator[tuple[Any, ...]]:
         self.db.validate_no_broken_transaction()
         with db_span(self.db, sql, params=params):
             with self.db.wrap_database_errors:
@@ -153,7 +153,7 @@ class CursorDebugWrapper(CursorWrapper):
 
     def stream(
         self, sql: str, params: Sequence[Any] | None = None
-    ) -> Generator[tuple[Any, ...], None, None]:
+    ) -> Generator[tuple[Any, ...]]:
         with self.debug_sql(sql, params, use_last_executed_query=True):
             yield from super().stream(sql, params)
 
@@ -176,7 +176,7 @@ class CursorDebugWrapper(CursorWrapper):
         params: Any = None,
         use_last_executed_query: bool = False,
         many: bool = False,
-    ) -> Generator[None, None, None]:
+    ) -> Generator[None]:
         start = time.monotonic()
         try:
             yield
@@ -210,9 +210,7 @@ class CursorDebugWrapper(CursorWrapper):
 
 
 @contextmanager
-def debug_transaction(
-    connection: DatabaseConnection, sql: str
-) -> Generator[None, None, None]:
+def debug_transaction(connection: DatabaseConnection, sql: str) -> Generator[None]:
     start = time.monotonic()
     try:
         yield
