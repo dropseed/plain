@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.45.4](https://github.com/dropseed/plain/releases/plain-jobs@0.45.4) (2026-03-10)
+
+### What's changed
+
+- Adopted PEP 695 type parameter syntax for `register_job` ([aa5b2db6e8ed](https://github.com/dropseed/plain/commit/aa5b2db6e8ed))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.45.3](https://github.com/dropseed/plain/releases/plain-jobs@0.45.3) (2026-03-09)
 
 ### What's changed
