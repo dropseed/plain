@@ -28,13 +28,19 @@ class AdminViewRegistry:
         """Slug -> view lookup dict, built once on first access."""
         return {view.get_slug(): view for view in self.registered_views}
 
+    @cached_property
+    def path_to_view(self) -> dict[str, type[AdminView]]:
+        """Path -> view lookup dict, built once on first access."""
+        return {view.get_path(): view for view in self.registered_views}
+
     def register_view(
         self, view: type[T] | None = None
     ) -> type[T] | Callable[[type[T]], type[T]]:
         def inner(view: type[T]) -> type[T]:
             self.registered_views.add(view)  # type: ignore[arg-type]
-            # Invalidate slug lookup cache
+            # Invalidate lookup caches
             self.__dict__.pop("slug_to_view", None)
+            self.__dict__.pop("path_to_view", None)
             return view
 
         if callable(view):
@@ -56,7 +62,7 @@ class AdminViewRegistry:
             return inner
 
     def get_nav_sections(
-        self, *, plain_packages: bool, user: Model | None
+        self, *, plain_packages: bool, user: Model
     ) -> dict[str, list[type]]:
         """Returns nav sections filtered by package type."""
         sections: dict[str, list[type]] = {}
@@ -69,7 +75,7 @@ class AdminViewRegistry:
             if view.nav_section is None:
                 continue
 
-            if view.restrict_admin_view(user):
+            if not view.has_permission(user):
                 continue
 
             sections.setdefault(view.nav_section, []).append(view)
@@ -110,23 +116,22 @@ class AdminViewRegistry:
 
         return urls
 
-    def get_list_views(self, user: Model | None) -> list[type[AdminView]]:
+    def get_list_views(self, user: Model) -> list[type[AdminView]]:
         from plain.admin.views.objects import AdminListView
 
         views: list[type[AdminView]] = [
             view
             for view in self.registered_views
-            if issubclass(view, AdminListView) and not view.restrict_admin_view(user)
+            if issubclass(view, AdminListView) and view.has_permission(user)
         ]
         views.sort(key=lambda v: v.get_slug())
         return views
 
-    def get_searchable_views(self, user: Model | None) -> list[type[AdminView]]:
+    def get_searchable_views(self, user: Model) -> list[type[AdminView]]:
         views = [
             view
             for view in self.registered_views
-            if getattr(view, "allow_global_search", False)
-            and not view.restrict_admin_view(user)
+            if getattr(view, "allow_global_search", False) and view.has_permission(user)
         ]
         views.sort(key=lambda v: v.get_slug())
         return views
@@ -153,6 +158,17 @@ class AdminViewRegistry:
         """Look up a view by its slug."""
         return self.slug_to_view.get(slug)
 
+    def get_view_by_path(self, path: str) -> type[AdminView] | None:
+        """Look up a view by its path."""
+        return self.path_to_view.get(path)
+
+    def get_url(self, view_path: str) -> str:
+        """Resolve an admin view URL by its path attribute."""
+        view = self.get_view_by_path(view_path)
+        if view is None:
+            raise ValueError(f"No admin view found with path '{view_path}'")
+        return view.get_view_url()
+
     def get_nav_tabs(
         self,
         request: Request,
@@ -163,17 +179,17 @@ class AdminViewRegistry:
         from plain.admin.models import PinnedNavItem
 
         user = get_request_user(request)
+        if not user:
+            return []
+
         session = get_request_session(request)
 
         # Get pinned items (ordered)
-        if user:
-            pinned_slugs = list(
-                PinnedNavItem.query.filter(user=user)
-                .order_by("order", "created_at")
-                .values_list("view_slug", flat=True)[:max_pinned]
-            )
-        else:
-            pinned_slugs = []
+        pinned_slugs = list(
+            PinnedNavItem.query.filter(user=user)
+            .order_by("order", "created_at")
+            .values_list("view_slug", flat=True)[:max_pinned]
+        )
 
         # Get recent items from session
         recent_slugs: list[str] = session.get("admin_recent_nav", [])
@@ -187,7 +203,7 @@ class AdminViewRegistry:
             if view := self.get_view_by_slug(slug):
                 if view.nav_section is None:
                     continue
-                if view.restrict_admin_view(user):
+                if not view.has_permission(user):
                     continue
                 tabs.append({"view": view, "pinned": True})
                 used_slugs.add(slug)
@@ -200,7 +216,7 @@ class AdminViewRegistry:
                 if view := self.get_view_by_slug(slug):
                     if view.nav_section is None:
                         continue
-                    if view.restrict_admin_view(user):
+                    if not view.has_permission(user):
                         continue
                     tabs.append({"view": view, "pinned": False})
                     used_slugs.add(slug)

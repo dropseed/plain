@@ -1,6 +1,6 @@
 {% use_elements %}
 {# Admin header partial - includes nav tabs and menu dialog #}
-{# Context: app_name, user, get_gravatar_url, nav_tabs, slug, parent_view_classes, pinned_slugs, admin_registry #}
+{# Context: app_name, user, nav_tabs, slug, parent_view_classes, pinned_slugs, admin_registry #}
 
 <header id="admin-header" class="sticky top-0 z-50 border-b border-stone-200 pt-2 bg-[#f6f3f2]">
     <!-- Top row -->
@@ -57,10 +57,10 @@
             </a>
 
             <button type="button" data-dropdown class="flex items-center cursor-pointer">
-                {% set gravatar_url = get_gravatar_url(user) %}
-                {% if gravatar_url %}
+                {% set avatar_url = user.get_avatar_url() if user.get_avatar_url is defined else None %}
+                {% if avatar_url %}
                     <img
-                        src="{{ gravatar_url }}"
+                        src="{{ avatar_url }}"
                         alt="{{ user }}"
                         class="w-7 h-7 rounded-full"
                     />
@@ -74,6 +74,7 @@
                 {% endif %}
                 <template>
                     <div class="py-1">
+                        {% include "admin/user_menu_items.html" ignore missing %}
                         <a href="{{ url('admin:settings') }}" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
                             <admin.Icon name="gear" />
                             App Settings
@@ -154,11 +155,11 @@
 
                 {# Menu content #}
                 <div class="overflow-auto flex-1 py-2 px-1.5" id="menu-items-container">
-                    {% with sections=admin_registry.get_nav_sections(plain_packages=False), header_label="App" %}
+                    {% with sections=admin_registry.get_nav_sections(plain_packages=False, user=user), header_label="App" %}
                         {% include "admin/_menu_section.html" %}
                     {% endwith %}
 
-                    {% with sections=admin_registry.get_nav_sections(plain_packages=True), header_label="Packages" %}
+                    {% with sections=admin_registry.get_nav_sections(plain_packages=True, user=user), header_label="Packages" %}
                         {% include "admin/_menu_section.html" %}
                     {% endwith %}
                 </div>

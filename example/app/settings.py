@@ -35,7 +35,7 @@ DEFAULT_RESPONSE_HEADERS = {
         "default-src 'self'; "
         "script-src 'self' 'nonce-{request.csp_nonce}'; "
         "style-src 'self' 'nonce-{request.csp_nonce}'; "
-        "img-src 'self' data: https://www.gravatar.com; "
+        "img-src 'self' data:; "
         "font-src 'self'; "
         "connect-src 'self'; "
         "frame-ancestors 'self'; "

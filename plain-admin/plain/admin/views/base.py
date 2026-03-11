@@ -13,7 +13,6 @@ from plain.views import (
 )
 
 from ..models import PinnedNavItem
-from ..utils import get_gravatar_url
 from .registry import registry, track_recent_nav
 from .types import Img
 
@@ -30,21 +29,22 @@ _URL_NAMESPACE = "admin"
 
 class AdminView(AuthView, TemplateView):
     admin_required = True
+    user: Model  # Always set — admin_required guarantees authentication
 
     # True for framework-provided views (index, search, settings, etc.)
-    # Available for use in ADMIN_RESTRICT_VIEWS to make per-view decisions.
+    # Available for use in ADMIN_HAS_PERMISSION to make per-view decisions.
     is_builtin = False
 
     def check_auth(self) -> None:
         super().check_auth()
-        if self.restrict_admin_view(self.user):
+        if not self.has_permission(self.user):
             raise ForbiddenError403("You don't have access to this page.")
 
     @classmethod
-    def restrict_admin_view(cls, user: Model | None) -> bool:
-        if restriction := settings.ADMIN_RESTRICT_VIEWS:
-            return restriction(cls, user)
-        return False
+    def has_permission(cls, user: Model) -> bool:
+        if check := settings.ADMIN_HAS_PERMISSION:
+            return check(cls, user)
+        return True
 
     title: str = ""
     description: str = ""  # Optional description shown below the title
@@ -96,7 +96,7 @@ class AdminView(AuthView, TemplateView):
         context["time_zone"] = timezone.get_current_timezone_name()
         context["view_class"] = self.__class__
         context["app_name"] = settings.NAME
-        context["get_gravatar_url"] = get_gravatar_url
+
         context["nav_tabs"] = registry.get_nav_tabs(self.request)
         context["pinned_slugs"] = set(
             PinnedNavItem.query.filter(user=self.user).values_list(
@@ -104,6 +104,7 @@ class AdminView(AuthView, TemplateView):
             )
         )
         context["preflight_counts"] = get_check_counts()
+        context["admin_url"] = registry.get_url
 
         return context
 

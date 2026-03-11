@@ -20,25 +20,27 @@ MAX_PINNED_ITEMS = 6
 
 
 class AdminIndexView(AdminView):
+    is_builtin = True
     template_name = "admin/index.html"
     title = "Dashboard"
 
     def get(self) -> Response:
         # Slight hack to redirect to the first view that doesn't
         # require any url params...
-        if views := registry.get_list_views():
+        if views := registry.get_list_views(user=self.user):
             return RedirectResponse(list(views)[0].get_view_url())
 
         return super().get()
 
 
 class AdminSearchView(AdminView):
+    is_builtin = True
     template_name = "admin/search.html"
     title = "Search"
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
-        context["searchable_views"] = registry.get_searchable_views()
+        context["searchable_views"] = registry.get_searchable_views(user=self.user)
         context["global_search_query"] = self.request.query_params.get("query", "")
         return context
 
@@ -46,6 +48,7 @@ class AdminSearchView(AdminView):
 class PinNavView(AdminView):
     """Pin a navigation item for the current user."""
 
+    is_builtin = True
     nav_section = None
 
     def post(self) -> Response:
@@ -87,6 +90,7 @@ class PinNavView(AdminView):
 class UnpinNavView(AdminView):
     """Unpin a navigation item for the current user."""
 
+    is_builtin = True
     nav_section = None
 
     def post(self) -> Response:
@@ -107,6 +111,7 @@ class UnpinNavView(AdminView):
 class ReorderPinnedView(AdminView):
     """Reorder pinned navigation items."""
 
+    is_builtin = True
     nav_section = None
 
     def post(self) -> Response:
@@ -146,6 +151,7 @@ def _setting_to_dict(name: str, defn: Any) -> dict[str, Any]:
 
 
 class SettingsView(AdminListView):
+    is_builtin = True
     title = "App Settings"
     description = (
         "All framework and app settings with their current values and sources."
@@ -194,6 +200,7 @@ class SettingsView(AdminListView):
 
 
 class SettingDetailView(AdminView):
+    is_builtin = True
     template_name = "admin/setting_detail.html"
     parent_view_class = SettingsView
     nav_section = None
@@ -214,6 +221,7 @@ class SettingDetailView(AdminView):
 class PreflightView(AdminView):
     """Run and display preflight check results."""
 
+    is_builtin = True
     template_name = "admin/preflight.html"
     title = "Preflight"
     description = "System checks that verify your app configuration is correct."
@@ -288,6 +296,7 @@ class PreflightView(AdminView):
 class StyleGuideView(AdminView):
     """Style guide showing available components and patterns."""
 
+    is_builtin = True
     template_name = "admin/style.html"
     title = "Style Guide"
     nav_section = None

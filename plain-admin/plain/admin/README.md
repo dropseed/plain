@@ -16,6 +16,12 @@
 - [Actions](#actions)
 - [Toolbar](#toolbar)
 - [Impersonate](#impersonate)
+- [Customization](#customization)
+    - [User avatar](#user-avatar)
+    - [User menu items](#user-menu-items)
+- [Access control](#access-control)
+    - [Per-view restriction](#per-view-restriction)
+    - [Global restriction](#global-restriction)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -380,6 +386,97 @@ def my_view(request):
         # `request.user` is the user being impersonated
         pass
 ```
+
+## Customization
+
+### User avatar
+
+The admin header shows a user avatar next to the account dropdown. If your User model defines a `get_avatar_url()` method, the admin will use it to display an image. Otherwise, a generic person icon is shown.
+
+```python
+# app/users/models.py
+import hashlib
+from plain import models
+from plain.models import types
+
+
+@models.register_model
+class User(models.Model):
+    email: str = types.EmailField()
+
+    def get_avatar_url(self) -> str:
+        # Use Gravatar
+        email_hash = hashlib.md5(self.email.lower().encode("utf-8")).hexdigest()
+        return f"https://www.gravatar.com/avatar/{email_hash}?d=identicon"
+```
+
+The method can return any image URL — a Gravatar, an uploaded file, or a data URI SVG.
+
+### User menu items
+
+To add items to the user dropdown menu (e.g., a profile page), create an `admin/user_menu_items.html` template in your app:
+
+```html
+<!-- app/templates/admin/user_menu_items.html -->
+<a
+    href="{{ admin_url('profile') }}"
+    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded"
+>
+    Profile
+</a>
+```
+
+The `admin_url()` function resolves a view URL by its `path` attribute. For example, a view with `path = "profile"` is resolved by `admin_url("profile")`.
+
+The template is included in the user dropdown before the "App Settings" and "Log out" links. If the template doesn't exist, nothing extra is shown.
+
+## Access control
+
+By default, any user with `is_admin=True` can access all admin views. To restrict specific views from certain admin users, use `has_permission`.
+
+### Per-view restriction
+
+Override `has_permission` on a view class to control who can access it. Return `False` to deny access.
+
+```python
+@register_viewset
+class SensitiveDataAdmin(AdminViewset):
+    class ListView(AdminModelListView):
+        model = SensitiveData
+        nav_section = "Internal"
+
+        @classmethod
+        def has_permission(cls, user) -> bool:
+            # Only superusers can access this view
+            return user.is_superuser
+```
+
+When a user is denied access to a view, they get a 403 response and the view is hidden from their navigation.
+
+### Global restriction
+
+To control access across all admin views (including package-shipped ones you don't own), set `ADMIN_HAS_PERMISSION` in your settings to a callable that receives the view class and user:
+
+```python
+# app/settings.py
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from plain.admin.views import AdminView
+
+    from app.users.models import User
+
+def ADMIN_HAS_PERMISSION(view_cls: type[AdminView], user: User) -> bool:
+    """Allow superusers to access all views, restrict others from package views."""
+    if user.is_superuser:
+        return True  # Allow access
+    # Deny views from plain packages
+    return not view_cls.__module__.startswith("plain.")
+```
+
+The callable should return `True` to allow access, `False` to deny it. Views can also override `has_permission` directly to implement their own logic instead of using the global setting.
 
 ## FAQs
 
