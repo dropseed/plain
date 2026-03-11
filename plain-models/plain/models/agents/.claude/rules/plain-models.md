@@ -75,3 +75,4 @@ Run `uv run plain docs models --section constraints` for full patterns with code
 - Use `model_options = models.Options(...)` not `class Meta`
 - Fields don't accept `unique=True` — use `UniqueConstraint` in constraints
 - Never format raw SQL strings — always use parameterized queries
+- Migrations are forward-only — no reverse migrations. `RunPython` takes a single callable (no `reverse_code` or `noop`). The callable signature is `fn(models, schema_editor)`, not `fn(apps, schema_editor)`
