@@ -6,9 +6,7 @@
     <!-- Top row -->
     <div class="flex items-center justify-between px-4 lg:px-8 h-11">
         <div class="flex items-center gap-1.5">
-            <a href="/" class="text-sm font-medium text-stone-500 hover:text-stone-700">{{ app_name }}</a>
-            <span class="text-stone-300">/</span>
-            <a href="{{ url('admin:index') }}" class="text-sm font-medium text-stone-900 hover:text-stone-700">Admin</a>
+            {% include "admin/header_branding.html" %}
         </div>
 
         <div class="flex items-center gap-2 sm:gap-3">

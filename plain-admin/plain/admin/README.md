@@ -17,6 +17,7 @@
 - [Toolbar](#toolbar)
 - [Impersonate](#impersonate)
 - [Customization](#customization)
+    - [Header branding](#header-branding)
     - [User avatar](#user-avatar)
     - [User menu items](#user-menu-items)
 - [Access control](#access-control)
@@ -388,6 +389,19 @@ def my_view(request):
 ```
 
 ## Customization
+
+### Header branding
+
+The top-left corner of the admin header shows your app name and an "Admin" link by default. To replace it with your own logo or branding, create an `admin/header_branding.html` template:
+
+```html
+<!-- app/templates/admin/header_branding.html -->
+<a href="/">
+    <img src="{{ asset('img/logo.svg') }}" alt="My App" class="h-5">
+</a>
+```
+
+The template completely replaces the default branding, so include whatever links and styling you want.
 
 ### User avatar
 
