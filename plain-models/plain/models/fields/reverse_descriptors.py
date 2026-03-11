@@ -8,7 +8,13 @@ without relying on automatic related_name generation.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+import sys
+from typing import TYPE_CHECKING, Any, Generic
+
+if sys.version_info >= (3, 13):
+    from typing import TypeVar
+else:
+    from typing_extensions import TypeVar
 
 if TYPE_CHECKING:
     from plain.models import Model

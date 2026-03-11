@@ -7,7 +7,13 @@ through foreign key and many-to-many relationships.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
+import sys
+from typing import TYPE_CHECKING, Any, Generic, cast
+
+if sys.version_info >= (3, 13):
+    from typing import TypeVar
+else:
+    from typing_extensions import TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable

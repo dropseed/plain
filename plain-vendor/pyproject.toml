@@ -5,7 +5,7 @@ description = "Download CDN scripts and styles as vendored dependencies."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = ["plain<1.0.0", "tomlkit>=0.12.1", "requests>=2.0.0"]
 
 # Make the CLI available without adding to INSTALLED_APPS

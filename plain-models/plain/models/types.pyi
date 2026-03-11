@@ -16,9 +16,11 @@ from collections.abc import Callable, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from json import JSONDecoder, JSONEncoder
-from typing import Any, Literal, overload
+from typing import Any, Generic, Literal, overload
 from uuid import UUID
 from zoneinfo import ZoneInfo
+
+from typing_extensions import TypeVar
 
 # Import manager types from runtime (will be Generic[T, QS] there)
 from plain.models.base import Model
@@ -27,6 +29,9 @@ from plain.models.fields.related_managers import (
     ReverseForeignKeyManager,
 )
 from plain.models.query import QuerySet
+
+_T = TypeVar("_T", bound=Model)
+_QS = TypeVar("_QS", bound=QuerySet[Any], default=QuerySet[Any])
 
 # String fields
 @overload
@@ -673,7 +678,7 @@ def ManyToManyField[T: Model](
 ) -> ManyToManyManager[T]: ...
 
 # Reverse relation descriptors
-class ReverseForeignKey[T: Model, QS: QuerySet[Any] = QuerySet[Any]]:
+class ReverseForeignKey(Generic[_T, _QS]):
     """
     Descriptor for the reverse side of a ForeignKeyField.
 
@@ -687,18 +692,18 @@ class ReverseForeignKey[T: Model, QS: QuerySet[Any] = QuerySet[Any]]:
 
         # Usage: org.repos.query.enabled()  # .enabled() is now recognized
     """
-    def __init__(self, *, to: type[T] | str, field: str) -> None: ...
+    def __init__(self, *, to: type[_T] | str, field: str) -> None: ...
     @overload
-    def __get__(self, instance: None, owner: type) -> ReverseForeignKey[T, QS]: ...
+    def __get__(self, instance: None, owner: type) -> ReverseForeignKey[_T, _QS]: ...
     @overload
     def __get__(
         self, instance: Model, owner: type
-    ) -> ReverseForeignKeyManager[T, QS]: ...
+    ) -> ReverseForeignKeyManager[_T, _QS]: ...
     def __get__(
         self, instance: Model | None, owner: type
-    ) -> ReverseForeignKey[T, QS] | ReverseForeignKeyManager[T, QS]: ...
+    ) -> ReverseForeignKey[_T, _QS] | ReverseForeignKeyManager[_T, _QS]: ...
 
-class ReverseManyToMany[T: Model, QS: QuerySet[Any] = QuerySet[Any]]:
+class ReverseManyToMany(Generic[_T, _QS]):
     """
     Descriptor for the reverse side of a ManyToManyField.
 
@@ -706,14 +711,14 @@ class ReverseManyToMany[T: Model, QS: QuerySet[Any] = QuerySet[Any]]:
         _T: The related model type
         _QS: The QuerySet type (use the model's custom QuerySet for proper method typing)
     """
-    def __init__(self, *, to: type[T] | str, field: str) -> None: ...
+    def __init__(self, *, to: type[_T] | str, field: str) -> None: ...
     @overload
-    def __get__(self, instance: None, owner: type) -> ReverseManyToMany[T, QS]: ...
+    def __get__(self, instance: None, owner: type) -> ReverseManyToMany[_T, _QS]: ...
     @overload
-    def __get__(self, instance: Model, owner: type) -> ManyToManyManager[T, QS]: ...
+    def __get__(self, instance: Model, owner: type) -> ManyToManyManager[_T, _QS]: ...
     def __get__(
         self, instance: Model | None, owner: type
-    ) -> ReverseManyToMany[T, QS] | ManyToManyManager[T, QS]: ...
+    ) -> ReverseManyToMany[_T, _QS] | ManyToManyManager[_T, _QS]: ...
 
 # Export all types (should match types.py)
 __all__ = [
