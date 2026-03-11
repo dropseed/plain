@@ -90,7 +90,7 @@ class BaseForm:
             self.data = request.form_data
             self.files = request.files
 
-        self.is_bound = bool(self.data or self.files)
+        self.is_bound = request.method in ("POST", "PUT", "PATCH")
 
         self._auto_id = auto_id
         if prefix is not None:
