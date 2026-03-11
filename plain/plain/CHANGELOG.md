@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.122.1](https://github.com/dropseed/plain/releases/plain@0.122.1) (2026-03-11)
+
+### What's changed
+
+- Fixed `is_bound` for forms with no fields (e.g., delete confirmation forms) — empty POST requests produced a falsy `QueryDict`, causing the form to never validate. `is_bound` now checks the request method instead of data truthiness ([f630b3b5fb22](https://github.com/dropseed/plain/commit/f630b3b5fb22))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.122.0](https://github.com/dropseed/plain/releases/plain@0.122.0) (2026-03-10)
 
 ### What's changed
