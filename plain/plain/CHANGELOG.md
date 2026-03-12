@@ -1,5 +1,27 @@
 # plain changelog
 
+## [0.123.0](https://github.com/dropseed/plain/releases/plain@0.123.0) (2026-03-11)
+
+### What's changed
+
+- **Open redirect protection for `RedirectResponse`** — external URLs are now rejected by default. Pass `allow_external=True` to explicitly allow redirects to external hosts (OAuth, CDN, etc.). Detects scheme-based URLs (`http://`, `https://`, `ftp://`), protocol-relative (`//`), and backslash variants (`/\`, `\\`) with whitespace stripping to prevent bypass attacks ([5edfb2bedf90](https://github.com/dropseed/plain/commit/5edfb2bedf90))
+- **`RedirectView.allow_external` attribute** — class-based redirect views now support `allow_external = True` for views that intentionally redirect to external URLs ([5edfb2bedf90](https://github.com/dropseed/plain/commit/5edfb2bedf90))
+
+### Upgrade instructions
+
+- If your code passes external URLs to `RedirectResponse` (e.g., OAuth providers, CDN URLs, SSO login pages), add `allow_external=True`:
+
+    ```python
+    # Before
+    RedirectResponse("https://example.com/callback")
+
+    # After
+    RedirectResponse("https://example.com/callback", allow_external=True)
+    ```
+
+- For `RedirectView` subclasses that redirect externally, set `allow_external = True` on the class.
+- Relative paths, query-only URLs, and other internal redirects continue to work without changes.
+
 ## [0.122.1](https://github.com/dropseed/plain/releases/plain@0.122.1) (2026-03-11)
 
 ### What's changed
