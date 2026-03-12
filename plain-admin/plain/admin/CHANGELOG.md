@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.73.0](https://github.com/dropseed/plain/releases/plain-admin@0.73.0) (2026-03-12)
+
+### What's changed
+
+- Updated all imports from `plain.models` to `plain.postgres` across views, builtin_views, cards, migrations, and README examples.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+
 ## [0.72.1](https://github.com/dropseed/plain/releases/plain-admin@0.72.1) (2026-03-11)
 
 ### What's changed
