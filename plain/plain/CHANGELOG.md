@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.123.2](https://github.com/dropseed/plain/releases/plain@0.123.2) (2026-03-12)
+
+### What's changed
+
+- **Server startup log now includes workers and threads** — the startup message shows `workers=N threads=N` so you can confirm the server configuration at a glance ([e63d9f90520c](https://github.com/dropseed/plain/commit/e63d9f90520c))
+- **H2 max concurrent streams setting registered with default of 100** — `SERVER_H2_MAX_CONCURRENT_STREAMS` is now a proper setting with a default value instead of using `getattr` with a fallback ([e72a4006515f](https://github.com/dropseed/plain/commit/e72a4006515f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.123.1](https://github.com/dropseed/plain/releases/plain@0.123.1) (2026-03-12)
 
 ### What's changed
