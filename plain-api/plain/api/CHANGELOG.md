@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-api@0.28.0) (2026-03-12)
+
+### What's changed
+
+- Updated all imports from `plain.models` to `plain.postgres` in models, views, migrations, and README examples.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+
 ## [0.27.2](https://github.com/dropseed/plain/releases/plain-api@0.27.2) (2026-03-10)
 
 ### What's changed
