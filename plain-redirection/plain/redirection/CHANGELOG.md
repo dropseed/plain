@@ -1,5 +1,17 @@
 # plain-redirection changelog
 
+## [0.33.0](https://github.com/dropseed/plain/releases/plain-redirection@0.33.0) (2026-03-12)
+
+### What's changed
+
+- Updated all imports from `plain.models` to `plain.postgres` in admin, models, and migrations.
+- Updated `pyproject.toml` dependency from `plain.models` to `plain.postgres`.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+- Update dependency declarations: `plain.models` to `plain.postgres` in `pyproject.toml`.
+
 ## [0.32.1](https://github.com/dropseed/plain/releases/plain-redirection@0.32.1) (2026-03-11)
 
 ### What's changed
