@@ -1,5 +1,16 @@
 # plain-email changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-email@0.17.0) (2026-03-12)
+
+### What's changed
+
+- **Removed file-based email backend** — the `plain.email.backends.filebased.EmailBackend` has been removed along with the `EMAIL_FILE_PATH` setting. Use the console backend for local development instead ([b0bfb96a7d27](https://github.com/dropseed/plain/commit/b0bfb96a7d27))
+
+### Upgrade instructions
+
+- If you were using `EMAIL_BACKEND = "plain.email.backends.filebased.EmailBackend"`, switch to the console backend: `EMAIL_BACKEND = "plain.email.backends.console.EmailBackend"`
+- Remove any `EMAIL_FILE_PATH` setting from your configuration.
+
 ## [0.16.1](https://github.com/dropseed/plain/releases/plain-email@0.16.1) (2026-03-10)
 
 ### What's changed
