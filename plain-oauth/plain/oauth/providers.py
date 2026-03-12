@@ -151,7 +151,7 @@ class OAuthProvider(ABC):
         # Sort authorization params for consistency
         sorted_authorization_params = sorted(authorization_params.items())
         redirect_url = authorization_url + "?" + urlencode(sorted_authorization_params)
-        return self.get_redirect_response(redirect_url)
+        return self.get_redirect_response(redirect_url, allow_external=True)
 
     def handle_connect_request(
         self, *, request: Request, redirect_to: str = ""
@@ -208,12 +208,14 @@ class OAuthProvider(ABC):
     def get_disconnect_redirect_url(self, *, request: Request) -> str:
         return request.form_data.get("next", "/")
 
-    def get_redirect_response(self, redirect_url: str) -> Response:
+    def get_redirect_response(
+        self, redirect_url: str, *, allow_external: bool = False
+    ) -> Response:
         """
         Returns a redirect response to the given URL.
         This is a utility method to ensure consistent redirect handling.
         """
-        response = RedirectResponse(redirect_url, allow_external=True)
+        response = RedirectResponse(redirect_url, allow_external=allow_external)
         add_never_cache_headers(response)
         return response
 
