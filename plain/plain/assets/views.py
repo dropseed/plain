@@ -270,6 +270,7 @@ class AssetView(View):
         return RedirectResponse(
             redirect_to=cdn_url,
             status_code=status_code,
+            allow_external=True,
             headers={"Cache-Control": cache_control},
         )
 

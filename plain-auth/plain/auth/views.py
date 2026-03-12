@@ -144,4 +144,4 @@ def redirect_to_login(
         querystring[redirect_field_name] = next
         login_url_parts[4] = querystring.urlencode(safe="/")
 
-    return RedirectResponse(str(urlunparse(login_url_parts)))
+    return RedirectResponse(str(urlunparse(login_url_parts)), allow_external=True)

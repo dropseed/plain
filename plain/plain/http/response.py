@@ -540,12 +540,37 @@ class FileResponse(StreamingResponse):
             self.headers["Content-Disposition"] = content_disposition
 
 
+def _is_external_url(url: str) -> bool:
+    """Check if a URL would redirect to an external host."""
+    if not url:
+        return False
+    # Browsers strip leading whitespace from Location headers
+    url = url.strip()
+    # Browsers normalize backslashes to forward slashes in URLs,
+    # so \\ and /\ are equivalent to //
+    if url[:2].replace("\\", "/") == "//":
+        return True
+    colon_pos = url.find("://")
+    if colon_pos > 0 and url[:colon_pos].isalpha():
+        return True
+    return False
+
+
 class RedirectResponse(Response):
     """HTTP redirect response"""
 
     status_code = 302
 
-    def __init__(self, redirect_to: str, **kwargs: Any):
+    def __init__(
+        self, redirect_to: str, *, allow_external: bool = False, **kwargs: Any
+    ):
+        if not allow_external and _is_external_url(redirect_to):
+            raise ValueError(
+                f"Unsafe redirect URL: {redirect_to!r}. "
+                "RedirectResponse does not allow external URLs by default. "
+                "Use allow_external=True if you intentionally want to redirect "
+                "to an external URL."
+            )
         super().__init__(**kwargs)
         self.headers["Location"] = iri_to_uri(redirect_to) or ""
 

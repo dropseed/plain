@@ -50,8 +50,7 @@ class LoginLinkSentView(AuthView, TemplateView):
     def get(self) -> Response:
         # Redirect if the user is already logged in
         if self.user:
-            next_url = self.request.query_params.get("next", "/")
-            return RedirectResponse(next_url)
+            return RedirectResponse(self.request.query_params.get("next", "/"))
 
         return super().get()
 

@@ -17,7 +17,9 @@ class RedirectionMiddleware(HttpMiddleware):
                     redirect_log = RedirectLog.from_redirect(redirect, request)
                     # Then redirect
                     return RedirectResponse(
-                        str(redirect_log.to_url), status_code=redirect.http_status
+                        str(redirect_log.to_url),
+                        status_code=redirect.http_status,
+                        allow_external=True,
                     )
 
             # Nothing matched, just log the 404

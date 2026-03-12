@@ -84,7 +84,7 @@ class PinNavView(AdminView):
 
         # Redirect back to current page (or referer)
         referer = self.request.headers.get("Referer", "/admin/")
-        return RedirectResponse(referer)
+        return RedirectResponse(referer, allow_external=True)
 
 
 class UnpinNavView(AdminView):
@@ -105,7 +105,7 @@ class UnpinNavView(AdminView):
 
         # Redirect back to current page (or referer)
         referer = self.request.headers.get("Referer", "/admin/")
-        return RedirectResponse(referer)
+        return RedirectResponse(referer, allow_external=True)
 
 
 class ReorderPinnedView(AdminView):

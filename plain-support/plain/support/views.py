@@ -61,4 +61,4 @@ class SupportIFrameView(SupportFormView):
 
 class SupportFormJSView(View):
     def get(self) -> RedirectResponse:
-        return RedirectResponse(get_asset_url("support/embed.js"))
+        return RedirectResponse(get_asset_url("support/embed.js"), allow_external=True)

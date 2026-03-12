@@ -106,7 +106,7 @@ class PageRedirectView(PageViewMixin, View):
             raise RedirectPageError("Redirect page is missing a url")
 
         status_code = self.page.vars.get("status_code", 302)
-        return RedirectResponse(url, status_code=status_code)
+        return RedirectResponse(url, status_code=status_code, allow_external=True)
 
 
 class PageAssetView(PageViewMixin, AssetView):

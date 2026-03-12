@@ -11,6 +11,7 @@ class RedirectView(View):
     url: str | None = None
     url_name: str | None = None
     preserve_query_params = False
+    allow_external = False
 
     def get_redirect_url(self) -> str:
         """
@@ -31,7 +32,9 @@ class RedirectView(View):
 
     def get(self) -> RedirectResponse:
         url = self.get_redirect_url()
-        return RedirectResponse(url, status_code=self.status_code)
+        return RedirectResponse(
+            url, status_code=self.status_code, allow_external=self.allow_external
+        )
 
     def head(self) -> RedirectResponse:
         return self.get()
