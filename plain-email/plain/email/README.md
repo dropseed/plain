@@ -159,17 +159,6 @@ Prints emails to the console instead of sending them. Useful during development.
 EMAIL_BACKEND = "plain.email.backends.console.EmailBackend"
 ```
 
-### File-based backend
-
-Writes emails to files in a directory. Useful for testing and debugging.
-
-```python
-EMAIL_BACKEND = "plain.email.backends.filebased.EmailBackend"
-EMAIL_FILE_PATH = "/path/to/email-output"
-```
-
-Each email is saved to a timestamped `.log` file in the specified directory.
-
 ## FAQs
 
 #### How do I send to multiple recipients efficiently?
