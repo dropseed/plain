@@ -318,14 +318,11 @@ async def async_handle_h2_connection(
 
     from plain.runtime import settings
 
-    # Configure max concurrent streams if set
-    max_streams = getattr(settings, "SERVER_H2_MAX_CONCURRENT_STREAMS", None)
-    if max_streams:
-        conn.update_settings(
-            {
-                h2.settings.SettingCodes.MAX_CONCURRENT_STREAMS: max_streams,
-            }
-        )
+    conn.update_settings(
+        {
+            h2.settings.SettingCodes.MAX_CONCURRENT_STREAMS: settings.SERVER_H2_MAX_CONCURRENT_STREAMS,
+        }
+    )
 
     scheme = "https" if is_ssl else "http"
     max_body = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or _H2_BODY_FALLBACK
