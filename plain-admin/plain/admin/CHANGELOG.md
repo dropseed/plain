@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.72.1](https://github.com/dropseed/plain/releases/plain-admin@0.72.1) (2026-03-11)
+
+### What's changed
+
+- Added `allow_external=True` to Referer-based redirects in `PinNavView` and `UnpinNavView` to work with the new `RedirectResponse` open redirect protection ([5edfb2bedf90](https://github.com/dropseed/plain/commit/5edfb2bedf90))
+
+### Upgrade instructions
+
+- Requires `plain>=0.123.0`. No other changes required.
+
 ## [0.72.0](https://github.com/dropseed/plain/releases/plain-admin@0.72.0) (2026-03-10)
 
 ### What's changed
