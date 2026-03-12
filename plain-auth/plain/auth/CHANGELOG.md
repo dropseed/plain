@@ -1,5 +1,17 @@
 # plain-auth changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-auth@0.28.0) (2026-03-12)
+
+### What's changed
+
+- Updated all imports from `plain.models` to `plain.postgres` in requests, sessions, views, and README examples.
+- Updated `pyproject.toml` dependency from `plain.models` to `plain.postgres`.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+- Update dependency declarations: `plain.models` to `plain.postgres` in `pyproject.toml`.
+
 ## [0.27.3](https://github.com/dropseed/plain/releases/plain-auth@0.27.3) (2026-03-11)
 
 ### What's changed
