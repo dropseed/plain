@@ -33,8 +33,8 @@ from .reverse_related import ForeignKeyRel, ManyToManyRel
 
 if TYPE_CHECKING:
     from plain.models.base import Model
+    from plain.models.connection import DatabaseConnection
     from plain.models.fields.reverse_related import ForeignObjectRel
-    from plain.models.postgres.connection import DatabaseConnection
 
 RECURSIVE_RELATIONSHIP_CONSTANT = "self"
 

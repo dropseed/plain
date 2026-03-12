@@ -7,16 +7,7 @@ from collections.abc import Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain.models.exceptions import EmptyResultSet, FullResultSet
-from plain.models.expressions import Expression, Func, ResolvableExpression, Value
-from plain.models.fields import (
-    BooleanField,
-    DateTimeField,
-    Field,
-    IntegerField,
-    UUIDField,
-)
-from plain.models.postgres.sql import (
+from plain.models.dialect import (
     INTEGER_FIELD_RANGES,
     OPERATORS,
     PATTERN_ESC,
@@ -27,12 +18,21 @@ from plain.models.postgres.sql import (
     year_lookup_bounds_for_date_field,
     year_lookup_bounds_for_datetime_field,
 )
+from plain.models.exceptions import EmptyResultSet, FullResultSet
+from plain.models.expressions import Expression, Func, ResolvableExpression, Value
+from plain.models.fields import (
+    BooleanField,
+    DateTimeField,
+    Field,
+    IntegerField,
+    UUIDField,
+)
 from plain.models.query_utils import RegisterLookupMixin
 from plain.utils.datastructures import OrderedSet
 from plain.utils.hashable import make_hashable
 
 if TYPE_CHECKING:
-    from plain.models.postgres.connection import DatabaseConnection
+    from plain.models.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 

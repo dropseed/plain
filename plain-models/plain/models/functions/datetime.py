@@ -3,6 +3,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from plain.models.dialect import (
+    date_extract_sql,
+    date_trunc_sql,
+    datetime_cast_date_sql,
+    datetime_cast_time_sql,
+    datetime_extract_sql,
+    datetime_trunc_sql,
+    time_extract_sql,
+    time_trunc_sql,
+)
 from plain.models.expressions import Func
 from plain.models.fields import (
     DateField,
@@ -20,20 +30,10 @@ from plain.models.lookups import (
     YearLt,
     YearLte,
 )
-from plain.models.postgres.sql import (
-    date_extract_sql,
-    date_trunc_sql,
-    datetime_cast_date_sql,
-    datetime_cast_time_sql,
-    datetime_extract_sql,
-    datetime_trunc_sql,
-    time_extract_sql,
-    time_trunc_sql,
-)
 from plain.utils import timezone
 
 if TYPE_CHECKING:
-    from plain.models.postgres.connection import DatabaseConnection
+    from plain.models.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 

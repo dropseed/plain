@@ -7,7 +7,7 @@ from plain.exceptions import ImproperlyConfigured
 from plain.runtime import settings as plain_settings
 
 if TYPE_CHECKING:
-    from plain.models.postgres.connection import DatabaseConnection
+    from plain.models.connection import DatabaseConnection
 
 
 class DatabaseConfig(TypedDict, total=False):
@@ -57,7 +57,7 @@ def _configure_settings() -> DatabaseConfig:
 
 
 def _create_connection() -> DatabaseConnection:
-    from plain.models.postgres.connection import DatabaseConnection
+    from plain.models.connection import DatabaseConnection
 
     database_config = _configure_settings()
     return DatabaseConnection(database_config)

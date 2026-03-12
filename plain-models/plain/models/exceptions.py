@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 import psycopg
 
 if TYPE_CHECKING:
-    from plain.models.postgres.connection import DatabaseConnection
+    from plain.models.connection import DatabaseConnection
 
 F = TypeVar("F", bound=Callable[..., Any])
 

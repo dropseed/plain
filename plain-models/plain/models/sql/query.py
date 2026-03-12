@@ -61,10 +61,10 @@ from plain.utils.tree import Node
 
 if TYPE_CHECKING:
     from plain.models import Model
+    from plain.models.connection import DatabaseConnection
     from plain.models.fields.related import RelatedField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.meta import Meta
-    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import (
         SQLAggregateCompiler,
         SQLCompiler,

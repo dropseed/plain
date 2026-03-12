@@ -20,6 +20,7 @@ from plain.models.db import (
     DatabaseError,
 )
 from plain.models.deletion import Collector
+from plain.models.dialect import MAX_NAME_LENGTH
 from plain.models.exceptions import (
     DoesNotExistDescriptor,
     FieldDoesNotExist,
@@ -31,7 +32,6 @@ from plain.models.fields.related import RelatedField
 from plain.models.fields.reverse_related import ForeignObjectRel
 from plain.models.meta import Meta
 from plain.models.options import Options
-from plain.models.postgres.sql import MAX_NAME_LENGTH
 from plain.models.query import F, Q, QuerySet
 from plain.preflight import PreflightResult
 from plain.utils.encoding import force_str

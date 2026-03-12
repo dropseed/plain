@@ -16,8 +16,8 @@ from plain.models.functions.mixins import NumericOutputFieldMixin
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from plain.models.connection import DatabaseConnection
     from plain.models.expressions import Expression
-    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.query_utils import Q
     from plain.models.sql.compiler import SQLCompiler
 

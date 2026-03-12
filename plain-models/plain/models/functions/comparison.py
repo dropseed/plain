@@ -9,7 +9,7 @@ from plain.models.fields import Field, TextField
 from plain.models.fields.json import JSONField
 
 if TYPE_CHECKING:
-    from plain.models.postgres.connection import DatabaseConnection
+    from plain.models.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 

@@ -18,7 +18,7 @@ from psycopg.types.json import Jsonb
 
 from plain.models.constants import OnConflict
 from plain.models.db import NotSupportedError
-from plain.models.postgres.utils import split_tzname_delta
+from plain.models.utils import split_tzname_delta
 from plain.utils import timezone
 from plain.utils.regex_helper import _lazy_re_compile
 

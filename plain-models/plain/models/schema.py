@@ -15,33 +15,33 @@ if TYPE_CHECKING:
     from plain.models.sql.compiler import SQLCompiler
 
 from plain.models.constraints import Deferrable
-from plain.models.fields import DbParameters, Field
-from plain.models.fields.related import ForeignKeyField, RelatedField
-from plain.models.fields.reverse_related import ForeignObjectRel, ManyToManyRel
-from plain.models.indexes import Index
-from plain.models.postgres.sql import (
+from plain.models.dialect import (
     DATA_TYPE_CHECK_CONSTRAINTS,
     DATA_TYPES,
     DEFERRABLE_SQL,
     MAX_NAME_LENGTH,
     quote_name,
 )
-from plain.models.postgres.utils import names_digest, split_identifier, strip_quotes
+from plain.models.fields import DbParameters, Field
+from plain.models.fields.related import ForeignKeyField, RelatedField
+from plain.models.fields.reverse_related import ForeignObjectRel, ManyToManyRel
+from plain.models.indexes import Index
 from plain.models.sql import Query
 from plain.models.transaction import atomic
+from plain.models.utils import names_digest, split_identifier, strip_quotes
 from plain.utils import timezone
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from plain.models.base import Model
+    from plain.models.connection import DatabaseConnection
     from plain.models.constraints import BaseConstraint
     from plain.models.fields import Field
     from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ManyToManyRel
-    from plain.models.postgres.connection import DatabaseConnection
 
-logger = logging.getLogger("plain.models.postgres.schema")
+logger = logging.getLogger("plain.models.schema")
 
 
 # ##### DDL Reference classes (for deferred DDL statement manipulation) #####

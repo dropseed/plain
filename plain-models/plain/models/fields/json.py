@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from plain import exceptions, preflight
 from plain.models import expressions, lookups
 from plain.models.constants import LOOKUP_SEP
+from plain.models.dialect import adapt_json_value
 from plain.models.fields import TextField
 from plain.models.lookups import (
     FieldGetDbPrepValueMixin,
@@ -14,12 +15,11 @@ from plain.models.lookups import (
     OperatorLookup,
     Transform,
 )
-from plain.models.postgres.sql import adapt_json_value
 
 from . import Field
 
 if TYPE_CHECKING:
-    from plain.models.postgres.connection import DatabaseConnection
+    from plain.models.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
     from plain.preflight.results import PreflightResult
 

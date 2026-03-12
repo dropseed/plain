@@ -9,6 +9,17 @@ from itertools import chain
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from plain.models.constants import LOOKUP_SEP
+from plain.models.dialect import (
+    PK_DEFAULT_VALUE,
+    bulk_insert_sql,
+    distinct_sql,
+    explain_query_prefix,
+    for_update_sql,
+    limit_offset_sql,
+    on_conflict_suffix_sql,
+    quote_name,
+    return_insert_columns,
+)
 from plain.models.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.models.expressions import (
     F,
@@ -22,17 +33,6 @@ from plain.models.fields.related import RelatedField
 from plain.models.functions import Cast, Random
 from plain.models.lookups import Lookup
 from plain.models.meta import Meta
-from plain.models.postgres.sql import (
-    PK_DEFAULT_VALUE,
-    bulk_insert_sql,
-    distinct_sql,
-    explain_query_prefix,
-    for_update_sql,
-    limit_offset_sql,
-    on_conflict_suffix_sql,
-    quote_name,
-    return_insert_columns,
-)
 from plain.models.query_utils import select_related_descend
 from plain.models.sql.constants import (
     CURSOR,
@@ -48,8 +48,8 @@ from plain.utils.hashable import make_hashable
 from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
+    from plain.models.connection import DatabaseConnection
     from plain.models.expressions import BaseExpression
-    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.query import InsertQuery
 
 # Type aliases for SQL compilation results

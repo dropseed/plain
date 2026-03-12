@@ -31,8 +31,8 @@ from ..migrations.writer import MigrationWriter
 from ..registry import models_registry
 
 if TYPE_CHECKING:
+    from ..connection import DatabaseConnection
     from ..migrations.operations.base import Operation
-    from ..postgres.connection import DatabaseConnection
 
 
 @register_cli("migrations")

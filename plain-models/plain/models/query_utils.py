@@ -21,12 +21,12 @@ from plain.utils import tree
 
 if TYPE_CHECKING:
     from plain.models.base import Model
+    from plain.models.connection import DatabaseConnection
     from plain.models.fields import Field
     from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ForeignObjectRel
     from plain.models.lookups import Lookup, Transform
     from plain.models.meta import Meta
-    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
     from plain.models.sql.where import WhereNode
 

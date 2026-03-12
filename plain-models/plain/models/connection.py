@@ -27,17 +27,17 @@ from psycopg.types.range import BaseRangeDumper, Range, RangeDumper
 from psycopg.types.string import TextLoader
 
 from plain.exceptions import ImproperlyConfigured
+from plain.models import utils
 from plain.models.db import (
     DatabaseError,
     DatabaseErrorWrapper,
 )
+from plain.models.dialect import MAX_NAME_LENGTH, quote_name
 from plain.models.indexes import Index
-from plain.models.postgres import utils
-from plain.models.postgres.schema import DatabaseSchemaEditor
-from plain.models.postgres.sql import MAX_NAME_LENGTH, quote_name
-from plain.models.postgres.utils import CursorDebugWrapper as BaseCursorDebugWrapper
-from plain.models.postgres.utils import CursorWrapper, debug_transaction
+from plain.models.schema import DatabaseSchemaEditor
 from plain.models.transaction import TransactionManagementError
+from plain.models.utils import CursorDebugWrapper as BaseCursorDebugWrapper
+from plain.models.utils import CursorWrapper, debug_transaction
 from plain.runtime import settings
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from plain.models.connections import DatabaseConfig
     from plain.models.fields import Field
 
-logger = logging.getLogger("plain.models.postgres")
+logger = logging.getLogger("plain.models.connection")
 
 # The prefix to put on the default database name when creating
 # the test database.

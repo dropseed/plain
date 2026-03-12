@@ -14,8 +14,8 @@ from plain.models.lookups import Exact
 from plain.utils import tree
 
 if TYPE_CHECKING:
+    from plain.models.connection import DatabaseConnection
     from plain.models.lookups import Lookup
-    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 # Connection types

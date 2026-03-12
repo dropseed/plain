@@ -25,8 +25,7 @@ import psycopg
 
 from plain import exceptions, validators
 from plain.models.constants import LOOKUP_SEP
-from plain.models.enums import ChoicesMeta
-from plain.models.postgres.sql import (
+from plain.models.dialect import (
     CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH,
     CAST_DATA_TYPES,
     DATA_TYPE_CHECK_CONSTRAINTS,
@@ -37,6 +36,7 @@ from plain.models.postgres.sql import (
     adapt_ipaddressfield_value,
     quote_name,
 )
+from plain.models.enums import ChoicesMeta
 from plain.models.query_utils import RegisterLookupMixin
 from plain.preflight import PreflightResult
 from plain.utils import timezone
@@ -56,9 +56,9 @@ from ..registry import models_registry
 
 if TYPE_CHECKING:
     from plain.models.base import Model
+    from plain.models.connection import DatabaseConnection
     from plain.models.expressions import Col
     from plain.models.fields.reverse_related import ForeignObjectRel
-    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 

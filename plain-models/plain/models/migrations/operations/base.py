@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from plain.models.migrations.state import ProjectState
-    from plain.models.postgres.schema import DatabaseSchemaEditor
+    from plain.models.schema import DatabaseSchemaEditor
 
 
 class Operation:

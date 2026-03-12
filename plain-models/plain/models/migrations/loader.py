@@ -17,8 +17,8 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
+    from plain.models.connection import DatabaseConnection
     from plain.models.migrations.migration import Migration
-    from plain.models.postgres.connection import DatabaseConnection
 
 MIGRATIONS_MODULE_NAME = "migrations"
 

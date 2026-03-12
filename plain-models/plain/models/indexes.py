@@ -4,15 +4,15 @@ from types import NoneType
 from typing import TYPE_CHECKING, Any, Self
 
 from plain.models.expressions import Col, ExpressionList, F, Func, OrderBy
-from plain.models.postgres.utils import names_digest, split_identifier
 from plain.models.query_utils import Q
 from plain.models.sql.query import Query
+from plain.models.utils import names_digest, split_identifier
 from plain.utils.functional import partition
 
 if TYPE_CHECKING:
     from plain.models.base import Model
     from plain.models.expressions import Expression
-    from plain.models.postgres.schema import DatabaseSchemaEditor, Statement
+    from plain.models.schema import DatabaseSchemaEditor, Statement
 
 __all__ = ["Index"]
 

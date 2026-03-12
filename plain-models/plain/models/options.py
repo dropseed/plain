@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
-from plain.models.postgres.sql import MAX_NAME_LENGTH
-from plain.models.postgres.utils import truncate_name
+from plain.models.dialect import MAX_NAME_LENGTH
+from plain.models.utils import truncate_name
 from plain.packages import packages_registry
 
 if TYPE_CHECKING:

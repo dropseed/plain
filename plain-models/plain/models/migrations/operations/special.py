@@ -7,7 +7,7 @@ from .base import Operation
 
 if TYPE_CHECKING:
     from plain.models.migrations.state import ProjectState
-    from plain.models.postgres.schema import DatabaseSchemaEditor
+    from plain.models.schema import DatabaseSchemaEditor
 
 
 class SeparateDatabaseAndState(Operation):

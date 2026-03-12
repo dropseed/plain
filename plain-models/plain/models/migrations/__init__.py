@@ -1,4 +1,4 @@
-from ..postgres.schema import DatabaseSchemaEditor
+from ..schema import DatabaseSchemaEditor
 from .migration import Migration, settings_dependency
 from .operations import (
     AddConstraint,

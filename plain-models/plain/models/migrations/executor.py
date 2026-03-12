@@ -11,7 +11,7 @@ from .recorder import MigrationRecorder
 from .state import ProjectState
 
 if TYPE_CHECKING:
-    from plain.models.postgres.connection import DatabaseConnection
+    from plain.models.connection import DatabaseConnection
 
 
 class MigrationExecutor:

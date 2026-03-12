@@ -14,7 +14,7 @@ from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameFie
 if TYPE_CHECKING:
     from plain.models.fields import Field
     from plain.models.migrations.state import ProjectState
-    from plain.models.postgres.schema import DatabaseSchemaEditor
+    from plain.models.schema import DatabaseSchemaEditor
 
 
 def _check_for_duplicates(arg_name: str, objs: Any) -> None:

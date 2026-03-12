@@ -7,14 +7,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from plain.models.dialect import quote_name
 from plain.models.exceptions import FullResultSet
-from plain.models.postgres.sql import quote_name
 from plain.models.sql.constants import INNER, LOUTER
 
 if TYPE_CHECKING:
+    from plain.models.connection import DatabaseConnection
     from plain.models.fields.related import ForeignKeyField
     from plain.models.fields.reverse_related import ForeignObjectRel
-    from plain.models.postgres.connection import DatabaseConnection
     from plain.models.sql.compiler import SQLCompiler
 
 

@@ -25,8 +25,8 @@ from . import Field
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from plain.models.connection import DatabaseConnection
     from plain.models.lookups import Lookup, Transform
-    from plain.models.postgres.connection import DatabaseConnection
     from plain.preflight.results import PreflightResult
 
 __all__ = [

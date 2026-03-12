@@ -11,8 +11,8 @@ from plain.cli import register_cli
 
 from ..backups.cli import cli as backups_cli
 from ..db import OperationalError, get_connection
+from ..dialect import quote_name
 from ..migrations.recorder import MIGRATION_TABLE_NAME
-from ..postgres.sql import quote_name
 
 
 @register_cli("db")
