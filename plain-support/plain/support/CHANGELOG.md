@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.31.6](https://github.com/dropseed/plain/releases/plain-support@0.31.6) (2026-03-11)
+
+### What's changed
+
+- Added `allow_external=True` to the support JS asset redirect, since it may resolve to a CDN URL when `ASSETS_CDN_URL` is configured ([5edfb2bedf90](https://github.com/dropseed/plain/commit/5edfb2bedf90))
+
+### Upgrade instructions
+
+- Requires `plain>=0.123.0`. No other changes required.
+
 ## [0.31.5](https://github.com/dropseed/plain/releases/plain-support@0.31.5) (2026-02-26)
 
 ### What's changed
