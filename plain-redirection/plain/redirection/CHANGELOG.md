@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.32.1](https://github.com/dropseed/plain/releases/plain-redirection@0.32.1) (2026-03-11)
+
+### What's changed
+
+- Added `allow_external=True` to redirect middleware responses, since database-configured redirects can legitimately target external URLs ([5edfb2bedf90](https://github.com/dropseed/plain/commit/5edfb2bedf90))
+
+### Upgrade instructions
+
+- Requires `plain>=0.123.0`. No other changes required.
+
 ## [0.32.0](https://github.com/dropseed/plain/releases/plain-redirection@0.32.0) (2026-03-06)
 
 ### What's changed
