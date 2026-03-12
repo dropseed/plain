@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-cache@0.26.0) (2026-03-12)
+
+### What's changed
+
+- Updated all imports from `plain.models` to `plain.postgres` in admin, core, models, and migrations.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+
 ## [0.25.4](https://github.com/dropseed/plain/releases/plain-cache@0.25.4) (2026-02-26)
 
 ### What's changed
