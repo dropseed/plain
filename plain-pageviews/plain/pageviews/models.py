@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -31,8 +31,8 @@ except ImportError:
 __all__ = ["Pageview"]
 
 
-@models.register_model
-class Pageview(models.Model):
+@postgres.register_model
+class Pageview(postgres.Model):
     url: str = types.URLField(max_length=2048)
     timestamp: datetime = types.DateTimeField(auto_now_add=True)
 
@@ -49,17 +49,17 @@ class Pageview(models.Model):
     medium: str = types.CharField(max_length=200, required=False)
     campaign: str = types.CharField(max_length=200, required=False)
 
-    query: models.QuerySet[Pageview] = models.QuerySet()
+    query: postgres.QuerySet[Pageview] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["-timestamp"],
         indexes=[
-            models.Index(fields=["timestamp"]),
-            models.Index(fields=["user_id"]),
-            models.Index(fields=["session_id"]),
-            models.Index(fields=["url"]),
-            models.Index(fields=["source"]),
-            models.Index(fields=["medium"]),
+            postgres.Index(fields=["timestamp"]),
+            postgres.Index(fields=["user_id"]),
+            postgres.Index(fields=["session_id"]),
+            postgres.Index(fields=["url"]),
+            postgres.Index(fields=["source"]),
+            postgres.Index(fields=["medium"]),
         ],
     )
 

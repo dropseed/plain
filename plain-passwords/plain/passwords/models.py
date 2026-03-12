@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain import models
+from plain import postgres
 
 from . import validators
 from .hashers import (
@@ -11,7 +11,7 @@ from .hashers import (
 )
 
 
-class PasswordField(models.CharField):
+class PasswordField(postgres.CharField):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs["max_length"] = 128
         kwargs.setdefault(
@@ -30,7 +30,7 @@ class PasswordField(models.CharField):
             del kwargs["max_length"]
         return name, path, args, kwargs
 
-    def pre_save(self, model_instance: models.Model, add: bool) -> str | None:
+    def pre_save(self, model_instance: postgres.Model, add: bool) -> str | None:
         value = super().pre_save(model_instance, add)
 
         if value and not self._is_hashed(value):

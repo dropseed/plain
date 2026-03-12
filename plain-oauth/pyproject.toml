@@ -9,7 +9,7 @@ requires-python = ">=3.13"
 dependencies = [
   "plain>=0.123.0,<1.0.0",
   "plain.auth<1.0.0",
-  "plain.models<1.0.0",
+  "plain.postgres<1.0.0",
   "requests>=2.0.0",
 ]
 

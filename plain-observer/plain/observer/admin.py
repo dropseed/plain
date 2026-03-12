@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from plain import models
+from plain import postgres
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
@@ -63,7 +63,7 @@ class SpanViewset(AdminViewset):
             if action == "Delete":
                 Span.query.filter(id__in=target_ids).delete()
 
-        def get_initial_queryset(self) -> models.QuerySet:
+        def get_initial_queryset(self) -> postgres.QuerySet:
             return (
                 super()
                 .get_initial_queryset()
@@ -76,7 +76,7 @@ class SpanViewset(AdminViewset):
                 )
             )
 
-        def filter_queryset(self, queryset: models.QuerySet) -> models.QuerySet:
+        def filter_queryset(self, queryset: postgres.QuerySet) -> postgres.QuerySet:
             if self.filter == "Parents only":
                 return queryset.filter(parent_id="")
             return queryset
@@ -109,7 +109,7 @@ class LogViewset(AdminViewset):
             elif action == "Delete all":
                 Log.query.all().delete()
 
-        def get_initial_queryset(self) -> models.QuerySet:
+        def get_initial_queryset(self) -> postgres.QuerySet:
             return (
                 super()
                 .get_initial_queryset()

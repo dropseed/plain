@@ -2,9 +2,9 @@
 
 import uuid
 
-import plain.models.deletion
-from plain import models
-from plain.models import migrations
+import plain.postgres.deletion
+from plain import postgres
+from plain.postgres import migrations
 from plain.runtime import settings
 
 
@@ -19,18 +19,18 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="SupportFormEntry",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("name", models.CharField(max_length=255)),
-                ("email", models.EmailField(max_length=254)),
-                ("message", models.TextField()),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("form_slug", models.CharField(max_length=255)),
+                ("id", postgres.PrimaryKeyField()),
+                ("uuid", postgres.UUIDField(default=uuid.uuid4)),
+                ("name", postgres.CharField(max_length=255)),
+                ("email", postgres.EmailField(max_length=254)),
+                ("message", postgres.TextField()),
+                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("form_slug", postgres.CharField(max_length=255)),
                 (
                     "user",
-                    models.ForeignKeyField(
+                    postgres.ForeignKeyField(
                         allow_null=True,
-                        on_delete=plain.models.deletion.SET_NULL,
+                        on_delete=plain.postgres.deletion.SET_NULL,
                         required=False,
                         to=settings.AUTH_USER_MODEL,
                     ),
@@ -42,13 +42,13 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="supportformentry",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["created_at"], name="plainsuppor_created_bda60d_idx"
             ),
         ),
         migrations.AddConstraint(
             model_name="supportformentry",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("uuid",), name="plainsupport_supportformentry_unique_uuid"
             ),
         ),

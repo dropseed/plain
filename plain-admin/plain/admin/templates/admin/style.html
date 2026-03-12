@@ -203,7 +203,7 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td>plain-models</td>
+                                <td>plain-postgres</td>
                                 <td>1.0.0</td>
                                 <td><span class="plain-label plain-label-success">Stable</span></td>
                             </tr>
@@ -277,10 +277,10 @@
                     Run <code>plain dev</code> to start the server, or <code>plain test</code> for tests.
                 </p>
 
-                <pre><code>from plain.models import Model
+                <pre><code>from plain.postgres import Model
 
 class User(Model):
-    name = models.CharField(max_length=100)</code></pre>
+    name = postgres.CharField(max_length=100)</code></pre>
             </div>
 
             <!-- Cards -->

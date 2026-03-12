@@ -10,8 +10,8 @@ def _is_excluded_path(path: Path, is_source: bool = False) -> bool:
     """Check if a path should be excluded from documentation."""
     path_str = str(path)
 
-    # Exclude migrations except for plain/models/migrations
-    if "/migrations/" in path_str and "/plain/models/migrations/" not in path_str:
+    # Exclude migrations except for plain/postgres/migrations
+    if "/migrations/" in path_str and "/plain/postgres/migrations/" not in path_str:
         return True
 
     # Exclude agents/.claude/ content (rules, skills shipped with packages)

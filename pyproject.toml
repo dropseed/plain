@@ -19,7 +19,7 @@ dev = [
   "plain-jobs",
   "plain-loginlink",
   "plain-email",
-  "plain-models",
+  "plain-postgres",
   "plain-oauth",
   "plain-observer",
   "plain-pages",
@@ -54,7 +54,7 @@ dev = [
 "plain-jobs" = { workspace = true }
 "plain-loginlink" = { workspace = true }
 "plain-email" = { workspace = true }
-"plain-models" = { workspace = true }
+"plain-postgres" = { workspace = true }
 "plain-oauth" = { workspace = true }
 "plain-observer" = { workspace = true }
 "plain-pages" = { workspace = true }
@@ -87,4 +87,4 @@ version = "1.50.0"
 exclude = ["example", "scratch", "scripts"]
 
 [tool.ty.environment]
-extra-paths = ["plain-models/tests", "plain/tests", "plain-admin/tests", "example"]
+extra-paths = ["plain-postgres/tests", "plain/tests", "plain-admin/tests", "example"]

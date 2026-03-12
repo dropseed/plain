@@ -2,27 +2,27 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 
 __all__ = ["Session"]
 
 
-@models.register_model
-class Session(models.Model):
+@postgres.register_model
+class Session(postgres.Model):
     session_key: str = types.CharField(max_length=40)
     session_data: dict = types.JSONField(default=dict, required=False)
     created_at: datetime = types.DateTimeField(auto_now_add=True)
     expires_at: datetime | None = types.DateTimeField(allow_null=True)
 
-    query: models.QuerySet[Session] = models.QuerySet()
+    query: postgres.QuerySet[Session] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         indexes=[
-            models.Index(fields=["expires_at"]),
+            postgres.Index(fields=["expires_at"]),
         ],
         constraints=[
-            models.UniqueConstraint(fields=["session_key"], name="unique_session_key")
+            postgres.UniqueConstraint(fields=["session_key"], name="unique_session_key")
         ],
     )
 

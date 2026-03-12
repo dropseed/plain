@@ -25,7 +25,7 @@ def postgres_advisory_lock(job: Job, concurrency_key: str) -> Iterator[None]:
         concurrency_key: Job grouping key
     """
     from plain.jobs.registry import jobs_registry
-    from plain.models.db import get_connection
+    from plain.postgres.db import get_connection
 
     # Generate lock key from job class + concurrency_key
     job_class_name = jobs_registry.get_job_class_name(job.__class__)

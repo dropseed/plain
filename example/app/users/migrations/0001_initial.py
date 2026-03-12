@@ -2,8 +2,8 @@
 
 import plain.passwords.models
 import plain.passwords.validators
-from plain import models
-from plain.models import migrations
+from plain import postgres
+from plain.postgres import migrations
 
 
 class Migration(migrations.Migration):
@@ -15,8 +15,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="User",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("email", models.EmailField(max_length=254)),
+                ("id", postgres.PrimaryKeyField()),
+                ("email", postgres.EmailField(max_length=254)),
                 (
                     "password",
                     plain.passwords.models.PasswordField(
@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
                         ]
                     ),
                 ),
-                ("is_admin", models.BooleanField(default=False)),
+                ("is_admin", postgres.BooleanField(default=False)),
             ],
         ),
     ]

@@ -14,7 +14,7 @@ from plain.views.exceptions import ResponseException
 from . import openapi
 from .schemas import ErrorSchema
 
-# Allow plain.api to be used without plain.models
+# Allow plain.api to be used without plain.postgres
 try:
     from .models import APIKey
 except ImportError:

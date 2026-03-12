@@ -18,7 +18,7 @@ Most Python modules you use with Plain need to be listed in `settings.INSTALLED_
 ```python
 # app/settings.py
 INSTALLED_PACKAGES = [
-    "plain.models",
+    "plain.postgres",
     "plain.tailwind",
     "plain.auth",
     "plain.passwords",

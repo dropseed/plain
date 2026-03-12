@@ -6,8 +6,8 @@ import uuid
 from datetime import datetime
 from uuid import UUID
 
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 
 __all__ = ["APIKey"]
 
@@ -16,8 +16,8 @@ def generate_token() -> str:
     return binascii.hexlify(os.urandom(20)).decode()
 
 
-@models.register_model
-class APIKey(models.Model):
+@postgres.register_model
+class APIKey(postgres.Model):
     uuid: UUID = types.UUIDField(default=uuid.uuid4)
     created_at: datetime = types.DateTimeField(auto_now_add=True)
     updated_at: datetime = types.DateTimeField(auto_now=True)
@@ -30,14 +30,14 @@ class APIKey(models.Model):
 
     api_version: str = types.CharField(max_length=255, required=False)
 
-    query: models.QuerySet[APIKey] = models.QuerySet()
+    query: postgres.QuerySet[APIKey] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["uuid"], name="plainapi_apikey_unique_uuid"
             ),
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["token"], name="plainapi_apikey_unique_token"
             ),
         ],

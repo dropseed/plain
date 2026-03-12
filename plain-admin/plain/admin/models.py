@@ -2,28 +2,28 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 from plain.runtime import SettingsReference
 
 
-@models.register_model
-class PinnedNavItem(models.Model):
+@postgres.register_model
+class PinnedNavItem(postgres.Model):
     """A user's pinned navigation item in the admin."""
 
     user = types.ForeignKeyField(
         SettingsReference("AUTH_USER_MODEL"),
-        on_delete=models.CASCADE,
+        on_delete=postgres.CASCADE,
     )
     view_slug: str = types.CharField(max_length=255)
     order: int = types.SmallIntegerField(default=0)
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 
-    query: models.QuerySet[PinnedNavItem] = models.QuerySet()
+    query: postgres.QuerySet[PinnedNavItem] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["user", "view_slug"],
                 name="plainadmin_pinnednavitem_unique_user_view",
             )

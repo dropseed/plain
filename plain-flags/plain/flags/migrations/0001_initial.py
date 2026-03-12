@@ -3,9 +3,9 @@
 import uuid
 
 import plain.flags.models
-import plain.models.deletion
-from plain import models
-from plain.models import migrations
+import plain.postgres.deletion
+from plain import postgres
+from plain.postgres import migrations
 
 
 class Migration(migrations.Migration):
@@ -17,61 +17,61 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Flag",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("id", postgres.PrimaryKeyField()),
+                ("uuid", postgres.UUIDField(default=uuid.uuid4)),
+                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("updated_at", postgres.DateTimeField(auto_now=True)),
                 (
                     "name",
-                    models.CharField(
+                    postgres.CharField(
                         max_length=255,
                         validators=[plain.flags.models.validate_flag_name],
                     ),
                 ),
-                ("description", models.TextField(required=False)),
-                ("enabled", models.BooleanField(default=True)),
-                ("used_at", models.DateTimeField(allow_null=True, required=False)),
+                ("description", postgres.TextField(required=False)),
+                ("enabled", postgres.BooleanField(default=True)),
+                ("used_at", postgres.DateTimeField(allow_null=True, required=False)),
             ],
         ),
         migrations.CreateModel(
             name="FlagResult",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                ("key", models.CharField(max_length=255)),
-                ("value", models.JSONField()),
+                ("id", postgres.PrimaryKeyField()),
+                ("uuid", postgres.UUIDField(default=uuid.uuid4)),
+                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("updated_at", postgres.DateTimeField(auto_now=True)),
+                ("key", postgres.CharField(max_length=255)),
+                ("value", postgres.JSONField()),
             ],
         ),
         migrations.AddConstraint(
             model_name="flag",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("name",), name="plainflags_flag_unique_name"
             ),
         ),
         migrations.AddConstraint(
             model_name="flag",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("uuid",), name="plainflags_flag_unique_uuid"
             ),
         ),
         migrations.AddField(
             model_name="flagresult",
             name="flag",
-            field=models.ForeignKeyField(
-                on_delete=plain.models.deletion.CASCADE, to="plainflags.flag"
+            field=postgres.ForeignKeyField(
+                on_delete=plain.postgres.deletion.CASCADE, to="plainflags.flag"
             ),
         ),
         migrations.AddConstraint(
             model_name="flagresult",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("flag", "key"), name="plainflags_flagresult_unique_key"
             ),
         ),
         migrations.AddConstraint(
             model_name="flagresult",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("uuid",), name="plainflags_flagresult_unique_uuid"
             ),
         ),

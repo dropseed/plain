@@ -22,7 +22,7 @@ from opentelemetry.trace import (
 from opentelemetry.util.types import Attributes
 
 from plain.logs import app_logger
-from plain.models.otel import suppress_db_tracing
+from plain.postgres.otel import suppress_db_tracing
 from plain.runtime import settings
 
 from .core import Observer, ObserverMode

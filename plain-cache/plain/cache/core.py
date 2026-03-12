@@ -12,7 +12,7 @@ from opentelemetry.semconv.attributes.db_attributes import (
 )
 from opentelemetry.trace import SpanKind
 
-from plain.models import IntegrityError
+from plain.postgres import IntegrityError
 from plain.utils import timezone
 
 tracer = trace.get_tracer("plain.cache")

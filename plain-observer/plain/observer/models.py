@@ -30,16 +30,16 @@ from opentelemetry.semconv.attributes.code_attributes import (
 )
 from opentelemetry.trace import format_trace_id
 
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 from plain.runtime import settings
 from plain.urls import reverse
 
 __all__ = ["Log", "Span", "Trace"]
 
 
-@models.register_model
-class Trace(models.Model):
+@postgres.register_model
+class Trace(postgres.Model):
     trace_id: str = types.CharField(max_length=255)
     start_time: datetime = types.DateTimeField()
     end_time: datetime = types.DateTimeField()
@@ -62,21 +62,21 @@ class Trace(models.Model):
         to="Log", field="trace"
     )
 
-    query: models.QuerySet[Trace] = models.QuerySet()
+    query: postgres.QuerySet[Trace] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["-start_time"],
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["trace_id"],
                 name="observer_unique_trace_id",
             )
         ],
         indexes=[
-            models.Index(fields=["trace_id"]),
-            models.Index(fields=["start_time"]),
-            models.Index(fields=["request_id"]),
-            models.Index(fields=["session_id"]),
+            postgres.Index(fields=["trace_id"]),
+            postgres.Index(fields=["start_time"]),
+            postgres.Index(fields=["request_id"]),
+            postgres.Index(fields=["session_id"]),
         ],
     )
 
@@ -256,7 +256,7 @@ class Trace(models.Model):
         return sorted(events, key=lambda x: x["timestamp"])
 
 
-class SpanQuerySet(models.QuerySet["Span"]):
+class SpanQuerySet(postgres.QuerySet["Span"]):
     def annotate_spans(self) -> list[Span]:
         """Annotate spans with nesting levels and duplicate query warnings."""
         spans: list[Span] = list(self.order_by("start_time"))
@@ -303,9 +303,9 @@ class SpanQuerySet(models.QuerySet["Span"]):
         return spans
 
 
-@models.register_model
-class Span(models.Model):
-    trace: Trace = types.ForeignKeyField(Trace, on_delete=models.CASCADE)
+@postgres.register_model
+class Span(postgres.Model):
+    trace: Trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
 
     span_id: str = types.CharField(max_length=255)
 
@@ -322,19 +322,19 @@ class Span(models.Model):
 
     query: SpanQuerySet = SpanQuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["-start_time"],
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["trace", "span_id"],
                 name="observer_unique_span_id",
             )
         ],
         indexes=[
-            models.Index(fields=["span_id"]),
-            models.Index(fields=["trace", "span_id"]),
-            models.Index(fields=["trace"]),
-            models.Index(fields=["start_time"]),
+            postgres.Index(fields=["span_id"]),
+            postgres.Index(fields=["trace", "span_id"]),
+            postgres.Index(fields=["trace"]),
+            postgres.Index(fields=["start_time"]),
         ],
     )
 
@@ -491,13 +491,13 @@ class Span(models.Model):
         return None
 
 
-@models.register_model
-class Log(models.Model):
-    trace: Trace = types.ForeignKeyField(Trace, on_delete=models.CASCADE)
+@postgres.register_model
+class Log(postgres.Model):
+    trace: Trace = types.ForeignKeyField(Trace, on_delete=postgres.CASCADE)
     trace_id: int
     span: Span | None = types.ForeignKeyField(
         Span,
-        on_delete=models.SET_NULL,
+        on_delete=postgres.SET_NULL,
         allow_null=True,
         required=False,
     )
@@ -507,14 +507,14 @@ class Log(models.Model):
     level: str = types.CharField(max_length=20)
     message: str = types.TextField()
 
-    query: models.QuerySet[Log] = models.QuerySet()
+    query: postgres.QuerySet[Log] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["timestamp"],
         indexes=[
-            models.Index(fields=["trace", "timestamp"]),
-            models.Index(fields=["trace", "span"]),
-            models.Index(fields=["timestamp"]),
-            models.Index(fields=["trace"]),
+            postgres.Index(fields=["trace", "timestamp"]),
+            postgres.Index(fields=["trace", "span"]),
+            postgres.Index(fields=["timestamp"]),
+            postgres.Index(fields=["trace"]),
         ],
     )

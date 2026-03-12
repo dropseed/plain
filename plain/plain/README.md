@@ -27,7 +27,7 @@ The `plain` package includes everything you need to start handling web requests 
 
 ## Foundational Packages
 
-- [plain.models](/plain-models/plain/models/README.md) - Define and interact with your database models.
+- [plain.postgres](/plain-postgres/plain/postgres/README.md) - Define and interact with your database models.
 - [plain.cache](/plain-cache/plain/cache/README.md) - A database-driven general purpose cache.
 - [plain.email](/plain-email/plain/email/README.md) - Send emails with SMTP or custom backends.
 - [plain.sessions](/plain-sessions/plain/sessions/README.md) - User sessions and cookies.

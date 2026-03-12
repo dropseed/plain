@@ -8,8 +8,8 @@ primitive Python types.
 Usage:
     from plain.passwords.types import PasswordField
 
-    @models.register_model
-    class User(models.Model):
+    @postgres.register_model
+    class User(postgres.Model):
         email: str = types.EmailField()
         password: str = PasswordField()
 

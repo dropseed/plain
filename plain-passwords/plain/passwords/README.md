@@ -113,18 +113,18 @@ for validator in validators:
 [`PasswordField`](./models.py#PasswordField) is a model field that automatically hashes passwords before saving. It includes all three validators by default:
 
 ```python
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 from plain.passwords.models import PasswordField
 
-@models.register_model
-class User(models.Model):
+@postgres.register_model
+class User(postgres.Model):
     email: str = types.EmailField()
     password = PasswordField()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         constraints=[
-            models.UniqueConstraint(fields=["email"], name="unique_email"),
+            postgres.UniqueConstraint(fields=["email"], name="unique_email"),
         ],
     )
 ```
@@ -297,18 +297,18 @@ Add the `password` field to your User model:
 
 ```python
 # app/models.py
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 from plain.passwords.models import PasswordField
 
-@models.register_model
-class User(models.Model):
+@postgres.register_model
+class User(postgres.Model):
     email: str = types.EmailField()
     password = PasswordField()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         constraints=[
-            models.UniqueConstraint(fields=["email"], name="unique_email"),
+            postgres.UniqueConstraint(fields=["email"], name="unique_email"),
         ],
     )
 ```

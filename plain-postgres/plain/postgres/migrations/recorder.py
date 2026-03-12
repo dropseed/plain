@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from plain import postgres
+from plain.postgres.db import DatabaseError
+from plain.postgres.meta import Meta
+from plain.postgres.registry import ModelsRegistry
+from plain.utils.functional import classproperty
+from plain.utils.timezone import now
+
+from .exceptions import MigrationSchemaMissing
+
+MIGRATION_TABLE_NAME = "plainmigrations"
+
+if TYPE_CHECKING:
+    from plain.postgres.connection import DatabaseConnection
+
+
+class MigrationRecorder:
+    """
+    Deal with storing migration records in the database.
+
+    Because this table is actually itself used for dealing with model
+    creation, it's the one thing we can't do normally via migrations.
+    We manually handle table creation/schema updating (using schema backend)
+    and then have a floating model to do queries with.
+
+    If a migration is unapplied its row is removed from the table. Having
+    a row in the table always means a migration is applied.
+    """
+
+    _migration_class: type[postgres.Model] | None = None
+
+    @classproperty  # type: ignore[invalid-argument-type]
+    def Migration(cls) -> type[postgres.Model]:
+        """
+        Lazy load to avoid PackageRegistryNotReady if installed packages import
+        MigrationRecorder.
+        """
+        if cls._migration_class is None:
+            _models_registry = ModelsRegistry()
+            _models_registry.ready = True
+
+            class Migration(postgres.Model):
+                app = postgres.CharField(max_length=255)
+                name = postgres.CharField(max_length=255)
+                applied = postgres.DateTimeField(default=now)
+
+                # Use isolated models registry for migrations
+                _model_meta = Meta(models_registry=_models_registry)
+
+                model_options = postgres.Options(
+                    package_label="migrations",
+                    db_table=MIGRATION_TABLE_NAME,
+                )
+
+                def __str__(self) -> str:
+                    return f"Migration {self.name} for {self.app}"
+
+            cls._migration_class = Migration
+        return cls._migration_class
+
+    def __init__(self, connection: DatabaseConnection) -> None:
+        self.connection = connection
+
+    @property
+    def migration_qs(self) -> Any:
+        return self.Migration.query.all()
+
+    def has_table(self) -> bool:
+        """Return True if the plainmigrations table exists."""
+        with self.connection.cursor() as cursor:
+            tables = self.connection.table_names(cursor)
+        return self.Migration.model_options.db_table in tables
+
+    def ensure_schema(self) -> None:
+        """Ensure the table exists and has the correct schema."""
+        # If the table's there, that's fine - we've never changed its schema
+        # in the codebase.
+        if self.has_table():
+            return
+        # Make the table
+        try:
+            with self.connection.schema_editor() as editor:
+                editor.create_model(self.Migration)
+        except DatabaseError as exc:
+            raise MigrationSchemaMissing(
+                f"Unable to create the plainmigrations table ({exc})"
+            )
+
+    def applied_migrations(self) -> dict[tuple[str, str], Any]:
+        """
+        Return a dict mapping (package_name, migration_name) to Migration instances
+        for all applied migrations.
+        """
+        if self.has_table():
+            return {
+                (migration.app, migration.name): migration
+                for migration in self.migration_qs
+            }
+        else:
+            # If the plainmigrations table doesn't exist, then no migrations
+            # are applied.
+            return {}
+
+    def record_applied(self, app: str, name: str) -> None:
+        """Record that a migration was applied."""
+        self.ensure_schema()
+        self.migration_qs.create(app=app, name=name)
+
+    def record_unapplied(self, app: str, name: str) -> None:
+        """Record that a migration was unapplied."""
+        self.ensure_schema()
+        self.migration_qs.filter(app=app, name=name).delete()
+
+    def flush(self) -> None:
+        """Delete all migration records. Useful for testing migrations."""
+        self.migration_qs.all().delete()

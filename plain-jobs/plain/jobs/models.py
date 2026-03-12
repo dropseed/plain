@@ -22,9 +22,9 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind
 
-from plain import models
-from plain.models import transaction, types
-from plain.models.expressions import F
+from plain import postgres
+from plain.postgres import transaction, types
+from plain.postgres.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -40,8 +40,8 @@ logger = logging.getLogger("plain.jobs")
 tracer = trace.get_tracer("plain.jobs")
 
 
-@models.register_model
-class JobRequest(models.Model):
+@postgres.register_model
+class JobRequest(postgres.Model):
     """
     Keep all pending job requests in a single table.
     """
@@ -72,29 +72,29 @@ class JobRequest(models.Model):
         max_length=18, required=False, allow_null=True
     )
 
-    # expires_at = models.DateTimeField(required=False, allow_null=True)
+    # expires_at = postgres.DateTimeField(required=False, allow_null=True)
 
-    query: models.QuerySet[JobRequest] = models.QuerySet()
+    query: postgres.QuerySet[JobRequest] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["priority", "-created_at"],
         indexes=[
-            models.Index(fields=["priority"]),
-            models.Index(fields=["created_at"]),
-            models.Index(fields=["queue"]),
-            models.Index(fields=["start_at"]),
-            models.Index(fields=["concurrency_key"]),
-            models.Index(fields=["job_class"]),
-            models.Index(fields=["trace_id"]),
-            models.Index(fields=["uuid"]),
+            postgres.Index(fields=["priority"]),
+            postgres.Index(fields=["created_at"]),
+            postgres.Index(fields=["queue"]),
+            postgres.Index(fields=["start_at"]),
+            postgres.Index(fields=["concurrency_key"]),
+            postgres.Index(fields=["job_class"]),
+            postgres.Index(fields=["trace_id"]),
+            postgres.Index(fields=["uuid"]),
             # Used for job grouping queries
-            models.Index(
+            postgres.Index(
                 name="job_request_concurrency_key",
                 fields=["job_class", "concurrency_key"],
             ),
         ],
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["uuid"], name="plainjobs_jobrequest_unique_uuid"
             ),
         ],
@@ -129,7 +129,7 @@ class JobRequest(models.Model):
         return result
 
 
-class JobQuerySet(models.QuerySet["JobProcess"]):
+class JobQuerySet(postgres.QuerySet["JobProcess"]):
     def running(self) -> Self:
         return self.filter(started_at__isnull=False)
 
@@ -153,8 +153,8 @@ class JobQuerySet(models.QuerySet["JobProcess"]):
             job.convert_to_result(status=JobResultStatuses.LOST)
 
 
-@models.register_model
-class JobProcess(models.Model):
+@postgres.register_model
+class JobProcess(postgres.Model):
     """
     All active jobs are stored in this table.
     """
@@ -186,25 +186,27 @@ class JobProcess(models.Model):
 
     query: JobQuerySet = JobQuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["-created_at"],
         indexes=[
-            models.Index(fields=["created_at"]),
-            models.Index(fields=["queue"]),
-            models.Index(fields=["concurrency_key"]),
-            models.Index(fields=["started_at"]),
-            models.Index(fields=["job_class"]),
-            models.Index(fields=["job_request_uuid"]),
-            models.Index(fields=["trace_id"]),
-            models.Index(fields=["uuid"]),
+            postgres.Index(fields=["created_at"]),
+            postgres.Index(fields=["queue"]),
+            postgres.Index(fields=["concurrency_key"]),
+            postgres.Index(fields=["started_at"]),
+            postgres.Index(fields=["job_class"]),
+            postgres.Index(fields=["job_request_uuid"]),
+            postgres.Index(fields=["trace_id"]),
+            postgres.Index(fields=["uuid"]),
             # Used for job grouping queries
-            models.Index(
+            postgres.Index(
                 name="job_concurrency_key",
                 fields=["job_class", "concurrency_key"],
             ),
         ],
         constraints=[
-            models.UniqueConstraint(fields=["uuid"], name="plainjobs_job_unique_uuid"),
+            postgres.UniqueConstraint(
+                fields=["uuid"], name="plainjobs_job_unique_uuid"
+            ),
         ],
     )
 
@@ -411,7 +413,7 @@ class JobProcess(models.Model):
         }
 
 
-class JobResultQuerySet(models.QuerySet["JobResult"]):
+class JobResultQuerySet(postgres.QuerySet["JobResult"]):
     def successful(self) -> Self:
         return self.filter(status=JobResultStatuses.SUCCESSFUL)
 
@@ -426,8 +428,8 @@ class JobResultQuerySet(models.QuerySet["JobResult"]):
 
     def retried(self) -> Self:
         return self.filter(
-            models.Q(retry_job_request_uuid__isnull=False)
-            | models.Q(retry_attempt__gt=0)
+            postgres.Q(retry_job_request_uuid__isnull=False)
+            | postgres.Q(retry_attempt__gt=0)
         )
 
     def failed(self) -> Self:
@@ -461,7 +463,7 @@ class JobResultQuerySet(models.QuerySet["JobResult"]):
                 result.save(update_fields=["retry_attempt"])
 
 
-class JobResultStatuses(models.TextChoices):
+class JobResultStatuses(postgres.TextChoices):
     SUCCESSFUL = "SUCCESSFUL", "Successful"
     ERRORED = "ERRORED", "Errored"  # Threw an error
     CANCELLED = "CANCELLED", "Cancelled"  # Interrupted by shutdown/deploy
@@ -472,8 +474,8 @@ class JobResultStatuses(models.TextChoices):
     )  # Either process lost, lost in transit, or otherwise never finished
 
 
-@models.register_model
-class JobResult(models.Model):
+@postgres.register_model
+class JobResult(postgres.Model):
     """
     All in-process and completed jobs are stored in this table.
     """
@@ -521,22 +523,22 @@ class JobResult(models.Model):
 
     query: JobResultQuerySet = JobResultQuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["-created_at"],
         indexes=[
-            models.Index(fields=["created_at"]),
-            models.Index(fields=["job_process_uuid"]),
-            models.Index(fields=["started_at"]),
-            models.Index(fields=["ended_at"]),
-            models.Index(fields=["status"]),
-            models.Index(fields=["job_request_uuid"]),
-            models.Index(fields=["job_class"]),
-            models.Index(fields=["queue"]),
-            models.Index(fields=["trace_id"]),
-            models.Index(fields=["uuid"]),
+            postgres.Index(fields=["created_at"]),
+            postgres.Index(fields=["job_process_uuid"]),
+            postgres.Index(fields=["started_at"]),
+            postgres.Index(fields=["ended_at"]),
+            postgres.Index(fields=["status"]),
+            postgres.Index(fields=["job_request_uuid"]),
+            postgres.Index(fields=["job_class"]),
+            postgres.Index(fields=["queue"]),
+            postgres.Index(fields=["trace_id"]),
+            postgres.Index(fields=["uuid"]),
         ],
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["uuid"], name="plainjobs_jobresult_unique_uuid"
             ),
         ],

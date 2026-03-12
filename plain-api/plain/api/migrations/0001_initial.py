@@ -3,8 +3,8 @@
 import uuid
 
 import plain.api.models
-from plain import models
-from plain.models import migrations
+from plain import postgres
+from plain.postgres import migrations
 
 
 class Migration(migrations.Migration):
@@ -16,31 +16,34 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="APIKey",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                ("expires_at", models.DateTimeField(allow_null=True, required=False)),
-                ("last_used_at", models.DateTimeField(allow_null=True, required=False)),
-                ("name", models.CharField(max_length=255, required=False)),
+                ("id", postgres.PrimaryKeyField()),
+                ("uuid", postgres.UUIDField(default=uuid.uuid4)),
+                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("updated_at", postgres.DateTimeField(auto_now=True)),
+                ("expires_at", postgres.DateTimeField(allow_null=True, required=False)),
+                (
+                    "last_used_at",
+                    postgres.DateTimeField(allow_null=True, required=False),
+                ),
+                ("name", postgres.CharField(max_length=255, required=False)),
                 (
                     "token",
-                    models.CharField(
+                    postgres.CharField(
                         default=plain.api.models.generate_token, max_length=40
                     ),
                 ),
-                ("api_version", models.CharField(max_length=255, required=False)),
+                ("api_version", postgres.CharField(max_length=255, required=False)),
             ],
         ),
         migrations.AddConstraint(
             model_name="apikey",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("uuid",), name="plainapi_apikey_unique_uuid"
             ),
         ),
         migrations.AddConstraint(
             model_name="apikey",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("token",), name="plainapi_apikey_unique_token"
             ),
         ),

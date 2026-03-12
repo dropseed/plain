@@ -209,7 +209,7 @@ Plain includes several built-in commands:
 | `plain install`       | Install package dependencies             |
 | `plain upgrade`       | Upgrade Plain packages                   |
 
-Additional commands are added by installed packages (like `plain models migrate` from plain.models).
+Additional commands are added by installed packages (like `plain models migrate` from plain.postgres).
 
 ### `plain check`
 

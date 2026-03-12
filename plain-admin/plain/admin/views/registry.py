@@ -10,7 +10,7 @@ from plain.urls import path, reverse_lazy
 
 if TYPE_CHECKING:
     from plain.http import Request
-    from plain.models import Model
+    from plain.postgres import Model
 
     from .base import AdminView
     from .viewsets import AdminViewset

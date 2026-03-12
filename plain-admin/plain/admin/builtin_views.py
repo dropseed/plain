@@ -6,8 +6,8 @@ import json
 from typing import Any
 
 from plain.http import NotFoundError404, RedirectResponse, Response
-from plain.models import QuerySet
 from plain.packages import packages_registry
+from plain.postgres import QuerySet
 from plain.preflight import run_checks, set_check_counts
 from plain.runtime import settings as plain_settings
 

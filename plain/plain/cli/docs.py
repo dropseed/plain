@@ -25,7 +25,7 @@ KNOWN_PACKAGES = {
     "plain-htmx": "HTMX integration for templates and views",
     "plain-jobs": "Background jobs with a database-driven queue",
     "plain-loginlink": "Link-based authentication",
-    "plain-models": "Model data and store it in a database",
+    "plain-postgres": "Model data and store it in a database",
     "plain-oauth": "OAuth provider login",
     "plain-observer": "On-page telemetry and observability",
     "plain-pages": "Serve static pages, markdown, and assets",
@@ -61,7 +61,7 @@ def _discover_core_modules() -> dict[str, str]:
 
 
 def _normalize_module(module: str) -> str:
-    """Normalize a module string to dotted form (e.g. plain-models -> plain.models)."""
+    """Normalize a module string to dotted form (e.g. plain-postgres -> plain.postgres)."""
     module = module.replace("-", ".")
     if not module.startswith("plain"):
         module = f"plain.{module}"
@@ -69,7 +69,7 @@ def _normalize_module(module: str) -> str:
 
 
 def _pip_package_name(module: str) -> str:
-    """Convert a dotted module name to a pip package name (e.g. plain.models -> plain-models)."""
+    """Convert a dotted module name to a pip package name (e.g. plain.postgres -> plain-postgres)."""
     return module.replace(".", "-")
 
 

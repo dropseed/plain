@@ -58,22 +58,22 @@ Concise guardrails always loaded into context. Keep them short (~50 lines) — b
 
 Django-specific corrections (e.g., "use X not Django's Y") belong only in `plain.md`'s "Key Differences from Django" section. Package rules should describe how Plain works, not what Django does differently. It's fine for those corrections to cross package boundaries — they live in one place.
 
-Example pattern (from plain-models rule → querying section):
+Example pattern (from plain-postgres rule → querying section):
 
 ```
 - Use `select_related()` for FK access in loops, `prefetch_related()` for reverse/M2N
 - Use `.exists()` not `.count() > 0`, `.count()` not `len(qs)`
 
-Run `uv run plain docs models --section querying` for full patterns with code examples.
+Run `uv run plain docs postgres --section querying` for full patterns with code examples.
 ```
 
 ### Docs
 
 Package README.md files are the primary documentation — rendered on the website, PyPI, and GitHub. They're also available to AI via the CLI:
 
-- `uv run plain docs models` — full docs
-- `uv run plain docs models --section querying` — just the Querying section
-- `uv run plain docs models --api` — public API surface from `__all__`
+- `uv run plain docs postgres` — full docs
+- `uv run plain docs postgres --section querying` — just the Querying section
+- `uv run plain docs postgres --api` — public API surface from `__all__`
 
 Write docs for humans first. Sections are `## ` headings in the README — keep each one self-contained enough to be useful when loaded independently via `--section`.
 

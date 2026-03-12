@@ -15,7 +15,7 @@
 #   --python 3.14  Run with a specific Python version (sets UV_PYTHON)
 ALL_PACKAGES="$(cat <<EOF
 plain
-plain-models
+plain-postgres
 plain-sessions
 plain-jobs
 plain-flags

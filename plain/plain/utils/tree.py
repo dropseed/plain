@@ -45,7 +45,7 @@ class Node:
     ) -> Self:
         """
         Create a new instance using Node() instead of __init__() as some
-        subclasses, e.g. plain.models.query_utils.Q, may implement a custom
+        subclasses, e.g. plain.postgres.query_utils.Q, may implement a custom
         __init__() with a signature that conflicts with the one defined in
         Node.__init__().
         """

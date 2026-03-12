@@ -5,7 +5,7 @@ from collections.abc import Iterator, MutableMapping
 from datetime import timedelta
 from typing import Any
 
-from plain.models import transaction
+from plain.postgres import transaction
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.crypto import get_random_string

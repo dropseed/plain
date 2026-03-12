@@ -10,7 +10,7 @@ from . import signing
 
 if TYPE_CHECKING:
     from plain.http import Request
-    from plain.models import Model
+    from plain.postgres import Model
 
 
 class LoginLinkExpired(Exception):

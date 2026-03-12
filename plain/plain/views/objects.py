@@ -5,7 +5,7 @@ from typing import Any
 from plain.exceptions import ImproperlyConfigured
 
 try:
-    from plain.models.exceptions import ObjectDoesNotExist
+    from plain.postgres.exceptions import ObjectDoesNotExist
 except ImportError:
     ObjectDoesNotExist = None  # type: ignore[misc, assignment]
 

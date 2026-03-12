@@ -54,12 +54,12 @@ def settings() -> Generator[SettingsProxy]:
 def testbrowser(browser: Any, request: Any) -> Generator[TestBrowser]:
     """Use playwright and pytest-playwright to run browser tests against a test server."""
     try:
-        # Check if isolated_db fixture is available from the plain-models package.
+        # Check if isolated_db fixture is available from the plain-postgres package.
         # If it is, then we need to run a server that has a database connection to the isolated database for this test.
         request.getfixturevalue("isolated_db")
 
-        from plain.models import get_connection
-        from plain.models.database_url import build_database_url
+        from plain.postgres import get_connection
+        from plain.postgres.database_url import build_database_url
 
         # Get a database url for the isolated db that we can have the plain server connect to also.
         database_url = build_database_url(get_connection().settings_dict)

@@ -1,6 +1,6 @@
 from typing import Any
 
-from plain import models
+from plain import postgres
 
 
 def coerce_key(key: Any) -> str:
@@ -11,7 +11,7 @@ def coerce_key(key: Any) -> str:
     if isinstance(key, str):
         return key
 
-    if isinstance(key, models.Model):
+    if isinstance(key, postgres.Model):
         return (
             f"{key.model_options.package_label}.{key.model_options.model_name}:{key.id}"
         )

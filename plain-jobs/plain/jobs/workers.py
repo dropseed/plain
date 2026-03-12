@@ -9,8 +9,8 @@ from concurrent.futures import Future, ProcessPoolExecutor
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from plain import models
-from plain.models import transaction
+from plain import postgres
+from plain.postgres import transaction
 from plain.runtime import settings
 from plain.signals import request_finished, request_started
 from plain.utils import timezone
@@ -134,8 +134,8 @@ class Worker:
                         queue__in=self.queues,
                     )
                     .filter(
-                        models.Q(start_at__isnull=True)
-                        | models.Q(start_at__lte=timezone.now())
+                        postgres.Q(start_at__isnull=True)
+                        | postgres.Q(start_at__lte=timezone.now())
                     )
                     .order_by("priority", "-start_at", "-created_at")
                     .first()

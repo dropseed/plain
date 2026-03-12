@@ -22,8 +22,8 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
 
-from plain import models
-from plain.models import transaction
+from plain import postgres
+from plain.postgres import transaction
 from plain.utils import timezone
 
 from .locks import postgres_advisory_lock
@@ -176,7 +176,7 @@ class Job(metaclass=JobType):
 
     def get_requested_jobs(
         self, *, concurrency_key: str | None = None, include_retries: bool = False
-    ) -> models.QuerySet:
+    ) -> postgres.QuerySet:
         """
         Get pending jobs (JobRequest) for this job class.
 
@@ -211,7 +211,7 @@ class Job(metaclass=JobType):
         concurrency_key: str | None = None,
         include_retries: bool = False,
         include_self: bool = False,
-    ) -> models.QuerySet:
+    ) -> postgres.QuerySet:
         """
         Get currently processing jobs (JobProcess) for this job class.
 

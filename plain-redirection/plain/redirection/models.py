@@ -4,8 +4,8 @@ import re
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 
 if TYPE_CHECKING:
     from plain.http import Request
@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 __all__ = ["NotFoundLog", "Redirect", "RedirectLog"]
 
 
-@models.register_model
-class Redirect(models.Model):
+@postgres.register_model
+class Redirect(postgres.Model):
     from_pattern: str = types.CharField(max_length=255)
     to_pattern: str = types.CharField(max_length=255)
     http_status: int = types.PositiveSmallIntegerField(
@@ -30,16 +30,16 @@ class Redirect(models.Model):
     # logged in or not? auth not required necessarily...
     # headers?
 
-    query: models.QuerySet[Redirect] = models.QuerySet()
+    query: postgres.QuerySet[Redirect] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["order", "-created_at"],
         indexes=[
-            models.Index(fields=["order"]),
-            models.Index(fields=["created_at"]),
+            postgres.Index(fields=["order"]),
+            postgres.Index(fields=["created_at"]),
         ],
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["from_pattern"],
                 name="plainredirects_redirect_unique_from_pattern",
             ),
@@ -80,9 +80,9 @@ class Redirect(models.Model):
         return re.sub(self.from_pattern, self.to_pattern, url)
 
 
-@models.register_model
-class RedirectLog(models.Model):
-    redirect: Redirect = types.ForeignKeyField(Redirect, on_delete=models.CASCADE)
+@postgres.register_model
+class RedirectLog(postgres.Model):
+    redirect: Redirect = types.ForeignKeyField(Redirect, on_delete=postgres.CASCADE)
 
     # The actuals that were used to redirect
     from_url: str = types.URLField(max_length=512)
@@ -96,12 +96,12 @@ class RedirectLog(models.Model):
 
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 
-    query: models.QuerySet[RedirectLog] = models.QuerySet()
+    query: postgres.QuerySet[RedirectLog] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["-created_at"],
         indexes=[
-            models.Index(fields=["created_at"]),
+            postgres.Index(fields=["created_at"]),
         ],
     )
 
@@ -127,8 +127,8 @@ class RedirectLog(models.Model):
         )
 
 
-@models.register_model
-class NotFoundLog(models.Model):
+@postgres.register_model
+class NotFoundLog(postgres.Model):
     url: str = types.URLField(max_length=512)
 
     # Request metadata
@@ -138,12 +138,12 @@ class NotFoundLog(models.Model):
 
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 
-    query: models.QuerySet[NotFoundLog] = models.QuerySet()
+    query: postgres.QuerySet[NotFoundLog] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["-created_at"],
         indexes=[
-            models.Index(fields=["created_at"]),
+            postgres.Index(fields=["created_at"]),
         ],
     )
 

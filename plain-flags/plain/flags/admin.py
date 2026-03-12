@@ -8,8 +8,8 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
-from plain.models import QuerySet
-from plain.models.forms import ModelForm
+from plain.postgres import QuerySet
+from plain.postgres.forms import ModelForm
 from plain.preflight import PreflightResult
 
 from .models import Flag, FlagResult

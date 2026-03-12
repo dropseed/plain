@@ -18,23 +18,23 @@ Here's what Plain code looks like:
 
 ```python
 # app/users/models.py
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 from plain.passwords.models import PasswordField
 
-@models.register_model
-class User(models.Model):
+@postgres.register_model
+class User(postgres.Model):
     email: str = types.EmailField()
     password: str = PasswordField()
     display_name: str = types.CharField(max_length=100)
     is_admin: bool = types.BooleanField(default=False)
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 
-    query: models.QuerySet[User] = models.QuerySet()
+    query: postgres.QuerySet[User] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         constraints=[
-            models.UniqueConstraint(fields=["email"], name="unique_email"),
+            postgres.UniqueConstraint(fields=["email"], name="unique_email"),
         ],
     )
 ```
@@ -118,7 +118,7 @@ Plain is opinionated. These are the technologies it's built on:
 **Foundation:**
 
 - [plain](https://plainframework.com/docs/plain/plain/) — core framework
-- [plain.models](https://plainframework.com/docs/plain-models/plain/models/) — database ORM
+- [plain.postgres](https://plainframework.com/docs/plain-postgres/plain/postgres/) — database ORM
 - [plain.auth](https://plainframework.com/docs/plain-auth/plain/auth/) — authentication
 - [plain.sessions](https://plainframework.com/docs/plain-sessions/plain/sessions/) — session storage
 

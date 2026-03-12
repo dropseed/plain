@@ -155,7 +155,7 @@ class DevProcess(ProcessManager):
         #         f"{sys.executable} -m plain dev logs --services --follow",
         #     )
 
-        if find_spec("plain.models"):
+        if find_spec("plain.postgres"):
             print_event("Waiting for database...", newline=False)
             subprocess.run(
                 [sys.executable, "-m", "plain", "db", "wait"],

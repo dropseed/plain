@@ -3,14 +3,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Self
 
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 from plain.utils import timezone
 
 __all__ = ["CachedItem", "CachedItemQuerySet"]
 
 
-class CachedItemQuerySet(models.QuerySet["CachedItem"]):
+class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
     def expired(self) -> Self:
         return self.filter(expires_at__lt=timezone.now())
 
@@ -21,8 +21,8 @@ class CachedItemQuerySet(models.QuerySet["CachedItem"]):
         return self.filter(expires_at=None)
 
 
-@models.register_model
-class CachedItem(models.Model):
+@postgres.register_model
+class CachedItem(postgres.Model):
     key: str = types.CharField(max_length=255)
     value: Any = types.JSONField(required=False, allow_null=True)
     expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
@@ -31,12 +31,12 @@ class CachedItem(models.Model):
 
     query: CachedItemQuerySet = CachedItemQuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         indexes=[
-            models.Index(fields=["expires_at"]),
+            postgres.Index(fields=["expires_at"]),
         ],
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["key"], name="plaincache_cacheditem_unique_key"
             ),
         ],

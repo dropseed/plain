@@ -31,7 +31,7 @@ class CheckDatabaseConnection(PreflightCheck):
     """Verify database is reachable."""
 
     def run(self) -> list[PreflightResult]:
-        from plain.models import connection
+        from plain.postgres import connection
 
         try:
             connection.ensure_connection()

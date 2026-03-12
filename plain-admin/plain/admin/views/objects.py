@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING, Any
 
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
-from plain.models import Model, QuerySet
 from plain.paginator import Paginator
+from plain.postgres import Model, QuerySet
 from plain.views import (
     CreateView,
     DeleteView,

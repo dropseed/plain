@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 from plain.runtime import SettingsReference
 
 __all__ = ["SupportFormEntry"]
 
 
-@models.register_model
-class SupportFormEntry(models.Model):
+@postgres.register_model
+class SupportFormEntry(postgres.Model):
     user = types.ForeignKeyField(
         SettingsReference("AUTH_USER_MODEL"),
-        on_delete=models.SET_NULL,
+        on_delete=postgres.SET_NULL,
         allow_null=True,
         required=False,
     )
@@ -25,11 +25,11 @@ class SupportFormEntry(models.Model):
     # referrer? source? session?
     # extra_data
 
-    query: models.QuerySet[SupportFormEntry] = models.QuerySet()
+    query: postgres.QuerySet[SupportFormEntry] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         ordering=["-created_at"],
         indexes=[
-            models.Index(fields=["created_at"]),
+            postgres.Index(fields=["created_at"]),
         ],
     )

@@ -9,7 +9,7 @@
 #
 # Step 1: Rename tables from plainworker_* to plainjobs_*
 
-from plain.models import migrations
+from plain.postgres import migrations
 
 
 class Migration(migrations.Migration):

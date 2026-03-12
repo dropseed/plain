@@ -19,12 +19,12 @@ members = [
     "plain-htmx",
     "plain-jobs",
     "plain-loginlink",
-    "plain-models",
     "plain-oauth",
     "plain-observer",
     "plain-pages",
     "plain-pageviews",
     "plain-passwords",
+    "plain-postgres",
     "plain-pytest",
     "plain-redirection",
     "plain-scan",
@@ -180,12 +180,12 @@ dependencies = [
     { name = "plain-htmx" },
     { name = "plain-jobs" },
     { name = "plain-loginlink" },
-    { name = "plain-models" },
     { name = "plain-oauth" },
     { name = "plain-observer" },
     { name = "plain-pages" },
     { name = "plain-pageviews" },
     { name = "plain-passwords" },
+    { name = "plain-postgres" },
     { name = "plain-pytest" },
     { name = "plain-redirection" },
     { name = "plain-scan" },
@@ -213,12 +213,12 @@ requires-dist = [
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-jobs", editable = "plain-jobs" },
     { name = "plain-loginlink", editable = "plain-loginlink" },
-    { name = "plain-models", editable = "plain-models" },
     { name = "plain-oauth", editable = "plain-oauth" },
     { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
     { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
+    { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-pytest", editable = "plain-pytest" },
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },
@@ -550,7 +550,7 @@ version = "0.27.3"
 source = { editable = "plain-auth" }
 dependencies = [
     { name = "plain" },
-    { name = "plain-models" },
+    { name = "plain-postgres" },
     { name = "plain-sessions" },
 ]
 
@@ -562,7 +562,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
-    { name = "plain-models", editable = "plain-models" },
+    { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-sessions", editable = "plain-sessions" },
 ]
 
@@ -673,7 +673,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-models" },
+    { name = "plain-postgres" },
     { name = "plain-pytest" },
 ]
 
@@ -682,7 +682,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "plain-models", editable = "plain-models" },
+    { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-pytest", editable = "plain-pytest" },
 ]
 
@@ -711,7 +711,7 @@ version = "0.45.4"
 source = { editable = "plain-jobs" }
 dependencies = [
     { name = "plain" },
-    { name = "plain-models" },
+    { name = "plain-postgres" },
 ]
 
 [package.dev-dependencies]
@@ -722,7 +722,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
-    { name = "plain-models", editable = "plain-models" },
+    { name = "plain-postgres", editable = "plain-postgres" },
 ]
 
 [package.metadata.requires-dev]
@@ -744,36 +744,13 @@ requires-dist = [
 ]
 
 [[package]]
-name = "plain-models"
-version = "0.83.0"
-source = { editable = "plain-models" }
-dependencies = [
-    { name = "plain" },
-    { name = "sqlparse" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "plain-pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "sqlparse", specifier = ">=0.3.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
-
-[[package]]
 name = "plain-oauth"
 version = "0.44.3"
 source = { editable = "plain-oauth" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },
-    { name = "plain-models" },
+    { name = "plain-postgres" },
     { name = "requests" },
 ]
 
@@ -786,7 +763,7 @@ dev = [
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-models", editable = "plain-models" },
+    { name = "plain-postgres", editable = "plain-postgres" },
     { name = "requests", specifier = ">=2.0.0" },
 ]
 
@@ -851,13 +828,13 @@ version = "0.33.2"
 source = { editable = "plain-pageviews" }
 dependencies = [
     { name = "plain" },
-    { name = "plain-models" },
+    { name = "plain-postgres" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
-    { name = "plain-models", editable = "plain-models" },
+    { name = "plain-postgres", editable = "plain-postgres" },
 ]
 
 [[package]]
@@ -870,6 +847,29 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "plain", editable = "plain" }]
+
+[[package]]
+name = "plain-postgres"
+version = "0.83.0"
+source = { editable = "plain-postgres" }
+dependencies = [
+    { name = "plain" },
+    { name = "sqlparse" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "sqlparse", specifier = ">=0.3.1" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-pytest"
@@ -896,13 +896,13 @@ version = "0.32.1"
 source = { editable = "plain-redirection" }
 dependencies = [
     { name = "plain" },
-    { name = "plain-models" },
+    { name = "plain-postgres" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
-    { name = "plain-models", editable = "plain-models" },
+    { name = "plain-postgres", editable = "plain-postgres" },
 ]
 
 [[package]]
@@ -938,7 +938,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-models" },
+    { name = "plain-postgres" },
     { name = "plain-pytest" },
 ]
 
@@ -947,7 +947,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "plain-models", editable = "plain-models" },
+    { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-pytest", editable = "plain-pytest" },
 ]
 
@@ -969,14 +969,14 @@ source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
     { name = "plain-auth" },
-    { name = "plain-models" },
+    { name = "plain-postgres" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-models", editable = "plain-models" },
+    { name = "plain-postgres", editable = "plain-postgres" },
 ]
 
 [[package]]
@@ -1066,12 +1066,12 @@ dev = [
     { name = "plain-htmx" },
     { name = "plain-jobs" },
     { name = "plain-loginlink" },
-    { name = "plain-models" },
     { name = "plain-oauth" },
     { name = "plain-observer" },
     { name = "plain-pages" },
     { name = "plain-pageviews" },
     { name = "plain-passwords" },
+    { name = "plain-postgres" },
     { name = "plain-pytest" },
     { name = "plain-redirection" },
     { name = "plain-scan" },
@@ -1103,12 +1103,12 @@ dev = [
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-jobs", editable = "plain-jobs" },
     { name = "plain-loginlink", editable = "plain-loginlink" },
-    { name = "plain-models", editable = "plain-models" },
     { name = "plain-oauth", editable = "plain-oauth" },
     { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
     { name = "plain-pageviews", editable = "plain-pageviews" },
     { name = "plain-passwords", editable = "plain-passwords" },
+    { name = "plain-postgres", editable = "plain-postgres" },
     { name = "plain-pytest", editable = "plain-pytest" },
     { name = "plain-redirection", editable = "plain-redirection" },
     { name = "plain-scan", editable = "plain-scan" },

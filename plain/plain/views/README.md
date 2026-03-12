@@ -439,7 +439,7 @@ def get_template_context(self):
 Use `transaction.atomic()` when creating or updating related objects together.
 
 ```python
-from plain.models import transaction
+from plain.postgres import transaction
 
 with transaction.atomic():
     order = Order(user=user)

@@ -21,7 +21,7 @@ from .sessions import logout
 from .utils import resolve_url
 
 if TYPE_CHECKING:
-    from plain.models import Model
+    from plain.postgres import Model
 
 try:
     from plain.admin.impersonate import get_request_impersonator

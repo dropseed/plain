@@ -5,7 +5,7 @@ from weakref import WeakKeyDictionary
 
 if TYPE_CHECKING:
     from plain.http import Request
-    from plain.models import Model
+    from plain.postgres import Model
 
 _request_users: WeakKeyDictionary[Request, Model | None] = WeakKeyDictionary()
 

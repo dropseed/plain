@@ -28,7 +28,7 @@ URLS_ROUTER = "app.urls.AppRouter"
 TIME_ZONE = "America/Chicago"
 
 INSTALLED_PACKAGES = [
-    "plain.models",
+    "plain.postgres",
     "plain.tailwind",
     "plain.auth",
     "plain.sessions",

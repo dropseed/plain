@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from plain import models
+from plain import postgres
 from plain.exceptions import ValidationError
-from plain.models import types
+from plain.postgres import types
 
 __all__ = ["Flag", "FlagResult"]
 
@@ -15,19 +15,19 @@ def validate_flag_name(value: str) -> None:
         raise ValidationError(f"{value} is not a valid Python identifier name")
 
 
-@models.register_model
-class FlagResult(models.Model):
+@postgres.register_model
+class FlagResult(postgres.Model):
     created_at: datetime = types.DateTimeField(auto_now_add=True)
     updated_at: datetime = types.DateTimeField(auto_now=True)
-    flag: Flag = types.ForeignKeyField("Flag", on_delete=models.CASCADE)
+    flag: Flag = types.ForeignKeyField("Flag", on_delete=postgres.CASCADE)
     key: str = types.CharField(max_length=255)
     value = types.JSONField()
 
-    query: models.QuerySet[FlagResult] = models.QuerySet()
+    query: postgres.QuerySet[FlagResult] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["flag", "key"], name="plainflags_flagresult_unique_key"
             ),
         ],
@@ -37,8 +37,8 @@ class FlagResult(models.Model):
         return self.key
 
 
-@models.register_model
-class Flag(models.Model):
+@postgres.register_model
+class Flag(postgres.Model):
     created_at: datetime = types.DateTimeField(auto_now_add=True)
     updated_at: datetime = types.DateTimeField(auto_now=True)
     name: str = types.CharField(max_length=255, validators=[validate_flag_name])
@@ -53,11 +53,11 @@ class Flag(models.Model):
     # To provide an easier way to see if a flag is still being used
     used_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
 
-    query: models.QuerySet[Flag] = models.QuerySet()
+    query: postgres.QuerySet[Flag] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["name"], name="plainflags_flag_unique_name"
             ),
         ],

@@ -3,8 +3,8 @@ from collections import defaultdict
 from typing import Any
 
 from plain.admin.dates import DatetimeRangeAliases
-from plain.models.aggregates import Count
-from plain.models.functions import (
+from plain.postgres.aggregates import Count
+from plain.postgres.functions import (
     TruncDate,
     TruncMonth,
 )

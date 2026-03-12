@@ -54,7 +54,7 @@ FULLY_TYPED_PATHS = [
     "plain-tunnel",
     "plain-vendor",
     "plain-jobs",
-    "plain-models",
+    "plain-postgres",
     "plain-scan",
     "plain-start",
 ]

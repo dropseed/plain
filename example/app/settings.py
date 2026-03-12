@@ -14,7 +14,7 @@ INSTALLED_PACKAGES = [
     "plain.htmx",
     "plain.jobs",
     "plain.loginlink",
-    "plain.models",
+    "plain.postgres",
     "plain.oauth",
     "plain.pages",
     "plain.pageviews",

@@ -5,7 +5,7 @@ from collections.abc import Generator
 from typing import TYPE_CHECKING
 
 from plain.exceptions import ImproperlyConfigured
-from plain.models import models_registry
+from plain.postgres import models_registry
 from plain.runtime import settings
 from plain.sessions import get_request_session
 from plain.utils.crypto import salted_hmac
@@ -15,7 +15,7 @@ from .requests import get_request_user, set_request_user
 
 if TYPE_CHECKING:
     from plain.http import Request
-    from plain.models import Model
+    from plain.postgres import Model
 
 _USER_ID_SESSION_KEY = "_auth_user_id"
 _USER_HASH_SESSION_KEY = "_auth_user_hash"

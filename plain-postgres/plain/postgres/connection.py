@@ -1,0 +1,1331 @@
+from __future__ import annotations
+
+import _thread
+import datetime
+import logging
+import os
+import signal
+import subprocess
+import sys
+import time
+import warnings
+import zoneinfo
+from collections import deque
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
+from functools import cached_property, lru_cache
+from typing import TYPE_CHECKING, Any, LiteralString, NamedTuple, cast
+
+import psycopg as Database
+from psycopg import ClientCursor, IsolationLevel, adapt, adapters, errors
+from psycopg import sql as psycopg_sql
+from psycopg.abc import Buffer, PyFormat
+from psycopg.postgres import types as pg_types
+from psycopg.pq import Format
+from psycopg.types.datetime import TimestamptzLoader
+from psycopg.types.range import BaseRangeDumper, Range, RangeDumper
+from psycopg.types.string import TextLoader
+
+from plain.exceptions import ImproperlyConfigured
+from plain.postgres import utils
+from plain.postgres.db import (
+    DatabaseError,
+    DatabaseErrorWrapper,
+)
+from plain.postgres.dialect import MAX_NAME_LENGTH, quote_name
+from plain.postgres.indexes import Index
+from plain.postgres.schema import DatabaseSchemaEditor
+from plain.postgres.transaction import TransactionManagementError
+from plain.postgres.utils import CursorDebugWrapper as BaseCursorDebugWrapper
+from plain.postgres.utils import CursorWrapper, debug_transaction
+from plain.runtime import settings
+
+if TYPE_CHECKING:
+    from psycopg import Connection as PsycopgConnection
+
+    from plain.postgres.connections import DatabaseConfig
+    from plain.postgres.fields import Field
+
+logger = logging.getLogger("plain.postgres.connection")
+
+# The prefix to put on the default database name when creating
+# the test database.
+TEST_DATABASE_PREFIX = "test_"
+
+
+def get_migratable_models() -> Generator[Any]:
+    """Return all models that should be included in migrations."""
+    from plain.packages import packages_registry
+    from plain.postgres import models_registry
+
+    return (
+        model
+        for package_config in packages_registry.get_package_configs()
+        for model in models_registry.get_models(
+            package_label=package_config.package_label
+        )
+    )
+
+
+class TableInfo(NamedTuple):
+    """Structure returned by DatabaseConnection.get_table_list()."""
+
+    name: str
+    type: str
+    comment: str | None
+
+
+# Type OIDs
+TIMESTAMPTZ_OID = adapters.types["timestamptz"].oid
+TSRANGE_OID = pg_types["tsrange"].oid
+TSTZRANGE_OID = pg_types["tstzrange"].oid
+
+
+class BaseTzLoader(TimestamptzLoader):
+    """
+    Load a PostgreSQL timestamptz using a specific timezone.
+    The timezone can be None too, in which case it will be chopped.
+    """
+
+    timezone: datetime.tzinfo | None = None
+
+    def load(self, data: Buffer) -> datetime.datetime:
+        res = super().load(data)
+        return res.replace(tzinfo=self.timezone)
+
+
+def register_tzloader(tz: datetime.tzinfo | None, context: Any) -> None:
+    class SpecificTzLoader(BaseTzLoader):
+        timezone = tz
+
+    context.adapters.register_loader("timestamptz", SpecificTzLoader)
+
+
+class PlainRangeDumper(RangeDumper):
+    """A Range dumper customized for Plain."""
+
+    def upgrade(self, obj: Range[Any], format: PyFormat) -> BaseRangeDumper:
+        dumper = super().upgrade(obj, format)
+        if dumper is not self and dumper.oid == TSRANGE_OID:
+            dumper.oid = TSTZRANGE_OID
+        return dumper
+
+
+@lru_cache
+def get_adapters_template(timezone: datetime.tzinfo | None) -> adapt.AdaptersMap:
+    ctx = adapt.AdaptersMap(adapters)
+    # No-op JSON loader to avoid psycopg3 round trips
+    ctx.register_loader("jsonb", TextLoader)
+    # Treat inet/cidr as text
+    ctx.register_loader("inet", TextLoader)
+    ctx.register_loader("cidr", TextLoader)
+    ctx.register_dumper(Range, PlainRangeDumper)
+    register_tzloader(timezone, ctx)
+    return ctx
+
+
+def _psql_settings_to_cmd_args_env(
+    settings_dict: DatabaseConfig, parameters: list[str]
+) -> tuple[list[str], dict[str, str] | None]:
+    """Build psql command-line arguments from database settings."""
+    args = ["psql"]
+    options = settings_dict.get("OPTIONS", {})
+
+    if user := settings_dict.get("USER"):
+        args += ["-U", user]
+    if host := settings_dict.get("HOST"):
+        args += ["-h", host]
+    if port := settings_dict.get("PORT"):
+        args += ["-p", str(port)]
+    args.extend(parameters)
+    args += [settings_dict.get("DATABASE") or "postgres"]
+
+    env: dict[str, str] = {}
+    if password := settings_dict.get("PASSWORD"):
+        env["PGPASSWORD"] = str(password)
+
+    # Map OPTIONS keys to their corresponding environment variables.
+    option_env_vars = {
+        "passfile": "PGPASSFILE",
+        "sslmode": "PGSSLMODE",
+        "sslrootcert": "PGSSLROOTCERT",
+        "sslcert": "PGSSLCERT",
+        "sslkey": "PGSSLKEY",
+    }
+    for option_key, env_var in option_env_vars.items():
+        if value := options.get(option_key):
+            env[env_var] = str(value)
+
+    return args, (env or None)
+
+
+class DatabaseConnection:
+    """
+    PostgreSQL database connection.
+
+    This is the only database backend supported by Plain.
+    """
+
+    queries_limit: int = 9000
+    executable_name: str = "psql"
+
+    index_default_access_method = "btree"
+    ignored_tables: list[str] = []
+
+    def __init__(self, settings_dict: DatabaseConfig):
+        # Connection related attributes.
+        # The underlying database connection (from the database library, not a wrapper).
+        self.connection: PsycopgConnection[Any] | None = None
+        # `settings_dict` should be a dictionary containing keys such as
+        # DATABASE, USER, etc. It's called `settings_dict` instead of `settings`
+        # to disambiguate it from Plain settings modules.
+        self.settings_dict: DatabaseConfig = settings_dict
+        # Query logging in debug mode or when explicitly enabled.
+        self.queries_log: deque[dict[str, Any]] = deque(maxlen=self.queries_limit)
+        self.force_debug_cursor: bool = False
+
+        # Transaction related attributes.
+        # Tracks if the connection is in autocommit mode. Per PEP 249, by
+        # default, it isn't.
+        self.autocommit: bool = False
+        # Tracks if the connection is in a transaction managed by 'atomic'.
+        self.in_atomic_block: bool = False
+        # Increment to generate unique savepoint ids.
+        self.savepoint_state: int = 0
+        # List of savepoints created by 'atomic'.
+        self.savepoint_ids: list[str | None] = []
+        # Stack of active 'atomic' blocks.
+        self.atomic_blocks: list[Any] = []
+        # Tracks if the transaction should be rolled back to the next
+        # available savepoint because of an exception in an inner block.
+        self.needs_rollback: bool = False
+        self.rollback_exc: Exception | None = None
+
+        # Connection termination related attributes.
+        self.close_at: float | None = None
+        self.closed_in_transaction: bool = False
+        self.errors_occurred: bool = False
+        self.health_check_enabled: bool = False
+        self.health_check_done: bool = False
+
+        # A list of no-argument functions to run when the transaction commits.
+        # Each entry is an (sids, func, robust) tuple, where sids is a set of
+        # the active savepoint IDs when this function was registered and robust
+        # specifies whether it's allowed for the function to fail.
+        self.run_on_commit: list[tuple[set[str | None], Any, bool]] = []
+
+        # Should we run the on-commit hooks the next time set_autocommit(True)
+        # is called?
+        self.run_commit_hooks_on_set_autocommit_on: bool = False
+
+        # A stack of wrappers to be invoked around execute()/executemany()
+        # calls. Each entry is a function taking five arguments: execute, sql,
+        # params, many, and context. It's the function's responsibility to
+        # call execute(sql, params, many, context).
+        self.execute_wrappers: list[Any] = []
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__qualname__} vendor='postgresql'>"
+
+    @cached_property
+    def timezone(self) -> datetime.tzinfo:
+        """
+        Return a tzinfo of the database connection time zone.
+
+        When a datetime is read from the database, it is returned in this time
+        zone. Since PostgreSQL supports time zones, it doesn't matter which
+        time zone Plain uses, as long as aware datetimes are used everywhere.
+        Other users connecting to the database can choose their own time zone.
+        """
+        if self.settings_dict["TIME_ZONE"] is None:
+            return datetime.UTC
+        return zoneinfo.ZoneInfo(self.settings_dict["TIME_ZONE"])
+
+    @cached_property
+    def timezone_name(self) -> str:
+        """
+        Name of the time zone of the database connection.
+        """
+        if self.settings_dict["TIME_ZONE"] is None:
+            return "UTC"
+        return self.settings_dict["TIME_ZONE"]
+
+    @property
+    def queries_logged(self) -> bool:
+        return self.force_debug_cursor or settings.DEBUG
+
+    @property
+    def queries(self) -> list[dict[str, Any]]:
+        if len(self.queries_log) == self.queries_log.maxlen:
+            warnings.warn(
+                f"Limit for query logging exceeded, only the last {self.queries_log.maxlen} queries "
+                "will be returned."
+            )
+        return list(self.queries_log)
+
+    # ##### Connection and cursor methods #####
+
+    def get_connection_params(self) -> dict[str, Any]:
+        """Return a dict of parameters suitable for get_new_connection."""
+        settings_dict = self.settings_dict
+        options = settings_dict.get("OPTIONS", {})
+        db_name = settings_dict.get("DATABASE")
+        if db_name == "":
+            raise ImproperlyConfigured(
+                "PostgreSQL database is not configured. "
+                "Set DATABASE_URL or the POSTGRES_DATABASE setting."
+            )
+        if len(db_name or "") > MAX_NAME_LENGTH:
+            raise ImproperlyConfigured(
+                "The database name '%s' (%d characters) is longer than "  # noqa: UP031
+                "PostgreSQL's limit of %d characters. Supply a shorter "
+                "POSTGRES_DATABASE setting."
+                % (
+                    db_name,
+                    len(db_name or ""),
+                    MAX_NAME_LENGTH,
+                )
+            )
+        if db_name is None:
+            # None is used to connect to the default 'postgres' db.
+            db_name = "postgres"
+        conn_params: dict[str, Any] = {
+            "dbname": db_name,
+            **options,
+        }
+
+        conn_params.pop("assume_role", None)
+        conn_params.pop("isolation_level", None)
+        conn_params.pop("server_side_binding", None)
+        if settings_dict["USER"]:
+            conn_params["user"] = settings_dict["USER"]
+        if settings_dict["PASSWORD"]:
+            conn_params["password"] = settings_dict["PASSWORD"]
+        if settings_dict["HOST"]:
+            conn_params["host"] = settings_dict["HOST"]
+        if settings_dict["PORT"]:
+            conn_params["port"] = settings_dict["PORT"]
+        conn_params["context"] = get_adapters_template(self.timezone)
+        # Disable prepared statements by default to keep connection poolers
+        # working. Can be reenabled via OPTIONS in the settings dict.
+        conn_params["prepare_threshold"] = conn_params.pop("prepare_threshold", None)
+        return conn_params
+
+    def get_new_connection(self, conn_params: dict[str, Any]) -> PsycopgConnection[Any]:
+        """Open a connection to the database."""
+        # self.isolation_level must be set:
+        # - after connecting to the database in order to obtain the database's
+        #   default when no value is explicitly specified in options.
+        # - before calling _set_autocommit() because if autocommit is on, that
+        #   will set connection.isolation_level to ISOLATION_LEVEL_AUTOCOMMIT.
+        options = self.settings_dict.get("OPTIONS", {})
+        set_isolation_level = False
+        try:
+            isolation_level_value = options["isolation_level"]
+        except KeyError:
+            self.isolation_level = IsolationLevel.READ_COMMITTED
+        else:
+            # Set the isolation level to the value from OPTIONS.
+            try:
+                self.isolation_level = IsolationLevel(isolation_level_value)
+                set_isolation_level = True
+            except ValueError:
+                raise ImproperlyConfigured(
+                    f"Invalid transaction isolation level {isolation_level_value} "
+                    f"specified. Use one of the psycopg.IsolationLevel values."
+                )
+        connection = Database.connect(**conn_params)
+        if set_isolation_level:
+            connection.isolation_level = self.isolation_level
+        # Use server-side binding cursor if requested, otherwise standard cursor
+        connection.cursor_factory = (
+            ServerBindingCursor
+            if options.get("server_side_binding") is True
+            else Cursor
+        )
+        return connection
+
+    def ensure_timezone(self) -> bool:
+        """
+        Ensure the connection's timezone is set to `self.timezone_name` and
+        return whether it changed or not.
+        """
+        if self.connection is None:
+            return False
+        conn_timezone_name = self.connection.info.parameter_status("TimeZone")
+        timezone_name = self.timezone_name
+        if timezone_name and conn_timezone_name != timezone_name:
+            self.connection.execute(
+                "SELECT set_config('TimeZone', %s, false)", [timezone_name]
+            )
+            return True
+        return False
+
+    def ensure_role(self) -> bool:
+        if self.connection is None:
+            return False
+        if new_role := self.settings_dict.get("OPTIONS", {}).get("assume_role"):
+            sql_str = self.compose_sql("SET ROLE %s", [new_role])
+            self.connection.execute(sql_str)  # type: ignore[arg-type]
+            return True
+        return False
+
+    def init_connection_state(self) -> None:
+        """Initialize the database connection settings."""
+        self.ensure_timezone()
+        # Set the role on the connection. This is useful if the credential used
+        # to login is not the same as the role that owns database resources. As
+        # can be the case when using temporary or ephemeral credentials.
+        self.ensure_role()
+
+    def create_cursor(self) -> Any:
+        """Create a cursor. Assume that a connection is established."""
+        assert self.connection is not None
+        cursor = self.connection.cursor()
+
+        # Register the cursor timezone only if the connection disagrees, to avoid copying the adapter map.
+        tzloader = self.connection.adapters.get_loader(TIMESTAMPTZ_OID, Format.TEXT)
+        if self.timezone != tzloader.timezone:  # type: ignore[union-attr]
+            register_tzloader(self.timezone, cursor)
+        return cursor
+
+    def _set_autocommit(self, autocommit: bool) -> None:
+        """Backend-specific implementation to enable or disable autocommit."""
+        assert self.connection is not None
+        with self.wrap_database_errors:
+            self.connection.autocommit = autocommit
+
+    def check_constraints(self, table_names: list[str] | None = None) -> None:
+        """
+        Check constraints by setting them to immediate. Return them to deferred
+        afterward.
+        """
+        with self.cursor() as cursor:
+            cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+            cursor.execute("SET CONSTRAINTS ALL DEFERRED")
+
+    def is_usable(self) -> bool:
+        """
+        Test if the database connection is usable.
+
+        This method may assume that self.connection is not None.
+
+        Actual implementations should take care not to raise exceptions
+        as that may prevent Plain from recycling unusable connections.
+        """
+        assert self.connection is not None
+        try:
+            # Use psycopg directly, bypassing Plain's utilities.
+            self.connection.execute("SELECT 1")
+        except Database.Error:
+            return False
+        else:
+            return True
+
+    @contextmanager
+    def _nodb_cursor(self) -> Generator[utils.CursorWrapper]:
+        """
+        Return a cursor from an alternative connection to be used when there is
+        no need to access the main database, specifically for test db
+        creation/deletion. This also prevents the production database from
+        being exposed to potential child threads while (or after) the test
+        database is destroyed. Refs #10868, #17786, #16969.
+        """
+        cursor = None
+        try:
+            conn = self.__class__({**self.settings_dict, "DATABASE": None})
+            try:
+                with conn.cursor() as cursor:
+                    yield cursor
+            finally:
+                conn.close()
+        except (Database.DatabaseError, DatabaseError):
+            if cursor is not None:
+                raise
+            warnings.warn(
+                "Normally Plain will use a connection to the 'postgres' database "
+                "to avoid running initialization queries against the production "
+                "database when it's not needed (for example, when running tests). "
+                "Plain was unable to create a connection to the 'postgres' database "
+                "and will use the first PostgreSQL database instead.",
+                RuntimeWarning,
+            )
+            conn = self.__class__(self.settings_dict)
+            try:
+                with conn.cursor() as cursor:
+                    yield cursor
+            finally:
+                conn.close()
+
+    @cached_property
+    def pg_version(self) -> int:
+        with self.temporary_connection():
+            assert self.connection is not None
+            return self.connection.info.server_version
+
+    def make_debug_cursor(self, cursor: Any) -> CursorDebugWrapper:
+        return CursorDebugWrapper(cursor, self)
+
+    # ##### Connection lifecycle #####
+
+    def connect(self) -> None:
+        """Connect to the database. Assume that the connection is closed."""
+        # In case the previous connection was closed while in an atomic block
+        self.in_atomic_block = False
+        self.savepoint_ids = []
+        self.atomic_blocks = []
+        self.needs_rollback = False
+        # Reset parameters defining when to close/health-check the connection.
+        self.health_check_enabled = self.settings_dict["CONN_HEALTH_CHECKS"]
+        max_age = self.settings_dict["CONN_MAX_AGE"]
+        self.close_at = None if max_age is None else time.monotonic() + max_age
+        self.closed_in_transaction = False
+        self.errors_occurred = False
+        # New connections are healthy.
+        self.health_check_done = True
+        # Establish the connection
+        conn_params = self.get_connection_params()
+        self.connection = self.get_new_connection(conn_params)
+        self.set_autocommit(True)
+        self.init_connection_state()
+
+        self.run_on_commit = []
+
+    def ensure_connection(self) -> None:
+        """Guarantee that a connection to the database is established."""
+        if self.connection is None:
+            with self.wrap_database_errors:
+                self.connect()
+
+    # ##### PEP-249 connection method wrappers #####
+
+    def _prepare_cursor(self, cursor: Any) -> utils.CursorWrapper:
+        """
+        Validate the connection is usable and perform database cursor wrapping.
+        """
+        if self.queries_logged:
+            wrapped_cursor = self.make_debug_cursor(cursor)
+        else:
+            wrapped_cursor = self.make_cursor(cursor)
+        return wrapped_cursor
+
+    def _cursor(self) -> utils.CursorWrapper:
+        self.close_if_health_check_failed()
+        self.ensure_connection()
+        with self.wrap_database_errors:
+            return self._prepare_cursor(self.create_cursor())
+
+    def _commit(self) -> None:
+        if self.connection is not None:
+            with debug_transaction(self, "COMMIT"), self.wrap_database_errors:
+                return self.connection.commit()
+
+    def _rollback(self) -> None:
+        if self.connection is not None:
+            with debug_transaction(self, "ROLLBACK"), self.wrap_database_errors:
+                return self.connection.rollback()
+
+    def _close(self) -> None:
+        if self.connection is not None:
+            with self.wrap_database_errors:
+                return self.connection.close()
+
+    # ##### Generic wrappers for PEP-249 connection methods #####
+
+    def cursor(self) -> utils.CursorWrapper:
+        """Create a cursor, opening a connection if necessary."""
+        return self._cursor()
+
+    def commit(self) -> None:
+        """Commit a transaction and reset the dirty flag."""
+        self.validate_no_atomic_block()
+        self._commit()
+        # A successful commit means that the database connection works.
+        self.errors_occurred = False
+        self.run_commit_hooks_on_set_autocommit_on = True
+
+    def rollback(self) -> None:
+        """Roll back a transaction and reset the dirty flag."""
+        self.validate_no_atomic_block()
+        self._rollback()
+        # A successful rollback means that the database connection works.
+        self.errors_occurred = False
+        self.needs_rollback = False
+        self.run_on_commit = []
+
+    def close(self) -> None:
+        """Close the connection to the database."""
+        self.run_on_commit = []
+
+        # Don't call validate_no_atomic_block() to avoid making it difficult
+        # to get rid of a connection in an invalid state. The next connect()
+        # will reset the transaction state anyway.
+        if self.closed_in_transaction or self.connection is None:
+            return
+        try:
+            self._close()
+        finally:
+            if self.in_atomic_block:
+                self.closed_in_transaction = True
+                self.needs_rollback = True
+            else:
+                self.connection = None
+
+    # ##### Savepoint management #####
+
+    def _savepoint(self, sid: str) -> None:
+        with self.cursor() as cursor:
+            cursor.execute(f"SAVEPOINT {quote_name(sid)}")
+
+    def _savepoint_rollback(self, sid: str) -> None:
+        with self.cursor() as cursor:
+            cursor.execute(f"ROLLBACK TO SAVEPOINT {quote_name(sid)}")
+
+    def _savepoint_commit(self, sid: str) -> None:
+        with self.cursor() as cursor:
+            cursor.execute(f"RELEASE SAVEPOINT {quote_name(sid)}")
+
+    # ##### Generic savepoint management methods #####
+
+    def savepoint(self) -> str | None:
+        """
+        Create a savepoint inside the current transaction. Return an
+        identifier for the savepoint that will be used for the subsequent
+        rollback or commit. Return None if in autocommit mode (no transaction).
+        """
+        if self.get_autocommit():
+            return None
+
+        thread_ident = _thread.get_ident()
+        tid = str(thread_ident).replace("-", "")
+
+        self.savepoint_state += 1
+        sid = "s%s_x%d" % (tid, self.savepoint_state)  # noqa: UP031
+
+        self._savepoint(sid)
+
+        return sid
+
+    def savepoint_rollback(self, sid: str) -> None:
+        """
+        Roll back to a savepoint. Do nothing if in autocommit mode.
+        """
+        if self.get_autocommit():
+            return
+
+        self._savepoint_rollback(sid)
+
+        # Remove any callbacks registered while this savepoint was active.
+        self.run_on_commit = [
+            (sids, func, robust)
+            for (sids, func, robust) in self.run_on_commit
+            if sid not in sids
+        ]
+
+    def savepoint_commit(self, sid: str) -> None:
+        """
+        Release a savepoint. Do nothing if in autocommit mode.
+        """
+        if self.get_autocommit():
+            return
+
+        self._savepoint_commit(sid)
+
+    def clean_savepoints(self) -> None:
+        """
+        Reset the counter used to generate unique savepoint ids in this thread.
+        """
+        self.savepoint_state = 0
+
+    # ##### Generic transaction management methods #####
+
+    def get_autocommit(self) -> bool:
+        """Get the autocommit state."""
+        self.ensure_connection()
+        return self.autocommit
+
+    def set_autocommit(self, autocommit: bool) -> None:
+        """
+        Enable or disable autocommit.
+
+        Used internally by atomic() to manage transactions. Don't call this
+        directly — use atomic() instead.
+        """
+        self.validate_no_atomic_block()
+        self.close_if_health_check_failed()
+        self.ensure_connection()
+
+        if autocommit:
+            self._set_autocommit(autocommit)
+        else:
+            with debug_transaction(self, "BEGIN"):
+                self._set_autocommit(autocommit)
+        self.autocommit = autocommit
+
+        if autocommit and self.run_commit_hooks_on_set_autocommit_on:
+            self.run_and_clear_commit_hooks()
+            self.run_commit_hooks_on_set_autocommit_on = False
+
+    def get_rollback(self) -> bool:
+        """Get the "needs rollback" flag -- for *advanced use* only."""
+        if not self.in_atomic_block:
+            raise TransactionManagementError(
+                "The rollback flag doesn't work outside of an 'atomic' block."
+            )
+        return self.needs_rollback
+
+    def set_rollback(self, rollback: bool) -> None:
+        """
+        Set or unset the "needs rollback" flag -- for *advanced use* only.
+        """
+        if not self.in_atomic_block:
+            raise TransactionManagementError(
+                "The rollback flag doesn't work outside of an 'atomic' block."
+            )
+        self.needs_rollback = rollback
+
+    def validate_no_atomic_block(self) -> None:
+        """Raise an error if an atomic block is active."""
+        if self.in_atomic_block:
+            raise TransactionManagementError(
+                "This is forbidden when an 'atomic' block is active."
+            )
+
+    def validate_no_broken_transaction(self) -> None:
+        if self.needs_rollback:
+            raise TransactionManagementError(
+                "An error occurred in the current transaction. You can't "
+                "execute queries until the end of the 'atomic' block."
+            ) from self.rollback_exc
+
+    # ##### Connection termination handling #####
+
+    def close_if_health_check_failed(self) -> None:
+        """Close existing connection if it fails a health check."""
+        if (
+            self.connection is None
+            or not self.health_check_enabled
+            or self.health_check_done
+        ):
+            return
+
+        if not self.is_usable():
+            self.close()
+        self.health_check_done = True
+
+    def close_if_unusable_or_obsolete(self) -> None:
+        """
+        Close the current connection if unrecoverable errors have occurred
+        or if it outlived its maximum age.
+        """
+        if self.connection is not None:
+            self.health_check_done = False
+            # If autocommit was not restored (e.g. a transaction was not
+            # properly closed), don't take chances, drop the connection.
+            if not self.get_autocommit():
+                self.close()
+                return
+
+            # If an exception other than DataError or IntegrityError occurred
+            # since the last commit / rollback, check if the connection works.
+            if self.errors_occurred:
+                if self.is_usable():
+                    self.errors_occurred = False
+                    self.health_check_done = True
+                else:
+                    self.close()
+                    return
+
+            if self.close_at is not None and time.monotonic() >= self.close_at:
+                self.close()
+                return
+
+    # ##### Miscellaneous #####
+
+    @cached_property
+    def wrap_database_errors(self) -> DatabaseErrorWrapper:
+        """
+        Context manager and decorator that re-throws backend-specific database
+        exceptions using Plain's common wrappers.
+        """
+        return DatabaseErrorWrapper(self)
+
+    def make_cursor(self, cursor: Any) -> utils.CursorWrapper:
+        """Create a cursor without debug logging."""
+        return utils.CursorWrapper(cursor, self)
+
+    @contextmanager
+    def temporary_connection(self) -> Generator[utils.CursorWrapper]:
+        """
+        Context manager that ensures that a connection is established, and
+        if it opened one, closes it to avoid leaving a dangling connection.
+        This is useful for operations outside of the request-response cycle.
+
+        Provide a cursor: with self.temporary_connection() as cursor: ...
+        """
+        must_close = self.connection is None
+        try:
+            with self.cursor() as cursor:
+                yield cursor
+        finally:
+            if must_close:
+                self.close()
+
+    def schema_editor(self, *args: Any, **kwargs: Any) -> DatabaseSchemaEditor:
+        """Return a new instance of the schema editor."""
+        return DatabaseSchemaEditor(self, *args, **kwargs)
+
+    def runshell(self, parameters: list[str]) -> None:
+        """Run an interactive psql shell."""
+        args, env = _psql_settings_to_cmd_args_env(self.settings_dict, parameters)
+        env = {**os.environ, **env} if env else None
+        sigint_handler = signal.getsignal(signal.SIGINT)
+        try:
+            # Allow SIGINT to pass to psql to abort queries.
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+            subprocess.run(args, env=env, check=True)
+        finally:
+            # Restore the original SIGINT handler.
+            signal.signal(signal.SIGINT, sigint_handler)
+
+    def on_commit(self, func: Any, robust: bool = False) -> None:
+        if not callable(func):
+            raise TypeError("on_commit()'s callback must be a callable.")
+        if self.in_atomic_block:
+            # Transaction in progress; save for execution on commit.
+            self.run_on_commit.append((set(self.savepoint_ids), func, robust))
+        else:
+            # No transaction in progress; execute immediately.
+            if robust:
+                try:
+                    func()
+                except Exception as e:
+                    logger.error(
+                        f"Error calling {func.__qualname__} in on_commit() (%s).",
+                        e,
+                        exc_info=True,
+                    )
+            else:
+                func()
+
+    def run_and_clear_commit_hooks(self) -> None:
+        self.validate_no_atomic_block()
+        current_run_on_commit = self.run_on_commit
+        self.run_on_commit = []
+        while current_run_on_commit:
+            _, func, robust = current_run_on_commit.pop(0)
+            if robust:
+                try:
+                    func()
+                except Exception as e:
+                    logger.error(
+                        f"Error calling {func.__qualname__} in on_commit() during "
+                        f"transaction (%s).",
+                        e,
+                        exc_info=True,
+                    )
+            else:
+                func()
+
+    @contextmanager
+    def execute_wrapper(self, wrapper: Any) -> Generator[None]:
+        """
+        Return a context manager under which the wrapper is applied to suitable
+        database query executions.
+        """
+        self.execute_wrappers.append(wrapper)
+        try:
+            yield
+        finally:
+            self.execute_wrappers.pop()
+
+    # ##### SQL generation methods that require connection state #####
+
+    def compose_sql(self, query: str, params: Any) -> str:
+        """
+        Compose a SQL query with parameters using psycopg's mogrify.
+
+        This requires an active connection because it uses the connection's
+        cursor to properly format parameters.
+        """
+        assert self.connection is not None
+        return ClientCursor(self.connection).mogrify(
+            psycopg_sql.SQL(cast(LiteralString, query)), params
+        )
+
+    def last_executed_query(
+        self,
+        cursor: utils.CursorWrapper,
+        sql: str,
+        params: Any,
+    ) -> str | None:
+        """
+        Return a string of the query last executed by the given cursor, with
+        placeholders replaced with actual values.
+        """
+        try:
+            return self.compose_sql(sql, params)
+        except errors.DataError:
+            return None
+
+    def unification_cast_sql(self, output_field: Field) -> str:
+        """
+        Given a field instance, return the SQL that casts the result of a union
+        to that type. The resulting string should contain a '%s' placeholder
+        for the expression being cast.
+        """
+        internal_type = output_field.get_internal_type()
+        if internal_type in (
+            "GenericIPAddressField",
+            "TimeField",
+            "UUIDField",
+        ):
+            # PostgreSQL will resolve a union as type 'text' if input types are
+            # 'unknown'.
+            # https://www.postgresql.org/docs/current/typeconv-union-case.html
+            # These fields cannot be implicitly cast back in the default
+            # PostgreSQL configuration so we need to explicitly cast them.
+            # We must also remove components of the type within brackets:
+            # varchar(255) -> varchar.
+            db_type = output_field.db_type()
+            if db_type:
+                return "CAST(%s AS {})".format(db_type.split("(")[0])
+        return "%s"
+
+    # ##### Introspection methods #####
+
+    def table_names(
+        self, cursor: CursorWrapper | None = None, include_views: bool = False
+    ) -> list[str]:
+        """
+        Return a list of names of all tables that exist in the database.
+        Sort the returned table list by Python's default sorting. Do NOT use
+        the database's ORDER BY here to avoid subtle differences in sorting
+        order between databases.
+        """
+
+        def get_names(cursor: CursorWrapper) -> list[str]:
+            return sorted(
+                ti.name
+                for ti in self.get_table_list(cursor)
+                if include_views or ti.type == "t"
+            )
+
+        if cursor is None:
+            with self.cursor() as cursor:
+                return get_names(cursor)
+        return get_names(cursor)
+
+    def get_table_list(self, cursor: CursorWrapper) -> Sequence[TableInfo]:
+        """
+        Return an unsorted list of TableInfo named tuples of all tables and
+        views that exist in the database.
+        """
+        cursor.execute(
+            """
+            SELECT
+                c.relname,
+                CASE
+                    WHEN c.relispartition THEN 'p'
+                    WHEN c.relkind IN ('m', 'v') THEN 'v'
+                    ELSE 't'
+                END,
+                obj_description(c.oid, 'pg_class')
+            FROM pg_catalog.pg_class c
+            LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relkind IN ('f', 'm', 'p', 'r', 'v')
+                AND n.nspname NOT IN ('pg_catalog', 'pg_toast')
+                AND pg_catalog.pg_table_is_visible(c.oid)
+        """
+        )
+        return [
+            TableInfo(*row)
+            for row in cursor.fetchall()
+            if row[0] not in self.ignored_tables
+        ]
+
+    def plain_table_names(
+        self, only_existing: bool = False, include_views: bool = True
+    ) -> list[str]:
+        """
+        Return a list of all table names that have associated Plain models and
+        are in INSTALLED_PACKAGES.
+
+        If only_existing is True, include only the tables in the database.
+        """
+        tables = set()
+        for model in get_migratable_models():
+            tables.add(model.model_options.db_table)
+            tables.update(
+                f.m2m_db_table() for f in model._model_meta.local_many_to_many
+            )
+        tables = list(tables)
+        if only_existing:
+            existing_tables = set(self.table_names(include_views=include_views))
+            tables = [t for t in tables if t in existing_tables]
+        return tables
+
+    def get_sequences(
+        self, cursor: CursorWrapper, table_name: str, table_fields: tuple[Any, ...] = ()
+    ) -> list[dict[str, Any]]:
+        """
+        Return a list of introspected sequences for table_name. Each sequence
+        is a dict: {'table': <table_name>, 'column': <column_name>, 'name': <sequence_name>}.
+        """
+        cursor.execute(
+            """
+            SELECT
+                s.relname AS sequence_name,
+                a.attname AS colname
+            FROM
+                pg_class s
+                JOIN pg_depend d ON d.objid = s.oid
+                    AND d.classid = 'pg_class'::regclass
+                    AND d.refclassid = 'pg_class'::regclass
+                JOIN pg_attribute a ON d.refobjid = a.attrelid
+                    AND d.refobjsubid = a.attnum
+                JOIN pg_class tbl ON tbl.oid = d.refobjid
+                    AND tbl.relname = %s
+                    AND pg_catalog.pg_table_is_visible(tbl.oid)
+            WHERE
+                s.relkind = 'S';
+        """,
+            [table_name],
+        )
+        return [
+            {"name": row[0], "table": table_name, "column": row[1]}
+            for row in cursor.fetchall()
+        ]
+
+    def get_constraints(
+        self, cursor: CursorWrapper, table_name: str
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Retrieve any constraints or keys (unique, pk, fk, check, index) across
+        one or more columns. Also retrieve the definition of expression-based
+        indexes.
+        """
+        constraints: dict[str, dict[str, Any]] = {}
+        # Loop over the key table, collecting things as constraints. The column
+        # array must return column names in the same order in which they were
+        # created.
+        cursor.execute(
+            """
+            SELECT
+                c.conname,
+                array(
+                    SELECT attname
+                    FROM unnest(c.conkey) WITH ORDINALITY cols(colid, arridx)
+                    JOIN pg_attribute AS ca ON cols.colid = ca.attnum
+                    WHERE ca.attrelid = c.conrelid
+                    ORDER BY cols.arridx
+                ),
+                c.contype,
+                (SELECT fkc.relname || '.' || fka.attname
+                FROM pg_attribute AS fka
+                JOIN pg_class AS fkc ON fka.attrelid = fkc.oid
+                WHERE fka.attrelid = c.confrelid AND fka.attnum = c.confkey[1]),
+                cl.reloptions
+            FROM pg_constraint AS c
+            JOIN pg_class AS cl ON c.conrelid = cl.oid
+            WHERE cl.relname = %s AND pg_catalog.pg_table_is_visible(cl.oid)
+        """,
+            [table_name],
+        )
+        for constraint, columns, kind, used_cols, options in cursor.fetchall():
+            constraints[constraint] = {
+                "columns": columns,
+                "primary_key": kind == "p",
+                "unique": kind in ["p", "u"],
+                "foreign_key": tuple(used_cols.split(".", 1)) if kind == "f" else None,
+                "check": kind == "c",
+                "index": False,
+                "definition": None,
+                "options": options,
+            }
+        # Now get indexes
+        cursor.execute(
+            """
+            SELECT
+                indexname,
+                array_agg(attname ORDER BY arridx),
+                indisunique,
+                indisprimary,
+                array_agg(ordering ORDER BY arridx),
+                amname,
+                exprdef,
+                s2.attoptions
+            FROM (
+                SELECT
+                    c2.relname as indexname, idx.*, attr.attname, am.amname,
+                    CASE
+                        WHEN idx.indexprs IS NOT NULL THEN
+                            pg_get_indexdef(idx.indexrelid)
+                    END AS exprdef,
+                    CASE am.amname
+                        WHEN %s THEN
+                            CASE (option & 1)
+                                WHEN 1 THEN 'DESC' ELSE 'ASC'
+                            END
+                    END as ordering,
+                    c2.reloptions as attoptions
+                FROM (
+                    SELECT *
+                    FROM
+                        pg_index i,
+                        unnest(i.indkey, i.indoption)
+                            WITH ORDINALITY koi(key, option, arridx)
+                ) idx
+                LEFT JOIN pg_class c ON idx.indrelid = c.oid
+                LEFT JOIN pg_class c2 ON idx.indexrelid = c2.oid
+                LEFT JOIN pg_am am ON c2.relam = am.oid
+                LEFT JOIN
+                    pg_attribute attr ON attr.attrelid = c.oid AND attr.attnum = idx.key
+                WHERE c.relname = %s AND pg_catalog.pg_table_is_visible(c.oid)
+            ) s2
+            GROUP BY indexname, indisunique, indisprimary, amname, exprdef, attoptions;
+        """,
+            [self.index_default_access_method, table_name],
+        )
+        for (
+            index,
+            columns,
+            unique,
+            primary,
+            orders,
+            type_,
+            definition,
+            options,
+        ) in cursor.fetchall():
+            if index not in constraints:
+                basic_index = (
+                    type_ == self.index_default_access_method and options is None
+                )
+                constraints[index] = {
+                    "columns": columns if columns != [None] else [],
+                    "orders": orders if orders != [None] else [],
+                    "primary_key": primary,
+                    "unique": unique,
+                    "foreign_key": None,
+                    "check": False,
+                    "index": True,
+                    "type": Index.suffix if basic_index else type_,
+                    "definition": definition,
+                    "options": options,
+                }
+        return constraints
+
+    # ##### Test database creation methods (merged from DatabaseCreation) #####
+
+    def _log(self, msg: str) -> None:
+        sys.stderr.write(msg + os.linesep)
+
+    def create_test_db(self, verbosity: int = 1, prefix: str = "") -> str:
+        """
+        Create a test database, prompting the user for confirmation if the
+        database already exists. Return the name of the test database created.
+
+        If prefix is provided, it will be prepended to the database name
+        to isolate it from other test databases.
+        """
+        from plain.postgres.cli.migrations import apply
+
+        test_database_name = self._get_test_db_name(prefix)
+
+        if verbosity >= 1:
+            self._log(f"Creating test database '{test_database_name}'...")
+
+        self._create_test_db(
+            test_database_name=test_database_name, verbosity=verbosity, autoclobber=True
+        )
+
+        self.close()
+        settings.POSTGRES_DATABASE = test_database_name
+        self.settings_dict["DATABASE"] = test_database_name
+
+        apply.callback(
+            package_label=None,
+            migration_name=None,
+            fake=False,
+            plan=False,
+            check_unapplied=False,
+            backup=False,
+            no_input=True,
+            atomic_batch=False,  # No need for atomic batch when creating test database
+            quiet=verbosity < 2,  # Show migration output when verbosity is 2+
+        )
+
+        # Ensure a connection for the side effect of initializing the test database.
+        self.ensure_connection()
+
+        return test_database_name
+
+    def _get_test_db_name(self, prefix: str = "") -> str:
+        """
+        Internal implementation - return the name of the test DB that will be
+        created. Only useful when called from create_test_db() and
+        _create_test_db() and when no external munging is done with the 'DATABASE'
+        settings.
+
+        If prefix is provided, it will be prepended to the database name.
+        """
+        # Determine the base name: explicit TEST.DATABASE overrides base DATABASE.
+        base_name = (
+            self.settings_dict["TEST"]["DATABASE"] or self.settings_dict["DATABASE"]
+        )
+        if prefix:
+            return f"{prefix}_{base_name}"
+        if self.settings_dict["TEST"]["DATABASE"]:
+            return self.settings_dict["TEST"]["DATABASE"]
+        name = self.settings_dict["DATABASE"]
+        if name is None:
+            raise ValueError("POSTGRES_DATABASE must be set")
+        return TEST_DATABASE_PREFIX + name
+
+    def _get_database_create_suffix(
+        self, encoding: str | None = None, template: str | None = None
+    ) -> str:
+        """Return PostgreSQL-specific CREATE DATABASE suffix."""
+        suffix = ""
+        if encoding:
+            suffix += f" ENCODING '{encoding}'"
+        if template:
+            suffix += f" TEMPLATE {quote_name(template)}"
+        return suffix and "WITH" + suffix
+
+    def _execute_create_test_db(self, cursor: Any, parameters: dict[str, str]) -> None:
+        try:
+            cursor.execute("CREATE DATABASE {dbname} {suffix}".format(**parameters))
+        except Exception as e:
+            cause = e.__cause__
+            if cause and not isinstance(cause, errors.DuplicateDatabase):
+                # All errors except "database already exists" cancel tests.
+                self._log(f"Got an error creating the test database: {e}")
+                sys.exit(2)
+            else:
+                raise
+
+    def _create_test_db(
+        self, *, test_database_name: str, verbosity: int, autoclobber: bool
+    ) -> str:
+        """
+        Internal implementation - create the test db tables.
+        """
+        test_db_params = {
+            "dbname": quote_name(test_database_name),
+            "suffix": self.sql_table_creation_suffix(),
+        }
+        # Create the test database and connect to it.
+        with self._nodb_cursor() as cursor:
+            try:
+                self._execute_create_test_db(cursor, test_db_params)
+            except Exception as e:
+                self._log(f"Got an error creating the test database: {e}")
+                if not autoclobber:
+                    confirm = input(
+                        "Type 'yes' if you would like to try deleting the test "
+                        f"database '{test_database_name}', or 'no' to cancel: "
+                    )
+                if autoclobber or confirm == "yes":
+                    try:
+                        if verbosity >= 1:
+                            self._log(
+                                f"Destroying old test database '{test_database_name}'..."
+                            )
+                        cursor.execute(
+                            "DROP DATABASE {dbname}".format(**test_db_params)
+                        )
+                        self._execute_create_test_db(cursor, test_db_params)
+                    except Exception as e:
+                        self._log(f"Got an error recreating the test database: {e}")
+                        sys.exit(2)
+                else:
+                    self._log("Tests cancelled.")
+                    sys.exit(1)
+
+        return test_database_name
+
+    def destroy_test_db(
+        self, old_database_name: str | None = None, verbosity: int = 1
+    ) -> None:
+        """
+        Destroy a test database, prompting the user for confirmation if the
+        database already exists.
+        """
+        self.close()
+
+        test_database_name = self.settings_dict["DATABASE"]
+        if test_database_name is None:
+            raise ValueError("Test POSTGRES_DATABASE must be set")
+
+        if verbosity >= 1:
+            self._log(f"Destroying test database '{test_database_name}'...")
+        self._destroy_test_db(test_database_name, verbosity)
+
+        # Restore the original database name
+        if old_database_name is not None:
+            settings.POSTGRES_DATABASE = old_database_name
+            self.settings_dict["DATABASE"] = old_database_name
+
+    def _destroy_test_db(self, test_database_name: str, verbosity: int) -> None:
+        """
+        Internal implementation - remove the test db tables.
+        """
+        # Remove the test database to clean up after
+        # ourselves. Connect to the previous database (not the test database)
+        # to do so, because it's not allowed to delete a database while being
+        # connected to it.
+        with self._nodb_cursor() as cursor:
+            cursor.execute(f"DROP DATABASE {quote_name(test_database_name)}")
+
+    def sql_table_creation_suffix(self) -> str:
+        """
+        SQL to append to the end of the test table creation statements.
+        """
+        test_settings = self.settings_dict["TEST"]
+        return self._get_database_create_suffix(
+            encoding=test_settings.get("CHARSET"),
+            template=test_settings.get("TEMPLATE"),
+        )
+
+
+class CursorMixin:
+    """
+    A subclass of psycopg cursor implementing callproc.
+    """
+
+    def callproc(
+        self, name: str | psycopg_sql.Identifier, args: list[Any] | None = None
+    ) -> list[Any] | None:
+        if not isinstance(name, psycopg_sql.Identifier):
+            name = psycopg_sql.Identifier(name)
+
+        qparts: list[psycopg_sql.Composable] = [
+            psycopg_sql.SQL("SELECT * FROM "),
+            name,
+            psycopg_sql.SQL("("),
+        ]
+        if args:
+            for item in args:
+                qparts.append(psycopg_sql.Literal(item))
+                qparts.append(psycopg_sql.SQL(","))
+            del qparts[-1]
+
+        qparts.append(psycopg_sql.SQL(")"))
+        stmt = psycopg_sql.Composed(qparts)
+        self.execute(stmt)  # type: ignore[attr-defined]
+        return args
+
+
+class ServerBindingCursor(CursorMixin, Database.Cursor):
+    pass
+
+
+class Cursor(CursorMixin, Database.ClientCursor):
+    pass
+
+
+class CursorDebugWrapper(BaseCursorDebugWrapper):
+    def copy(self, statement: Any) -> Any:
+        with self.debug_sql(statement):
+            return self.cursor.copy(statement)

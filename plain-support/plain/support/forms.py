@@ -4,8 +4,8 @@ from typing import Any
 
 from plain.auth import get_user_model
 from plain.email import TemplateEmail
-from plain.models import Model
-from plain.models.forms import ModelForm
+from plain.postgres import Model
+from plain.postgres.forms import ModelForm
 from plain.runtime import settings
 
 from .models import SupportFormEntry

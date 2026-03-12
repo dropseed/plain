@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING, Any
 from plain import forms
 from plain.auth import get_user_model
 from plain.exceptions import ValidationError
-from plain.models.forms import ModelForm
+from plain.postgres.forms import ModelForm
 
 from .core import check_user_password
 from .hashers import check_password
 from .utils import unicode_ci_compare
 
 if TYPE_CHECKING:
-    from plain.models import Model
+    from plain.postgres import Model
 
 
 class PasswordResetForm(forms.Form):

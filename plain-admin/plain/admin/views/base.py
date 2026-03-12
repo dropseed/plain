@@ -18,7 +18,7 @@ from .types import Img
 
 if TYPE_CHECKING:
     from plain.http import ResponseBase
-    from plain.models import Model
+    from plain.postgres import Model
 
     from ..cards import Card
     from .viewsets import AdminViewset

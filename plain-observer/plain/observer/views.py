@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain import models
+from plain import postgres
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import Response, ResponseBase
@@ -19,7 +19,7 @@ class ObserverTracesView(AuthView, HTMXView, ListView):
     context_object_name = "traces"
     admin_required = True
 
-    def get_objects(self) -> models.QuerySet:
+    def get_objects(self) -> postgres.QuerySet:
         return Trace.query.all()
 
     def check_auth(self) -> None:

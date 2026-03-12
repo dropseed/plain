@@ -1,8 +1,8 @@
 # Step 2: Rename constraints and indexes from plainworker_* to plainjobs_*
 # (Tables were renamed to plainjobs_* in migration 0004)
 
-from plain import models
-from plain.models import migrations
+from plain import postgres
+from plain.postgres import migrations
 
 
 class Migration(migrations.Migration):
@@ -147,27 +147,27 @@ class Migration(migrations.Migration):
         # Add new constraints (on plainworker_* tables, but with new names)
         migrations.AddConstraint(
             model_name="jobprocess",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("uuid",), name="plainjobs_job_unique_uuid"
             ),
         ),
         migrations.AddConstraint(
             model_name="jobrequest",
-            constraint=models.UniqueConstraint(
-                condition=models.Q(("retry_attempt", 0), ("unique_key__gt", "")),
+            constraint=postgres.UniqueConstraint(
+                condition=postgres.Q(("retry_attempt", 0), ("unique_key__gt", "")),
                 fields=("job_class", "unique_key"),
                 name="plainjobs_jobrequest_unique_job_class_key",
             ),
         ),
         migrations.AddConstraint(
             model_name="jobrequest",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("uuid",), name="plainjobs_jobrequest_unique_uuid"
             ),
         ),
         migrations.AddConstraint(
             model_name="jobresult",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("uuid",), name="plainjobs_jobresult_unique_uuid"
             ),
         ),

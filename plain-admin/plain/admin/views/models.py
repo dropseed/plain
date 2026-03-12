@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from plain import models
-from plain.models import Q
-from plain.models.exceptions import FieldDoesNotExist
-from plain.models.fields.related_managers import BaseRelatedManager
+from plain import postgres
+from plain.postgres import Q
+from plain.postgres.exceptions import FieldDoesNotExist
+from plain.postgres.fields.related_managers import BaseRelatedManager
 
 from ..utils import camelcase_to_title
 from .objects import (
@@ -17,11 +17,11 @@ from .objects import (
 )
 
 if TYPE_CHECKING:
-    from plain import models
+    from plain import postgres
     from plain.forms import BaseForm
 
 
-def get_model_field(instance: models.Model, field: str) -> Any:
+def get_model_field(instance: postgres.Model, field: str) -> Any:
     if "__" in field:
         # Allow __ syntax like querysets use,
         # also automatically calling callables (like __date)
@@ -44,7 +44,7 @@ def get_model_field(instance: models.Model, field: str) -> Any:
 class AdminModelListView(AdminListView):
     allow_global_search = False
 
-    model: type[models.Model]
+    model: type[postgres.Model]
 
     fields: list = ["id"]
     queryset_order = []
@@ -73,16 +73,16 @@ class AdminModelListView(AdminListView):
 
         return f"{cls.model.model_options.model_name}/"
 
-    def get_initial_objects(self) -> models.QuerySet:
+    def get_initial_objects(self) -> postgres.QuerySet:
         return self.get_initial_queryset()
 
-    def get_initial_queryset(self) -> models.QuerySet:
+    def get_initial_queryset(self) -> postgres.QuerySet:
         """Override this to customize the base queryset (e.g., add annotations)."""
         return self.model.query.all()
 
     def filter_objects(
-        self, objects: models.QuerySet | list[Any]
-    ) -> models.QuerySet | list[Any]:
+        self, objects: postgres.QuerySet | list[Any]
+    ) -> postgres.QuerySet | list[Any]:
         if isinstance(objects, list):
             return super().filter_objects(objects)
         return self.filter_queryset(objects)
@@ -92,8 +92,8 @@ class AdminModelListView(AdminListView):
         return queryset
 
     def search_objects(
-        self, objects: models.QuerySet | list[Any]
-    ) -> models.QuerySet | list[Any]:
+        self, objects: postgres.QuerySet | list[Any]
+    ) -> postgres.QuerySet | list[Any]:
         if isinstance(objects, list):
             return super().search_objects(objects)
         return self.search_queryset(objects)
@@ -108,8 +108,8 @@ class AdminModelListView(AdminListView):
         return queryset
 
     def order_objects(
-        self, objects: models.QuerySet | list[Any]
-    ) -> models.QuerySet | list[Any]:
+        self, objects: postgres.QuerySet | list[Any]
+    ) -> postgres.QuerySet | list[Any]:
         if isinstance(objects, list):
             return super().order_objects(objects)
         return self.order_queryset(objects)
@@ -153,7 +153,7 @@ class AdminModelListView(AdminListView):
                 return value.query.all()
 
             # For Model instances with choice fields, use get_field_display
-            if isinstance(obj, models.Model):
+            if isinstance(obj, postgres.Model):
                 try:
                     field_obj = obj._model_meta.get_field(field)
                     if hasattr(field_obj, "flatchoices") and field_obj.flatchoices:
@@ -167,7 +167,7 @@ class AdminModelListView(AdminListView):
 
 
 class AdminModelDetailView(AdminDetailView):
-    model: type[models.Model]
+    model: type[postgres.Model]
 
     def get_title(self) -> str:
         return str(self.object)
@@ -203,7 +203,7 @@ class AdminModelDetailView(AdminDetailView):
                 return value.query.all()
 
             # For Model instances with choice fields, use get_field_display
-            if isinstance(obj, models.Model):
+            if isinstance(obj, postgres.Model):
                 try:
                     field_obj = obj._model_meta.get_field(field)
                     if hasattr(field_obj, "flatchoices") and field_obj.flatchoices:
@@ -215,12 +215,12 @@ class AdminModelDetailView(AdminDetailView):
         except (AttributeError, TypeError):
             return get_model_field(obj, field)
 
-    def get_object(self) -> models.Model:
+    def get_object(self) -> postgres.Model:
         return self.model.query.get(id=self.url_kwargs["id"])
 
 
 class AdminModelCreateView(AdminCreateView):
-    model: type[models.Model]
+    model: type[postgres.Model]
     form_class: type[BaseForm] | None = None
 
     def get_title(self) -> str:
@@ -238,7 +238,7 @@ class AdminModelCreateView(AdminCreateView):
 
 
 class AdminModelUpdateView(AdminUpdateView):
-    model: type[models.Model]
+    model: type[postgres.Model]
     form_class: type[BaseForm] | None = None
     success_url = "."  # Redirect back to the same update page by default
 
@@ -255,12 +255,12 @@ class AdminModelUpdateView(AdminUpdateView):
 
         return f"{cls.model.model_options.model_name}/<int:id>/edit/"
 
-    def get_object(self) -> models.Model:
+    def get_object(self) -> postgres.Model:
         return self.model.query.get(id=self.url_kwargs["id"])
 
 
 class AdminModelDeleteView(AdminDeleteView):
-    model: type[models.Model]
+    model: type[postgres.Model]
 
     def get_title(self) -> str:
         return f"Delete {self.object}"
@@ -272,5 +272,5 @@ class AdminModelDeleteView(AdminDeleteView):
 
         return f"{cls.model.model_options.model_name}/<int:id>/delete/"
 
-    def get_object(self) -> models.Model:
+    def get_object(self) -> postgres.Model:
         return self.model.query.get(id=self.url_kwargs["id"])

@@ -1,0 +1,336 @@
+from __future__ import annotations
+
+import inspect
+from collections import defaultdict
+from collections.abc import Callable
+from typing import Any
+
+from plain.packages import packages_registry
+from plain.postgres.db import get_connection
+from plain.postgres.migrations.recorder import MIGRATION_TABLE_NAME
+from plain.postgres.registry import ModelsRegistry, models_registry
+from plain.preflight import PreflightCheck, PreflightResult, register_check
+
+
+@register_check("postgres.all_models")
+class CheckAllModels(PreflightCheck):
+    """Validates all model definitions for common issues."""
+
+    def run(self) -> list[PreflightResult]:
+        db_table_models = defaultdict(list)
+        indexes = defaultdict(list)
+        constraints = defaultdict(list)
+        errors = []
+        models = models_registry.get_models()
+        for model in models:
+            db_table_models[model.model_options.db_table].append(
+                model.model_options.label
+            )
+            if not inspect.ismethod(model.preflight):
+                errors.append(
+                    PreflightResult(
+                        fix=f"The '{model.__name__}.preflight()' class method is currently overridden by {model.preflight!r}.",
+                        obj=model,
+                        id="postgres.preflight_method_overridden",
+                    )
+                )
+            else:
+                errors.extend(model.preflight())
+            for model_index in model.model_options.indexes:
+                indexes[model_index.name].append(model.model_options.label)
+            for model_constraint in model.model_options.constraints:
+                constraints[model_constraint.name].append(model.model_options.label)
+        for db_table, model_labels in db_table_models.items():
+            if len(model_labels) != 1:
+                model_labels_str = ", ".join(model_labels)
+                errors.append(
+                    PreflightResult(
+                        fix=f"db_table '{db_table}' is used by multiple models: {model_labels_str}.",
+                        obj=db_table,
+                        id="postgres.duplicate_db_table",
+                    )
+                )
+        for index_name, model_labels in indexes.items():
+            if len(model_labels) > 1:
+                model_labels = set(model_labels)
+                errors.append(
+                    PreflightResult(
+                        fix="index name '{}' is not unique {} {}.".format(
+                            index_name,
+                            "for model" if len(model_labels) == 1 else "among models:",
+                            ", ".join(sorted(model_labels)),
+                        ),
+                        id="postgres.index_name_not_unique_single"
+                        if len(model_labels) == 1
+                        else "postgres.index_name_not_unique_multiple",
+                    ),
+                )
+        for constraint_name, model_labels in constraints.items():
+            if len(model_labels) > 1:
+                model_labels = set(model_labels)
+                errors.append(
+                    PreflightResult(
+                        fix="constraint name '{}' is not unique {} {}.".format(
+                            constraint_name,
+                            "for model" if len(model_labels) == 1 else "among models:",
+                            ", ".join(sorted(model_labels)),
+                        ),
+                        id="postgres.constraint_name_not_unique_single"
+                        if len(model_labels) == 1
+                        else "postgres.constraint_name_not_unique_multiple",
+                    ),
+                )
+        return errors
+
+
+def _check_lazy_references(
+    models_registry: ModelsRegistry, packages_registry: Any
+) -> list[PreflightResult]:
+    """
+    Ensure all lazy (i.e. string) model references have been resolved.
+
+    Lazy references are used in various places throughout Plain, primarily in
+    related fields and model signals. Identify those common cases and provide
+    more helpful error messages for them.
+    """
+    pending_models = set(models_registry._pending_operations)
+
+    # Short circuit if there aren't any errors.
+    if not pending_models:
+        return []
+
+    def extract_operation(
+        obj: Any,
+    ) -> tuple[Callable[..., Any], list[Any], dict[str, Any]]:
+        """
+        Take a callable found in Packages._pending_operations and identify the
+        original callable passed to Packages.lazy_model_operation(). If that
+        callable was a partial, return the inner, non-partial function and
+        any arguments and keyword arguments that were supplied with it.
+
+        obj is a callback defined locally in Packages.lazy_model_operation() and
+        annotated there with a `func` attribute so as to imitate a partial.
+        """
+        operation, args, keywords = obj, [], {}
+        while hasattr(operation, "func"):
+            args.extend(getattr(operation, "args", []))
+            keywords.update(getattr(operation, "keywords", {}))
+            operation = operation.func
+        return operation, args, keywords
+
+    def app_model_error(model_key: tuple[str, str]) -> str:
+        try:
+            packages_registry.get_package_config(model_key[0])
+            model_error = "app '{}' doesn't provide model '{}'".format(*model_key)
+        except LookupError:
+            model_error = f"app '{model_key[0]}' isn't installed"
+        return model_error
+
+    # Here are several functions which return CheckMessage instances for the
+    # most common usages of lazy operations throughout Plain. These functions
+    # take the model that was being waited on as an (package_label, modelname)
+    # pair, the original lazy function, and its positional and keyword args as
+    # determined by extract_operation().
+
+    def field_error(
+        model_key: tuple[str, str],
+        func: Callable[..., Any],
+        args: list[Any],
+        keywords: dict[str, Any],
+    ) -> PreflightResult:
+        error_msg = (
+            "The field %(field)s was declared with a lazy reference "
+            "to '%(model)s', but %(model_error)s."
+        )
+        params = {
+            "model": ".".join(model_key),
+            "field": keywords["field"],
+            "model_error": app_model_error(model_key),
+        }
+        return PreflightResult(
+            fix=error_msg % params,
+            obj=keywords["field"],
+            id="fields.lazy_reference_not_resolvable",
+        )
+
+    def default_error(
+        model_key: tuple[str, str],
+        func: Callable[..., Any],
+        args: list[Any],
+        keywords: dict[str, Any],
+    ) -> PreflightResult:
+        error_msg = (
+            "%(op)s contains a lazy reference to %(model)s, but %(model_error)s."
+        )
+        params = {
+            "op": func,
+            "model": ".".join(model_key),
+            "model_error": app_model_error(model_key),
+        }
+        return PreflightResult(
+            fix=error_msg % params,
+            obj=func,
+            id="postgres.lazy_reference_resolution_failed",
+        )
+
+    # Maps common uses of lazy operations to corresponding error functions
+    # defined above. If a key maps to None, no error will be produced.
+    # default_error() will be used for usages that don't appear in this dict.
+    known_lazy = {
+        ("plain.postgres.fields.related", "resolve_related_class"): field_error,
+    }
+
+    def build_error(
+        model_key: tuple[str, str],
+        func: Callable[..., Any],
+        args: list[Any],
+        keywords: dict[str, Any],
+    ) -> PreflightResult | None:
+        key = (func.__module__, func.__name__)  # type: ignore[attr-defined]
+        error_fn = known_lazy.get(key, default_error)
+        return error_fn(model_key, func, args, keywords) if error_fn else None
+
+    return sorted(
+        filter(
+            None,
+            (
+                build_error(model_key, *extract_operation(func))
+                for model_key in pending_models
+                for func in models_registry._pending_operations[model_key]
+            ),
+        ),
+        key=lambda error: error.fix,
+    )
+
+
+@register_check("postgres.lazy_references")
+class CheckLazyReferences(PreflightCheck):
+    """Ensures all lazy (string) model references have been resolved."""
+
+    def run(self) -> list[PreflightResult]:
+        return _check_lazy_references(models_registry, packages_registry)
+
+
+@register_check("postgres.postgres_version")
+class CheckPostgresVersion(PreflightCheck):
+    """Checks that the PostgreSQL server meets the minimum version requirement."""
+
+    MINIMUM_VERSION = 16
+
+    def run(self) -> list[PreflightResult]:
+        conn = get_connection()
+        major, minor = divmod(conn.pg_version, 10000)
+        if major < self.MINIMUM_VERSION:
+            return [
+                PreflightResult(
+                    fix=f"PostgreSQL {self.MINIMUM_VERSION} or later is required (found {major}.{minor}).",
+                    id="postgres.postgres_version_too_old",
+                )
+            ]
+        return []
+
+
+@register_check("postgres.database_tables")
+class CheckDatabaseTables(PreflightCheck):
+    """Checks for unknown tables in the database when plain.postgres is available."""
+
+    def run(self) -> list[PreflightResult]:
+        conn = get_connection()
+        unknown_tables = (
+            set(conn.table_names())
+            - set(conn.plain_table_names())
+            - {MIGRATION_TABLE_NAME}
+        )
+
+        if not unknown_tables:
+            return []
+
+        table_names = ", ".join(sorted(unknown_tables))
+        return [
+            PreflightResult(
+                fix=f"Unknown tables in default database: {table_names}. "
+                "Tables may be from packages/models that have been uninstalled. "
+                "Make sure you have a backup, then run `plain db drop-unknown-tables` to remove them.",
+                id="postgres.unknown_database_tables",
+                warning=True,
+            )
+        ]
+
+
+@register_check("postgres.prunable_migrations")
+class CheckPrunableMigrations(PreflightCheck):
+    """Warns about stale migration records in the database."""
+
+    def run(self) -> list[PreflightResult]:
+        # Import here to avoid circular import issues
+        from plain.postgres.migrations.loader import MigrationLoader
+        from plain.postgres.migrations.recorder import MigrationRecorder
+
+        errors = []
+
+        # Load migrations from disk and database
+        conn = get_connection()
+        loader = MigrationLoader(conn, ignore_no_migrations=True)
+        recorder = MigrationRecorder(conn)
+        recorded_migrations = recorder.applied_migrations()
+
+        # disk_migrations should not be None after MigrationLoader initialization,
+        # but check to satisfy type checker
+        if loader.disk_migrations is None:
+            return errors
+
+        # Find all prunable migrations (recorded but not on disk)
+        all_prunable = [
+            migration
+            for migration in recorded_migrations
+            if migration not in loader.disk_migrations
+        ]
+
+        if not all_prunable:
+            return errors
+
+        # Separate into existing packages vs orphaned packages
+        existing_packages = set(loader.migrated_packages)
+        prunable_existing: list[tuple[str, str]] = []
+        prunable_orphaned: list[tuple[str, str]] = []
+
+        for migration in all_prunable:
+            package, name = migration
+            if package in existing_packages:
+                prunable_existing.append(migration)
+            else:
+                prunable_orphaned.append(migration)
+
+        # Build the warning message
+        total_count = len(all_prunable)
+        message_parts = [
+            f"Found {total_count} stale migration record{'s' if total_count != 1 else ''} in the database."
+        ]
+
+        if prunable_existing:
+            existing_list = ", ".join(
+                f"{pkg}.{name}" for pkg, name in prunable_existing[:3]
+            )
+            if len(prunable_existing) > 3:
+                existing_list += f" (and {len(prunable_existing) - 3} more)"
+            message_parts.append(f"From existing packages: {existing_list}.")
+
+        if prunable_orphaned:
+            orphaned_list = ", ".join(
+                f"{pkg}.{name}" for pkg, name in prunable_orphaned[:3]
+            )
+            if len(prunable_orphaned) > 3:
+                orphaned_list += f" (and {len(prunable_orphaned) - 3} more)"
+            message_parts.append(f"From removed packages: {orphaned_list}.")
+
+        message_parts.append("Run 'plain migrations prune' to review and remove them.")
+
+        errors.append(
+            PreflightResult(
+                fix=" ".join(message_parts),
+                id="postgres.prunable_migrations",
+                warning=True,
+            )
+        )
+
+        return errors

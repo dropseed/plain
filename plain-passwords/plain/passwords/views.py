@@ -29,7 +29,7 @@ from .forms import (
 
 if TYPE_CHECKING:
     from plain.http import Response
-    from plain.models import Model
+    from plain.postgres import Model
 
 
 class PasswordForgotView(FormView):

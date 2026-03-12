@@ -33,7 +33,7 @@ The Plain Admin provides a combination of built-in views and the flexibility to 
 
 ![Plain Admin user example](https://assets.plainframework.com/docs/plain-pageviews-user.png)
 
-The most common use of the admin is to manage your `plain.models`. To do this, create a [viewset](./views/viewsets.py#AdminViewset) with inner/nested views:
+The most common use of the admin is to manage your `plain.postgres`. To do this, create a [viewset](./views/viewsets.py#AdminViewset) with inner/nested views:
 
 ```python
 # app/users/admin.py
@@ -44,7 +44,7 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
-from plain.models.forms import ModelForm
+from plain.postgres.forms import ModelForm
 
 from .models import User
 
@@ -284,10 +284,10 @@ class RecentOrdersCard(TableCard):
 
 ## Admin forms
 
-Admin forms work with standard [plain.forms](/plain/plain/forms/README.md). For model-based forms, use [`ModelForm`](/plain-models/plain/models/forms.py#ModelForm).
+Admin forms work with standard [plain.forms](/plain/plain/forms/README.md). For model-based forms, use [`ModelForm`](/plain-postgres/plain/postgres/forms.py#ModelForm).
 
 ```python
-from plain.models.forms import ModelForm
+from plain.postgres.forms import ModelForm
 from plain.admin.views import AdminModelUpdateView
 
 
@@ -442,12 +442,12 @@ The admin header shows a user avatar next to the account dropdown. If your User 
 ```python
 # app/users/models.py
 import hashlib
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 
 
-@models.register_model
-class User(models.Model):
+@postgres.register_model
+class User(postgres.Model):
     email: str = types.EmailField()
 
     def get_avatar_url(self) -> str:
@@ -573,7 +573,7 @@ The admin uses a combination of other Plain packages, most of which you will alr
 ```python
 # app/settings.py
 INSTALLED_PACKAGES = [
-    "plain.models",
+    "plain.postgres",
     "plain.tailwind",
     "plain.auth",
     "plain.sessions",
@@ -597,12 +597,12 @@ Your User model is expected to have an `is_admin` field (or attribute) for check
 
 ```python
 # app/users/models.py
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 
 
-@models.register_model
-class User(models.Model):
+@postgres.register_model
+class User(postgres.Model):
     is_admin: bool = types.BooleanField(default=False)
     # other fields...
 ```

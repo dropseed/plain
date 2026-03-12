@@ -8,7 +8,7 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
-from plain.models.forms import ModelForm
+from plain.postgres.forms import ModelForm
 
 from .models import NotFoundLog, Redirect, RedirectLog
 

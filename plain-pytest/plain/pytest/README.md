@@ -100,7 +100,7 @@ def test_no_broken_links(testbrowser, user):
 
 **Database isolation**
 
-If `plain.models` is installed, the `testbrowser` fixture automatically uses the [`isolated_db`](/plain-models/plain/models/test/pytest.py#isolated_db) fixture and passes the database connection to the test server. This means your browser tests and your test code share the same database state.
+If `plain.postgres` is installed, the `testbrowser` fixture automatically uses the [`isolated_db`](/plain-postgres/plain/postgres/test/pytest.py#isolated_db) fixture and passes the database connection to the test server. This means your browser tests and your test code share the same database state.
 
 ## FAQs
 

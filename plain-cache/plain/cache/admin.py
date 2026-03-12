@@ -7,7 +7,7 @@ from plain.admin.views import (
     register_viewset,
 )
 from plain.cache.models import CachedItem
-from plain.models import QuerySet
+from plain.postgres import QuerySet
 
 
 @register_viewset

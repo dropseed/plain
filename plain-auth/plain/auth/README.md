@@ -71,13 +71,13 @@ You can create your own user model using `plain create users` or manually:
 # app/users/models.py
 from datetime import datetime
 
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 from plain.passwords.models import PasswordField
 
 
-@models.register_model
-class User(models.Model):
+@postgres.register_model
+class User(postgres.Model):
     email: str = types.EmailField()
     password = PasswordField()
     is_admin: bool = types.BooleanField(default=False)

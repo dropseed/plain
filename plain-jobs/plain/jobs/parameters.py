@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
-from plain.models import Model, models_registry
+from plain.postgres import Model, models_registry
 
 
 class JobParameter:

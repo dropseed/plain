@@ -11,7 +11,7 @@ description: Upgrades Plain packages and applies required migration changes. Use
 uv run plain upgrade [package-names...]
 ```
 
-This will show which packages were upgraded (e.g., `plain-models: 0.1.0 -> 0.2.0`).
+This will show which packages were upgraded (e.g., `plain-postgres: 0.1.0 -> 0.2.0`).
 
 ## 2. Apply code changes for each upgraded package
 

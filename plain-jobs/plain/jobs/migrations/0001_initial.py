@@ -2,8 +2,8 @@
 
 import uuid
 
-from plain import models
-from plain.models import migrations
+from plain import postgres
+from plain.postgres import migrations
 
 
 class Migration(migrations.Migration):
@@ -15,19 +15,19 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Job",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("started_at", models.DateTimeField(allow_null=True, required=False)),
-                ("job_request_uuid", models.UUIDField()),
-                ("job_class", models.CharField(max_length=255)),
-                ("parameters", models.JSONField(allow_null=True, required=False)),
-                ("priority", models.IntegerField(default=0)),
-                ("source", models.TextField(required=False)),
-                ("queue", models.CharField(default="default", max_length=255)),
-                ("retries", models.IntegerField(default=0)),
-                ("retry_attempt", models.IntegerField(default=0)),
-                ("unique_key", models.CharField(max_length=255, required=False)),
+                ("id", postgres.PrimaryKeyField()),
+                ("uuid", postgres.UUIDField(default=uuid.uuid4)),
+                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("started_at", postgres.DateTimeField(allow_null=True, required=False)),
+                ("job_request_uuid", postgres.UUIDField()),
+                ("job_class", postgres.CharField(max_length=255)),
+                ("parameters", postgres.JSONField(allow_null=True, required=False)),
+                ("priority", postgres.IntegerField(default=0)),
+                ("source", postgres.TextField(required=False)),
+                ("queue", postgres.CharField(default="default", max_length=255)),
+                ("retries", postgres.IntegerField(default=0)),
+                ("retry_attempt", postgres.IntegerField(default=0)),
+                ("unique_key", postgres.CharField(max_length=255, required=False)),
             ],
             options={
                 "ordering": ["-created_at"],
@@ -36,18 +36,18 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="JobRequest",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("job_class", models.CharField(max_length=255)),
-                ("parameters", models.JSONField(allow_null=True, required=False)),
-                ("priority", models.IntegerField(default=0)),
-                ("source", models.TextField(required=False)),
-                ("queue", models.CharField(default="default", max_length=255)),
-                ("retries", models.IntegerField(default=0)),
-                ("retry_attempt", models.IntegerField(default=0)),
-                ("unique_key", models.CharField(max_length=255, required=False)),
-                ("start_at", models.DateTimeField(allow_null=True, required=False)),
+                ("id", postgres.PrimaryKeyField()),
+                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("uuid", postgres.UUIDField(default=uuid.uuid4)),
+                ("job_class", postgres.CharField(max_length=255)),
+                ("parameters", postgres.JSONField(allow_null=True, required=False)),
+                ("priority", postgres.IntegerField(default=0)),
+                ("source", postgres.TextField(required=False)),
+                ("queue", postgres.CharField(default="default", max_length=255)),
+                ("retries", postgres.IntegerField(default=0)),
+                ("retry_attempt", postgres.IntegerField(default=0)),
+                ("unique_key", postgres.CharField(max_length=255, required=False)),
+                ("start_at", postgres.DateTimeField(allow_null=True, required=False)),
             ],
             options={
                 "ordering": ["priority", "-created_at"],
@@ -56,16 +56,16 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="JobResult",
             fields=[
-                ("id", models.PrimaryKeyField()),
-                ("uuid", models.UUIDField(default=uuid.uuid4)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("job_uuid", models.UUIDField()),
-                ("started_at", models.DateTimeField(allow_null=True, required=False)),
-                ("ended_at", models.DateTimeField(allow_null=True, required=False)),
-                ("error", models.TextField(required=False)),
+                ("id", postgres.PrimaryKeyField()),
+                ("uuid", postgres.UUIDField(default=uuid.uuid4)),
+                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("job_uuid", postgres.UUIDField()),
+                ("started_at", postgres.DateTimeField(allow_null=True, required=False)),
+                ("ended_at", postgres.DateTimeField(allow_null=True, required=False)),
+                ("error", postgres.TextField(required=False)),
                 (
                     "status",
-                    models.CharField(
+                    postgres.CharField(
                         choices=[
                             ("SUCCESSFUL", "Successful"),
                             ("ERRORED", "Errored"),
@@ -75,18 +75,18 @@ class Migration(migrations.Migration):
                         max_length=20,
                     ),
                 ),
-                ("job_request_uuid", models.UUIDField()),
-                ("job_class", models.CharField(max_length=255)),
-                ("parameters", models.JSONField(allow_null=True, required=False)),
-                ("priority", models.IntegerField(default=0)),
-                ("source", models.TextField(required=False)),
-                ("queue", models.CharField(default="default", max_length=255)),
-                ("retries", models.IntegerField(default=0)),
-                ("retry_attempt", models.IntegerField(default=0)),
-                ("unique_key", models.CharField(max_length=255, required=False)),
+                ("job_request_uuid", postgres.UUIDField()),
+                ("job_class", postgres.CharField(max_length=255)),
+                ("parameters", postgres.JSONField(allow_null=True, required=False)),
+                ("priority", postgres.IntegerField(default=0)),
+                ("source", postgres.TextField(required=False)),
+                ("queue", postgres.CharField(default="default", max_length=255)),
+                ("retries", postgres.IntegerField(default=0)),
+                ("retry_attempt", postgres.IntegerField(default=0)),
+                ("unique_key", postgres.CharField(max_length=255, required=False)),
                 (
                     "retry_job_request_uuid",
-                    models.UUIDField(allow_null=True, required=False),
+                    postgres.UUIDField(allow_null=True, required=False),
                 ),
             ],
             options={
@@ -95,151 +95,153 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="job",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["created_at"], name="plainworker_created_a02317_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="job",
-            index=models.Index(fields=["queue"], name="plainworker_queue_077806_idx"),
+            index=postgres.Index(fields=["queue"], name="plainworker_queue_077806_idx"),
         ),
         migrations.AddIndex(
             model_name="job",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["unique_key"], name="plainworker_unique__04d87b_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="job",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["started_at"], name="plainworker_started_143df5_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="job",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["job_class"], name="plainworker_job_cla_884b46_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="job",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["job_request_uuid"], name="plainworker_job_req_db2681_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="job",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["job_class", "unique_key"], name="job_class_unique_key"
             ),
         ),
         migrations.AddConstraint(
             model_name="job",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("uuid",), name="plainworker_job_unique_uuid"
             ),
         ),
         migrations.AddIndex(
             model_name="jobrequest",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["priority"], name="plainworker_priorit_785e73_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobrequest",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["created_at"], name="plainworker_created_c81fe5_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobrequest",
-            index=models.Index(fields=["queue"], name="plainworker_queue_2614aa_idx"),
+            index=postgres.Index(fields=["queue"], name="plainworker_queue_2614aa_idx"),
         ),
         migrations.AddIndex(
             model_name="jobrequest",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["start_at"], name="plainworker_start_a_4d6020_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobrequest",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["unique_key"], name="plainworker_unique__21a534_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobrequest",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["job_class"], name="plainworker_job_cla_3e7dea_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobrequest",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["job_class", "unique_key"], name="job_request_class_unique_key"
             ),
         ),
         migrations.AddConstraint(
             model_name="jobrequest",
-            constraint=models.UniqueConstraint(
-                condition=models.Q(("retry_attempt", 0), ("unique_key__gt", "")),
+            constraint=postgres.UniqueConstraint(
+                condition=postgres.Q(("retry_attempt", 0), ("unique_key__gt", "")),
                 fields=("job_class", "unique_key"),
                 name="plainworker_jobrequest_unique_job_class_key",
             ),
         ),
         migrations.AddConstraint(
             model_name="jobrequest",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("uuid",), name="plainworker_jobrequest_unique_uuid"
             ),
         ),
         migrations.AddIndex(
             model_name="jobresult",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["created_at"], name="plainworker_created_6894c5_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobresult",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["job_uuid"], name="plainworker_job_uui_8307d1_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobresult",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["started_at"], name="plainworker_started_9bce76_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobresult",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["ended_at"], name="plainworker_ended_a_63caaf_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobresult",
-            index=models.Index(fields=["status"], name="plainworker_status_a7ca35_idx"),
+            index=postgres.Index(
+                fields=["status"], name="plainworker_status_a7ca35_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="jobresult",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["job_request_uuid"], name="plainworker_job_req_1e1bf2_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobresult",
-            index=models.Index(
+            index=postgres.Index(
                 fields=["job_class"], name="plainworker_job_cla_d138b5_idx"
             ),
         ),
         migrations.AddIndex(
             model_name="jobresult",
-            index=models.Index(fields=["queue"], name="plainworker_queue_23d8fe_idx"),
+            index=postgres.Index(fields=["queue"], name="plainworker_queue_23d8fe_idx"),
         ),
         migrations.AddConstraint(
             model_name="jobresult",
-            constraint=models.UniqueConstraint(
+            constraint=postgres.UniqueConstraint(
                 fields=("uuid",), name="plainworker_jobresult_unique_uuid"
             ),
         ),

@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from plain import models
-from plain.models import migrations
+from plain import postgres
+from plain.postgres import migrations
 
 
 def extract_tracking_params_migration(url: str) -> tuple[str, str, str]:
@@ -93,25 +93,29 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="pageview",
             name="campaign",
-            field=models.CharField(max_length=200, required=False),
+            field=postgres.CharField(max_length=200, required=False),
         ),
         migrations.AddField(
             model_name="pageview",
             name="medium",
-            field=models.CharField(max_length=200, required=False),
+            field=postgres.CharField(max_length=200, required=False),
         ),
         migrations.AddField(
             model_name="pageview",
             name="source",
-            field=models.CharField(max_length=200, required=False),
+            field=postgres.CharField(max_length=200, required=False),
         ),
         migrations.AddIndex(
             model_name="pageview",
-            index=models.Index(fields=["source"], name="plainpagevi_source_23e80d_idx"),
+            index=postgres.Index(
+                fields=["source"], name="plainpagevi_source_23e80d_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="pageview",
-            index=models.Index(fields=["medium"], name="plainpagevi_medium_370c1b_idx"),
+            index=postgres.Index(
+                fields=["medium"], name="plainpagevi_medium_370c1b_idx"
+            ),
         ),
         migrations.RunPython(
             populate_attribution_fields,

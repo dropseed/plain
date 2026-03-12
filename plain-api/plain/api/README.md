@@ -223,26 +223,26 @@ Associating an `APIKey` with a user (or team, for example) is up to you. Most li
 
 ```python
 # app/users/models.py
-from plain import models
-from plain.models import types
+from plain import postgres
+from plain.postgres import types
 from plain.api.models import APIKey
 
 
-@models.register_model
-class User(models.Model):
+@postgres.register_model
+class User(postgres.Model):
     # other fields...
     api_key: APIKey = types.ForeignKeyField(
         APIKey,
-        on_delete=models.CASCADE,
+        on_delete=postgres.CASCADE,
         allow_null=True,
         required=False,
     )
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["api_key"],
-                condition=models.Q(api_key__isnull=False),
+                condition=postgres.Q(api_key__isnull=False),
                 name="unique_user_api_key",
             ),
         ],
@@ -453,9 +453,9 @@ class PublicAPIView(APIView, APIKeyView):
             return {"status": "anonymous"}
 ```
 
-#### Can I use plain.api without plain.models?
+#### Can I use plain.api without plain.postgres?
 
-Yes. The `APIKey` model requires `plain.models`, but you can use `APIView` without it. If you try to use `APIKeyView` without `plain.models` installed, you will need to override the [`get_api_key`](./views.py#get_api_key) method to provide your own API key lookup logic.
+Yes. The `APIKey` model requires `plain.postgres`, but you can use `APIView` without it. If you try to use `APIKeyView` without `plain.postgres` installed, you will need to override the [`get_api_key`](./views.py#get_api_key) method to provide your own API key lookup logic.
 
 #### How do I return different status codes?
 

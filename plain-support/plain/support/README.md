@@ -47,7 +47,7 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 ## Custom forms
 
-You can create custom support forms by extending [`SupportForm`](./forms.py#SupportForm). The form uses [ModelForm](/plain/plain/models/README.md#modelform) from `plain.models.forms`.
+You can create custom support forms by extending [`SupportForm`](./forms.py#SupportForm). The form uses [ModelForm](/plain-postgres/plain/postgres/README.md#forms) from `plain.postgres.forms`.
 
 ```python
 # app/forms.py

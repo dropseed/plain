@@ -3,11 +3,11 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain import models
+from plain import postgres
 from plain.auth import get_user_model
 from plain.exceptions import ValidationError
-from plain.models import transaction, types
-from plain.models.db import IntegrityError
+from plain.postgres import transaction, types
+from plain.postgres.db import IntegrityError
 from plain.runtime import SettingsReference
 from plain.utils import timezone
 
@@ -19,14 +19,14 @@ if TYPE_CHECKING:
 __all__ = ["OAuthConnection"]
 
 
-@models.register_model
-class OAuthConnection(models.Model):
+@postgres.register_model
+class OAuthConnection(postgres.Model):
     created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
     updated_at: datetime.datetime = types.DateTimeField(auto_now=True)
 
     user = types.ForeignKeyField(
         SettingsReference("AUTH_USER_MODEL"),
-        on_delete=models.CASCADE,
+        on_delete=postgres.CASCADE,
     )
 
     # The key used to refer to this provider type (in settings)
@@ -45,11 +45,11 @@ class OAuthConnection(models.Model):
         required=False, allow_null=True
     )
 
-    query: models.QuerySet[OAuthConnection] = models.QuerySet()
+    query: postgres.QuerySet[OAuthConnection] = postgres.QuerySet()
 
-    model_options = models.Options(
+    model_options = postgres.Options(
         constraints=[
-            models.UniqueConstraint(
+            postgres.UniqueConstraint(
                 fields=["provider_key", "provider_user_id"],
                 name="plainoauth_oauthconnection_unique_provider_key_user_id",
             )
