@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.59.0](https://github.com/dropseed/plain/releases/plain-dev@0.59.0) (2026-03-12)
+
+### What's changed
+
+- Updated database availability check from `plain.models` to `plain.postgres` spec detection.
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.58.4](https://github.com/dropseed/plain/releases/plain-dev@0.58.4) (2026-03-10)
 
 ### What's changed

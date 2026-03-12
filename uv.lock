@@ -603,7 +603,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-dev"
-version = "0.58.4"
+version = "0.59.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
