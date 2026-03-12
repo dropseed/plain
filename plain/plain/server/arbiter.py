@@ -100,9 +100,11 @@ class Arbiter:
 
         listeners_str = ",".join([str(lnr) for lnr in self._listeners])
         self.log.info(
-            "Plain server started address=%s pid=%s version=%s",
+            "Plain server started address=%s pid=%s workers=%s threads=%s version=%s",
             listeners_str,
             self.pid,
+            self.num_workers,
+            self.app.threads,
             plain.runtime.__version__,
         )
 
