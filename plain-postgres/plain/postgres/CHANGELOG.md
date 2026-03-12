@@ -1,5 +1,19 @@
 # plain-postgres changelog
 
+## [0.84.0](https://github.com/dropseed/plain/releases/plain-postgres@0.84.0) (2026-03-12)
+
+### What's changed
+
+- Renamed package from `plain-models` to `plain-postgres` — the pip package, module path, and package label (`plainmodels` to `plainpostgres`) all reflect the PostgreSQL-only scope.
+- All internal imports updated from `plain.models` to `plain.postgres`.
+- Flattened `plain.models.postgres` subpackage into top-level `plain.postgres`.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+- In `pyproject.toml`, change `plain-models` to `plain-postgres` and `plain.models` to `plain.postgres` in dependencies.
+- In `INSTALLED_PACKAGES`, change `"plain.models"` to `"plain.postgres"`.
+
 ## [0.83.0](https://github.com/dropseed/plain/releases/plain-postgres@0.83.0) (2026-03-12)
 
 ### What's changed
