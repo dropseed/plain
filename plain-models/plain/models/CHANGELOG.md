@@ -1,5 +1,19 @@
 # plain-models changelog
 
+## [0.83.0](https://github.com/dropseed/plain/releases/plain-models@0.83.0) (2026-03-12)
+
+### What's changed
+
+- Flattened the `plain.models.postgres` subpackage into `plain.models` — all internal modules now live at the top level ([7488e969ecbd](https://github.com/dropseed/plain/commit/7488e969ecbd)):
+    - `plain.models.postgres.connection` → `plain.models.connection`
+    - `plain.models.postgres.sql` → `plain.models.dialect`
+    - `plain.models.postgres.schema` → `plain.models.schema`
+    - `plain.models.postgres.utils` → `plain.models.utils`
+
+### Upgrade instructions
+
+- If you import from `plain.models.postgres.*`, update those imports to the new top-level paths listed above.
+
 ## [0.82.3](https://github.com/dropseed/plain/releases/plain-models@0.82.3) (2026-03-10)
 
 ### What's changed
