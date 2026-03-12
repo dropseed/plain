@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.24.0](https://github.com/dropseed/plain/releases/plain-passwords@0.24.0) (2026-03-12)
+
+### What's changed
+
+- Updated all imports from `plain.models` to `plain.postgres` in forms, models, types, views, and README examples.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+
 ## [0.23.6](https://github.com/dropseed/plain/releases/plain-passwords@0.23.6) (2026-03-10)
 
 ### What's changed
