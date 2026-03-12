@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.17.0](https://github.com/dropseed/plain/releases/plain-pytest@0.17.0) (2026-03-12)
+
+### What's changed
+
+- Updated imports from `plain.models` to `plain.postgres` in the pytest plugin and README.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+
 ## [0.16.7](https://github.com/dropseed/plain/releases/plain-pytest@0.16.7) (2026-03-10)
 
 ### What's changed
