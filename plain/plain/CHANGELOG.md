@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.123.1](https://github.com/dropseed/plain/releases/plain@0.123.1) (2026-03-12)
+
+### What's changed
+
+- **Health check moved from middleware to server event loop** — the `HEALTHCHECK_PATH` endpoint now responds directly on the async event loop with a raw `200 OK` before the request reaches the thread pool or any middleware. This means health checks continue to work even when the thread pool is fully saturated. Supports both HTTP/1.1 and HTTP/2 connections ([ef8f020a86dc](https://github.com/dropseed/plain/commit/ef8f020a86dc))
+- Removed `HealthcheckMiddleware` — no longer needed since the server handles health checks directly ([ef8f020a86dc](https://github.com/dropseed/plain/commit/ef8f020a86dc))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.123.0](https://github.com/dropseed/plain/releases/plain@0.123.0) (2026-03-11)
 
 ### What's changed
