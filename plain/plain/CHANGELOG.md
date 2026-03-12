@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.123.4](https://github.com/dropseed/plain/releases/plain@0.123.4) (2026-03-12)
+
+### What's changed
+
+- **Read cgroup v2 CPU quota for accurate container worker count** — `os.process_cpu_count()` only checks `sched_getaffinity`, not cgroup CPU quotas, so containers still saw the host CPU count. Now reads `/proc/self/cgroup` to resolve the process's cgroup path, then parses `cpu.max` for the actual quota. Uses ceiling division so fractional vCPUs (e.g. 1.5) round up to 2 workers. Silently falls through on non-Linux systems ([32785b4634e8](https://github.com/dropseed/plain/commit/32785b4634e8))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.123.3](https://github.com/dropseed/plain/releases/plain@0.123.3) (2026-03-12)
 
 ### What's changed
