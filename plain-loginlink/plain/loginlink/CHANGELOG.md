@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.0) (2026-03-12)
+
+### What's changed
+
+- Updated type import from `plain.models` to `plain.postgres` in links.py.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+
 ## [0.20.1](https://github.com/dropseed/plain/releases/plain-loginlink@0.20.1) (2026-03-11)
 
 ### What's changed
