@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.44.2](https://github.com/dropseed/plain/releases/plain-oauth@0.44.2) (2026-03-11)
+
+### What's changed
+
+- Added `allow_external=True` to OAuth provider redirect responses, since these legitimately redirect to external authorization servers ([5edfb2bedf90](https://github.com/dropseed/plain/commit/5edfb2bedf90))
+
+### Upgrade instructions
+
+- Requires `plain>=0.123.0`. No other changes required.
+
 ## [0.44.1](https://github.com/dropseed/plain/releases/plain-oauth@0.44.1) (2026-03-09)
 
 ### What's changed
