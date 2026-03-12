@@ -1,5 +1,17 @@
 # plain-jobs changelog
 
+## [0.46.0](https://github.com/dropseed/plain/releases/plain-jobs@0.46.0) (2026-03-12)
+
+### What's changed
+
+- Updated all imports from `plain.models` to `plain.postgres` in admin, jobs, locks, models, parameters, workers, and migrations.
+- Updated `pyproject.toml` dependency from `plain.models` to `plain.postgres`.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+- Update dependency declarations: `plain.models` to `plain.postgres` in `pyproject.toml`.
+
 ## [0.45.4](https://github.com/dropseed/plain/releases/plain-jobs@0.45.4) (2026-03-10)
 
 ### What's changed
