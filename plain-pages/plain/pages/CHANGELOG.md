@@ -1,5 +1,15 @@
 # plain-pages changelog
 
+## [0.19.2](https://github.com/dropseed/plain/releases/plain-pages@0.19.2) (2026-03-11)
+
+### What's changed
+
+- Added `allow_external=True` to page redirect responses, since CMS-configured redirects can legitimately target external URLs ([5edfb2bedf90](https://github.com/dropseed/plain/commit/5edfb2bedf90))
+
+### Upgrade instructions
+
+- Requires `plain>=0.123.0`. No other changes required.
+
 ## [0.19.1](https://github.com/dropseed/plain/releases/plain-pages@0.19.1) (2026-03-10)
 
 ### What's changed
