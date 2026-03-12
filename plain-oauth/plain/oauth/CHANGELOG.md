@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.44.3](https://github.com/dropseed/plain/releases/plain-oauth@0.44.3) (2026-03-12)
+
+### What's changed
+
+- Fixed open-redirect vulnerability in disconnect and callback redirects — `allow_external` on `get_redirect_response()` now defaults to `False`, with only the OAuth authorization redirect (to the external provider) explicitly passing `True` ([bb763cf53667](https://github.com/dropseed/plain/commit/bb763cf53667))
+
+### Upgrade instructions
+
+- If you override `get_redirect_response()` in a custom provider subclass, update your signature to accept the new `allow_external` keyword argument: `def get_redirect_response(self, redirect_url: str, *, allow_external: bool = False) -> Response`
+
 ## [0.44.2](https://github.com/dropseed/plain/releases/plain-oauth@0.44.2) (2026-03-11)
 
 ### What's changed
