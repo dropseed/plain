@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-observer@0.29.0) (2026-03-12)
+
+### What's changed
+
+- Updated all imports from `plain.models` to `plain.postgres` in admin, models, otel, views, and migrations.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+
 ## [0.28.1](https://github.com/dropseed/plain/releases/plain-observer@0.28.1) (2026-03-04)
 
 ### What's changed
