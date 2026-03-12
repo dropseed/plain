@@ -80,9 +80,9 @@ def server(
                 f"  {defn.env_var_name} -> {name}={defn.display_value()}", dim=True
             )
 
-    # 0 = auto (CPU count)
+    # 0 = auto (CPU count, cgroup-aware)
     if workers == 0:
-        workers = os.cpu_count() or 1
+        workers = os.process_cpu_count() or 1
 
     from plain.server import ServerApplication
 
