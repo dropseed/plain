@@ -88,6 +88,10 @@ class Worker:
         self.max_connections: int = settings.SERVER_CONNECTIONS
         self.max_keepalived: int = self.max_connections - self.app.threads
         self.max_body: int = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or (10 * 1024 * 1024)
+        healthcheck_path = settings.HEALTHCHECK_PATH
+        self.healthcheck_path_bytes: bytes = (
+            healthcheck_path.encode("ascii") if healthcheck_path else b""
+        )
         self.nr_conns: int = 0
         self._connection_tasks: set[asyncio.Task] = set()
         # Worker-level H2 stream budget — limits total in-flight H2 streams

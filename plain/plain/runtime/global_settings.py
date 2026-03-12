@@ -36,8 +36,8 @@ ENV_SETTINGS_PREFIXES: list[str] = ["PLAIN_"]
 ALLOWED_HOSTS: list[str] = []
 
 # Path for the built-in healthcheck endpoint.
-# When set, requests to this exact path return a 200 "ok" response
-# before host validation, HTTPS redirect, or any other middleware runs.
+# When set, the server responds directly on the event loop with a 200 "ok"
+# before the thread pool or any middleware runs.
 # Example: HEALTHCHECK_PATH = "/up/"
 HEALTHCHECK_PATH: str = ""
 

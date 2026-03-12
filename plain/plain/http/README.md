@@ -347,7 +347,7 @@ The `HEALTHCHECK_PATH` setting provides a built-in healthcheck endpoint for load
 HEALTHCHECK_PATH = "/up/"
 ```
 
-When set, requests to this exact path return a `200` response before any other middleware runs — bypassing host validation, HTTPS redirects, and authentication. This avoids two common issues with health checkers:
+When set, the server responds directly on the event loop with a `200 OK` before the request reaches the thread pool or any middleware — bypassing host validation, HTTPS redirects, and authentication. This means health checks work even when the thread pool is fully saturated. It avoids two common issues with health checkers:
 
 1. **ALLOWED_HOSTS rejection** — the health checker uses an internal hostname not in the allowlist
 2. **HTTPS redirect loops** — the health checker sends plain HTTP without proxy headers

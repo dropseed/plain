@@ -432,6 +432,25 @@ def test_keepalive_timeout(addr: tuple[str, int]) -> bool | tuple[bool, str]:
         s.close()
 
 
+def test_healthcheck(addr: tuple[str, int]) -> bool | tuple[bool, str]:
+    """Health check path returns 200 OK directly from the server layer."""
+    s = connect(addr)
+    s.settimeout(5)
+    try:
+        # The example app sets HEALTHCHECK_PATH = "/up/"
+        req = b"GET /up/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+        s.sendall(req)
+        resp = recv_close_response(s)
+        status = parse_status(resp)
+        if status != 200:
+            return False, f"Expected 200, got {status}"
+        if b"ok" not in resp:
+            return False, f"Expected 'ok' body, got: {resp[-50:]!r}"
+        return True
+    finally:
+        s.close()
+
+
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
@@ -453,6 +472,7 @@ def main() -> int:
     threads = args.threads
 
     tests: list[tuple[str, Callable[..., Any]]] = [
+        ("Health check returns 200", test_healthcheck),
         ("Concurrent connections", test_concurrent_connections),
         ("Concurrent keep-alive sessions", test_concurrent_keepalive),
         ("Slow request headers", test_slow_request_headers),

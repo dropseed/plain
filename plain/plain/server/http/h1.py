@@ -32,6 +32,29 @@ if TYPE_CHECKING:
     from ..workers.worker import Worker
 
 
+HEALTHCHECK_RESPONSE = (
+    b"HTTP/1.1 200 OK\r\n"
+    b"Content-Type: text/plain\r\n"
+    b"Content-Length: 2\r\n"
+    b"Connection: close\r\n"
+    b"\r\nok"
+)
+
+
+def extract_request_path(header_data: bytes) -> bytes:
+    """Extract the raw path (without query string) from an HTTP/1.x request line.
+
+    Returns an empty bytes object if the request line cannot be parsed.
+    """
+    request_line_end = header_data.find(b"\r\n")
+    if request_line_end <= 0:
+        return b""
+    parts = header_data[:request_line_end].split(b" ", 2)
+    if len(parts) < 2:
+        return b""
+    return parts[1].split(b"?", 1)[0]
+
+
 class _ParseError(Exception):
     """Raised for connection-level issues (EOF, disconnect) that don't need an error response."""
 
@@ -568,6 +591,13 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             break
         if not header_data:
             break
+
+        # Health check — respond on the event loop without touching the thread pool.
+        if worker.healthcheck_path_bytes:
+            path = extract_request_path(header_data)
+            if path == worker.healthcheck_path_bytes:
+                await conn.sendall(HEALTHCHECK_RESPONSE)
+                break
 
         # Analyze headers to determine body handling strategy
         max_body = worker.max_body

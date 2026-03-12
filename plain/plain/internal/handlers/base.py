@@ -26,7 +26,6 @@ if TYPE_CHECKING:
 # before_request runs top-down, after_response runs bottom-up (outermost).
 BUILTIN_BEFORE_MIDDLEWARE = [
     "plain.internal.middleware.headers.DefaultHeadersMiddleware",
-    "plain.internal.middleware.healthcheck.HealthcheckMiddleware",
     "plain.internal.middleware.hosts.HostValidationMiddleware",
     "plain.internal.middleware.https.HttpsRedirectMiddleware",
     "plain.csrf.middleware.CsrfViewMiddleware",

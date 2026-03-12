@@ -46,34 +46,6 @@ class TestMiddlewarePipelineBasics:
         assert response.headers["Content-Length"] == str(len(b"Hello, world!"))
 
 
-class TestHealthcheckMiddleware:
-    """Healthcheck middleware should short-circuit before reaching the view."""
-
-    def test_healthcheck_returns_200(self):
-        """Healthcheck path should return 200 without hitting the view."""
-        original = settings.HEALTHCHECK_PATH
-        try:
-            settings.HEALTHCHECK_PATH = "/_health"
-            client = _fresh_client()
-            response = client.get("/_health")
-            assert response.status_code == 200
-            assert response.content == b"ok"
-        finally:
-            settings.HEALTHCHECK_PATH = original
-
-    def test_healthcheck_does_not_affect_other_paths(self):
-        """Non-healthcheck paths should still reach the view."""
-        original = settings.HEALTHCHECK_PATH
-        try:
-            settings.HEALTHCHECK_PATH = "/_health"
-            client = _fresh_client()
-            response = client.get("/")
-            assert response.status_code == 200
-            assert response.content == b"Hello, world!"
-        finally:
-            settings.HEALTHCHECK_PATH = original
-
-
 class TestHostValidationMiddleware:
     """Host validation middleware should reject invalid hosts."""
 

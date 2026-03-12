@@ -329,6 +329,7 @@ async def async_handle_h2_connection(
 
     scheme = "https" if is_ssl else "http"
     max_body = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or _H2_BODY_FALLBACK
+    healthcheck_path: str = settings.HEALTHCHECK_PATH
     state = H2ConnectionState(
         conn,
         writer,
@@ -415,6 +416,30 @@ async def async_handle_h2_connection(
                 elif isinstance(event, h2.events.StreamEnded):
                     stream = state.streams.pop(event.stream_id, None)
                     if stream is not None:
+                        # Health check — respond immediately without thread pool.
+                        if healthcheck_path:
+                            stream_path = ""
+                            for hname, hval in stream.headers:
+                                if hname == ":path":
+                                    stream_path = hval.split("?", 1)[0]
+                                    break
+                            if stream_path == healthcheck_path:
+                                async with state.write_lock:
+                                    conn.send_headers(
+                                        event.stream_id,
+                                        [
+                                            (":status", "200"),
+                                            ("content-type", "text/plain"),
+                                            ("content-length", "2"),
+                                        ],
+                                    )
+                                    conn.send_data(
+                                        event.stream_id, b"ok", end_stream=True
+                                    )
+                                    await state.flush()
+                                state.aggregate_body_size -= stream.data_size
+                                continue
+
                         task = asyncio.get_running_loop().create_task(
                             _async_handle_stream(state, stream)
                         )
