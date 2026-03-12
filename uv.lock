@@ -745,7 +745,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-oauth"
-version = "0.44.3"
+version = "0.45.0"
 source = { editable = "plain-oauth" }
 dependencies = [
     { name = "plain" },

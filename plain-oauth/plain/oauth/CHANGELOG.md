@@ -1,5 +1,17 @@
 # plain-oauth changelog
 
+## [0.45.0](https://github.com/dropseed/plain/releases/plain-oauth@0.45.0) (2026-03-12)
+
+### What's changed
+
+- Updated all imports from `plain.models` to `plain.postgres` in admin, models, preflight, and migrations.
+- Updated `pyproject.toml` dependency from `plain.models` to `plain.postgres`.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+- Update dependency declarations: `plain.models` to `plain.postgres` in `pyproject.toml`.
+
 ## [0.44.3](https://github.com/dropseed/plain/releases/plain-oauth@0.44.3) (2026-03-12)
 
 ### What's changed
