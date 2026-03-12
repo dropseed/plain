@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.124.0](https://github.com/dropseed/plain/releases/plain@0.124.0) (2026-03-12)
+
+### What's changed
+
+- Updated all references from `plain.models` to `plain.postgres` across views, CLI docs, registry docstrings, README doc links, and agent rules.
+
+### Upgrade instructions
+
+- Update imports: `from plain.models` to `from plain.postgres`, `from plain import models` to `from plain import postgres`.
+
 ## [0.123.4](https://github.com/dropseed/plain/releases/plain@0.123.4) (2026-03-12)
 
 ### What's changed
