@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.27.3](https://github.com/dropseed/plain/releases/plain-auth@0.27.3) (2026-03-11)
+
+### What's changed
+
+- Added `allow_external=True` to `redirect_to_login` to support SSO configurations where `AUTH_LOGIN_URL` resolves to an external URL ([5edfb2bedf90](https://github.com/dropseed/plain/commit/5edfb2bedf90))
+
+### Upgrade instructions
+
+- Requires `plain>=0.123.0`. No other changes required.
+
 ## [0.27.2](https://github.com/dropseed/plain/releases/plain-auth@0.27.2) (2026-03-10)
 
 ### What's changed
