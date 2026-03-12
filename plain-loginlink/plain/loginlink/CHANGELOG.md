@@ -1,5 +1,15 @@
 # plain-loginlink changelog
 
+## [0.20.1](https://github.com/dropseed/plain/releases/plain-loginlink@0.20.1) (2026-03-11)
+
+### What's changed
+
+- Simplified redirect logic in `LoginLinkSentView` — removed intermediate variable for `next` query param ([5edfb2bedf90](https://github.com/dropseed/plain/commit/5edfb2bedf90))
+
+### Upgrade instructions
+
+- Requires `plain>=0.123.0`. No other changes required.
+
 ## [0.20.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.20.0) (2026-03-07)
 
 ### What's changed
