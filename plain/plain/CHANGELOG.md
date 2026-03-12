@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.123.3](https://github.com/dropseed/plain/releases/plain@0.123.3) (2026-03-12)
+
+### What's changed
+
+- **Fix auto worker count in Docker/cgroup environments** — replaced `os.cpu_count()` with `os.process_cpu_count()` (Python 3.13+) for cgroup-aware CPU detection. Previously, containers would see the host's CPU count instead of their allocated limit, spawning far too many workers (e.g. 48 on a 2 vCPU container) ([c1e2c186c3aa](https://github.com/dropseed/plain/commit/c1e2c186c3aa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.123.2](https://github.com/dropseed/plain/releases/plain@0.123.2) (2026-03-12)
 
 ### What's changed
