@@ -61,6 +61,8 @@ class Manager:
         self._processes = {}
 
         self._terminating = False
+        self._terminate_start = datetime.datetime.min
+        self._killed = False
 
     def add_process(
         self,
@@ -111,7 +113,11 @@ class Manager:
             sig = signal.Signals(signum)
             self._system_print("{} received\n".format(SIGNALS[sig]["name"]))
             self.returncode = SIGNALS[sig]["rc"]
-            self.terminate()
+            if self._terminating:
+                self._system_print("forcing immediate shutdown\n")
+                self.kill()
+            else:
+                self.terminate()
 
         signal.signal(signal.SIGTERM, _terminate)
         signal.signal(signal.SIGINT, _terminate)
@@ -120,7 +126,6 @@ class Manager:
             self._start_process(name)
 
         exit = False
-        exit_start = None
 
         while 1:
             try:
@@ -147,14 +152,11 @@ class Manager:
             if self._all_started() and self._all_stopped():
                 exit = True
 
-            if exit_start is None and self._all_started() and self._any_stopped():
-                exit_start = self._clock.now()
+            if not self._terminating and self._all_started() and self._any_stopped():
                 self.terminate()
 
-            if exit_start is not None:
-                # If we've been in this loop for more than KILL_WAIT seconds,
-                # it's time to kill all remaining children.
-                waiting = self._clock.now() - exit_start
+            if self._terminating and not self._all_stopped():
+                waiting = self._clock.now() - self._terminate_start
                 if waiting > datetime.timedelta(seconds=KILL_WAIT):
                     self.kill()
 
@@ -165,12 +167,16 @@ class Manager:
         if self._terminating:
             return
         self._terminating = True
+        self._terminate_start = self._clock.now()
         self._killall()
 
     def kill(self) -> None:
         """
         Kill all processes managed by this ProcessManager.
         """
+        if self._killed:
+            return
+        self._killed = True
         self._killall(force=True)
 
     def _killall(self, force: bool = False) -> None:
