@@ -35,6 +35,7 @@ Deeper breaking changes that users can't directly control or fix in their own co
 
 ## Coding style
 
+- Plain requires Python 3.13+ — use modern Python APIs and syntax freely (e.g. `X | Y` unions, `match`, `ExceptionGroup`, etc.)
 - Prefer unique, greppable names over overloaded terms
 - Verify changes with `print()` statements, then remove before committing
 
