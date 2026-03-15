@@ -1,2 +1,0 @@
-#!/bin/sh
-exec uv run --with rich --with pyyaml python3 "$(dirname "$0")/proposals.py" "$@"

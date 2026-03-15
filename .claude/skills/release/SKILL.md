@@ -39,7 +39,7 @@ All mechanical operations are handled by scripts in this skill directory:
     This outputs JSON with each package's name, current version, and commits since last release.
     If specific packages were requested, filter the results to only those packages.
 
-3. For each package that has changes to release, check if any of its files appear in the git status output. If so, **stop and warn the user** — uncommitted changes in a package being released could mean the release misses work or includes an inconsistent state. Ask them to commit or discard before proceeding. Changes in other directories (e.g. `proposals/`, `scripts/`) are fine to ignore.
+3. For each package that has changes to release, check if any of its files appear in the git status output. If so, **stop and warn the user** — uncommitted changes in a package being released could mean the release misses work or includes an inconsistent state. Ask them to commit or discard before proceeding. Changes in other directories (e.g. `work/`, `scripts/`) are fine to ignore.
 
 ### Phase 1b: First Release Detection
 
