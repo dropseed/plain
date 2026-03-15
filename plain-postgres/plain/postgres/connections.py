@@ -14,7 +14,7 @@ class DatabaseConfig(TypedDict, total=False):
     CONN_MAX_AGE: int | None
     CONN_HEALTH_CHECKS: bool
     HOST: str
-    DATABASE: str | None
+    DATABASE: str  # Required (validated in _configure_settings)
     OPTIONS: dict[str, Any]
     PASSWORD: str
     PORT: int | None

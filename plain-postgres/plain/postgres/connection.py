@@ -29,7 +29,6 @@ from psycopg.types.string import TextLoader
 from plain.exceptions import ImproperlyConfigured
 from plain.postgres import utils
 from plain.postgres.db import (
-    DatabaseError,
     DatabaseErrorWrapper,
 )
 from plain.postgres.dialect import MAX_NAME_LENGTH, quote_name
@@ -138,7 +137,7 @@ def _psql_settings_to_cmd_args_env(
     if port := settings_dict.get("PORT"):
         args += ["-p", str(port)]
     args.extend(parameters)
-    args += [settings_dict.get("DATABASE") or "postgres"]
+    args += [settings_dict["DATABASE"]]
 
     env: dict[str, str] = {}
     if password := settings_dict.get("PASSWORD"):
@@ -269,26 +268,18 @@ class DatabaseConnection:
         """Return a dict of parameters suitable for get_new_connection."""
         settings_dict = self.settings_dict
         options = settings_dict.get("OPTIONS", {})
-        db_name = settings_dict.get("DATABASE")
-        if db_name == "":
-            raise ImproperlyConfigured(
-                "PostgreSQL database is not configured. "
-                "Set DATABASE_URL or the POSTGRES_DATABASE setting."
-            )
-        if len(db_name or "") > MAX_NAME_LENGTH:
+        db_name = settings_dict["DATABASE"]
+        if len(db_name) > MAX_NAME_LENGTH:
             raise ImproperlyConfigured(
                 "The database name '%s' (%d characters) is longer than "  # noqa: UP031
                 "PostgreSQL's limit of %d characters. Supply a shorter "
                 "POSTGRES_DATABASE setting."
                 % (
                     db_name,
-                    len(db_name or ""),
+                    len(db_name),
                     MAX_NAME_LENGTH,
                 )
             )
-        if db_name is None:
-            # None is used to connect to the default 'postgres' db.
-            db_name = "postgres"
         conn_params: dict[str, Any] = {
             "dbname": db_name,
             **options,
@@ -426,34 +417,14 @@ class DatabaseConnection:
     def _maintenance_cursor(self) -> Generator[utils.CursorWrapper]:
         """
         Return a cursor connected to the PostgreSQL maintenance database
-        (typically 'postgres') for admin operations like test db
-        creation/deletion.
+        for admin operations like test db creation/deletion.
         """
-        cursor = None
+        conn = DatabaseConnection({**self.settings_dict, "DATABASE": "postgres"})
         try:
-            conn = self.__class__({**self.settings_dict, "DATABASE": None})
-            try:
-                with conn.cursor() as cursor:
-                    yield cursor
-            finally:
-                conn.close()
-        except (Database.DatabaseError, DatabaseError):
-            if cursor is not None:
-                raise
-            warnings.warn(
-                "Normally Plain will use a connection to the 'postgres' database "
-                "to avoid running initialization queries against the production "
-                "database when it's not needed (for example, when running tests). "
-                "Plain was unable to create a connection to the 'postgres' database "
-                "and will use the first PostgreSQL database instead.",
-                RuntimeWarning,
-            )
-            conn = self.__class__(self.settings_dict)
-            try:
-                with conn.cursor() as cursor:
-                    yield cursor
-            finally:
-                conn.close()
+            with conn.cursor() as cursor:
+                yield cursor
+        finally:
+            conn.close()
 
     @cached_property
     def pg_version(self) -> int:
