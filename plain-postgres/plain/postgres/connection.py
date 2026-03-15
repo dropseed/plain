@@ -423,13 +423,11 @@ class DatabaseConnection:
             return True
 
     @contextmanager
-    def _nodb_cursor(self) -> Generator[utils.CursorWrapper]:
+    def _maintenance_cursor(self) -> Generator[utils.CursorWrapper]:
         """
-        Return a cursor from an alternative connection to be used when there is
-        no need to access the main database, specifically for test db
-        creation/deletion. This also prevents the production database from
-        being exposed to potential child threads while (or after) the test
-        database is destroyed. Refs #10868, #17786, #16969.
+        Return a cursor connected to the PostgreSQL maintenance database
+        (typically 'postgres') for admin operations like test db
+        creation/deletion.
         """
         cursor = None
         try:
@@ -1216,7 +1214,7 @@ class DatabaseConnection:
             "suffix": self.sql_table_creation_suffix(),
         }
         # Create the test database and connect to it.
-        with self._nodb_cursor() as cursor:
+        with self._maintenance_cursor() as cursor:
             try:
                 self._execute_create_test_db(cursor, test_db_params)
             except Exception as e:
@@ -1275,7 +1273,7 @@ class DatabaseConnection:
         # ourselves. Connect to the previous database (not the test database)
         # to do so, because it's not allowed to delete a database while being
         # connected to it.
-        with self._nodb_cursor() as cursor:
+        with self._maintenance_cursor() as cursor:
             cursor.execute(f"DROP DATABASE {quote_name(test_database_name)}")
 
     def sql_table_creation_suffix(self) -> str:
