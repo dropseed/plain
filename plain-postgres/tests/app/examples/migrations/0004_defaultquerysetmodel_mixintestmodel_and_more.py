@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             name="DefaultQuerySetModel",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("name", postgres.CharField(max_length=100)),
+                ("name", postgres.TextField(max_length=100)),
             ],
         ),
         migrations.CreateModel(
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                 ("id", postgres.PrimaryKeyField()),
                 ("created_at", postgres.DateTimeField(auto_now_add=True)),
                 ("updated_at", postgres.DateTimeField(auto_now=True)),
-                ("name", postgres.CharField(max_length=100)),
+                ("name", postgres.TextField(max_length=100)),
             ],
             options={
                 "ordering": ["-created_at"],
@@ -37,14 +37,14 @@ class Migration(migrations.Migration):
             name="CustomQuerySetModel",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("name", postgres.CharField(max_length=100)),
+                ("name", postgres.TextField(max_length=100)),
             ],
         ),
         migrations.CreateModel(
             name="CustomSpecialQuerySetModel",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("name", postgres.CharField(max_length=100)),
+                ("name", postgres.TextField(max_length=100)),
             ],
         ),
         migrations.AlterField(

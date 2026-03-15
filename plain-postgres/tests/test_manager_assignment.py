@@ -40,10 +40,10 @@ def test_field_named_objects_validation():
     # Even if we define a field named objects, the query property takes precedence
     @postgres.register_model
     class FieldObjectsModel(postgres.Model):
-        objects = postgres.CharField(
+        objects = postgres.TextField(
             max_length=100
         )  # This field exists but won't override query property
-        name = postgres.CharField(max_length=100)
+        name = postgres.TextField(max_length=100)
 
         model_options = postgres.Options(package_label="test_app")
 
@@ -86,7 +86,7 @@ def test_query_validation():
     @postgres.register_model
     class BadObjectsModel(postgres.Model):
         objects = "not a manager"  # This won't affect the query property
-        name = postgres.CharField(max_length=100)
+        name = postgres.TextField(max_length=100)
 
         model_options = postgres.Options(package_label="test_app")
 

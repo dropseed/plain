@@ -15,8 +15,8 @@ __all__ = ["NotFoundLog", "Redirect", "RedirectLog"]
 
 @postgres.register_model
 class Redirect(postgres.Model):
-    from_pattern: str = types.CharField(max_length=255)
-    to_pattern: str = types.CharField(max_length=255)
+    from_pattern: str = types.TextField(max_length=255)
+    to_pattern: str = types.TextField(max_length=255)
     http_status: int = types.PositiveSmallIntegerField(
         default=301
     )  # Default to permanent - could be choices?
@@ -91,8 +91,8 @@ class RedirectLog(postgres.Model):
 
     # Request metadata
     ip_address: str = types.GenericIPAddressField()
-    user_agent: str = types.CharField(required=False, max_length=512)
-    referrer: str = types.CharField(required=False, max_length=512)
+    user_agent: str = types.TextField(required=False, max_length=512)
+    referrer: str = types.TextField(required=False, max_length=512)
 
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 
@@ -133,8 +133,8 @@ class NotFoundLog(postgres.Model):
 
     # Request metadata
     ip_address: str = types.GenericIPAddressField()
-    user_agent: str = types.CharField(required=False, max_length=512)
-    referrer: str = types.CharField(required=False, max_length=512)
+    user_agent: str = types.TextField(required=False, max_length=512)
+    referrer: str = types.TextField(required=False, max_length=512)
 
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 

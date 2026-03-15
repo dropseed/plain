@@ -43,8 +43,8 @@ class MigrationRecorder:
             _models_registry.ready = True
 
             class Migration(postgres.Model):
-                app = postgres.CharField(max_length=255)
-                name = postgres.CharField(max_length=255)
+                app = postgres.TextField(max_length=255)
+                name = postgres.TextField(max_length=255)
                 applied = postgres.DateTimeField(default=now)
 
                 # Use isolated models registry for migrations

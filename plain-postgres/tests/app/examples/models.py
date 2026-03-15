@@ -8,7 +8,7 @@ from plain.postgres import types
 
 @postgres.register_model
 class Feature(postgres.Model):
-    name: str = types.CharField(max_length=100)
+    name: str = types.TextField(max_length=100)
 
     query: postgres.QuerySet[Feature] = postgres.QuerySet()
 
@@ -32,8 +32,8 @@ class CarFeature(postgres.Model):
 
 @postgres.register_model
 class Car(postgres.Model):
-    make: str = types.CharField(max_length=100)
-    model: str = types.CharField(max_length=100)
+    make: str = types.TextField(max_length=100)
+    model: str = types.TextField(max_length=100)
     features: types.ManyToManyManager[Feature] = types.ManyToManyField(
         Feature, through=CarFeature
     )
@@ -55,7 +55,7 @@ class UnregisteredModel(postgres.Model):
 
 @postgres.register_model
 class DeleteParent(postgres.Model):
-    name: str = types.CharField(max_length=100)
+    name: str = types.TextField(max_length=100)
 
     query: postgres.QuerySet[DeleteParent] = postgres.QuerySet()
 
@@ -133,7 +133,7 @@ class ChildDoNothing(postgres.Model):
 class DefaultQuerySetModel(postgres.Model):
     """Model that uses the default objects QuerySet."""
 
-    name: str = types.CharField(max_length=100)
+    name: str = types.TextField(max_length=100)
 
     query: postgres.QuerySet[DefaultQuerySetModel] = postgres.QuerySet()
 
@@ -152,7 +152,7 @@ class CustomSpecialQuerySet(postgres.QuerySet):
 class CustomQuerySetModel(postgres.Model):
     """Model with a custom QuerySet."""
 
-    name: str = types.CharField(max_length=100)
+    name: str = types.TextField(max_length=100)
 
     query = CustomQuerySet()
 
@@ -161,7 +161,7 @@ class CustomQuerySetModel(postgres.Model):
 class CustomSpecialQuerySetModel(postgres.Model):
     """Model with a custom special QuerySet."""
 
-    name: str = types.CharField(max_length=100)
+    name: str = types.TextField(max_length=100)
 
     query = CustomSpecialQuerySet()
 
@@ -178,7 +178,7 @@ class TimestampMixin:
 class MixinTestModel(TimestampMixin, postgres.Model):
     """Model that inherits fields from a mixin."""
 
-    name: str = types.CharField(max_length=100)
+    name: str = types.TextField(max_length=100)
 
     query: postgres.QuerySet[MixinTestModel] = postgres.QuerySet()
 
@@ -191,7 +191,7 @@ class MixinTestModel(TimestampMixin, postgres.Model):
 class SecretStore(postgres.Model):
     """Model for testing encrypted fields."""
 
-    name: str = types.CharField(max_length=100)
+    name: str = types.TextField(max_length=100)
     api_key: str = types.EncryptedTextField(max_length=200)
     notes: str = types.EncryptedTextField(required=False)
     config: dict = types.EncryptedJSONField(required=False, allow_null=True)

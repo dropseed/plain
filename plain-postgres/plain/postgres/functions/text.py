@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.expressions import Func, ResolvableExpression, Value
-from plain.postgres.fields import CharField, IntegerField, TextField
+from plain.postgres.fields import IntegerField, TextField
 from plain.postgres.functions import Cast, Coalesce
 from plain.postgres.lookups import Transform
 
@@ -106,7 +106,7 @@ class Concat(Func):
 class Left(Func):
     function = "LEFT"
     arity = 2
-    output_field = CharField()
+    output_field = TextField()
 
     def __init__(self, expression: Any, length: Any, **extra: Any) -> None:
         """
@@ -137,7 +137,7 @@ class Lower(Transform):
 
 class LPad(Func):
     function = "LPAD"
-    output_field = CharField()
+    output_field = TextField()
 
     def __init__(
         self, expression: Any, length: Any, fill_text: Any = Value(" "), **extra: Any
@@ -169,7 +169,7 @@ class Ord(Transform):
 
 class Repeat(Func):
     function = "REPEAT"
-    output_field = CharField()
+    output_field = TextField()
 
     def __init__(self, expression: Any, number: Any, **extra: Any) -> None:
         if (
@@ -253,7 +253,7 @@ class StrIndex(Func):
 
 class Substr(Func):
     function = "SUBSTRING"
-    output_field = CharField()
+    output_field = TextField()
 
     def __init__(
         self, expression: Any, pos: Any, length: Any = None, **extra: Any

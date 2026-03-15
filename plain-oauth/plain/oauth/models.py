@@ -30,14 +30,14 @@ class OAuthConnection(postgres.Model):
     )
 
     # The key used to refer to this provider type (in settings)
-    provider_key: str = types.CharField(max_length=100)
+    provider_key: str = types.TextField(max_length=100)
 
     # The unique ID of the user on the provider's system
-    provider_user_id: str = types.CharField(max_length=100)
+    provider_user_id: str = types.TextField(max_length=100)
 
     # Token data
-    access_token: str = types.CharField(max_length=2000)
-    refresh_token: str = types.CharField(max_length=2000, required=False)
+    access_token: str = types.TextField(max_length=2000)
+    refresh_token: str = types.TextField(max_length=2000, required=False)
     access_token_expires_at: datetime.datetime | None = types.DateTimeField(
         required=False, allow_null=True
     )

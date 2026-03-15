@@ -93,7 +93,7 @@ class TimeZoneField(Field[zoneinfo.ZoneInfo]):
         return [("", "---------")] + zones
 
     def get_internal_type(self) -> str:
-        return "CharField"
+        return "TextField"
 
     def to_python(self, value: Any) -> zoneinfo.ZoneInfo | None:
         """Convert input to ZoneInfo object."""

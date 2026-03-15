@@ -1027,7 +1027,7 @@ class Value(Expression):
            added into the sql parameter list and properly quoted.
 
          * output_field: an instance of the model field type that this
-           expression will return, such as IntegerField() or CharField().
+           expression will return, such as IntegerField() or TextField().
         """
         super().__init__(output_field=output_field)
         self.value = value
@@ -1068,7 +1068,7 @@ class Value(Expression):
 
     def _resolve_output_field(self) -> Field | None:
         if isinstance(self.value, str):
-            return fields.CharField()
+            return fields.TextField()
         if isinstance(self.value, bool):
             return fields.BooleanField()
         if isinstance(self.value, int):

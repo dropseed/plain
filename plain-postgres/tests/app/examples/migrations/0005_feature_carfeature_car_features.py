@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             name="Feature",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("name", postgres.CharField(max_length=100)),
+                ("name", postgres.TextField(max_length=100)),
             ],
         ),
         migrations.CreateModel(

@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
             name="SecretStore",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("name", postgres.CharField(max_length=100)),
+                ("name", postgres.TextField(max_length=100)),
                 ("api_key", EncryptedTextField(max_length=200)),
                 ("notes", EncryptedTextField(required=False)),
                 ("config", EncryptedJSONField(allow_null=True, required=False)),

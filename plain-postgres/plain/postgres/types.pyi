@@ -3,7 +3,7 @@ Type stubs for typed model fields.
 
 These stubs tell type checkers that field constructors return primitive types,
 enabling typed model definitions like:
-    name: str = types.CharField()
+    name: str = types.TextField()
 
 At runtime, these are Field instances (descriptors), but type checkers see the primitives.
 
@@ -29,28 +29,6 @@ from plain.postgres.fields.related_managers import (
 from plain.postgres.query import QuerySet
 
 # String fields
-@overload
-def CharField(
-    *,
-    max_length: int | None = None,
-    required: bool = True,
-    allow_null: Literal[True],
-    default: Any = ...,
-    choices: Any = None,
-    validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
-) -> str | None: ...
-@overload
-def CharField(
-    *,
-    max_length: int | None = None,
-    required: bool = True,
-    allow_null: Literal[False] = False,
-    default: Any = ...,
-    choices: Any = None,
-    validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
-) -> str: ...
 @overload
 def TextField(
     *,
@@ -720,7 +698,6 @@ __all__ = [
     "BigIntegerField",
     "BinaryField",
     "BooleanField",
-    "CharField",
     "DateField",
     "DateTimeField",
     "DecimalField",

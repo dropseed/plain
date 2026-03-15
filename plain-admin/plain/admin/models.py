@@ -15,7 +15,7 @@ class PinnedNavItem(postgres.Model):
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=postgres.CASCADE,
     )
-    view_slug: str = types.CharField(max_length=255)
+    view_slug: str = types.TextField(max_length=255)
     order: int = types.SmallIntegerField(default=0)
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 

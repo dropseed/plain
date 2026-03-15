@@ -42,8 +42,6 @@ CAST_DATA_TYPES: dict[str, str] = {
     "PrimaryKeyField": "bigint",
 }
 
-# CharField data type when max_length isn't provided.
-CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH: str | None = "varchar"
 
 # Start and end points for window expressions.
 PRECEDING: str = "PRECEDING"
@@ -94,9 +92,9 @@ _EXTRACT_FORMAT_RE = _lazy_re_compile(r"[A-Z_]+")
 # ##### Data type mappings (from constants.py) #####
 
 
-def _get_varchar_column(data: dict[str, Any]) -> str:
+def _get_text_column(data: dict[str, Any]) -> str:
     if data["max_length"] is None:
-        return "varchar"
+        return "text"
     return "varchar({max_length})".format(**data)
 
 
@@ -106,7 +104,6 @@ DATA_TYPES: dict[str, Any] = {
     "PrimaryKeyField": "bigint",
     "BinaryField": "bytea",
     "BooleanField": "boolean",
-    "CharField": _get_varchar_column,
     "DateField": "date",
     "DateTimeField": "timestamp with time zone",
     "DecimalField": "numeric(%(max_digits)s, %(decimal_places)s)",
@@ -120,7 +117,7 @@ DATA_TYPES: dict[str, Any] = {
     "PositiveIntegerField": "integer",
     "PositiveSmallIntegerField": "smallint",
     "SmallIntegerField": "smallint",
-    "TextField": "text",
+    "TextField": _get_text_column,
     "TimeField": "time",
     "UUIDField": "uuid",
 }
@@ -384,7 +381,6 @@ def lookup_cast(lookup_type: str, internal_type: str | None = None) -> str:
     lookup = "%s"
 
     if lookup_type == "isnull" and internal_type in (
-        "CharField",
         "EmailField",
         "TextField",
     ):

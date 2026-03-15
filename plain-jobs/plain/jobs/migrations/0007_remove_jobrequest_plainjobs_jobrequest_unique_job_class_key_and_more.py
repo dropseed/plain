@@ -93,7 +93,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="jobresult",
             name="status",
-            field=postgres.CharField(
+            field=postgres.TextField(
                 choices=[
                     ("SUCCESSFUL", "Successful"),
                     ("ERRORED", "Errored"),

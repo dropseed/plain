@@ -26,7 +26,7 @@ from plain.passwords.models import PasswordField
 class User(postgres.Model):
     email: str = types.EmailField()
     password: str = PasswordField()
-    display_name: str = types.CharField(max_length=100)
+    display_name: str = types.TextField(max_length=100)
     is_admin: bool = types.BooleanField(default=False)
     created_at: datetime = types.DateTimeField(auto_now_add=True)
 

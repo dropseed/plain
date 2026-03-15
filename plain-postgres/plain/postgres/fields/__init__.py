@@ -26,7 +26,6 @@ import psycopg
 from plain import exceptions, validators
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import (
-    CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH,
     CAST_DATA_TYPES,
     DATA_TYPE_CHECK_CONSTRAINTS,
     DATA_TYPES,
@@ -76,7 +75,6 @@ __all__ = [
     "BigIntegerField",
     "BinaryField",
     "BooleanField",
-    "CharField",
     "DateField",
     "DateTimeField",
     "DecimalField",
@@ -979,62 +977,6 @@ class BooleanField(Field[bool]):
         return self.to_python(value)
 
 
-class CharField(Field[str]):
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
-        if self.max_length is not None:
-            self.validators.append(validators.MaxLengthValidator(self.max_length))
-
-    @property
-    def description(self) -> str:
-        if self.max_length is not None:
-            return "String (up to %(max_length)s)"
-        else:
-            return "String (unlimited)"
-
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        return [
-            *super().preflight(**kwargs),
-            *self._check_max_length_attribute(),
-        ]
-
-    def _check_max_length_attribute(self, **kwargs: Any) -> list[PreflightResult]:
-        # Unlimited VARCHAR is supported (no max_length required)
-        if self.max_length is None:
-            return []
-        elif (
-            not isinstance(self.max_length, int)
-            or isinstance(self.max_length, bool)
-            or self.max_length <= 0
-        ):
-            return [
-                PreflightResult(
-                    fix="'max_length' must be a positive integer.",
-                    obj=self,
-                    id="fields.charfield_invalid_max_length",
-                )
-            ]
-        else:
-            return []
-
-    def cast_db_type(self) -> str | None:
-        if self.max_length is None:
-            return CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH
-        return super().cast_db_type()
-
-    def get_internal_type(self) -> str:
-        return "CharField"
-
-    def to_python(self, value: Any) -> str | None:
-        if isinstance(value, str) or value is None:
-            return value
-        return str(value)
-
-    def get_prep_value(self, value: Any) -> Any:
-        value = super().get_prep_value(value)
-        return self.to_python(value)
-
-
 def _to_naive(value: datetime.datetime) -> datetime.datetime:
     if timezone.is_aware(value):
         value = timezone.make_naive(value, datetime.UTC)
@@ -1538,7 +1480,57 @@ class DurationField(Field[datetime.timedelta]):
         return "" if val is None else duration_string(val)
 
 
-class EmailField(CharField):
+class TextField(Field[str]):
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+        if self.max_length is not None:
+            self.validators.append(validators.MaxLengthValidator(self.max_length))
+
+    @property
+    def description(self) -> str:
+        if self.max_length is not None:
+            return "Text (up to %(max_length)s)"
+        else:
+            return "Text"
+
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
+        return [
+            *super().preflight(**kwargs),
+            *self._check_max_length_attribute(),
+        ]
+
+    def _check_max_length_attribute(self, **kwargs: Any) -> list[PreflightResult]:
+        if self.max_length is None:
+            return []
+        elif (
+            not isinstance(self.max_length, int)
+            or isinstance(self.max_length, bool)
+            or self.max_length <= 0
+        ):
+            return [
+                PreflightResult(
+                    fix="'max_length' must be a positive integer.",
+                    obj=self,
+                    id="fields.textfield_invalid_max_length",
+                )
+            ]
+        else:
+            return []
+
+    def get_internal_type(self) -> str:
+        return "TextField"
+
+    def to_python(self, value: Any) -> str | None:
+        if isinstance(value, str) or value is None:
+            return value
+        return str(value)
+
+    def get_prep_value(self, value: Any) -> Any:
+        value = super().get_prep_value(value)
+        return self.to_python(value)
+
+
+class EmailField(TextField):
     default_validators = [validators.validate_email]
     description = "Email address"
 
@@ -1836,22 +1828,6 @@ class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField
         return "PositiveSmallIntegerField"
 
 
-class TextField(Field[str]):
-    description = "Text"
-
-    def get_internal_type(self) -> str:
-        return "TextField"
-
-    def to_python(self, value: Any) -> str | None:
-        if isinstance(value, str) or value is None:
-            return value
-        return str(value)
-
-    def get_prep_value(self, value: Any) -> Any:
-        value = super().get_prep_value(value)
-        return self.to_python(value)
-
-
 class TimeField(DateTimeCheckMixin, Field[datetime.time]):
     empty_strings_allowed = False
     default_error_messages = {
@@ -1954,7 +1930,7 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
         return "" if val is None else val.isoformat()
 
 
-class URLField(CharField):
+class URLField(TextField):
     default_validators = [validators.URLValidator()]
     description = "URL"
 

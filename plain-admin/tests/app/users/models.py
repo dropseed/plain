@@ -6,7 +6,7 @@ from plain.postgres import types
 
 @postgres.register_model
 class User(postgres.Model):
-    username: str = types.CharField(max_length=255)
+    username: str = types.TextField(max_length=255)
     is_admin: bool = types.BooleanField(default=False)
 
     query: postgres.QuerySet[User] = postgres.QuerySet()

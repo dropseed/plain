@@ -14,8 +14,8 @@ class Migration(migrations.Migration):
             name="Car",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("make", postgres.CharField(max_length=100)),
-                ("model", postgres.CharField(max_length=100)),
+                ("make", postgres.TextField(max_length=100)),
+                ("model", postgres.TextField(max_length=100)),
             ],
         ),
         migrations.AddConstraint(

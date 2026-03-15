@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
                 ("updated_at", postgres.DateTimeField(auto_now=True)),
                 (
                     "name",
-                    postgres.CharField(
+                    postgres.TextField(
                         max_length=255,
                         validators=[plain.flags.models.validate_flag_name],
                     ),
@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
                 ("created_at", postgres.DateTimeField(auto_now_add=True)),
                 ("updated_at", postgres.DateTimeField(auto_now=True)),
-                ("key", postgres.CharField(max_length=255)),
+                ("key", postgres.TextField(max_length=255)),
                 ("value", postgres.JSONField()),
             ],
         ),

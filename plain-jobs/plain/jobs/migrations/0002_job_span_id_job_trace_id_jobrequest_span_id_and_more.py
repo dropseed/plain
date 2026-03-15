@@ -13,32 +13,32 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="job",
             name="span_id",
-            field=postgres.CharField(allow_null=True, max_length=18, required=False),
+            field=postgres.TextField(allow_null=True, max_length=18, required=False),
         ),
         migrations.AddField(
             model_name="job",
             name="trace_id",
-            field=postgres.CharField(allow_null=True, max_length=34, required=False),
+            field=postgres.TextField(allow_null=True, max_length=34, required=False),
         ),
         migrations.AddField(
             model_name="jobrequest",
             name="span_id",
-            field=postgres.CharField(allow_null=True, max_length=18, required=False),
+            field=postgres.TextField(allow_null=True, max_length=18, required=False),
         ),
         migrations.AddField(
             model_name="jobrequest",
             name="trace_id",
-            field=postgres.CharField(allow_null=True, max_length=34, required=False),
+            field=postgres.TextField(allow_null=True, max_length=34, required=False),
         ),
         migrations.AddField(
             model_name="jobresult",
             name="span_id",
-            field=postgres.CharField(allow_null=True, max_length=18, required=False),
+            field=postgres.TextField(allow_null=True, max_length=18, required=False),
         ),
         migrations.AddField(
             model_name="jobresult",
             name="trace_id",
-            field=postgres.CharField(allow_null=True, max_length=34, required=False),
+            field=postgres.TextField(allow_null=True, max_length=34, required=False),
         ),
         migrations.AddIndex(
             model_name="job",

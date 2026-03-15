@@ -17,11 +17,11 @@ class SupportFormEntry(postgres.Model):
         allow_null=True,
         required=False,
     )
-    name: str = types.CharField(max_length=255)
+    name: str = types.TextField(max_length=255)
     email: str = types.EmailField()
     message: str = types.TextField()
     created_at: datetime = types.DateTimeField(auto_now_add=True)
-    form_slug: str = types.CharField(max_length=255)
+    form_slug: str = types.TextField(max_length=255)
     # referrer? source? session?
     # extra_data
 
