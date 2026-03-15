@@ -1,8 +1,6 @@
 ---
 labels:
   - plain.server
-related:
-  - fix-worker-timeout
 ---
 
 # Fix: Reintroduce optional worker recycling (Finding 11)

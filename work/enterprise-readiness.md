@@ -1,15 +1,16 @@
 ---
-packages:
+labels:
   - plain.http
   - plain.server
   - plain.preflight
   - plain-observer
   - plain-admin
   - plain-auth
-related:
+depends_on:
   - metrics
-  - models-encrypted-field
   - auth-otel-user-context
+related:
+  - models-encrypted-field
 ---
 
 # Enterprise Readiness

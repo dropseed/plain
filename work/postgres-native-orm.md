@@ -1,7 +1,7 @@
 ---
-packages:
+labels:
   - plain-postgres
-related:
+depends_on:
   - models-explicit-create-update
   - models-psycopg3-features
   - models-typed-query-api

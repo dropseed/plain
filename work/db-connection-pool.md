@@ -3,7 +3,6 @@ labels:
   - plain-models
 related:
   - remove-signals
-  - models-rename-to-postgres
 ---
 
 # DB connection pooling

@@ -1,3 +1,8 @@
+---
+labels:
+  - plain.runtime
+---
+
 # Support Callable type annotations in settings
 
 ## Problem

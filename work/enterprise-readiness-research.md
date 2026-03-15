@@ -1,5 +1,5 @@
 ---
-packages:
+labels:
   - plain.http
   - plain.server
   - plain.logs

@@ -2,9 +2,10 @@
 labels:
   - plain-models
 related:
-  - models-min-postgres-version
   - models-read-only-transactions
-depends_on: db-connection-pool
+depends_on:
+  - db-connection-pool
+  - models-min-postgres-version
 ---
 
 # plain-models: psycopg3 features

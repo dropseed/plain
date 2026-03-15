@@ -1,9 +1,9 @@
 ---
 labels:
   - plain-models
+depends_on: models-explicit-create-update
 related:
   - models-encrypted-field
-  - models-explicit-create-update
 ---
 
 # plain-models: Typed Query API

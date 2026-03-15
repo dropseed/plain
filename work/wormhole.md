@@ -1,8 +1,7 @@
 ---
 labels:
   - plain.cli
-related:
-  - models-read-only-transactions
+depends_on: models-read-only-transactions
 ---
 
 # Wormhole: Remote Python shell and file transfer via encrypted tunnel

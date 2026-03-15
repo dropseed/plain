@@ -1,8 +1,8 @@
 ---
 labels:
   - plain-oauth
+depends_on: models-encrypted-field
 related:
-  - models-encrypted-field
   - api-hashed-tokens
 ---
 
