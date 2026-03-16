@@ -113,6 +113,31 @@ jQuery(($) => {
     alert("Request timed out");
   });
 
+  // Encrypted field reveal/hide toggle
+  $(document).on("click", "[data-encrypted]", function () {
+    const $el = $(this);
+    if ($el.data("revealed")) {
+      $el
+        .data("revealed", false)
+        .html('<i class="bi bi-lock text-xs"></i> ••••••')
+        .addClass("text-stone-400 hover:text-stone-500")
+        .removeClass("text-amber-900");
+    } else {
+      const escaped = $("<span>")
+        .text(String($el.data("encrypted")))
+        .html();
+      $el
+        .data("revealed", true)
+        .html(
+          '<i class="bi bi-unlock text-xs"></i> <code class="text-sm break-all bg-amber-50/75 rounded px-1 py-0.5 select-all">' +
+            escaped +
+            "</code>",
+        )
+        .removeClass("text-stone-400 hover:text-stone-500")
+        .addClass("text-amber-900");
+    }
+  });
+
   // Global search keyboard shortcut
   $(document).on("keydown", (e) => {
     const activeTag = document.activeElement.tagName;

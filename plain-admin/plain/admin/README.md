@@ -476,6 +476,17 @@ The `admin_url()` function resolves a view URL by its `path` attribute. For exam
 
 The template is included in the user dropdown before the "App Settings" and "Log out" links. If the template doesn't exist, nothing extra is shown.
 
+### Field value templates
+
+The admin resolves a template for each field value in list and detail views. Templates are checked in priority order — the first one that exists wins:
+
+1. **Field name** — `admin/values/{field_name}.html` (e.g., `admin/values/access_token.html`)
+2. **Database field type** — `admin/values/{FieldClass}.html` (e.g., `admin/values/EncryptedTextField.html`)
+3. **Python value type** — `admin/values/{type}.html` (e.g., `admin/values/bool.html`)
+4. **Default** — `admin/values/default.html`
+
+To customize how a field type renders, create a template matching the field class name. For example, `EncryptedTextField` and `EncryptedJSONField` are automatically masked with click-to-reveal using their built-in templates.
+
 ## Access control
 
 By default, any user with `is_admin=True` can access all admin views. To restrict specific views from certain admin users, use `has_permission`.

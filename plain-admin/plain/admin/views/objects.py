@@ -235,12 +235,27 @@ class AdminListView(HTMXView, AdminView):
         return self.get_field_value(obj, "id")
 
     def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
+        templates = []
+
+        # By field name
+        templates.append(f"admin/values/{field}.html")
+
+        # By database field type
+        try:
+            field_obj = obj._model_meta.get_field(field)
+            field_type = type(field_obj).__name__
+            templates.append(f"admin/values/{field_type}.html")
+        except Exception:
+            pass
+
+        # By value type
         type_str = type(value).__name__.lower()
-        return [
-            f"admin/values/{type_str}.html",  # Create a template per-type
-            f"admin/values/{field}.html",  # Or for specific field names
-            "admin/values/default.html",
-        ]
+        templates.append(f"admin/values/{type_str}.html")
+
+        # Default
+        templates.append("admin/values/default.html")
+
+        return templates
 
     def get_list_url(self) -> str:
         return ""
@@ -360,12 +375,20 @@ class AdminDetailView(AdminView, DetailView):
     def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
         templates = []
 
-        # By type name
-        type_str = type(value).__name__.lower()
-        templates.append(f"admin/values/{type_str}.html")
-
         # By field name
         templates.append(f"admin/values/{field}.html")
+
+        # By database field type
+        try:
+            field_obj = obj._model_meta.get_field(field)
+            field_type = type(field_obj).__name__
+            templates.append(f"admin/values/{field_type}.html")
+        except Exception:
+            pass
+
+        # By value type
+        type_str = type(value).__name__.lower()
+        templates.append(f"admin/values/{type_str}.html")
 
         # As any model
         if isinstance(value, Model):
