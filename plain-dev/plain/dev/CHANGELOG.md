@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.59.1](https://github.com/dropseed/plain/releases/plain-dev@0.59.1) (2026-03-16)
+
+### What's changed
+
+- Fixed Ctrl+C shutdown reliability — a second Ctrl+C now forces immediate shutdown instead of being ignored, and the kill-after-timeout logic no longer races with the initial terminate signal ([a96bd2a9563e](https://github.com/dropseed/plain/commit/a96bd2a9563e))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.59.0](https://github.com/dropseed/plain/releases/plain-dev@0.59.0) (2026-03-12)
 
 ### What's changed
