@@ -850,7 +850,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-postgres"
-version = "0.84.0"
+version = "0.84.1"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },

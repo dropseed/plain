@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.84.1](https://github.com/dropseed/plain/releases/plain-postgres@0.84.1) (2026-03-16)
+
+### What's changed
+
+- Renamed `_nodb_cursor` to `_maintenance_cursor` for clarity — it now always connects to the `postgres` database directly instead of falling back through multiple connection strategies ([27bdee72d03e](https://github.com/dropseed/plain/commit/27bdee72d03e), [f15b46ede57d](https://github.com/dropseed/plain/commit/f15b46ede57d))
+- `DATABASE` config key is now required (validated at configure time) rather than allowing `None`/empty string with runtime fallbacks ([f15b46ede57d](https://github.com/dropseed/plain/commit/f15b46ede57d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.84.0](https://github.com/dropseed/plain/releases/plain-postgres@0.84.0) (2026-03-12)
 
 ### What's changed
