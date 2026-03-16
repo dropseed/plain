@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.124.1](https://github.com/dropseed/plain/releases/plain@0.124.1) (2026-03-16)
+
+### What's changed
+
+- Added `/plain-guide` skill for researching framework questions using `plain docs` and source code ([16597aa560af](https://github.com/dropseed/plain/commit/16597aa560af))
+- `plain docs --search` now supports regex patterns instead of only literal string matching ([1b494cbe7d8f](https://github.com/dropseed/plain/commit/1b494cbe7d8f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.124.0](https://github.com/dropseed/plain/releases/plain@0.124.0) (2026-03-12)
 
 ### What's changed
