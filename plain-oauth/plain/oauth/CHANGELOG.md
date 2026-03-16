@@ -1,5 +1,17 @@
 # plain-oauth changelog
 
+## [0.46.0](https://github.com/dropseed/plain/releases/plain-oauth@0.46.0) (2026-03-16)
+
+### What's changed
+
+- OAuth `access_token` and `refresh_token` fields are now encrypted at rest using `EncryptedTextField`, protecting credentials if the database is compromised ([66c35c1eef75](https://github.com/dropseed/plain/commit/66c35c1eef75))
+- Existing unencrypted tokens are automatically encrypted on next save (no data migration needed)
+
+### Upgrade instructions
+
+- Run `uv run plain migrate` to apply the field type migration.
+- Ensure the `cryptography` package is installed (required by `EncryptedTextField`).
+
 ## [0.45.0](https://github.com/dropseed/plain/releases/plain-oauth@0.45.0) (2026-03-12)
 
 ### What's changed
