@@ -5,11 +5,11 @@ NORMAL=$(tput sgr0)
 echo "${BOLD}Checking formatting and linting${NORMAL}"
 ./scripts/fix --check
 
-# Skip tests, type checks, and preflight if only proposals are being committed
-STAGED_NON_PROPOSALS=$(git diff --cached --name-only | grep -v '^proposals/' || true)
-if [ -z "$STAGED_NON_PROPOSALS" ]; then
+# Skip tests, type checks, and preflight if only .md files are being committed
+STAGED_CODE=$(git diff --cached --name-only | grep -v '\.md$' || true)
+if [ -z "$STAGED_CODE" ]; then
     echo ""
-    echo "Only proposals staged — skipping tests, type checks, and preflight."
+    echo "Only .md files staged — skipping tests, type checks, and preflight."
     exit 0
 fi
 
