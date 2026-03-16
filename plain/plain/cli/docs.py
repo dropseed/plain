@@ -378,7 +378,7 @@ def docs(
 
     # --search without module: search all installed docs
     if search and not module:
-        pattern = re.compile(re.escape(search), re.IGNORECASE)
+        pattern = re.compile(search, re.IGNORECASE)
         all_docs = _collect_all_doc_paths()
         found = False
         for name, doc_paths in sorted(all_docs.items()):
@@ -445,7 +445,7 @@ def docs(
         return
 
     if search:
-        pattern = re.compile(re.escape(search), re.IGNORECASE)
+        pattern = re.compile(search, re.IGNORECASE)
         doc_matches = _search_docs(llm_docs.docs, pattern)
         api_matches = _search_api(llm_docs, pattern) if api else {}
         if not doc_matches and not api_matches:
