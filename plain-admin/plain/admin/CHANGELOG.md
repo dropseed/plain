@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.74.0](https://github.com/dropseed/plain/releases/plain-admin@0.74.0) (2026-03-16)
+
+### What's changed
+
+- **CSS grid detail view layout** — detail view fields now use a two-column CSS grid (`grid-cols-[auto_1fr]`) that auto-sizes the label column to the widest label, replacing the fixed-width flexbox layout ([9f9c2625afb4](https://github.com/dropseed/plain/commit/9f9c2625afb4))
+- **Encrypted field masking** — `EncryptedTextField` and `EncryptedJSONField` values are automatically masked with a click-to-reveal toggle in both list and detail views ([2a2730d155db](https://github.com/dropseed/plain/commit/2a2730d155db))
+- **Field value template resolution by database field type** — template lookup now checks field name → database field class name → Python value type → default, enabling per-field-type customization (e.g., `admin/values/EncryptedTextField.html`) ([2a2730d155db](https://github.com/dropseed/plain/commit/2a2730d155db))
+
+### Upgrade instructions
+
+- Field value template priority order has changed: field name templates now take highest priority, followed by database field type, then Python value type. If you have custom templates that relied on the previous order, verify they still resolve correctly.
+
 ## [0.73.0](https://github.com/dropseed/plain/releases/plain-admin@0.73.0) (2026-03-12)
 
 ### What's changed
