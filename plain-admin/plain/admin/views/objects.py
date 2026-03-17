@@ -44,6 +44,7 @@ def get_field_label(field: str) -> str:
 class AdminListView(HTMXView, AdminView):
     template_name = "admin/list.html"
     fields: list[str] = []
+    field_templates: dict[str, str] = {}
     search_fields: list[str] = []
     actions: list[str] = []
     filters: list[str] = []
@@ -216,8 +217,14 @@ class AdminListView(HTMXView, AdminView):
             field, subfield = field.split(".", 1)
             return self.get_field_value(obj[field], subfield)
 
-        # Try regular object attribute
-        attr = getattr(obj, field)
+        # Try regular object attribute, but return None for
+        # fields that only exist in field_templates
+        try:
+            attr = getattr(obj, field)
+        except AttributeError:
+            if field in self.field_templates:
+                return None
+            raise
 
         # Call if it's callable
         if callable(attr):
@@ -235,6 +242,10 @@ class AdminListView(HTMXView, AdminView):
         return self.get_field_value(obj, "id")
 
     def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
+        # Check field_templates first
+        if field in self.field_templates:
+            return [self.field_templates[field]]
+
         templates = []
 
         # By field name
@@ -331,6 +342,7 @@ class AdminDetailView(AdminView, DetailView):
     template_name = None
     nav_section = None
     fields: list[str] = []
+    field_templates: dict[str, str] = {}
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
@@ -359,8 +371,14 @@ class AdminDetailView(AdminView, DetailView):
             field, subfield = field.split(".", 1)
             return self.get_field_value(obj[field], subfield)
 
-        # Try regular object attribute
-        attr = getattr(obj, field)
+        # Try regular object attribute, but return None for
+        # fields that only exist in field_templates
+        try:
+            attr = getattr(obj, field)
+        except AttributeError:
+            if field in self.field_templates:
+                return None
+            raise
 
         # Call if it's callable
         if callable(attr):
@@ -373,6 +391,10 @@ class AdminDetailView(AdminView, DetailView):
         return value
 
     def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
+        # Check field_templates first
+        if field in self.field_templates:
+            return [self.field_templates[field]]
+
         templates = []
 
         # By field name

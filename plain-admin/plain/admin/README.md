@@ -480,12 +480,34 @@ The template is included in the user dropdown before the "App Settings" and "Log
 
 The admin resolves a template for each field value in list and detail views. Templates are checked in priority order — the first one that exists wins:
 
-1. **Field name** — `admin/values/{field_name}.html` (e.g., `admin/values/access_token.html`)
-2. **Database field type** — `admin/values/{FieldClass}.html` (e.g., `admin/values/EncryptedTextField.html`)
-3. **Python value type** — `admin/values/{type}.html` (e.g., `admin/values/bool.html`)
-4. **Default** — `admin/values/default.html`
+1. **Explicit `field_templates`** — checked first (see below)
+2. **Field name** — `admin/values/{field_name}.html` (e.g., `admin/values/access_token.html`)
+3. **Database field type** — `admin/values/{FieldClass}.html` (e.g., `admin/values/EncryptedTextField.html`)
+4. **Python value type** — `admin/values/{type}.html` (e.g., `admin/values/bool.html`)
+5. **Default** — `admin/values/default.html`
 
 To customize how a field type renders, create a template matching the field class name. For example, `EncryptedTextField` and `EncryptedJSONField` are automatically masked with click-to-reveal using their built-in templates.
+
+Use `field_templates` to point specific fields at custom templates:
+
+```python
+class OrderListView(AdminModelListView):
+    model = Order
+    fields = ["name", "status", "badge", "created_at"]
+    field_templates = {
+        "status": "admin/values/order_status.html",
+        "badge": "admin/values/order_badge.html",
+    }
+```
+
+The template receives `value`, `object`, `field`, and `request` in its context. For real fields like `status`, `value` is resolved from the object as usual. For virtual fields like `badge` that don't exist on the object, `value` is `None` — use `object` directly to access whatever data you need.
+
+```html
+<!-- templates/admin/values/order_badge.html -->
+{% use_elements %}
+
+<Badge label={object.status} verified={object.is_verified} />
+```
 
 ## Access control
 
