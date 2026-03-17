@@ -139,12 +139,7 @@ Install the `plain.pytest` package from [PyPI](https://pypi.org/project/plain.py
 uv add plain.pytest --dev
 ```
 
-Create a `conftest.py` in your tests directory to make the fixtures available:
-
-```python
-# tests/conftest.py
-from plain.pytest.plugin import settings, testbrowser  # noqa: F401
-```
+The `settings` and `testbrowser` fixtures are automatically available in all tests — no `conftest.py` import needed.
 
 If you're using the `testbrowser` fixture, also install Playwright:
 
