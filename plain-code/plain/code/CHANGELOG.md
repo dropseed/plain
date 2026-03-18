@@ -1,5 +1,16 @@
 # plain-code changelog
 
+## [0.21.4](https://github.com/dropseed/plain/releases/plain-code@0.21.4) (2026-03-18)
+
+### What's changed
+
+- When `fix` or `check` targets a single file, irrelevant tools are now skipped — Python-only tools (ruff, ty, annotations) won't run on non-Python files, and JS-only tools (oxlint, oxfmt) won't run on Python files ([64189f969ef2](https://github.com/dropseed/plain/commit/64189f969ef2))
+- `oxfmt` no longer errors when no matching files are found ([64189f969ef2](https://github.com/dropseed/plain/commit/64189f969ef2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.3](https://github.com/dropseed/plain/releases/plain-code@0.21.3) (2026-03-10)
 
 ### What's changed
