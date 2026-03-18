@@ -11,6 +11,7 @@ import io
 import os
 import platform
 import subprocess
+import sys
 import tarfile
 import zipfile
 
@@ -181,8 +182,23 @@ class OxcTool:
         config_path = os.path.join(
             os.path.dirname(__file__), f"{self.name}_defaults.json"
         )
-        extra_args = ["-c", config_path]
-        return subprocess.run([self.standalone_path, *extra_args, *args], cwd=cwd)
+        result = subprocess.run(
+            [self.standalone_path, "-c", config_path, *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+        )
+        if result.stdout:
+            print(result.stdout, end="")
+        # oxfmt errors when no matching files are found — treat as success
+        if (
+            result.returncode != 0
+            and "Expected at least one target file" in result.stderr
+        ):
+            result.returncode = 0
+        elif result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
+        return result
 
 
 def install_oxc(version: str = "") -> str:

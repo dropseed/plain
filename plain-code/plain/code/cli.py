@@ -91,6 +91,7 @@ def check(
     """Check for formatting and linting issues"""
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
     config = get_code_config()
+    is_python = None if Path(path).is_dir() else Path(path).suffix == ".py"
 
     for e in config.get("exclude", []):
         ruff_args.extend(["--exclude", e])
@@ -104,7 +105,7 @@ def check(
             )
             sys.exit(return_code)
 
-    if not skip_ruff:
+    if not skip_ruff and is_python is not False:
         print_event("ruff check...", newline=False)
         result = subprocess.run(["ruff", "check", path, *ruff_args])
         maybe_exit(result.returncode)
@@ -113,7 +114,11 @@ def check(
         result = subprocess.run(["ruff", "format", path, "--check", *ruff_args])
         maybe_exit(result.returncode)
 
-    if not skip_ty and config.get("ty", {}).get("enabled", True):
+    if (
+        not skip_ty
+        and is_python is not False
+        and config.get("ty", {}).get("enabled", True)
+    ):
         print_event("ty check...", newline=False)
         ty_args = ["ty", "check", path, "--no-progress"]
         for e in config.get("exclude", []):
@@ -121,7 +126,11 @@ def check(
         result = subprocess.run(ty_args)
         maybe_exit(result.returncode)
 
-    if not skip_oxc and config.get("oxc", {}).get("enabled", True):
+    if (
+        not skip_oxc
+        and is_python is not True
+        and config.get("oxc", {}).get("enabled", True)
+    ):
         oxlint = OxcTool("oxlint")
         oxfmt = OxcTool("oxfmt")
 
@@ -136,7 +145,11 @@ def check(
         result = oxfmt.invoke("--check", path)
         maybe_exit(result.returncode)
 
-    if not skip_annotations and config.get("annotations", {}).get("enabled", True):
+    if (
+        not skip_annotations
+        and is_python is not False
+        and config.get("annotations", {}).get("enabled", True)
+    ):
         print_event("annotations...", newline=False)
         # Combine top-level exclude with annotation-specific exclude
         exclude_patterns = list(config.get("exclude", []))
@@ -253,6 +266,7 @@ def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> No
     """Fix formatting and linting issues"""
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
     config = get_code_config()
+    is_python = None if Path(path).is_dir() else Path(path).suffix == ".py"
 
     for e in config.get("exclude", []):
         ruff_args.extend(["--exclude", e])
@@ -260,27 +274,28 @@ def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> No
     if unsafe_fixes and add_noqa:
         raise click.UsageError("Cannot use both --unsafe-fixes and --add-noqa")
 
-    if unsafe_fixes:
-        print_event("ruff check --fix --unsafe-fixes...", newline=False)
-        result = subprocess.run(
-            ["ruff", "check", path, "--fix", "--unsafe-fixes", *ruff_args]
-        )
-    elif add_noqa:
-        print_event("ruff check --add-noqa...", newline=False)
-        result = subprocess.run(["ruff", "check", path, "--add-noqa", *ruff_args])
-    else:
-        print_event("ruff check --fix...", newline=False)
-        result = subprocess.run(["ruff", "check", path, "--fix", *ruff_args])
+    if is_python is not False:
+        if unsafe_fixes:
+            print_event("ruff check --fix --unsafe-fixes...", newline=False)
+            result = subprocess.run(
+                ["ruff", "check", path, "--fix", "--unsafe-fixes", *ruff_args]
+            )
+        elif add_noqa:
+            print_event("ruff check --add-noqa...", newline=False)
+            result = subprocess.run(["ruff", "check", path, "--add-noqa", *ruff_args])
+        else:
+            print_event("ruff check --fix...", newline=False)
+            result = subprocess.run(["ruff", "check", path, "--fix", *ruff_args])
 
-    if result.returncode != 0:
-        sys.exit(result.returncode)
+        if result.returncode != 0:
+            sys.exit(result.returncode)
 
-    print_event("ruff format...", newline=False)
-    result = subprocess.run(["ruff", "format", path, *ruff_args])
-    if result.returncode != 0:
-        sys.exit(result.returncode)
+        print_event("ruff format...", newline=False)
+        result = subprocess.run(["ruff", "format", path, *ruff_args])
+        if result.returncode != 0:
+            sys.exit(result.returncode)
 
-    if config.get("oxc", {}).get("enabled", True):
+    if is_python is not True and config.get("oxc", {}).get("enabled", True):
         oxlint = OxcTool("oxlint")
         oxfmt = OxcTool("oxfmt")
 
