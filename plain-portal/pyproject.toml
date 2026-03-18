@@ -1,0 +1,19 @@
+[project]
+name = "plain.portal"
+version = "0.1.0"
+description = "Remote Python shell and file transfer via encrypted tunnel."
+authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
+license = "BSD-3-Clause"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = ["plain<1.0.0", "websockets>=14.0", "spake2>=0.9", "pynacl>=1.5"]
+
+[project.entry-points."plain.setup"]
+"portal-setup" = "plain.portal.entrypoints:setup"
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

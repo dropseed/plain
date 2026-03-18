@@ -1,0 +1,13 @@
+name = "plainportal"
+main = "worker.js"
+compatibility_date = "2024-12-01"
+
+workers_dev = false
+route = { pattern = "portal.plainframework.com/*", zone_name = "plainframework.com" }
+
+[durable_objects]
+bindings = [{ name = "PORTAL_NAMESPACE", class_name = "Portal" }]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["Portal"]
