@@ -1,5 +1,15 @@
 # plain-pytest changelog
 
+## [0.17.1](https://github.com/dropseed/plain/releases/plain-pytest@0.17.1) (2026-03-18)
+
+### What's changed
+
+- Removed incorrect `conftest.py` import instructions from docs — the `settings` and `testbrowser` fixtures are automatically available ([c399f3dcfd3c](https://github.com/dropseed/plain/commit/c399f3dcfd3c))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-pytest@0.17.0) (2026-03-12)
 
 ### What's changed
