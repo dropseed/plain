@@ -142,7 +142,7 @@ class JobRequestViewset(AdminViewset):
             "concurrency_key",
         ]
         actions = ["Delete"]
-        queryset_order = ["priority", "-start_at", "-created_at"]
+        queryset_order = ["-priority", "-start_at", "-created_at"]
 
         def perform_action(self, action: str, target_ids: list[int]) -> None:
             if action == "Delete":
