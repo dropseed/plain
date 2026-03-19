@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.29.1](https://github.com/dropseed/plain/releases/plain-observer@0.29.1) (2026-03-19)
+
+### What's changed
+
+- **Trend cards** — traces (grouped by app version), spans (grouped by kind), and logs (grouped by level) list views now include trend charts ([2df536722ddf](https://github.com/dropseed/plain/commit/2df536722ddf))
+- **Styled span fields** — span `kind` and `status` are displayed as colored badges in the list view ([2df536722ddf](https://github.com/dropseed/plain/commit/2df536722ddf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.29.0](https://github.com/dropseed/plain/releases/plain-observer@0.29.0) (2026-03-12)
 
 ### What's changed
