@@ -77,7 +77,7 @@ class JobRequest(postgres.Model):
     query: postgres.QuerySet[JobRequest] = postgres.QuerySet()
 
     model_options = postgres.Options(
-        ordering=["priority", "-created_at"],
+        ordering=["-priority", "-created_at"],
         indexes=[
             postgres.Index(fields=["priority"]),
             postgres.Index(fields=["created_at"]),

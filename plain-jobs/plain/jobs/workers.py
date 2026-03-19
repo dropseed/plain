@@ -137,7 +137,7 @@ class Worker:
                         postgres.Q(start_at__isnull=True)
                         | postgres.Q(start_at__lte=timezone.now())
                     )
-                    .order_by("priority", "-start_at", "-created_at")
+                    .order_by("-priority", "-start_at", "-created_at")
                     .first()
                 )
                 if not job_request:
