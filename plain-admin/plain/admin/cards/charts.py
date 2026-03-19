@@ -34,7 +34,7 @@ class TrendCard(ChartCard):
     datetime_field = None
     group_field: str | None = None
     group_labels: dict[str, str] | None = None
-    group_colors: list[dict[str, str]] = [
+    default_group_colors: list[dict[str, str]] = [
         {"bg": "rgba(85, 107, 68, 0.8)", "hover": "rgba(85, 107, 68, 1)"},  # sage
         {
             "bg": "rgba(74, 111, 165, 0.8)",
@@ -57,6 +57,7 @@ class TrendCard(ChartCard):
             "hover": "rgba(130, 100, 140, 1)",
         },  # muted plum
     ]
+    group_colors: dict[str, dict[str, str]] | None = None
     default_filter = DatetimeRangeAliases.SINCE_30_DAYS_AGO
 
     filters = DatetimeRangeAliases
@@ -112,13 +113,10 @@ class TrendCard(ChartCard):
                 date_values[row["chart_date"]] = row["chart_date_count"]
             return {date.strftime("%Y-%m-%d"): date_values[date] for date in dates}
 
-        labels = self.group_labels or {}
-
         groups: dict[str, defaultdict[Any, int]] = defaultdict(lambda: defaultdict(int))
         for row in rows:
-            raw_value = row[self.group_field]
-            label = labels.get(raw_value, raw_value) or "Unknown"
-            groups[label][row["chart_date"]] = row["chart_date_count"]
+            raw_value = row[self.group_field] or "Unknown"
+            groups[raw_value][row["chart_date"]] = row["chart_date_count"]
 
         return {
             group: {date.strftime("%Y-%m-%d"): counts[date] for date in dates}
@@ -152,19 +150,26 @@ class TrendCard(ChartCard):
         }
 
     def _build_grouped_chart(self, data: dict) -> dict:
+        if not data:
+            return self._build_single_chart({})
+
         labels = list(next(iter(data.values())).keys())
 
+        group_labels = self.group_labels or {}
+
         datasets = []
-        for i, (group_name, date_counts) in enumerate(data.items()):
-            colors = self.group_colors[i % len(self.group_colors)]
+        for i, (raw_name, date_counts) in enumerate(data.items()):
+            display_name = group_labels.get(raw_name, raw_name)
+            if self.group_colors and raw_name in self.group_colors:
+                colors = self.group_colors[raw_name]
+            else:
+                colors = self.default_group_colors[i % len(self.default_group_colors)]
             datasets.append(
                 {
-                    "label": str(group_name),
+                    "label": str(display_name),
                     "data": list(date_counts.values()),
                     "backgroundColor": colors["bg"],
                     "hoverBackgroundColor": colors["hover"],
-                    "borderRadius": {"topLeft": 2, "topRight": 2},
-                    "borderSkipped": False,
                 }
             )
 
