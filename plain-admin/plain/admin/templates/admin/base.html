@@ -52,6 +52,8 @@
                         {% if loop.first and parent_view.nav_section %}
                             <span class="text-black/40">{{ parent_view.nav_section }}</span>
                             <span class="text-black/30">/</span>
+                        {% elif not loop.first %}
+                            <span class="text-black/30">/</span>
                         {% endif %}
                         <a href="{{ parent_view.get_view_url(object if object is defined else None) }}" class="hover:text-black/70 hover:underline">
                             {{ parent_view.get_nav_title() }}
