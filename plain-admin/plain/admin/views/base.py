@@ -62,6 +62,7 @@ class AdminView(AuthView, TemplateView):
 
     links: dict[str, str] = {}
     extra_links: dict[str, str] = {}
+    field_templates: dict[str, str] = {}
 
     parent_view_class: AdminView | None = None
 
@@ -200,6 +201,10 @@ class AdminView(AuthView, TemplateView):
 
     def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
         templates = []
+
+        # By explicit field_templates mapping
+        if field in self.field_templates:
+            templates.append(self.field_templates[field])
 
         # By field name
         templates.append(f"admin/values/{field}.html")

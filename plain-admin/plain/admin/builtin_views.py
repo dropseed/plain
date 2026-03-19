@@ -167,10 +167,10 @@ class SettingsView(AdminListView):
     filters = ["default", "explicit", "env"]
     page_size = 100
 
-    _FIELD_TEMPLATES = {
-        "name": ["admin/values/setting_name.html"],
-        "source": ["admin/values/setting_source.html"],
-        "value": ["admin/values/setting_value.html"],
+    field_templates = {
+        "name": "admin/values/setting_name.html",
+        "source": "admin/values/setting_source.html",
+        "value": "admin/values/setting_value.html",
     }
 
     def get_initial_objects(self) -> list[dict[str, Any]]:
@@ -192,11 +192,6 @@ class SettingsView(AdminListView):
 
     def get_detail_url(self, obj: Any) -> str:
         return f"/admin/settings/{obj['name']}/"
-
-    def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
-        if field in self._FIELD_TEMPLATES:
-            return self._FIELD_TEMPLATES[field]
-        return super().get_field_value_template(obj, field, value)
 
 
 class SettingDetailView(AdminView):
