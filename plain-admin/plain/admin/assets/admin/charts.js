@@ -36,17 +36,6 @@ window.AdminCharts = {
     // Only create chart if Chart.js is loaded
     if (typeof Chart === "undefined") return;
 
-    // Create gradient for bars
-    const context = ctx.getContext("2d");
-    const gradient = context.createLinearGradient(0, 0, 0, ctx.parentElement.offsetHeight || 140);
-    gradient.addColorStop(0, "rgba(120, 113, 108, 0.85)"); // stone-500
-    gradient.addColorStop(0.5, "rgba(168, 162, 158, 0.7)"); // stone-400
-    gradient.addColorStop(1, "rgba(214, 211, 209, 0.5)"); // stone-300
-
-    if (data.data?.datasets?.[0]) {
-      data.data.datasets[0].backgroundColor = gradient;
-    }
-
     ctx._chart = new Chart(ctx, data);
   },
 
