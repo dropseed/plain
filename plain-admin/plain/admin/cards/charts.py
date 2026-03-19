@@ -117,7 +117,7 @@ class TrendCard(ChartCard):
         groups: dict[str, defaultdict[Any, int]] = defaultdict(lambda: defaultdict(int))
         for row in rows:
             raw_value = row[self.group_field]
-            label = labels.get(raw_value, raw_value) or "Other"
+            label = labels.get(raw_value, raw_value) or "Unknown"
             groups[label][row["chart_date"]] = row["chart_date_count"]
 
         return {
