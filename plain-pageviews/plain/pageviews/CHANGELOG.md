@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.34.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.34.1) (2026-03-19)
+
+### What's changed
+
+- **Pageviews trend grouped by source** — the trend card now shows a stacked bar chart grouped by traffic source, with empty sources labeled "Direct" ([0e18b706cf29](https://github.com/dropseed/plain/commit/0e18b706cf29))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.34.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.34.0) (2026-03-12)
 
 ### What's changed
