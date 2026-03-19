@@ -1,5 +1,17 @@
 # plain-jobs changelog
 
+## [0.46.1](https://github.com/dropseed/plain/releases/plain-jobs@0.46.1) (2026-03-19)
+
+### What's changed
+
+- **Trend card on job results** — results list now shows a trend chart grouped by status with semantic colors (green/red/amber/blue/stone) ([083ec33a4ec9](https://github.com/dropseed/plain/commit/083ec33a4ec9))
+- **Styled status badges** — job result status is displayed as a colored badge in the list view ([083ec33a4ec9](https://github.com/dropseed/plain/commit/083ec33a4ec9))
+- **Fix job priority ordering** — `JobRequest` default ordering and worker query now use `-priority` (descending) so higher priority values are processed first, matching documented semantics ([11253fbe1c3f](https://github.com/dropseed/plain/commit/11253fbe1c3f))
+
+### Upgrade instructions
+
+- Job priority ordering has changed: higher numeric priority values are now processed first (descending order). If you relied on the previous ascending order, adjust your priority values accordingly.
+
 ## [0.46.0](https://github.com/dropseed/plain/releases/plain-jobs@0.46.0) (2026-03-12)
 
 ### What's changed
