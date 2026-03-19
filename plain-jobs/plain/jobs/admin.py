@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from plain import postgres
-from plain.admin.cards import Card
+from plain.admin.cards import Card, TrendCard
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
@@ -36,6 +36,31 @@ def _td_format(td_object: timedelta) -> str:
             strings.append(f"{period_value} {period_name}{has_s}")
 
     return ", ".join(strings)
+
+
+class JobResultsTrendCard(TrendCard):
+    title = "Results trend"
+    model = JobResult
+    datetime_field = "created_at"
+    size = TrendCard.Sizes.FULL
+    group_field = "status"
+    group_labels = {
+        "SUCCESSFUL": "Successful",
+        "ERRORED": "Errored",
+        "CANCELLED": "Cancelled",
+        "DEFERRED": "Deferred",
+        "LOST": "Lost",
+    }
+    group_colors = {
+        "SUCCESSFUL": {"bg": "rgba(34, 197, 94, 0.7)", "hover": "rgba(34, 197, 94, 1)"},
+        "ERRORED": {"bg": "rgba(239, 68, 68, 0.7)", "hover": "rgba(239, 68, 68, 1)"},
+        "CANCELLED": {
+            "bg": "rgba(168, 162, 158, 0.7)",
+            "hover": "rgba(168, 162, 158, 1)",
+        },
+        "DEFERRED": {"bg": "rgba(59, 130, 246, 0.7)", "hover": "rgba(59, 130, 246, 1)"},
+        "LOST": {"bg": "rgba(245, 158, 11, 0.7)", "hover": "rgba(245, 158, 11, 1)"},
+    }
 
 
 class SuccessfulJobsCard(Card):
@@ -176,6 +201,9 @@ class JobResultViewset(AdminViewset):
             "retried",
             "is_retry",
         ]
+        field_templates = {
+            "status": "jobs/values/job_status.html",
+        }
         search_fields = [
             "uuid",
             "job_process_uuid",
@@ -183,6 +211,7 @@ class JobResultViewset(AdminViewset):
             "job_class",
         ]
         cards = [
+            JobResultsTrendCard,
             SuccessfulJobsCard,
             ErroredJobsCard,
             LostJobsCard,
