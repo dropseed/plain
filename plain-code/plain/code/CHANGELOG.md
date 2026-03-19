@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.21.5](https://github.com/dropseed/plain/releases/plain-code@0.21.5) (2026-03-19)
+
+### What's changed
+
+- `fix`, `check`, and `annotations` commands now accept multiple paths as arguments (e.g., `plain fix src/ lib/`), with each path routed to the appropriate tools based on file type ([63a2d55ca6b1](https://github.com/dropseed/plain/commit/63a2d55ca6b1))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.4](https://github.com/dropseed/plain/releases/plain-code@0.21.4) (2026-03-18)
 
 ### What's changed
