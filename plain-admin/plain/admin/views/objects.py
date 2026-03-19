@@ -18,6 +18,16 @@ if TYPE_CHECKING:
     from plain.forms import BaseForm
 
 
+_LABEL_ACRONYMS = {
+    "Id": "ID",
+    "Uid": "UID",
+    "Uuid": "UUID",
+    "Url": "URL",
+    "Api": "API",
+    "Json": "JSON",
+}
+
+
 def get_field_label(field: str) -> str:
     """Convert snake_case field names to human-readable labels.
 
@@ -37,8 +47,9 @@ def get_field_label(field: str) -> str:
         parts = field.split(".")
         return " ".join(get_field_label(part) for part in parts)
 
-    # Convert snake_case to Title Case
-    return field.replace("_", " ").title()
+    # Convert snake_case to Title Case, then fix common acronyms
+    words = field.replace("_", " ").title().split()
+    return " ".join(_LABEL_ACRONYMS.get(w, w) for w in words)
 
 
 class AdminListView(HTMXView, AdminView):
