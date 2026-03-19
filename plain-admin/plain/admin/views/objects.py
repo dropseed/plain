@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
 from plain.paginator import Paginator
-from plain.postgres import Model, QuerySet
+from plain.postgres import QuerySet
 from plain.views import (
     CreateView,
     DeleteView,
@@ -214,59 +214,8 @@ class AdminListView(HTMXView, AdminView):
     def get_filter_names(self) -> list[str]:
         return self.filters.copy()  # Avoid mutating the class attribute itself
 
-    def get_field_value(self, obj: Any, field: str) -> Any:
-        try:
-            # Try basic dict lookup first
-            if field in obj:
-                return obj[field]
-        except TypeError:
-            pass
-
-        # Try dot notation
-        if "." in field:
-            field, subfield = field.split(".", 1)
-            return self.get_field_value(obj[field], subfield)
-
-        # Try regular object attribute
-        attr = getattr(obj, field)
-
-        # Call if it's callable
-        if callable(attr):
-            return attr()
-        else:
-            return attr
-
-    def format_field_value(self, obj: Any, field: str, value: Any) -> Any:
-        """Format a field value for display. Override this for display formatting
-        like currency symbols, percentages, etc. Sorting and searching use
-        get_field_value directly, so formatting here won't affect sort order."""
-        return value
-
     def get_object_id(self, obj: Any) -> Any:
         return self.get_field_value(obj, "id")
-
-    def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
-        templates = []
-
-        # By field name
-        templates.append(f"admin/values/{field}.html")
-
-        # By database field type
-        try:
-            field_obj = obj._model_meta.get_field(field)
-            field_type = type(field_obj).__name__
-            templates.append(f"admin/values/{field_type}.html")
-        except Exception:
-            pass
-
-        # By value type
-        type_str = type(value).__name__.lower()
-        templates.append(f"admin/values/{type_str}.html")
-
-        # Default
-        templates.append("admin/values/default.html")
-
-        return templates
 
     def get_list_url(self) -> str:
         return ""
@@ -356,59 +305,6 @@ class AdminDetailView(AdminView, DetailView):
         return super().get_template_names() + [
             "admin/detail.html",  # A generic detail view for rendering any object
         ]
-
-    def get_field_value(self, obj: Any, field: str) -> Any:
-        try:
-            # Try basic dict lookup first
-            if field in obj:
-                return obj[field]
-        except TypeError:
-            pass
-
-        # Try dot notation
-        if "." in field:
-            field, subfield = field.split(".", 1)
-            return self.get_field_value(obj[field], subfield)
-
-        # Try regular object attribute
-        attr = getattr(obj, field)
-
-        # Call if it's callable
-        if callable(attr):
-            return attr()
-        else:
-            return attr
-
-    def format_field_value(self, obj: Any, field: str, value: Any) -> Any:
-        """Format a field value for display. Override this for display formatting."""
-        return value
-
-    def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
-        templates = []
-
-        # By field name
-        templates.append(f"admin/values/{field}.html")
-
-        # By database field type
-        try:
-            field_obj = obj._model_meta.get_field(field)
-            field_type = type(field_obj).__name__
-            templates.append(f"admin/values/{field_type}.html")
-        except Exception:
-            pass
-
-        # By value type
-        type_str = type(value).__name__.lower()
-        templates.append(f"admin/values/{type_str}.html")
-
-        # As any model
-        if isinstance(value, Model):
-            templates.append("admin/values/model.html")
-
-        # Default
-        templates.append("admin/values/default.html")
-
-        return templates
 
     def get_list_url(self) -> str:
         return ""

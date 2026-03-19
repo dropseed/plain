@@ -169,3 +169,56 @@ class AdminView(AuthView, TemplateView):
 
     def get_cards(self) -> list[Card]:
         return self.cards.copy()
+
+    def get_field_value(self, obj: Any, field: str) -> Any:
+        try:
+            # Try basic dict lookup first
+            if field in obj:
+                return obj[field]
+        except TypeError:
+            pass
+
+        # Try dot notation
+        if "." in field:
+            field, subfield = field.split(".", 1)
+            return self.get_field_value(obj[field], subfield)
+
+        # Try regular object attribute
+        attr = getattr(obj, field)
+
+        # Call if it's callable
+        if callable(attr):
+            return attr()
+        else:
+            return attr
+
+    def format_field_value(self, obj: Any, field: str, value: Any) -> Any:
+        """Format a field value for display. Override this for display formatting
+        like currency symbols, percentages, etc. Sorting and searching use
+        get_field_value directly, so formatting here won't affect sort order."""
+        return value
+
+    def get_field_value_template(self, obj: Any, field: str, value: Any) -> list[str]:
+        templates = []
+
+        # By field name
+        templates.append(f"admin/values/{field}.html")
+
+        # By database field type
+        try:
+            field_obj = obj._model_meta.get_field(field)
+            field_type = type(field_obj).__name__
+            templates.append(f"admin/values/{field_type}.html")
+        except Exception:
+            pass
+
+        # By value type (walk MRO for parent classes)
+        for cls in type(value).__mro__:
+            if cls is object:
+                break
+            templates.append(f"admin/values/{cls.__name__}.html")
+
+        # Default
+        templates.append("admin/values/default.html")
+
+        return templates
