@@ -56,8 +56,9 @@
                border border-white/10 sm:border-0 sm:border-t sm:border-white/5
                bg-stone-950 shadow-xl"
     >
-        {# Version badge: tappable toggle on mobile #}
-        <button id="plaintoolbar-mobile-toggle" class="flex items-center flex-shrink-0 cursor-pointer sm:cursor-default whitespace-nowrap" type="button">
+        {# Version: selectable text on desktop, tappable toggle on mobile #}
+        <span class="hidden sm:flex items-center flex-shrink-0 whitespace-nowrap select-all">{{ toolbar.version }}</span>
+        <button id="plaintoolbar-mobile-toggle" class="flex sm:hidden items-center flex-shrink-0 cursor-pointer whitespace-nowrap" type="button">
             {{ toolbar.version }}
         </button>
         <button type="button" data-plaintoolbar-expand class="hidden sm:block flex-grow cursor-pointer min-w-0"></button>
