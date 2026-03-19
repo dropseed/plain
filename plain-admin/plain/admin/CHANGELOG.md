@@ -1,5 +1,26 @@
 # plain-admin changelog
 
+## [0.75.0](https://github.com/dropseed/plain/releases/plain-admin@0.75.0) (2026-03-19)
+
+### What's changed
+
+- **Grouped chart support for TrendCard** — set `group_field` on a TrendCard to render stacked bar charts with automatic legend, color assignment, and per-group tooltips ([f27dea19039e](https://github.com/dropseed/plain/commit/f27dea19039e))
+- **Dict-based group colors** — `group_colors` can now be a dict keyed by raw field value for semantic color mapping (e.g., green for success, red for error), with `default_group_colors` as the positional fallback palette ([4b2cd54022b7](https://github.com/dropseed/plain/commit/4b2cd54022b7))
+- **`field_templates` class attribute** — map field names to custom templates directly on any view class, replacing the need to override `get_field_value_template()` ([6652f8aeed61](https://github.com/dropseed/plain/commit/6652f8aeed61))
+- **Declarative dict-based filters** — `AdminModelListView.filters` can now be a `dict[str, Q]` mapping filter names to Q objects, with automatic queryset filtering ([9d9f35aa030d](https://github.com/dropseed/plain/commit/9d9f35aa030d))
+- **Linked card metrics** — cards with both a metric and a link now render the metric as a clickable link ([9d9f35aa030d](https://github.com/dropseed/plain/commit/9d9f35aa030d))
+- **Collapsible JSON and list fields** — JSON and list values in detail views are collapsible with a toggle, keeping long values from dominating the page ([4e5245fa17d0](https://github.com/dropseed/plain/commit/4e5245fa17d0))
+- **Select-all for UUID values** — UUID fields in admin list/detail views use `select-all` styling for easy copying ([307e8d0037d9](https://github.com/dropseed/plain/commit/307e8d0037d9))
+- **Common acronym handling in field labels** — ID, UUID, URL, API, JSON, and UID are now properly uppercased in auto-generated labels ([63d76b23d868](https://github.com/dropseed/plain/commit/63d76b23d868))
+- **Fix chart rendering on first page load** ([257fc004a278](https://github.com/dropseed/plain/commit/257fc004a278))
+- **Fix missing breadcrumb divider** between parent views ([597fe43ca9de](https://github.com/dropseed/plain/commit/597fe43ca9de))
+- **Allow selecting revealed encrypted field values** ([4c9a9997d1ca](https://github.com/dropseed/plain/commit/4c9a9997d1ca))
+
+### Upgrade instructions
+
+- `get_filters` has been renamed to `get_filter_names`. If you override this method, update the name.
+- The `group_colors` attribute on TrendCard is now a `dict[str, dict]` (keyed by group label) instead of a `list[dict]`. The positional list is now `default_group_colors`. If you set custom `group_colors`, update to the dict format.
+
 ## [0.74.0](https://github.com/dropseed/plain/releases/plain-admin@0.74.0) (2026-03-16)
 
 ### What's changed
