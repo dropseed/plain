@@ -14,6 +14,8 @@ class PageviewsTrendCard(TrendCard):
     model = Pageview
     datetime_field = "timestamp"
     size = TrendCard.Sizes.FULL
+    group_field = "source"
+    group_labels = {"": "Direct"}
 
 
 @register_viewset
