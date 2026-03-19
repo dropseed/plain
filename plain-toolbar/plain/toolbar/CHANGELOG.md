@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.12.3](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.3) (2026-03-19)
+
+### What's changed
+
+- **Selectable version text on desktop** — the toolbar version string is now selectable text on desktop (for easy copying), while remaining a tappable toggle on mobile ([826e7658fdae](https://github.com/dropseed/plain/commit/826e7658fdae))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.2](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.2) (2026-03-10)
 
 ### What's changed
