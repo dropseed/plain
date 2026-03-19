@@ -114,7 +114,9 @@ jQuery(($) => {
   });
 
   // Encrypted field reveal/hide toggle
-  $(document).on("click", "[data-encrypted]", function () {
+  $(document).on("click", "[data-encrypted]", function (e) {
+    // Don't toggle when clicking the revealed value (let user select text)
+    if ($(e.target).is("code")) return;
     const $el = $(this);
     if ($el.data("revealed")) {
       $el
