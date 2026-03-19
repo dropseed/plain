@@ -68,6 +68,9 @@ window.AdminCharts = {
   },
 };
 
+// Render any charts already on the page (deferred script runs after HTML is parsed)
+window.AdminCharts.renderAll(document);
+
 // HTMX integration - render charts after content swaps
 document.addEventListener("htmx:afterSettle", (evt) => {
   window.AdminCharts.renderAll(evt.target);
