@@ -2,13 +2,17 @@
 
 {% block content %}
 
-{% if metric is not none %}
+{# Metric: linked when link is provided, plain div otherwise #}
+{% if metric is not none and link %}
+<a href="{{ link }}">{{ metric }}</a>
+{% elif metric is not none %}
 <div>{{ metric }}</div>
 {% endif %}
 
-{% if link %}
-<a class="hover:underline" href="{{ link }}">{{ text }}</a>
-{% elif text %}
+{# Text: linked only when there's no metric to carry the link #}
+{% if text and link and metric is none %}
+<a href="{{ link }}">{{ text }}</a>
+{% elif text and not link %}
 <div>{{ text }}</div>
 {% endif %}
 

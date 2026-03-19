@@ -80,6 +80,13 @@ class AdminModelListView(AdminListView):
         """Override this to customize the base queryset (e.g., add annotations)."""
         return self.model.query.all()
 
+    def get_filter_names(self) -> list[str]:
+        """Return filter names. Supports both list[str] and dict[str, Q] formats."""
+        filters = self.filters
+        if isinstance(filters, dict):
+            return list(filters.keys())
+        return super().get_filter_names()
+
     def filter_objects(
         self, objects: postgres.QuerySet | list[Any]
     ) -> postgres.QuerySet | list[Any]:
@@ -88,7 +95,15 @@ class AdminModelListView(AdminListView):
         return self.filter_queryset(objects)
 
     def filter_queryset(self, queryset: Any) -> Any:
-        """Override this to filter the queryset based on self.filter."""
+        """Filter the queryset based on self.filter.
+
+        When filters is a dict[str, Q], matching is handled automatically.
+        Override this for custom filter logic when using list[str] filters.
+        """
+        if isinstance(self.filters, dict) and self.filter:
+            q = self.filters.get(self.filter)
+            if q is not None:
+                return queryset.filter(q)
         return queryset
 
     def search_objects(

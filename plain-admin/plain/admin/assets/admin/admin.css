@@ -349,8 +349,9 @@ See /admin/style/ for the full style guide.
       justify-content: flex-start;
     }
 
-    /* Metric cards - large numbers */
-    .card > section > div:first-child {
+    /* Metric cards - large numbers (both plain divs and linked metrics) */
+    .card > section > div:first-child,
+    .card > section > a:first-child {
       font-size: 1.75rem;
       font-weight: 600;
       line-height: 1.2;
@@ -359,15 +360,24 @@ See /admin/style/ for the full style guide.
       font-feature-settings: "tnum" 1;
     }
 
-    /* Text below metric (links, secondary text) */
-    .card > section > a {
+    .card > section > a:first-child {
+      align-self: flex-start;
+      text-decoration: none;
+    }
+
+    .card > section > a:first-child:hover {
+      text-decoration: underline;
+    }
+
+    /* Text-only links (below a metric div) */
+    .card > section > div + a {
       margin-top: 0.375rem;
       font-size: 0.75rem;
       color: var(--plain-steel);
       text-decoration: underline;
     }
 
-    .card > section > a:hover {
+    .card > section > div + a:hover {
       color: var(--plain-steel-hover);
     }
 

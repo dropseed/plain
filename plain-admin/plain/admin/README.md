@@ -204,7 +204,7 @@ Cards display summary information on admin pages. You can add them to any view b
 
 ### Basic cards
 
-The base [`Card`](./cards/base.py#Card) class displays a simple card with a title, optional description, metric, text, and link.
+The base [`Card`](./cards/base.py#Card) class displays a simple card with a title, optional description, metric, text, and link. When both a metric and link are provided, the metric itself becomes a clickable link.
 
 ```python
 from plain.admin.cards import Card
@@ -319,18 +319,48 @@ The form template should extend the admin base and use the form rendering helper
 
 ## List filters
 
-On [`AdminListView`](./views/objects.py#AdminListView) and [`AdminModelListView`](./views/models.py#AdminModelListView), you can define different `filters` to build predefined views of your data. The filter choices will be shown in the UI, and you can use the current `self.filter` in your view logic.
+On [`AdminListView`](./views/objects.py#AdminListView) and [`AdminModelListView`](./views/models.py#AdminModelListView), you can define different `filters` to build predefined views of your data. The filter choices will be shown in a dropdown in the UI.
+
+### Declarative filters
+
+On `AdminModelListView`, filters can be defined as a `dict[str, Q]` mapping filter names to `Q` objects. The framework handles the queryset filtering automatically.
+
+```python
+from plain.postgres import Q
+
+@register_viewset
+class UserAdmin(AdminViewset):
+    class ListView(AdminModelListView):
+        model = User
+        fields = ["id", "email", "created_at__date"]
+        filters = {
+            "Active": Q(is_active=True),
+            "Inactive": Q(is_active=False),
+            "Staff": Q(is_staff=True),
+        }
+```
+
+Use prefixed names to organize filters that span multiple dimensions:
+
+```python
+filters = {
+    "Host: GitHub": Q(host_type="GITHUB"),
+    "Host: GitLab": Q(host_type="GITLAB"),
+    "Mode: Active": Q(mode="ACTIVE"),
+    "Mode: Disabled": Q(mode="DISABLED"),
+}
+```
+
+### Custom filters
+
+For filters that need custom logic (e.g., annotations), use a `list[str]` and override `filter_queryset`:
 
 ```python
 @register_viewset
 class UserAdmin(AdminViewset):
     class ListView(AdminModelListView):
         model = User
-        fields = [
-            "id",
-            "email",
-            "created_at__date",
-        ]
+        fields = ["id", "email", "created_at__date"]
         filters = ["Active users", "Inactive users"]
 
         def filter_queryset(self, queryset):

@@ -35,10 +35,10 @@
         {% endif %}
 
         <form method="GET" class="inline-flex space-x-2">
-            {% if filters %}
+            {% if filter_names %}
             <select data-autosubmit name="filter" class="w-auto text-sm py-1 pl-3 pr-8">
                 <option value="">Filter...</option>
-                {% for filter in filters %}
+                {% for filter in filter_names %}
                 <option {% if filter == current_filter %}selected{% endif %}>{{ filter }}</option>
                 {% endfor %}
             </select>
@@ -185,7 +185,7 @@
             {% endif %}
             <form data-autosubmit method="GET">
                 {% if search_fields and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
-                {% if filters and current_filter %}<input type="hidden" name="filter" value="{{ current_filter }}" />{% endif %}
+                {% if filter_names and current_filter %}<input type="hidden" name="filter" value="{{ current_filter }}" />{% endif %}
                 <select name="page" class="w-auto text-xs py-1 pl-2 pr-6 border-stone-200 rounded">
                 {% for page_num in page.paginator.page_range %}
                     <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>

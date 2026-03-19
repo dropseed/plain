@@ -58,7 +58,7 @@ class AdminListView(HTMXView, AdminView):
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
 
-        # Make this available to get_filters and stuff
+        # Make this available to get_filter_names and stuff
         self.objects = self.process_objects()
 
         page_size = self.request.query_params.get("page_size", self.page_size)
@@ -70,7 +70,7 @@ class AdminListView(HTMXView, AdminView):
         context["objects"] = self._page  # alias
         context["fields"] = self.get_fields()
         context["actions"] = self.get_actions()
-        context["filters"] = self.get_filters()
+        context["filter_names"] = self.get_filter_names()
 
         context["current_filter"] = self.filter
 
@@ -200,7 +200,7 @@ class AdminListView(HTMXView, AdminView):
     def get_actions(self) -> list[str]:
         return self.actions.copy()  # Avoid mutating the class attribute itself
 
-    def get_filters(self) -> list[str]:
+    def get_filter_names(self) -> list[str]:
         return self.filters.copy()  # Avoid mutating the class attribute itself
 
     def get_field_value(self, obj: Any, field: str) -> Any:
