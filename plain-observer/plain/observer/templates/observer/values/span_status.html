@@ -1,0 +1,7 @@
+<span
+    data-status="{{ value }}"
+    class="inline-flex items-center px-1.5 py-0.5 text-xs rounded-md
+           data-[status=OK]:bg-green-50 data-[status=OK]:text-green-700
+           data-[status=ERROR]:bg-red-50 data-[status=ERROR]:text-red-700
+           data-[status=UNSET]:bg-stone-100 data-[status=UNSET]:text-stone-400"
+>{{ value or "UNSET" }}</span>

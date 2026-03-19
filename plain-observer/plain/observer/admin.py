@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from plain import postgres
+from plain.admin.cards import TrendCard
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,
@@ -11,6 +12,30 @@ from plain.admin.views import (
 )
 
 from .models import Log, Span, Trace
+
+
+class TracesTrendCard(TrendCard):
+    title = "Traces trend"
+    model = Trace
+    datetime_field = "start_time"
+    size = TrendCard.Sizes.FULL
+    group_field = "app_version"
+
+
+class SpansTrendCard(TrendCard):
+    title = "Spans trend"
+    model = Span
+    datetime_field = "start_time"
+    size = TrendCard.Sizes.FULL
+    group_field = "kind"
+
+
+class LogsTrendCard(TrendCard):
+    title = "Logs trend"
+    model = Log
+    datetime_field = "timestamp"
+    size = TrendCard.Sizes.FULL
+    group_field = "level"
 
 
 @register_viewset
@@ -27,6 +52,7 @@ class TraceViewset(AdminViewset):
             "user_id",
             "start_time",
         ]
+        cards = [TracesTrendCard]
         actions = ["Delete"]
 
         def perform_action(self, action: str, target_ids: Sequence[int]) -> None:
@@ -54,7 +80,12 @@ class SpanViewset(AdminViewset):
             "parent_id",
             "start_time",
         ]
+        field_templates = {
+            "kind": "observer/values/span_kind.html",
+            "status": "observer/values/span_status.html",
+        }
         queryset_order = ["-id"]
+        cards = [SpansTrendCard]
         filters = ["Parents only"]
         search_fields = ["name", "span_id", "parent_id"]
         actions = ["Delete"]
@@ -99,6 +130,7 @@ class LogViewset(AdminViewset):
             "trace",
             "span",
         ]
+        cards = [LogsTrendCard]
         queryset_order = ["-timestamp"]
         search_fields = ["message", "level"]
         actions = ["Delete selected", "Delete all"]
