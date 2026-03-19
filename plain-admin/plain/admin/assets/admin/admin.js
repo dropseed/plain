@@ -140,6 +140,37 @@ jQuery(($) => {
     }
   });
 
+  // Collapsible content - detect overflow and show expand button
+  function initCollapsibles(target) {
+    $(target)
+      .find("[data-collapsible]")
+      .addBack("[data-collapsible]")
+      .each(function () {
+        if (this.scrollHeight > this.clientHeight) {
+          this.dataset.collapsible = "overflowing";
+        }
+      });
+  }
+
+  $(document).on("click", "[data-collapsible-toggle]", function () {
+    const collapsible = $(this).prev("[data-collapsible]")[0];
+    if (!collapsible) return;
+
+    if (collapsible.dataset.collapsible === "expanded") {
+      collapsible.dataset.collapsible = "overflowing";
+      $(this).text("Expand ▾");
+    } else {
+      collapsible.dataset.collapsible = "expanded";
+      $(this).text("Collapse ▴");
+    }
+  });
+
+  initCollapsibles(document);
+
+  htmx.on("htmx:afterSwap", (evt) => {
+    initCollapsibles(evt.detail.target);
+  });
+
   // Global search keyboard shortcut
   $(document).on("keydown", (e) => {
     const activeTag = document.activeElement.tagName;

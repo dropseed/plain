@@ -515,7 +515,9 @@ See /admin/style/ for the full style guide.
 
 /* Label classes - base + variants */
 .plain-label {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px 8px;
   font-size: 12px;
   font-weight: 500;
@@ -540,6 +542,36 @@ See /admin/style/ for the full style guide.
 .plain-label-info {
   background-color: var(--plain-info-light);
   color: var(--plain-info-text);
+}
+
+/* Collapsible content (JSON fields, long text) */
+[data-collapsible] {
+  max-height: 10rem;
+  overflow: hidden;
+}
+
+[data-collapsible="expanded"] {
+  max-height: none;
+}
+
+[data-collapsible="overflowing"] + [data-collapsible-toggle],
+[data-collapsible="expanded"] + [data-collapsible-toggle] {
+  display: block;
+}
+
+[data-collapsible-toggle] {
+  display: none;
+  border: none;
+  background: none;
+  padding: 4px 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--plain-steel);
+  cursor: pointer;
+}
+
+[data-collapsible-toggle]:hover {
+  color: var(--plain-steel-hover);
 }
 
 /* Button classes - base + variants */
