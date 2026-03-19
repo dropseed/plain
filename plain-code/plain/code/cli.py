@@ -72,26 +72,47 @@ def update() -> None:
     click.secho(f"oxlint and oxfmt {version} installed", fg="green")
 
 
+def _partition_paths(paths: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Split paths into (python_paths, other_paths).
+
+    Directories go into both groups. Files are routed by extension.
+    """
+    python_paths: list[str] = []
+    other_paths: list[str] = []
+    for p in paths:
+        if Path(p).is_dir():
+            python_paths.append(p)
+            other_paths.append(p)
+        elif Path(p).suffix == ".py":
+            python_paths.append(p)
+        else:
+            other_paths.append(p)
+    return tuple(python_paths), tuple(other_paths)
+
+
 @without_runtime_setup
 @cli.command()
 @click.pass_context
-@click.argument("path", default=".")
+@click.argument("paths", nargs=-1)
 @click.option("--skip-ruff", is_flag=True, help="Skip Ruff checks")
 @click.option("--skip-ty", is_flag=True, help="Skip ty type checks")
 @click.option("--skip-oxc", is_flag=True, help="Skip oxlint and oxfmt checks")
 @click.option("--skip-annotations", is_flag=True, help="Skip type annotation checks")
 def check(
     ctx: click.Context,
-    path: str,
+    paths: tuple[str, ...],
     skip_ruff: bool,
     skip_ty: bool,
     skip_oxc: bool,
     skip_annotations: bool,
 ) -> None:
     """Check for formatting and linting issues"""
+    if not paths:
+        paths = (".",)
+
+    python_paths, other_paths = _partition_paths(paths)
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
     config = get_code_config()
-    is_python = None if Path(path).is_dir() else Path(path).suffix == ".py"
 
     for e in config.get("exclude", []):
         ruff_args.extend(["--exclude", e])
@@ -105,32 +126,26 @@ def check(
             )
             sys.exit(return_code)
 
-    if not skip_ruff and is_python is not False:
+    if not skip_ruff and python_paths:
         print_event("ruff check...", newline=False)
-        result = subprocess.run(["ruff", "check", path, *ruff_args])
+        result = subprocess.run(["ruff", "check", *python_paths, *ruff_args])
         maybe_exit(result.returncode)
 
         print_event("ruff format --check...", newline=False)
-        result = subprocess.run(["ruff", "format", path, "--check", *ruff_args])
+        result = subprocess.run(
+            ["ruff", "format", *python_paths, "--check", *ruff_args]
+        )
         maybe_exit(result.returncode)
 
-    if (
-        not skip_ty
-        and is_python is not False
-        and config.get("ty", {}).get("enabled", True)
-    ):
+    if not skip_ty and python_paths and config.get("ty", {}).get("enabled", True):
         print_event("ty check...", newline=False)
-        ty_args = ["ty", "check", path, "--no-progress"]
+        ty_args = ["ty", "check", *python_paths, "--no-progress"]
         for e in config.get("exclude", []):
             ty_args.extend(["--exclude", e])
         result = subprocess.run(ty_args)
         maybe_exit(result.returncode)
 
-    if (
-        not skip_oxc
-        and is_python is not True
-        and config.get("oxc", {}).get("enabled", True)
-    ):
+    if not skip_oxc and other_paths and config.get("oxc", {}).get("enabled", True):
         oxlint = OxcTool("oxlint")
         oxfmt = OxcTool("oxfmt")
 
@@ -138,23 +153,25 @@ def check(
             ctx.invoke(install)
 
         print_event("oxlint...", newline=False)
-        result = oxlint.invoke(path)
+        result = oxlint.invoke(*other_paths)
         maybe_exit(result.returncode)
 
         print_event("oxfmt --check...", newline=False)
-        result = oxfmt.invoke("--check", path)
+        result = oxfmt.invoke("--check", *other_paths)
         maybe_exit(result.returncode)
 
     if (
         not skip_annotations
-        and is_python is not False
+        and python_paths
         and config.get("annotations", {}).get("enabled", True)
     ):
         print_event("annotations...", newline=False)
         # Combine top-level exclude with annotation-specific exclude
         exclude_patterns = list(config.get("exclude", []))
         exclude_patterns.extend(config.get("annotations", {}).get("exclude", []))
-        ann_result = check_annotations(path, exclude_patterns or None)
+        ann_result = check_annotations(
+            *python_paths, exclude_patterns=exclude_patterns or None
+        )
         if ann_result.missing_count > 0:
             click.secho(
                 f"{ann_result.missing_count} functions are untyped",
@@ -168,16 +185,18 @@ def check(
 
 @without_runtime_setup
 @cli.command()
-@click.argument("path", default=".")
+@click.argument("paths", nargs=-1)
 @click.option("--details", is_flag=True, help="List untyped functions")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def annotations(path: str, details: bool, as_json: bool) -> None:
+def annotations(paths: tuple[str, ...], details: bool, as_json: bool) -> None:
     """Check type annotation status"""
+    if not paths:
+        paths = (".",)
     config = get_code_config()
     # Combine top-level exclude with annotation-specific exclude
     exclude_patterns = list(config.get("exclude", []))
     exclude_patterns.extend(config.get("annotations", {}).get("exclude", []))
-    result = check_annotations(path, exclude_patterns or None)
+    result = check_annotations(*paths, exclude_patterns=exclude_patterns or None)
     if as_json:
         _print_annotations_json(result)
     else:
@@ -259,14 +278,19 @@ def _print_annotations_json(result: AnnotationResult) -> None:
 @register_cli("fix", shortcut_for="code fix")
 @cli.command()
 @click.pass_context
-@click.argument("path", default=".")
+@click.argument("paths", nargs=-1)
 @click.option("--unsafe-fixes", is_flag=True, help="Apply ruff unsafe fixes")
 @click.option("--add-noqa", is_flag=True, help="Add noqa comments to suppress errors")
-def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> None:
+def fix(
+    ctx: click.Context, paths: tuple[str, ...], unsafe_fixes: bool, add_noqa: bool
+) -> None:
     """Fix formatting and linting issues"""
+    if not paths:
+        paths = (".",)
+
+    python_paths, other_paths = _partition_paths(paths)
     ruff_args = ["--config", str(DEFAULT_RUFF_CONFIG)]
     config = get_code_config()
-    is_python = None if Path(path).is_dir() else Path(path).suffix == ".py"
 
     for e in config.get("exclude", []):
         ruff_args.extend(["--exclude", e])
@@ -274,28 +298,32 @@ def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> No
     if unsafe_fixes and add_noqa:
         raise click.UsageError("Cannot use both --unsafe-fixes and --add-noqa")
 
-    if is_python is not False:
+    if python_paths:
         if unsafe_fixes:
             print_event("ruff check --fix --unsafe-fixes...", newline=False)
             result = subprocess.run(
-                ["ruff", "check", path, "--fix", "--unsafe-fixes", *ruff_args]
+                ["ruff", "check", *python_paths, "--fix", "--unsafe-fixes", *ruff_args]
             )
         elif add_noqa:
             print_event("ruff check --add-noqa...", newline=False)
-            result = subprocess.run(["ruff", "check", path, "--add-noqa", *ruff_args])
+            result = subprocess.run(
+                ["ruff", "check", *python_paths, "--add-noqa", *ruff_args]
+            )
         else:
             print_event("ruff check --fix...", newline=False)
-            result = subprocess.run(["ruff", "check", path, "--fix", *ruff_args])
+            result = subprocess.run(
+                ["ruff", "check", *python_paths, "--fix", *ruff_args]
+            )
 
         if result.returncode != 0:
             sys.exit(result.returncode)
 
         print_event("ruff format...", newline=False)
-        result = subprocess.run(["ruff", "format", path, *ruff_args])
+        result = subprocess.run(["ruff", "format", *python_paths, *ruff_args])
         if result.returncode != 0:
             sys.exit(result.returncode)
 
-    if is_python is not True and config.get("oxc", {}).get("enabled", True):
+    if other_paths and config.get("oxc", {}).get("enabled", True):
         oxlint = OxcTool("oxlint")
         oxfmt = OxcTool("oxfmt")
 
@@ -304,16 +332,16 @@ def fix(ctx: click.Context, path: str, unsafe_fixes: bool, add_noqa: bool) -> No
 
         if unsafe_fixes:
             print_event("oxlint --fix-dangerously...", newline=False)
-            result = oxlint.invoke(path, "--fix-dangerously")
+            result = oxlint.invoke(*other_paths, "--fix-dangerously")
         else:
             print_event("oxlint --fix...", newline=False)
-            result = oxlint.invoke(path, "--fix")
+            result = oxlint.invoke(*other_paths, "--fix")
 
         if result.returncode != 0:
             sys.exit(result.returncode)
 
         print_event("oxfmt...", newline=False)
-        result = oxfmt.invoke(path)
+        result = oxfmt.invoke(*other_paths)
 
         if result.returncode != 0:
             sys.exit(result.returncode)

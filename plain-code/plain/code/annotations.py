@@ -293,38 +293,20 @@ class AnnotationResult:
 
 
 def check_annotations(
-    path: str, exclude_patterns: list[str] | None = None
+    *paths: str, exclude_patterns: list[str] | None = None
 ) -> AnnotationResult:
-    """Check type annotations in the given path."""
-    target = Path(path)
-
-    if target.is_file():
-        if not target.suffix == ".py":
-            return AnnotationResult(
-                total_functions=0,
-                fully_typed_functions=0,
-                missing_count=0,
-                total_ignores=0,
-                total_casts=0,
-                total_asserts=0,
-                file_stats=[],
-            )
-        python_files = [target]
-    elif target.is_dir():
-        python_files = find_python_files(target, exclude_patterns)
-    else:
-        return AnnotationResult(
-            total_functions=0,
-            fully_typed_functions=0,
-            missing_count=0,
-            total_ignores=0,
-            total_casts=0,
-            total_asserts=0,
-            file_stats=[],
-        )
+    """Check type annotations in the given paths."""
+    python_files: set[Path] = set()
+    for path in paths:
+        target = Path(path)
+        if target.is_file():
+            if target.suffix == ".py":
+                python_files.add(target)
+        elif target.is_dir():
+            python_files.update(find_python_files(target, exclude_patterns))
 
     all_stats = []
-    for file_path in python_files:
+    for file_path in sorted(python_files):
         stats = analyze_file(file_path)
         if stats:
             all_stats.append(stats)
