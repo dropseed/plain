@@ -8,11 +8,6 @@ Plain is a Python web framework.
 - Use the `/plain-install` skill to add new Plain packages.
 - Use the `/plain-upgrade` skill to upgrade Plain packages.
 
-## After making code changes
-
-- Run `uv run plain check` to verify changes — this runs linting, preflight, migration, and test checks. Add `--skip-test` for faster iteration during development.
-- Use `uv run plain request /path` to smoke-test changed GET views — errors and stacktraces surface immediately, making for fast iteration. Supports `--user`, `--status`, `--contains`, `--not-contains`.
-
 ## Coding style
 
 - **Painfully obvious over clever** — blatant clarity, even if it means more code. You should _see_ what is happening, not have to deduce it.
@@ -63,3 +58,8 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 - `uv run plain request /path` — test HTTP request against dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`)
 - `uv run plain settings list` — list all settings with their current values and sources
 - `uv run plain settings get <SETTING_NAME>` — get the value of a specific setting
+
+## After making code changes
+
+- Run `uv run plain check` to verify changes — this runs linting, preflight, migration, and test checks. Add `--skip-test` for faster iteration during development.
+- Use `uv run plain request /path` to smoke-test changed GET views — errors and stacktraces surface immediately, making for fast iteration. Supports `--user`, `--status`, `--contains`, `--not-contains`.
