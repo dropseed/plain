@@ -44,7 +44,7 @@ app_logger.error("Payment failed", context={"order_id": "abc-123", "reason": "in
 
 ### Basic logging
 
-The [`app_logger`](./app.py#AppLogger) supports all standard logging levels: `debug`, `info`, `warning`, `error`, and `critical`.
+The [`app_logger`](./logger.py#PlainLogger) supports all standard logging levels: `debug`, `info`, `warning`, `error`, and `critical`.
 
 ```python
 app_logger.debug("Entering validation step")

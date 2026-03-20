@@ -64,10 +64,10 @@ def configure_logging(
     # Determine formatter based on app_log_format
     formatter = create_log_formatter(app_log_format)
 
-    # Create and configure the plain logger using AppLogger for structured formatting
-    from .app import AppLogger, app_logger
+    # Create and configure the plain logger with structured formatting
+    from .logger import PlainLogger, app_logger
 
-    plain_logger = AppLogger("plain")
+    plain_logger = PlainLogger("plain")
     plain_logger.setLevel(plain_log_level)
     attach_log_handlers(
         logger=plain_logger,
@@ -77,7 +77,7 @@ def configure_logging(
     )
     plain_logger.propagate = False
 
-    # Register so getLogger("plain") returns our AppLogger and children inherit handlers
+    # Register so getLogger("plain") returns our PlainLogger and children inherit handlers
     logging.root.manager.loggerDict["plain"] = plain_logger
 
     # Configure the existing app_logger

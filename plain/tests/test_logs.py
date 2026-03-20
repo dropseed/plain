@@ -5,9 +5,9 @@ from io import StringIO
 import pytest
 
 from plain.logs import app_logger
-from plain.logs.app import AppLogger
 from plain.logs.configure import configure_logging
 from plain.logs.formatters import JSONFormatter, KeyValueFormatter
+from plain.logs.logger import PlainLogger
 
 
 class TestLoggingConfiguration:
@@ -29,9 +29,9 @@ class TestLoggingConfiguration:
         assert not plain_logger.propagate
         assert not app_logger.propagate
 
-        # plain logger should be an AppLogger with structured formatter
-        assert isinstance(plain_logger, AppLogger)
-        assert isinstance(app_logger, AppLogger)
+        # plain logger should be an PlainLogger with structured formatter
+        assert isinstance(plain_logger, PlainLogger)
+        assert isinstance(app_logger, PlainLogger)
 
     def test_nested_logger_inheritance(self):
         """Test that nested loggers inherit settings from parent loggers."""
@@ -93,7 +93,7 @@ class TestLoggerFormats:
         handler = logging.StreamHandler(stream)
         handler.setFormatter(JSONFormatter("%(json)s"))
 
-        logger = AppLogger("test")
+        logger = PlainLogger("test")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -116,7 +116,7 @@ class TestLoggerFormats:
             KeyValueFormatter("[%(levelname)s] %(message)s %(keyvalue)s")
         )
 
-        logger = AppLogger("test")
+        logger = PlainLogger("test")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -136,18 +136,18 @@ class TestLoggerFormats:
         assert 'quotes="has \\"quotes\\""' in output
 
 
-class TestAppLogger:
-    """Test AppLogger specific functionality."""
+class TestPlainLogger:
+    """Test PlainLogger specific functionality."""
 
     def test_app_logger_instance_and_kwargs(self):
-        """Test AppLogger instance and kwargs functionality."""
-        assert isinstance(app_logger, AppLogger)
+        """Test PlainLogger instance and kwargs functionality."""
+        assert isinstance(app_logger, PlainLogger)
 
         stream = StringIO()
         handler = logging.StreamHandler(stream)
         handler.setFormatter(JSONFormatter("%(json)s"))
 
-        logger = AppLogger("test")
+        logger = PlainLogger("test")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -159,12 +159,12 @@ class TestAppLogger:
         assert parsed["action"] == "login"
 
     def test_context_management(self):
-        """Test AppLogger context management and restoration."""
+        """Test PlainLogger context management and restoration."""
         stream = StringIO()
         handler = logging.StreamHandler(stream)
         handler.setFormatter(JSONFormatter("%(json)s"))
 
-        logger = AppLogger("test")
+        logger = PlainLogger("test")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -204,7 +204,7 @@ class TestAppLogger:
         handler = logging.StreamHandler(stream)
         handler.setFormatter(JSONFormatter("%(json)s"))
 
-        logger = AppLogger("test")
+        logger = PlainLogger("test")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -228,7 +228,7 @@ class TestAppLogger:
         handler = logging.StreamHandler(stream)
         handler.setFormatter(JSONFormatter("%(json)s"))
 
-        logger = AppLogger("test")
+        logger = PlainLogger("test")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -247,7 +247,7 @@ class TestAppLogger:
 
     def test_reserved_context_key_error(self):
         """Test that using 'context' key in extra raises an error."""
-        logger = AppLogger("test")
+        logger = PlainLogger("test")
         logger.setLevel(logging.INFO)
 
         with pytest.raises(ValueError, match="The 'context' key in extra is reserved"):
@@ -259,7 +259,7 @@ class TestAppLogger:
         handler = logging.StreamHandler(stream)
         handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
 
-        logger = AppLogger("test")
+        logger = PlainLogger("test")
         logging.Logger.manager.loggerDict["test"] = logger
         logger.addHandler(handler)
         logger.setLevel(logging.WARNING)
@@ -298,7 +298,7 @@ class TestLogLevels:
         handler = logging.StreamHandler(stream)
         handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
 
-        logger = AppLogger("test")
+        logger = PlainLogger("test")
         logger.addHandler(handler)
         logger.setLevel(logging.WARNING)
 

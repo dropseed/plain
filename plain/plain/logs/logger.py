@@ -8,8 +8,8 @@ from typing import Any
 from .debug import DebugMode
 
 
-class AppLogger(logging.Logger):
-    """Enhanced logger that supports context dict logging and context management."""
+class PlainLogger(logging.Logger):
+    """Enhanced logger that supports structured output and context management."""
 
     def __init__(self, name: str):
         super().__init__(name)
@@ -185,4 +185,4 @@ class AppLogger(logging.Logger):
 
 
 # Create the default app logger instance
-app_logger = AppLogger("app")
+app_logger = PlainLogger("app")
