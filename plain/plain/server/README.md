@@ -84,6 +84,8 @@ SERVER_ACCESS_LOG_FIELDS = ["method", "path", "query", "status", "duration_ms", 
 SERVER_GRACEFUL_TIMEOUT = 30
 SERVER_SENDFILE = True
 SERVER_CONNECTIONS = 1000
+SERVER_MAX_REQUESTS = 1000   # 0 = disabled, restart worker after N requests
+SERVER_MAX_REQUESTS_JITTER = 100  # random +/- variance to stagger restarts
 ```
 
 Settings can also be set via environment variables with the `PLAIN_` prefix (e.g., `PLAIN_SERVER_WORKERS=4`).
@@ -137,6 +139,14 @@ Access logging has three layers, each at the right level of abstraction:
 1. **`SERVER_ACCESS_LOG`** (server setting) — master switch that enables or disables access logging entirely.
 2. **`response.log_access`** (per-response) — individual responses can opt out by setting `log_access = False`.
 3. **`ASSETS_LOG_304`** (assets setting) — controls whether 304 Not Modified responses for assets are logged. When `False` (default), asset 304s set `log_access = False` on the response.
+
+### Worker recycling
+
+Long-running workers can accumulate memory from fragmentation, C extension leaks, or unbounded caches. By default, workers gracefully restart after 1000 requests (with +/- 100 jitter) to keep memory usage in check.
+
+When a worker reaches the limit, it stops accepting new connections and drains in-flight requests before exiting. The arbiter automatically spawns a replacement. The jitter prevents all workers from restarting at the same time in multi-worker deployments.
+
+Both HTTP/1.1 requests and HTTP/2 streams count toward the limit. Set `SERVER_MAX_REQUESTS = 0` to disable recycling.
 
 ## Signals
 

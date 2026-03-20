@@ -5,7 +5,6 @@ labels:
 depends_on:
   - server-memory-diagnostics
 related:
-  - fix-worker-recycling
   - metrics
 ---
 

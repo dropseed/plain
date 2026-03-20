@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import random
 import signal
 import sys
 import time
@@ -100,8 +101,25 @@ class Worker:
             self.app.threads * 4
         )
 
+        # Worker recycling — gracefully restart after N requests to prevent
+        # memory accumulation from fragmentation, C extension leaks, etc.
+        # Jitter is applied later in init_process() after util.seed() so
+        # each forked worker gets a unique value.
+        self.max_requests: int = settings.SERVER_MAX_REQUESTS
+        self.total_requests: int = 0
+
     def __str__(self) -> str:
         return f"<Worker {self.pid}>"
+
+    def _count_request(self) -> None:
+        """Increment the request counter and initiate graceful shutdown if the limit is reached."""
+        self.total_requests += 1
+        if self.max_requests and self.total_requests >= self.max_requests:
+            self.log.info(
+                "Worker reached max requests (%d), initiating graceful shutdown",
+                self.max_requests,
+            )
+            self.alive = False
 
     def notify(self) -> None:
         self.heartbeat.notify()
@@ -112,8 +130,21 @@ class Worker:
             max_workers=self.app.threads
         )
 
-        # Reseed the random number generator
+        # Reseed the random number generator (must happen before jitter)
         util.seed()
+
+        # Apply jitter after reseeding so each forked worker gets unique jitter
+        from plain.runtime import settings
+
+        if self.max_requests and settings.SERVER_MAX_REQUESTS_JITTER:
+            self.max_requests += random.randint(
+                -settings.SERVER_MAX_REQUESTS_JITTER,
+                settings.SERVER_MAX_REQUESTS_JITTER,
+            )
+            self.max_requests = max(1, self.max_requests)
+            self.log.debug(
+                "Worker max_requests set to %d (with jitter)", self.max_requests
+            )
 
         # Prevent listener sockets from leaking into subprocesses
         for s in self.sockets:
@@ -278,6 +309,7 @@ class Worker:
                     self.app.is_ssl,
                     self.tpool,
                     stream_budget=self._h2_stream_budget,
+                    on_stream_complete=self._count_request,
                 )
                 return
 

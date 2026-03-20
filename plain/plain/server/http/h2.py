@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any
@@ -259,6 +260,7 @@ class H2ConnectionState:
         *,
         stream_budget: asyncio.Semaphore | None = None,
         max_aggregate_body: int = 0,
+        on_stream_complete: Callable[[], None] | None = None,
     ) -> None:
         self.conn = conn
         self.writer = writer
@@ -274,6 +276,7 @@ class H2ConnectionState:
         self.stream_budget = stream_budget
         self.aggregate_body_size: int = 0
         self.max_aggregate_body = max_aggregate_body
+        self.on_stream_complete = on_stream_complete
 
     def get_window_event(self, stream_id: int) -> asyncio.Event:
         ev = self.window_events.get(stream_id)
@@ -304,6 +307,7 @@ async def async_handle_h2_connection(
     is_ssl: bool,
     executor: ThreadPoolExecutor,
     stream_budget: asyncio.Semaphore | None = None,
+    on_stream_complete: Callable[[], None] | None = None,
 ) -> None:
     """Async HTTP/2 connection loop.
 
@@ -337,6 +341,7 @@ async def async_handle_h2_connection(
         executor,
         stream_budget=stream_budget,
         max_aggregate_body=max_body * 10,
+        on_stream_complete=on_stream_complete,
     )
 
     stream_tasks: dict[int, asyncio.Task[None]] = {}
@@ -538,6 +543,8 @@ async def _async_handle_stream(
         state.aggregate_body_size -= stream.data_size
         if acquired and budget is not None:
             budget.release()
+        if state.on_stream_complete is not None:
+            state.on_stream_complete()
 
 
 async def _async_handle_stream_inner(
