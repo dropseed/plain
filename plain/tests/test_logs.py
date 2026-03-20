@@ -29,6 +29,10 @@ class TestLoggingConfiguration:
         assert not plain_logger.propagate
         assert not app_logger.propagate
 
+        # plain logger should be an AppLogger with structured formatter
+        assert isinstance(plain_logger, AppLogger)
+        assert isinstance(app_logger, AppLogger)
+
     def test_nested_logger_inheritance(self):
         """Test that nested loggers inherit settings from parent loggers."""
         configure_logging(
@@ -43,6 +47,34 @@ class TestLoggingConfiguration:
 
         assert plain_nested.getEffectiveLevel() == logging.ERROR
         assert app_nested.getEffectiveLevel() == logging.DEBUG
+
+    def test_plain_logger_structured_output(self):
+        """Test that the plain logger produces structured output via parent handlers."""
+        stream = StringIO()
+        configure_logging(
+            plain_log_level=logging.INFO,
+            app_log_level=logging.INFO,
+            app_log_format="keyvalue",
+            log_stream="stdout",
+        )
+
+        # Replace the plain logger's handlers with one that writes to our stream
+        plain_logger = logging.getLogger("plain")
+        for handler in plain_logger.handlers[:]:
+            plain_logger.removeHandler(handler)
+        handler = logging.StreamHandler(stream)
+        handler.setFormatter(
+            KeyValueFormatter("[%(levelname)s] %(message)s %(keyvalue)s")
+        )
+        plain_logger.addHandler(handler)
+
+        # A child logger should produce structured output through the parent
+        child = logging.getLogger("plain.server")
+        child.info("Request", extra={"context": {"method": "GET", "status": 200}})
+
+        output = stream.getvalue()
+        assert "method=GET" in output
+        assert "status=200" in output
 
 
 class TestLoggerFormats:

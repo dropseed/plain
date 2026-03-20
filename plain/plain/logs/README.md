@@ -6,6 +6,7 @@
 - [Using app_logger](#using-app_logger)
     - [Basic logging](#basic-logging)
     - [Adding context](#adding-context)
+- [Message format](#message-format)
 - [Output formats](#output-formats)
     - [Key-value format](#key-value-format)
     - [JSON format](#json-format)
@@ -76,6 +77,30 @@ except PaymentError:
         exc_info=True,
         context={"order_id": "ord-456"},
     )
+```
+
+## Message format
+
+Log messages should be **capitalized sentence fragments** — short, stable, and greppable. Pass variable data through `context={}` instead of embedding it in the message string.
+
+```python
+# Good: message is stable, data is structured
+app_logger.info("Order placed", context={"order_id": "ord-456", "total": 99.99})
+app_logger.warning("Rate limit approaching", context={"requests": 95, "limit": 100})
+app_logger.error("Webhook delivery failed", context={"url": "https://example.com", "attempts": 3})
+```
+
+This keeps the message and data visually distinct in output. The message stays greppable across environments, and the structured data is available for filtering in log aggregation tools.
+
+```python
+# Bad: snake_case token as message
+app_logger.info("order_placed", context={"order_id": "ord-456"})
+
+# Bad: variable data embedded in the message via f-string
+app_logger.info(f"Order {order_id} placed")
+
+# Bad: inline key=value in the message string
+app_logger.info(f"Order placed order_id={order_id} total={total}")
 ```
 
 ## Output formats

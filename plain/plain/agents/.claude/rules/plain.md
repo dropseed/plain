@@ -25,6 +25,14 @@ Plain is a Django fork but has different APIs. Package-specific differences are 
 
 When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
+## Logging
+
+- **Message format**: Capitalized sentence fragments — `"User logged in"`, `"Payment failed"`, not snake_case tokens or inline key=value
+- **No f-strings or % formatting** in log messages — pass variable data via `context={}` instead
+- Use `context={}` for `app_logger`, `extra={"context": {...}}` for standard loggers (`logging.getLogger("plain.xxx")`)
+
+Run `uv run plain docs logs --section message-format` for full examples and anti-patterns.
+
 ## Documentation
 
 **Discovery** — find what's available and where things are:
