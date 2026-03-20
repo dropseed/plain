@@ -22,7 +22,11 @@ For each package that was upgraded:
 3. If it says "No changes required", skip to next package
 4. Apply any required code changes
 
-## 3. Validate
+## 3. Update agent rules and skills
+
+Run `uv run plain agent install` to sync any updated rules and skills from the upgraded packages.
+
+## 4. Validate
 
 1. Run `uv run plain fix` to fix formatting
 2. Run `uv run plain check` to validate (linting, preflight, migrations, tests)
