@@ -40,6 +40,7 @@ version = "4.2.1"
 
 [tool.plain.dev.run]
 tunnel = { cmd = "plain tunnel $DEV_URL --subdomain plain-example --quiet" }
+worker = { cmd = "plain jobs worker" }
 
 [tool.plain.code.oxc]
 version = "1.51.0"
