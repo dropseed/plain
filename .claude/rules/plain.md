@@ -13,6 +13,12 @@ Plain is a Python web framework.
 - Run `uv run plain check` to verify changes — this runs linting, preflight, migration, and test checks. Add `--skip-test` for faster iteration during development.
 - Use `uv run plain request /path` to smoke-test changed GET views — errors and stacktraces surface immediately, making for fast iteration. Supports `--user`, `--status`, `--contains`, `--not-contains`.
 
+## Coding style
+
+- **Painfully obvious over clever** — blatant clarity, even if it means more code. You should _see_ what is happening, not have to deduce it.
+- **Write code meant to be read** — clear names, natural flow, obvious structure. The next person reading it should understand it immediately.
+- **Simplify to the present need** — if it feels overcomplicated, it is. Get right to the heart of the issue.
+
 ## Key Differences from Django
 
 Plain is a Django fork but has different APIs. Package-specific differences are in their respective rules (plain-postgres, plain-templates, plain-test). These are the core framework differences:
@@ -42,7 +48,7 @@ When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 
 **Workflow**: Use `--search <term>` to find which module has what you need, then `<name> --search <term>` to get the full sections, or `<name> --section <name>` for a specific one.
 
-Packages: plain, plain-admin, plain-api, plain-auth, plain-cache, plain-code, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-postgres, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-toolbar, plain-tunnel, plain-vendor
+Packages: plain, plain-admin, plain-api, plain-auth, plain-cache, plain-code, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-postgres, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-toolbar, plain-tunnel, plain-vendor
 
 Core modules: agents, assets, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, signals, templates, test, urls, utils, views
 

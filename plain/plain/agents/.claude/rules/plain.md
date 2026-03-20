@@ -13,6 +13,12 @@ Plain is a Python web framework.
 - Run `uv run plain check` to verify changes — this runs linting, preflight, migration, and test checks. Add `--skip-test` for faster iteration during development.
 - Use `uv run plain request /path` to smoke-test changed GET views — errors and stacktraces surface immediately, making for fast iteration. Supports `--user`, `--status`, `--contains`, `--not-contains`.
 
+## Coding style
+
+- **Painfully obvious over clever** — blatant clarity, even if it means more code. You should _see_ what is happening, not have to deduce it.
+- **Write code meant to be read** — clear names, natural flow, obvious structure. The next person reading it should understand it immediately.
+- **Simplify to the present need** — if it feels overcomplicated, it is. Get right to the heart of the issue.
+
 ## Key Differences from Django
 
 Plain is a Django fork but has different APIs. Package-specific differences are in their respective rules (plain-postgres, plain-templates, plain-test). These are the core framework differences:
