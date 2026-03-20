@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.84.2](https://github.com/dropseed/plain/releases/plain-postgres@0.84.2) (2026-03-20)
+
+### What's changed
+
+- Migrated all internal logging to structured format using `get_framework_logger()` and flat `extra={}` dicts instead of inline string formatting — log messages are now short descriptive labels (e.g. "Query executed", "Transaction command") with structured metadata (`sql`, `params`, `duration`, etc.) passed separately ([75a8b60c91](https://github.com/dropseed/plain/commit/75a8b60c91))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.84.1](https://github.com/dropseed/plain/releases/plain-postgres@0.84.1) (2026-03-16)
 
 ### What's changed
