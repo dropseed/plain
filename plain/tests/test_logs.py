@@ -4,7 +4,7 @@ from io import StringIO
 
 import pytest
 
-from plain.logs import app_logger
+from plain.logs import app_logger, get_framework_logger
 from plain.logs.configure import configure_logging
 from plain.logs.formatters import JSONFormatter, KeyValueFormatter
 from plain.logs.logger import PlainLogger
@@ -287,6 +287,48 @@ class TestPlainLogger:
         assert "Context manager debug" in output
         assert "Nested debug" in output
         assert "Manual debug" in output
+
+
+class TestGetLogger:
+    """Test the get_framework_logger factory function."""
+
+    def test_get_framework_logger_auto_name(self):
+        """Test that get_framework_logger() derives name from caller's module."""
+        log = get_framework_logger()
+        # Called from tests.test_logs → "tests.test_logs" truncated to "tests"
+        # (or whatever the module structure is)
+        assert isinstance(log, PlainLogger)
+        # Name should be first two segments of the caller's __name__
+        parts = __name__.split(".")
+        expected = ".".join(parts[:2]) if len(parts) >= 2 else parts[0]
+        assert log.name == expected
+
+    def test_get_framework_logger_explicit_name(self):
+        """Test that get_framework_logger() with explicit name uses it directly."""
+        log = get_framework_logger("plain.server.access")
+        assert isinstance(log, PlainLogger)
+        assert log.name == "plain.server.access"
+
+    def test_get_framework_logger_registered_in_manager(self):
+        """Test that get_framework_logger() registers the logger in the logging manager."""
+        log = get_framework_logger("plain.test.factory")
+        assert logging.root.manager.loggerDict["plain.test.factory"] is log
+
+    def test_get_framework_logger_has_context_param(self):
+        """Test that get_framework_logger() loggers support the context parameter."""
+        stream = StringIO()
+        handler = logging.StreamHandler(stream)
+        handler.setFormatter(JSONFormatter("%(json)s"))
+
+        log = get_framework_logger("plain.test.ctx")
+        log.addHandler(handler)
+        log.setLevel(logging.INFO)
+
+        log.info("Test message", context={"key": "value"})
+
+        parsed = json.loads(stream.getvalue().strip())
+        assert parsed["key"] == "value"
+        assert parsed["message"] == "Test message"
 
 
 class TestLogLevels:

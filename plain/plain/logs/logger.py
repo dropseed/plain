@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from typing import Any
@@ -182,6 +183,35 @@ class PlainLogger(logging.Logger):
             stack_info=stack_info,
             stacklevel=stacklevel,
         )
+
+
+def get_framework_logger(name: str = "") -> PlainLogger:
+    """Get a PlainLogger for framework code.
+
+    With no arguments, derives the name from the caller's module:
+        plain.postgres.connection → plain.postgres
+        plain.server.workers.entry → plain.server
+
+    With an explicit name, uses it directly:
+        get_framework_logger("plain.server.access")
+
+    Returns the same instance for repeated calls with the same name.
+    """
+    if not name:
+        caller = sys._getframe(1).f_globals["__name__"]
+        parts = caller.split(".")
+        name = ".".join(parts[:2])
+
+    # Return existing instance if already created
+    existing = logging.root.manager.loggerDict.get(name)
+    if isinstance(existing, PlainLogger):
+        return existing
+
+    logger = PlainLogger(name)
+    # Register so getLogger(name) and child loggers find this instance.
+    # Handlers are inherited from the "plain" parent logger via propagation.
+    logging.root.manager.loggerDict[name] = logger
+    return logger
 
 
 # Create the default app logger instance
