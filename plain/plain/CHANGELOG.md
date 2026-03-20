@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.125.0](https://github.com/dropseed/plain/releases/plain@0.125.0) (2026-03-19)
+
+### What's changed
+
+- **`plain memory baseline`** — new command that measures per-package memory cost at worker boot time, showing which dependencies are heaviest. Runs in an isolated subprocess for accurate measurements ([4b747665fc2a](https://github.com/dropseed/plain/commit/4b747665fc2a))
+- **`plain memory leaks`** — new command that detects memory leaks on a running server. Uses a three-phase tracemalloc approach (snapshots A, B, C) and reports only allocations that grew in both halves, filtering one-time initialization noise. Includes auto-stop safety timeout, atomic file writes, and current RSS on Linux via `/proc/self/statm` ([cdd7b2def319](https://github.com/dropseed/plain/commit/cdd7b2def319))
+- Server arbiter now handles `SIGUSR1` to forward memory recording signals to all workers ([cdd7b2def319](https://github.com/dropseed/plain/commit/cdd7b2def319))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.124.1](https://github.com/dropseed/plain/releases/plain@0.124.1) (2026-03-16)
 
 ### What's changed
