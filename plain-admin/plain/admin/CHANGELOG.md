@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.75.1](https://github.com/dropseed/plain/releases/plain-admin@0.75.1) (2026-03-20)
+
+### What's changed
+
+- Move preflight badge before the admin link in the toolbar for better visibility ([4536cd4186c4](https://github.com/dropseed/plain/commit/4536cd4186c4))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.75.0](https://github.com/dropseed/plain/releases/plain-admin@0.75.0) (2026-03-19)
 
 ### What's changed
