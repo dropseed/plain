@@ -20,6 +20,9 @@ from opentelemetry.semconv._incubating.attributes.code_attributes import (
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,
 )
+from opentelemetry.semconv._incubating.attributes.http_attributes import (
+    HTTP_RESPONSE_BODY_SIZE,
+)
 from opentelemetry.semconv.attributes import db_attributes, service_attributes
 from opentelemetry.semconv.attributes.code_attributes import (
     CODE_COLUMN_NUMBER,
@@ -36,6 +39,15 @@ from plain.runtime import settings
 from plain.urls import reverse
 
 __all__ = ["Log", "Span", "Trace"]
+
+
+def _format_bytes(size: int) -> str:
+    """Format a byte count as a human-readable string."""
+    if size >= 1_000_000:
+        return f"{size / 1_000_000:.1f} MB"
+    if size >= 1_000:
+        return f"{size / 1_000:.1f} KB"
+    return f"{size} B"
 
 
 @postgres.register_model
@@ -93,15 +105,19 @@ class Trace(postgres.Model):
     def get_trace_summary(self, spans: Iterable[Span]) -> str:
         # Count database queries with query text and track duplicates
         query_texts: list[str] = []
+        response_body_size: int | None = None
         for span in spans:
             if query_text := span.attributes.get(db_attributes.DB_QUERY_TEXT):
                 query_texts.append(query_text)
+            # Get response body size from root span
+            if (body_size := span.attributes.get(HTTP_RESPONSE_BODY_SIZE)) is not None:
+                response_body_size = int(body_size)
 
         query_counts = Counter(query_texts)
         query_total = len(query_texts)
         duplicate_count = sum(query_counts.values()) - len(query_counts)
 
-        # Build summary: "n spans, n queries (n duplicates), Xms"
+        # Build summary: "n queries (n duplicates) • Xms • YKB"
         parts: list[str] = []
 
         # Queries count with duplicates
@@ -114,6 +130,10 @@ class Trace(postgres.Model):
         # Duration
         if (duration_ms := self.duration_ms()) is not None:
             parts.append(f"{round(duration_ms, 1)}ms")
+
+        # Response body size
+        if response_body_size is not None:
+            parts.append(_format_bytes(response_body_size))
 
         return " • ".join(parts)
 

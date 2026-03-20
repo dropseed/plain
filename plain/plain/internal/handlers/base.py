@@ -7,9 +7,13 @@ import inspect
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import baggage, context, trace
+from opentelemetry.semconv._incubating.attributes.http_attributes import (
+    HTTP_RESPONSE_BODY_SIZE,
+)
 from opentelemetry.semconv.attributes import http_attributes, url_attributes
 
 from plain import signals
+from plain.http import Response
 from plain.runtime import settings
 from plain.urls import get_resolver
 from plain.utils.module_loading import import_string
@@ -104,6 +108,8 @@ class BaseHandler:
         span.set_attribute(
             http_attributes.HTTP_RESPONSE_STATUS_CODE, response.status_code
         )
+        if isinstance(response, Response):
+            span.set_attribute(HTTP_RESPONSE_BODY_SIZE, len(response.content))
         span.set_status(
             trace.StatusCode.OK
             if response.status_code < 400

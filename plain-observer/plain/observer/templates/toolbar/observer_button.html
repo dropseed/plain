@@ -28,3 +28,39 @@
     {% endif %}
     </span>
 </button>
+<span
+    data-observer-response-size
+    class="hidden items-baseline text-[11px] tabular-nums"
+>
+    <span class="text-[10px] text-white/30 mr-1">SIZE</span>
+    <span
+        data-observer-response-size-value
+        class="text-white/50
+               data-[level=warn]:text-amber-400
+               data-[level=danger]:text-red-400"
+    ></span>
+</span>
+<script nonce="{{ request.csp_nonce }}">
+(function() {
+    function formatBytes(bytes) {
+        if (bytes >= 1000000) return (bytes / 1000000).toFixed(1) + " MB";
+        if (bytes >= 1000) return (bytes / 1000).toFixed(1) + " KB";
+        return bytes + " B";
+    }
+    window.addEventListener("load", function() {
+        var nav = performance.getEntriesByType("navigation")[0];
+        var el = document.querySelector("[data-observer-response-size]");
+        var valueEl = document.querySelector("[data-observer-response-size-value]");
+        if (nav && nav.decodedBodySize > 0 && el && valueEl) {
+            valueEl.textContent = formatBytes(nav.decodedBodySize);
+            if (nav.decodedBodySize >= 1000000) {
+                valueEl.dataset.level = "danger";
+            } else if (nav.decodedBodySize >= 100000) {
+                valueEl.dataset.level = "warn";
+            }
+            el.classList.remove("hidden");
+            el.classList.add("inline-flex");
+        }
+    });
+})();
+</script>
