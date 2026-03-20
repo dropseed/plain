@@ -1,5 +1,23 @@
 # plain changelog
 
+## [0.126.0](https://github.com/dropseed/plain/releases/plain@0.126.0) (2026-03-20)
+
+### What's changed
+
+- **Worker recycling** — workers now gracefully restart after a configurable number of requests to prevent memory accumulation from fragmentation, C extension leaks, or unbounded caches. Controlled by new `SERVER_MAX_REQUESTS` (default 1000, 0 to disable) and `SERVER_MAX_REQUESTS_JITTER` (default 100) settings. Both HTTP/1.1 requests and HTTP/2 streams count toward the limit ([e953f62609](https://github.com/dropseed/plain/commit/e953f62609))
+- **Structured logging throughout the framework** — all `plain.*` loggers now use the same key-value / JSON formatters as `app_logger` instead of bare `[LEVEL] message` format. Log messages use stable, greppable sentence fragments with variable data passed as structured `extra={}` fields rather than `%s` interpolation ([75a8b60c91](https://github.com/dropseed/plain/commit/75a8b60c91))
+- **`get_framework_logger()` factory** — new public function in `plain.logs` that auto-derives logger names from the caller's module (e.g. `plain.server.workers.entry` becomes `plain.server`), replacing scattered `logging.getLogger("plain.xxx")` calls across the codebase ([2e25cae784](https://github.com/dropseed/plain/commit/2e25cae784))
+- **`AppLogger` renamed to `PlainLogger`** — the logger class in `plain.logs` has been renamed and moved from `app.py` to `logger.py`. The `app_logger` instance and its API are unchanged. A new `exception()` method was added to support `context={}` on exception logs ([b79829ddbb](https://github.com/dropseed/plain/commit/b79829ddbb))
+- **Flat extra for structured formatters** — `PlainLogger._log()` now merges persistent context, `extra`, and per-call `context` into flat top-level `LogRecord` attributes instead of nesting under `extra["context"]`. The `KeyValueFormatter` and `JSONFormatter` extract context by diffing against standard `LogRecord` attributes, so both `app_logger` and standard `plain.*` loggers produce identical structured output ([5148b2bc31](https://github.com/dropseed/plain/commit/5148b2bc31))
+- **Response body size in traces** — the `http.response.body.size` OpenTelemetry attribute is now set on server spans for non-streaming responses, making response sizes visible in observer traces and the toolbar ([46f981ff80](https://github.com/dropseed/plain/commit/46f981ff80))
+- **Cgroup-aware CPU count shared via `plain.utils.os`** — the `get_cpu_count()` helper was moved from the server CLI to `plain.utils.os` so the jobs worker can also use it for container-aware process counts ([aa0e57b7eb](https://github.com/dropseed/plain/commit/aa0e57b7eb))
+
+### Upgrade instructions
+
+- If you subclassed or imported `AppLogger` directly, update to `PlainLogger` (import path changed from `plain.logs.app` to `plain.logs.logger`).
+- If you relied on `extra["context"]` being a nested dict on log records from `app_logger`, note that context keys are now flat top-level attributes on the `LogRecord`. Standard `extra={}` usage and `context={}` on `app_logger` calls are unaffected.
+- Review any custom log parsing that expected `[LEVEL] message` format from `plain.*` loggers — they now use the same formatter as `app_logger` (key-value or JSON depending on `APP_LOG_FORMAT`).
+
 ## [0.125.0](https://github.com/dropseed/plain/releases/plain@0.125.0) (2026-03-19)
 
 ### What's changed
