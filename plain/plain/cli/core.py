@@ -18,6 +18,7 @@ from .chores import chores
 from .docs import docs
 from .formatting import PlainContext
 from .install import install
+from .memory import memory
 from .preflight import preflight_cli
 from .registry import cli_registry
 from .request import request
@@ -38,6 +39,7 @@ def plain_cli() -> None:
 plain_cli.add_command(check)
 plain_cli.add_command(docs)
 plain_cli.add_command(request)
+plain_cli.add_command(memory)
 plain_cli.add_command(agent)
 plain_cli.add_command(preflight_cli)
 plain_cli.add_command(create)
