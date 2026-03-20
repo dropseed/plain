@@ -5,7 +5,7 @@ labels:
 
 # Fix: Reintroduce optional worker recycling (Finding 11)
 
-## Status: UNRESOLVED
+## Status: RESOLVED
 
 ## Problem
 

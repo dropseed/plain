@@ -193,6 +193,8 @@ SERVER_GRACEFUL_TIMEOUT: int = 30
 SERVER_SENDFILE: bool = True
 SERVER_CONNECTIONS: int = 1000
 SERVER_H2_MAX_CONCURRENT_STREAMS: int = 100
+SERVER_MAX_REQUESTS: int = 0  # 0 = disabled
+SERVER_MAX_REQUESTS_JITTER: int = 0  # random variance, e.g., 50 means +/- 50
 
 # MARK: Preflight Checks
 

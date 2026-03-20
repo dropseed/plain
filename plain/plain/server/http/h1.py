@@ -684,6 +684,7 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
 
         req, http_request, resp, request_start = parse_result
         conn.req_count += 1
+        worker._count_request()
 
         keepalive = await dispatch(worker, req, conn, http_request, resp, request_start)
 
