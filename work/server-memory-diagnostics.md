@@ -3,7 +3,6 @@ labels:
   - plain.server
   - plain.cli
 related:
-  - fix-worker-recycling
   - observer-profiling
   - server-performance
 ---
