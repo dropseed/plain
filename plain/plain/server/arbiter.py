@@ -95,6 +95,7 @@ class Arbiter:
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_hard_stop)
         signal.signal(signal.SIGQUIT, self._handle_hard_stop)
+        signal.signal(signal.SIGUSR1, self._handle_memory_signal)
 
         self._listeners = sock.create_sockets(self.app)
 
@@ -111,6 +112,10 @@ class Arbiter:
         from plain.runtime import settings
 
         check_worker_config(self.app.threads, settings.SERVER_CONNECTIONS, self.log)
+
+    def _handle_memory_signal(self, sig: int, frame: object) -> None:
+        """Forward SIGUSR1 to all workers for memory profiling."""
+        self._kill_workers(signal.SIGUSR1)
 
     def _handle_signal(self, sig: int, frame: object) -> None:
         self._shutdown_event.set()

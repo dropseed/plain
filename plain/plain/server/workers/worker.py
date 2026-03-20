@@ -156,6 +156,7 @@ class Worker:
         loop.add_signal_handler(signal.SIGTERM, self._signal_exit)
         loop.add_signal_handler(signal.SIGINT, self._signal_quit)
         loop.add_signal_handler(signal.SIGQUIT, self._signal_quit)
+        loop.add_signal_handler(signal.SIGUSR1, self._handle_memory_signal)
         # SIGABRT/SIGWINCH use signal.signal() because they need the
         # (sig, frame) signature and call sys.exit() directly
         signal.signal(signal.SIGABRT, self.handle_abort)
@@ -311,6 +312,11 @@ class Worker:
         self.alive = False
         self.tpool.shutdown(wait=False, cancel_futures=True)
         sys.exit(1)
+
+    def _handle_memory_signal(self) -> None:
+        from ._memory import signal_handler
+
+        signal_handler()
 
     def handle_winch(self, sig: int, fname: Any) -> None:
         # Ignore SIGWINCH in worker. Fixes a crash on OpenBSD.

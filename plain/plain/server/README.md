@@ -7,6 +7,7 @@
 - [Configuration options](#configuration-options)
 - [Settings](#settings)
 - [Signals](#signals)
+- [Memory leak detection](#memory-leak-detection)
 - [FAQs](#faqs)
 - [Architecture](#architecture)
 - [Installation](#installation)
@@ -141,11 +142,47 @@ Access logging has three layers, each at the right level of abstraction:
 
 The server responds to UNIX signals for process management.
 
-| Signal    | Effect            |
-| --------- | ----------------- |
-| `SIGTERM` | Graceful shutdown |
-| `SIGINT`  | Quick shutdown    |
-| `SIGQUIT` | Quick shutdown    |
+| Signal    | Effect                                                 |
+| --------- | ------------------------------------------------------ |
+| `SIGTERM` | Graceful shutdown                                      |
+| `SIGINT`  | Quick shutdown                                         |
+| `SIGQUIT` | Quick shutdown                                         |
+| `SIGUSR1` | Toggle memory recording (used by `plain memory leaks`) |
+
+## Memory leak detection
+
+```bash
+plain memory leaks
+plain memory leaks --duration 60
+```
+
+Records allocations on a running server using a three-phase approach:
+
+1. Takes a baseline snapshot
+2. Takes a midpoint snapshot after half the duration
+3. Takes a final snapshot and compares both halves
+
+Only allocations that grew in **both** halves are reported, filtering out one-time initialization. This makes it practical to run against production traffic — cache warmup and lazy loading won't show up as false positives.
+
+The command auto-detects the running server and signals all workers via `SIGUSR1`. Use `--pid` to target a specific server if multiple are running. Recording auto-stops after 5 minutes if interrupted.
+
+```
+plain memory leaks --duration 30
+
+Checking for leaks (30s, 2 worker(s))
+Send traffic to your app while this runs.
+
+  Phase 1/2 (15s)... done
+  Phase 2/2 (15s)... done
+
+  RSS: 98 MB → 99 MB (+1.2 MB)
+
+Suspected leaks:
+  app/views.py
+    line 42: +18.6 KB → +19.1 KB
+```
+
+On Linux, RSS readings use `/proc/self/statm` for current (not peak) memory. On macOS, `ru_maxrss` (peak) is used as a fallback.
 
 ## FAQs
 

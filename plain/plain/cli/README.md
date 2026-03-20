@@ -208,6 +208,7 @@ Plain includes several built-in commands:
 | `plain build`         | Run build commands                       |
 | `plain install`       | Install package dependencies             |
 | `plain upgrade`       | Upgrade Plain packages                   |
+| `plain memory`        | Memory profiling tools                   |
 
 Additional commands are added by installed packages (like `plain models migrate` from plain.postgres).
 
@@ -234,6 +235,31 @@ my-check = {cmd = "echo 'running my check'"}
 ```
 
 Custom commands run first, before any built-in checks.
+
+### `plain memory`
+
+Memory profiling tools for diagnosing boot-time costs and runtime leaks.
+
+#### `plain memory baseline`
+
+Measures which packages consume the most memory when a worker process starts — before any requests are handled. Runs in an isolated subprocess so results aren't contaminated by prior imports.
+
+```bash
+plain memory baseline
+```
+
+```
+Worker RSS: 87 MB (245 modules)
+
+Heaviest packages:
+  stripe                           35.1 MB
+  boto3                            12.3 MB
+  plain.postgres                    8.7 MB
+```
+
+#### `plain memory leaks`
+
+Checks a running server for memory leaks. See the [server docs](../server/README.md#memory-leak-detection) for details.
 
 ## FAQs
 
