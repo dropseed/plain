@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.46.3](https://github.com/dropseed/plain/releases/plain-jobs@0.46.3) (2026-03-20)
+
+### What's changed
+
+- **Cgroup-aware worker process count** — when `max_processes` is not explicitly set, the jobs worker now uses `get_cpu_count()` which respects cgroup v2 CPU quotas, preventing over-provisioning of worker processes in containerized environments ([aa0e57b7eb85](https://github.com/dropseed/plain/commit/aa0e57b7eb85))
+- **Structured logging** — all log messages now use structured `extra={}` for variable data instead of inline string formatting, making logs easier to parse and filter in log aggregation tools ([75a8b60c91](https://github.com/dropseed/plain/commit/75a8b60c91))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.46.2](https://github.com/dropseed/plain/releases/plain-jobs@0.46.2) (2026-03-19)
 
 ### What's changed
