@@ -1,3 +1,4 @@
+{% set trace_summary = observer.get_current_trace_summary() %}
 <button
     type="button"
     class="inline-flex items-center cursor-pointer text-xs rounded-full px-2.5 py-px bg-white/20 text-white/80 hover:bg-white/30 overflow-hidden"
@@ -15,8 +16,8 @@
         <span class="rounded-full bg-zinc-500 w-2 h-2 inline-block mr-2 flex-shrink-0"></span>
     {% endif %}
     <span class="truncate">
-    {% if observer.get_current_trace_summary() %}
-        {{ observer.get_current_trace_summary() }}
+    {% if trace_summary %}
+        {{ trace_summary }}
     {% elif observer.is_persisting() %}
         Recording (no summary)
     {% elif observer.is_summarizing() %}
@@ -29,24 +30,89 @@
     </span>
 </button>
 <span
-    data-observer-response-size
-    class="hidden items-baseline text-[11px] tabular-nums"
+    data-observer-stats-dot
+    class="cursor-pointer flex-shrink-0
+           text-zinc-500
+           data-[level=warn]:text-amber-400
+           data-[level=danger]:text-red-500"
+    data-level="{{ system_stats.level }}"
+    title="Click to expand system stats"
 >
-    <span class="text-[10px] text-white/30 mr-1">SIZE</span>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M6 2a.5.5 0 0 1 .47.33L10 12.036l1.53-4.208A.5.5 0 0 1 12 7.5h3.5a.5.5 0 0 1 0 1h-3.15l-1.88 5.17a.5.5 0 0 1-.94 0L6 3.964 4.47 8.171A.5.5 0 0 1 4 8.5H.5a.5.5 0 0 1 0-1h3.15l1.88-5.17A.5.5 0 0 1 6 2"/>
+    </svg>
+</span>
+<span data-observer-stats-expanded class="hidden items-center divide-x divide-white/10 [&>span]:px-2">
     <span
-        data-observer-response-size-value
-        class="text-white/50
-               data-[level=warn]:text-amber-400
-               data-[level=danger]:text-red-400"
-    ></span>
+        data-observer-response-size
+        class="hidden items-baseline text-[11px] tabular-nums"
+    >
+        <span class="text-[10px] text-white/30 mr-1">SIZE</span>
+        <span
+            data-observer-response-size-value
+            class="text-white/50
+                   data-[level=warn]:text-amber-400
+                   data-[level=danger]:text-red-400"
+        ></span>
+    </span>
+    <span class="items-baseline text-[11px] tabular-nums">
+        <span class="text-[10px] text-white/30 mr-1">CPU</span>
+        <span
+            class="text-white/50
+                   data-[level=warn]:text-amber-400
+                   data-[level=danger]:text-red-400"
+            {% if system_stats.cpu_level != "ok" %}data-level="{{ system_stats.cpu_level }}"{% endif %}
+        >{{ system_stats.cpu_percent }}%</span>
+    </span>
+    <span class="items-baseline text-[11px] tabular-nums">
+        <span class="text-[10px] text-white/30 mr-1">MEM</span>
+        <span
+            class="text-white/50
+                   data-[level=warn]:text-amber-400
+                   data-[level=danger]:text-red-400"
+            {% if system_stats.mem_level != "ok" %}data-level="{{ system_stats.mem_level }}"{% endif %}
+        >{{ system_stats.mem_percent }}%</span>
+    </span>
 </span>
 <script nonce="{{ request.csp_nonce }}">
 (function() {
     function formatBytes(bytes) {
         if (bytes >= 1000000) return (bytes / 1000000).toFixed(1) + " MB";
-        if (bytes >= 1000) return (bytes / 1000).toFixed(1) + " KB";
+        if (bytes >= 1000) return Math.round(bytes / 1000) + " KB";
         return bytes + " B";
     }
+
+    var dot = document.querySelector("[data-observer-stats-dot]");
+    var expanded = document.querySelector("[data-observer-stats-expanded]");
+
+    try {
+        var collapsed = localStorage.getItem("observer.stats.collapsed") !== "0";
+    } catch (e) {
+        var collapsed = true;
+    }
+
+    function toggle() {
+        collapsed = !collapsed;
+        try { localStorage.setItem("observer.stats.collapsed", collapsed ? "1" : "0"); } catch (e) {}
+        render();
+    }
+
+    function render() {
+        if (collapsed) {
+            dot.classList.remove("hidden");
+            expanded.classList.add("hidden");
+            expanded.classList.remove("flex");
+        } else {
+            dot.classList.add("hidden");
+            expanded.classList.remove("hidden");
+            expanded.classList.add("flex");
+        }
+    }
+
+    dot.addEventListener("click", toggle);
+    expanded.addEventListener("click", toggle);
+    render();
+
     window.addEventListener("load", function() {
         var nav = performance.getEntriesByType("navigation")[0];
         var el = document.querySelector("[data-observer-response-size]");
@@ -55,7 +121,11 @@
             valueEl.textContent = formatBytes(nav.decodedBodySize);
             if (nav.decodedBodySize >= 1000000) {
                 valueEl.dataset.level = "danger";
+                dot.dataset.level = "danger";
             } else if (nav.decodedBodySize >= 100000) {
+                if (dot.dataset.level !== "danger") {
+                    dot.dataset.level = "warn";
+                }
                 valueEl.dataset.level = "warn";
             }
             el.classList.remove("hidden");
