@@ -15,6 +15,7 @@ from plain.runtime import settings
 from plain.signals import request_finished, request_started
 from plain.utils import timezone
 from plain.utils.module_loading import import_string
+from plain.utils.os import get_cpu_count
 
 from .registry import jobs_registry
 
@@ -66,6 +67,9 @@ class Worker:
     ) -> None:
         if jobs_schedule is None:
             jobs_schedule = []
+
+        if max_processes is None:
+            max_processes = get_cpu_count()
 
         self.executor = ProcessPoolExecutor(
             max_workers=max_processes,
