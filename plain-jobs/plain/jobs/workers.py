@@ -332,8 +332,15 @@ def process_job(job_process_uuid: str) -> None:
         duration = job_result.ended_at - job_result.started_at  # type: ignore[operator]
         duration = duration.total_seconds()
 
+        if job_result.requested_at and job_result.started_at:
+            queue_time = (
+                job_result.started_at - job_result.requested_at
+            ).total_seconds()
+        else:
+            queue_time = None
+
         logger.info(
-            'Completed job worker_pid=%s job_class=%s job_process_uuid=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_queue="%s" job_duration=%s',
+            'Completed job worker_pid=%s job_class=%s job_process_uuid=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_queue="%s" job_duration=%s job_queue_time=%s',
             worker_pid,
             job_result.job_class,
             job_result.job_process_uuid,
@@ -343,6 +350,7 @@ def process_job(job_process_uuid: str) -> None:
             job_result.source,
             job_result.queue,
             duration,
+            queue_time,
         )
     except Exception as e:
         # Raising exceptions inside the worker process doesn't
