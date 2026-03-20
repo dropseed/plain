@@ -1,5 +1,19 @@
 # plain-observer changelog
 
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-observer@0.30.0) (2026-03-20)
+
+### What's changed
+
+- Redesigned the observer toolbar button as a two-pill layout: a request pill (observer state, query count, request duration, response body size) and a system pill (CPU and memory usage), with color-coded warning/danger levels ([44d226b886e1](https://github.com/dropseed/plain/commit/44d226b886e1))
+- Added live system CPU and memory stats to the toolbar, powered by a new `psutil` dependency ([98b50749e958](https://github.com/dropseed/plain/commit/98b50749e958))
+- Response body size is now captured from OpenTelemetry spans and displayed in the toolbar (via the Navigation Timing API) and in persisted trace summaries ([46f981ff80fb](https://github.com/dropseed/plain/commit/46f981ff80fb))
+- Renamed `get_current_trace_summary` / `get_trace_summary` to `get_current_trace_stats` / `get_trace_stats`, which now return structured `dict` data instead of a formatted string ([44d226b886e1](https://github.com/dropseed/plain/commit/44d226b886e1))
+
+### Upgrade instructions
+
+- If you called `Observer.get_current_trace_summary()`, rename to `get_current_trace_stats()` — it now returns a `dict` with keys `query_count`, `duplicate_count`, `duration_ms`, and `response_body_size` instead of a formatted string.
+- Add `psutil>=5.9` to your dependencies if you pin observer's transitive deps.
+
 ## [0.29.1](https://github.com/dropseed/plain/releases/plain-observer@0.29.1) (2026-03-19)
 
 ### What's changed
