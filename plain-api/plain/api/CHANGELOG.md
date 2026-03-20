@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.28.1](https://github.com/dropseed/plain/releases/plain-api@0.28.1) (2026-03-20)
+
+### What's changed
+
+- Switched internal logging to use the structured framework logger (`plain.logs.get_framework_logger`) instead of the standard `logging` module ([75a8b60c91](https://github.com/dropseed/plain/commit/75a8b60c91))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-api@0.28.0) (2026-03-12)
 
 ### What's changed
