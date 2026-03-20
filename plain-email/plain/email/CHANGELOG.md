@@ -1,5 +1,16 @@
 # plain-email changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-email@0.18.0) (2026-03-20)
+
+### What's changed
+
+- **Removed `auth_user` and `auth_password` parameters** from `send_mail()` and `send_mass_mail()` — these functions now always use the `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD` settings for authentication. Use `get_connection(username=..., password=...)` and pass the connection directly if you need custom credentials ([99c9e751e8](https://github.com/dropseed/plain/commit/99c9e751e8))
+
+### Upgrade instructions
+
+- Remove any `auth_user` or `auth_password` arguments from `send_mail()` and `send_mass_mail()` calls.
+- If you need custom SMTP credentials per-call, create a connection with `get_connection(username=..., password=...)` and pass it via the `connection` parameter instead.
+
 ## [0.17.0](https://github.com/dropseed/plain/releases/plain-email@0.17.0) (2026-03-12)
 
 ### What's changed
