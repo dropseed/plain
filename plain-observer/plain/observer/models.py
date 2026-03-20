@@ -102,38 +102,42 @@ class Trace(postgres.Model):
     def duration_ms(self) -> float:
         return (self.end_time - self.start_time).total_seconds() * 1000
 
-    def get_trace_summary(self, spans: Iterable[Span]) -> str:
-        # Count database queries with query text and track duplicates
+    def get_trace_stats(self, spans: Iterable[Span]) -> dict[str, Any]:
+        """Extract structured performance stats from trace spans."""
         query_texts: list[str] = []
         response_body_size: int | None = None
         for span in spans:
             if query_text := span.attributes.get(db_attributes.DB_QUERY_TEXT):
                 query_texts.append(query_text)
-            # Get response body size from root span
             if (body_size := span.attributes.get(HTTP_RESPONSE_BODY_SIZE)) is not None:
                 response_body_size = int(body_size)
 
         query_counts = Counter(query_texts)
-        query_total = len(query_texts)
-        duplicate_count = sum(query_counts.values()) - len(query_counts)
+        return {
+            "query_count": len(query_texts),
+            "duplicate_count": sum(query_counts.values()) - len(query_counts),
+            "duration_ms": self.duration_ms(),
+            "response_body_size": response_body_size,
+        }
 
-        # Build summary: "n queries (n duplicates) • Xms • YKB"
+    def get_trace_summary(self, spans: Iterable[Span]) -> str:
+        """Format trace stats as a human-readable summary string."""
+        stats = self.get_trace_stats(spans)
         parts: list[str] = []
 
-        # Queries count with duplicates
+        query_total = stats["query_count"]
         if query_total > 0:
             query_part = f"{query_total} quer{'y' if query_total == 1 else 'ies'}"
+            duplicate_count = stats["duplicate_count"]
             if duplicate_count > 0:
                 query_part += f" ({duplicate_count} duplicate{'' if duplicate_count == 1 else 's'})"
             parts.append(query_part)
 
-        # Duration
-        if (duration_ms := self.duration_ms()) is not None:
-            parts.append(f"{round(duration_ms, 1)}ms")
+        if stats["duration_ms"] is not None:
+            parts.append(f"{round(stats['duration_ms'], 1)}ms")
 
-        # Response body size
-        if response_body_size is not None:
-            parts.append(_format_bytes(response_body_size))
+        if stats["response_body_size"] is not None:
+            parts.append(_format_bytes(stats["response_body_size"]))
 
         return " • ".join(parts)
 

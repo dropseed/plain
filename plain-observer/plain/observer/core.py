@@ -169,8 +169,8 @@ class Observer:
             max_age=self.PERSIST_COOKIE_DURATION,
         )
 
-    def get_current_trace_summary(self) -> str | None:
-        """Get performance summary string for the currently active trace."""
-        from .otel import get_current_trace_summary
+    def get_current_trace_stats(self) -> dict[str, Any] | None:
+        """Get structured performance stats for the currently active trace."""
+        from .otel import get_current_trace_stats
 
-        return get_current_trace_summary()
+        return get_current_trace_stats()

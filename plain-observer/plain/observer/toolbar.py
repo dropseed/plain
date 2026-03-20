@@ -14,7 +14,7 @@ from .core import Observer
 _cpu_count = get_cpu_count()
 
 
-def _level(value: int, warn: int, danger: int) -> str:
+def _level(value: int | float, warn: int, danger: int) -> str:
     if value >= danger:
         return "danger"
     if value >= warn:
@@ -28,23 +28,47 @@ def _get_system_stats() -> dict[str, Any]:
     cpu_percent = min(round(load_1 / _cpu_count * 100), 100)
     mem_percent = round(psutil.virtual_memory().percent)
 
-    cpu_level = _level(cpu_percent, warn=50, danger=80)
-    mem_level = _level(mem_percent, warn=70, danger=90)
-
-    # Worst level for the aggregate dot
-    if "danger" in (cpu_level, mem_level):
-        level = "danger"
-    elif "warn" in (cpu_level, mem_level):
-        level = "warn"
-    else:
-        level = "ok"
-
     return {
         "cpu_percent": cpu_percent,
-        "cpu_level": cpu_level,
+        "cpu_level": _level(cpu_percent, warn=50, danger=80),
         "mem_percent": mem_percent,
-        "mem_level": mem_level,
-        "level": level,
+        "mem_level": _level(mem_percent, warn=70, danger=90),
+    }
+
+
+def _get_trace_stats(observer: Observer) -> dict[str, Any] | None:
+    """Get trace-level stats with levels and display values."""
+    stats = observer.get_current_trace_stats()
+    if stats is None:
+        return None
+
+    query_count = stats["query_count"]
+    duplicate_count = stats["duplicate_count"]
+    duration_ms = stats["duration_ms"]
+
+    # Any duplicate queries promote to at least "warn" (N+1 indicator)
+    query_level = _level(query_count, warn=10, danger=30)
+    if duplicate_count > 0 and query_level == "ok":
+        query_level = "warn"
+
+    # Format duration for display
+    if duration_ms is not None:
+        duration_ms_rounded = round(duration_ms)
+        if duration_ms >= 1000:
+            duration_display = f"{duration_ms / 1000:.1f}s"
+        else:
+            duration_display = f"{duration_ms_rounded}ms"
+        duration_level = _level(duration_ms_rounded, warn=200, danger=1000)
+    else:
+        duration_display = None
+        duration_level = "ok"
+
+    return {
+        "query_count": query_count,
+        "duplicate_count": duplicate_count,
+        "query_level": query_level,
+        "duration_display": duration_display,
+        "duration_level": duration_level,
     }
 
 
@@ -64,6 +88,7 @@ class ObserverToolbarItem(ToolbarItem):
         context = super().get_template_context()
         context["observer"] = self.observer
         context["system_stats"] = _get_system_stats()
+        context["trace_stats"] = _get_trace_stats(self.observer)
         return context
 
     def get_template_context(self) -> dict[str, Any]:

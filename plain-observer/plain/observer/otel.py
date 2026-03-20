@@ -58,19 +58,14 @@ def get_observer_span_processor() -> ObserverSpanProcessor | None:
     return None
 
 
-def get_current_trace_summary() -> str | None:
-    """Get performance summary for the currently active trace."""
+def get_current_trace_stats() -> dict[str, Any] | None:
+    """Get structured performance stats for the currently active trace."""
     if not (current_span := trace.get_current_span()):
         return None
-
     if not (processor := get_observer_span_processor()):
         return None
-
     trace_id = f"0x{format_trace_id(current_span.get_span_context().trace_id)}"
-
-    # Technically we're still in the trace... so the duration and stuff could shift slightly
-    # (though we should be at the end of the template, hopefully)
-    return processor.get_trace_summary(trace_id)
+    return processor.get_trace_stats(trace_id)
 
 
 class ObserverSampler(sampling.Sampler):
@@ -310,18 +305,16 @@ class ObserverSpanProcessor(SpanProcessor):
                 # Clean up trace
                 del self._traces[trace_id]
 
-    def get_trace_summary(self, trace_id: str) -> str | None:
-        """Get performance summary for a specific trace."""
+    def get_trace_stats(self, trace_id: str) -> dict[str, Any] | None:
+        """Get structured performance stats for a specific trace."""
         from .models import Span, Trace
 
         with self._traces_lock:
-            # Return None if trace doesn't exist (mode was None)
             if trace_id not in self._traces:
                 return None
 
             trace_info = self._traces[trace_id]
 
-            # Combine active and completed spans
             all_otel_spans = (
                 list(trace_info["active_otel_spans"].values())
                 + trace_info["completed_otel_spans"]
@@ -330,22 +323,21 @@ class ObserverSpanProcessor(SpanProcessor):
             if not all_otel_spans:
                 return None
 
-            # Create or update trace model instance
             if not trace_info["trace"]:
                 trace_info["trace"] = Trace.from_opentelemetry_spans(all_otel_spans)
 
             if not trace_info["trace"]:
                 return None
 
-            # Create span model instances if needed
             span_models = trace_info.get("span_models", [])
             if not span_models:
                 span_models = [
                     Span.from_opentelemetry_span(s, trace_info["trace"])
                     for s in all_otel_spans
                 ]
+                trace_info["span_models"] = span_models
 
-            return trace_info["trace"].get_trace_summary(span_models)
+            return trace_info["trace"].get_trace_stats(span_models)
 
     def _export_trace(
         self,

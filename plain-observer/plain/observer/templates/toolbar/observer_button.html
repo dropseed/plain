@@ -1,62 +1,57 @@
-{% set trace_summary = observer.get_current_trace_summary() %}
+{# Request pill — observer state + request stats, clickable to open Observer panel #}
 <button
     type="button"
-    class="inline-flex items-center cursor-pointer text-xs rounded-full px-2.5 py-px bg-white/20 text-white/80 hover:bg-white/30 overflow-hidden"
-    data-toolbar-tab="Observer">
-    {% if observer.is_persisting() %}
-        <span class="relative inline-flex size-2 mr-2.5 flex-shrink-0">
-            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
-            <span class="relative inline-flex size-2 rounded-full bg-red-500"></span>
-        </span>
-    {% elif observer.is_summarizing() %}
-        <span class="relative inline-flex size-2 mr-2 flex-shrink-0">
-            <span class="relative inline-flex size-2 rounded-full bg-zinc-500"></span>
-        </span>
-    {% elif not observer.is_enabled() %}
-        <span class="rounded-full bg-zinc-500 w-2 h-2 inline-block mr-2 flex-shrink-0"></span>
-    {% endif %}
-    <span class="truncate">
-    {% if trace_summary %}
-        {{ trace_summary }}
-    {% elif observer.is_persisting() %}
-        Recording (no summary)
-    {% elif observer.is_summarizing() %}
-        No summary
-    {% elif observer.is_enabled() %}
-        Observing
-    {% else %}
-        Observer disabled
-    {% endif %}
-    </span>
-</button>
-<span
-    data-observer-stats-dot
-    class="cursor-pointer flex-shrink-0
-           text-zinc-500
-           data-[level=warn]:text-amber-400
-           data-[level=danger]:text-red-500"
-    data-level="{{ system_stats.level }}"
-    title="Click to expand system stats"
+    class="inline-flex items-center cursor-pointer text-xs rounded-full px-1 py-px bg-white/8 text-white/80 hover:bg-white/12 overflow-hidden divide-x divide-white/10 [&>span]:px-1.5"
+    data-toolbar-tab="Observer"
 >
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-        <path fill-rule="evenodd" d="M6 2a.5.5 0 0 1 .47.33L10 12.036l1.53-4.208A.5.5 0 0 1 12 7.5h3.5a.5.5 0 0 1 0 1h-3.15l-1.88 5.17a.5.5 0 0 1-.94 0L6 3.964 4.47 8.171A.5.5 0 0 1 4 8.5H.5a.5.5 0 0 1 0-1h3.15l1.88-5.17A.5.5 0 0 1 6 2"/>
-    </svg>
-</span>
-<span data-observer-stats-expanded class="hidden items-center divide-x divide-white/10 [&>span]:px-2">
+    {% if observer.is_persisting() %}
+    <span class="inline-flex items-center">
+        <span class="relative inline-flex size-1.5 mr-1.5 flex-shrink-0">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+            <span class="relative inline-flex size-1.5 rounded-full bg-red-500"></span>
+        </span>
+        <span class="text-[11px]">Recording</span>
+    </span>
+    {% elif not observer.is_enabled() %}
+    <span class="inline-flex items-center gap-1.5">
+        <span class="rounded-full bg-zinc-500 size-1.5 flex-shrink-0"></span>
+        <span class="text-[11px]">Disabled</span>
+    </span>
+    {% endif %}
+
+    {% if trace_stats %}
+    <span
+        class="text-[11px] text-white/50
+               data-[level=warn]:text-amber-400
+               data-[level=danger]:text-red-400"
+        title="SQL queries"
+        {% if trace_stats.query_level != "ok" %}data-level="{{ trace_stats.query_level }}"{% endif %}
+    >{{ trace_stats.query_count }}{% if trace_stats.duplicate_count %}+{{ trace_stats.duplicate_count }}{% endif %} {{ "query" if trace_stats.query_count == 1 else "queries" }}</span>
+    {% if trace_stats.duration_display %}
+    <span
+        class="text-[11px] text-white/50
+               data-[level=warn]:text-amber-400
+               data-[level=danger]:text-red-400"
+        title="Request duration"
+        {% if trace_stats.duration_level != "ok" %}data-level="{{ trace_stats.duration_level }}"{% endif %}
+    >{{ trace_stats.duration_display }}</span>
+    {% endif %}
+    {% endif %}
+
     <span
         data-observer-response-size
-        class="hidden items-baseline text-[11px] tabular-nums"
-    >
-        <span class="text-[10px] text-white/30 mr-1">SIZE</span>
-        <span
-            data-observer-response-size-value
-            class="text-white/50
-                   data-[level=warn]:text-amber-400
-                   data-[level=danger]:text-red-400"
-        ></span>
-    </span>
+        class="hidden text-[11px] text-white/50
+               data-[level=warn]:text-amber-400
+               data-[level=danger]:text-red-400"
+        title="Response body size"
+        data-observer-response-size-value
+    ></span>
+</button>
+
+{# System pill — CPU and memory, non-interactive #}
+<span class="inline-flex items-center text-xs rounded-full px-1 py-px bg-white/8 overflow-hidden divide-x divide-white/10 [&>span]:px-1.5">
     <span class="items-baseline text-[11px] tabular-nums">
-        <span class="text-[10px] text-white/30 mr-1">CPU</span>
+        <span class="text-[9px] text-white/30 mr-1">CPU</span>
         <span
             class="text-white/50
                    data-[level=warn]:text-amber-400
@@ -65,7 +60,7 @@
         >{{ system_stats.cpu_percent }}%</span>
     </span>
     <span class="items-baseline text-[11px] tabular-nums">
-        <span class="text-[10px] text-white/30 mr-1">MEM</span>
+        <span class="text-[9px] text-white/30 mr-1">MEM</span>
         <span
             class="text-white/50
                    data-[level=warn]:text-amber-400
@@ -74,6 +69,7 @@
         >{{ system_stats.mem_percent }}%</span>
     </span>
 </span>
+
 <script nonce="{{ request.csp_nonce }}">
 (function() {
     function formatBytes(bytes) {
@@ -82,54 +78,17 @@
         return bytes + " B";
     }
 
-    var dot = document.querySelector("[data-observer-stats-dot]");
-    var expanded = document.querySelector("[data-observer-stats-expanded]");
-
-    try {
-        var collapsed = localStorage.getItem("observer.stats.collapsed") !== "0";
-    } catch (e) {
-        var collapsed = true;
-    }
-
-    function toggle() {
-        collapsed = !collapsed;
-        try { localStorage.setItem("observer.stats.collapsed", collapsed ? "1" : "0"); } catch (e) {}
-        render();
-    }
-
-    function render() {
-        if (collapsed) {
-            dot.classList.remove("hidden");
-            expanded.classList.add("hidden");
-            expanded.classList.remove("flex");
-        } else {
-            dot.classList.add("hidden");
-            expanded.classList.remove("hidden");
-            expanded.classList.add("flex");
-        }
-    }
-
-    dot.addEventListener("click", toggle);
-    expanded.addEventListener("click", toggle);
-    render();
-
     window.addEventListener("load", function() {
         var nav = performance.getEntriesByType("navigation")[0];
         var el = document.querySelector("[data-observer-response-size]");
-        var valueEl = document.querySelector("[data-observer-response-size-value]");
-        if (nav && nav.decodedBodySize > 0 && el && valueEl) {
-            valueEl.textContent = formatBytes(nav.decodedBodySize);
+        if (nav && nav.decodedBodySize > 0 && el) {
+            el.textContent = formatBytes(nav.decodedBodySize);
             if (nav.decodedBodySize >= 1000000) {
-                valueEl.dataset.level = "danger";
-                dot.dataset.level = "danger";
+                el.dataset.level = "danger";
             } else if (nav.decodedBodySize >= 100000) {
-                if (dot.dataset.level !== "danger") {
-                    dot.dataset.level = "warn";
-                }
-                valueEl.dataset.level = "warn";
+                el.dataset.level = "warn";
             }
             el.classList.remove("hidden");
-            el.classList.add("inline-flex");
         }
     });
 })();
