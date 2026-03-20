@@ -48,8 +48,6 @@ def send_mail(
     message: str,
     from_email: str | None,
     recipient_list: list[str],
-    auth_user: str | None = None,
-    auth_password: str | None = None,
     connection: BaseEmailBackend | None = None,
     html_message: str | None = None,
 ) -> int:
@@ -58,16 +56,8 @@ def send_mail(
     of the recipient list will see the other recipients in the 'To' field.
 
     If from_email is None, use the EMAIL_DEFAULT_FROM setting.
-    If auth_user is None, use the EMAIL_HOST_USER setting.
-    If auth_password is None, use the EMAIL_HOST_PASSWORD setting.
-
-    Note: The API for this method is frozen. New code wanting to extend the
-    functionality should use the EmailMessage class directly.
     """
-    connection = connection or get_connection(
-        username=auth_user,
-        password=auth_password,
-    )
+    connection = connection or get_connection()
     mail = EmailMultiAlternatives(
         subject, message, from_email, recipient_list, connection=connection
     )
@@ -79,8 +69,6 @@ def send_mail(
 
 def send_mass_mail(
     datatuple: tuple[tuple[str, str, str, list[str]], ...],
-    auth_user: str | None = None,
-    auth_password: str | None = None,
     connection: BaseEmailBackend | None = None,
 ) -> int:
     """
@@ -88,17 +76,8 @@ def send_mass_mail(
     each message to each recipient list. Return the number of emails sent.
 
     If from_email is None, use the EMAIL_DEFAULT_FROM setting.
-    If auth_user and auth_password are set, use them to log in.
-    If auth_user is None, use the EMAIL_HOST_USER setting.
-    If auth_password is None, use the EMAIL_HOST_PASSWORD setting.
-
-    Note: The API for this method is frozen. New code wanting to extend the
-    functionality should use the EmailMessage class directly.
     """
-    connection = connection or get_connection(
-        username=auth_user,
-        password=auth_password,
-    )
+    connection = connection or get_connection()
     messages = [
         EmailMessage(subject, message, sender, recipient, connection=connection)
         for subject, message, sender, recipient in datatuple
