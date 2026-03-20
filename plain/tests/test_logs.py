@@ -29,8 +29,7 @@ class TestLoggingConfiguration:
         assert not plain_logger.propagate
         assert not app_logger.propagate
 
-        # plain logger should be an PlainLogger with structured formatter
-        assert isinstance(plain_logger, PlainLogger)
+        # app_logger is a PlainLogger, plain logger is a standard Logger
         assert isinstance(app_logger, PlainLogger)
 
     def test_nested_logger_inheritance(self):
@@ -70,7 +69,7 @@ class TestLoggingConfiguration:
 
         # A child logger should produce structured output through the parent
         child = logging.getLogger("plain.server")
-        child.info("Request", extra={"context": {"method": "GET", "status": 200}})
+        child.info("Request", extra={"method": "GET", "status": 200})
 
         output = stream.getvalue()
         assert "method=GET" in output
@@ -222,8 +221,8 @@ class TestPlainLogger:
         assert "exception" in parsed
         assert "ValueError: Test exception" in parsed["exception"]
 
-    def test_extra_vs_context_separation(self):
-        """Test that extra parameters and context system are separate."""
+    def test_extra_and_context_both_appear(self):
+        """Test that both extra and context params merge into output."""
         stream = StringIO()
         handler = logging.StreamHandler(stream)
         handler.setFormatter(JSONFormatter("%(json)s"))
@@ -232,26 +231,15 @@ class TestPlainLogger:
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
-        # Standard extra won't appear in JSONFormatter, context will
         logger.info(
             "Test message",
-            extra={"standard_extra": "ignored"},
-            stacklevel=2,  # Standard param, won't appear
-            context={"user_id": 456},  # Context param, will appear
+            extra={"from_extra": "yes"},
+            context={"from_context": "yes"},
         )
 
         parsed = json.loads(stream.getvalue().strip())
-        assert "standard_extra" not in parsed
-        assert "stacklevel" not in parsed
-        assert parsed["user_id"] == 456
-
-    def test_reserved_context_key_error(self):
-        """Test that using 'context' key in extra raises an error."""
-        logger = PlainLogger("test")
-        logger.setLevel(logging.INFO)
-
-        with pytest.raises(ValueError, match="The 'context' key in extra is reserved"):
-            logger.info("Test", extra={"context": {"user_id": 123}})
+        assert parsed["from_extra"] == "yes"
+        assert parsed["from_context"] == "yes"
 
     def test_force_debug_functionality(self):
         """Test debug mode forcing and reference counting."""
@@ -289,33 +277,30 @@ class TestPlainLogger:
         assert "Manual debug" in output
 
 
-class TestGetLogger:
+class TestGetFrameworkLogger:
     """Test the get_framework_logger factory function."""
 
-    def test_get_framework_logger_auto_name(self):
+    def test_auto_name(self):
         """Test that get_framework_logger() derives name from caller's module."""
         log = get_framework_logger()
-        # Called from tests.test_logs → "tests.test_logs" truncated to "tests"
-        # (or whatever the module structure is)
-        assert isinstance(log, PlainLogger)
         # Name should be first two segments of the caller's __name__
         parts = __name__.split(".")
         expected = ".".join(parts[:2]) if len(parts) >= 2 else parts[0]
         assert log.name == expected
 
-    def test_get_framework_logger_explicit_name(self):
+    def test_explicit_name(self):
         """Test that get_framework_logger() with explicit name uses it directly."""
         log = get_framework_logger("plain.server.access")
-        assert isinstance(log, PlainLogger)
         assert log.name == "plain.server.access"
 
-    def test_get_framework_logger_registered_in_manager(self):
-        """Test that get_framework_logger() registers the logger in the logging manager."""
-        log = get_framework_logger("plain.test.factory")
-        assert logging.root.manager.loggerDict["plain.test.factory"] is log
+    def test_returns_same_instance(self):
+        """Test that repeated calls return the same logger instance."""
+        log1 = get_framework_logger("plain.test.same")
+        log2 = get_framework_logger("plain.test.same")
+        assert log1 is log2
 
-    def test_get_framework_logger_has_context_param(self):
-        """Test that get_framework_logger() loggers support the context parameter."""
+    def test_structured_output_via_extra(self):
+        """Test that framework loggers produce structured output via extra=context."""
         stream = StringIO()
         handler = logging.StreamHandler(stream)
         handler.setFormatter(JSONFormatter("%(json)s"))
@@ -324,7 +309,7 @@ class TestGetLogger:
         log.addHandler(handler)
         log.setLevel(logging.INFO)
 
-        log.info("Test message", context={"key": "value"})
+        log.info("Test message", extra={"key": "value"})
 
         parsed = json.loads(stream.getvalue().strip())
         assert parsed["key"] == "value"

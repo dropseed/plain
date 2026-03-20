@@ -7,7 +7,6 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import errno
-import logging
 import multiprocessing
 import os
 import signal
@@ -18,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import plain.runtime
+from plain.logs import get_framework_logger
 from plain.runtime import settings
 
 from . import sock
@@ -49,7 +49,7 @@ class Arbiter:
         os.environ["SERVER_SOFTWARE"] = f"plain/{plain.runtime.__version__}"
 
         self.app = app
-        self.log: logging.Logger = logging.getLogger("plain.server")
+        self.log = get_framework_logger()
         self.num_workers: int = app.workers
         self.timeout: int = app.timeout
         self.pid: int = os.getpid()
@@ -101,12 +101,14 @@ class Arbiter:
 
         listeners_str = ",".join([str(lnr) for lnr in self._listeners])
         self.log.info(
-            "Plain server started address=%s pid=%s workers=%s threads=%s version=%s",
-            listeners_str,
-            self.pid,
-            self.num_workers,
-            self.app.threads,
-            plain.runtime.__version__,
+            "Plain server started",
+            extra={
+                "address": listeners_str,
+                "pid": self.pid,
+                "workers": self.num_workers,
+                "threads": self.app.threads,
+                "version": plain.runtime.__version__,
+            },
         )
 
         from plain.runtime import settings
@@ -133,7 +135,7 @@ class Arbiter:
         log_func = self.log.info if exit_status == 0 else self.log.error
         log_func("Shutting down: Master")
         if reason is not None:
-            log_func("Reason: %s", reason)
+            log_func("Shutting down", extra={"reason": reason})
 
         sys.exit(exit_status)
 
@@ -181,7 +183,7 @@ class Arbiter:
                 continue
 
             if not info.aborted:
-                self.log.critical("WORKER TIMEOUT (pid:%s)", pid)
+                self.log.critical("WORKER TIMEOUT", extra={"pid": pid})
                 info.aborted = True
                 self._kill_worker(pid, signal.SIGABRT)
             else:
@@ -202,7 +204,10 @@ class Arbiter:
                 continue
 
             if exitcode > 0:
-                self.log.error("Worker (pid:%s) exited with code %s", pid, exitcode)
+                self.log.error(
+                    "Worker exited with error code",
+                    extra={"pid": pid, "exitcode": exitcode},
+                )
 
             if exitcode == WORKER_BOOT_ERROR and self._halt_error is None:
                 self._halt_error = HaltServer(
@@ -216,13 +221,14 @@ class Arbiter:
                     sig_name = signal.Signals(-exitcode).name
                 except ValueError:
                     sig_name = f"signal {-exitcode}"
-                msg = f"Worker (pid:{pid}) was sent {sig_name}!"
-                if -exitcode == signal.SIGKILL:
-                    msg += " Perhaps out of memory?"
+                note = "Perhaps out of memory?" if -exitcode == signal.SIGKILL else ""
+                ctx = {"pid": pid, "signal": sig_name}
+                if note:
+                    ctx["note"] = note
                 if -exitcode == signal.SIGTERM:
-                    self.log.info(msg)
+                    self.log.info("Worker was sent signal", extra=ctx)
                 else:
-                    self.log.error(msg)
+                    self.log.error("Worker was sent signal", extra=ctx)
 
             info.heartbeat.close()
             info.process.join(timeout=0)

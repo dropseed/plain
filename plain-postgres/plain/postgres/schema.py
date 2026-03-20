@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import operator
 from collections.abc import Callable, Generator
 from copy import deepcopy
@@ -14,6 +13,7 @@ if TYPE_CHECKING:
 
     from plain.postgres.sql.compiler import SQLCompiler
 
+from plain.logs import get_framework_logger
 from plain.postgres.constraints import Deferrable
 from plain.postgres.dialect import (
     DATA_TYPE_CHECK_CONSTRAINTS,
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from plain.postgres.fields.related import ForeignKeyField
     from plain.postgres.fields.reverse_related import ManyToManyRel
 
-logger = logging.getLogger("plain.postgres.schema")
+logger = get_framework_logger()
 
 
 # ##### DDL Reference classes (for deferred DDL statement manipulation) #####
@@ -468,9 +468,7 @@ class DatabaseSchemaEditor:
             params = None
 
         # Log the command we're running, then run it
-        logger.debug(
-            "%s; (params %r)", sql_str, params, extra={"params": params, "sql": sql_str}
-        )
+        logger.debug("Schema SQL executed", extra={"sql": sql_str, "params": params})
 
         # Track executed SQL for display in migration output
         self.executed_sql.append(sql_str)

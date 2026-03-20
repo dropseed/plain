@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import inspect
-import logging
 from collections.abc import Callable
 from http import HTTPMethod
 from typing import Any
@@ -14,10 +13,11 @@ from plain.http import (
     Response,
     ResponseBase,
 )
+from plain.logs import get_framework_logger
 
 from .exceptions import ResponseException
 
-logger = logging.getLogger("plain.request")
+logger = get_framework_logger("plain.request")
 
 
 class View:
@@ -49,10 +49,13 @@ class View:
 
         if not handler:
             logger.warning(
-                "Method Not Allowed (%s): %s",
-                self.request.method,
-                self.request.path,
-                extra={"status_code": 405, "request": self.request},
+                "Method not allowed",
+                extra={
+                    "method": self.request.method,
+                    "path": self.request.path,
+                    "status_code": 405,
+                    "request": self.request,
+                },
             )
             return NotAllowedResponse(self._allowed_methods())
 

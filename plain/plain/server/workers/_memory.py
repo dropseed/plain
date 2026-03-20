@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import gc
 import json
-import logging
 import os
 import sys
 import tempfile
 import time
 import tracemalloc
 
-log = logging.getLogger("plain.server")
+from plain.logs import get_framework_logger
+
+log = get_framework_logger()
 
 # Per-worker state machine: 0=idle, 1=phase 1, 2=phase 2
 _phase: int = 0
@@ -96,7 +97,10 @@ def signal_handler() -> None:
     try:
         _advance()
     except Exception:
-        log.exception("Memory signal handler failed (pid=%d), resetting", os.getpid())
+        log.exception(
+            "Memory signal handler failed, resetting",
+            extra={"pid": os.getpid()},
+        )
         _reset()
 
 
@@ -109,9 +113,8 @@ def _advance() -> None:
     # Safety: auto-reset if recording has been running too long
     if _phase != 0 and (time.monotonic() - _started_at) > _MAX_DURATION:
         log.warning(
-            "Memory recording timed out after %ds, resetting (pid=%d)",
-            _MAX_DURATION,
-            pid,
+            "Memory recording timed out, resetting",
+            extra={"duration": _MAX_DURATION, "pid": pid},
         )
         _reset()
 
@@ -124,9 +127,8 @@ def _advance() -> None:
         _started_at = time.monotonic()
         _phase = 1
         log.info(
-            "Memory recording STARTED (pid=%d, RSS=%.1f MB)",
-            pid,
-            _rss_start / (1024 * 1024),
+            "Memory recording STARTED",
+            extra={"pid": pid, "rss_mb": round(_rss_start / (1024 * 1024), 1)},
         )
 
     elif _phase == 1:
@@ -134,7 +136,7 @@ def _advance() -> None:
         gc.collect()
         _snapshot_b = tracemalloc.take_snapshot()
         _phase = 2
-        log.info("Memory recording MIDPOINT (pid=%d)", pid)
+        log.info("Memory recording MIDPOINT", extra={"pid": pid})
 
     elif _phase == 2:
         # Phase 3: take final snapshot, compute intersection, write results
@@ -146,7 +148,10 @@ def _advance() -> None:
 
         # Compare B-A and C-B
         if _snapshot_a is None or _snapshot_b is None:
-            log.error("Memory recording in bad state (pid=%d), resetting", pid)
+            log.error(
+                "Memory recording in bad state, resetting",
+                extra={"pid": pid},
+            )
             _reset()
             return
         first_half = _snapshot_b.compare_to(_snapshot_a, "lineno")
@@ -183,13 +188,15 @@ def _advance() -> None:
         os.replace(tmp_path, output_path)
 
         log.info(
-            "Memory recording STOPPED (pid=%d, %.0fs). RSS: %.1f → %.1f MB. Suspected leaks: %d. Profile: %s",
-            pid,
-            duration,
-            _rss_start / (1024 * 1024),
-            rss_end / (1024 * 1024),
-            len(leaks),
-            output_path,
+            "Memory recording STOPPED",
+            extra={
+                "pid": pid,
+                "duration_s": round(duration),
+                "rss_before_mb": round(_rss_start / (1024 * 1024), 1),
+                "rss_after_mb": round(rss_end / (1024 * 1024), 1),
+                "suspected_leaks": len(leaks),
+                "profile": output_path,
+            },
         )
 
         _reset()

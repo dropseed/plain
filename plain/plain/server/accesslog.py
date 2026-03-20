@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import datetime
 import logging
+import sys
 import traceback
 from typing import Any
 
+from plain.logs import get_framework_logger
+
 # Module-level loggers
-log = logging.getLogger("plain.server")
-access_log = logging.getLogger("plain.server.access")
+log = get_framework_logger()
+access_log = get_framework_logger("plain.server.access")
 
 # Maps field names that come from request headers
 _HEADER_FIELDS = {
@@ -72,6 +75,24 @@ def log_access(
             context[field] = _get_header(req, header_name)
 
     try:
-        access_log.info("Request", extra={"context": context})
+        access_log.info("Request", extra=context)
     except Exception:
         log.error(traceback.format_exc())
+
+
+def configure_access_log(*, enabled: bool, log_format: str) -> None:
+    """Configure the access logger.
+
+    Always writes to stdout (separate from the LOG_STREAM setting)
+    and can be disabled entirely via the enabled flag.
+    """
+    from plain.logs.configure import create_log_formatter
+
+    access_log.setLevel(logging.INFO)
+    access_log.handlers.clear()
+    access_log.propagate = False
+
+    if enabled:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(create_log_formatter(log_format))
+        access_log.addHandler(handler)

@@ -7,7 +7,6 @@ from __future__ import annotations
 #
 # Vendored and modified for Plain.
 import errno
-import logging
 import os
 import socket
 import ssl
@@ -16,12 +15,14 @@ import sys
 import time
 from typing import TYPE_CHECKING
 
+from plain.logs import get_framework_logger
+
 from . import util
 
 if TYPE_CHECKING:
     from .app import ServerApplication
 
-log = logging.getLogger(__name__)
+log = get_framework_logger()
 
 # Maximum number of pending connections in the socket listen queue
 BACKLOG = 2048
@@ -93,7 +94,7 @@ class BaseSocket:
         try:
             self.sock.close()
         except OSError as e:
-            log.info("Error while closing socket %s", str(e))
+            log.info("Error while closing socket", extra={"error": str(e)})
 
         self.sock = None
         return None
@@ -192,11 +193,13 @@ def create_sockets(app: ServerApplication) -> list[BaseSocket]:
                 sock = sock_type(addr, is_ssl=app.is_ssl)
             except OSError as e:
                 if e.args[0] == errno.EADDRINUSE:
-                    log.error("Connection in use: %s", str(addr))
+                    log.error("Connection in use", extra={"addr": str(addr)})
                 if e.args[0] == errno.EADDRNOTAVAIL:
-                    log.error("Invalid address: %s", str(addr))
-                msg = "connection to {addr} failed: {error}"
-                log.error(msg.format(addr=str(addr), error=str(e)))
+                    log.error("Invalid address", extra={"addr": str(addr)})
+                log.error(
+                    "Connection failed",
+                    extra={"addr": str(addr), "error": str(e)},
+                )
                 if i < 5:
                     log.debug("Retrying in 1 second.")
                     time.sleep(1)
@@ -204,7 +207,7 @@ def create_sockets(app: ServerApplication) -> list[BaseSocket]:
                 break
 
         if sock is None:
-            log.error("Can't connect to %s", str(addr))
+            log.error("Can't connect", extra={"addr": str(addr)})
             sys.exit(1)
 
         listeners.append(sock)

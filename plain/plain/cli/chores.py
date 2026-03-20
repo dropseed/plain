@@ -1,9 +1,10 @@
-import logging
 import sys
 
 import click
 
-logger = logging.getLogger("plain.chores")
+from plain.logs import get_framework_logger
+
+logger = get_framework_logger()
 
 
 @click.group()
@@ -77,7 +78,9 @@ def run_chores(name: tuple[str, ...], dry_run: bool) -> None:
             except Exception:
                 click.secho(" Failed", fg="red")
                 chores_failed.append(chore_class)
-                logger.exception(f"Error running chore {chore_name}")
+                logger.exception(
+                    "Error running chore", extra={"chore_name": chore_name}
+                )
                 continue
 
             if result is None:

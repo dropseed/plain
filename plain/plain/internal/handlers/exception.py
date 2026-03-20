@@ -13,6 +13,7 @@ from plain.http import (
     SuspiciousOperationError400,
 )
 from plain.http.multipartparser import MultiPartParserError
+from plain.logs import get_framework_logger
 from plain.runtime import settings
 from plain.views.errors import ErrorView
 
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
     from plain.http import Request
 
 
-request_logger = logging.getLogger("plain.request")
+request_logger = get_framework_logger("plain.request")
 
 
 def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
@@ -34,9 +35,12 @@ def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
             request=request, status_code=403, exception=exc
         )
         request_logger.warning(
-            "Forbidden (Permission denied): %s",
-            request.path,
-            extra={"status_code": response.status_code, "request": request},
+            "Forbidden, permission denied",
+            extra={
+                "path": request.path,
+                "status_code": response.status_code,
+                "request": request,
+            },
         )
 
     elif isinstance(exc, MultiPartParserError):
@@ -44,9 +48,12 @@ def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
             request=request, status_code=400, exception=None
         )
         request_logger.warning(
-            "Bad request (Unable to parse request body): %s",
-            request.path,
-            extra={"status_code": response.status_code, "request": request},
+            "Bad request, unable to parse request body",
+            extra={
+                "path": request.path,
+                "status_code": response.status_code,
+                "request": request,
+            },
         )
 
     elif isinstance(exc, BadRequestError400):
@@ -54,10 +61,13 @@ def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
             request=request, status_code=400, exception=exc
         )
         request_logger.warning(
-            "%s: %s",
-            str(exc),
-            request.path,
-            extra={"status_code": response.status_code, "request": request},
+            "Bad request",
+            extra={
+                "error": str(exc),
+                "path": request.path,
+                "status_code": response.status_code,
+                "request": request,
+            },
         )
     elif isinstance(exc, SuspiciousOperationError400):
         # The request logger receives events for any problematic request
@@ -77,10 +87,13 @@ def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
             request=request, status_code=400, exception=None
         )
         request_logger.warning(
-            "Bad request (missing form field '%s'): %s",
-            exc.field_name,
-            request.path,
-            extra={"status_code": 400, "request": request},
+            "Bad request, missing form field",
+            extra={
+                "field_name": exc.field_name,
+                "path": request.path,
+                "status_code": 400,
+                "request": request,
+            },
         )
 
     else:
@@ -88,10 +101,13 @@ def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
             request=request, status_code=500, exception=exc
         )
         request_logger.error(
-            "%s: %s",
-            response.reason_phrase,
-            request.path,
-            extra={"status_code": response.status_code, "request": request},
+            "Server error",
+            extra={
+                "reason": response.reason_phrase,
+                "path": request.path,
+                "status_code": response.status_code,
+                "request": request,
+            },
             exc_info=exc,
         )
 

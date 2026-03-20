@@ -74,18 +74,12 @@ def worker_main(
             log.propagate = True
 
         # Configure access logger based on the --access-log CLI flag.
-        access_logger = logging.getLogger("plain.server.access")
-        access_logger.setLevel(logging.INFO)
-        access_logger.handlers.clear()
-        access_logger.propagate = False
-        if app.accesslog:
-            from plain.logs.configure import create_log_formatter
+        from ..accesslog import configure_access_log
 
-            log_handler = logging.StreamHandler(sys.stdout)
-            log_handler.setFormatter(
-                create_log_formatter(plain.runtime.settings.LOG_FORMAT)
-            )
-            access_logger.addHandler(log_handler)
+        configure_access_log(
+            enabled=app.accesslog,
+            log_format=plain.runtime.settings.LOG_FORMAT,
+        )
 
         # Load the request handler
         try:

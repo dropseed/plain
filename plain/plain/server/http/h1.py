@@ -7,6 +7,8 @@ import ssl
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from plain.logs import get_framework_logger
+
 from .. import http
 from ..accesslog import log_access
 from ..connection import KEEPALIVE, Connection
@@ -31,6 +33,7 @@ from .unreader import AsyncBridgeUnreader, BufferUnreader
 if TYPE_CHECKING:
     from ..workers.worker import Worker
 
+log = get_framework_logger()
 
 HEALTHCHECK_RESPONSE = (
     b"HTTP/1.1 200 OK\r\n"
@@ -187,7 +190,10 @@ async def async_read_headers(
     while True:
         remaining = deadline - loop.time()
         if remaining <= 0:
-            log.debug("Header read exceeded total timeout (%ss)", HEADER_READ_TIMEOUT)
+            log.debug(
+                "Header read exceeded total timeout",
+                extra={"timeout": HEADER_READ_TIMEOUT},
+            )
             raise TimeoutError("Header read timeout exceeded")
         try:
             data = await asyncio.wait_for(
@@ -345,16 +351,19 @@ def parse_request(
 
         return (req, http_request, resp, request_start)
     except http.errors.NoMoreData as e:
-        worker.log.debug("Ignored premature client disconnection. %s", e)
+        worker.log.debug(
+            "Ignored premature client disconnection",
+            extra={"error": str(e)},
+        )
         raise _ParseError from e
     except StopIteration as e:
-        worker.log.debug("Closing connection. %s", e)
+        worker.log.debug("Closing connection", extra={"error": str(e)})
         raise _ParseError from e
     except OSError as e:
         if e.errno not in (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN):
             worker.log.exception("Socket error processing request.")
         else:
-            worker.log.debug("Ignoring connection %s", e)
+            worker.log.debug("Ignoring connection error", extra={"error": str(e)})
         raise _ParseError from e
     # HTTP protocol errors (InvalidRequestLine, InvalidHeader, etc.)
     # propagate to the caller for async error response handling.
@@ -418,11 +427,10 @@ async def async_handle_error(
             mesg = f"'{exc}'"
             status_int = 403
 
-        msg = "Invalid request from ip={ip}: {error}"
-        worker.log.warning(msg.format(ip=addr[0], error=str(exc)))
+        worker.log.warning("Invalid request", extra={"ip": addr[0], "error": str(exc)})
     else:
         if hasattr(req, "uri"):
-            worker.log.exception("Error handling request %s", req.uri)
+            worker.log.exception("Error handling request", extra={"uri": req.uri})
         else:
             worker.log.exception("Error handling request (no URI read)")
         status_int = 500
@@ -459,7 +467,7 @@ async def async_finish_request(
             http_response.close()
 
     if resp.should_close():
-        logging.getLogger("plain.server").debug("Closing connection.")
+        log.debug("Closing connection.")
         return False
 
     return True
@@ -480,12 +488,18 @@ async def async_handle_dispatch_error(
     if isinstance(exc, ConnectionResetError):
         # asyncio's _drain_helper raises ConnectionResetError('Connection lost')
         # without an errno, so we handle it before the errno-based OSError check.
-        worker.log.debug("Client disconnected during dispatch: %s", exc)
+        worker.log.debug(
+            "Client disconnected during dispatch",
+            extra={"error": str(exc)},
+        )
         return False
 
     if isinstance(exc, OSError):
         if exc.errno in (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN):
-            worker.log.debug("Client disconnected during dispatch: %s", exc)
+            worker.log.debug(
+                "Client disconnected during dispatch",
+                extra={"error": str(exc)},
+            )
         else:
             worker.log.exception("Socket error during dispatch.")
         return False
@@ -536,7 +550,6 @@ async def stream_async_response(
     Headers and chunks are written using async I/O. This keeps the
     event loop free between chunks and doesn't consume thread pool slots.
     """
-    log = logging.getLogger("plain.server")
     client_disconnected = False
     try:
         resp.prepare_response(http_response)

@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import functools
 import inspect
-import logging
 from collections.abc import Callable, Generator
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self
 
+from plain.logs import get_framework_logger
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.db import DatabaseError
 from plain.postgres.exceptions import FieldError
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from plain.postgres.sql.compiler import SQLCompiler
     from plain.postgres.sql.where import WhereNode
 
-logger = logging.getLogger("plain.postgres")
+logger = get_framework_logger()
 
 
 class PathInfo(NamedTuple):
@@ -167,7 +167,10 @@ class Q(tree.Node):
         try:
             return compiler.execute_sql(SINGLE) is not None
         except DatabaseError as e:
-            logger.warning("Got a database error calling check() on %r: %s", self, e)
+            logger.warning(
+                "Got a database error calling check()",
+                extra={"expression": repr(self), "error": str(e)},
+            )
             return True
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:

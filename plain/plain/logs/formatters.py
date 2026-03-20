@@ -4,19 +4,38 @@ import json
 import logging
 from typing import Any
 
+# Standard LogRecord attributes that are NOT user context.
+# Everything else on the record is treated as structured context data.
+_BASE_RECORD = logging.LogRecord("", 0, "", 0, "", (), None)
+_BASE_RECORD_ATTR_COUNT = len(_BASE_RECORD.__dict__)
+_STANDARD_RECORD_ATTRS = frozenset(_BASE_RECORD.__dict__.keys()) | {
+    "message",
+    "asctime",
+    "keyvalue",
+    "json",
+}
+
+
+def _get_context(record: logging.LogRecord) -> dict[str, Any]:
+    """Extract user context from a LogRecord (everything not a standard attribute)."""
+    if len(record.__dict__) <= _BASE_RECORD_ATTR_COUNT:
+        return {}
+    return {
+        key: value
+        for key, value in record.__dict__.items()
+        if key not in _STANDARD_RECORD_ATTRS
+    }
+
 
 class KeyValueFormatter(logging.Formatter):
-    """Formatter that outputs key-value pairs from Plain's context system."""
+    """Formatter that outputs key-value pairs from structured context."""
 
     def format(self, record: logging.LogRecord) -> str:
-        # Build key-value pairs from context
         kv_pairs = []
 
-        # Look for Plain's context data
-        if hasattr(record, "context") and isinstance(record.context, dict):
-            for key, value in record.context.items():
-                formatted_value = self._format_value(value)
-                kv_pairs.append(f"{key}={formatted_value}")
+        for key, value in _get_context(record).items():
+            formatted_value = self._format_value(value)
+            kv_pairs.append(f"{key}={formatted_value}")
 
         # Add the keyvalue attribute to the record for %(keyvalue)s substitution
         record.keyvalue = " ".join(kv_pairs)
@@ -47,10 +66,9 @@ class KeyValueFormatter(logging.Formatter):
 
 
 class JSONFormatter(logging.Formatter):
-    """Formatter that outputs JSON from Plain's context system, with optional format string."""
+    """Formatter that outputs JSON with structured context."""
 
     def format(self, record: logging.LogRecord) -> str:
-        # Build the JSON object from Plain's context data
         log_obj = {
             "timestamp": self.formatTime(record),
             "level": record.levelname,
@@ -58,9 +76,8 @@ class JSONFormatter(logging.Formatter):
             "logger": record.name,
         }
 
-        # Add Plain's context data to the main JSON object
-        if hasattr(record, "context") and isinstance(record.context, dict):
-            log_obj.update(record.context)  # type: ignore[arg-type]
+        # Add structured context data
+        log_obj.update(_get_context(record))
 
         # Handle exceptions
         if record.exc_info:

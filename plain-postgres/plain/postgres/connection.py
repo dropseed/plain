@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import _thread
 import datetime
-import logging
 import os
 import signal
 import subprocess
@@ -27,6 +26,7 @@ from psycopg.types.range import BaseRangeDumper, Range, RangeDumper
 from psycopg.types.string import TextLoader
 
 from plain.exceptions import ImproperlyConfigured
+from plain.logs import get_framework_logger
 from plain.postgres import utils
 from plain.postgres.db import (
     DatabaseErrorWrapper,
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from plain.postgres.connections import DatabaseConfig
     from plain.postgres.fields import Field
 
-logger = logging.getLogger("plain.postgres.connection")
+logger = get_framework_logger()
 
 # The prefix to put on the default database name when creating
 # the test database.
@@ -770,9 +770,9 @@ class DatabaseConnection:
                     func()
                 except Exception as e:
                     logger.error(
-                        f"Error calling {func.__qualname__} in on_commit() (%s).",
-                        e,
+                        "Error calling on_commit() handler",
                         exc_info=True,
+                        extra={"handler": func.__qualname__, "error": str(e)},
                     )
             else:
                 func()
@@ -788,10 +788,9 @@ class DatabaseConnection:
                     func()
                 except Exception as e:
                     logger.error(
-                        f"Error calling {func.__qualname__} in on_commit() during "
-                        f"transaction (%s).",
-                        e,
+                        "Error calling on_commit() handler during transaction",
                         exc_info=True,
+                        extra={"handler": func.__qualname__, "error": str(e)},
                     )
             else:
                 func()

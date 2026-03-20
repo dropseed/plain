@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import functools
-import logging
 import time
 from collections.abc import Generator, Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -11,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Self
 
 import psycopg
 
+from plain.logs import get_framework_logger
 from plain.postgres.db import NotSupportedError
 from plain.postgres.otel import db_span
 from plain.utils.dateparse import parse_time
@@ -18,7 +18,7 @@ from plain.utils.dateparse import parse_time
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
 
-logger = logging.getLogger("plain.postgres.utils")
+logger = get_framework_logger()
 
 
 def make_model_tuple(model: Any) -> tuple[str, str]:
@@ -234,12 +234,9 @@ class CursorDebugWrapper(CursorWrapper):
                 }
             )
             logger.debug(
-                "(%.3f) %s; args=%s",
-                duration,
-                sql,
-                params,
+                "Query executed",
                 extra={
-                    "duration": duration,
+                    "duration": round(duration, 3),
                     "sql": sql,
                     "params": params,
                 },
@@ -262,12 +259,9 @@ def debug_transaction(connection: DatabaseConnection, sql: str) -> Generator[Non
                 }
             )
             logger.debug(
-                "(%.3f) %s; args=%s",
-                duration,
-                sql,
-                None,
+                "Transaction command",
                 extra={
-                    "duration": duration,
+                    "duration": round(duration, 3),
                     "sql": sql,
                 },
             )

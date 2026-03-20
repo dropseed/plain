@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import datetime
-import logging
 import signal
 from typing import Any
 
 import click
 
 from plain.cli import SettingOption, register_cli
+from plain.logs import get_framework_logger
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -16,7 +16,7 @@ from .registry import jobs_registry
 from .scheduling import load_schedule
 from .workers import Worker
 
-logger = logging.getLogger("plain.jobs")
+logger = get_framework_logger()
 
 
 @register_cli("jobs")
@@ -124,7 +124,10 @@ def _run_once(worker_kwargs: dict[str, Any]) -> None:
     w = Worker(**worker_kwargs)
 
     def _shutdown(signalnum: int, _: Any) -> None:
-        logger.info("Job worker shutdown signal received signalnum=%s", signalnum)
+        logger.info(
+            "Job worker shutdown signal received",
+            extra={"signalnum": signalnum},
+        )
         w.shutdown()
 
     signal.signal(signal.SIGTERM, _shutdown)

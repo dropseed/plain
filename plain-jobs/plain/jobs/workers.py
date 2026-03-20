@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import gc
-import logging
 import multiprocessing
 import os
 import time
@@ -10,6 +9,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from plain import postgres
+from plain.logs import get_framework_logger
 from plain.postgres import transaction
 from plain.runtime import settings
 from plain.signals import request_finished, request_started
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 # Models are NOT imported at the top of this file!
 # See comment on _worker_process_initializer() for explanation.
 
-logger = logging.getLogger("plain.jobs")
+logger = get_framework_logger()
 
 
 def _worker_process_initializer() -> None:
@@ -99,17 +99,17 @@ class Worker:
         from .models import JobRequest
 
         logger.info(
-            "⬣ Starting Plain worker\n    Registered jobs: %s\n    Queues: %s\n    Jobs schedule: %s\n    Stats every: %s seconds\n    Max processes: %s\n    Max jobs per process: %s\n    Max pending per process: %s\n    PID: %s",
-            "\n                     ".join(
-                f"{name}: {cls}" for name, cls in jobs_registry.jobs.items()
-            ),
-            ", ".join(self.queues),
-            "\n                   ".join(str(x) for x in self.jobs_schedule),
-            self.stats_every,
-            self.max_processes,
-            self.max_jobs_per_process,
-            self.max_pending_per_process,
-            os.getpid(),
+            "Starting Plain worker",
+            extra={
+                "registered_jobs": list(jobs_registry.jobs.keys()),
+                "queues": list(self.queues),
+                "jobs_schedule": [str(x) for x in self.jobs_schedule],
+                "stats_every": self.stats_every,
+                "max_processes": self.max_processes,
+                "max_jobs_per_process": self.max_jobs_per_process,
+                "max_pending_per_process": self.max_pending_per_process,
+                "pid": os.getpid(),
+            },
         )
 
         while not self._is_shutting_down:
@@ -151,12 +151,14 @@ class Worker:
                     continue
 
                 logger.debug(
-                    'Preparing to execute job job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queues="%s"',
-                    job_request.job_class,
-                    job_request.uuid,
-                    job_request.priority,
-                    job_request.source,
-                    job_request.queue,
+                    "Preparing to execute job",
+                    extra={
+                        "job_class": job_request.job_class,
+                        "job_request_uuid": job_request.uuid,
+                        "job_priority": job_request.priority,
+                        "job_source": job_request.source,
+                        "job_queue": job_request.queue,
+                    },
                 )
 
                 job = job_request.convert_to_job_process()
@@ -230,12 +232,14 @@ class Worker:
                 # Result is None if should_enqueue returned False
                 if result:
                     logger.info(
-                        'Scheduling job job_class=%s job_queue="%s" job_start_at="%s" job_schedule="%s" concurrency_key="%s"',
-                        result.job_class,
-                        result.queue,
-                        result.start_at,
-                        schedule,
-                        result.concurrency_key,
+                        "Scheduling job",
+                        extra={
+                            "job_class": result.job_class,
+                            "job_queue": result.queue,
+                            "job_start_at": result.start_at,
+                            "job_schedule": schedule,
+                            "concurrency_key": result.concurrency_key,
+                        },
                     )
 
             self._jobs_schedule_checked_at = now
@@ -254,13 +258,15 @@ class Worker:
         jobs_processing = JobProcess.query.filter(queue__in=self.queues).count()
 
         logger.info(
-            'Job worker stats worker_processes=%s worker_queues="%s" jobs_requested=%s jobs_processing=%s worker_max_processes=%s worker_max_jobs_per_process=%s',
-            num_proccesses,
-            ",".join(self.queues),
-            jobs_requested,
-            jobs_processing,
-            self.max_processes,
-            self.max_jobs_per_process,
+            "Job worker stats",
+            extra={
+                "worker_processes": num_proccesses,
+                "worker_queues": ",".join(self.queues),
+                "jobs_requested": jobs_requested,
+                "jobs_processing": jobs_processing,
+                "worker_max_processes": self.max_processes,
+                "worker_max_jobs_per_process": self.max_jobs_per_process,
+            },
         )
 
     def rescue_job_results(self) -> None:
@@ -278,7 +284,7 @@ def future_finished_callback(job_process_uuid: str, future: Future) -> None:
     from .models import JobProcess, JobResultStatuses
 
     if future.cancelled():
-        logger.warning("Job cancelled job_process_uuid=%s", job_process_uuid)
+        logger.warning("Job cancelled", extra={"job_process_uuid": job_process_uuid})
         try:
             job = JobProcess.query.get(uuid=job_process_uuid)
             job.convert_to_result(status=JobResultStatuses.CANCELLED)
@@ -288,8 +294,8 @@ def future_finished_callback(job_process_uuid: str, future: Future) -> None:
     elif exception := future.exception():
         # Process pool may have been killed...
         logger.warning(
-            "Job failed job_process_uuid=%s",
-            job_process_uuid,
+            "Job failed",
+            extra={"job_process_uuid": job_process_uuid},
             exc_info=exception,
         )
         try:
@@ -299,7 +305,7 @@ def future_finished_callback(job_process_uuid: str, future: Future) -> None:
             # Job may have already been cleaned up
             pass
     else:
-        logger.debug("Job finished job_process_uuid=%s", job_process_uuid)
+        logger.debug("Job finished", extra={"job_process_uuid": job_process_uuid})
 
 
 def process_job(job_process_uuid: str) -> None:
@@ -314,13 +320,15 @@ def process_job(job_process_uuid: str) -> None:
         job_process = JobProcess.query.get(uuid=job_process_uuid)
 
         logger.info(
-            'Executing job worker_pid=%s job_class=%s job_request_uuid=%s job_priority=%s job_source="%s" job_queue="%s"',
-            worker_pid,
-            job_process.job_class,
-            job_process.job_request_uuid,
-            job_process.priority,
-            job_process.source,
-            job_process.queue,
+            "Executing job",
+            extra={
+                "worker_pid": worker_pid,
+                "job_class": job_process.job_class,
+                "job_request_uuid": job_process.job_request_uuid,
+                "job_priority": job_process.priority,
+                "job_source": job_process.source,
+                "job_queue": job_process.queue,
+            },
         )
 
         def middleware_chain(job: JobProcess) -> JobResult:
@@ -337,16 +345,18 @@ def process_job(job_process_uuid: str) -> None:
         duration = duration.total_seconds()
 
         logger.info(
-            'Completed job worker_pid=%s job_class=%s job_process_uuid=%s job_request_uuid=%s job_result_uuid=%s job_priority=%s job_source="%s" job_queue="%s" job_duration=%s',
-            worker_pid,
-            job_result.job_class,
-            job_result.job_process_uuid,
-            job_result.job_request_uuid,
-            job_result.uuid,
-            job_result.priority,
-            job_result.source,
-            job_result.queue,
-            duration,
+            "Completed job",
+            extra={
+                "worker_pid": worker_pid,
+                "job_class": job_result.job_class,
+                "job_process_uuid": job_result.job_process_uuid,
+                "job_request_uuid": job_result.job_request_uuid,
+                "job_result_uuid": job_result.uuid,
+                "job_priority": job_result.priority,
+                "job_source": job_result.source,
+                "job_queue": job_result.queue,
+                "job_duration": duration,
+            },
         )
     except Exception as e:
         # Raising exceptions inside the worker process doesn't

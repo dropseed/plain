@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import logging
 import threading
 import weakref
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from plain.logs import get_framework_logger
 from plain.utils.inspect import func_accepts_kwargs
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-_logger = logging.getLogger("plain.signals.dispatch")
+_logger = get_framework_logger()
 
 
 def _make_id(target: Any) -> int | tuple[int, int]:
@@ -205,9 +205,11 @@ class Signal:
 
     def _log_robust_failure(self, receiver: Callable[..., Any], err: Exception) -> None:
         _logger.error(
-            "Error calling %s in Signal.send_robust() (%s)",
-            getattr(receiver, "__qualname__", repr(receiver)),
-            err,
+            "Error calling receiver in Signal.send_robust()",
+            extra={
+                "receiver": getattr(receiver, "__qualname__", repr(receiver)),
+                "error": str(err),
+            },
             exc_info=err,
         )
 

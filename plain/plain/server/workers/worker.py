@@ -29,6 +29,7 @@ from types import FrameType
 from typing import TYPE_CHECKING, Any
 
 from plain.internal.reloader import Reloader
+from plain.logs import get_framework_logger
 
 from .. import sock, util
 from ..connection import Connection
@@ -80,7 +81,7 @@ class Worker:
         self.reloader: Any = None
 
         self.alive = True
-        self.log = logging.getLogger("plain.server")
+        self.log = get_framework_logger()
         self.heartbeat = heartbeat
         self.handler = handler
 
@@ -116,8 +117,8 @@ class Worker:
         self.total_requests += 1
         if self.max_requests and self.total_requests >= self.max_requests:
             self.log.info(
-                "Worker reached max requests (%d), initiating graceful shutdown",
-                self.max_requests,
+                "Worker reached max requests, initiating graceful shutdown",
+                extra={"max_requests": self.max_requests},
             )
             self.alive = False
 
@@ -143,7 +144,8 @@ class Worker:
             )
             self.max_requests = max(1, self.max_requests)
             self.log.debug(
-                "Worker max_requests set to %d (with jitter)", self.max_requests
+                "Worker max_requests set with jitter",
+                extra={"max_requests": self.max_requests},
             )
 
         # Prevent listener sockets from leaking into subprocesses
@@ -158,7 +160,7 @@ class Worker:
         if self.app.reload:
 
             def changed(fname: str) -> None:
-                self.log.debug("Server worker reloading: %s modified", fname)
+                self.log.debug("Server worker reloading", extra={"modified": fname})
                 self.alive = False
                 time.sleep(0.1)
                 sys.exit(0)
@@ -236,9 +238,8 @@ class Worker:
                 )
             except TimeoutError:
                 self.log.warning(
-                    "Thread pool stalled (no-op didn't complete in %ss), "
-                    "stopping heartbeat to trigger restart",
-                    self.timeout,
+                    "Thread pool stalled, stopping heartbeat to trigger restart",
+                    extra={"timeout": self.timeout},
                 )
                 break
 
@@ -357,6 +358,9 @@ class Worker:
     def is_parent_alive(self) -> bool:
         # If our parent changed then we shut down.
         if self.ppid != os.getppid():
-            self.log.info("Parent changed, shutting down: %s", self)
+            self.log.info(
+                "Parent changed, shutting down",
+                extra={"worker": str(self)},
+            )
             return False
         return True

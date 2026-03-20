@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import logging
 import traceback
 from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID, uuid4
@@ -23,6 +22,7 @@ from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind
 
 from plain import postgres
+from plain.logs import get_framework_logger
 from plain.postgres import transaction, types
 from plain.postgres.expressions import F
 from plain.runtime import settings
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 __all__ = ["JobRequest", "JobProcess", "JobResult", "JobResultStatuses"]
 
-logger = logging.getLogger("plain.jobs")
+logger = get_framework_logger()
 tracer = trace.get_tracer("plain.jobs")
 
 
@@ -224,7 +224,10 @@ class JobProcess(postgres.Model):
                     )
                 )
             except (ValueError, TypeError):
-                logger.warning("Invalid trace context for job %s", self.uuid)
+                logger.warning(
+                    "Invalid trace context for job",
+                    extra={"job_uuid": self.uuid},
+                )
 
         with (
             tracer.start_as_current_span(
@@ -255,11 +258,13 @@ class JobProcess(postgres.Model):
                 except DeferJob as e:
                     # Job deferred - not an error, log at INFO level
                     logger.info(
-                        "Job deferred for %s seconds (increment_retries=%s): job_class=%s job_process_uuid=%s",
-                        e.delay,
-                        e.increment_retries,
-                        self.job_class,
-                        self.uuid,
+                        "Job deferred",
+                        extra={
+                            "delay": e.delay,
+                            "increment_retries": e.increment_retries,
+                            "job_class": self.job_class,
+                            "job_process_uuid": self.uuid,
+                        },
                     )
                     span.set_attribute(ERROR_TYPE, "DeferJob")
                     span.set_status(trace.StatusCode.OK)  # Not an error
@@ -273,7 +278,10 @@ class JobProcess(postgres.Model):
                 # Defer failed (e.g., concurrency limit reached during re-enqueue)
                 # The transaction was rolled back, so the JobProcess still exists in DB.
                 # The pk was restored in defer() before raising, so we can proceed normally.
-                logger.warning("Defer failed for %s: %s", self.job_class, e)
+                logger.warning(
+                    "Defer failed",
+                    extra={"job_class": self.job_class, "error": str(e)},
+                )
                 span.record_exception(e)
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
                 span.set_attribute(ERROR_TYPE, type(e).__name__)
@@ -457,7 +465,8 @@ class JobResultQuerySet(postgres.QuerySet["JobResult"]):
                 # then we immediately increment the retry_attempt on the existing obj
                 # so it won't retry forever.
                 logger.exception(
-                    "Failed to retry job (incrementing retry_attempt): %s", result
+                    "Failed to retry job, incrementing retry_attempt",
+                    extra={"result": str(result)},
                 )
                 result.retry_attempt += 1
                 result.save(update_fields=["retry_attempt"])

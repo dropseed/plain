@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import io
-import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -16,13 +15,14 @@ import h2.settings
 
 from plain.http import AsyncStreamingResponse, FileResponse, StreamingResponse
 from plain.http import Request as HttpRequest
+from plain.logs import get_framework_logger
 
 from ..accesslog import log_access
 from ..util import http_date
 from .request import _merge_headers, _resolve_path, _resolve_remote_addr
 from .response import FileWrapper
 
-log = logging.getLogger("plain.server")
+log = get_framework_logger()
 
 # Fallback max request body size per H2 stream when DATA_UPLOAD_MAX_MEMORY_SIZE is None (10 MiB)
 _H2_BODY_FALLBACK = 10 * 1024 * 1024
@@ -358,7 +358,7 @@ async def async_handle_h2_connection(
                     timeout=H2_IDLE_TIMEOUT,
                 )
             except TimeoutError:
-                log.debug("HTTP/2 idle timeout from %s", client)
+                log.debug("HTTP/2 idle timeout", extra={"client": client})
                 break
             if not data:
                 break
@@ -397,15 +397,17 @@ async def async_handle_h2_connection(
                     ):
                         _reject_h2_stream(conn, state, event, stream, 503)
                         log.warning(
-                            "H2 aggregate body budget exceeded on stream %d",
-                            event.stream_id,
+                            "H2 aggregate body budget exceeded",
+                            extra={"stream_id": event.stream_id},
                         )
                     elif stream.data_size + data_len > max_body:
                         _reject_h2_stream(conn, state, event, stream, 413)
                         log.warning(
-                            "H2 stream %d exceeded max body size (%d bytes)",
-                            event.stream_id,
-                            max_body,
+                            "H2 stream exceeded max body size",
+                            extra={
+                                "stream_id": event.stream_id,
+                                "max_body": max_body,
+                            },
                         )
                     else:
                         stream.data_size += data_len
@@ -490,16 +492,19 @@ async def async_handle_h2_connection(
             break
 
     except h2.exceptions.ProtocolError:
-        log.debug("HTTP/2 protocol error on connection from %s", client)
+        log.debug("HTTP/2 protocol error on connection", extra={"client": client})
         try:
             async with state.write_lock:
                 await state.flush()
         except OSError:
             pass
     except OSError:
-        log.debug("HTTP/2 connection closed from %s", client)
+        log.debug("HTTP/2 connection closed", extra={"client": client})
     except Exception:
-        log.exception("Unexpected error in HTTP/2 connection from %s", client)
+        log.exception(
+            "Unexpected error in HTTP/2 connection",
+            extra={"client": client},
+        )
     finally:
         for task in stream_tasks.values():
             task.cancel()
@@ -559,7 +564,10 @@ async def _async_handle_stream_inner(
             stream, state.client, state.server, state.scheme
         )
     except Exception:
-        log.exception("Error building HTTP/2 request for stream %d", stream.stream_id)
+        log.exception(
+            "Error building HTTP/2 request",
+            extra={"stream_id": stream.stream_id},
+        )
         await _async_send_h2_error(state, stream.stream_id, 500)
         return
 
@@ -587,7 +595,10 @@ async def _async_handle_stream_inner(
     except h2.exceptions.StreamClosedError:
         pass
     except Exception:
-        log.exception("Error handling HTTP/2 request %s", http_request.path_info)
+        log.exception(
+            "Error handling HTTP/2 request",
+            extra={"path": http_request.path_info},
+        )
         if stream.stream_id not in state.reset_streams:
             if h2_resp.headers_sent:
                 # Headers already sent — can't send a clean error response.
@@ -754,9 +765,8 @@ async def _async_send_h2_data(
 
         if not done:
             log.warning(
-                "H2 stream %d: timed out waiting for flow-control window update, "
-                "resetting stream",
-                stream_id,
+                "H2 stream timed out waiting for flow-control window update, resetting stream",
+                extra={"stream_id": stream_id},
             )
             async with state.write_lock:
                 try:
@@ -790,4 +800,7 @@ async def _async_send_h2_error(
             state.conn.send_data(stream_id, body, end_stream=True)
             await state.flush()
     except Exception:
-        log.debug("Failed to send H2 error response for stream %d", stream_id)
+        log.debug(
+            "Failed to send H2 error response",
+            extra={"stream_id": stream_id},
+        )

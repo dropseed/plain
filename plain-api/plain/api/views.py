@@ -1,11 +1,11 @@
 import datetime
-import logging
 from functools import cached_property
 from typing import Any
 
 from plain.exceptions import ValidationError
 from plain.forms.exceptions import FormFieldMissingError
 from plain.http import ForbiddenError403, JsonResponse, NotFoundError404, ResponseBase
+from plain.logs import get_framework_logger
 from plain.utils import timezone
 from plain.utils.cache import patch_cache_control
 from plain.views.base import View
@@ -25,7 +25,7 @@ __all__ = [
     "APIView",
 ]
 
-logger = logging.getLogger("plain.api")
+logger = get_framework_logger()
 
 
 # @openapi.response_typed_dict(400, ErrorSchema)

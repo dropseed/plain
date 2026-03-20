@@ -147,6 +147,26 @@ class PlainLogger(logging.Logger):
                 context=context,
             )
 
+    def exception(
+        self,
+        msg: object,
+        *args: object,
+        exc_info: Any = True,
+        stack_info: bool = False,
+        stacklevel: int = 1,
+        extra: Mapping[str, object] | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        self.error(
+            msg,
+            *args,
+            exc_info=exc_info,
+            stack_info=stack_info,
+            stacklevel=stacklevel,
+            extra=extra,
+            context=context,
+        )
+
     def _log(
         self,
         level: int,
@@ -160,20 +180,16 @@ class PlainLogger(logging.Logger):
     ) -> None:
         """Low-level logging routine which creates a LogRecord and then calls all handlers."""
 
-        # Check if extra already has a 'context' key
-        if extra and "context" in extra:
-            raise ValueError(
-                "The 'context' key in extra is reserved for Plain's context system"
-            )
+        # Merge into one dict: persistent context < extra < per-call context.
+        # All keys end up as top-level attributes on the LogRecord.
+        merged_extra: dict[str, object] = {}
+        if self.context:
+            merged_extra.update(self.context)
+        if extra:
+            merged_extra.update(extra)
+        if context:
+            merged_extra.update(context)
 
-        # Build final extra with context
-        merged_extra: dict[str, object] = dict(extra) if extra else {}
-
-        # Add our context (persistent + passed context) to extra["context"]
-        if self.context or context:
-            merged_extra["context"] = {**self.context, **(context or {})}
-
-        # Call the parent logger's _log method with explicit parameters
         super()._log(
             level=level,
             msg=msg,
@@ -185,8 +201,8 @@ class PlainLogger(logging.Logger):
         )
 
 
-def get_framework_logger(name: str = "") -> PlainLogger:
-    """Get a PlainLogger for framework code.
+def get_framework_logger(name: str = "") -> logging.Logger:
+    """Get a logger for framework code with auto-derived naming.
 
     With no arguments, derives the name from the caller's module:
         plain.postgres.connection → plain.postgres
@@ -194,24 +210,13 @@ def get_framework_logger(name: str = "") -> PlainLogger:
 
     With an explicit name, uses it directly:
         get_framework_logger("plain.server.access")
-
-    Returns the same instance for repeated calls with the same name.
     """
     if not name:
         caller = sys._getframe(1).f_globals["__name__"]
         parts = caller.split(".")
         name = ".".join(parts[:2])
 
-    # Return existing instance if already created
-    existing = logging.root.manager.loggerDict.get(name)
-    if isinstance(existing, PlainLogger):
-        return existing
-
-    logger = PlainLogger(name)
-    # Register so getLogger(name) and child loggers find this instance.
-    # Handlers are inherited from the "plain" parent logger via propagation.
-    logging.root.manager.loggerDict[name] = logger
-    return logger
+    return logging.getLogger(name)
 
 
 # Create the default app logger instance
