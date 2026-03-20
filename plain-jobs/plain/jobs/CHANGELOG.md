@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.46.2](https://github.com/dropseed/plain/releases/plain-jobs@0.46.2) (2026-03-19)
+
+### What's changed
+
+- **Fix admin job request list ordering** — the admin list view now correctly orders by `-priority` (descending) so higher priority jobs appear first, matching the worker's processing order ([b77789f0fe68](https://github.com/dropseed/plain/commit/b77789f0fe68))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.46.1](https://github.com/dropseed/plain/releases/plain-jobs@0.46.1) (2026-03-19)
 
 ### What's changed
