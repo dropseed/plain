@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import jinja2
-from jinja2 import meta, nodes
+from jinja2 import nodes
 from jinja2.ext import Extension
 from jinja2.nodes import CallBlock, Node
 from jinja2.parser import Parser
@@ -30,13 +30,16 @@ class HTMXJSExtension(InclusionTagExtension):
         }
 
 
+class _FragmentFound(Exception):
+    """Raised to short-circuit template rendering once the target fragment is found."""
+
+    def __init__(self, content: str) -> None:
+        self.content = content
+
+
 @register_template_extension
 class HTMXFragmentExtension(Extension):
     tags = {"htmxfragment"}
-
-    def __init__(self, environment: jinja2.Environment):
-        super().__init__(environment)
-        environment.extend(htmx_fragment_nodes={})
 
     def parse(self, parser: Parser) -> Node:
         lineno = next(parser.stream).lineno
@@ -64,16 +67,26 @@ class HTMXFragmentExtension(Extension):
         callblock = CallBlock(call, [], [], body)
         callblock.set_lineno(lineno)
 
-        # Store a reference to the node for later
-        self.environment.htmx_fragment_nodes.setdefault(parser.name, {})[  # type: ignore[attr-defined]
-            fragment_name.value  # type: ignore[attr-defined]
-        ] = callblock
-
         return callblock
 
     def _render_htmx_fragment(
         self, fragment_name: str, context: dict[str, Any], caller: Any, **kwargs: Any
     ) -> str:
+        # Two-phase fragment targeting (see render_template_fragment):
+        # Phase 1 skips non-target bodies, phase 2 renders them for nesting.
+        # Once the target is found, "found" is set so child fragments render
+        # normally with their wrapper divs.
+        target_state = context.get("_htmx_target_fragment")
+        if target_state is not None and not target_state["found"]:
+            if str(fragment_name) == target_state["name"]:
+                target_state["found"] = True
+                content = caller()
+                raise _FragmentFound(content)
+            elif target_state["render_bodies"]:
+                return caller()
+            else:
+                return ""
+
         def attrs_to_str(attrs: dict[str, Any]) -> str:
             parts = []
             for k, v in attrs.items():
@@ -87,20 +100,22 @@ class HTMXFragmentExtension(Extension):
         as_element = kwargs.get("as", "div")
         attrs = {}
         for k, v in kwargs.items():
+            if k in ("lazy", "as"):
+                continue
             if k.startswith("hx_"):
                 attrs[k.replace("_", "-")] = v
             else:
                 attrs[k] = v
 
         if render_lazy:
+            attrs.setdefault("hx-trigger", "load from:body")
             attrs.setdefault("hx-swap", "outerHTML")
             attrs.setdefault("hx-target", "this")
             attrs.setdefault("hx-indicator", "this")
             attrs_str = attrs_to_str(attrs)
-            return f'<{as_element} plain-hx-fragment="{fragment_name}" hx-get hx-trigger="load from:body" {attrs_str}></{as_element}>'
+            return f'<{as_element} plain-hx-fragment="{fragment_name}" hx-get {attrs_str}></{as_element}>'
         else:
             # Swap innerHTML so we can re-run hx calls inside the fragment automatically
-            # (render_template_fragment won't render this part of the node again, just the inner nodes)
             attrs.setdefault("hx-swap", "innerHTML")
             attrs.setdefault("hx-target", "this")
             attrs.setdefault("hx-indicator", "this")
@@ -113,63 +128,25 @@ class HTMXFragmentExtension(Extension):
 def render_template_fragment(
     *, template: jinja2.Template, fragment_name: str, context: dict[str, Any]
 ) -> str:
-    template = find_template_fragment(template, fragment_name)
-    return template.render(context)
+    """Render only the named fragment from a template.
 
+    Two-phase approach:
+    1. Skip non-target fragment bodies (fast — handles top-level and loop fragments)
+    2. If not found, render bodies too (handles fragments nested inside other fragments)
 
-def find_template_fragment(
-    template: jinja2.Template, fragment_name: str
-) -> jinja2.Template:
-    # Look in this template for the fragment
-    callblock_node = template.environment.htmx_fragment_nodes.get(  # type: ignore[attr-defined]
-        template.name, {}
-    ).get(fragment_name)
+    Raises _FragmentFound to short-circuit as soon as the target is found.
+    """
+    for render_bodies in (False, True):
+        target_state = {
+            "name": fragment_name,
+            "found": False,
+            "render_bodies": render_bodies,
+        }
+        try:
+            template.render({**context, "_htmx_target_fragment": target_state})
+        except _FragmentFound as e:
+            return e.content
 
-    if not callblock_node:
-        # Look in other templates for this fragment
-        matching_callblock_nodes = []
-        for fragments in template.environment.htmx_fragment_nodes.values():  # type: ignore[attr-defined]
-            if fragment_name in fragments:
-                matching_callblock_nodes.append(fragments[fragment_name])
-
-        if len(matching_callblock_nodes) == 0:
-            # If we still haven't found anything, it's possible that we're
-            # in a different/new worker/process and haven't parsed the related templates yet
-            if template.environment.loader and template.name:
-                ast = template.environment.parse(
-                    template.environment.loader.get_source(
-                        template.environment, template.name
-                    )[0]
-                )
-                for ref in meta.find_referenced_templates(ast):
-                    if (
-                        ref is not None
-                        and ref not in template.environment.htmx_fragment_nodes  # type: ignore[attr-defined]
-                    ):
-                        # Trigger them to parse
-                        template.environment.get_template(ref)
-
-                # Now look again
-                for fragments in template.environment.htmx_fragment_nodes.values():  # type: ignore[attr-defined]
-                    if fragment_name in fragments:
-                        matching_callblock_nodes.append(fragments[fragment_name])
-
-        if len(matching_callblock_nodes) == 1:
-            callblock_node = matching_callblock_nodes[0]
-        elif len(matching_callblock_nodes) > 1:
-            raise jinja2.TemplateNotFound(
-                f"Fragment {fragment_name} found in multiple templates. Use a more specific name."
-            )
-        else:
-            raise jinja2.TemplateNotFound(
-                f"Fragment {fragment_name} not found in any templates"
-            )
-
-    if not callblock_node:
-        raise jinja2.TemplateNotFound(
-            f"Fragment {fragment_name} not found in template {template.name}"
-        )
-
-    # Create a new template from the node
-    template_node = nodes.Template(callblock_node.body)
-    return template.environment.from_string(template_node)
+    raise jinja2.TemplateNotFound(
+        f"Fragment '{fragment_name}' not found in template {template.name}"
+    )

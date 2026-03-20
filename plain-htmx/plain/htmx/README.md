@@ -4,6 +4,7 @@
 
 - [Overview](#overview)
 - [Template fragments](#template-fragments)
+    - [Fragments in loops](#fragments-in-loops)
     - [Lazy template fragments](#lazy-template-fragments)
     - [How template fragments work](#how-template-fragments-work)
 - [View actions](#view-actions)
@@ -74,6 +75,37 @@ Here's an example:
 
 Everything inside `{% htmxfragment %}` will automatically update when "Refresh" is clicked.
 
+### Fragments in loops
+
+You can use `{% htmxfragment %}` inside a `{% for %}` loop by giving each iteration a unique fragment name using a dynamic expression:
+
+```html
+{% for item in items %}
+  {% htmxfragment "item-" ~ item.pk %}
+  <p>{{ item.name }}</p>
+  <button hx-post plain-hx-action="toggle">Toggle</button>
+  {% endhtmxfragment %}
+{% endfor %}
+```
+
+The `~` operator concatenates the string `"item-"` with the item's primary key, producing unique fragment names like `item-1`, `item-2`, etc. When a button inside a specific fragment is clicked, only that fragment re-renders — the server renders the full template but extracts just the matching fragment's content.
+
+The view doesn't need any special handling for loop fragments — the standard `HTMXView` works as-is. Just make sure the view's context includes the full list of items so the loop can execute during the fragment render:
+
+```python
+class ItemListView(HTMXView):
+    template_name = "items.html"
+
+    def get_template_context(self):
+        context = super().get_template_context()
+        context["items"] = Item.query.all()
+        return context
+
+    def htmx_post_toggle(self):
+        # Handle the action...
+        return self.render_template()
+```
+
 ### Lazy template fragments
 
 If you want to render a fragment lazily, you can add the `lazy` attribute to the `{% htmxfragment %}` tag.
@@ -128,7 +160,7 @@ Then the response content is automatically swapped in to replace the content of 
 
 Note that there is no URL specified on the `hx-get` attribute. By default, HTMX will send the request to the current URL for the page. When you're working with fragments, this is typically the behavior you want! (You're on a page and want to selectively re-render a part of that page.)
 
-The `{% htmxfragment %}` tag is somewhat similar to a `{% block %}` tag -- the fragments on a page should be named and unique, and you can't use it inside of loops. For fragment-like behavior inside of a for-loop, you'll most likely want to set up a dedicated URL that can handle a single instance of the looped items, and maybe leverage [dedicated templates](#dedicated-templates).
+Fragment names must be unique on a page. For static fragments, use distinct string names. Inside loops, use a dynamic expression like `"item-" ~ item.pk` to generate unique names per iteration (see [fragments in loops](#fragments-in-loops)).
 
 ## View actions
 
@@ -238,7 +270,7 @@ class PullRequestDetailView(HTMXView, DetailView):
 
 A small additional feature is that `plain.htmx` will automatically find templates named `{template_name}_htmx.html` for HTMX requests. More than anything, this is just a nice way to formalize a naming scheme for template "partials" dedicated to HTMX.
 
-Because template fragments don't work inside of loops, for example, you'll often need to define dedicated URLs to handle the HTMX behaviors for individual items in a loop. You can sometimes think of these as "pages within a page".
+For cases where loop items need their own URL (e.g., each item has a detail page), you can define dedicated URLs to handle the HTMX behaviors for individual items. You can sometimes think of these as "pages within a page". (For simpler cases, [fragments in loops](#fragments-in-loops) may be sufficient.)
 
 So if you have a template that renders a collection of items, you can do the initial render using a `{% include %}`:
 
