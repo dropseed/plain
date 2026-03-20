@@ -1,5 +1,17 @@
 # plain-htmx changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-htmx@0.18.0) (2026-03-20)
+
+### What's changed
+
+- `{% htmxfragment %}` now supports dynamic fragment names (e.g., `"item-" ~ item.pk`), enabling use inside `{% for %}` loops where each iteration gets a unique fragment name ([6ddaa13845](https://github.com/dropseed/plain/commit/6ddaa13845))
+- Rewrote fragment rendering to use a two-phase runtime approach instead of static template-tree walking, which is what enables dynamic and loop-based fragments ([6ddaa13845](https://github.com/dropseed/plain/commit/6ddaa13845))
+- Lazy fragments now default to `hx-trigger="load from:body"` ([6ddaa13845](https://github.com/dropseed/plain/commit/6ddaa13845))
+
+### Upgrade instructions
+
+- No changes required. Existing static fragment names continue to work as before. To use fragments in loops, pass a dynamic expression as the fragment name (e.g., `{% htmxfragment "item-" ~ item.pk %}`).
+
 ## [0.17.1](https://github.com/dropseed/plain/releases/plain-htmx@0.17.1) (2026-03-10)
 
 ### What's changed
