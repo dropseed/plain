@@ -37,10 +37,16 @@ async def _send_framed(writer: asyncio.StreamWriter, data: bytes) -> None:
     await writer.drain()
 
 
+# 10MB — generous for JSON messages, prevents unbounded allocation
+_MAX_FRAME_SIZE = 10 * 1024 * 1024
+
+
 async def _recv_framed(reader: asyncio.StreamReader) -> bytes:
     """Read a length-prefixed message from a stream."""
     length_bytes = await reader.readexactly(4)
     length = struct.unpack("!I", length_bytes)[0]
+    if length > _MAX_FRAME_SIZE:
+        raise ValueError(f"Frame too large: {length} bytes (max {_MAX_FRAME_SIZE})")
     return await reader.readexactly(length)
 
 
@@ -194,8 +200,12 @@ async def _run_daemon(
                     future.set_result({"error": "Remote disconnected"})
             _cleanup()
 
-    server = await asyncio.start_unix_server(handle_local_client, path=SOCKET_PATH)
-    os.chmod(SOCKET_PATH, 0o600)
+    # Set restrictive umask so the socket is created owner-only (no TOCTOU window)
+    old_umask = os.umask(0o177)
+    try:
+        server = await asyncio.start_unix_server(handle_local_client, path=SOCKET_PATH)
+    finally:
+        os.umask(old_umask)
 
     loop = asyncio.get_running_loop()
 
