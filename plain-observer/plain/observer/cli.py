@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import click
 
@@ -12,6 +13,251 @@ from plain.observer.models import Span, Trace
 @click.group("observer")
 def observer_cli() -> None:
     """Observability and tracing tools"""
+
+
+@observer_cli.command("request")
+@click.argument("path")
+@click.option(
+    "--method",
+    default="GET",
+    help="HTTP method",
+)
+@click.option("--data", help="Request data (JSON string for POST/PUT/PATCH)")
+@click.option(
+    "--user",
+    "user_id",
+    help="User ID or email to authenticate as",
+)
+def observer_request(
+    path: str,
+    method: str,
+    data: str | None,
+    user_id: str | None,
+) -> None:
+    """Make an HTTP request and return trace analysis as JSON.
+
+    Automatically enables tracing and returns structured performance
+    analysis designed for AI agent consumption.
+    """
+    from plain.runtime import settings
+    from plain.test import Client
+
+    if not settings.DEBUG:
+        click.secho("This command only works when DEBUG=True", fg="red", err=True)
+        raise SystemExit(1)
+
+    client = Client(raise_request_exception=False, headers={"Host": "localhost"})
+
+    if user_id:
+        try:
+            from plain.auth import get_user_model
+        except ImportError:
+            raise click.UsageError("plain-auth is required to use --user")
+
+        User = get_user_model()
+
+        user = None
+        try:
+            user = User.query.get(id=user_id)
+        except (User.DoesNotExist, ValueError):
+            pass
+
+        if user is None:
+            try:
+                user = User.query.get(email=user_id)
+            except User.DoesNotExist:
+                pass
+
+        if user is None:
+            click.secho(f"User not found: {user_id}", fg="red", err=True)
+            raise SystemExit(1)
+
+        client.force_login(user)
+
+    method = method.upper()
+    kwargs: dict[str, Any] = {
+        "follow": True,
+        "headers": {"Accept": "text/html", "Observer": "persist"},
+    }
+
+    if method in ("POST", "PUT", "PATCH") and data:
+        kwargs["data"] = data
+        kwargs["content_type"] = "application/json"
+
+    client_method = getattr(client, method.lower(), None)
+    if not client_method:
+        click.secho(f"Unsupported HTTP method: {method}", fg="red", err=True)
+        raise SystemExit(1)
+
+    try:
+        response = client_method(path, **kwargs)
+    except Exception as e:
+        click.secho(f"Request failed: {e}", fg="red", err=True)
+        raise SystemExit(1)
+
+    request_id = response.request.unique_id
+    trace = Trace.query.filter(request_id=request_id).first()
+
+    if not trace:
+        click.echo(
+            json.dumps(
+                {
+                    "response": {"status": response.status_code},
+                    "error": "No trace captured — is plain-observer installed and configured?",
+                },
+                indent=2,
+            )
+        )
+        raise SystemExit(1)
+
+    # Analyze spans
+    spans = trace.spans.query.all().annotate_spans()  # type: ignore[attr-defined]
+
+    # Group queries by SQL text
+    queries_by_sql: dict[str, dict[str, Any]] = {}
+    issues: list[dict[str, Any]] = []
+
+    for span in spans:
+        sql = span.sql_query
+        if not sql:
+            # Check non-query spans for exceptions
+            if stacktrace := span.get_exception_stacktrace():
+                issues.append(
+                    {
+                        "type": "exception",
+                        "description": f"Exception in {span.name}",
+                        "span": span.name,
+                        "stacktrace": stacktrace,
+                    }
+                )
+            continue
+
+        if sql not in queries_by_sql:
+            queries_by_sql[sql] = {
+                "sql": sql,
+                "count": 0,
+                "durations_ms": [],
+                "sources": [],
+            }
+        entry = queries_by_sql[sql]
+        entry["count"] += 1
+        entry["durations_ms"].append(round(span.duration_ms(), 2))
+
+        if loc := span.source_code_location:
+            source = str(loc.get("File", ""))
+            if "Line" in loc:
+                source += f":{loc['Line']}"
+            if "Function" in loc:
+                source += f" in {loc['Function']}"
+            if source and source not in entry["sources"]:
+                entry["sources"].append(source)
+
+    # Build sorted query list and detect duplicates
+    queries: list[dict[str, Any]] = []
+    query_count = 0
+    duplicate_query_count = 0
+
+    for q in sorted(
+        queries_by_sql.values(),
+        key=lambda x: (-x["count"], -sum(x["durations_ms"])),
+    ):
+        query_count += q["count"]
+        if q["count"] > 1:
+            duplicate_query_count += q["count"] - 1
+            issues.insert(
+                0,
+                {
+                    "type": "duplicate_query",
+                    "description": f"Query executed {q['count']} times — likely N+1",
+                    "sql": q["sql"],
+                    "count": q["count"],
+                    "total_duration_ms": round(sum(q["durations_ms"]), 2),
+                    "sources": q["sources"],
+                },
+            )
+        queries.append(
+            {
+                "sql": q["sql"],
+                "count": q["count"],
+                "total_duration_ms": round(sum(q["durations_ms"]), 2),
+                "sources": q["sources"],
+            }
+        )
+
+    # Build span tree
+    span_dict = {s.span_id: s for s in spans}
+    children_map: dict[str, list[str]] = {}
+    for s in spans:
+        if s.parent_id:
+            children_map.setdefault(s.parent_id, []).append(s.span_id)
+
+    def span_to_dict(span: Span) -> dict[str, Any]:
+        node: dict[str, Any] = {
+            "name": span.name,
+            "duration_ms": round(span.duration_ms(), 2),
+        }
+        if span.sql_query:
+            node["sql"] = span.sql_query
+        if loc := span.source_code_location:
+            source = str(loc.get("File", ""))
+            if "Line" in loc:
+                source += f":{loc['Line']}"
+            if source:
+                node["source"] = source
+        if span.annotations:
+            node["warnings"] = [a["message"] for a in span.annotations]
+        if stacktrace := span.get_exception_stacktrace():
+            node["exception"] = stacktrace
+        if span.span_id in children_map:
+            node["children"] = [
+                span_to_dict(span_dict[cid])
+                for cid in children_map[span.span_id]
+                if cid in span_dict
+            ]
+        return node
+
+    # Build output
+    output: dict[str, Any] = {
+        "response": {
+            "status": response.status_code,
+        },
+        "trace": {
+            "id": trace.trace_id,
+            "duration_ms": round(trace.duration_ms(), 2),
+            "query_count": query_count,
+            "duplicate_query_count": duplicate_query_count,
+        },
+    }
+
+    if response.resolver_match:
+        match = response.resolver_match
+        url_name = getattr(match, "namespaced_url_name", None) or getattr(
+            match, "url_name", None
+        )
+        if url_name:
+            output["response"]["url_pattern"] = url_name
+
+    if issues:
+        output["issues"] = issues
+
+    output["queries"] = queries
+    output["spans"] = [span_to_dict(s) for s in spans if not s.parent_id]
+
+    logs = [
+        {
+            "timestamp": log.timestamp.isoformat(),
+            "level": log.level,
+            "message": log.message,
+        }
+        for log in trace.logs.query.all().order_by("timestamp")
+    ]
+    if logs:
+        output["logs"] = logs
+
+    click.echo(json.dumps(output, indent=2))
+
+    if response.status_code >= 500:
+        raise SystemExit(1)
 
 
 @observer_cli.command()

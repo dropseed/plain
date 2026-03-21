@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import contextlib
 import dataclasses
 import inspect
 from typing import TYPE_CHECKING, Any
@@ -78,10 +79,10 @@ class BaseHandler:
         # as a flag for initialization being complete.
         self._middleware_chain = chain
 
-    def _build_request_span(
+    def _start_request_span(
         self, request: Request
-    ) -> tuple[dict[str, str], context.Context]:
-        """Build OpenTelemetry span attributes and baggage context for a request."""
+    ) -> contextlib.AbstractContextManager[trace.Span]:
+        """Start an OpenTelemetry span for a request and set it as current."""
         span_attributes: dict[str, str] = {
             "plain.request.id": request.unique_id,
             http_attributes.HTTP_REQUEST_METHOD: request.method or "",
@@ -101,7 +102,13 @@ class BaseHandler:
         span_context = baggage.set_baggage(
             "http.request.headers", request.headers, span_context
         )
-        return span_attributes, span_context
+
+        return tracer.start_as_current_span(
+            f"{request.method} {request.path_info}",
+            context=span_context,
+            attributes=span_attributes,
+            kind=trace.SpanKind.SERVER,
+        )
 
     def _finalize_span(self, span: trace.Span, response: ResponseBase) -> None:
         """Set span status and record exceptions from the response."""
@@ -167,14 +174,7 @@ class BaseHandler:
             "load_middleware() must be called before handle()"
         )
 
-        span_attributes, span_context = self._build_request_span(request)
-
-        with tracer.start_as_current_span(
-            f"{request.method} {request.path_info}",
-            context=span_context,
-            attributes=span_attributes,
-            kind=trace.SpanKind.SERVER,
-        ) as span:
+        with self._start_request_span(request) as span:
             result = await self._run_in_executor(
                 executor, self._run_sync_pipeline, request
             )

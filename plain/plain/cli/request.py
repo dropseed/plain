@@ -23,7 +23,7 @@ from plain.test import Client
 @click.option(
     "--user",
     "user_id",
-    help="User ID to authenticate as (skips normal authentication)",
+    help="User ID or email to authenticate as (skips normal authentication)",
 )
 @click.option(
     "--follow/--no-follow",
@@ -94,25 +94,31 @@ def request(
         # Create test client
         client = Client(headers={"Host": "localhost"})
 
-        # If user_id provided, force login
         if user_id:
             try:
-                # Get the User model using plain.auth utility
                 from plain.auth import get_user_model
+            except ImportError:
+                raise click.UsageError("plain-auth is required to use --user")
 
-                User = get_user_model()
+            User = get_user_model()
 
-                # Get the user
+            user = None
+            try:
+                user = User.query.get(id=user_id)
+            except (User.DoesNotExist, ValueError):
+                pass
+
+            if user is None:
                 try:
-                    user = User.query.get(id=user_id)
-                    client.force_login(user)
+                    user = User.query.get(email=user_id)
                 except User.DoesNotExist:
-                    click.secho(f"User {user_id} not found", fg="red", err=True)
-                    raise SystemExit(1)
+                    pass
 
-            except Exception as e:
-                click.secho(f"Authentication error: {e}", fg="red", err=True)
+            if user is None:
+                click.secho(f"User not found: {user_id}", fg="red", err=True)
                 raise SystemExit(1)
+
+            client.force_login(user)
 
         # Parse additional headers (default Accept to text/html)
         header_dict = {"Accept": "text/html"}

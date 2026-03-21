@@ -91,9 +91,14 @@ The toolbar panel displays:
 
 ## CLI commands
 
-Observer provides CLI commands for managing and viewing traces.
+Observer provides CLI commands for capturing, managing, and viewing traces.
 
 ```bash
+# Capture a trace and return structured JSON analysis
+plain observer request /path
+plain observer request /path --user 1
+plain observer request /path --method POST --data '{"key": "value"}'
+
 # List recent traces
 plain observer traces
 plain observer traces --limit 50
@@ -115,6 +120,8 @@ plain observer span <span_id>
 plain observer clear
 plain observer clear --force
 ```
+
+The `observer request` command makes a request with tracing automatically enabled and returns structured JSON output including query counts, duplicate detection, issue analysis, and a span tree. The `--user` flag accepts a user ID or email.
 
 The `traces` and `spans` commands support filtering by user ID, session ID, or request ID, and can output JSON for programmatic use.
 

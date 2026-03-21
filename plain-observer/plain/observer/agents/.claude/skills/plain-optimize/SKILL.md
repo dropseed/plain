@@ -5,41 +5,41 @@ description: Captures and analyzes performance traces to identify slow queries a
 
 # Performance Optimization Workflow
 
-## 1. Capture Traces
+## 1. Capture and Analyze
 
-Make a request with tracing enabled:
-
-```
-uv run plain request /path --user 1 --header "Observer: persist"
-```
-
-## 2. Find Traces
+Make a request with tracing enabled — returns structured JSON with query counts, duplicates, issues, and span tree:
 
 ```
-uv run plain observer traces --request-id <request-id>
+uv run plain observer request /path
+uv run plain observer request /path --user 1
+uv run plain observer request /path --method POST --data '{"key": "value"}'
 ```
 
-## 3. Analyze Trace
+The `--user` flag accepts a user ID or email.
 
-```
-uv run plain observer trace <trace-id> --json
-```
+The JSON output includes:
 
-## 4. Identify Bottlenecks
+- `response.status` — HTTP status code
+- `trace.query_count` / `trace.duplicate_query_count` — query summary
+- `issues` — pre-detected problems (duplicate queries, exceptions)
+- `queries` — each unique query with count, total duration, and source locations
+- `spans` — nested span tree showing the request flow
 
-Look for:
+## 2. Identify Bottlenecks
 
-- N+1 queries (many similar queries)
-- Slow database queries
+Check the `issues` array first — duplicate queries are flagged automatically with source locations. Then review:
+
+- N+1 queries (duplicate queries with count > 1)
+- Slow database queries (high `total_duration_ms`)
 - Missing indexes
 - Unnecessary work in hot paths
 
-## 5. Apply Fixes
+## 3. Apply Fixes
 
 - Add `select_related()` / `prefetch_related()` for N+1
 - Add database indexes for slow queries
 - Cache expensive computations
 
-## 6. Verify Improvement
+## 4. Verify Improvement
 
-Re-run the trace and compare.
+Re-run `uv run plain observer request /path` and compare `query_count`, `duplicate_query_count`, and `trace.duration_ms`.

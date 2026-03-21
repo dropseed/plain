@@ -4,6 +4,6 @@ Use the `/plain-optimize` skill for the full performance optimization workflow (
 
 Key commands:
 
-- `uv run plain request /path --header "Observer: persist"` - Capture a trace
-- `uv run plain observer traces --request-id <id>` - Find traces
-- `uv run plain observer trace <trace-id> --json` - Analyze a trace
+- `uv run plain observer request /path` - Capture a trace and return structured JSON analysis (query counts, duplicates, issues, span tree)
+- `uv run plain observer request /path --user 1` - Trace as a specific user (accepts ID or email)
+- `uv run plain observer trace <trace-id> --json` - Get raw trace data for a previously captured trace

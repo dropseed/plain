@@ -193,15 +193,18 @@ class ClientHandler(BaseHandler):
 
         from plain.internal.handlers.base import _AsyncViewPending
 
-        # Call the sync pipeline directly — no event loop needed for sync
-        # views. This keeps the test client usable from both sync tests and
-        # async tests (where asyncio.run() would raise).
-        result = self._run_sync_pipeline(request)
+        with self._start_request_span(request) as span:
+            # Call the sync pipeline directly — no event loop needed for sync
+            # views. This keeps the test client usable from both sync tests and
+            # async tests (where asyncio.run() would raise).
+            result = self._run_sync_pipeline(request)
 
-        if isinstance(result, _AsyncViewPending):
-            response = self._handle_async_view(request, result)
-        else:
-            response = result
+            if isinstance(result, _AsyncViewPending):
+                response = self._handle_async_view(request, result)
+            else:
+                response = result
+
+            self._finalize_span(span, response)
 
         response._resource_closers.append(request.close)
 
