@@ -20,7 +20,7 @@ import tempfile
 import websockets.client
 
 from .codegen import validate_code
-from .crypto import PortalEncryptor, create_spake2_joiner
+from .crypto import PortalEncryptor, channel_id, create_spake2_joiner
 from .protocol import (
     DEFAULT_RELAY_HOST,
     PROTOCOL_VERSION,
@@ -52,7 +52,8 @@ async def connect(
         sys.exit(1)
 
     scheme = "ws" if relay_host.startswith("localhost") else "wss"
-    relay_url = f"{scheme}://{relay_host}{RELAY_PATH}?v={PROTOCOL_VERSION}&code={code}&side=connect"
+    cid = channel_id(code)
+    relay_url = f"{scheme}://{relay_host}{RELAY_PATH}?v={PROTOCOL_VERSION}&channel={cid}&side=connect"
 
     # SPAKE2 side B (joiner)
     spake = create_spake2_joiner(code)
@@ -107,6 +108,8 @@ async def _run_daemon(
         os.unlink(SOCKET_PATH)
 
     pending_responses: dict[int, asyncio.Future] = {}
+    # Accumulate multi-chunk file_data responses before delivering
+    file_data_accumulators: dict[int, dict] = {}
     request_counter = 0
 
     async def handle_local_client(
@@ -177,12 +180,34 @@ async def _run_daemon(
 
                 # Match response to pending request
                 req_id = msg.pop("_req_id", None)
-                if req_id and req_id in pending_responses:
+                if not req_id or req_id not in pending_responses:
+                    continue
+
+                if msg_type == "file_data":
+                    # Accumulate chunks, deliver when all received
+                    if req_id not in file_data_accumulators:
+                        file_data_accumulators[req_id] = {
+                            "name": msg["name"],
+                            "chunks": msg["chunks"],
+                            "received": {},
+                        }
+                    acc = file_data_accumulators[req_id]
+                    acc["received"][msg["chunk"]] = msg["data"]
+                    if len(acc["received"]) == acc["chunks"]:
+                        # All chunks received — concatenate and deliver
+                        all_data = ""
+                        for i in range(acc["chunks"]):
+                            all_data += acc["received"][i]
+                        del file_data_accumulators[req_id]
+                        pending_responses[req_id].set_result(
+                            {
+                                "type": "file_data",
+                                "name": acc["name"],
+                                "data": all_data,
+                            }
+                        )
+                else:
                     pending_responses[req_id].set_result(msg)
-                # For multi-chunk file_data, accumulate and deliver on last chunk
-                elif msg_type == "file_data":
-                    # File data messages carry their own req_id
-                    _deliver_file_chunk(msg, pending_responses)
 
         except websockets.exceptions.ConnectionClosed:
             pass
@@ -194,6 +219,9 @@ async def _run_daemon(
             _cleanup()
 
     server = await asyncio.start_unix_server(handle_local_client, path=SOCKET_PATH)
+
+    # Restrict socket to current user only (default is world-accessible)
+    os.chmod(SOCKET_PATH, 0o600)
 
     # Handle SIGTERM for clean shutdown
     loop = asyncio.get_event_loop()
@@ -211,17 +239,6 @@ async def _run_daemon(
         server.close()
         await server.wait_closed()
         _cleanup()
-
-
-def _deliver_file_chunk(
-    msg: dict, pending_responses: dict[int, asyncio.Future]
-) -> None:
-    """Accumulate file data chunks and deliver when complete."""
-    # The req_id is embedded in file_data messages for matching
-    req_id = msg.get("_req_id")
-    if req_id and req_id in pending_responses:
-        # For simplicity, deliver each chunk — the CLI side accumulates
-        pending_responses[req_id].set_result(msg)
 
 
 def _cleanup() -> None:

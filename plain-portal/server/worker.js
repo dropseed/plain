@@ -34,9 +34,9 @@ export default {
       return new Response("Not found", { status: 404 });
     }
 
-    const code = url.searchParams.get("code");
-    if (!code) {
-      return new Response("Missing 'code' parameter", { status: 400 });
+    const channel = url.searchParams.get("channel");
+    if (!channel) {
+      return new Response("Missing 'channel' parameter", { status: 400 });
     }
 
     const version = parseInt(url.searchParams.get("v") || "0", 10);
@@ -52,8 +52,8 @@ export default {
       return new Response("'side' must be 'start' or 'connect'", { status: 400 });
     }
 
-    // Each code maps to a unique Durable Object
-    const objectId = env.PORTAL_NAMESPACE.idFromName(code);
+    // Each channel maps to a unique Durable Object
+    const objectId = env.PORTAL_NAMESPACE.idFromName(channel);
     const portal = env.PORTAL_NAMESPACE.get(objectId);
 
     // Forward to the Durable Object, passing side info via header
@@ -171,6 +171,7 @@ export class Portal {
     });
 
     server.addEventListener("close", () => {
+      // Clear this side's state
       if (side === "start") {
         this.startSocket = null;
         this.startSpakeMsg = null;
@@ -179,7 +180,7 @@ export class Portal {
         this.connectSpakeMsg = null;
       }
 
-      // Notify the peer
+      // Notify and close the peer
       const peer = peerSocket();
       if (peer) {
         try {
@@ -187,12 +188,6 @@ export class Portal {
         } catch {
           /* ignore */
         }
-      }
-
-      if (side === "start") {
-        this.connectSocket = null;
-      } else {
-        this.startSocket = null;
       }
 
       this.paired = false;

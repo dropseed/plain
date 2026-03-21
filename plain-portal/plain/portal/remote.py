@@ -19,7 +19,7 @@ from datetime import datetime
 import websockets.client
 
 from .codegen import generate_code
-from .crypto import PortalEncryptor, create_spake2_initiator
+from .crypto import PortalEncryptor, channel_id, create_spake2_initiator
 from .protocol import (
     DEFAULT_RELAY_HOST,
     FILE_CHUNK_SIZE,
@@ -62,7 +62,8 @@ async def run_remote(
 
     # Build relay URL
     scheme = "ws" if relay_host.startswith("localhost") else "wss"
-    relay_url = f"{scheme}://{relay_host}{RELAY_PATH}?v={PROTOCOL_VERSION}&code={code}&side=start"
+    cid = channel_id(code)
+    relay_url = f"{scheme}://{relay_host}{RELAY_PATH}?v={PROTOCOL_VERSION}&channel={cid}&side=start"
 
     # SPAKE2 side A (initiator)
     spake = create_spake2_initiator(code)
@@ -121,6 +122,7 @@ async def run_remote(
                     await ws.send(encryptor.encrypt_message(make_pong()))
 
                 elif msg_type == "exec":
+                    req_id = msg.get("_req_id")
                     code_str = msg["code"]
                     _log(f"exec: {_truncate(code_str)}")
                     result = _execute_code(code_str, writable=writable)
@@ -132,12 +134,14 @@ async def run_remote(
                         return_value=result["return_value"],
                         error=result["error"],
                     )
+                    response["_req_id"] = req_id
                     await ws.send(encryptor.encrypt_message(response))
 
                 elif msg_type == "file_pull":
+                    req_id = msg.get("_req_id")
                     remote_path = msg["remote_path"]
                     _log(f"pull: {remote_path}")
-                    await _handle_file_pull(ws, encryptor, remote_path)
+                    await _handle_file_pull(ws, encryptor, remote_path, req_id)
 
                 elif msg_type == "file_push":
                     await _handle_file_push(ws, encryptor, msg)
@@ -209,6 +213,7 @@ async def _handle_file_pull(
     ws: websockets.client.ClientConnection,
     encryptor: PortalEncryptor,
     remote_path: str,
+    req_id: int | None,
 ) -> None:
     """Read a file from disk and send it in chunks."""
     try:
@@ -219,6 +224,7 @@ async def _handle_file_pull(
                 return_value=None,
                 error=f"File too large: {file_size} bytes (max {MAX_FILE_SIZE})",
             )
+            error_msg["_req_id"] = req_id
             await ws.send(encryptor.encrypt_message(error_msg))
             return
 
@@ -231,12 +237,14 @@ async def _handle_file_pull(
             for i in range(chunks):
                 data = f.read(FILE_CHUNK_SIZE)
                 msg = make_file_data(name=name, chunk=i, chunks=chunks, data=data)
+                msg["_req_id"] = req_id
                 await ws.send(encryptor.encrypt_message(msg))
 
     except FileNotFoundError:
         error_msg = make_exec_result(
             stdout="", return_value=None, error=f"File not found: {remote_path}"
         )
+        error_msg["_req_id"] = req_id
         await ws.send(encryptor.encrypt_message(error_msg))
     except PermissionError:
         error_msg = make_exec_result(
@@ -244,6 +252,7 @@ async def _handle_file_pull(
             return_value=None,
             error=f"Permission denied: {remote_path}",
         )
+        error_msg["_req_id"] = req_id
         await ws.send(encryptor.encrypt_message(error_msg))
 
 
@@ -253,18 +262,21 @@ async def _handle_file_push(
     msg: dict,
 ) -> None:
     """Receive a file chunk and write it to disk."""
+    req_id = msg.get("_req_id")
     remote_path = msg["remote_path"]
     chunk = msg["chunk"]
     chunks = msg["chunks"]
     data = base64.b64decode(msg["data"])
 
-    # Security: default to /tmp only
-    if not remote_path.startswith("/tmp"):
+    # Security: resolve symlinks and .. components, then verify still under /tmp/
+    resolved = os.path.realpath(remote_path)
+    if not resolved.startswith("/tmp/"):
         error_msg = make_exec_result(
             stdout="",
             return_value=None,
-            error=f"Push restricted to /tmp/. Got: {remote_path}",
+            error=f"Push restricted to /tmp/. Got: {remote_path} (resolved: {resolved})",
         )
+        error_msg["_req_id"] = req_id
         await ws.send(encryptor.encrypt_message(error_msg))
         return
 
@@ -281,4 +293,5 @@ async def _handle_file_push(
         total_bytes = os.path.getsize(remote_path)
         _log(f"       received {total_bytes} bytes")
         result = make_file_push_result(path=remote_path, total_bytes=total_bytes)
+        result["_req_id"] = req_id
         await ws.send(encryptor.encrypt_message(result))
