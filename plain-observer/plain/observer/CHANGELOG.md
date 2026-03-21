@@ -1,5 +1,17 @@
 # plain-observer changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-observer@0.31.0) (2026-03-20)
+
+### What's changed
+
+- **New `plain observer request` command** — makes a request with tracing enabled and returns structured JSON analysis including query counts, duplicate detection, issue analysis, and a span tree. Supports `--user` (ID or email), `--method`, and `--data` options ([aa54f27d95](https://github.com/dropseed/plain/commit/aa54f27d95))
+- **Replaced `psutil` dependency with stdlib metrics** — the toolbar now uses container-aware helpers from `plain.utils.os` (`get_process_cpu_percent()`, `get_memory_usage()`) instead of `psutil`, removing the external dependency ([40482feb2b](https://github.com/dropseed/plain/commit/40482feb2b))
+- Toolbar system stats now display conditionally (CPU and memory shown only when available) with improved tooltips ([40482feb2b](https://github.com/dropseed/plain/commit/40482feb2b))
+
+### Upgrade instructions
+
+- `psutil` is no longer a dependency — you can remove it from your own dependencies if you only had it via plain-observer.
+
 ## [0.30.0](https://github.com/dropseed/plain/releases/plain-observer@0.30.0) (2026-03-20)
 
 ### What's changed
