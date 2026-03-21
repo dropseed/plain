@@ -6,15 +6,29 @@ observing the relay traffic cannot brute-force the code offline.
 
 All messages after the key exchange are encrypted with NaCl SecretBox
 (XSalsa20-Poly1305).
+
+The portal code is never sent to the relay. Instead, a SHA-256 hash
+of the code is used as the channel ID for pairing. The raw code is
+only used locally for the SPAKE2 exchange.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 
 import nacl.secret
 import nacl.utils
 import spake2
+
+
+def channel_id(code: str) -> str:
+    """Derive a relay channel ID from the portal code.
+
+    Uses SHA-256 so the relay never learns the raw code and cannot
+    perform SPAKE2 to impersonate either side.
+    """
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
 
 
 def create_spake2_initiator(code: str) -> spake2.SPAKE2_A:
