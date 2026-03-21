@@ -19,17 +19,18 @@ from datetime import datetime
 import websockets.client
 
 from .codegen import generate_code
-from .crypto import PortalEncryptor, channel_id, create_spake2_initiator
+from .crypto import PortalEncryptor, channel_id, perform_key_exchange
 from .protocol import (
     DEFAULT_RELAY_HOST,
     FILE_CHUNK_SIZE,
     MAX_FILE_SIZE,
-    PROTOCOL_VERSION,
-    RELAY_PATH,
+    chunk_count,
+    make_error,
     make_exec_result,
     make_file_data,
     make_file_push_result,
     make_pong,
+    make_relay_url,
 )
 
 
@@ -44,6 +45,18 @@ def _truncate(s: str, max_len: int = 200) -> str:
     return s[:max_len] + "..."
 
 
+async def _send_error(
+    ws: websockets.client.ClientConnection,
+    encryptor: PortalEncryptor,
+    req_id: int | None,
+    error_text: str,
+) -> None:
+    """Send an error response back through the tunnel."""
+    msg = make_error(error_text)
+    msg["_req_id"] = req_id
+    await ws.send(encryptor.encrypt_message(msg))
+
+
 async def run_remote(
     *,
     code: str | None = None,
@@ -56,33 +69,26 @@ async def run_remote(
     if code is None:
         code = generate_code()
 
+    # Set up Plain runtime once at session start
+    try:
+        import plain.runtime
+
+        plain.runtime.setup()
+    except Exception:
+        pass
+
     print(f"Portal code: {code}")
     print("Waiting for connection...")
     print()
 
-    # Build relay URL
-    scheme = "ws" if relay_host.startswith("localhost") else "wss"
     cid = channel_id(code)
-    relay_url = f"{scheme}://{relay_host}{RELAY_PATH}?v={PROTOCOL_VERSION}&channel={cid}&side=start"
-
-    # SPAKE2 side A (initiator)
-    spake = create_spake2_initiator(code)
-    spake_msg = spake.msg()
+    relay_url = make_relay_url(relay_host, cid, "start")
 
     async with websockets.client.connect(relay_url) as ws:
-        # Send our SPAKE2 message as the first thing
-        await ws.send(base64.b64encode(spake_msg).decode("ascii"))
-
-        # Wait for the other side's SPAKE2 message
-        peer_msg_b64 = await ws.recv()
-        peer_msg = base64.b64decode(peer_msg_b64)
-        key = spake.finish(peer_msg)
-
-        encryptor = PortalEncryptor(key)
+        encryptor = await perform_key_exchange(ws, code, side="start")
         _log("Connected from remote client.")
 
-        # Main message loop
-        last_activity = asyncio.get_event_loop().time()
+        last_activity = asyncio.get_running_loop().time()
 
         async def check_timeout() -> None:
             nonlocal last_activity
@@ -90,7 +96,7 @@ async def run_remote(
                 return
             while True:
                 await asyncio.sleep(60)
-                idle = asyncio.get_event_loop().time() - last_activity
+                idle = asyncio.get_running_loop().time() - last_activity
                 remaining = (timeout_minutes * 60) - idle
                 if remaining <= 60 and remaining > 0:
                     print(
@@ -109,10 +115,9 @@ async def run_remote(
 
         try:
             async for raw in ws:
-                last_activity = asyncio.get_event_loop().time()
+                last_activity = asyncio.get_running_loop().time()
 
                 if isinstance(raw, str):
-                    # Shouldn't happen after key exchange — ignore
                     continue
 
                 msg = encryptor.decrypt_message(raw)
@@ -125,7 +130,10 @@ async def run_remote(
                     req_id = msg.get("_req_id")
                     code_str = msg["code"]
                     _log(f"exec: {_truncate(code_str)}")
-                    result = _execute_code(code_str, writable=writable)
+                    # Run in thread to avoid blocking the async loop
+                    result = await asyncio.to_thread(
+                        _execute_code, code_str, writable=writable
+                    )
                     display = result.get("return_value") or result.get("error") or ""
                     if display:
                         _log(f"       → {_truncate(display)}")
@@ -162,22 +170,12 @@ def _execute_code(code_str: str, *, writable: bool = False) -> dict:
     is captured as the return value (like the interactive REPL).
     """
     namespace: dict = {}
-
-    # Set up Plain runtime so models etc. are available
-    try:
-        import plain.runtime
-
-        plain.runtime.setup()
-    except Exception:
-        pass  # May already be set up, or not available
-
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
     return_value = None
     error = None
 
     try:
-        # Parse the code to separate the last expression (if any)
         tree = ast.parse(code_str, mode="exec")
         last_expr = None
 
@@ -185,12 +183,10 @@ def _execute_code(code_str: str, *, writable: bool = False) -> dict:
             last_expr = tree.body.pop()
 
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-            # Execute all statements
             if tree.body:
                 compiled = compile(tree, "<portal>", "exec")
                 exec(compiled, namespace)  # noqa: S102
 
-            # Evaluate the last expression for its value
             if last_expr is not None:
                 expr_code = compile(ast.Expression(last_expr.value), "<portal>", "eval")
                 result = eval(expr_code, namespace)  # noqa: S307
@@ -219,17 +215,16 @@ async def _handle_file_pull(
     try:
         file_size = os.path.getsize(remote_path)
         if file_size > MAX_FILE_SIZE:
-            error_msg = make_exec_result(
-                stdout="",
-                return_value=None,
-                error=f"File too large: {file_size} bytes (max {MAX_FILE_SIZE})",
+            await _send_error(
+                ws,
+                encryptor,
+                req_id,
+                f"File too large: {file_size} bytes (max {MAX_FILE_SIZE})",
             )
-            error_msg["_req_id"] = req_id
-            await ws.send(encryptor.encrypt_message(error_msg))
             return
 
         name = os.path.basename(remote_path)
-        chunks = max(1, (file_size + FILE_CHUNK_SIZE - 1) // FILE_CHUNK_SIZE)
+        chunks = chunk_count(file_size)
 
         _log(f"       sending {name} ({file_size} bytes, {chunks} chunks)")
 
@@ -241,19 +236,9 @@ async def _handle_file_pull(
                 await ws.send(encryptor.encrypt_message(msg))
 
     except FileNotFoundError:
-        error_msg = make_exec_result(
-            stdout="", return_value=None, error=f"File not found: {remote_path}"
-        )
-        error_msg["_req_id"] = req_id
-        await ws.send(encryptor.encrypt_message(error_msg))
+        await _send_error(ws, encryptor, req_id, f"File not found: {remote_path}")
     except PermissionError:
-        error_msg = make_exec_result(
-            stdout="",
-            return_value=None,
-            error=f"Permission denied: {remote_path}",
-        )
-        error_msg["_req_id"] = req_id
-        await ws.send(encryptor.encrypt_message(error_msg))
+        await _send_error(ws, encryptor, req_id, f"Permission denied: {remote_path}")
 
 
 async def _handle_file_push(
@@ -264,32 +249,29 @@ async def _handle_file_push(
     """Receive a file chunk and write it to disk."""
     req_id = msg.get("_req_id")
     remote_path = msg["remote_path"]
-    chunk = msg["chunk"]
+    chunk_idx = msg["chunk"]
     chunks = msg["chunks"]
     data = base64.b64decode(msg["data"])
 
     # Security: resolve symlinks and .. components, then verify still under /tmp/
     resolved = os.path.realpath(remote_path)
     if not resolved.startswith("/tmp/"):
-        error_msg = make_exec_result(
-            stdout="",
-            return_value=None,
-            error=f"Push restricted to /tmp/. Got: {remote_path} (resolved: {resolved})",
+        await _send_error(
+            ws,
+            encryptor,
+            req_id,
+            f"Push restricted to /tmp/. Got: {remote_path} (resolved: {resolved})",
         )
-        error_msg["_req_id"] = req_id
-        await ws.send(encryptor.encrypt_message(error_msg))
         return
 
-    if chunk == 0:
+    if chunk_idx == 0:
         _log(f"push: {remote_path} ({chunks} chunks)")
 
-    # Write/append the chunk
-    mode = "wb" if chunk == 0 else "ab"
+    mode = "wb" if chunk_idx == 0 else "ab"
     with open(remote_path, mode) as f:
         f.write(data)
 
-    # Send confirmation after last chunk
-    if chunk == chunks - 1:
+    if chunk_idx == chunks - 1:
         total_bytes = os.path.getsize(remote_path)
         _log(f"       received {total_bytes} bytes")
         result = make_file_push_result(path=remote_path, total_bytes=total_bytes)
