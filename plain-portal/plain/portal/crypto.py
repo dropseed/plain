@@ -14,6 +14,7 @@ only used locally for the SPAKE2 exchange.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 
@@ -31,14 +32,19 @@ def channel_id(code: str) -> str:
     return hashlib.sha256(code.encode("utf-8")).hexdigest()
 
 
-def create_spake2_initiator(code: str) -> spake2.SPAKE2_A:
-    """Create the SPAKE2 side A (remote/start side)."""
-    return spake2.SPAKE2_A(code.encode("utf-8"))
+async def perform_key_exchange(ws, code: str, *, side: str) -> PortalEncryptor:
+    """Run the SPAKE2 handshake over a WebSocket and return an encryptor.
 
+    `side` must be "start" (SPAKE2_A / initiator) or "connect" (SPAKE2_B / joiner).
+    """
+    spake_cls = spake2.SPAKE2_A if side == "start" else spake2.SPAKE2_B
+    spake_instance = spake_cls(code.encode("utf-8"))
+    spake_msg = spake_instance.msg()
 
-def create_spake2_joiner(code: str) -> spake2.SPAKE2_B:
-    """Create the SPAKE2 side B (local/connect side)."""
-    return spake2.SPAKE2_B(code.encode("utf-8"))
+    await ws.send(base64.b64encode(spake_msg).decode("ascii"))
+    peer_msg = base64.b64decode(await ws.recv())
+    key = spake_instance.finish(peer_msg)
+    return PortalEncryptor(key)
 
 
 class PortalEncryptor:
