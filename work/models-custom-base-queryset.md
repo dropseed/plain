@@ -1,9 +1,9 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 ---
 
-# plain-models: Custom Base QuerySet
+# plain-postgres: Custom Base QuerySet
 
 - Add `default_queryset()` classmethod to QuerySet that subclasses can override
 - Replaces functionality lost in Manager/QuerySet merge (commit `bbaee93839`)

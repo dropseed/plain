@@ -1,12 +1,12 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 related:
 - models-choices-classes
 - models-field-max-length
 ---
 
-# plain-models: Extract choices parameter to ChoicesFieldMixin
+# plain-postgres: Extract choices parameter to ChoicesFieldMixin
 
 - The `choices` parameter currently lives on the base `Field` class, but not all field types meaningfully support choices
 - Extract `choices` into a `ChoicesFieldMixin` so only specific field types (CharField, IntegerField, etc.) accept it

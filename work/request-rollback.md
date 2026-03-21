@@ -1,7 +1,7 @@
 ---
 labels:
 - plain.cli
-- plain-models
+- plain-postgres
 ---
 
 # plain request: Rollback database changes by default
@@ -12,7 +12,7 @@ labels:
 
 - **Default**: Wrap the request in a transaction and roll back afterward. Display a message: `Database changes rolled back. Use --commit to persist.`
 - **`--commit` flag**: Actually persist database changes (current behavior).
-- **Without plain-models**: Silently degrade to current behavior (no transaction wrapping). No database to worry about.
+- **Without plain-postgres**: Silently degrade to current behavior (no transaction wrapping). No database to worry about.
 
 Rollback applies to all HTTP methods, not just non-GET. GET requests can have database side effects too (logging, session creation, counters), so drawing a line between GET and non-GET is a leaky abstraction.
 
@@ -23,22 +23,22 @@ Rollback applies to all HTTP methods, not just non-GET. GET requests can have da
 
 ## Integration approach
 
-`plain request` lives in core `plain`, but transactions require `plain-models`. Use a try/except import — the same pattern used elsewhere in the codebase (e.g., PIL in `validators.py`):
+`plain request` lives in core `plain`, but transactions require `plain-postgres`. Use a try/except import:
 
 ```python
 try:
-    from plain.models import transaction
-    from plain.models.db import get_connection
-    has_models = True
+    from plain.postgres import transaction
+    from plain.postgres.db import get_connection
+    has_postgres = True
 except ImportError:
-    has_models = False
+    has_postgres = False
 ```
 
 Then wrap the request:
 
 ```python
 atomic = None
-if has_models and not commit:
+if has_postgres and not commit:
     atomic = transaction.atomic()
     atomic._from_testcase = True
     atomic.__enter__()
@@ -57,7 +57,7 @@ finally:
         )
 ```
 
-This mirrors the pattern used by the `db` test fixture in `plain-models/plain/models/test/pytest.py`.
+This mirrors the pattern used by the `db` test fixture in `plain-postgres/plain/postgres/test/pytest.py`.
 
 ## Why not signals?
 

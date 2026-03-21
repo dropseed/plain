@@ -1,11 +1,11 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 related:
 - models-prevent-manual-pk
 ---
 
-# plain-models: Explicit create() and persist() Methods
+# plain-postgres: Explicit create() and persist() Methods
 
 **Replace the ambiguous `save()` method with explicit `create()` and `persist()` instance methods.**
 
@@ -640,19 +640,19 @@ self._prepare_related_fields_for_save("persist", field_objects)
 **Critical:** Related managers must be updated to use instance methods while preserving FK auto-population.
 
 - [ ] Update `ReverseManyToOneManager.create()` to use `instance.create()`
-    - File: `plain-models/plain/models/fields/related_managers.py:193-196`
+    - File: `plain-postgres/plain/postgres/fields/related_managers.py:193-196`
     - Must preserve: FK auto-injection via `kwargs[self.field.name] = self.instance`
 - [ ] Update `ReverseManyToOneManager.get_or_create()` to use `instance.create()`
-    - File: `plain-models/plain/models/fields/related_managers.py:198-201`
+    - File: `plain-postgres/plain/postgres/fields/related_managers.py:198-201`
 - [ ] Update `ReverseManyToOneManager.update_or_create()` to use `instance.persist()`
-    - File: `plain-models/plain/models/fields/related_managers.py:203-206`
+    - File: `plain-postgres/plain/postgres/fields/related_managers.py:203-206`
 - [ ] Update `BaseManyToManyManager.create()` to use `instance.create()`
-    - File: `plain-models/plain/models/fields/related_managers.py:418-423`
+    - File: `plain-postgres/plain/postgres/fields/related_managers.py:418-423`
     - Must preserve: Auto-adding relationship after creation
 - [ ] Update `BaseManyToManyManager.get_or_create()` to use `instance.create()`
-    - File: `plain-models/plain/models/fields/related_managers.py:425-433`
+    - File: `plain-postgres/plain/postgres/fields/related_managers.py:425-433`
 - [ ] Update `BaseManyToManyManager.update_or_create()` to use `instance.persist()`
-    - File: `plain-models/plain/models/fields/related_managers.py:435-443`
+    - File: `plain-postgres/plain/postgres/fields/related_managers.py:435-443`
 
 ### Phase 4: Update Other Internal Usage
 
@@ -888,7 +888,7 @@ Replacing `save()` with explicit `create()` and `save_changes()` methods:
 
 ### Core Implementation
 
-- **`plain-models/plain/models/base.py`**
+- **`plain-postgres/plain/postgres/base.py`**
     - Import `transaction` module if not already imported
     - Add `Model.create()` method
         - Wrap in `transaction.mark_for_rollback_on_error()`
@@ -905,7 +905,7 @@ Replacing `save()` with explicit `create()` and `save_changes()` methods:
 
 ### QuerySet Changes
 
-- **`plain-models/plain/models/query.py`**
+- **`plain-postgres/plain/postgres/query.py`**
     - Update `get_or_create()` to use `instance.create()` (line 848)
         - **CRITICAL:** Preserve `transaction.atomic()` wrapper (line 865)
         - **CRITICAL:** Preserve `resolve_callables()` (line 866)
@@ -922,7 +922,7 @@ Replacing `save()` with explicit `create()` and `save_changes()` methods:
 
 ### Related Managers
 
-- **`plain-models/plain/models/fields/related_managers.py`**
+- **`plain-postgres/plain/postgres/fields/related_managers.py`**
     - Update `ReverseManyToOneManager.create()` (line 193)
     - Update `ReverseManyToOneManager.get_or_create()` (line 198)
     - Update `ReverseManyToOneManager.update_or_create()` (line 203)
@@ -932,17 +932,17 @@ Replacing `save()` with explicit `create()` and `save_changes()` methods:
 
 ### Form Integration
 
-- **`plain-models/plain/models/forms.py`**
+- **`plain-postgres/plain/postgres/forms.py`**
     - Update `ModelForm.save()` to use explicit methods (line 395)
 
 ### Validation
 
-- **`plain-models/plain/models/constraints.py`**
+- **`plain-postgres/plain/postgres/constraints.py`**
     - **Keep `_state.adding` checks** (line 410) - needed for excluding self from constraint validation
 
 ### Tests
 
-- **`plain-models/tests/test_related_manager_api.py`**
+- **`plain-postgres/tests/test_related_manager_api.py`**
     - Verify `parent.children.create()` still auto-populates FK
     - Add tests for all related manager methods
 
@@ -953,7 +953,7 @@ Replacing `save()` with explicit `create()` and `save_changes()` methods:
 
 ### Documentation
 
-- **All README.md files in plain-models/**
+- **All README.md files in plain-postgres/**
     - Update examples to use `.create()` and `.save_changes()`
     - Remove references to `.save()`, `force_insert`, `force_update`
     - Add note distinguishing `instance.save_changes()` from `QuerySet.update()`

@@ -2,7 +2,7 @@
 labels:
 - plain
 - plain-admin
-- plain-models
+- plain-postgres
 - plain-flags
 - plain-pageviews
 - plain-support

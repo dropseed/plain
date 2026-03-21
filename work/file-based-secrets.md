@@ -68,6 +68,6 @@ secrets:
 
 ## Connection to encrypted fields
 
-This proposal is a prerequisite for good encrypted field key management. If `SECRET_KEY` is used to derive encryption keys (see `models-encrypted-field` proposal), then file-based secrets loading ensures self-hosted customers can securely provide `SECRET_KEY` via Docker/K8s secrets rather than environment variables.
+This proposal is a prerequisite for good encrypted field key management. `SECRET_KEY` is used to derive encryption keys for `EncryptedTextField`/`EncryptedJSONField` (already shipped), so file-based secrets loading ensures self-hosted customers can securely provide `SECRET_KEY` via Docker/K8s secrets rather than environment variables.
 
 Sentry takes a different approach — storing encryption keys as separate files on disk, independent from their Django SECRET_KEY. The file-based secrets approach here is simpler (one mechanism for all secrets) and covers the same use case. A self-hosted customer would mount their `SECRET_KEY` as a Docker secret file, and both signing and encryption derive from it.

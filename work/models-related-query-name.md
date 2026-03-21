@@ -1,10 +1,10 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 depends_on: models-consolidate-related-descriptors
 ---
 
-# plain-models: Tie related_query_name to reverse descriptors
+# plain-postgres: Tie related_query_name to reverse descriptors
 
 **Make reverse ORM filtering use the explicit `ReverseForeignKey`/`ReverseManyToMany` descriptor name instead of an independent `related_query_name` parameter.**
 
@@ -55,12 +55,12 @@ The reverse descriptor sets `remote_field.related_query_name` to its attribute n
 
 ## Changes
 
-**`plain-models/plain/models/fields/reverse_descriptors.py`** — Core change: `resolve_related_field` sets `remote_field.related_query_name` to descriptor name, invalidates `ForeignObjectRel.name` cache, expires Meta reverse cache.
+**`plain-postgres/plain/postgres/fields/reverse_descriptors.py`** — Core change: `resolve_related_field` sets `remote_field.related_query_name` to descriptor name, invalidates `ForeignObjectRel.name` cache, expires Meta reverse cache.
 
-**`plain-models/plain/models/fields/related.py`** — Remove `related_query_name` param from `RelatedField.__init__`, `ForeignKeyField.__init__`, `ManyToManyField.__init__`. Remove `%(class)s` template formatting (dead code — Plain has no model inheritance). Remove from `deconstruct()`. Update preflight error messages.
+**`plain-postgres/plain/postgres/fields/related.py`** — Remove `related_query_name` param from `RelatedField.__init__`, `ForeignKeyField.__init__`, `ManyToManyField.__init__`. Remove `%(class)s` template formatting (dead code — Plain has no model inheritance). Remove from `deconstruct()`. Update preflight error messages.
 
-**`plain-models/plain/models/fields/reverse_related.py`** — Remove `related_query_name` param from `ForeignObjectRel.__init__`, `ForeignKeyRel.__init__`, `ManyToManyRel.__init__`. Init as `None`.
+**`plain-postgres/plain/postgres/fields/reverse_related.py`** — Remove `related_query_name` param from `ForeignObjectRel.__init__`, `ForeignKeyRel.__init__`, `ManyToManyRel.__init__`. Init as `None`.
 
-**`plain-models/plain/models/fields/__init__.py`** — Remove `"related_query_name"` from `non_db_attrs`.
+**`plain-postgres/plain/postgres/fields/__init__.py`** — Remove `"related_query_name"` from `non_db_attrs`.
 
-**`plain-models/plain/models/types.pyi`** — Remove `related_query_name` from type stubs.
+**`plain-postgres/plain/postgres/types.pyi`** — Remove `related_query_name` from type stubs.

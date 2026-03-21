@@ -1,6 +1,6 @@
 ---
 labels:
-  - plain-models
+  - plain-postgres
 related:
   - remove-signals
 ---
@@ -181,9 +181,9 @@ This replaced their identical pattern — `threading.local()` holding one connec
 
 ## psycopg dependency changes
 
-Currently `psycopg` is not declared as a dependency of plain-models (users install it separately). This proposal also fixes that:
+Currently `psycopg` is not declared as a dependency of plain-postgres (users install it separately). This proposal also fixes that:
 
-**plain-models dependencies:**
+**plain-postgres dependencies:**
 
 ```toml
 dependencies = [
@@ -198,7 +198,7 @@ dependencies = [
 - `psycopg-pool` — pure Python, no platform issues
 - `plain start` templates include `psycopg[binary]` in the project's own dependencies for speed
 
-psycopg auto-detects at runtime: prefers `psycopg-c` (compiled from source), falls back to `psycopg-binary` (pre-compiled wheels), falls back to pure Python. So `plain-models` depending on the base package guarantees the driver exists, and users layer on `psycopg[binary]` or `psycopg[c]` in their project for performance. No conflicts — they coexist.
+psycopg auto-detects at runtime: prefers `psycopg-c` (compiled from source), falls back to `psycopg-binary` (pre-compiled wheels), falls back to pure Python. So `plain-postgres` depending on the base package guarantees the driver exists, and users layer on `psycopg[binary]` or `psycopg[c]` in their project for performance. No conflicts — they coexist.
 
 ## Implementation details
 

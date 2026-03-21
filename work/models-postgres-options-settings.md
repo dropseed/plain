@@ -1,11 +1,11 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 related:
 - db-connection-pool
 ---
 
-# plain-models: Promote POSTGRES_OPTIONS keys to named settings
+# plain-postgres: Promote POSTGRES_OPTIONS keys to named settings
 
 - `POSTGRES_OPTIONS` is currently a catch-all dict passed to psycopg
 - Some keys are Plain-specific (extracted and handled specially by the wrapper)

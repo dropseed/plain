@@ -1,12 +1,12 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 related:
 - models-foreignkey-deferred-loading
 - models-related-query-name
 ---
 
-# plain-models: Consolidate Related Field Descriptors
+# plain-postgres: Consolidate Related Field Descriptors
 
 **Remove descriptor indirection by making ForeignKeyField and ManyToManyField act as their own descriptors.**
 
@@ -33,13 +33,13 @@ Make `ForeignKey` and `ManyToManyField` implement the descriptor protocol direct
 
 ## Changes
 
-**Modified:** `plain-models/plain/models/fields/related.py` (+241 lines)
+**Modified:** `plain-postgres/plain/postgres/fields/related.py` (+241 lines)
 
 - Add `__get__`, `__set__`, `__reduce__` methods to `ForeignKey`
 - Add `__get__`, `__set__` methods to `ManyToManyField`
 - Add `_ForeignKeyValueDescriptor` helper for FK value access (e.g., `obj.parent_id`)
 
-**Removed:** `plain-models/plain/models/fields/related_descriptors.py` (-310 lines)
+**Removed:** `plain-postgres/plain/postgres/fields/related_descriptors.py` (-310 lines)
 
 **Net:** -69 lines
 

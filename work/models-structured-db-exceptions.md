@@ -1,6 +1,6 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 related:
 - models-db-level-on-delete
 ---

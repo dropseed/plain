@@ -1,7 +1,7 @@
 ---
 labels:
 - plain.server
-- plain-models
+- plain-postgres
 depends_on: server-h2-websockets
 related:
 - server-direction
@@ -75,7 +75,7 @@ H2 handling has been extracted to `h2handler.py`. SSE/async streaming is handled
 
 ### F. `psycopg` dependency is implicit
 
-**Problem:** `plain.realtime.listener` imports `psycopg` at runtime but it's not in `plain`'s dependencies. It comes transitively via `plain-models`.
+**Problem:** `plain.realtime.listener` imports `psycopg` at runtime but it's not in `plain`'s dependencies. It comes transitively via `plain-postgres`.
 
 **Fix:** When `plain-realtime` becomes its own package, it declares `plain-postgres` as a dependency. Problem goes away naturally with the package split.
 

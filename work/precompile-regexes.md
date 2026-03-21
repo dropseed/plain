@@ -4,7 +4,7 @@ labels:
 - plain-elements
 - plain-observer
 - plain-redirection
-- plain-models
+- plain-postgres
 ---
 
 # Pre-compile regular expressions

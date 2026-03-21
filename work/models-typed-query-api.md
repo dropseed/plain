@@ -1,12 +1,10 @@
 ---
 labels:
-  - plain-models
+  - plain-postgres
 depends_on: models-explicit-create-update
-related:
-  - models-encrypted-field
 ---
 
-# plain-models: Typed Query API
+# plain-postgres: Typed Query API
 
 Replace the stringly-typed `filter(**kwargs)` / `exclude(**kwargs)` query API with field-reference expressions that are type-checkable with standard Python typing. Establish a clear two-layer design: typed Python for common queries, raw SQL with model-aware interpolation for everything else.
 

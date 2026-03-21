@@ -43,17 +43,9 @@ Plain is built on Django's battle-tested foundation (Instagram, Mozilla, NASA, F
 
 ## What's missing
 
-### 1. Security policy (SECURITY.md) — framework
+### 1. ~~Security policy (SECURITY.md)~~ — done
 
-Procurement teams look for this immediately. Needs:
-
-- Disclosure process (email, PGP key)
-- Response SLA (e.g., critical CVEs acknowledged within 48h)
-- Supported versions policy
-
-Apps built on Plain also need their own SECURITY.md, independently.
-
-Effort: tiny. Impact: unblocks procurement review.
+Shipped in repo root. Covers disclosure process (GitHub advisory + email), 48h acknowledgment SLA, supported versions.
 
 ### 2. Audit logging — framework
 
@@ -100,11 +92,11 @@ Effort: small-medium. Impact: security review checkbox.
 
 ## Priority order
 
-| #   | Item                          | Level           | Effort       | Blocks                 |
-| --- | ----------------------------- | --------------- | ------------ | ---------------------- |
-| 1   | Security policy (SECURITY.md) | Framework + App | Tiny         | Procurement review     |
-| 2   | Audit logging                 | Framework       | Medium       | Compliance review      |
-| 3   | OTLP export                   | Framework       | Medium       | Monitoring integration |
-| 4   | Rate limiting                 | Framework       | Small-Medium | Security review        |
+| #     | Item                              | Level               | Effort       | Blocks                 |
+| ----- | --------------------------------- | ------------------- | ------------ | ---------------------- |
+| ~~1~~ | ~~Security policy (SECURITY.md)~~ | ~~Framework + App~~ | ~~Tiny~~     | ~~Done~~               |
+| 2     | Audit logging                     | Framework           | Medium       | Compliance review      |
+| 3     | OTLP export                       | Framework           | Medium       | Monitoring integration |
+| 4     | Rate limiting                     | Framework           | Small-Medium | Security review        |
 
 SBOM generation removed — this is an app/deployment concern. Tools like Syft and pip-audit already handle it; no framework wrapper needed.

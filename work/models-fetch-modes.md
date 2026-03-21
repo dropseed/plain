@@ -1,6 +1,6 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 related:
 - models-foreignkey-deferred-loading
 - models-consolidate-related-descriptors

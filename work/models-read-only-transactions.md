@@ -1,10 +1,10 @@
 ---
 labels:
-  - plain-models
+  - plain-postgres
   - plain.views
 ---
 
-# plain-models: Read-only transactions
+# plain-postgres: Read-only transactions
 
 - Use psycopg3's `connection.read_only = True` to enforce read-only transactions at the database level
 - Any INSERT/UPDATE/DELETE/DDL in a read-only transaction raises a database error — catches accidental writes as bugs

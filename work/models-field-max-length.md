@@ -1,11 +1,11 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 related:
 - models-field-choices-mixin
 ---
 
-# plain-models: Move max_length to specific Field types
+# plain-postgres: Move max_length to specific Field types
 
 - `max_length` is currently defined on the base `Field` class but only used by a few field types
 - Move `max_length` to only the fields that actually use it: `CharField`, `BinaryField`

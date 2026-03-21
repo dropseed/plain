@@ -1,6 +1,6 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 related:
 - remove-signals
 - models-foreignkey-deferred-loading

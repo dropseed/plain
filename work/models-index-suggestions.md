@@ -1,6 +1,6 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 - plain-observer
 related:
 - observer-testing

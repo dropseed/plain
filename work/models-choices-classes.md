@@ -1,13 +1,13 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 related:
 - models-field-choices-mixin
 ---
 
-# plain-models: Evaluate custom Choices classes vs standard enums
+# plain-postgres: Evaluate custom Choices classes vs standard enums
 
-- `plain-models/plain/models/enums.py` defines `Choices`, `IntegerChoices`, and `TextChoices`
+- `plain-postgres/plain/postgres/enums.py` defines `Choices`, `IntegerChoices`, and `TextChoices`
 - These use a custom `ChoicesMeta` metaclass
 - Evaluate whether standard Python enums (`StrEnum`/`IntEnum`) could replace these
 

@@ -153,7 +153,7 @@ Full HTTP security audits for any URL:
 ### What's instrumented
 
 - **HTTP requests** (`internal/handlers/base.py`): request ID, method, path, scheme, query string, route info, response status, errors
-- **Database queries** (`plain-models/plain/models/otel.py`): operation type, table name, SQL text, parameterized values, source code location (file/line/function/stacktrace in DEBUG), network peer info
+- **Database queries** (`plain-postgres/plain/postgres/otel.py`): operation type, table name, SQL text, parameterized values, source code location (file/line/function/stacktrace in DEBUG), network peer info
 - **Background jobs** (`plain-jobs`): job parameters, errors, linked to originating request trace
 
 ### Modes
@@ -182,7 +182,7 @@ These are lower priority but worth knowing about:
 
 - **No 2FA/MFA** — would need custom implementation or a new package
 - **No concurrent session management** — can't "log out all other sessions" or limit session count
-- **No field-level encryption** — see `models-encrypted-field.md` proposal
+- **Field-level encryption** — `EncryptedTextField`/`EncryptedJSONField` shipped
 - **No brute force protection** — no account lockout, no failed login tracking, no CAPTCHA
 - **No distributed tracing** — observer stores traces locally, no cross-service correlation
 - **No Prometheus metrics endpoint** — no `/metrics`, no counters/gauges/histograms

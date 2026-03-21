@@ -1,14 +1,13 @@
 ---
 labels:
-  - plain-models
+  - plain-postgres
 related:
   - models-read-only-transactions
 depends_on:
   - db-connection-pool
-  - models-min-postgres-version
 ---
 
-# plain-models: psycopg3 features
+# plain-postgres: psycopg3 features
 
 Now that Plain is PostgreSQL-only, we should lean into psycopg3's native capabilities — both to gain features and to remove abstraction that existed for multi-DB compatibility.
 

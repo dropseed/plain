@@ -1,10 +1,10 @@
 ---
 labels:
-- plain-models
+- plain-postgres
 depends_on: models-explicit-create-update
 ---
 
-# plain-models: Prevent Manual Primary Key Setting
+# plain-postgres: Prevent Manual Primary Key Setting
 
 **Prevent users from setting auto-generated primary keys during `Model.__init__()`, forcing them to use query methods instead.**
 
@@ -134,7 +134,7 @@ def test_cannot_set_auto_generated_id_in_init(db):
 
 ## Related Work
 
-- **Proposal**: `plain-models-explicit-create-update.md` - Related effort to make model operations more explicit
+- **Proposal**: `models-explicit-create-update.md` - Related effort to make model operations more explicit
 - **Current behavior**: Plain only supports auto-increment IDs, this formalizes that constraint
 
 ## Open Questions
