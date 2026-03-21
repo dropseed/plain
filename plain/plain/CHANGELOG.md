@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.127.0](https://github.com/dropseed/plain/releases/plain@0.127.0) (2026-03-20)
+
+### What's changed
+
+- **Container-aware system metrics in `plain.utils.os`** — added `get_rss_bytes()`, `get_memory_usage()`, and `get_process_cpu_percent()` helpers that work inside cgroups v1/v2 containers. Also added cgroup v1 CPU quota support to `get_cpu_count()` ([40482feb2b](https://github.com/dropseed/plain/commit/40482feb2b))
+- **Test client now creates OTel spans** — `plain.test.Client` wraps each request in a server span, so observer traces are captured during tests ([aa54f27d95](https://github.com/dropseed/plain/commit/aa54f27d95))
+- **`plain request --user` accepts email addresses** — in addition to user IDs, with a clearer error when `plain-auth` is not installed ([aa54f27d95](https://github.com/dropseed/plain/commit/aa54f27d95))
+- Updated the plain-upgrade skill to include a "plain agent install" step ([5cae05a696](https://github.com/dropseed/plain/commit/5cae05a696))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.126.0](https://github.com/dropseed/plain/releases/plain@0.126.0) (2026-03-20)
 
 ### What's changed
