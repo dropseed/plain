@@ -97,7 +97,7 @@ def worker_main(
         worker = Worker(age, os.getppid(), listeners, app, timeout, heartbeat, handler)
         worker.pid = os.getpid()
 
-        log.info("Server worker started pid=%s", worker.pid)
+        log.info("Server worker started (pid: %s)", worker.pid)
         worker.init_process()
         sys.exit(0)
     except SystemExit:
