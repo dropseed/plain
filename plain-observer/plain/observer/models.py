@@ -41,13 +41,7 @@ from plain.urls import reverse
 __all__ = ["Log", "Span", "Trace"]
 
 
-def _format_bytes(size: int) -> str:
-    """Format a byte count as a human-readable string."""
-    if size >= 1_000_000:
-        return f"{size / 1_000_000:.1f} MB"
-    if size >= 1_000:
-        return f"{size / 1_000:.1f} KB"
-    return f"{size} B"
+from .formatting import format_bytes
 
 
 @postgres.register_model
@@ -137,7 +131,7 @@ class Trace(postgres.Model):
             parts.append(f"{round(stats['duration_ms'], 1)}ms")
 
         if stats["response_body_size"] is not None:
-            parts.append(_format_bytes(stats["response_body_size"]))
+            parts.append(format_bytes(stats["response_body_size"]))
 
         return " • ".join(parts)
 

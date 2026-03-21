@@ -11,7 +11,6 @@ from __future__ import annotations
 import gc
 import json
 import os
-import sys
 import tempfile
 import time
 import tracemalloc
@@ -34,24 +33,9 @@ def profile_path(pid: int) -> str:
 
 
 def _rss_bytes() -> int:
-    """Current RSS in bytes (not peak)."""
-    if sys.platform == "linux":
-        # /proc/self/statm: fields are in pages
-        try:
-            with open("/proc/self/statm") as f:
-                resident_pages = int(f.read().split()[1])
-            return resident_pages * os.sysconf("SC_PAGE_SIZE")
-        except (OSError, ValueError, IndexError):
-            pass
+    from plain.utils.os import get_rss_bytes
 
-    # macOS / fallback: ru_maxrss is peak, not current, but it's
-    # the best we can do without ctypes or external tools.
-    import resource
-
-    rusage = resource.getrusage(resource.RUSAGE_SELF)
-    if sys.platform == "darwin":
-        return rusage.ru_maxrss  # bytes on macOS
-    return rusage.ru_maxrss * 1024  # KB on Linux (fallback)
+    return get_rss_bytes()
 
 
 def _is_noise(filename: str) -> bool:

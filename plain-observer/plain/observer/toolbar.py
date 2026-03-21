@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-import os
 from functools import cached_property
 from typing import Any
 
-import psutil
-
 from plain.toolbar import ToolbarItem, register_toolbar_item
-from plain.utils.os import get_cpu_count
+from plain.utils.os import get_memory_usage, get_process_cpu_percent
 
 from .core import Observer
-
-_cpu_count = get_cpu_count()
+from .formatting import format_bytes
 
 
 def _level(value: int | float, warn: int, danger: int) -> str:
@@ -24,16 +20,28 @@ def _level(value: int | float, warn: int, danger: int) -> str:
 
 def _get_system_stats() -> dict[str, Any]:
     """Get system-level CPU and memory stats."""
-    load_1, _, _ = os.getloadavg()
-    cpu_percent = min(round(load_1 / _cpu_count * 100), 100)
-    mem_percent = round(psutil.virtual_memory().percent)
+    cpu_percent = get_process_cpu_percent()
+    usage_bytes, limit_bytes = get_memory_usage()
 
-    return {
-        "cpu_percent": cpu_percent,
-        "cpu_level": _level(cpu_percent, warn=50, danger=80),
-        "mem_percent": mem_percent,
-        "mem_level": _level(mem_percent, warn=70, danger=90),
-    }
+    stats: dict[str, Any] = {}
+
+    if cpu_percent is not None:
+        stats["cpu_percent"] = cpu_percent
+        stats["cpu_level"] = _level(cpu_percent, warn=50, danger=80)
+
+    if limit_bytes is not None:
+        mem_percent = round(usage_bytes / limit_bytes * 100)
+        stats["mem_display"] = f"{mem_percent}%"
+        stats["mem_title"] = (
+            f"Container memory: {format_bytes(usage_bytes)} / {format_bytes(limit_bytes)}"
+        )
+        stats["mem_level"] = _level(mem_percent, warn=70, danger=90)
+    else:
+        stats["mem_display"] = format_bytes(usage_bytes, precision=0)
+        stats["mem_title"] = "Server process RSS"
+        stats["mem_level"] = "ok"
+
+    return stats
 
 
 def _get_trace_stats(observer: Observer) -> dict[str, Any] | None:

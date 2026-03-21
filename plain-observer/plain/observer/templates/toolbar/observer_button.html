@@ -48,10 +48,12 @@
     ></span>
 </button>
 
+{% if system_stats %}
 {# System pill — CPU and memory, non-interactive #}
 <span class="inline-flex items-center text-xs rounded-full px-1 py-px bg-white/8 overflow-hidden divide-x divide-white/10 [&>span]:px-1.5">
-    <span class="items-baseline text-[11px] tabular-nums">
-        <span class="text-[9px] text-white/30 mr-1">CPU</span>
+    {% if system_stats.cpu_percent is defined %}
+    <span class="items-baseline text-[11px] tabular-nums" title="Server process CPU usage">
+        <span class="text-[9px] text-white/30 mr-0.5">CPU</span>
         <span
             class="text-white/50
                    data-[level=warn]:text-amber-400
@@ -59,16 +61,20 @@
             {% if system_stats.cpu_level != "ok" %}data-level="{{ system_stats.cpu_level }}"{% endif %}
         >{{ system_stats.cpu_percent }}%</span>
     </span>
-    <span class="items-baseline text-[11px] tabular-nums">
-        <span class="text-[9px] text-white/30 mr-1">MEM</span>
+    {% endif %}
+    {% if system_stats.mem_display %}
+    <span class="items-baseline text-[11px] tabular-nums" title="{{ system_stats.mem_title }}">
+        <span class="text-[9px] text-white/30 mr-0.5">MEM</span>
         <span
             class="text-white/50
                    data-[level=warn]:text-amber-400
                    data-[level=danger]:text-red-400"
             {% if system_stats.mem_level != "ok" %}data-level="{{ system_stats.mem_level }}"{% endif %}
-        >{{ system_stats.mem_percent }}%</span>
+        >{{ system_stats.mem_display }}</span>
     </span>
+    {% endif %}
 </span>
+{% endif %}
 
 <script nonce="{{ request.csp_nonce }}">
 (function() {
