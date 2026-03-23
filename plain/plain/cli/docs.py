@@ -25,6 +25,7 @@ KNOWN_PACKAGES = {
     "plain-htmx": "HTMX integration for templates and views",
     "plain-jobs": "Background jobs with a database-driven queue",
     "plain-loginlink": "Link-based authentication",
+    "plain-portal": "Remote Python shell and file transfer via encrypted tunnel",
     "plain-postgres": "Model data and store it in a database",
     "plain-oauth": "OAuth provider login",
     "plain-observer": "On-page telemetry and observability",

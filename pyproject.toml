@@ -19,6 +19,7 @@ dev = [
   "plain-jobs",
   "plain-loginlink",
   "plain-email",
+  "plain-portal",
   "plain-postgres",
   "plain-oauth",
   "plain-observer",
@@ -54,6 +55,7 @@ dev = [
 "plain-jobs" = { workspace = true }
 "plain-loginlink" = { workspace = true }
 "plain-email" = { workspace = true }
+"plain-portal" = { workspace = true }
 "plain-postgres" = { workspace = true }
 "plain-oauth" = { workspace = true }
 "plain-observer" = { workspace = true }

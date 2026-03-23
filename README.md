@@ -113,7 +113,7 @@ Plain is opinionated. These are the technologies it's built on:
 
 ## Packages
 
-29 first-party packages, one framework. All with built-in docs.
+30 first-party packages, one framework. All with built-in docs.
 
 **Foundation:**
 
@@ -145,6 +145,7 @@ Plain is opinionated. These are the technologies it's built on:
 - [plain.pytest](https://plainframework.com/docs/plain-pytest/plain/pytest/) — testing helpers
 - [plain.toolbar](https://plainframework.com/docs/plain-toolbar/plain/toolbar/) — debug toolbar
 - [plain.code](https://plainframework.com/docs/plain-code/plain/code/) — code formatting
+- [plain.portal](https://plainframework.com/docs/plain-portal/plain/portal/) — remote shell and file transfer
 - [plain.tunnel](https://plainframework.com/docs/plain-tunnel/plain/tunnel/) — dev tunneling
 - [plain.start](https://plainframework.com/docs/plain-start/plain/start/) — project starter
 

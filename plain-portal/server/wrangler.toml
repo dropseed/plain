@@ -1,0 +1,13 @@
+name = "plainportal"
+account_id = "fb2bc39a7d24454b23a5785e35bce8af"
+main = "worker.js"
+compatibility_date = "2024-12-01"
+
+workers_dev = false
+
+[durable_objects]
+bindings = [{ name = "PORTAL_NAMESPACE", class_name = "Portal" }]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["Portal"]

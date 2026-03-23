@@ -18,6 +18,7 @@ dependencies = [
   "plain-jobs",
   "plain-loginlink",
   "plain-email",
+  "plain-portal",
   "plain-postgres",
   "plain-oauth",
   "plain-pages",
