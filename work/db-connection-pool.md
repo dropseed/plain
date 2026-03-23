@@ -3,6 +3,7 @@ labels:
   - plain-postgres
 related:
   - remove-signals
+  - postgres-cli-and-insights
 ---
 
 # DB connection pooling
@@ -205,6 +206,20 @@ psycopg auto-detects at runtime: prefers `psycopg-c` (compiled from source), fal
 - Pool uses `configure` callback to run `ensure_timezone` and `ensure_role` on each checkout
 - `close()` calls `pool.putconn()` instead of `connection.close()` when pooling
 - Connection return at request end: signal handler (today) or middleware `after_response` (after `remove-signals`)
+
+## work_mem multiplication danger
+
+Each Postgres connection is an OS process. `work_mem` is per-operation (not per-query), and hash operations use up to `hash_mem_multiplier × work_mem` (default 2x). The worst-case formula:
+
+```
+work_mem × operations_per_query × (parallel_workers + 1) × connections
+```
+
+Example: 128MB work_mem, 3 ops, 2 parallel workers, 100 connections → ~150GB worst case. This is a common cause of OOM in containerized/Kubernetes deployments.
+
+Connection pooling directly reduces this risk by bounding concurrent connections. With `max_size=20` instead of 100 open connections, the memory ceiling drops proportionally. This is another argument for pooling beyond just connection management — it's memory safety.
+
+The `plain postgres diagnose` command (see `postgres-cli-and-insights`) should check connection counts and warn about `idle_in_transaction` connections, which hold locks and block VACUUM.
 
 ## Managed Postgres services (Neon, Supabase, etc.)
 

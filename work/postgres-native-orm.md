@@ -1,6 +1,9 @@
 ---
 labels:
   - plain-postgres
+related:
+  - postgres-native-schema
+  - postgres-full-text-search
 depends_on:
   - models-explicit-create-update
   - models-psycopg3-features

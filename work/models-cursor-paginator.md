@@ -30,8 +30,22 @@ related:
         next_page = paginator.page(after=page.end_cursor)
     ```
 
+- **Row value syntax** is the underlying mechanism for efficient multi-column cursor comparison. Instead of complex nested OR logic for multi-field ordering:
+
+    ```sql
+    -- Naive approach (complex, error-prone)
+    WHERE (first_name > 'Aliyah')
+       OR (first_name = 'Aliyah' AND last_name > 'Bashirian')
+       OR (first_name = 'Aliyah' AND last_name = 'Bashirian' AND id > 322714)
+
+    -- Row value syntax (single clean expression)
+    WHERE (first_name, last_name, id) > ('Aliyah', 'Bashirian', 322714)
+    ```
+
+    Postgres handles the tuple comparison correctly, including NULL handling. This drastically simplifies the implementation — the paginator only needs to build a single row value comparison, not nested OR chains that grow with each sort field.
+
 - Implementation challenges:
-    - Building WHERE clauses for multi-field ordering (complex)
+    - ~~Building WHERE clauses for multi-field ordering (complex)~~ — row value syntax solves this
     - Cursor encoding/decoding (base64 JSON)
     - Type serialization for dates, UUIDs, etc.
 

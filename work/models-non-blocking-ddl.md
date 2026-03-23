@@ -3,6 +3,7 @@ labels:
   - plain-postgres
 related:
   - models-index-suggestions
+  - migrations-safety-analysis
 ---
 
 # Non-blocking DDL for indexes, constraints, and foreign keys
@@ -96,7 +97,8 @@ These non-blocking patterns trade atomicity for availability. The failure scenar
 - Queries won't use it
 - You must `DROP INDEX` it before retrying
 - Re-running the migration without handling this hits "index already exists"
-- The migration system needs either `IF NOT EXISTS` or detection/cleanup logic
+- **The `IF NOT EXISTS` trap**: `CREATE INDEX CONCURRENTLY IF NOT EXISTS` silently succeeds if an invalid index with that name already exists — it doesn't rebuild it. You think the migration succeeded, but the index is still INVALID (maintained on writes, never used for reads). You must explicitly `DROP INDEX` the invalid index before retrying.
+- The migration system needs detection/cleanup logic: check `pg_index.indisvalid` before creating, drop invalid indexes automatically or warn the user
 
 **Long-running transactions stall CONCURRENTLY:**
 

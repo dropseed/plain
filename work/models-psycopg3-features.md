@@ -1,7 +1,7 @@
 ---
 labels:
   - plain-postgres
-depends_on:
+related:
   - db-connection-pool
 ---
 
@@ -31,9 +31,9 @@ This is a meaningful refactor, not a drop-in swap.
 
 psycopg3 connections can execute queries directly without creating an explicit cursor. Some internal operations (savepoint SQL, `SET ROLE`, `SELECT 1` health check) create cursors just to run one statement. Minor cleanup.
 
-### Exception hierarchy
+### ~~Exception hierarchy~~ ✓
 
-The `DatabaseErrorWrapper` maps psycopg exceptions to Plain exceptions (~50 lines). Worth keeping as a stable API boundary (PEP-249 standard, low maintenance cost), but user-facing docs could recommend catching psycopg exceptions directly for granular handling (e.g., `psycopg.errors.UniqueViolation` vs `plain.models.IntegrityError`).
+Done — PEP-249 mirror and `DatabaseErrorWrapper` removed. psycopg exceptions propagate directly. `errors_occurred` flag replaced with `connection.closed` check.
 
 ### Row factories for `values()` / `values_list()`
 

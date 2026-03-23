@@ -4,6 +4,7 @@ labels:
 related:
 - remove-signals
 - models-foreignkey-deferred-loading
+- postgres-native-schema
 ---
 
 # DB-Level ON DELETE for Foreign Keys
@@ -132,6 +133,23 @@ def delete(self):
 ### Migration
 
 Every existing FK constraint needs to be recreated with the ON DELETE clause. This is a one-time migration per model. For Plain's own packages, that's ~9 foreign keys.
+
+## NO ACTION vs RESTRICT
+
+These are often conflated but have a subtle difference that matters for the implementation:
+
+- **RESTRICT**: Checks immediately when the DELETE is executed. Cannot be deferred.
+- **NO ACTION** (Postgres default): Can be deferred to the end of a transaction using `DEFERRABLE INITIALLY DEFERRED`. At the end of the transaction, if the constraint is still violated, it raises an error.
+
+This matters because Plain's FK constraints are currently `DEFERRABLE INITIALLY DEFERRED`. If we map `PROTECT` to `RESTRICT`, we'd need to change the deferrable behavior for those FKs — RESTRICT and deferred constraints are incompatible.
+
+Mapping `PROTECT` → `NO ACTION` (the Postgres default) is safer: it allows deferred checking, and the end result is the same — the delete fails if references exist.
+
+## CASCADE danger
+
+CASCADE can be genuinely dangerous. Deleting a single top-level record (e.g., a user account) can cascade through multiple tables, expanding in breadth at each level — a "cascade of cascades" that unintentionally wipes out massive amounts of data across connected tables.
+
+This reinforces Option A (DB-level only) with a strong recommendation: default to `RESTRICT` (or `NO ACTION`) and require explicit opt-in for `CASCADE`. The current Plain default is `CASCADE` (inherited from Django) — changing this default would be a safety improvement.
 
 ## Open questions
 
