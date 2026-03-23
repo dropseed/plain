@@ -1,5 +1,19 @@
 # plain-postgres changelog
 
+## [0.85.0](https://github.com/dropseed/plain/releases/plain-postgres@0.85.0) (2026-03-22)
+
+### What's changed
+
+- Added read-only database connection support via `read_only()` context manager and `connection.set_read_only()` — enforces `SET default_transaction_read_only = ON` so any write attempt raises a database error ([69d23b04fde9](https://github.com/dropseed/plain/commit/69d23b04fde9))
+- Removed PEP-249 exception mirror — `IntegrityError`, `OperationalError`, `ProgrammingError`, etc. are no longer re-exported from `plain.postgres`. Use `psycopg` exceptions directly (e.g. `psycopg.IntegrityError`) ([d4b170e60a2c](https://github.com/dropseed/plain/commit/d4b170e60a2c))
+- Removed `DatabaseErrorWrapper` context manager — psycopg's native connection state handling replaces it ([015b04ce38e9](https://github.com/dropseed/plain/commit/015b04ce38e9))
+- Added transaction and read-only connection documentation to README
+
+### Upgrade instructions
+
+- Replace any `from plain.postgres import IntegrityError` (or `OperationalError`, `ProgrammingError`, etc.) with `import psycopg` and use `psycopg.IntegrityError` directly.
+- Replace any usage of `plain.postgres.db.DatabaseErrorWrapper` with standard `try/except` on psycopg exceptions.
+
 ## [0.84.2](https://github.com/dropseed/plain/releases/plain-postgres@0.84.2) (2026-03-20)
 
 ### What's changed
