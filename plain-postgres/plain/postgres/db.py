@@ -16,6 +16,7 @@ from .exceptions import (
     NotSupportedError,
     OperationalError,
     ProgrammingError,
+    ReadOnlyError,
 )
 
 PLAIN_VERSION_PICKLE_KEY = "_plain_version"
@@ -55,5 +56,6 @@ __all__ = [
     "ProgrammingError",
     "NotSupportedError",
     "DatabaseErrorWrapper",
+    "ReadOnlyError",
     "close_old_connections",
 ]

@@ -386,6 +386,29 @@ class DatabaseConnection:
         with self.wrap_database_errors:
             self.connection.autocommit = autocommit
 
+    def set_read_only(self, read_only: bool) -> None:
+        """Set read-only mode on this connection.
+
+        When enabled, all subsequent transactions will be read-only —
+        any INSERT/UPDATE/DELETE/DDL will raise a database error.
+        This applies to both explicit transactions and autocommit queries.
+        Persists until changed or the connection is closed.
+
+        Must be called outside a transaction — the setting only takes
+        effect on the next transaction that starts.
+        """
+        if self.in_atomic_block:
+            raise TransactionManagementError(
+                "set_read_only() cannot be called inside a transaction. "
+                "Call it before entering an atomic block."
+            )
+        self.ensure_connection()
+        assert self.connection is not None
+        if read_only:
+            self.connection.execute("SET default_transaction_read_only = on")
+        else:
+            self.connection.execute("SET default_transaction_read_only = off")
+
     def check_constraints(self, table_names: list[str] | None = None) -> None:
         """
         Check constraints by setting them to immediate. Return them to deferred

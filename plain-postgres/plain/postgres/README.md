@@ -370,6 +370,63 @@ for row in HugeTable.query.iterator(chunk_size=2000):
     process(row)
 ```
 
+## Transactions
+
+By default, each query runs in its own implicit transaction and is committed immediately (autocommit mode). When you need multiple queries to succeed or fail together — like creating a user and their profile — wrap them in an explicit transaction.
+
+### Atomic blocks
+
+Wrap multiple queries in a transaction with `transaction.atomic()`:
+
+```python
+from plain.postgres import transaction
+
+with transaction.atomic():
+    user = User(email="test@example.com")
+    user.save()
+    Profile(user=user).save()
+    # Both saves commit together, or both roll back on error
+```
+
+Nesting `atomic()` creates savepoints:
+
+```python
+with transaction.atomic():
+    user.save()
+    try:
+        with transaction.atomic():
+            risky_operation()  # If this fails...
+    except SomeError:
+        pass  # ...only the inner block rolls back
+    safe_operation()  # This still runs in the outer transaction
+```
+
+### Read-only connections
+
+Enforce read-only mode on the current database connection using `read_only()`. Any write (INSERT, UPDATE, DELETE, DDL) raises a [`ReadOnlyError`](./exceptions.py#ReadOnlyError):
+
+```python
+from plain.postgres.connections import read_only
+
+with read_only():
+    users = User.query.all()       # reads work
+    User.query.create(name="x")   # raises ReadOnlyError
+```
+
+This works with both autocommit queries and explicit `atomic()` blocks.
+
+For sticky read-only mode (e.g., a shell session), use `set_read_only()` on the connection directly:
+
+```python
+from plain.postgres.db import get_connection
+
+conn = get_connection()
+conn.set_read_only(True)   # all subsequent queries are read-only
+conn.set_read_only(False)  # back to normal
+```
+
+Read-only mode must be set outside a transaction — calling it inside `atomic()` raises `TransactionManagementError`.
+
 ## Migrations
 
 Migrations track changes to your models and update the database schema accordingly. They are Python files stored in your app's `migrations/` directory.

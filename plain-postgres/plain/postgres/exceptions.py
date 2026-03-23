@@ -152,6 +152,12 @@ class InternalError(DatabaseError):
     pass
 
 
+class ReadOnlyError(InternalError):
+    """A write was attempted on a read-only database connection."""
+
+    pass
+
+
 class ProgrammingError(DatabaseError):
     pass
 
@@ -185,6 +191,11 @@ class DatabaseErrorWrapper:
     ) -> None:
         if exc_type is None:
             return
+        if issubclass(exc_type, psycopg.errors.ReadOnlySqlTransaction):
+            plain_exc_value = (
+                ReadOnlyError(*exc_value.args) if exc_value else ReadOnlyError()
+            )
+            raise plain_exc_value.with_traceback(traceback) from exc_value
         for plain_exc_type in (
             DataError,
             OperationalError,

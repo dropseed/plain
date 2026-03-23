@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -75,3 +77,22 @@ def get_connection() -> DatabaseConnection:
 def has_connection() -> bool:
     """Check if a database connection exists in the current context."""
     return _db_conn.get() is not None
+
+
+@contextmanager
+def read_only() -> Generator[None]:
+    """Set the current database connection to read-only for the duration of this block.
+
+    Any INSERT/UPDATE/DELETE/DDL will raise a database error. This applies
+    to all queries in the block — both explicit transactions and implicit
+    autocommit queries.
+    """
+    conn = get_connection()
+    conn.set_read_only(True)
+    try:
+        yield
+    finally:
+        try:
+            conn.set_read_only(False)
+        except Exception:
+            pass
