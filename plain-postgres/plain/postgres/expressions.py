@@ -11,9 +11,10 @@ from types import NoneType
 from typing import TYPE_CHECKING, Any, Protocol, Self, runtime_checkable
 from uuid import UUID
 
+import psycopg
+
 from plain.postgres import fields
 from plain.postgres.constants import LOOKUP_SEP
-from plain.postgres.db import NotSupportedError
 from plain.postgres.dialect import (
     CURRENT_ROW,
     FOLLOWING,
@@ -877,7 +878,7 @@ class ResolvedOuterRef(F):
     def resolve_expression(self, *args: Any, **kwargs: Any) -> Any:
         col = super().resolve_expression(*args, **kwargs)
         if col.contains_over_clause:
-            raise NotSupportedError(
+            raise psycopg.NotSupportedError(
                 f"Referencing outer query window expression is not supported: "
                 f"{self.name}."
             )

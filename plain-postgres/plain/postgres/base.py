@@ -10,15 +10,14 @@ if TYPE_CHECKING:
     from plain.postgres.meta import Meta
     from plain.postgres.options import Options
 
+import psycopg
+
 import plain.runtime
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import models_registry, transaction, types
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.constraints import CheckConstraint, UniqueConstraint
-from plain.postgres.db import (
-    PLAIN_VERSION_PICKLE_KEY,
-    DatabaseError,
-)
+from plain.postgres.db import PLAIN_VERSION_PICKLE_KEY
 from plain.postgres.deletion import Collector
 from plain.postgres.dialect import MAX_NAME_LENGTH
 from plain.postgres.exceptions import (
@@ -496,9 +495,11 @@ class Model(metaclass=ModelBase):
                 base_qs, id_val, values, update_fields, forced_update
             )
             if force_update and not updated:
-                raise DatabaseError("Forced update did not affect any rows.")
+                raise psycopg.DatabaseError("Forced update did not affect any rows.")
             if update_fields and not updated:
-                raise DatabaseError("Save with update_fields did not affect any rows.")
+                raise psycopg.DatabaseError(
+                    "Save with update_fields did not affect any rows."
+                )
         if not updated:
             fields = meta.local_concrete_fields
             if not id_set:

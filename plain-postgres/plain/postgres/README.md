@@ -403,14 +403,14 @@ with transaction.atomic():
 
 ### Read-only connections
 
-Enforce read-only mode on the current database connection using `read_only()`. Any write (INSERT, UPDATE, DELETE, DDL) raises a [`ReadOnlyError`](./exceptions.py#ReadOnlyError):
+Enforce read-only mode on the current database connection using `read_only()`. Any write (INSERT, UPDATE, DELETE, DDL) raises `psycopg.errors.ReadOnlySqlTransaction`:
 
 ```python
 from plain.postgres.connections import read_only
 
 with read_only():
     users = User.query.all()       # reads work
-    User.query.create(name="x")   # raises ReadOnlyError
+    User.query.create(name="x")   # raises psycopg.errors.ReadOnlySqlTransaction
 ```
 
 This works with both autocommit queries and explicit `atomic()` blocks.

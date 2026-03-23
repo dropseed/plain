@@ -13,11 +13,11 @@ from collections.abc import Callable, Iterable
 from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any
 
+import psycopg
 from psycopg.types import numeric
 from psycopg.types.json import Jsonb
 
 from plain.postgres.constants import OnConflict
-from plain.postgres.db import NotSupportedError
 from plain.postgres.utils import split_tzname_delta
 from plain.utils import timezone
 from plain.utils.regex_helper import _lazy_re_compile
@@ -583,7 +583,7 @@ def window_frame_range_start_end(
     start_, end_ = window_frame_rows_start_end(start, end)
     # PostgreSQL only supports UNBOUNDED with PRECEDING/FOLLOWING
     if (start and start < 0) or (end and end > 0):
-        raise NotSupportedError(
+        raise psycopg.NotSupportedError(
             "PostgreSQL only supports UNBOUNDED together with PRECEDING and FOLLOWING."
         )
     return start_, end_

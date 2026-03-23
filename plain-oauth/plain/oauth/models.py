@@ -3,11 +3,12 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Any
 
+import psycopg
+
 from plain import postgres
 from plain.auth import get_user_model
 from plain.exceptions import ValidationError
 from plain.postgres import transaction, types
-from plain.postgres.db import IntegrityError
 from plain.runtime import SettingsReference
 from plain.utils import timezone
 
@@ -119,7 +120,7 @@ class OAuthConnection(postgres.Model):
                             **oauth_user.user_model_fields,
                         )
                         user.save()
-                except (IntegrityError, ValidationError):
+                except (psycopg.IntegrityError, ValidationError):
                     raise OAuthUserAlreadyExistsError(
                         provider_key=provider_key,
                         user_model_fields=oauth_user.user_model_fields,

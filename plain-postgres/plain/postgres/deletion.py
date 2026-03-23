@@ -7,11 +7,12 @@ from itertools import chain
 from operator import attrgetter, or_
 from typing import TYPE_CHECKING, Any
 
+import psycopg
+
 from plain.postgres import (
     query_utils,
     transaction,
 )
-from plain.postgres.db import IntegrityError
 from plain.postgres.meta import Meta
 from plain.postgres.query import QuerySet
 from plain.postgres.sql import DeleteQuery, UpdateQuery
@@ -28,16 +29,16 @@ if TYPE_CHECKING:
 _LAZY_ON_DELETE: set[Callable[..., Any]] = set()
 
 
-class ProtectedError(IntegrityError):
+class ProtectedError(psycopg.IntegrityError):
     def __init__(self, msg: str, protected_objects: Iterable[Any]) -> None:
         self.protected_objects = protected_objects
-        super().__init__(msg, protected_objects)
+        super().__init__(msg)
 
 
-class RestrictedError(IntegrityError):
+class RestrictedError(psycopg.IntegrityError):
     def __init__(self, msg: str, restricted_objects: Iterable[Any]) -> None:
         self.restricted_objects = restricted_objects
-        super().__init__(msg, restricted_objects)
+        super().__init__(msg)
 
 
 def CASCADE(collector: Collector, field: RelatedField, sub_objs: Any) -> None:

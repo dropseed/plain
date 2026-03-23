@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import psycopg
+
 from plain import postgres
-from plain.postgres.db import DatabaseError
 from plain.postgres.meta import Meta
 from plain.postgres.registry import ModelsRegistry
 from plain.utils.functional import classproperty
@@ -84,7 +85,7 @@ class MigrationRecorder:
         try:
             with self.connection.schema_editor() as editor:
                 editor.create_model(self.Migration)
-        except DatabaseError as exc:
+        except psycopg.DatabaseError as exc:
             raise MigrationSchemaMissing(
                 f"Unable to create the plainmigrations table ({exc})"
             )

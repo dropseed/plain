@@ -6,11 +6,12 @@ import time
 from collections import defaultdict
 
 import click
+import psycopg
 
 from plain.cli import register_cli
 
 from ..backups.cli import cli as backups_cli
-from ..db import OperationalError, get_connection
+from ..db import get_connection
 from ..dialect import quote_name
 from ..migrations.recorder import MIGRATION_TABLE_NAME
 
@@ -126,7 +127,7 @@ def wait() -> None:
 
         try:
             get_connection().ensure_connection()
-        except OperationalError:
+        except psycopg.OperationalError:
             waiting_for = True
 
         if waiting_for:

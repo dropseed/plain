@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any, Self
 import psycopg
 
 from plain.logs import get_framework_logger
-from plain.postgres.db import NotSupportedError
 from plain.postgres.otel import db_span
 from plain.utils.dateparse import parse_time
 
@@ -136,7 +135,7 @@ class CursorWrapper:
         # Keyword parameters for callproc aren't supported in PEP 249.
         # PostgreSQL's psycopg doesn't support them either.
         if kparams is not None:
-            raise NotSupportedError(
+            raise psycopg.NotSupportedError(
                 "Keyword parameters for callproc are not supported."
             )
         self.db.validate_no_broken_transaction()

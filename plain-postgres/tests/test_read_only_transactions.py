@@ -11,19 +11,20 @@ is already in progress.
 
 from __future__ import annotations
 
+import psycopg.errors
 import pytest
 from app.examples.models import Car
 
 from plain.postgres import transaction
 from plain.postgres.connections import read_only
-from plain.postgres.db import ReadOnlyError, get_connection
+from plain.postgres.db import get_connection
 from plain.postgres.transaction import TransactionManagementError
 
 
 class TestReadOnlyContextManager:
     def test_blocks_writes(self, isolated_db):
         with read_only():
-            with pytest.raises(ReadOnlyError, match="read-only transaction"):
+            with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
                 Car.query.create(make="Toyota", model="Tundra")
 
     def test_allows_reads(self, isolated_db):
@@ -47,7 +48,7 @@ class TestReadOnlyContextManager:
 
     def test_blocks_in_atomic(self, isolated_db):
         with read_only():
-            with pytest.raises(ReadOnlyError, match="read-only transaction"):
+            with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
                 with transaction.atomic():
                     Car.query.create(make="Toyota", model="Tundra")
 
@@ -84,7 +85,7 @@ class TestSetReadOnly:
         conn = get_connection()
         conn.set_read_only(True)
         try:
-            with pytest.raises(ReadOnlyError, match="read-only transaction"):
+            with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
                 Car.query.create(make="Toyota", model="Tundra")
         finally:
             conn.set_read_only(False)

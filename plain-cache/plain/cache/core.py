@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from functools import cached_property
 from typing import Any
 
+import psycopg
 from opentelemetry import trace
 from opentelemetry.semconv.attributes.db_attributes import (
     DB_NAMESPACE,
@@ -12,7 +13,6 @@ from opentelemetry.semconv.attributes.db_attributes import (
 )
 from opentelemetry.trace import SpanKind
 
-from plain.postgres import IntegrityError
 from plain.utils import timezone
 
 tracer = trace.get_tracer("plain.cache")
@@ -137,7 +137,7 @@ class Cached:
                 item, _ = self._model_class.query.update_or_create(
                     key=self.key, defaults=defaults
                 )
-            except IntegrityError:
+            except psycopg.IntegrityError:
                 # Most likely a race condition in creating the item,
                 # so trying again should do an update
                 item, _ = self._model_class.query.update_or_create(

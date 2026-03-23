@@ -4,10 +4,12 @@ from collections.abc import Callable, Generator
 from contextlib import ContextDecorator, contextmanager
 from typing import Any
 
-from plain.postgres.db import DatabaseError, Error, ProgrammingError, get_connection
+import psycopg
+
+from plain.postgres.db import get_connection
 
 
-class TransactionManagementError(ProgrammingError):
+class TransactionManagementError(psycopg.ProgrammingError):
     """Transaction management is used improperly."""
 
     pass
@@ -151,13 +153,13 @@ class Atomic(ContextDecorator):
                     if sid is not None:
                         try:
                             conn.savepoint_commit(sid)
-                        except DatabaseError:
+                        except psycopg.DatabaseError:
                             try:
                                 conn.savepoint_rollback(sid)
                                 # The savepoint won't be reused. Release it to
                                 # minimize overhead for the database server.
                                 conn.savepoint_commit(sid)
-                            except Error:
+                            except psycopg.Error:
                                 # If rolling back to a savepoint fails, mark for
                                 # rollback at a higher level and avoid shadowing
                                 # the original exception.
@@ -167,10 +169,10 @@ class Atomic(ContextDecorator):
                     # Commit transaction
                     try:
                         conn.commit()
-                    except DatabaseError:
+                    except psycopg.DatabaseError:
                         try:
                             conn.rollback()
-                        except Error:
+                        except psycopg.Error:
                             # An error during rollback means that something
                             # went wrong with the connection. Drop it.
                             conn.close()
@@ -190,7 +192,7 @@ class Atomic(ContextDecorator):
                             # The savepoint won't be reused. Release it to
                             # minimize overhead for the database server.
                             conn.savepoint_commit(sid)
-                        except Error:
+                        except psycopg.Error:
                             # If rolling back to a savepoint fails, mark for
                             # rollback at a higher level and avoid shadowing
                             # the original exception.
@@ -199,7 +201,7 @@ class Atomic(ContextDecorator):
                     # Roll back transaction
                     try:
                         conn.rollback()
-                    except Error:
+                    except psycopg.Error:
                         # An error during rollback means that something
                         # went wrong with the connection. Drop it.
                         conn.close()

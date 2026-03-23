@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain.postgres.db import DatabaseError
+import psycopg
 
 
 class AmbiguityError(Exception):
@@ -50,5 +50,5 @@ class NodeNotFoundError(LookupError):
         return f"NodeNotFoundError({self.node!r})"
 
 
-class MigrationSchemaMissing(DatabaseError):
+class MigrationSchemaMissing(psycopg.DatabaseError):
     pass

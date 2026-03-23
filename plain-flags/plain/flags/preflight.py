@@ -1,4 +1,5 @@
-from plain.postgres.db import OperationalError, ProgrammingError
+import psycopg
+
 from plain.preflight import PreflightCheck, PreflightResult, register_check
 from plain.runtime import settings
 
@@ -25,7 +26,7 @@ class CheckUnusedFlags(PreflightCheck):
 
         try:
             flag_names = set(flag_names)
-        except (ProgrammingError, OperationalError):
+        except (psycopg.ProgrammingError, psycopg.OperationalError):
             # The table doesn't exist yet
             # (migrations probably haven't run yet),
             # so we can't check it.

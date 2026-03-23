@@ -1,4 +1,5 @@
-from plain.postgres.db import OperationalError, ProgrammingError
+import psycopg
+
 from plain.preflight import PreflightCheck, PreflightResult, register_check
 
 
@@ -18,7 +19,7 @@ class CheckOAuthProviderKeys(PreflightCheck):
             keys_in_db = set(
                 OAuthConnection.query.values_list("provider_key", flat=True).distinct()
             )
-        except (OperationalError, ProgrammingError):
+        except (psycopg.OperationalError, psycopg.ProgrammingError):
             # Check runs on plain migrate, and the table may not exist yet
             # or it may not be installed on the particular database intentionally
             return errors

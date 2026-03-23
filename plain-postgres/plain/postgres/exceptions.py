@@ -121,63 +121,20 @@ class MultipleObjectsReturnedDescriptor:
         raise AttributeError("Cannot set MultipleObjectsReturned")
 
 
-# MARK: Database Exceptions (PEP-249)
-
-
-class Error(Exception):
-    pass
-
-
-class InterfaceError(Error):
-    pass
-
-
-class DatabaseError(Error):
-    pass
-
-
-class DataError(DatabaseError):
-    pass
-
-
-class OperationalError(DatabaseError):
-    pass
-
-
-class IntegrityError(DatabaseError):
-    pass
-
-
-class InternalError(DatabaseError):
-    pass
-
-
-class ReadOnlyError(InternalError):
-    """A write was attempted on a read-only database connection."""
-
-    pass
-
-
-class ProgrammingError(DatabaseError):
-    pass
-
-
-class NotSupportedError(DatabaseError):
-    pass
+# MARK: Database Error Tracking
 
 
 class DatabaseErrorWrapper:
     """
-    Context manager and decorator that reraises backend-specific database
-    exceptions using Plain's common wrappers.
+    Context manager and decorator that tracks database errors for connection
+    health monitoring. Sets errors_occurred on the connection when a psycopg
+    error occurs that may have left the connection unusable.
+
+    DataError and IntegrityError are excluded — they indicate data problems,
+    not connection problems.
     """
 
     def __init__(self, wrapper: DatabaseConnection) -> None:
-        """
-        wrapper is a database wrapper.
-
-        It must have a Database attribute defining PEP-249 exceptions.
-        """
         self.wrapper = wrapper
 
     def __enter__(self) -> None:
@@ -191,32 +148,10 @@ class DatabaseErrorWrapper:
     ) -> None:
         if exc_type is None:
             return
-        if issubclass(exc_type, psycopg.errors.ReadOnlySqlTransaction):
-            plain_exc_value = (
-                ReadOnlyError(*exc_value.args) if exc_value else ReadOnlyError()
-            )
-            raise plain_exc_value.with_traceback(traceback) from exc_value
-        for plain_exc_type in (
-            DataError,
-            OperationalError,
-            IntegrityError,
-            InternalError,
-            ProgrammingError,
-            NotSupportedError,
-            DatabaseError,
-            InterfaceError,
-            Error,
+        if issubclass(exc_type, psycopg.Error) and not issubclass(
+            exc_type, psycopg.DataError | psycopg.IntegrityError
         ):
-            db_exc_type = getattr(psycopg, plain_exc_type.__name__)
-            if issubclass(exc_type, db_exc_type):
-                plain_exc_value = (
-                    plain_exc_type(*exc_value.args) if exc_value else plain_exc_type()
-                )
-                # Only set the 'errors_occurred' flag for errors that may make
-                # the connection unusable.
-                if plain_exc_type not in (DataError, IntegrityError):
-                    self.wrapper.errors_occurred = True
-                raise plain_exc_value.with_traceback(traceback) from exc_value
+            self.wrapper.errors_occurred = True
 
     def __call__(self, func: F) -> F:
         # Note that we are intentionally not using @wraps here for performance

@@ -12,13 +12,14 @@ from functools import cached_property
 from itertools import chain, islice
 from typing import TYPE_CHECKING, Any, Never, Self, overload
 
+import psycopg
+
 import plain.runtime
 from plain.exceptions import ValidationError
 from plain.postgres import transaction
 from plain.postgres.constants import LOOKUP_SEP, OnConflict
 from plain.postgres.db import (
     PLAIN_VERSION_PICKLE_KEY,
-    IntegrityError,
     get_connection,
 )
 from plain.postgres.exceptions import (
@@ -833,7 +834,7 @@ class QuerySet[T: "Model"]:
                 with transaction.atomic():
                     params = dict(resolve_callables(params))
                     return self.create(**params), True
-            except (IntegrityError, ValidationError):
+            except (psycopg.IntegrityError, ValidationError):
                 # Since create() also validates by default,
                 # we can get any kind of ValidationError here,
                 # or it can flow through and get an IntegrityError from the database.

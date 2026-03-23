@@ -13,9 +13,10 @@ import inspect
 from collections.abc import Callable, Generator
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self
 
+import psycopg
+
 from plain.logs import get_framework_logger
 from plain.postgres.constants import LOOKUP_SEP
-from plain.postgres.db import DatabaseError
 from plain.postgres.exceptions import FieldError
 from plain.utils import tree
 
@@ -166,7 +167,7 @@ class Q(tree.Node):
         compiler = query.get_compiler()
         try:
             return compiler.execute_sql(SINGLE) is not None
-        except DatabaseError as e:
+        except psycopg.DatabaseError as e:
             logger.warning(
                 "Got a database error calling check()",
                 extra={"expression": repr(self), "error": str(e)},

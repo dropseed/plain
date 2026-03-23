@@ -29,9 +29,11 @@ from typing import (
     overload,
 )
 
+import psycopg
+
 from plain.postgres.aggregates import Count
 from plain.postgres.constants import LOOKUP_SEP, OnConflict
-from plain.postgres.db import NotSupportedError, get_connection
+from plain.postgres.db import get_connection
 from plain.postgres.exceptions import FieldDoesNotExist, FieldError
 from plain.postgres.expressions import (
     BaseExpression,
@@ -1274,7 +1276,7 @@ class Query(BaseExpression):
         if isinstance(expression, ResolvableExpression) and not getattr(
             expression, "filterable", True
         ):
-            raise NotSupportedError(
+            raise psycopg.NotSupportedError(
                 expression.__class__.__name__ + " is disallowed in the filter clause."
             )
         if hasattr(expression, "get_source_expressions"):
