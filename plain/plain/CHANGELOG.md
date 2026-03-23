@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.127.1](https://github.com/dropseed/plain/releases/plain@0.127.1) (2026-03-22)
+
+### What's changed
+
+- Added `plain-portal` to workspace, package list, and `plain docs` registry ([7c782e15a962](https://github.com/dropseed/plain/commit/7c782e15a962))
+- Consistent format for server worker log messages ([905c4f2ea051](https://github.com/dropseed/plain/commit/905c4f2ea051))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.127.0](https://github.com/dropseed/plain/releases/plain@0.127.0) (2026-03-20)
 
 ### What's changed
