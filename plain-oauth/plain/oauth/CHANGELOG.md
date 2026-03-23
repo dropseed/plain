@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.47.0](https://github.com/dropseed/plain/releases/plain-oauth@0.47.0) (2026-03-22)
+
+### What's changed
+
+- Switched from `plain.postgres.IntegrityError` to `psycopg.IntegrityError` directly, following the removal of PEP-249 exception re-exports from plain-postgres ([d4b170e60a2c](https://github.com/dropseed/plain/commit/d4b170e60a2c))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.85.0`. No other changes required.
+
 ## [0.46.0](https://github.com/dropseed/plain/releases/plain-oauth@0.46.0) (2026-03-16)
 
 ### What's changed
