@@ -416,7 +416,7 @@ class RequestFactory:
     def post(
         self,
         path: str,
-        data: dict[str, Any] | None = None,
+        data: Any = None,
         content_type: str = _MULTIPART_CONTENT,
         secure: bool = True,
         *,
@@ -629,7 +629,7 @@ class Client:
     def post(
         self,
         path: str,
-        data: dict[str, Any] | None = None,
+        data: Any = None,
         content_type: str = _MULTIPART_CONTENT,
         follow: bool = False,
         secure: bool = True,
