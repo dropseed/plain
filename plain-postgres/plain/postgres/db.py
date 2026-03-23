@@ -5,7 +5,6 @@ from typing import Any
 from plain import signals
 
 from .connections import get_connection, has_connection
-from .exceptions import DatabaseErrorWrapper
 
 PLAIN_VERSION_PICKLE_KEY = "_plain_version"
 
@@ -34,6 +33,5 @@ __all__ = [
     "get_connection",
     "has_connection",
     "PLAIN_VERSION_PICKLE_KEY",
-    "DatabaseErrorWrapper",
     "close_old_connections",
 ]

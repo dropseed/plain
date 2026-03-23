@@ -1,14 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar, cast
-
-import psycopg
-
-if TYPE_CHECKING:
-    from plain.postgres.connection import DatabaseConnection
-
-F = TypeVar("F", bound=Callable[..., Any])
+from typing import Any, cast
 
 # MARK: Database Query Exceptions
 
@@ -119,45 +111,3 @@ class MultipleObjectsReturnedDescriptor:
 
     def __set__(self, instance: Any, value: Any) -> None:
         raise AttributeError("Cannot set MultipleObjectsReturned")
-
-
-# MARK: Database Error Tracking
-
-
-class DatabaseErrorWrapper:
-    """
-    Context manager and decorator that tracks database errors for connection
-    health monitoring. Sets errors_occurred on the connection when a psycopg
-    error occurs that may have left the connection unusable.
-
-    DataError and IntegrityError are excluded — they indicate data problems,
-    not connection problems.
-    """
-
-    def __init__(self, wrapper: DatabaseConnection) -> None:
-        self.wrapper = wrapper
-
-    def __enter__(self) -> None:
-        pass
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: Any,
-    ) -> None:
-        if exc_type is None:
-            return
-        if issubclass(exc_type, psycopg.Error) and not issubclass(
-            exc_type, psycopg.DataError | psycopg.IntegrityError
-        ):
-            self.wrapper.errors_occurred = True
-
-    def __call__(self, func: F) -> F:
-        # Note that we are intentionally not using @wraps here for performance
-        # reasons. Refs #21109.
-        def inner(*args: Any, **kwargs: Any) -> Any:
-            with self:
-                return func(*args, **kwargs)
-
-        return cast(F, inner)

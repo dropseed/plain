@@ -62,32 +62,22 @@ class CursorWrapper:
         self.cursor = cursor
         self.db = db
 
-    WRAP_ERROR_ATTRS = frozenset(["nextset"])
-
     def __getattr__(self, attr: str) -> Any:
-        cursor_attr = getattr(self.cursor, attr)
-        if attr in CursorWrapper.WRAP_ERROR_ATTRS:
-            return self.db.wrap_database_errors(cursor_attr)
-        else:
-            return cursor_attr
+        return getattr(self.cursor, attr)
 
     def __iter__(self) -> Iterator[tuple[Any, ...]]:
-        with self.db.wrap_database_errors:
-            yield from self.cursor
+        yield from self.cursor
 
     def fetchone(self) -> tuple[Any, ...] | None:
-        with self.db.wrap_database_errors:
-            return self.cursor.fetchone()
+        return self.cursor.fetchone()
 
     def fetchmany(self, size: int | None = None) -> list[tuple[Any, ...]]:
-        with self.db.wrap_database_errors:
-            if size is None:
-                return self.cursor.fetchmany()
-            return self.cursor.fetchmany(size)
+        if size is None:
+            return self.cursor.fetchmany()
+        return self.cursor.fetchmany(size)
 
     def fetchall(self) -> list[tuple[Any, ...]]:
-        with self.db.wrap_database_errors:
-            return self.cursor.fetchall()
+        return self.cursor.fetchall()
 
     def __enter__(self) -> Self:
         return self
@@ -111,17 +101,16 @@ class CursorWrapper:
     ) -> Generator[tuple[Any, ...]]:
         self.db.validate_no_broken_transaction()
         with db_span(self.db, sql, params=params):
-            with self.db.wrap_database_errors:
+            try:
+                if params is None:
+                    yield from self.cursor.stream(sql)
+                else:
+                    yield from self.cursor.stream(sql, params)
+            finally:
                 try:
-                    if params is None:
-                        yield from self.cursor.stream(sql)
-                    else:
-                        yield from self.cursor.stream(sql, params)
-                finally:
-                    try:
-                        self.close()
-                    except psycopg.Error:
-                        pass
+                    self.close()
+                except psycopg.Error:
+                    pass
 
     # The following methods cannot be implemented in __getattr__, because the
     # code must run when the method is invoked, not just when it is accessed.
@@ -139,10 +128,9 @@ class CursorWrapper:
                 "Keyword parameters for callproc are not supported."
             )
         self.db.validate_no_broken_transaction()
-        with self.db.wrap_database_errors:
-            if params is None:
-                return self.cursor.callproc(procname)
-            return self.cursor.callproc(procname, params)
+        if params is None:
+            return self.cursor.callproc(procname)
+        return self.cursor.callproc(procname, params)
 
     def execute(
         self, sql: str, params: Sequence[Any] | Mapping[str, Any] | None = None
@@ -169,19 +157,17 @@ class CursorWrapper:
         # Wrap in an OpenTelemetry span with standard attributes.
         with db_span(self.db, sql, params=params):
             self.db.validate_no_broken_transaction()
-            with self.db.wrap_database_errors:
-                if params is None:
-                    self.cursor.execute(sql)
-                else:
-                    self.cursor.execute(sql, params)
+            if params is None:
+                self.cursor.execute(sql)
+            else:
+                self.cursor.execute(sql, params)
 
     def _executemany(
         self, sql: str, param_list: Any, *ignored_wrapper_args: Any
     ) -> None:
         with db_span(self.db, sql, many=True, params=param_list):
             self.db.validate_no_broken_transaction()
-            with self.db.wrap_database_errors:
-                self.cursor.executemany(sql, param_list)
+            self.cursor.executemany(sql, param_list)
 
 
 class CursorDebugWrapper(CursorWrapper):

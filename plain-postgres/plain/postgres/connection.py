@@ -28,9 +28,6 @@ from psycopg.types.string import TextLoader
 from plain.exceptions import ImproperlyConfigured
 from plain.logs import get_framework_logger
 from plain.postgres import utils
-from plain.postgres.db import (
-    DatabaseErrorWrapper,
-)
 from plain.postgres.dialect import MAX_NAME_LENGTH, quote_name
 from plain.postgres.indexes import Index
 from plain.postgres.schema import DatabaseSchemaEditor
@@ -203,7 +200,6 @@ class DatabaseConnection:
         # Connection termination related attributes.
         self.close_at: float | None = None
         self.closed_in_transaction: bool = False
-        self.errors_occurred: bool = False
         self.health_check_enabled: bool = False
         self.health_check_done: bool = False
 
@@ -383,8 +379,7 @@ class DatabaseConnection:
     def _set_autocommit(self, autocommit: bool) -> None:
         """Backend-specific implementation to enable or disable autocommit."""
         assert self.connection is not None
-        with self.wrap_database_errors:
-            self.connection.autocommit = autocommit
+        self.connection.autocommit = autocommit
 
     def set_read_only(self, read_only: bool) -> None:
         """Set read-only mode on this connection.
@@ -472,7 +467,6 @@ class DatabaseConnection:
         max_age = self.settings_dict["CONN_MAX_AGE"]
         self.close_at = None if max_age is None else time.monotonic() + max_age
         self.closed_in_transaction = False
-        self.errors_occurred = False
         # New connections are healthy.
         self.health_check_done = True
         # Establish the connection
@@ -486,8 +480,7 @@ class DatabaseConnection:
     def ensure_connection(self) -> None:
         """Guarantee that a connection to the database is established."""
         if self.connection is None:
-            with self.wrap_database_errors:
-                self.connect()
+            self.connect()
 
     # ##### PEP-249 connection method wrappers #####
 
@@ -504,23 +497,21 @@ class DatabaseConnection:
     def _cursor(self) -> utils.CursorWrapper:
         self.close_if_health_check_failed()
         self.ensure_connection()
-        with self.wrap_database_errors:
-            return self._prepare_cursor(self.create_cursor())
+        return self._prepare_cursor(self.create_cursor())
 
     def _commit(self) -> None:
         if self.connection is not None:
-            with debug_transaction(self, "COMMIT"), self.wrap_database_errors:
+            with debug_transaction(self, "COMMIT"):
                 return self.connection.commit()
 
     def _rollback(self) -> None:
         if self.connection is not None:
-            with debug_transaction(self, "ROLLBACK"), self.wrap_database_errors:
+            with debug_transaction(self, "ROLLBACK"):
                 return self.connection.rollback()
 
     def _close(self) -> None:
         if self.connection is not None:
-            with self.wrap_database_errors:
-                return self.connection.close()
+            return self.connection.close()
 
     # ##### Generic wrappers for PEP-249 connection methods #####
 
@@ -532,16 +523,12 @@ class DatabaseConnection:
         """Commit a transaction and reset the dirty flag."""
         self.validate_no_atomic_block()
         self._commit()
-        # A successful commit means that the database connection works.
-        self.errors_occurred = False
         self.run_commit_hooks_on_set_autocommit_on = True
 
     def rollback(self) -> None:
         """Roll back a transaction and reset the dirty flag."""
         self.validate_no_atomic_block()
         self._rollback()
-        # A successful rollback means that the database connection works.
-        self.errors_occurred = False
         self.needs_rollback = False
         self.run_on_commit = []
 
@@ -707,8 +694,8 @@ class DatabaseConnection:
 
     def close_if_unusable_or_obsolete(self) -> None:
         """
-        Close the current connection if unrecoverable errors have occurred
-        or if it outlived its maximum age.
+        Close the current connection if it's broken, improperly restored,
+        or has outlived its maximum age.
         """
         if self.connection is not None:
             self.health_check_done = False
@@ -718,29 +705,18 @@ class DatabaseConnection:
                 self.close()
                 return
 
-            # If an exception other than DataError or IntegrityError occurred
-            # since the last commit / rollback, check if the connection works.
-            if self.errors_occurred:
-                if self.is_usable():
-                    self.errors_occurred = False
-                    self.health_check_done = True
-                else:
-                    self.close()
-                    return
+            # If psycopg detected the connection is dead (e.g. server
+            # terminated the backend), close our wrapper so the next
+            # request gets a fresh connection.
+            if self.connection.closed:
+                self.close()
+                return
 
             if self.close_at is not None and time.monotonic() >= self.close_at:
                 self.close()
                 return
 
     # ##### Miscellaneous #####
-
-    @cached_property
-    def wrap_database_errors(self) -> DatabaseErrorWrapper:
-        """
-        Context manager and decorator that re-throws backend-specific database
-        exceptions using Plain's common wrappers.
-        """
-        return DatabaseErrorWrapper(self)
 
     def make_cursor(self, cursor: Any) -> utils.CursorWrapper:
         """Create a cursor without debug logging."""
