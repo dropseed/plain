@@ -1,9 +1,8 @@
 """Local side of a portal session.
 
 Runs on the developer's machine. `connect` establishes the encrypted
-tunnel through the relay and starts a background process that listens
-on a Unix socket. Subsequent commands (exec, pull, push) talk to
-the background process over the socket.
+tunnel through the relay and listens on a Unix socket. Subsequent
+commands (exec, pull, push) talk to the connect process over the socket.
 """
 
 from __future__ import annotations
@@ -28,7 +27,6 @@ from .protocol import (
 )
 
 SOCKET_PATH = os.path.join(tempfile.gettempdir(), "plain-portal.sock")
-PID_PATH = os.path.join(tempfile.gettempdir(), "plain-portal.pid")
 
 
 async def _send_framed(writer: asyncio.StreamWriter, data: bytes) -> None:
@@ -64,7 +62,7 @@ async def connect(
 
     if os.path.exists(SOCKET_PATH):
         print(
-            "A portal session is already active. Run 'plain portal disconnect' first.",
+            "A portal session is already active.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -81,9 +79,6 @@ async def connect(
     encryptor = await perform_key_exchange(ws, code, side="connect")
 
     print("Connected to remote. Session active.")
-
-    with open(PID_PATH, "w") as f:
-        f.write(str(os.getpid()))
 
     try:
         os.unlink(SOCKET_PATH)
@@ -250,16 +245,15 @@ async def connect(
 
 
 def _cleanup() -> None:
-    """Remove socket and PID files."""
-    for path in (SOCKET_PATH, PID_PATH):
-        try:
-            os.unlink(path)
-        except FileNotFoundError:
-            pass
+    """Remove the socket file."""
+    try:
+        os.unlink(SOCKET_PATH)
+    except FileNotFoundError:
+        pass
 
 
 async def send_command(request: dict) -> dict:
-    """Send a command to the background daemon via Unix socket.
+    """Send a command to the connect process via Unix socket.
 
     Returns a single response. For streaming exec, use send_exec_streaming instead.
     """
@@ -311,37 +305,3 @@ async def send_exec_streaming(
     finally:
         writer.close()
         await writer.wait_closed()
-
-
-def disconnect() -> None:
-    """Kill the background daemon and clean up."""
-    if os.path.exists(PID_PATH):
-        try:
-            with open(PID_PATH) as f:
-                pid = int(f.read().strip())
-            os.kill(pid, signal.SIGTERM)
-            print("Portal session disconnected.")
-        except (ProcessLookupError, ValueError):
-            print("Portal daemon not running (stale PID file).")
-        _cleanup()
-    elif os.path.exists(SOCKET_PATH):
-        _cleanup()
-        print("Cleaned up stale socket.")
-    else:
-        print("No active portal session.")
-
-
-def status() -> None:
-    """Show portal session status."""
-    if os.path.exists(PID_PATH):
-        try:
-            with open(PID_PATH) as f:
-                pid = int(f.read().strip())
-            os.kill(pid, 0)
-            print(f"Portal session active (PID {pid})")
-            print(f"Socket: {SOCKET_PATH}")
-        except (ProcessLookupError, ValueError):
-            print("Portal daemon not running (stale PID file).")
-            _cleanup()
-    else:
-        print("No active portal session.")

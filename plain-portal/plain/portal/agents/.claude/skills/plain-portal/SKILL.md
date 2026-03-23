@@ -7,15 +7,7 @@ description: Open a remote Python shell on a production machine via encrypted tu
 
 Open an encrypted tunnel to a remote machine and run Python code on it.
 
-## 1. Check for existing session
-
-```
-uv run plain portal status
-```
-
-If a session is already active, skip to step 3.
-
-## 2. Start the remote side and connect
+## 1. Start the remote side and connect
 
 The remote side must be running first. Either start it yourself (if you have access to the platform CLI) or ask the user to start it:
 
@@ -29,13 +21,13 @@ The remote side must be running first. Either start it yourself (if you have acc
 
 The remote side prints a portal code (e.g. `7-crossword-pineapple`). If you ran the command yourself, read the code from the output. If the user ran it, ask them for the code.
 
-Then connect:
+Then connect (runs in the foreground — use `run_in_background` so you can continue working):
 
 ```
 uv run plain portal connect <code>
 ```
 
-## 3. Run commands
+## 2. Run commands
 
 Execute Python code on the remote machine:
 
@@ -66,13 +58,9 @@ uv run plain portal push <local_path> <remote_path>
 
 Push is restricted to `/tmp/` on the remote machine.
 
-## 4. Disconnect
+## 3. Disconnect
 
-```
-uv run plain portal disconnect
-```
-
-Always disconnect when done to free the remote process.
+Kill the `connect` process to end the session. This also frees the remote process.
 
 ## Important
 

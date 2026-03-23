@@ -70,29 +70,16 @@ def start(writable: bool, timeout: int, relay_host: str) -> None:
 @cli.command()
 @click.argument("code")
 @click.option(
-    "--foreground",
-    is_flag=True,
-    help="Run in foreground instead of backgrounding.",
-)
-@click.option(
     "--relay-host",
     envvar="PLAIN_PORTAL_RELAY_HOST",
     default=DEFAULT_RELAY_HOST,
     hidden=True,
 )
-def connect(code: str, foreground: bool, relay_host: str) -> None:
+def connect(code: str, relay_host: str) -> None:
     """Connect to a remote portal session."""
     from .local import connect as do_connect
 
-    if foreground:
-        asyncio.run(do_connect(code, relay_host=relay_host))
-    else:
-        # Fork before entering asyncio — kqueue FDs don't survive fork on macOS
-        pid = os.fork()
-        if pid > 0:
-            return
-        os.setsid()
-        asyncio.run(do_connect(code, relay_host=relay_host))
+    asyncio.run(do_connect(code, relay_host=relay_host))
 
 
 @cli.command("exec")
@@ -197,19 +184,3 @@ def push(local_path: str, remote_path: str) -> None:
 
     total_bytes = response.get("bytes", file_size)
     print(f"Pushed {local_path} → {remote_path} ({total_bytes} bytes)")
-
-
-@cli.command()
-def disconnect() -> None:
-    """Disconnect the active portal session."""
-    from .local import disconnect as do_disconnect
-
-    do_disconnect()
-
-
-@cli.command()
-def status() -> None:
-    """Show portal session status."""
-    from .local import status as do_status
-
-    do_status()
