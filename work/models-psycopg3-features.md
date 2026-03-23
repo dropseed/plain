@@ -1,8 +1,6 @@
 ---
 labels:
   - plain-postgres
-related:
-  - models-read-only-transactions
 depends_on:
   - db-connection-pool
 ---
