@@ -55,9 +55,8 @@ async def connect(
     code: str,
     *,
     relay_host: str = DEFAULT_RELAY_HOST,
-    foreground: bool = False,
 ) -> None:
-    """Connect to a remote portal session and start the local daemon."""
+    """Connect to a remote portal session and run the daemon."""
 
     if not validate_code(code):
         print(f"Invalid portal code: {code}", file=sys.stderr)
@@ -83,19 +82,8 @@ async def connect(
 
     print("Connected to remote. Session active.")
 
-    if not foreground:
-        pid = os.fork()
-        if pid > 0:
-            with open(PID_PATH, "w") as f:
-                f.write(str(pid))
-            return
-        os.setsid()
-
-    if foreground:
-        with open(PID_PATH, "w") as f:
-            f.write(str(os.getpid()))
-
-    # --- daemon logic (runs in child process or foreground) ---
+    with open(PID_PATH, "w") as f:
+        f.write(str(os.getpid()))
 
     try:
         os.unlink(SOCKET_PATH)

@@ -84,7 +84,15 @@ def connect(code: str, foreground: bool, relay_host: str) -> None:
     """Connect to a remote portal session."""
     from .local import connect as do_connect
 
-    asyncio.run(do_connect(code, relay_host=relay_host, foreground=foreground))
+    if foreground:
+        asyncio.run(do_connect(code, relay_host=relay_host))
+    else:
+        # Fork before entering asyncio — kqueue FDs don't survive fork on macOS
+        pid = os.fork()
+        if pid > 0:
+            return
+        os.setsid()
+        asyncio.run(do_connect(code, relay_host=relay_host))
 
 
 @cli.command("exec")
