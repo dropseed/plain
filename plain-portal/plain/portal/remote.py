@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import base64
+import contextlib
 import io
 import os
 import traceback
@@ -168,6 +169,9 @@ def _execute_code(code_str: str, *, writable: bool = False) -> dict:
 
     Each execution gets a fresh namespace. The last expression's value
     is captured as the return value (like the interactive REPL).
+
+    When ``writable`` is False (default), the database connection is set
+    to read-only mode so INSERT/UPDATE/DELETE/DDL raise ReadOnlyError.
     """
     namespace: dict = {}
     stdout_capture = io.StringIO()
@@ -182,7 +186,19 @@ def _execute_code(code_str: str, *, writable: bool = False) -> dict:
         if tree.body and isinstance(tree.body[-1], ast.Expr):
             last_expr = tree.body.pop()
 
-        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+        # Build the execution context — enforce read-only unless --writable
+        ctx = contextlib.ExitStack()
+        ctx.enter_context(redirect_stdout(stdout_capture))
+        ctx.enter_context(redirect_stderr(stderr_capture))
+        if not writable:
+            try:
+                from plain.postgres.connections import read_only
+
+                ctx.enter_context(read_only())
+            except Exception:
+                pass  # No DB configured or plain-postgres not installed
+
+        with ctx:
             if tree.body:
                 compiled = compile(tree, "<portal>", "exec")
                 exec(compiled, namespace)  # noqa: S102
