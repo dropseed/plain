@@ -1,5 +1,16 @@
 # plain-portal changelog
 
+## [0.1.1](https://github.com/dropseed/plain/releases/plain-portal@0.1.1) (2026-03-23)
+
+### What's changed
+
+- Fix backgrounded `connect` on macOS by forking before entering asyncio, avoiding kqueue file descriptor issues ([870d591fb1cc](https://github.com/dropseed/plain/commit/870d591fb1cc))
+- Simplify `local.py` by moving fork/daemonize logic into `cli.py` and removing the `foreground` parameter from the `connect()` function ([870d591fb1cc](https://github.com/dropseed/plain/commit/870d591fb1cc))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.0](https://github.com/dropseed/plain/releases/plain-portal@0.1.0) (2026-03-22)
 
 ### What's changed
