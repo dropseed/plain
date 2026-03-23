@@ -14,11 +14,20 @@ Plain is a Python web framework.
 - **Write code meant to be read** — clear names, natural flow, obvious structure. The next person reading it should understand it immediately.
 - **Simplify to the present need** — if it feels overcomplicated, it is. Get right to the heart of the issue.
 
+## Settings
+
+Settings live in `app/settings.py` and are accessed via `plain.runtime.settings`.
+
+- Type-annotated settings can be set via `PLAIN_`-prefixed environment variables (e.g., `PLAIN_SECRET_KEY`, `PLAIN_DEBUG=true`). Env vars take highest precedence — they override `settings.py` values. When suggesting how to configure a setting, mention the env var option.
+- `uv run plain settings list` — list all settings with current values and sources
+- `uv run plain settings get <SETTING_NAME>` — get a specific setting's value
+
+Run `uv run plain docs runtime` for full details on env var syntax, `.env` files, custom prefixes, and package settings.
+
 ## Key Differences from Django
 
 Plain is a Django fork but has different APIs. Package-specific differences are in their respective rules (plain-postgres, plain-templates, plain-test). These are the core framework differences:
 
-- **Settings**: Use `plain.runtime.settings`, not `django.conf.settings`
 - **URLs**: Use `Router` with `urls` list, not Django's `urlpatterns`
 - **Request data**: Use `request.query_params` not `request.GET`, `request.form_data` not `request.POST`, `request.json_data` not `json.loads(request.body)`, `request.files` not `request.FILES`
 - **Middleware**: Middleware uses `before_request(self, request) -> Response | None` and `after_response(self, request, response) -> Response` — not Django's `__init__(self, get_response)` / `__call__` pattern. No `AuthMiddleware` exists — auth works through sessions + view-level checks (`AuthViewMixin`).
@@ -64,8 +73,6 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 - `uv run plain shell` — interactive Python shell with Plain configured (`-c "..."` for one-off commands)
 - `uv run plain run script.py` — run a script with Plain configured
 - `uv run plain request /path` — test HTTP request against dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`)
-- `uv run plain settings list` — list all settings with their current values and sources
-- `uv run plain settings get <SETTING_NAME>` — get the value of a specific setting
 
 ## After making code changes
 
