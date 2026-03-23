@@ -1,7 +1,6 @@
 ---
 labels:
   - plain.cli
-depends_on: models-read-only-transactions
 ---
 
 # Wormhole: Remote Python shell and file transfer via encrypted tunnel
@@ -107,7 +106,7 @@ plain wormhole start --writable
 # "⚠ This session allows writes to the production database. Continue? [y/N]"
 ```
 
-Uses the same `connection.read_only` mechanism from psycopg3 proposed in `models-read-only-transactions`.
+Uses `get_connection().set_read_only(True)` from `plain.postgres`.
 
 ## Output format
 
