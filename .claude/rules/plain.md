@@ -22,6 +22,8 @@ Settings live in `app/settings.py` and are accessed via `plain.runtime.settings`
 - `uv run plain settings list` — list all settings with current values and sources
 - `uv run plain settings get <SETTING_NAME>` — get a specific setting's value
 
+- Never use `getattr(settings, "X", default)` — all known settings have defaults registered by their packages, so `settings.X` always works. Using `getattr` masks typos and missing package installs.
+
 Run `uv run plain docs runtime` for full details on env var syntax, `.env` files, custom prefixes, and package settings.
 
 ## Key Differences from Django
