@@ -78,7 +78,9 @@ async def run_remote(
     except Exception:
         pass
 
+    mode = "writable" if writable else "read-only"
     print(f"Portal code: {code}")
+    print(f"Session mode: {mode}")
     print("Waiting for connection...")
     print()
 
@@ -153,7 +155,16 @@ async def run_remote(
                     await _handle_file_pull(ws, encryptor, remote_path, req_id)
 
                 elif msg_type == "file_push":
-                    await _handle_file_push(ws, encryptor, msg)
+                    if not writable:
+                        req_id = msg.get("_req_id")
+                        await _send_error(
+                            ws,
+                            encryptor,
+                            req_id,
+                            "File push requires --writable mode",
+                        )
+                    else:
+                        await _handle_file_push(ws, encryptor, msg)
 
                 else:
                     _log(f"Unknown message type: {msg_type}")
