@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.12.4](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.4) (2026-03-22)
+
+### What's changed
+
+- Added `account_id` to wrangler.toml for non-interactive deploys ([e97362f914f4](https://github.com/dropseed/plain/commit/e97362f914f4))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.3](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.3) (2026-03-10)
 
 ### What's changed
