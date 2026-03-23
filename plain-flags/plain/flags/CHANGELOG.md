@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.34.1](https://github.com/dropseed/plain/releases/plain-flags@0.34.1) (2026-03-22)
+
+### What's changed
+
+- Switched from `plain.postgres.db.OperationalError`/`ProgrammingError` to `psycopg.OperationalError`/`psycopg.ProgrammingError` directly ([d4b170e60a2c](https://github.com/dropseed/plain/commit/d4b170e60a2c))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.34.0](https://github.com/dropseed/plain/releases/plain-flags@0.34.0) (2026-03-12)
 
 ### What's changed
