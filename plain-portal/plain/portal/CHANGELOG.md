@@ -1,5 +1,19 @@
 # plain-portal changelog
 
+## [0.2.0](https://github.com/dropseed/plain/releases/plain-portal@0.2.0) (2026-03-24)
+
+### What's changed
+
+- **Simplified `portal connect`** — now runs in the foreground instead of forking a background daemon. Kill the process to end the session ([95be9f59e68a](https://github.com/dropseed/plain/commit/95be9f59e68a))
+- Removed `portal disconnect` and `portal status` commands — no longer needed since connect runs in the foreground ([95be9f59e68a](https://github.com/dropseed/plain/commit/95be9f59e68a))
+- Removed PID file tracking and `--foreground` flag ([95be9f59e68a](https://github.com/dropseed/plain/commit/95be9f59e68a))
+- Updated agent skill to reflect foreground-only connect workflow ([669e52eda37d](https://github.com/dropseed/plain/commit/669e52eda37d))
+
+### Upgrade instructions
+
+- `plain portal connect` now runs in the foreground — kill the process (Ctrl+C) to disconnect instead of running `plain portal disconnect`.
+- Remove any scripts or automation that use `plain portal disconnect` or `plain portal status`.
+
 ## [0.1.1](https://github.com/dropseed/plain/releases/plain-portal@0.1.1) (2026-03-23)
 
 ### What's changed
