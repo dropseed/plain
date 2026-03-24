@@ -1,0 +1,445 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = ["pyyaml", "rich"]
+# ///
+"""Future tracker — dependency graph, arcs, and overview for future/ items."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+import yaml
+from rich.console import Console
+from rich.table import Table
+from rich.tree import Tree
+
+FUTURE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "future"
+SKIP_FILES = {"ARC.md", "README.md", "CLAUDE.md", "TODO.md"}
+
+
+def parse_frontmatter(path: Path) -> dict:
+    text = path.read_text()
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end != -1:
+            try:
+                return yaml.safe_load(text[4:end]) or {}
+            except yaml.YAMLError:
+                return {}
+    return {}
+
+
+def get_title(path: Path) -> str:
+    for line in path.read_text().splitlines():
+        if line.startswith("# "):
+            return line[2:].strip()
+    return path.stem
+
+
+def as_list(val) -> list[str]:
+    if not val:
+        return []
+    if isinstance(val, str):
+        return [val]
+    return list(val)
+
+
+def load_arc_sequence(arc_dir: Path) -> list[str]:
+    """Read the sequence from ARC.md."""
+    arc_file = arc_dir / "ARC.md"
+    if not arc_file.exists():
+        return []
+    text = arc_file.read_text()
+    sequence = []
+    in_sequence = False
+    for line in text.splitlines():
+        if line.strip().lower() == "## sequence":
+            in_sequence = True
+            continue
+        if in_sequence:
+            if line.startswith("## "):
+                break
+            m = re.match(r"\d+\.\s+(\S+)", line.strip())
+            if m:
+                sequence.append(m.group(1))
+    return sequence
+
+
+def load_futures() -> tuple[list[dict], dict[str, list[str]]]:
+    """Load all futures and arc sequences."""
+    items = []
+    arc_sequences = {}
+
+    # Load futures from arc subdirectories
+    for arc_dir in sorted(FUTURE_DIR.iterdir()):
+        if not arc_dir.is_dir():
+            continue
+        arc_name = arc_dir.name
+        arc_sequences[arc_name] = load_arc_sequence(arc_dir)
+
+        for path in sorted(arc_dir.glob("*.md")):
+            if path.name in SKIP_FILES:
+                continue
+            fm = parse_frontmatter(path)
+            items.append({
+                "path": path,
+                "stem": path.stem,
+                "title": get_title(path),
+                "arc": arc_name,
+                "depends_on": as_list(fm.get("depends_on")),
+                "related": as_list(fm.get("related")),
+            })
+
+    # Load unassigned futures from top level
+    for path in sorted(FUTURE_DIR.glob("*.md")):
+        if path.name in SKIP_FILES:
+            continue
+        fm = parse_frontmatter(path)
+        items.append({
+            "path": path,
+            "stem": path.stem,
+            "title": get_title(path),
+            "arc": "",
+            "depends_on": as_list(fm.get("depends_on")),
+            "related": as_list(fm.get("related")),
+        })
+
+    return items, arc_sequences
+
+
+def build_graph(items: list[dict]) -> dict[str, dict]:
+    by_stem = {item["stem"]: item for item in items}
+    all_stems = set(by_stem)
+
+    # Compute bidirectional related links
+    for item in items:
+        item["all_related"] = set(item["related"])
+    for item in items:
+        for rel in item["related"]:
+            if rel in by_stem:
+                by_stem[rel]["all_related"].add(item["stem"])
+    for item in items:
+        item["all_related"] = sorted(item["all_related"] & all_stems)
+
+    # Compute dependents (reverse of depends_on)
+    for item in items:
+        item["dependents"] = []
+    for item in items:
+        for dep in item["depends_on"]:
+            if dep in by_stem:
+                by_stem[dep]["dependents"].append(item["stem"])
+
+    # Compute unblocked status
+    for item in items:
+        missing_deps = [d for d in item["depends_on"] if d in all_stems]
+        item["is_root"] = len(item["depends_on"]) == 0
+        item["is_unblocked"] = len(missing_deps) == 0
+
+    return by_stem
+
+
+def count_downstream(stem: str, by_stem: dict[str, dict], seen: set | None = None) -> int:
+    if seen is None:
+        seen = set()
+    if stem in seen:
+        return 0
+    seen.add(stem)
+    total = 0
+    for dep in by_stem.get(stem, {}).get("dependents", []):
+        total += 1 + count_downstream(dep, by_stem, seen)
+    return total
+
+
+def cmd_list(args, items: list[dict]):
+    if args.arc:
+        term = args.arc.lower()
+        items = [i for i in items if term in i["arc"].lower()]
+    if args.search:
+        term = args.search.lower()
+        items = [
+            i for i in items
+            if term in i["title"].lower() or term in i["stem"].lower()
+        ]
+
+    if args.json:
+        print(json.dumps([{
+            "stem": i["stem"],
+            "title": i["title"],
+            "arc": i["arc"],
+            "depends_on": i["depends_on"],
+            "related": i.get("all_related", []),
+            "is_root": i["is_root"],
+            "is_unblocked": i["is_unblocked"],
+        } for i in items], indent=2))
+        return
+
+    console = Console()
+    table = Table(show_lines=False, pad_edge=False, box=None)
+    table.add_column("Future", style="bold", no_wrap=True)
+    table.add_column("Arc", style="cyan")
+    table.add_column("Deps", style="yellow", justify="right")
+    table.add_column("Status", style="green")
+
+    items.sort(key=lambda i: (i["arc"] or "zzz", i["stem"]))
+    for i in items:
+        status = "root" if i["is_root"] else ("ready" if i["is_unblocked"] else "blocked")
+        style = {"root": "green", "ready": "yellow", "blocked": "dim"}[status]
+        table.add_row(
+            i["stem"],
+            i["arc"] or "-",
+            str(len(i["depends_on"])) if i["depends_on"] else "",
+            f"[{style}]{status}[/{style}]",
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(items)} futures[/dim]")
+
+
+def cmd_graph(args, items: list[dict], by_stem: dict[str, dict]):
+    """Show dependency graph — roots and what they unlock."""
+    console = Console()
+
+    roots = [i for i in items if i["is_root"]]
+    roots.sort(key=lambda i: count_downstream(i["stem"], by_stem), reverse=True)
+
+    if args.json:
+        result = []
+        for r in roots:
+            downstream = count_downstream(r["stem"], by_stem)
+            result.append({
+                "stem": r["stem"],
+                "title": r["title"],
+                "arc": r["arc"],
+                "downstream_count": downstream,
+                "direct_dependents": r["dependents"],
+            })
+        print(json.dumps(result, indent=2))
+        return
+
+    tree = Tree("[bold]Dependency graph[/bold] (roots → dependents)")
+    for r in roots:
+        downstream = count_downstream(r["stem"], by_stem)
+        if downstream == 0:
+            continue
+        label = r["stem"]
+        label += f"  [yellow]→ unlocks {downstream}[/yellow]"
+        node = tree.add(f"[bold green]{label}[/bold green]")
+        _add_dependents(node, r["stem"], by_stem, seen=set())
+
+    console.print(tree)
+
+
+def _add_dependents(node, stem: str, by_stem: dict[str, dict], seen: set):
+    if stem in seen:
+        return
+    seen.add(stem)
+    for dep in sorted(by_stem.get(stem, {}).get("dependents", [])):
+        child = node.add(f"[dim]{dep}[/dim]")
+        _add_dependents(child, dep, by_stem, seen)
+
+
+def cmd_next(args, items: list[dict], by_stem: dict[str, dict]):
+    """Show unblocked futures prioritized by downstream impact."""
+    unblocked = [i for i in items if i["is_unblocked"]]
+    for i in unblocked:
+        i["_downstream"] = count_downstream(i["stem"], by_stem)
+    unblocked.sort(key=lambda i: i["_downstream"], reverse=True)
+
+    if args.json:
+        print(json.dumps([{
+            "stem": i["stem"],
+            "title": i["title"],
+            "arc": i["arc"],
+            "downstream_count": i["_downstream"],
+            "direct_dependents": i["dependents"],
+        } for i in unblocked], indent=2))
+        return
+
+    console = Console()
+    table = Table(show_lines=False, pad_edge=False, box=None)
+    table.add_column("Future", style="bold")
+    table.add_column("Arc", style="cyan")
+    table.add_column("Unlocks", style="yellow", justify="right")
+    table.add_column("Dependents", style="dim")
+
+    for i in unblocked:
+        table.add_row(
+            i["stem"],
+            i["arc"] or "-",
+            str(i["_downstream"]) if i["_downstream"] > 0 else "",
+            ", ".join(i["dependents"]) if i["dependents"] else "",
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(unblocked)} unblocked futures[/dim]")
+
+
+def cmd_show(args, items: list[dict], by_stem: dict[str, dict], arc_sequences: dict[str, list[str]]):
+    name = args.name.replace(".md", "")
+    if name not in by_stem:
+        matches = [s for s in by_stem if name in s]
+        if len(matches) == 1:
+            name = matches[0]
+        elif matches:
+            print(f"Ambiguous: {', '.join(matches)}", file=sys.stderr)
+            sys.exit(1)
+        else:
+            print(f"Not found: {name}", file=sys.stderr)
+            sys.exit(1)
+
+    i = by_stem[name]
+    downstream = count_downstream(name, by_stem)
+
+    if args.json:
+        seq_pos = None
+        if i["arc"] and i["arc"] in arc_sequences:
+            seq = arc_sequences[i["arc"]]
+            if name in seq:
+                seq_pos = seq.index(name) + 1
+        print(json.dumps({
+            "stem": i["stem"],
+            "title": i["title"],
+            "arc": i["arc"],
+            "sequence_position": seq_pos,
+            "depends_on": i["depends_on"],
+            "related": i.get("all_related", []),
+            "dependents": i["dependents"],
+            "downstream_count": downstream,
+            "is_root": i["is_root"],
+            "is_unblocked": i["is_unblocked"],
+        }, indent=2))
+        return
+
+    console = Console()
+    console.print(f"[bold]{i['title']}[/bold]")
+    arc = i["arc"]
+    if arc:
+        seq = arc_sequences.get(arc, [])
+        pos = seq.index(name) + 1 if name in seq else None
+        pos_str = f" (#{pos} of {len(seq)})" if pos else ""
+        console.print(f"[dim]Arc:[/dim] [cyan]{arc}[/cyan]{pos_str}")
+    console.print(f"[dim]File:[/dim] future/{arc + '/' if arc else ''}{i['stem']}.md")
+    status = "root" if i["is_root"] else ("ready" if i["is_unblocked"] else "blocked")
+    console.print(f"[dim]Status:[/dim] {status}")
+
+    if i["depends_on"]:
+        console.print(f"\n[bold]Depends on:[/bold]")
+        for dep in i["depends_on"]:
+            exists = dep in by_stem
+            marker = "[green]✓[/green]" if not exists else "[yellow]●[/yellow]"
+            title = by_stem[dep]["title"] if exists else "(completed/missing)"
+            console.print(f"  {marker} {dep}  [dim]{title}[/dim]")
+
+    if i["dependents"]:
+        console.print(f"\n[bold]Unlocks:[/bold] ({downstream} total downstream)")
+        for dep in i["dependents"]:
+            console.print(f"  → {dep}  [dim]{by_stem[dep]['title']}[/dim]")
+
+    if i.get("all_related"):
+        console.print(f"\n[bold]Related:[/bold]")
+        for rel in i["all_related"]:
+            if rel in by_stem:
+                console.print(f"  ↔ {rel}  [dim]{by_stem[rel]['title']}[/dim]")
+
+
+def cmd_arcs(args, items: list[dict], arc_sequences: dict[str, list[str]]):
+    """List all arcs with their futures in sequence order."""
+    arcs: dict[str, list[dict]] = {}
+    for i in items:
+        arc = i["arc"] or "(none)"
+        arcs.setdefault(arc, []).append(i)
+
+    if args.json:
+        result = {}
+        for arc, members in sorted(arcs.items()):
+            seq = arc_sequences.get(arc, [])
+            # Sort by sequence position
+            def sort_key(m):
+                try:
+                    return seq.index(m["stem"])
+                except ValueError:
+                    return len(seq)
+            result[arc] = [{
+                "stem": i["stem"],
+                "title": i["title"],
+                "sequence_position": seq.index(i["stem"]) + 1 if i["stem"] in seq else None,
+                "is_root": i["is_root"],
+                "is_unblocked": i["is_unblocked"],
+            } for i in sorted(members, key=sort_key)]
+        print(json.dumps(result, indent=2))
+        return
+
+    console = Console()
+    for arc, members in sorted(arcs.items()):
+        unblocked = sum(1 for m in members if m["is_unblocked"])
+        console.print(f"\n[bold cyan]{arc}[/bold cyan]  [dim]({len(members)} futures, {unblocked} unblocked)[/dim]")
+
+        seq = arc_sequences.get(arc, [])
+        def sort_key(m):
+            try:
+                return seq.index(m["stem"])
+            except ValueError:
+                return len(seq)
+
+        for idx, m in enumerate(sorted(members, key=sort_key)):
+            status = "root" if m["is_root"] else ("ready" if m["is_unblocked"] else "blocked")
+            style = {"root": "green", "ready": "yellow", "blocked": "dim"}[status]
+            pos = seq.index(m["stem"]) + 1 if m["stem"] in seq else None
+            prefix = f"{pos:2d}." if pos else "  ?"
+            console.print(f"  {prefix} [{style}]●[/{style}] {m['stem']}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Future tracker")
+    parser.add_argument("--json", action="store_true", help="JSON output")
+    sub = parser.add_subparsers(dest="command")
+
+    ls = sub.add_parser("list", aliases=["ls"], help="List futures")
+    ls.add_argument("--search", "-s", help="Search titles and names")
+    ls.add_argument("--arc", "-a", help="Filter by arc")
+    ls.add_argument("--json", action="store_true", dest="json_sub")
+
+    graph = sub.add_parser("graph", help="Show dependency graph")
+    graph.add_argument("--json", action="store_true", dest="json_sub")
+
+    nxt = sub.add_parser("next", help="Show unblocked futures by impact")
+    nxt.add_argument("--json", action="store_true", dest="json_sub")
+
+    show = sub.add_parser("show", help="Show future details")
+    show.add_argument("name", help="Future name (partial match ok)")
+    show.add_argument("--json", action="store_true", dest="json_sub")
+
+    arcs_cmd = sub.add_parser("arcs", help="List all arcs")
+    arcs_cmd.add_argument("--json", action="store_true", dest="json_sub")
+
+    args = parser.parse_args()
+
+    # Merge --json from subcommand
+    if hasattr(args, "json_sub") and args.json_sub:
+        args.json = True
+
+    items, arc_sequences = load_futures()
+    by_stem = build_graph(items)
+
+    match args.command:
+        case "list" | "ls":
+            cmd_list(args, items)
+        case "graph":
+            cmd_graph(args, items, by_stem)
+        case "next":
+            cmd_next(args, items, by_stem)
+        case "show":
+            cmd_show(args, items, by_stem, arc_sequences)
+        case "arcs":
+            cmd_arcs(args, items, arc_sequences)
+        case _:
+            cmd_next(args, items, by_stem)
+
+
+if __name__ == "__main__":
+    main()
