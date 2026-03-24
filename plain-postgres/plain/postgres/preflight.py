@@ -6,10 +6,47 @@ from collections.abc import Callable
 from typing import Any
 
 from plain.packages import packages_registry
+from plain.postgres.constraints import UniqueConstraint
 from plain.postgres.db import get_connection
+from plain.postgres.fields.related import ForeignKeyField
 from plain.postgres.migrations.recorder import MIGRATION_TABLE_NAME
 from plain.postgres.registry import ModelsRegistry, models_registry
 from plain.preflight import PreflightCheck, PreflightResult, register_check
+
+
+def _get_app_models() -> list[Any]:
+    """Return models from the user's app packages only (not framework/third-party)."""
+    app_models = []
+    for package_config in packages_registry.get_package_configs():
+        if package_config.name.startswith("app."):
+            app_models.extend(
+                models_registry.get_models(package_label=package_config.package_label)
+            )
+    return app_models
+
+
+def _collect_model_indexes(model: Any) -> list[tuple[str, list[str], bool]]:
+    """Collect all index field-lists for a model as (name, fields, is_unique) tuples."""
+    all_indexes: list[tuple[str, list[str], bool]] = []
+
+    for index in model.model_options.indexes:
+        if index.fields:
+            fields = [f.lstrip("-") for f in index.fields]
+            all_indexes.append((index.name, fields, False))
+
+    for constraint in model.model_options.constraints:
+        if isinstance(constraint, UniqueConstraint) and constraint.fields:
+            all_indexes.append((constraint.name, list(constraint.fields), True))
+
+    for field in model._model_meta.local_fields:
+        if (
+            isinstance(field, ForeignKeyField)
+            and field.db_index
+            and not field.primary_key
+        ):
+            all_indexes.append((f"{field.name} (auto)", [field.name], False))
+
+    return all_indexes
 
 
 @register_check("postgres.all_models")
@@ -334,3 +371,73 @@ class CheckPrunableMigrations(PreflightCheck):
         )
 
         return errors
+
+
+@register_check("postgres.missing_fk_indexes")
+class CheckMissingFKIndexes(PreflightCheck):
+    """Warns about foreign key fields without index coverage."""
+
+    def run(self) -> list[PreflightResult]:
+        results = []
+
+        for model in _get_app_models():
+            # Leading field of each index/constraint covers FK lookups
+            covered_fields = {
+                fields[0] for _, fields, _ in _collect_model_indexes(model)
+            }
+
+            for field in model._model_meta.local_fields:
+                if (
+                    isinstance(field, ForeignKeyField)
+                    and not field.primary_key
+                    and field.name not in covered_fields
+                    and not field.db_index
+                ):
+                    results.append(
+                        PreflightResult(
+                            fix=f"Foreign key '{field.name}' has no index coverage. "
+                            f"Add an Index on [\"{field.name}\"] or a constraint with '{field.name}' as the first field.",
+                            obj=f"{model.model_options.label}.{field.name}",
+                            id="postgres.missing_fk_index",
+                            warning=True,
+                        )
+                    )
+
+        return results
+
+
+@register_check("postgres.duplicate_indexes")
+class CheckDuplicateIndexes(PreflightCheck):
+    """Warns about indexes that are prefix-redundant with other indexes or constraints."""
+
+    def run(self) -> list[PreflightResult]:
+        results = []
+
+        for model in _get_app_models():
+            all_indexes = _collect_model_indexes(model)
+
+            flagged: set[str] = set()
+            for i, idx_a in enumerate(all_indexes):
+                for idx_b in all_indexes[i + 1 :]:
+                    for shorter, longer in [(idx_a, idx_b), (idx_b, idx_a)]:
+                        s_name, s_fields, s_unique = shorter
+                        l_name, l_fields, _ = longer
+                        if (
+                            s_name not in flagged
+                            and len(s_fields) < len(l_fields)
+                            and l_fields[: len(s_fields)] == s_fields
+                            and not s_unique
+                        ):
+                            results.append(
+                                PreflightResult(
+                                    fix=f"Index '{s_name}' on [{', '.join(s_fields)}] "
+                                    f"is redundant with '{l_name}' on [{', '.join(l_fields)}]. "
+                                    f"The longer index covers the same queries.",
+                                    obj=model.model_options.label,
+                                    id="postgres.duplicate_index",
+                                    warning=True,
+                                )
+                            )
+                            flagged.add(s_name)
+
+        return results
