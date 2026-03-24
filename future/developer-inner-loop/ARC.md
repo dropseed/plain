@@ -4,12 +4,12 @@ Everything that makes the edit/save/see cycle faster and more informative.
 
 ## Sequence
 
-1. logging-contextvars
-2. preflight-log-warnings
-3. preflight-allowed-hosts-validation
-4. dev-error-notifications
-5. forms-422-status-code
-6. listview-pagination
-7. elements-dev-toolbar
-8. flags-toolbar-panel
-9. precommit-runtime-md-detection
+- [ ] [logging-contextvars](logging-contextvars.md)
+- [ ] [preflight-log-warnings](preflight-log-warnings.md)
+- [ ] [preflight-allowed-hosts-validation](preflight-allowed-hosts-validation.md)
+- [ ] [dev-error-notifications](dev-error-notifications.md)
+- [ ] [forms-422-status-code](forms-422-status-code.md)
+- [ ] [listview-pagination](listview-pagination.md)
+- [ ] [elements-dev-toolbar](elements-dev-toolbar.md)
+- [ ] [flags-toolbar-panel](flags-toolbar-panel.md)
+- [ ] [precommit-runtime-md-detection](precommit-runtime-md-detection.md)

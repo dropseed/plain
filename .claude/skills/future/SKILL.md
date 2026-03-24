@@ -61,9 +61,9 @@ Content...
 Arc membership is determined by directory. Each arc directory contains an `ARC.md` with:
 
 1. **Vision** — what Plain looks like at the end of this arc
-2. **Sequence** — numbered list of futures in intended order
+2. **Sequence** — checklist of linked futures in intended order (place near the top, right after the vision)
 
-The sequence is the editorial ordering — "this is the path we'd like to take." `depends_on` is for hard blocks that can't be reordered.
+Format: `- [ ] [future-name](future-name.md)` — checked when done. The sequence is the editorial ordering — "this is the path we'd like to take." `depends_on` is for hard blocks that can't be reordered. Any deeper context (research, references, industry analysis) goes after the sequence.
 
 Current arcs:
 
@@ -73,6 +73,7 @@ Current arcs:
 - `background-processing` — jobs, workers, monitoring
 - `developer-inner-loop` — faster edit/save/see cycle
 - `production-hardening` — security, compliance, operational maturity
+- `postgres-insights` — diagnostics, health checks, optimization tools
 
 ## Scripts
 

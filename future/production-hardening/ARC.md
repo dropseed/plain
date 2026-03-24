@@ -4,11 +4,11 @@ Security, compliance, and operational maturity.
 
 ## Sequence
 
-1. remove-signals
-2. auth-simplify-authview
-3. passwords-argon2id
-4. api-hashed-tokens
-5. file-based-secrets
-6. sessions-multiple-sessions
-7. enterprise-readiness-research
-8. enterprise-readiness
+- [ ] [remove-signals](remove-signals.md)
+- [ ] [auth-simplify-authview](auth-simplify-authview.md)
+- [ ] [passwords-argon2id](passwords-argon2id.md)
+- [ ] [api-hashed-tokens](api-hashed-tokens.md)
+- [ ] [file-based-secrets](file-based-secrets.md)
+- [ ] [sessions-multiple-sessions](sessions-multiple-sessions.md)
+- [ ] [enterprise-readiness-research](enterprise-readiness-research.md)
+- [ ] [enterprise-readiness](enterprise-readiness.md)

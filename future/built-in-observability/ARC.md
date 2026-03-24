@@ -4,15 +4,15 @@ Framework-level insight into what's happening in production — metrics, profili
 
 ## Sequence
 
-1. metrics
-2. otel-spans-proposal
-3. auth-otel-user-context
-4. observer-testing
-5. observer-request-headers
-6. observer-record-this-page
-7. observer-geolocation
-8. server-memory-diagnostics
-9. observer-profiling
-10. coverage
-11. pageviews-analytics
-12. pageviews-dashboard
+- [ ] [metrics](metrics.md)
+- [ ] [otel-spans-proposal](otel-spans-proposal.md)
+- [ ] [auth-otel-user-context](auth-otel-user-context.md)
+- [ ] [observer-testing](observer-testing.md)
+- [ ] [observer-request-headers](observer-request-headers.md)
+- [ ] [observer-record-this-page](observer-record-this-page.md)
+- [ ] [observer-geolocation](observer-geolocation.md)
+- [ ] [server-memory-diagnostics](server-memory-diagnostics.md)
+- [ ] [observer-profiling](observer-profiling.md)
+- [ ] [coverage](coverage.md)
+- [ ] [pageviews-analytics](pageviews-analytics.md)
+- [ ] [pageviews-dashboard](pageviews-dashboard.md)

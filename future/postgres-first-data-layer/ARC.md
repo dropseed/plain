@@ -4,29 +4,29 @@ Making the ORM truly postgres-native rather than inheriting Django's database-ag
 
 ## Sequence
 
-1. models-explicit-create-update
-2. models-prevent-manual-pk
-3. models-consolidate-related-descriptors
-4. models-related-query-name
-5. models-foreignkey-deferred-loading
-6. models-psycopg3-features
-7. models-typed-query-api
-8. db-connection-pool
-9. models-fetch-modes
-10. models-cursor-paginator
-11. models-custom-base-queryset
-12. postgres-native-schema
-13. postgres-native-orm
-14. postgres-full-text-search
-15. models-field-choices-mixin
-16. models-field-max-length
-17. models-choices-classes
-18. models-db-level-on-delete
-19. models-non-blocking-ddl
-20. models-index-suggestions
-21. models-postgres-options-settings
-22. db-schema-command
-23. postgres-cli-and-insights
-24. migrations-schema-check
-25. migrations-safety-analysis
-26. migrations-rename-app-column
+- [ ] [models-explicit-create-update](models-explicit-create-update.md)
+- [ ] [models-prevent-manual-pk](models-prevent-manual-pk.md)
+- [ ] [models-consolidate-related-descriptors](models-consolidate-related-descriptors.md)
+- [ ] [models-related-query-name](models-related-query-name.md)
+- [ ] [models-foreignkey-deferred-loading](models-foreignkey-deferred-loading.md)
+- [ ] [models-psycopg3-features](models-psycopg3-features.md)
+- [ ] [models-typed-query-api](models-typed-query-api.md)
+- [ ] [db-connection-pool](db-connection-pool.md)
+- [ ] [models-fetch-modes](models-fetch-modes.md)
+- [ ] [models-cursor-paginator](models-cursor-paginator.md)
+- [ ] [models-custom-base-queryset](models-custom-base-queryset.md)
+- [ ] [postgres-native-schema](postgres-native-schema.md)
+- [ ] [postgres-native-orm](postgres-native-orm.md)
+- [ ] [postgres-full-text-search](postgres-full-text-search.md)
+- [ ] [models-field-choices-mixin](models-field-choices-mixin.md)
+- [ ] [models-field-max-length](models-field-max-length.md)
+- [ ] [models-choices-classes](models-choices-classes.md)
+- [ ] [models-db-level-on-delete](models-db-level-on-delete.md)
+- [ ] [models-non-blocking-ddl](models-non-blocking-ddl.md)
+- [ ] [models-index-suggestions](models-index-suggestions.md)
+- [ ] [models-postgres-options-settings](models-postgres-options-settings.md)
+- [ ] [db-schema-command](db-schema-command.md)
+- [ ] [db-rename-to-postgres](db-rename-to-postgres.md)
+- [ ] [migrations-schema-check](migrations-schema-check.md)
+- [ ] [migrations-safety-analysis](migrations-safety-analysis.md)
+- [ ] [migrations-rename-app-column](migrations-rename-app-column.md)
