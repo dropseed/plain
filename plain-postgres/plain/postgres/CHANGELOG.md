@@ -1,5 +1,17 @@
 # plain-postgres changelog
 
+## [0.86.0](https://github.com/dropseed/plain/releases/plain-postgres@0.86.0) (2026-03-24)
+
+### What's changed
+
+- **New `plain db diagnose` command** — runs health checks against your Postgres database and reports issues as structured JSON. Checks for unused indexes, duplicate indexes, missing foreign key indexes, sequence exhaustion, transaction ID wraparound, vacuum health, and slow queries (via `pg_stat_statements`). Each finding includes table ownership info (app vs package) and actionable suggestions ([91994604b60d](https://github.com/dropseed/plain/commit/91994604b60d))
+- **New preflight checks** for missing foreign key indexes and duplicate indexes — these run automatically during `plain check` and flag issues before they hit production ([3703fe8ab38d](https://github.com/dropseed/plain/commit/3703fe8ab38d))
+- New `plain-postgres-diagnose` AI skill for guided database health check workflow ([91994604b60d](https://github.com/dropseed/plain/commit/91994604b60d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.85.0](https://github.com/dropseed/plain/releases/plain-postgres@0.85.0) (2026-03-22)
 
 ### What's changed
