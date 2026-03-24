@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.31.1](https://github.com/dropseed/plain/releases/plain-observer@0.31.1) (2026-03-24)
+
+### What's changed
+
+- Improved `plain-optimize` skill description to better trigger on performance-related queries ([669e52eda37d](https://github.com/dropseed/plain/commit/669e52eda37d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.31.0](https://github.com/dropseed/plain/releases/plain-observer@0.31.0) (2026-03-20)
 
 ### What's changed
