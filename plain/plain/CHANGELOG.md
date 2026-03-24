@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.127.2](https://github.com/dropseed/plain/releases/plain@0.127.2) (2026-03-24)
+
+### What's changed
+
+- Fixed `post()` data type annotation in test client (`RequestFactory` and `Client`) to accept `Any` instead of `dict[str, Any] | None`, allowing JSON payloads and other data types ([a67018f94cfb](https://github.com/dropseed/plain/commit/a67018f94cfb))
+- Updated agent rules and skill descriptions ([669e52eda37d](https://github.com/dropseed/plain/commit/669e52eda37d), [bdff05dfb9f6](https://github.com/dropseed/plain/commit/bdff05dfb9f6), [1be549a7fd31](https://github.com/dropseed/plain/commit/1be549a7fd31))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.127.1](https://github.com/dropseed/plain/releases/plain@0.127.1) (2026-03-22)
 
 ### What's changed
