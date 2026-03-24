@@ -1,5 +1,15 @@
 # plainx-dev changelog
 
+## [0.1.2](https://github.com/dropseed/plain/releases/plainx-dev@0.1.2) (2026-03-24)
+
+### What's changed
+
+- Added `disable-model-invocation` safety flag to the `plainx-release` skill ([669e52eda37d](https://github.com/dropseed/plain/commit/669e52eda37d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.1](https://github.com/dropseed/plain/releases/plainx-dev@0.1.1) (2026-02-26)
 
 ### What's changed
