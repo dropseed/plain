@@ -14,6 +14,7 @@ from ..backups.cli import cli as backups_cli
 from ..db import get_connection
 from ..dialect import quote_name
 from ..migrations.recorder import MIGRATION_TABLE_NAME
+from .diagnose import diagnose
 
 
 @register_cli("db")
@@ -23,6 +24,7 @@ def cli() -> None:
 
 
 cli.add_command(backups_cli)
+cli.add_command(diagnose)
 
 
 @cli.command()
