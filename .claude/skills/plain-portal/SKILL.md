@@ -1,6 +1,7 @@
 ---
 name: plain-portal
 description: Open a remote Python shell on a production machine via encrypted tunnel. Use when you need to inspect production data, debug issues, run queries, or transfer files.
+disable-model-invocation: true
 ---
 
 # Remote Portal Session

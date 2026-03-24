@@ -1,6 +1,7 @@
 ---
 name: plainx-release
 description: Releases plainx packages with version suggestions, changelog generation, and git tagging. Use when releasing a package to PyPI.
+disable-model-invocation: true
 ---
 
 # Release Package

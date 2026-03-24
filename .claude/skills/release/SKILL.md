@@ -1,6 +1,7 @@
 ---
 name: release
 description: Releases Plain packages with intelligent version suggestions and parallel release notes generation. Use when releasing packages to PyPI.
+disable-model-invocation: true
 ---
 
 # Release Packages

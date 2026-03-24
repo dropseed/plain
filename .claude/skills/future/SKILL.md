@@ -1,6 +1,6 @@
 ---
 name: future
-description: Navigate and manage the future/ directory — view dependency graphs, filter by arc, find unblocked futures, and identify what to work on next.
+description: Navigate and manage the future/ directory — view dependency graphs, filter by arc, find unblocked futures, and identify what to work on next. Use when deciding what to work on, exploring planned work, or checking dependencies between futures.
 ---
 
 # Future
