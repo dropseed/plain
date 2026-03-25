@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.34.2](https://github.com/dropseed/plain/releases/plain-flags@0.34.2) (2026-03-25)
+
+### What's changed
+
+- Removed duplicate FK index on `FlagResult.flag` — the auto-created FK index was redundant with an existing composite index. Adds migration to set `db_index=False` ([262ad569d5df](https://github.com/dropseed/plain/commit/262ad569d5df))
+
+### Upgrade instructions
+
+- Run `uv run plain postgres migrate` to apply the migration.
+
 ## [0.34.1](https://github.com/dropseed/plain/releases/plain-flags@0.34.1) (2026-03-22)
 
 ### What's changed
