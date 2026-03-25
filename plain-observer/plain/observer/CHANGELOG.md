@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.31.2](https://github.com/dropseed/plain/releases/plain-observer@0.31.2) (2026-03-25)
+
+### What's changed
+
+- Removed duplicate indexes on `Span` and `Log` models — dropped redundant `trace` and `(trace, span_id)` indexes that were covered by existing composite indexes, and set `db_index=False` on the `trace` FK fields ([262ad569d5df](https://github.com/dropseed/plain/commit/262ad569d5df))
+
+### Upgrade instructions
+
+- Run `uv run plain postgres migrate` to apply the migration.
+
 ## [0.31.1](https://github.com/dropseed/plain/releases/plain-observer@0.31.1) (2026-03-24)
 
 ### What's changed
