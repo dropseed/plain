@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.48.0](https://github.com/dropseed/plain/releases/plain-oauth@0.48.0) (2026-03-25)
+
+### What's changed
+
+- Added explicit `Index` on `OAuthConnection.user` FK field — replaces the old auto-created index from `db_index=True`. Migration drops the orphan auto-index and creates the new named index. ([061b97f5d538](https://github.com/dropseed/plain/commit/061b97f5d538))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.89.0`. Run `uv run plain postgres migrate`.
+
 ## [0.47.0](https://github.com/dropseed/plain/releases/plain-oauth@0.47.0) (2026-03-22)
 
 ### What's changed
