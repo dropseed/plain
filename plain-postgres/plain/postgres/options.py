@@ -168,12 +168,7 @@ class Options:
         options = {}
         for name in self._provided_options:
             if name == "indexes":
-                # Clone indexes and ensure names are set
-                indexes = [idx.clone() for idx in self.indexes]
-                for index in indexes:
-                    if not index.name:
-                        index.set_name_with_model(self.model)
-                options["indexes"] = indexes
+                options["indexes"] = [idx.clone() for idx in self.indexes]
             elif name == "constraints":
                 # Clone constraints
                 options["constraints"] = [con.clone() for con in self.constraints]

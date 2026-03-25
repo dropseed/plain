@@ -132,13 +132,6 @@ class Meta:
         instance.local_fields.sort(key=lambda f: (not f.primary_key, f.name))
         instance.local_many_to_many.sort(key=lambda f: f.name)
 
-        # Set index names now that fields are contributed
-        # Trigger model_options descriptor to ensure it's initialized
-        # (accessing it will cache the instance)
-        for index in model.model_options.indexes:
-            if not index.name:
-                index.set_name_with_model(model)
-
         return instance
 
     @property
