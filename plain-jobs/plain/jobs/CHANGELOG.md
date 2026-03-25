@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.46.5](https://github.com/dropseed/plain/releases/plain-jobs@0.46.5) (2026-03-25)
+
+### What's changed
+
+- Renamed indexes to use readable `{table}_{column}_idx` naming convention, replacing the old truncated hash-based names. Includes a migration with `RenameIndex` operations (instant `ALTER INDEX RENAME`, no locks). ([74aa8b76aa40](https://github.com/dropseed/plain/commit/74aa8b76aa40))
+
+### Upgrade instructions
+
+- Run `plain migrate` to apply the index rename migration. This is an instant metadata-only operation with no performance impact.
+
 ## [0.46.4](https://github.com/dropseed/plain/releases/plain-jobs@0.46.4) (2026-03-25)
 
 ### What's changed
