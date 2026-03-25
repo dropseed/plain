@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.88.0](https://github.com/dropseed/plain/releases/plain-postgres@0.88.0) (2026-03-25)
+
+### What's changed
+
+- **`Index` now requires a `name` argument** — auto-naming (`set_name_with_model`) is no longer used for new indexes. Use the `{table}_{column(s)}_idx` convention (e.g., `plainjobs_jobrequest_priority_idx`). ([74aa8b76aa40](https://github.com/dropseed/plain/commit/74aa8b76aa40))
+- Raised `Index.max_name_length` from 30 to 63 to match Postgres's actual identifier limit (`NAMEDATALEN - 1`). The old limit was inherited from Django's multi-database support. ([74aa8b76aa40](https://github.com/dropseed/plain/commit/74aa8b76aa40))
+
+### Upgrade instructions
+
+- Add `name=` to all `Index` objects in your models. Use the `{table}_{column}_idx` convention. Run `makemigrations` — it will auto-generate `RenameIndex` operations (instant `ALTER INDEX RENAME`, no locks). Then run `migrate`.
+
 ## [0.87.0](https://github.com/dropseed/plain/releases/plain-postgres@0.87.0) (2026-03-25)
 
 ### What's changed
