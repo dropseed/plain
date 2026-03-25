@@ -55,8 +55,9 @@ class CheckAllModels(PreflightCheck):
 
     def run(self) -> list[PreflightResult]:
         db_table_models = defaultdict(list)
-        indexes = defaultdict(list)
-        constraints = defaultdict(list)
+        # Indexes and constraints share the same Postgres namespace,
+        # so track them together to catch cross-type collisions.
+        relation_names = defaultdict(list)
         errors = []
         models = models_registry.get_models()
         for model in models:
@@ -74,9 +75,9 @@ class CheckAllModels(PreflightCheck):
             else:
                 errors.extend(model.preflight())
             for model_index in model.model_options.indexes:
-                indexes[model_index.name].append(model.model_options.label)
+                relation_names[model_index.name].append(model.model_options.label)
             for model_constraint in model.model_options.constraints:
-                constraints[model_constraint.name].append(model.model_options.label)
+                relation_names[model_constraint.name].append(model.model_options.label)
         for db_table, model_labels in db_table_models.items():
             if len(model_labels) != 1:
                 model_labels_str = ", ".join(model_labels)
@@ -87,34 +88,20 @@ class CheckAllModels(PreflightCheck):
                         id="postgres.duplicate_db_table",
                     )
                 )
-        for index_name, model_labels in indexes.items():
+        for relation_name, model_labels in relation_names.items():
             if len(model_labels) > 1:
-                model_labels = set(model_labels)
+                unique_models = set(model_labels)
+                single_model = len(unique_models) == 1
                 errors.append(
                     PreflightResult(
-                        fix="index name '{}' is not unique {} {}.".format(
-                            index_name,
-                            "for model" if len(model_labels) == 1 else "among models:",
-                            ", ".join(sorted(model_labels)),
+                        fix="index/constraint name '{}' is not unique {} {}.".format(
+                            relation_name,
+                            "for model" if single_model else "among models:",
+                            ", ".join(sorted(unique_models)),
                         ),
-                        id="postgres.index_name_not_unique_single"
-                        if len(model_labels) == 1
-                        else "postgres.index_name_not_unique_multiple",
-                    ),
-                )
-        for constraint_name, model_labels in constraints.items():
-            if len(model_labels) > 1:
-                model_labels = set(model_labels)
-                errors.append(
-                    PreflightResult(
-                        fix="constraint name '{}' is not unique {} {}.".format(
-                            constraint_name,
-                            "for model" if len(model_labels) == 1 else "among models:",
-                            ", ".join(sorted(model_labels)),
-                        ),
-                        id="postgres.constraint_name_not_unique_single"
-                        if len(model_labels) == 1
-                        else "postgres.constraint_name_not_unique_multiple",
+                        id="postgres.relation_name_not_unique_single"
+                        if single_model
+                        else "postgres.relation_name_not_unique_multiple",
                     ),
                 )
         return errors
