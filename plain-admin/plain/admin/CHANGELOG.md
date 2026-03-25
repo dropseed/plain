@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.76.0](https://github.com/dropseed/plain/releases/plain-admin@0.76.0) (2026-03-25)
+
+### What's changed
+
+- Removed `db_index=False` from `PinnedNavItem.user` FK field — the `db_index` parameter no longer exists on `ForeignKeyField`. The user FK is already covered by the `UniqueConstraint` on `["user", "view_slug"]`. ([061b97f5d538](https://github.com/dropseed/plain/commit/061b97f5d538))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.89.0`. Run `uv run plain postgres migrate`.
+
 ## [0.75.2](https://github.com/dropseed/plain/releases/plain-admin@0.75.2) (2026-03-25)
 
 ### What's changed
