@@ -1,5 +1,53 @@
 # plain-postgres changelog
 
+## [0.89.0](https://github.com/dropseed/plain/releases/plain-postgres@0.89.0) (2026-03-25)
+
+### What's changed
+
+- **Removed `db_index` from `ForeignKeyField`** — FK fields no longer create indexes automatically. Declare an explicit `Index(fields=["field"], name="...")` for any FK column that needs one. The `db_index` parameter has been removed entirely. ([061b97f5d538](https://github.com/dropseed/plain/commit/061b97f5d538))
+- **Removed `Index.set_name_with_model()`** — the hash-based auto-naming machinery is gone. `Index.name` is now validated as non-empty at construction time. ([9a4ecf8ac2f0](https://github.com/dropseed/plain/commit/9a4ecf8ac2f0))
+- **Index/constraint name collision detection** — preflight now checks index and constraint names together (they share the same Postgres namespace), catching cross-type collisions that would fail at migrate time. ([292f8d6791d6](https://github.com/dropseed/plain/commit/292f8d6791d6))
+- **New `plain postgres schema` command** — shows expected DB schema from model definitions and compares it against the actual database. Detects column type mismatches, nullability drift, missing/extra columns, and orphan indexes. Use `--check` for CI (exits non-zero on drift). ([ee336078483f](https://github.com/dropseed/plain/commit/ee336078483f))
+
+### Upgrade instructions
+
+**FK index migration — required for all FK fields:**
+
+1. For each `ForeignKeyField` in your models, check if it's covered by an explicit `Index` or `UniqueConstraint` (with the FK as the leading field). Most FK columns should have an index.
+
+2. **If uncovered**, add an explicit index:
+
+    ```python
+    model_options = postgres.Options(
+        indexes=[
+            postgres.Index(name="myapp_mymodel_author_id_idx", fields=["author"]),
+        ],
+    )
+    ```
+
+3. Run `makemigrations`. This generates an `AddIndex` migration. Before the `AddIndex` operation, add a `RunSQL` to drop the orphan auto-index left behind by the old `db_index=True` default:
+
+    ```python
+    operations = [
+        migrations.RunSQL('DROP INDEX IF EXISTS "myapp_mymodel_author_id_abc12345"'),
+        migrations.AddIndex(...),
+    ]
+    ```
+
+    The old auto-index name can be reconstructed using `_create_index_name(table, [column])` from the schema editor, or found by running `plain postgres schema --check`.
+
+4. **If already covered** by a composite index or unique constraint, the orphan auto-index is just wasted space. Generate a migration to drop it:
+
+    ```python
+    operations = [
+        migrations.RunSQL('DROP INDEX IF EXISTS "myapp_mymodel_author_id_abc12345"'),
+    ]
+    ```
+
+5. Remove any `db_index=False` from FK fields in models and migration files — the parameter no longer exists.
+
+6. Run `migrate`.
+
 ## [0.88.2](https://github.com/dropseed/plain/releases/plain-postgres@0.88.2) (2026-03-25)
 
 ### What's changed
