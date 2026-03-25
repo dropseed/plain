@@ -11,6 +11,7 @@
 - [Constraints](#constraints)
 - [Forms](#forms)
 - [Architecture](#architecture)
+- [Diagnostics](#diagnostics)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -914,6 +915,67 @@ graph TB
 - [`Query`](./sql/query.py#Query) - Internal representation of a query's logical structure (tables, joins, filters)
 - [`SQLCompiler`](./sql/compiler.py#SQLCompiler) - Transforms a Query into executable SQL
 - [`DatabaseConnection`](./postgres/connection.py#DatabaseConnection) - PostgreSQL connection and query execution
+
+## Diagnostics
+
+You can run health checks against your database to find issues like missing indexes, redundant indexes, and configuration problems.
+
+```bash
+uv run plain db diagnose
+```
+
+Use `--json` for structured output (useful for scripting and AI agents):
+
+```bash
+uv run plain db diagnose --json
+```
+
+Use `--all` to include issues in installed packages (by default, only your app's issues are shown):
+
+```bash
+uv run plain db diagnose --all
+```
+
+### Checks
+
+| Check                   | What it finds                                                                                                                                                  | Severity         |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| **Invalid indexes**     | Broken indexes from failed `CREATE INDEX CONCURRENTLY` — maintained on writes, never used for reads                                                            | Warning          |
+| **Duplicate indexes**   | Indexes where one is a column-prefix of another on the same table (e.g., an auto FK index that's redundant with a composite index)                             | Warning          |
+| **Unused indexes**      | Indexes with zero scans since stats reset (>1 MB). Excludes unique indexes, constraint-backing indexes, and indexes that are the sole coverage for a FK column | Warning          |
+| **Missing FK indexes**  | Foreign key columns without any index coverage — parent DELETE/UPDATE operations will sequentially scan the child table                                        | Warning          |
+| **Sequence exhaustion** | Identity sequences approaching their type max (>50% warning, >90% critical)                                                                                    | Warning/Critical |
+| **XID wraparound**      | Transaction ID age approaching the 2 billion wraparound limit (>25% warning, >40% critical)                                                                    | Warning/Critical |
+| **Cache hit ratio**     | Heap buffer hit ratio below 98.5% — indicates insufficient `shared_buffers` or RAM                                                                             | Warning          |
+| **Index hit ratio**     | Index buffer hit ratio below 98.5%                                                                                                                             | Warning          |
+| **Vacuum health**       | Tables with significant dead tuple accumulation (>10% of live rows) where autovacuum may be falling behind                                                     | Warning          |
+
+### App vs package issues
+
+Each finding is tagged with its **source**:
+
+- **App** — your code, fully actionable
+- **Package** — owned by an installed package (e.g., `plain-jobs`). These appear in the footer summary by default; use `--all` to see details
+- **Unmanaged** — tables not managed by any Plain model. The suggestion includes exact SQL to run
+
+### Production usage
+
+Run diagnose against your **production database** to get meaningful stats. On Heroku:
+
+```bash
+heroku run -a your-app "plain db diagnose --json"
+```
+
+The `--json` flag must be quoted so Heroku passes it through to the command.
+
+### Preflight checks
+
+Two related checks run automatically during `uv run plain preflight` (and `uv run plain check`):
+
+- **`postgres.missing_fk_indexes`** — warns about FK fields without index coverage in your model definitions
+- **`postgres.duplicate_indexes`** — warns about prefix-redundant indexes in your model constraints
+
+These are static, code-level checks that catch issues before you deploy. The `diagnose` command complements them with runtime stats from the actual database.
 
 ## Settings
 

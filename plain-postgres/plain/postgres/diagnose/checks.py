@@ -101,6 +101,24 @@ def check_duplicate_indexes(
     """)
     rows = cursor.fetchall()
 
+    # Identify FK columns: (table_name, column_number) -> column_name
+    cursor.execute("""
+        SELECT
+            ct.relname AS table_name,
+            c.conkey[1] AS col_number,
+            a.attname AS column_name
+        FROM pg_catalog.pg_constraint c
+        JOIN pg_catalog.pg_class ct ON ct.oid = c.conrelid
+        JOIN pg_catalog.pg_namespace n ON n.oid = ct.relnamespace
+        JOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+        WHERE c.contype = 'f'
+          AND array_length(c.conkey, 1) = 1
+          AND n.nspname = 'public'
+    """)
+    fk_columns: dict[tuple[str, int], str] = {
+        (row[0], row[1]): row[2] for row in cursor.fetchall()
+    }
+
     # Group by table
     by_table: dict[str, list[tuple[str, list[int], list[int], bool, str, int]]] = {}
     for table_name, index_name, cols, opclasses, is_unique, size, size_bytes in rows:
@@ -124,7 +142,19 @@ def check_duplicate_indexes(
                         and ops_l[: len(cols_s)] == ops_s
                         and not unique_s  # unique indexes serve a constraint purpose
                     ):
+                        # Single-column index on a FK column = auto-generated FK index
+                        fk_field = (
+                            fk_columns.get((table_name, cols_s[0]))
+                            if len(cols_s) == 1
+                            else None
+                        )
+
                         source, package = _table_source(table_name, table_owners)
+                        if fk_field:
+                            app_suggestion = f'Set db_index=False on the "{fk_field}" FK field, then run makemigrations'
+                        else:
+                            app_suggestion = f'Remove "{name_s}" from model constraints, then run makemigrations'
+
                         items.append(
                             CheckItem(
                                 table=table_name,
@@ -135,7 +165,7 @@ def check_duplicate_indexes(
                                 suggestion=_index_suggestion(
                                     source=source,
                                     package=package,
-                                    app_suggestion=f'Remove "{name_s}" from model constraints, then run makemigrations',
+                                    app_suggestion=app_suggestion,
                                     unmanaged_suggestion=f'DROP INDEX CONCURRENTLY "{name_s}";',
                                 ),
                             )
@@ -155,7 +185,12 @@ def check_duplicate_indexes(
 def check_unused_indexes(
     cursor: Any, table_owners: dict[str, TableOwner]
 ) -> CheckResult:
-    """Indexes with zero scans since stats reset, excluding unique/expression/constraint-backing."""
+    """Indexes with zero scans since stats reset, excluding unique/expression/constraint-backing.
+
+    Also excludes indexes that are the sole coverage for a FK column — even at
+    0 scans, FK columns should always have index coverage for referential
+    integrity enforcement (parent DELETE/UPDATE scans the child table).
+    """
     cursor.execute("""
         SELECT
             s.relname AS table_name,
@@ -173,6 +208,24 @@ def check_unused_indexes(
               WHERE c.conindid = s.indexrelid
           )
           AND i.indisvalid
+          AND NOT (
+              -- Leading column is a FK column on this table
+              EXISTS (
+                  SELECT 1 FROM pg_catalog.pg_constraint fk
+                  WHERE fk.conrelid = i.indrelid
+                    AND fk.contype = 'f'
+                    AND array_length(fk.conkey, 1) = 1
+                    AND fk.conkey[1] = i.indkey[0]
+              )
+              -- And no other valid index covers that column as its leading column
+              AND NOT EXISTS (
+                  SELECT 1 FROM pg_catalog.pg_index other
+                  WHERE other.indrelid = i.indrelid
+                    AND other.indexrelid != i.indexrelid
+                    AND other.indisvalid
+                    AND other.indkey[0] = i.indkey[0]
+              )
+          )
         ORDER BY pg_relation_size(s.indexrelid) DESC
     """)
     rows = cursor.fetchall()

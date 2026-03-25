@@ -72,6 +72,8 @@ Run `uv run plain docs postgres --section constraints` for full patterns with co
 
 Use the `/plain-postgres-diagnose` skill to run database health checks (unused indexes, missing FK indexes, sequence exhaustion, etc.).
 
+Run `uv run plain docs postgres --section diagnostics` for check details, thresholds, and production usage.
+
 ## Differences from Django
 
 - Use `Model.query` not `Model.objects`

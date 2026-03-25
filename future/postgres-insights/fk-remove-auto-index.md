@@ -46,6 +46,21 @@ The upgrade skill knows all FK fields had auto-indexes (since `db_index=True` wa
 
 For Plain's own packages: create explicit migrations in each package that drop the redundant FK auto-indexes.
 
+## Design decision: always index FK columns
+
+Aligning with PlanetScale's database-skills guidance: **always index FK columns, no exceptions.**
+
+The Postgres docs say "often a good idea... because this is not always needed" — but we're choosing the stricter rule because:
+
+1. It's indisputable — no judgment calls about on_delete behavior or parent deletion frequency
+2. The preflight check stays simple: missing FK index = warning, always
+3. The diagnose `check_unused_indexes` already excludes sole-FK-coverage indexes from findings (even at 0 scans), so it won't contradict the preflight rule
+4. Write overhead of a single B-tree index on a FK column is negligible compared to the risk of a seq scan + lock during an unexpected parent DELETE on a large table
+
+**Key research finding**: FK enforcement scans (the RI trigger `SELECT ... FOR KEY SHARE` query) go through the normal Postgres executor and ARE counted in `pg_stat_user_indexes.idx_scan`. An FK index with `idx_scan = 0` truly has zero scans from all sources. But even so, we keep it — the index is insurance against future parent operations, and the cost of maintaining it is low.
+
+This means the upgrade path (step 3) always adds explicit indexes for uncovered FK columns — no "is this one worth indexing?" analysis needed.
+
 ## Open questions
 
 - Should we also remove auto-indexing from other relation fields (OneToOneField)?
