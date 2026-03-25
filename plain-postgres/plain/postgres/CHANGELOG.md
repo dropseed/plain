@@ -11,17 +11,11 @@
 
 ### Upgrade instructions
 
-Run `/plain-upgrade` — it handles this automatically:
+1. Remove any `db_index=False` from FK fields in models and migration files — the parameter no longer exists.
 
-1. Adds explicit `Index` declarations for uncovered FK fields
-2. Generates migrations with `DROP INDEX IF EXISTS` to clean up orphan auto-indexes
-3. Removes `db_index=False` from FK fields and migration files
+2. For each `ForeignKeyField`, check if it's covered by an explicit `Index` or `UniqueConstraint` (with the FK as the leading field). Most FK columns should have an index.
 
-**Manual steps (if not using `/plain-upgrade`):**
-
-1. For each `ForeignKeyField`, check if it's covered by an explicit `Index` or `UniqueConstraint` (with the FK as the leading field).
-
-2. **If uncovered**, add an explicit index:
+3. **If uncovered**, add an explicit index:
 
     ```python
     model_options = postgres.Options(
@@ -31,7 +25,7 @@ Run `/plain-upgrade` — it handles this automatically:
     )
     ```
 
-3. Run `makemigrations`. Before the `AddIndex` operation, add a `RunSQL` to drop the orphan auto-index left behind by the old `db_index=True` default:
+4. Run `makemigrations`. Before the `AddIndex` operation, add a `RunSQL` to drop the orphan auto-index left behind by the old `db_index=True` default:
 
     ```python
     operations = [
@@ -40,17 +34,15 @@ Run `/plain-upgrade` — it handles this automatically:
     ]
     ```
 
-    Find orphan index names by running `plain postgres schema --check`.
+    The old auto-index name follows the pattern `{table}_{column}_{hash}`. Find orphan names by running `plain postgres schema`.
 
-4. **If already covered** by a composite index or unique constraint, generate a migration to drop the orphan:
+5. **If already covered** by a composite index or unique constraint, the orphan auto-index is redundant. Generate a migration to drop it:
 
     ```python
     operations = [
         migrations.RunSQL('DROP INDEX IF EXISTS "myapp_mymodel_author_id_abc12345"'),
     ]
     ```
-
-5. Remove any `db_index=False` from FK fields in models and migration files — the parameter no longer exists.
 
 6. Run `migrate`.
 
