@@ -25,18 +25,14 @@ class Index:
     def __init__(
         self,
         *expressions: Any,
+        name: str,
         fields: tuple[str, ...] | list[str] = (),
-        name: str | None = None,
         opclasses: tuple[str, ...] | list[str] = (),
         condition: Q | None = None,
         include: tuple[str, ...] | list[str] | None = None,
     ) -> None:
-        if opclasses and not name:
-            raise ValueError("An index must be named to use opclasses.")
         if not isinstance(condition, NoneType | Q):
             raise ValueError("Index.condition must be a Q instance.")
-        if condition and not name:
-            raise ValueError("An index must be named to use condition.")
         if not isinstance(fields, list | tuple):
             raise ValueError("Index.fields must be a list or tuple.")
         if not isinstance(opclasses, list | tuple):
@@ -49,8 +45,6 @@ class Index:
             raise ValueError(
                 "Index.fields and expressions are mutually exclusive.",
             )
-        if expressions and not name:
-            raise ValueError("An index must be named to use expressions.")
         if expressions and opclasses:
             raise ValueError(
                 "Index.opclasses cannot be used with expressions. Use "
@@ -63,8 +57,6 @@ class Index:
             )
         if fields and not all(isinstance(field, str) for field in fields):
             raise ValueError("Index.fields must contain only strings with field names.")
-        if include and not name:
-            raise ValueError("A covering index must be named.")
         if not isinstance(include, NoneType | list | tuple):
             raise ValueError("Index.include must be a list or tuple.")
         self.fields = list(fields)
