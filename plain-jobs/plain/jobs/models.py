@@ -84,7 +84,6 @@ class JobRequest(postgres.Model):
             postgres.Index(fields=["queue"]),
             postgres.Index(fields=["start_at"]),
             postgres.Index(fields=["concurrency_key"]),
-            postgres.Index(fields=["job_class"]),
             postgres.Index(fields=["trace_id"]),
             postgres.Index(fields=["uuid"]),
             # Used for job grouping queries
@@ -193,7 +192,6 @@ class JobProcess(postgres.Model):
             postgres.Index(fields=["queue"]),
             postgres.Index(fields=["concurrency_key"]),
             postgres.Index(fields=["started_at"]),
-            postgres.Index(fields=["job_class"]),
             postgres.Index(fields=["job_request_uuid"]),
             postgres.Index(fields=["trace_id"]),
             postgres.Index(fields=["uuid"]),

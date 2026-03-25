@@ -19,7 +19,9 @@ def validate_flag_name(value: str) -> None:
 class FlagResult(postgres.Model):
     created_at: datetime = types.DateTimeField(auto_now_add=True)
     updated_at: datetime = types.DateTimeField(auto_now=True)
-    flag: Flag = types.ForeignKeyField("Flag", on_delete=postgres.CASCADE)
+    flag: Flag = types.ForeignKeyField(
+        "Flag", on_delete=postgres.CASCADE, db_index=False
+    )
     key: str = types.CharField(max_length=255)
     value = types.JSONField()
 
