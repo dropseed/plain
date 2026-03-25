@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.34.0](https://github.com/dropseed/plain/releases/plain-redirection@0.34.0) (2026-03-25)
+
+### What's changed
+
+- Added explicit `Index` on `RedirectLog.redirect` FK field — replaces the old auto-created index from `db_index=True`. Migration drops the orphan auto-index and creates the new named index. ([061b97f5d538](https://github.com/dropseed/plain/commit/061b97f5d538))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.89.0`. Run `uv run plain postgres migrate`.
+
 ## [0.33.1](https://github.com/dropseed/plain/releases/plain-redirection@0.33.1) (2026-03-25)
 
 ### What's changed
