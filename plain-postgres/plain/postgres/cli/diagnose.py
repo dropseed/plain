@@ -827,6 +827,21 @@ def format_human(
             dim=True,
         )
 
+    # Slow queries
+    slow_queries = context.get("slow_queries", [])
+    if slow_queries:
+        click.echo()
+        click.secho("  Slowest queries (by total time)", bold=True)
+        for q in slow_queries:
+            click.echo(
+                f"    {q['total_time_ms']:>10.0f}ms total"
+                f"  {q['mean_time_ms']:>8.0f}ms avg"
+                f"  {q['calls']:>8,} calls"
+                f"  ({q['pct_total_time']:.1f}%)"
+            )
+            query_preview = q["query"].replace("\n", " ").strip()
+            click.secho(f"      {query_preview}", dim=True)
+
     # Footer
     click.echo()
     stats_reset = context.get("stats_reset")
