@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.46.4](https://github.com/dropseed/plain/releases/plain-jobs@0.46.4) (2026-03-25)
+
+### What's changed
+
+- Removed duplicate `job_class` indexes from `JobRequest` and `JobProcess` — these single-column indexes were redundant with existing composite indexes that share the same leading column. Adds migration to drop both ([262ad569d5df](https://github.com/dropseed/plain/commit/262ad569d5df))
+
+### Upgrade instructions
+
+- Run `uv run plain postgres migrate` to apply the migration.
+
 ## [0.46.3](https://github.com/dropseed/plain/releases/plain-jobs@0.46.3) (2026-03-20)
 
 ### What's changed
