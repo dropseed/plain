@@ -79,10 +79,18 @@ class Trace(postgres.Model):
             )
         ],
         indexes=[
-            postgres.Index(fields=["trace_id"]),
-            postgres.Index(fields=["start_time"]),
-            postgres.Index(fields=["request_id"]),
-            postgres.Index(fields=["session_id"]),
+            postgres.Index(
+                name="plainobserver_trace_trace_id_idx", fields=["trace_id"]
+            ),
+            postgres.Index(
+                name="plainobserver_trace_start_time_idx", fields=["start_time"]
+            ),
+            postgres.Index(
+                name="plainobserver_trace_request_id_idx", fields=["request_id"]
+            ),
+            postgres.Index(
+                name="plainobserver_trace_session_id_idx", fields=["session_id"]
+            ),
         ],
     )
 
@@ -351,8 +359,10 @@ class Span(postgres.Model):
             )
         ],
         indexes=[
-            postgres.Index(fields=["span_id"]),
-            postgres.Index(fields=["start_time"]),
+            postgres.Index(name="plainobserver_span_span_id_idx", fields=["span_id"]),
+            postgres.Index(
+                name="plainobserver_span_start_time_idx", fields=["start_time"]
+            ),
         ],
     )
 
@@ -532,8 +542,15 @@ class Log(postgres.Model):
     model_options = postgres.Options(
         ordering=["timestamp"],
         indexes=[
-            postgres.Index(fields=["trace", "timestamp"]),
-            postgres.Index(fields=["trace", "span"]),
-            postgres.Index(fields=["timestamp"]),
+            postgres.Index(
+                name="plainobserver_log_trace_id_timestamp_idx",
+                fields=["trace", "timestamp"],
+            ),
+            postgres.Index(
+                name="plainobserver_log_trace_id_span_id_idx", fields=["trace", "span"]
+            ),
+            postgres.Index(
+                name="plainobserver_log_timestamp_idx", fields=["timestamp"]
+            ),
         ],
     )

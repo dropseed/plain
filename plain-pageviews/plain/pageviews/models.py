@@ -54,12 +54,22 @@ class Pageview(postgres.Model):
     model_options = postgres.Options(
         ordering=["-timestamp"],
         indexes=[
-            postgres.Index(fields=["timestamp"]),
-            postgres.Index(fields=["user_id"]),
-            postgres.Index(fields=["session_id"]),
-            postgres.Index(fields=["url"]),
-            postgres.Index(fields=["source"]),
-            postgres.Index(fields=["medium"]),
+            postgres.Index(
+                name="plainpageviews_pageview_timestamp_idx", fields=["timestamp"]
+            ),
+            postgres.Index(
+                name="plainpageviews_pageview_user_id_idx", fields=["user_id"]
+            ),
+            postgres.Index(
+                name="plainpageviews_pageview_session_id_idx", fields=["session_id"]
+            ),
+            postgres.Index(name="plainpageviews_pageview_url_idx", fields=["url"]),
+            postgres.Index(
+                name="plainpageviews_pageview_source_idx", fields=["source"]
+            ),
+            postgres.Index(
+                name="plainpageviews_pageview_medium_idx", fields=["medium"]
+            ),
         ],
     )
 

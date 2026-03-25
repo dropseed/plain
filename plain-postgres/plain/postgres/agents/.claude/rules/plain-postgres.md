@@ -62,6 +62,7 @@ Run `uv run plain docs postgres --section querying` for full patterns with code 
 ## Schema Design
 
 - Index fields used in `.filter()` and `.order_by()`
+- `Index` requires a `name` argument — use `{table}_{column(s)}_idx` (e.g., `plainjobs_jobrequest_priority_idx`, `plainobserver_log_trace_id_timestamp_idx`)
 - Use `UniqueConstraint` in constraints, not `unique=True` on fields
 - Choose `on_delete` deliberately: CASCADE for children, PROTECT for referenced data
 - No `allow_null` on string fields — use `default=""`

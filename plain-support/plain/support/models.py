@@ -30,6 +30,9 @@ class SupportFormEntry(postgres.Model):
     model_options = postgres.Options(
         ordering=["-created_at"],
         indexes=[
-            postgres.Index(fields=["created_at"]),
+            postgres.Index(
+                name="plainsupport_supportformentry_created_at_idx",
+                fields=["created_at"],
+            ),
         ],
     )

@@ -79,13 +79,24 @@ class JobRequest(postgres.Model):
     model_options = postgres.Options(
         ordering=["-priority", "-created_at"],
         indexes=[
-            postgres.Index(fields=["priority"]),
-            postgres.Index(fields=["created_at"]),
-            postgres.Index(fields=["queue"]),
-            postgres.Index(fields=["start_at"]),
-            postgres.Index(fields=["concurrency_key"]),
-            postgres.Index(fields=["trace_id"]),
-            postgres.Index(fields=["uuid"]),
+            postgres.Index(
+                name="plainjobs_jobrequest_priority_idx", fields=["priority"]
+            ),
+            postgres.Index(
+                name="plainjobs_jobrequest_created_at_idx", fields=["created_at"]
+            ),
+            postgres.Index(name="plainjobs_jobrequest_queue_idx", fields=["queue"]),
+            postgres.Index(
+                name="plainjobs_jobrequest_start_at_idx", fields=["start_at"]
+            ),
+            postgres.Index(
+                name="plainjobs_jobrequest_concurrency_key_idx",
+                fields=["concurrency_key"],
+            ),
+            postgres.Index(
+                name="plainjobs_jobrequest_trace_id_idx", fields=["trace_id"]
+            ),
+            postgres.Index(name="plainjobs_jobrequest_uuid_idx", fields=["uuid"]),
             # Used for job grouping queries
             postgres.Index(
                 name="job_request_concurrency_key",
@@ -188,13 +199,25 @@ class JobProcess(postgres.Model):
     model_options = postgres.Options(
         ordering=["-created_at"],
         indexes=[
-            postgres.Index(fields=["created_at"]),
-            postgres.Index(fields=["queue"]),
-            postgres.Index(fields=["concurrency_key"]),
-            postgres.Index(fields=["started_at"]),
-            postgres.Index(fields=["job_request_uuid"]),
-            postgres.Index(fields=["trace_id"]),
-            postgres.Index(fields=["uuid"]),
+            postgres.Index(
+                name="plainjobs_jobprocess_created_at_idx", fields=["created_at"]
+            ),
+            postgres.Index(name="plainjobs_jobprocess_queue_idx", fields=["queue"]),
+            postgres.Index(
+                name="plainjobs_jobprocess_concurrency_key_idx",
+                fields=["concurrency_key"],
+            ),
+            postgres.Index(
+                name="plainjobs_jobprocess_started_at_idx", fields=["started_at"]
+            ),
+            postgres.Index(
+                name="plainjobs_jobprocess_job_request_uuid_idx",
+                fields=["job_request_uuid"],
+            ),
+            postgres.Index(
+                name="plainjobs_jobprocess_trace_id_idx", fields=["trace_id"]
+            ),
+            postgres.Index(name="plainjobs_jobprocess_uuid_idx", fields=["uuid"]),
             # Used for job grouping queries
             postgres.Index(
                 name="job_concurrency_key",
@@ -533,16 +556,32 @@ class JobResult(postgres.Model):
     model_options = postgres.Options(
         ordering=["-created_at"],
         indexes=[
-            postgres.Index(fields=["created_at"]),
-            postgres.Index(fields=["job_process_uuid"]),
-            postgres.Index(fields=["started_at"]),
-            postgres.Index(fields=["ended_at"]),
-            postgres.Index(fields=["status"]),
-            postgres.Index(fields=["job_request_uuid"]),
-            postgres.Index(fields=["job_class"]),
-            postgres.Index(fields=["queue"]),
-            postgres.Index(fields=["trace_id"]),
-            postgres.Index(fields=["uuid"]),
+            postgres.Index(
+                name="plainjobs_jobresult_created_at_idx", fields=["created_at"]
+            ),
+            postgres.Index(
+                name="plainjobs_jobresult_job_process_uuid_idx",
+                fields=["job_process_uuid"],
+            ),
+            postgres.Index(
+                name="plainjobs_jobresult_started_at_idx", fields=["started_at"]
+            ),
+            postgres.Index(
+                name="plainjobs_jobresult_ended_at_idx", fields=["ended_at"]
+            ),
+            postgres.Index(name="plainjobs_jobresult_status_idx", fields=["status"]),
+            postgres.Index(
+                name="plainjobs_jobresult_job_request_uuid_idx",
+                fields=["job_request_uuid"],
+            ),
+            postgres.Index(
+                name="plainjobs_jobresult_job_class_idx", fields=["job_class"]
+            ),
+            postgres.Index(name="plainjobs_jobresult_queue_idx", fields=["queue"]),
+            postgres.Index(
+                name="plainjobs_jobresult_trace_id_idx", fields=["trace_id"]
+            ),
+            postgres.Index(name="plainjobs_jobresult_uuid_idx", fields=["uuid"]),
         ],
         constraints=[
             postgres.UniqueConstraint(

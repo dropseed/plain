@@ -19,7 +19,9 @@ class Session(postgres.Model):
 
     model_options = postgres.Options(
         indexes=[
-            postgres.Index(fields=["expires_at"]),
+            postgres.Index(
+                name="plainsessions_session_expires_at_idx", fields=["expires_at"]
+            ),
         ],
         constraints=[
             postgres.UniqueConstraint(fields=["session_key"], name="unique_session_key")

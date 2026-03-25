@@ -35,8 +35,12 @@ class Redirect(postgres.Model):
     model_options = postgres.Options(
         ordering=["order", "-created_at"],
         indexes=[
-            postgres.Index(fields=["order"]),
-            postgres.Index(fields=["created_at"]),
+            postgres.Index(
+                name="plainredirection_redirect_order_idx", fields=["order"]
+            ),
+            postgres.Index(
+                name="plainredirection_redirect_created_at_idx", fields=["created_at"]
+            ),
         ],
         constraints=[
             postgres.UniqueConstraint(
@@ -101,7 +105,10 @@ class RedirectLog(postgres.Model):
     model_options = postgres.Options(
         ordering=["-created_at"],
         indexes=[
-            postgres.Index(fields=["created_at"]),
+            postgres.Index(
+                name="plainredirection_redirectlog_created_at_idx",
+                fields=["created_at"],
+            ),
         ],
     )
 
@@ -143,7 +150,10 @@ class NotFoundLog(postgres.Model):
     model_options = postgres.Options(
         ordering=["-created_at"],
         indexes=[
-            postgres.Index(fields=["created_at"]),
+            postgres.Index(
+                name="plainredirection_notfoundlog_created_at_idx",
+                fields=["created_at"],
+            ),
         ],
     )
 

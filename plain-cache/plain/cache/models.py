@@ -33,7 +33,9 @@ class CachedItem(postgres.Model):
 
     model_options = postgres.Options(
         indexes=[
-            postgres.Index(fields=["expires_at"]),
+            postgres.Index(
+                name="plaincache_cacheditem_expires_at_idx", fields=["expires_at"]
+            ),
         ],
         constraints=[
             postgres.UniqueConstraint(

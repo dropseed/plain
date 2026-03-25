@@ -19,8 +19,8 @@ __all__ = ["Index"]
 
 class Index:
     suffix = "idx"
-    # The max length of the name of the index
-    max_name_length = 30
+    # Postgres identifier limit: NAMEDATALEN - 1 = 63
+    max_name_length = 63
 
     def __init__(
         self,
