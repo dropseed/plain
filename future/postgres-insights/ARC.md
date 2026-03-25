@@ -8,11 +8,8 @@ Unlike rails-pg-extras or pgHero, Plain can connect Postgres catalog stats back 
 
 - [x] [diagnose-command](diagnose-command.md)
 - [x] [preflight-index-checks](preflight-index-checks.md)
+- [x] [agent-skill](agent-skill.md)
 - [ ] [fk-remove-auto-index](fk-remove-auto-index.md)
-- [ ] [insight-commands](insight-commands.md)
-- [ ] [preflight-checks](preflight-checks.md)
-- [ ] [agent-skill](agent-skill.md)
-- [ ] [admin-dashboard](admin-dashboard.md)
 
 ## Industry context
 
