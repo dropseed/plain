@@ -1,5 +1,15 @@
 # plainx-dev changelog
 
+## [0.1.3](https://github.com/dropseed/plain/releases/plainx-dev@0.1.3) (2026-03-25)
+
+### What's changed
+
+- Added `SettingsReference` migration warning rule — reminds package developers to fix auto-generated migrations that hardcode the host app's concrete model instead of using `settings.AUTH_USER_MODEL` ([bd5bfc3ec9cf](https://github.com/dropseed/plain/commit/bd5bfc3ec9cf))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.2](https://github.com/dropseed/plain/releases/plainx-dev@0.1.2) (2026-03-24)
 
 ### What's changed
