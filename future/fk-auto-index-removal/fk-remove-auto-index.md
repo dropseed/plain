@@ -7,35 +7,27 @@ related:
 
 # Remove auto-indexing on ForeignKey fields
 
-Remove `db_index` parameter from ForeignKeyField entirely. FK fields create no indexes on their own. If you want a FK column indexed, declare an explicit `Index(fields=["field"], name="...")`.
+Done. `db_index` parameter fully removed from `ForeignKeyField`. FK fields create no indexes on their own — declare an explicit `Index(fields=["field"], name="...")`.
 
-## Implementation
+## What was done
 
-1. Remove `db_index` parameter from `ForeignKeyField.__init__` (keep as ignored kwarg with `False` default for migration file compatibility)
-2. Remove `db_index` from `deconstruct()`
-3. Set `self.db_index = False` unconditionally
-4. Remove auto-indexing from schema editor (`_field_should_be_indexed` returns `False`)
-5. Remove dead `db_index` handling in `_alter_field`
-6. Remove `db_index` skip in `CheckMissingFKIndexes` preflight
-7. Remove auto FK index collection from `_collect_model_indexes` preflight helper
-
-**Verified**: `makemigrations --dry-run` detects no changes after this — historical migrations never stored `db_index=True`.
+1. Removed `db_index` parameter from `ForeignKeyField.__init__` entirely
+2. Removed `db_index` from `deconstruct()`
+3. Removed `_field_should_be_indexed` (always returned `False`, now deleted)
+4. Removed db_index add/remove blocks from `_alter_field` in schema editor
+5. Removed `db_index` skip in `CheckMissingFKIndexes` preflight
+6. Removed auto FK index collection from `_collect_model_indexes` preflight helper
+7. Simplified Postgres-specific like-index blocks to primary-key-only
+8. Added explicit FK indexes to 4 uncovered framework packages (oauth, support, redirection, observer)
+9. Migration files use `DROP INDEX IF EXISTS "old_auto_name"` + `AddIndex` to handle orphan cleanup
 
 ## Upgrade path
 
-The `/plain-upgrade` skill:
+The `/plain-upgrade` skill should:
 
 1. For each FK field, check if covered by a declared `Index` or `UniqueConstraint`
-2. **If uncovered**: add `Index(fields=["field"], name="table_column_idx")` to the model, generate `SeparateDatabaseAndState` to adopt the orphan auto-index into state and rename it (instant `ALTER INDEX RENAME`)
+2. **If uncovered**: add `Index(fields=["field"], name="table_column_idx")`, generate `RunSQL('DROP INDEX IF EXISTS "old_auto_name"')` + `AddIndex`
 3. **If covered**: generate `RunSQL('DROP INDEX IF EXISTS "old_auto_name"')` to clean up the redundant orphan
-4. Remove any `db_index=False` from FK fields (parameter no longer exists)
+4. Remove any `db_index=False` from FK fields and migration files (parameter no longer exists)
 
-Old auto-index names reconstructed via `names_digest` — deterministic, verified.
-
-## Design decision: always index FK columns
-
-Aligning with PlanetScale's database-skills guidance: **always index FK columns, no exceptions.**
-
-FK enforcement scans go through the normal Postgres executor and ARE counted in `pg_stat_user_indexes.idx_scan`. An FK index with `idx_scan = 0` truly has zero scans from all sources. But we keep it — insurance against future parent operations.
-
-The preflight `missing_fk_indexes` check enforces this: any uncovered FK = warning. The diagnose `check_unused_indexes` excludes sole-FK-coverage indexes from findings.
+Old auto-index names reconstructed via `_create_index_name` / `names_digest` — deterministic.

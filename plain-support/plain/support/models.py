@@ -34,5 +34,9 @@ class SupportFormEntry(postgres.Model):
                 name="plainsupport_supportformentry_created_at_idx",
                 fields=["created_at"],
             ),
+            postgres.Index(
+                name="plainsupport_supportformentry_user_id_idx",
+                fields=["user"],
+            ),
         ],
     )

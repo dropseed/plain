@@ -339,7 +339,6 @@ class ForeignKeyField(RelatedField):
         on_delete: Any,
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
-        db_index: bool = True,
         db_constraint: bool = True,
         **kwargs: Any,
     ):
@@ -367,7 +366,6 @@ class ForeignKeyField(RelatedField):
             limit_choices_to=limit_choices_to,
             **kwargs,
         )
-        self.db_index = db_index
         self.db_constraint = db_constraint
 
     def __copy__(self) -> ForeignKeyField:
@@ -555,9 +553,6 @@ class ForeignKeyField(RelatedField):
                 kwargs["to"] = self.remote_field.model.lower()
         else:
             kwargs["to"] = self.remote_field.model.model_options.label_lower
-
-        if self.db_index is not True:
-            kwargs["db_index"] = self.db_index
 
         if self.db_constraint is not True:
             kwargs["db_constraint"] = self.db_constraint

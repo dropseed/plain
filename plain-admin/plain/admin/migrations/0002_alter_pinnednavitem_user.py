@@ -17,7 +17,6 @@ class Migration(migrations.Migration):
             model_name="pinnednavitem",
             name="user",
             field=postgres.ForeignKeyField(
-                db_index=False,
                 on_delete=plain.postgres.deletion.CASCADE,
                 to=settings.AUTH_USER_MODEL,
             ),

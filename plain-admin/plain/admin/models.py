@@ -14,7 +14,6 @@ class PinnedNavItem(postgres.Model):
     user = types.ForeignKeyField(
         SettingsReference("AUTH_USER_MODEL"),
         on_delete=postgres.CASCADE,
-        db_index=False,
     )
     view_slug: str = types.CharField(max_length=255)
     order: int = types.SmallIntegerField(default=0)

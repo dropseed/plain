@@ -15,7 +15,6 @@ class Migration(migrations.Migration):
             model_name="flagresult",
             name="flag",
             field=postgres.ForeignKeyField(
-                db_index=False,
                 on_delete=plain.postgres.deletion.CASCADE,
                 to="plainflags.flag",
             ),

@@ -38,14 +38,6 @@ def _collect_model_indexes(model: Any) -> list[tuple[str, list[str], bool]]:
         if isinstance(constraint, UniqueConstraint) and constraint.fields:
             all_indexes.append((constraint.name, list(constraint.fields), True))
 
-    for field in model._model_meta.local_fields:
-        if (
-            isinstance(field, ForeignKeyField)
-            and field.db_index
-            and not field.primary_key
-        ):
-            all_indexes.append((f"{field.name} (auto)", [field.name], False))
-
     return all_indexes
 
 
@@ -378,7 +370,6 @@ class CheckMissingFKIndexes(PreflightCheck):
                     isinstance(field, ForeignKeyField)
                     and not field.primary_key
                     and field.name not in covered_fields
-                    and not field.db_index
                 ):
                     results.append(
                         PreflightResult(

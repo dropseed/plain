@@ -27,7 +27,6 @@ class Migration(migrations.Migration):
             model_name="log",
             name="trace",
             field=postgres.ForeignKeyField(
-                db_index=False,
                 on_delete=plain.postgres.deletion.CASCADE,
                 to="plainobserver.trace",
             ),
@@ -36,7 +35,6 @@ class Migration(migrations.Migration):
             model_name="span",
             name="trace",
             field=postgres.ForeignKeyField(
-                db_index=False,
                 on_delete=plain.postgres.deletion.CASCADE,
                 to="plainobserver.trace",
             ),

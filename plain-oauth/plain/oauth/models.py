@@ -49,6 +49,11 @@ class OAuthConnection(postgres.Model):
     query: postgres.QuerySet[OAuthConnection] = postgres.QuerySet()
 
     model_options = postgres.Options(
+        indexes=[
+            postgres.Index(
+                name="plainoauth_oauthconnection_user_id_idx", fields=["user"]
+            ),
+        ],
         constraints=[
             postgres.UniqueConstraint(
                 fields=["provider_key", "provider_user_id"],

@@ -109,6 +109,10 @@ class RedirectLog(postgres.Model):
                 name="plainredirection_redirectlog_created_at_idx",
                 fields=["created_at"],
             ),
+            postgres.Index(
+                name="plainredirection_redirectlog_redirect_id_idx",
+                fields=["redirect"],
+            ),
         ],
     )
 

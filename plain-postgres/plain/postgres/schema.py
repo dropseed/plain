@@ -951,41 +951,6 @@ class DatabaseSchemaEditor:
                             self.sql_delete_fk, new_rel.related_model, fk_name
                         )
                     )
-        # Removed an index? (no strict check, as multiple indexes are possible)
-        # Remove indexes if db_index switched to False or a unique constraint
-        # will now be used in lieu of an index. The following lines from the
-        # truth table show all True cases; the rest are False:
-        #
-        # old_field.db_index | old_field.primary_key | new_field.db_index | new_field.primary_key
-        # ------------------------------------------------------------------------------
-        # True               | False            | False              | False
-        # True               | False            | False              | True
-        # True               | False            | True               | True
-        if (
-            isinstance(old_field, ForeignKeyField)
-            and old_field.db_index
-            and not old_field.primary_key
-            and (
-                not (isinstance(new_field, ForeignKeyField) and new_field.db_index)
-                or new_field.primary_key
-            )
-        ):
-            # Find the index for this field
-            meta_index_names = {index.name for index in model.model_options.indexes}
-            # Retrieve only BTREE indexes since this is what's created with
-            # db_index=True.
-            index_names = self._constraint_names(
-                model,
-                [old_field.column],
-                index=True,
-                type_=Index.suffix,
-                exclude=meta_index_names,
-            )
-            for index_name in index_names:
-                # The only way to check if an index was created with
-                # db_index=True or with Index(['field'], name='foo')
-                # is to look at its name (refs #28053).
-                self.execute(self._delete_index_sql(model, index_name))
         # Change check constraints?
         old_db_check = self._field_db_check(old_field, old_db_params)
         new_db_check = self._field_db_check(new_field, new_db_params)
@@ -1109,25 +1074,6 @@ class DatabaseSchemaEditor:
         if old_field.primary_key and not new_field.primary_key:
             self._delete_primary_key(model, strict)
 
-        # Added an index? Add an index if db_index switched to True or a unique
-        # constraint will no longer be used in lieu of an index. The following
-        # lines from the truth table show all True cases; the rest are False:
-        #
-        # old_field.db_index | old_field.primary_key | new_field.db_index | new_field.primary_key
-        # ------------------------------------------------------------------------------
-        # False              | False            | True               | False
-        # False              | True             | True               | False
-        # True               | True             | True               | False
-        if (
-            (
-                not (isinstance(old_field, ForeignKeyField) and old_field.db_index)
-                or old_field.primary_key
-            )
-            and isinstance(new_field, ForeignKeyField)
-            and new_field.db_index
-            and not new_field.primary_key
-        ):
-            self.execute(self._create_index_sql(model, fields=[new_field]))
         # Type alteration on primary key? Then we need to alter the column
         # referring to us.
         rels_to_update = []
@@ -1201,24 +1147,14 @@ class DatabaseSchemaEditor:
             }
             self.execute(sql, params)
 
-        # Added an index? Create any PostgreSQL-specific indexes.
-        if (
-            not (
-                (isinstance(old_field, ForeignKeyField) and old_field.db_index)
-                or old_field.primary_key
-            )
-            and isinstance(new_field, ForeignKeyField)
-            and new_field.db_index
-        ) or (not old_field.primary_key and new_field.primary_key):
+        # Added a primary key? Create any PostgreSQL-specific indexes.
+        if not old_field.primary_key and new_field.primary_key:
             like_index_statement = self._create_like_index_sql(model, new_field)
             if like_index_statement is not None:
                 self.execute(like_index_statement)
 
-        # Removed an index? Drop any PostgreSQL-specific indexes.
-        if old_field.primary_key and not (
-            (isinstance(new_field, ForeignKeyField) and new_field.db_index)
-            or new_field.primary_key
-        ):
+        # Removed a primary key? Drop any PostgreSQL-specific indexes.
+        if old_field.primary_key and not new_field.primary_key:
             index_to_remove = self._create_index_name(
                 model.model_options.db_table, [old_field.column], suffix="_like"
             )
@@ -1570,8 +1506,6 @@ class DatabaseSchemaEditor:
         Return a list of all index SQL statements for the specified field.
         """
         output: list[Statement] = []
-        if self._field_should_be_indexed(model, field):
-            output.append(self._create_index_sql(model, fields=[field]))
         # Add LIKE index for varchar/text primary keys
         like_index_statement = self._create_like_index_sql(model, field)
         if like_index_statement is not None:
@@ -1631,11 +1565,6 @@ class DatabaseSchemaEditor:
             old_args,
             old_kwargs,
         ) != (new_path, new_args, new_kwargs)
-
-    def _field_should_be_indexed(self, model: type[Model], field: Field) -> bool:
-        if isinstance(field, ForeignKeyField):
-            return bool(field.remote_field) and field.db_index and not field.primary_key
-        return False
 
     def _field_became_primary_key(self, old_field: Field, new_field: Field) -> bool:
         return not old_field.primary_key and new_field.primary_key
