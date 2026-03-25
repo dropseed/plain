@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.35.0](https://github.com/dropseed/plain/releases/plain-flags@0.35.0) (2026-03-25)
+
+### What's changed
+
+- Removed `db_index=False` from `FlagResult.flag` FK field — the `db_index` parameter no longer exists on `ForeignKeyField`. The flag FK is already covered by the `UniqueConstraint` on `["flag", "key"]`. ([061b97f5d538](https://github.com/dropseed/plain/commit/061b97f5d538))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.89.0`. Run `uv run plain postgres migrate`.
+
 ## [0.34.2](https://github.com/dropseed/plain/releases/plain-flags@0.34.2) (2026-03-25)
 
 ### What's changed
