@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.32.0](https://github.com/dropseed/plain/releases/plain-observer@0.32.0) (2026-03-25)
+
+### What's changed
+
+- Removed `db_index=False` from `Span.trace` and `Log.trace` FK fields — the `db_index` parameter no longer exists on `ForeignKeyField`. Both are already covered by existing composite indexes/constraints. ([061b97f5d538](https://github.com/dropseed/plain/commit/061b97f5d538))
+- Added explicit `Index` on `Log.span` FK field — replaces the old auto-created index. Migration drops the orphan auto-index and creates the new named index. ([061b97f5d538](https://github.com/dropseed/plain/commit/061b97f5d538))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.89.0`. Run `uv run plain postgres migrate`.
+
 ## [0.31.3](https://github.com/dropseed/plain/releases/plain-observer@0.31.3) (2026-03-25)
 
 ### What's changed
