@@ -19,6 +19,8 @@ _TYPE_ALIASES: dict[str, str] = {
     "int8": "bigint",
     "float4": "real",
     "float8": "double precision",
+    "time": "time without time zone",
+    "timestamp": "timestamp without time zone",
     "timestamptz": "timestamp with time zone",
     "timetz": "time with time zone",
     "serial": "integer",
@@ -172,9 +174,7 @@ def _show_model(conn: Any, cursor: Any, model: Any) -> int:
 
     # Unique constraints
     model_constraints = [
-        c
-        for c in model.model_options.constraints
-        if isinstance(c, UniqueConstraint) and c.fields
+        c for c in model.model_options.constraints if isinstance(c, UniqueConstraint)
     ]
     extra_constraints = actual_unique.keys() - {c.name for c in model_constraints}
 
@@ -183,7 +183,10 @@ def _show_model(conn: Any, cursor: Any, model: Any) -> int:
         click.secho("  Constraints:", dim=True)
 
     for constraint in model_constraints:
-        fields_str = ", ".join(constraint.fields)
+        if constraint.fields:
+            fields_str = ", ".join(constraint.fields)
+        else:
+            fields_str = "expressions"
         click.echo(f"    {constraint.name}  UNIQUE ({fields_str})", nl=False)
 
         if constraint.name not in actual_unique:

@@ -109,7 +109,7 @@ DATA_TYPES: dict[str, Any] = {
     "CharField": _get_varchar_column,
     "DateField": "date",
     "DateTimeField": "timestamp with time zone",
-    "DecimalField": "numeric(%(max_digits)s, %(decimal_places)s)",
+    "DecimalField": "numeric(%(max_digits)s,%(decimal_places)s)",
     "DurationField": "interval",
     "FloatField": "double precision",
     "IntegerField": "integer",
