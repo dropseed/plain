@@ -287,7 +287,7 @@ class CheckDatabaseTables(PreflightCheck):
             PreflightResult(
                 fix=f"Unknown tables in default database: {table_names}. "
                 "Tables may be from packages/models that have been uninstalled. "
-                "Make sure you have a backup, then run `plain db drop-unknown-tables` to remove them.",
+                "Make sure you have a backup, then run `plain postgres drop-unknown-tables` to remove them.",
                 id="postgres.unknown_database_tables",
                 warning=True,
             )

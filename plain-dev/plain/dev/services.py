@@ -30,7 +30,7 @@ def auto_start_services() -> None:
 
     # Only auto-start services for commands that need the database/runtime
     service_commands = {
-        "db",
+        "postgres",
         "dev",
         "makemigrations",
         "migrate",

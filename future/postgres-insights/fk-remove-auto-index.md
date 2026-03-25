@@ -14,12 +14,12 @@ Remove `db_index` parameter from ForeignKeyField entirely. FK fields create no i
 ## Why this is safe
 
 1. **Preflight check catches missing coverage** — a code-level preflight warning detects FK columns that aren't the leading column of any declared index or constraint (see `preflight-index-checks`)
-2. **`plain db diagnose` catches DB-level gaps** — the missing FK indexes check queries the actual catalog
+2. **`plain postgres diagnose` catches DB-level gaps** — the missing FK indexes check queries the actual catalog
 3. **Most FK columns are already covered** — by UniqueConstraints, composite indexes, or explicit indexes that users would declare anyway
 
 ## Why this is better
 
-- No more redundant indexes from the framework (the `plain db diagnose` command found 8 in Plain's own example app, 16 on a production app)
+- No more redundant indexes from the framework (the `plain postgres diagnose` command found 8 in Plain's own example app, 16 on a production app)
 - Developers are intentional about which FKs get indexed
 - Explicit `Index(fields=["user"])` on a model is clearer than a hidden `db_index=True` default on the field class
 - Fits Plain's philosophy: painfully obvious over clever

@@ -921,19 +921,19 @@ graph TB
 You can run health checks against your database to find issues like missing indexes, redundant indexes, and configuration problems.
 
 ```bash
-uv run plain db diagnose
+uv run plain postgres diagnose
 ```
 
 Use `--json` for structured output (useful for scripting and AI agents):
 
 ```bash
-uv run plain db diagnose --json
+uv run plain postgres diagnose --json
 ```
 
 Use `--all` to include issues in installed packages (by default, only your app's issues are shown):
 
 ```bash
-uv run plain db diagnose --all
+uv run plain postgres diagnose --all
 ```
 
 ### Checks
@@ -963,7 +963,7 @@ Each finding is tagged with its **source**:
 Run diagnose against your **production database** to get meaningful stats. On Heroku:
 
 ```bash
-heroku run -a your-app "plain db diagnose --json"
+heroku run -a your-app "plain postgres diagnose --json"
 ```
 
 The `--json` flag must be quoted so Heroku passes it through to the command.

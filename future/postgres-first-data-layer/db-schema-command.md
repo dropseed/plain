@@ -3,18 +3,18 @@ related:
   - migrations-schema-check
 ---
 
-# db: Schema inspection command
+# Schema inspection command
 
-`plain db schema` for quick inspection of actual database state using model names instead of table names.
+`plain postgres schema` for quick inspection of actual database state using model names instead of table names.
 
 ## Commands
 
-### `plain db schema <ModelName>`
+### `plain postgres schema <ModelName>`
 
 Show column types, constraints, and indexes for a model's table.
 
 ```
-$ plain db schema Organization
+$ plain postgres schema Organization
 
 organizations_organization (16 columns, 247 rows, 96 kB)
 
@@ -38,12 +38,12 @@ organizations_organization (16 columns, 247 rows, 96 kB)
 
 Accepts model name (`Organization`), qualified name (`organizations.Organization`), or table name (`organizations_organization`).
 
-### `plain db tables`
+### `plain postgres tables`
 
 List all tables with row counts and sizes.
 
 ```
-$ plain db tables
+$ plain postgres tables
 
   Table                              Rows    Size
   ──────────────────────────────────────────────────
@@ -57,6 +57,6 @@ $ plain db tables
   18 tables, 14,528 rows, 5.3 MB total
 ```
 
-## Why not just `plain db shell`
+## Why not just `plain postgres shell`
 
-`plain db shell` already exists and opens psql. This is for when you want a quick look without an interactive session — scriptable, uses model names, and could later show expected-vs-actual if `migrations check-schema` is implemented.
+`plain postgres shell` already exists and opens psql. This is for when you want a quick look without an interactive session — scriptable, uses model names, and could later show expected-vs-actual if `migrations check-schema` is implemented.

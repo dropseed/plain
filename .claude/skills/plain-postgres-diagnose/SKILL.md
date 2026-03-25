@@ -11,14 +11,14 @@ Run health checks against the production Postgres database and act on findings l
 
 The diagnose command should run against the **production database**, not the local dev database. Ask the user how they run commands in production if you don't know. Common patterns:
 
-- **Heroku**: `heroku run -a app-name "plain db diagnose --json"`
-- **Direct**: `uv run plain db diagnose --json` (if DATABASE_URL points to production)
+- **Heroku**: `heroku run -a app-name "plain postgres diagnose --json"`
+- **Direct**: `uv run plain postgres diagnose --json` (if DATABASE_URL points to production)
 - **Other platforms**: wrap with the platform's run command
 
 For local/dev analysis, run directly:
 
 ```
-uv run plain db diagnose --json
+uv run plain postgres diagnose --json
 ```
 
 ## 2. Interpret the JSON output

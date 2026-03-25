@@ -5,10 +5,6 @@ related:
 
 # Rename `plain db` → `plain postgres`
 
-The framework is Postgres-only. `plain db` is a generic name inherited from Django's multi-backend world. Rename to `plain postgres` — existing commands (`shell`, `wait`, `drop-unknown-tables`, `backups`) move under it.
+Done. Changed `register_cli("db")` to `register_cli("postgres")`. All commands (`shell`, `wait`, `drop-unknown-tables`, `backups`, `diagnose`) now live under `plain postgres`.
 
-This also creates a natural namespace for Postgres-specific insight commands that wouldn't make sense under a generic `db` prefix.
-
-## Open questions
-
-- `plain postgres` or `plain pg` for brevity? Heroku uses `pg`, but `postgres` is more explicit.
+Went with `plain postgres` over `plain pg` — more explicit, matches the package name.

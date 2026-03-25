@@ -158,7 +158,7 @@ class DevProcess(ProcessManager):
         if find_spec("plain.postgres"):
             print_event("Waiting for database...", newline=False)
             subprocess.run(
-                [sys.executable, "-m", "plain", "db", "wait"],
+                [sys.executable, "-m", "plain", "postgres", "wait"],
                 env=self.plain_env,
                 check=True,
             )
