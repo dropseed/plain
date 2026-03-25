@@ -11,9 +11,15 @@
 
 ### Upgrade instructions
 
-**FK index migration — required for all FK fields:**
+Run `/plain-upgrade` — it handles this automatically:
 
-1. For each `ForeignKeyField` in your models, check if it's covered by an explicit `Index` or `UniqueConstraint` (with the FK as the leading field). Most FK columns should have an index.
+1. Adds explicit `Index` declarations for uncovered FK fields
+2. Generates migrations with `DROP INDEX IF EXISTS` to clean up orphan auto-indexes
+3. Removes `db_index=False` from FK fields and migration files
+
+**Manual steps (if not using `/plain-upgrade`):**
+
+1. For each `ForeignKeyField`, check if it's covered by an explicit `Index` or `UniqueConstraint` (with the FK as the leading field).
 
 2. **If uncovered**, add an explicit index:
 
@@ -25,7 +31,7 @@
     )
     ```
 
-3. Run `makemigrations`. This generates an `AddIndex` migration. Before the `AddIndex` operation, add a `RunSQL` to drop the orphan auto-index left behind by the old `db_index=True` default:
+3. Run `makemigrations`. Before the `AddIndex` operation, add a `RunSQL` to drop the orphan auto-index left behind by the old `db_index=True` default:
 
     ```python
     operations = [
@@ -34,9 +40,9 @@
     ]
     ```
 
-    The old auto-index name can be reconstructed using `_create_index_name(table, [column])` from the schema editor, or found by running `plain postgres schema --check`.
+    Find orphan index names by running `plain postgres schema --check`.
 
-4. **If already covered** by a composite index or unique constraint, the orphan auto-index is just wasted space. Generate a migration to drop it:
+4. **If already covered** by a composite index or unique constraint, generate a migration to drop the orphan:
 
     ```python
     operations = [
