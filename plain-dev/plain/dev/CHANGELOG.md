@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.59.2](https://github.com/dropseed/plain/releases/plain-dev@0.59.2) (2026-03-25)
+
+### What's changed
+
+- Updated internal references from `plain db` to `plain postgres` to match the CLI rename — affects the database wait command during `plain dev` startup and the auto-start services list ([a639aeacbf8d](https://github.com/dropseed/plain/commit/a639aeacbf8d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.59.1](https://github.com/dropseed/plain/releases/plain-dev@0.59.1) (2026-03-16)
 
 ### What's changed
