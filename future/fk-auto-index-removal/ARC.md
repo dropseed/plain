@@ -9,5 +9,5 @@ The safety net is already in place: preflight warns about uncovered FK columns, 
 ## Sequence
 
 - [x] [index-require-name](index-require-name.md)
-- [ ] [remove-index-auto-naming](remove-index-auto-naming.md)
-- [ ] [fk-remove-auto-index](fk-remove-auto-index.md)
+- [x] [remove-index-auto-naming](remove-index-auto-naming.md)
+- [x] [fk-remove-auto-index](fk-remove-auto-index.md)
