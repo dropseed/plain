@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.88.1](https://github.com/dropseed/plain/releases/plain-postgres@0.88.1) (2026-03-25)
+
+### What's changed
+
+- Actually enforce `name` as a required argument on `Index.__init__` — the 0.88.0 changelog documented it but the code change was missing from the release.
+
+### Upgrade instructions
+
+- See 0.88.0 upgrade instructions.
+
 ## [0.88.0](https://github.com/dropseed/plain/releases/plain-postgres@0.88.0) (2026-03-25)
 
 ### What's changed
