@@ -1,5 +1,19 @@
 # plain-postgres changelog
 
+## [0.87.0](https://github.com/dropseed/plain/releases/plain-postgres@0.87.0) (2026-03-25)
+
+### What's changed
+
+- **Renamed `plain db` CLI to `plain postgres`** — all subcommands (`migrate`, `diagnose`, `wait`, `backups`, etc.) are now under `plain postgres` ([a639aeacbf8d](https://github.com/dropseed/plain/commit/a639aeacbf8d))
+- **Extracted diagnose checks into `plain.postgres.diagnose` package** — the monolithic diagnose module is now split into individual check modules for better maintainability ([91f354108202](https://github.com/dropseed/plain/commit/91f354108202))
+- **FK-aware index checks** — duplicate index detection now recognizes that FK fields auto-create indexes, avoiding false positives when a composite index covers the FK column ([c116f808ac0b](https://github.com/dropseed/plain/commit/c116f808ac0b))
+- Added Diagnostics documentation section to README with check details, thresholds, and production usage guidance ([c116f808ac0b](https://github.com/dropseed/plain/commit/c116f808ac0b))
+- Show slow queries in diagnose human-readable output and fix Heroku command quoting in the diagnose skill ([6feaad54065d](https://github.com/dropseed/plain/commit/6feaad54065d))
+
+### Upgrade instructions
+
+- Replace `plain db` with `plain postgres` in all scripts, CI configs, and documentation. The old `plain db` command no longer exists.
+
 ## [0.86.0](https://github.com/dropseed/plain/releases/plain-postgres@0.86.0) (2026-03-24)
 
 ### What's changed
