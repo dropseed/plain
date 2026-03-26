@@ -20,12 +20,22 @@ class WorkerHeartbeat:
         # read is harmless here — worst case is a slightly stale
         # timestamp, which only affects heartbeat precision by microseconds.
         self._timestamp = mp_context.Value("d", time.monotonic(), lock=False)
+        # Retiring flag — set by the worker when it hits max_requests.
+        # The arbiter reads this to pre-spawn a replacement before
+        # shutting down the retiring worker.
+        self._retiring = mp_context.Value("b", 0, lock=False)
 
     def notify(self) -> None:
         self._timestamp.value = time.monotonic()
 
     def last_update(self) -> float:
         return self._timestamp.value
+
+    def set_retiring(self) -> None:
+        self._retiring.value = 1
+
+    def is_retiring(self) -> bool:
+        return bool(self._retiring.value)
 
     def close(self) -> None:
         # No-op: shared memory is cleaned up automatically.

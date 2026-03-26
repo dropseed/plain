@@ -236,17 +236,55 @@ class Arbiter:
             del self._workers[pid]
 
     def manage_workers(self) -> None:
-        """Maintain the number of workers by spawning or killing as required."""
-        while len(self._workers) < self.num_workers:
-            self._spawn_worker()
+        """Maintain the number of workers by spawning or killing as required.
 
-        if len(self._workers) > self.num_workers:
-            workers = sorted(self._workers.items(), key=lambda w: w[1].age)
+        Retiring workers (hit max_requests) are not counted toward the target.
+        Replacements are pre-spawned so the retiring worker can keep serving
+        traffic until the replacement is ready, avoiding dropped connections.
+        """
+        active_pids = []
+        retiring_pids = []
+
+        for pid, info in self._workers.items():
+            if info.heartbeat.is_retiring():
+                retiring_pids.append(pid)
+            else:
+                active_pids.append(pid)
+
+        # Spawn replacements for retiring workers (and any other shortfall)
+        active_count = len(active_pids)
+        while active_count < self.num_workers:
+            self._spawn_worker()
+            active_count += 1
+
+        # Kill excess non-retiring workers
+        if active_count > self.num_workers:
+            workers = sorted(
+                [(pid, self._workers[pid]) for pid in active_pids],
+                key=lambda w: w[1].age,
+            )
             while len(workers) > self.num_workers:
                 (pid, _) = workers.pop(0)
                 self._kill_worker(pid, signal.SIGTERM)
 
-        active_worker_count = len(self._workers)
+        # Once enough non-retiring workers are ready (heartbeating),
+        # tell retiring workers to shut down gracefully.
+        ready_count = sum(
+            1
+            for pid, info in self._workers.items()
+            if not info.heartbeat.is_retiring()
+            and info.heartbeat.last_update() > info.spawned_at
+        )
+        if ready_count >= self.num_workers:
+            for pid in retiring_pids:
+                if pid in self._workers:
+                    self.log.info(
+                        "Replacement ready, shutting down retiring worker",
+                        extra={"pid": pid},
+                    )
+                    self._kill_worker(pid, signal.SIGTERM)
+
+        active_worker_count = len(active_pids)
         if self._last_logged_active_worker_count != active_worker_count:
             self._last_logged_active_worker_count = active_worker_count
             self.log.debug(

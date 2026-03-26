@@ -113,14 +113,15 @@ class Worker:
         return f"<Worker {self.pid}>"
 
     def _count_request(self) -> None:
-        """Increment the request counter and initiate graceful shutdown if the limit is reached."""
+        """Increment the request counter and signal for replacement if the limit is reached."""
         self.total_requests += 1
         if self.max_requests and self.total_requests >= self.max_requests:
-            self.log.info(
-                "Worker reached max requests, initiating graceful shutdown",
-                extra={"max_requests": self.max_requests},
-            )
-            self.alive = False
+            if not self.heartbeat.is_retiring():
+                self.heartbeat.set_retiring()
+                self.log.info(
+                    "Worker reached max requests, requesting replacement",
+                    extra={"max_requests": self.max_requests},
+                )
 
     def notify(self) -> None:
         self.heartbeat.notify()
@@ -249,6 +250,7 @@ class Worker:
                     self.log.error("Server stopped serving unexpectedly")
                     self.alive = False
                     break
+
             await asyncio.sleep(1.0)
 
         # Stop accepting new connections (don't await wait_closed() —
