@@ -1230,7 +1230,10 @@ class DatabaseSchemaEditor:
         old_type = old_db_params["type"]
         assert old_type is not None, "old_type cannot be None for primary key field"
         if old_field.primary_key and (
-            (old_type.startswith("varchar") and not new_type.startswith("varchar"))
+            (
+                old_type.startswith("character varying")
+                and not new_type.startswith("character varying")
+            )
             or (old_type.startswith("text") and not new_type.startswith("text"))
             or (old_type.startswith("citext") and not new_type.startswith("citext"))
         ):
@@ -1530,7 +1533,7 @@ class DatabaseSchemaEditor:
             # and text[size], so skip them.
             if "[" in db_type:
                 return None
-            if db_type.startswith("varchar"):
+            if db_type.startswith("character varying"):
                 return self._create_index_sql(
                     model,
                     fields=[field],

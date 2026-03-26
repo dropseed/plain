@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import sys
 from typing import Any
 
@@ -8,37 +7,6 @@ import click
 
 from ..db import get_connection
 from ..registry import models_registry
-
-# Map from db_type() short names to format_type() canonical names.
-# Postgres stores these as aliases; format_type() returns the long form.
-_TYPE_ALIASES: dict[str, str] = {
-    "bool": "boolean",
-    "varchar": "character varying",
-    "int2": "smallint",
-    "int4": "integer",
-    "int8": "bigint",
-    "float4": "real",
-    "float8": "double precision",
-    "time": "time without time zone",
-    "timestamp": "timestamp without time zone",
-    "timestamptz": "timestamp with time zone",
-    "timetz": "time with time zone",
-    "serial": "integer",
-    "bigserial": "bigint",
-    "smallserial": "smallint",
-}
-
-_TYPE_PARTS = re.compile(r"^(\w+)(.*)")
-
-
-def _normalize_type(db_type: str) -> str:
-    """Normalize a db_type() string to match Postgres format_type() output."""
-    m = _TYPE_PARTS.match(db_type)
-    if not m:
-        return db_type
-    base, suffix = m.group(1), m.group(2)
-    canonical = _TYPE_ALIASES.get(base, base)
-    return canonical + suffix
 
 
 def _ok() -> None:
@@ -105,7 +73,7 @@ def _show_model(conn: Any, cursor: Any, model: Any) -> int:
             continue
 
         expected_col_names.add(field.column)
-        expected_type = _normalize_type(db_type)
+        expected_type = db_type
 
         col_display = field.column
         if field.column != field.name:

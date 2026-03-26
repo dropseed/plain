@@ -43,7 +43,7 @@ CAST_DATA_TYPES: dict[str, str] = {
 }
 
 # CharField data type when max_length isn't provided.
-CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH: str | None = "varchar"
+CAST_CHAR_FIELD_WITHOUT_MAX_LENGTH: str | None = "character varying"
 
 # Start and end points for window expressions.
 PRECEDING: str = "PRECEDING"
@@ -96,8 +96,8 @@ _EXTRACT_FORMAT_RE = _lazy_re_compile(r"[A-Z_]+")
 
 def _get_varchar_column(data: dict[str, Any]) -> str:
     if data["max_length"] is None:
-        return "varchar"
-    return "varchar({max_length})".format(**data)
+        return "character varying"
+    return "character varying({max_length})".format(**data)
 
 
 # Maps Field objects to their associated PostgreSQL column types.
@@ -121,7 +121,7 @@ DATA_TYPES: dict[str, Any] = {
     "PositiveSmallIntegerField": "smallint",
     "SmallIntegerField": "smallint",
     "TextField": "text",
-    "TimeField": "time",
+    "TimeField": "time without time zone",
     "UUIDField": "uuid",
 }
 
