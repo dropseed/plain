@@ -496,7 +496,31 @@ Use this when migrations have already been committed or deployed to other enviro
 | ----------------------------------------- | ------------------------------------------------------- |
 | Migrations are local only (not committed) | Delete-and-recreate                                     |
 | Migrations are committed but not deployed | Delete-and-recreate (if all developers reset) or squash |
-| Migrations are deployed to production     | Squash                                                  |
+| Migrations are deployed to production     | Squash or full reset                                    |
+
+### Resetting migrations
+
+Over time a package can accumulate dozens of migrations. Once **every environment** (dev, staging, production) has applied all of them, you can replace the entire history with a single fresh `0001_initial`.
+
+**Prerequisites:**
+
+- Every environment (dev, staging, production) has applied all existing migrations. If any environment is behind, the reset will break it.
+- The first migration is named `0001_initial` (the default). If it has a different name, this workflow won't work cleanly.
+
+**Steps:**
+
+1. Run `plain migrations list` locally and verify everything is applied.
+2. Delete every file in the package's `migrations/` directory except `__init__.py`.
+3. Run `plain makemigrations` to generate a fresh `0001_initial`.
+4. Run `plain migrations prune --yes` to remove stale DB records. The existing `0001_initial` record matches the new file, so the database is immediately up to date.
+5. Verify with `plain postgres schema` (zero issues means the reset is clean) and `plain makemigrations --check` (no pending changes).
+6. Commit and deploy. On every other environment, run `plain migrations prune --yes`. No actual SQL runs — it only cleans up migration history records. If `migrations prune` is already in your deploy steps, no changes are needed.
+
+**Things to keep in mind:**
+
+- If resetting multiple packages, process depended-on packages first — the new `0001_initial` may have cross-package FK dependencies.
+- Data migrations (`RunPython`) in the deleted history are gone, which is fine since they've already run everywhere.
+- If CI runs `makemigrations --check` or `migrate --check`, the reset PR must be merged and deployed before those checks pass in other branches.
 
 ### Other migration commands
 
