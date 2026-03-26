@@ -57,7 +57,7 @@ from plain import forms
 
 
 class BugReportForm(SupportForm):
-    browser = forms.CharField(max_length=100, required=False)
+    browser = forms.TextField(max_length=100, required=False)
 
     class Meta:
         model = SupportFormEntry

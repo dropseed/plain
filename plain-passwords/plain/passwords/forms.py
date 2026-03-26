@@ -85,8 +85,8 @@ class PasswordSetForm(forms.Form):
     password
     """
 
-    new_password1 = forms.CharField(strip=False)
-    new_password2 = forms.CharField(strip=False)
+    new_password1 = forms.TextField(strip=False)
+    new_password2 = forms.TextField(strip=False)
 
     def __init__(self, user: Model, *args: Any, **kwargs: Any) -> None:
         self.user = user
@@ -123,7 +123,7 @@ class PasswordChangeForm(PasswordSetForm):
     password.
     """
 
-    current_password = forms.CharField(strip=False)
+    current_password = forms.TextField(strip=False)
 
     def clean_current_password(self) -> str:
         """
@@ -140,7 +140,7 @@ class PasswordChangeForm(PasswordSetForm):
 
 class PasswordLoginForm(forms.Form):
     email = forms.EmailField(max_length=150)
-    password = forms.CharField(strip=False)
+    password = forms.TextField(strip=False)
 
     def clean(self) -> dict[str, Any]:
         User = get_user_model()
@@ -177,7 +177,7 @@ class PasswordLoginForm(forms.Form):
 
 
 class PasswordSignupForm(ModelForm):
-    confirm_password = forms.CharField(strip=False)
+    confirm_password = forms.TextField(strip=False)
 
     class Meta:
         model = get_user_model()

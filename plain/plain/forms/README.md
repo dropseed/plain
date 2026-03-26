@@ -30,7 +30,7 @@ from plain.views import FormView
 
 class ContactForm(forms.Form):
     email = forms.EmailField()
-    message = forms.CharField()
+    message = forms.TextField()
 
 
 class ContactView(FormView):
@@ -58,11 +58,11 @@ All fields accept these common parameters:
 
 ### Text fields
 
-**[`CharField`](./fields.py#CharField)** accepts text input with optional length constraints.
+**[`TextField`](./fields.py#TextField)** accepts text input with optional length constraints.
 
 ```python
-name = forms.CharField(max_length=100, min_length=2)
-bio = forms.CharField(required=False, strip=True)  # strip=True is the default
+name = forms.TextField(max_length=100, min_length=2)
+bio = forms.TextField(required=False, strip=True)  # strip=True is the default
 ```
 
 **[`EmailField`](./fields.py#EmailField)** validates email addresses.
@@ -221,7 +221,7 @@ You can add custom validation for a specific field by defining a `clean_<fieldna
 
 ```python
 class SignupForm(forms.Form):
-    username = forms.CharField(max_length=30)
+    username = forms.TextField(max_length=30)
     email = forms.EmailField()
 
     def clean_username(self):
@@ -237,8 +237,8 @@ Override the `clean()` method for validation that involves multiple fields.
 
 ```python
 class PasswordForm(forms.Form):
-    password = forms.CharField()
-    password_confirm = forms.CharField()
+    password = forms.TextField()
+    password_confirm = forms.TextField()
 
     def clean(self):
         cleaned_data = super().clean()
@@ -324,7 +324,7 @@ Forms automatically handle JSON request bodies when the `Content-Type` header is
 
 ```python
 class ApiForm(forms.Form):
-    name = forms.CharField()
+    name = forms.TextField()
     count = forms.IntegerField()
 ```
 
@@ -355,7 +355,7 @@ Both will validate the same way and populate `cleaned_data` with the same values
 Set `required=False` on the field.
 
 ```python
-notes = forms.CharField(required=False)
+notes = forms.TextField(required=False)
 ```
 
 #### How do I pre-populate a form with existing data?
@@ -382,7 +382,7 @@ Pass a list of validator functions to the `validators` parameter.
 ```python
 from plain.validators import MinLengthValidator
 
-username = forms.CharField(validators=[MinLengthValidator(3)])
+username = forms.TextField(validators=[MinLengthValidator(3)])
 ```
 
 #### Why is my checkbox field always `False`?
@@ -419,9 +419,9 @@ from plain import forms
 
 
 class ContactForm(forms.Form):
-    name = forms.CharField(max_length=100)
+    name = forms.TextField(max_length=100)
     email = forms.EmailField()
-    message = forms.CharField()
+    message = forms.TextField()
 ```
 
 Use the form with a view. The [`FormView`](/plain-views/README.md) base class handles GET/POST logic automatically.

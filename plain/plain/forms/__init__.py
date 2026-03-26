@@ -6,7 +6,6 @@ from .boundfield import BoundField
 from .exceptions import FormFieldMissingError, ValidationError
 from .fields import (
     BooleanField,
-    CharField,
     ChoiceField,
     DateField,
     DateTimeField,
@@ -22,6 +21,7 @@ from .fields import (
     MultipleChoiceField,
     NullBooleanField,
     RegexField,
+    TextField,
     TimeField,
     TypedChoiceField,
     URLField,
@@ -34,7 +34,7 @@ __all__ = [
     "FormFieldMissingError",
     "ValidationError",
     "BooleanField",
-    "CharField",
+    "TextField",
     "ChoiceField",
     "DateField",
     "DateTimeField",

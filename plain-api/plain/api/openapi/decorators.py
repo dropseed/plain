@@ -129,7 +129,7 @@ def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
             fields.BooleanField: {
                 "type": "boolean",
             },
-            fields.CharField: {
+            fields.TextField: {
                 "type": "string",
             },
             fields.EmailField: {

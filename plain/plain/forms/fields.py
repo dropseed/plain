@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 __all__ = (
     "Field",
-    "CharField",
+    "TextField",
     "IntegerField",
     "DateField",
     "TimeField",
@@ -182,7 +182,7 @@ class Field:
         return data.get(html_name, None)
 
 
-class CharField(Field):
+class TextField(Field):
     def __init__(
         self,
         *,
@@ -548,7 +548,7 @@ class DurationField(Field):
         return value
 
 
-class RegexField(CharField):
+class RegexField(TextField):
     def __init__(
         self,
         regex: str | re.Pattern[str],
@@ -595,7 +595,7 @@ class RegexField(CharField):
     regex = property(_get_regex, _set_regex)
 
 
-class EmailField(CharField):
+class EmailField(TextField):
     default_validators = [validators_.validate_email]
 
     def __init__(
@@ -761,7 +761,7 @@ class ImageField(FileField):
         return f
 
 
-class URLField(CharField):
+class URLField(TextField):
     default_error_messages = {
         "invalid": "Enter a valid URL.",
     }
@@ -1076,7 +1076,7 @@ class MultipleChoiceField(ChoiceField):
         return data.getlist(html_name)
 
 
-class UUIDField(CharField):
+class UUIDField(TextField):
     default_error_messages = {
         "invalid": "Enter a valid UUID.",
     }
@@ -1106,7 +1106,7 @@ class JSONString(str):
     pass
 
 
-class JSONField(CharField):
+class JSONField(TextField):
     default_error_messages = {
         "invalid": "Enter a valid JSON.",
     }

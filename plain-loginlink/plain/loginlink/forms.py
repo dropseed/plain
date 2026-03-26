@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 class LoginLinkForm(forms.Form):
     email = forms.EmailField()
-    next = forms.CharField(required=False)
+    next = forms.TextField(required=False)
 
     def maybe_send_link(
         self, request: Request, expires_in: int = 60 * 60
