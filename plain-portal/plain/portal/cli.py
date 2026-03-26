@@ -52,9 +52,10 @@ def cli() -> None:
     default=DEFAULT_RELAY_HOST,
     hidden=True,
 )
-def start(writable: bool, timeout: int, relay_host: str) -> None:
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
+def start(writable: bool, timeout: int, relay_host: str, yes: bool) -> None:
     """Start a portal session on the remote machine."""
-    if writable:
+    if writable and not yes:
         if not click.confirm(
             "This session allows writes to the production database. Continue?"
         ):

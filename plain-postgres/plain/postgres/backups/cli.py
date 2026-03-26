@@ -138,11 +138,13 @@ def delete_backup(backup_name: str) -> None:
 
 
 @cli.command("clear")
-@click.confirmation_option(prompt="Are you sure you want to delete all backups?")
-def clear_backups() -> None:
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
+def clear_backups(yes: bool) -> None:
     """Clear all database backups"""
     backups_handler = DatabaseBackups()
     backups = backups_handler.find_backups()
+    if not yes:
+        click.confirm("Are you sure you want to delete all backups?", abort=True)
     for backup in backups:
         backup.delete()
     click.secho("All backups deleted", fg="green")

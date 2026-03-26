@@ -61,8 +61,9 @@ def shell(parameters: tuple[str, ...]) -> None:
 @cli.command("drop-unknown-tables")
 @click.option(
     "--yes",
+    "-y",
     is_flag=True,
-    help="Skip confirmation prompt (for non-interactive use).",
+    help="Skip confirmation prompt.",
 )
 def drop_unknown_tables(yes: bool) -> None:
     """Drop all tables not associated with a Plain model"""

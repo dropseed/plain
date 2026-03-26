@@ -20,10 +20,10 @@ def clear_expired() -> None:
 
 
 @cli.command()
-@click.option("--force", is_flag=True)
-def clear_all(force: bool) -> None:
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
+def clear_all(yes: bool) -> None:
     """Clear all cache entries"""
-    if not force and not click.confirm(
+    if not yes and not click.confirm(
         "Are you sure you want to delete all cache items?"
     ):
         return

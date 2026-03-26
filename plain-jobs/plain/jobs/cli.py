@@ -165,9 +165,10 @@ def stats() -> None:
 
 
 @cli.command()
-def purge() -> None:
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
+def purge(yes: bool) -> None:
     """Delete all pending and running jobs"""
-    if not click.confirm(
+    if not yes and not click.confirm(
         "Are you sure you want to clear all running and pending jobs? This will delete all current Jobs and JobRequests"
     ):
         return

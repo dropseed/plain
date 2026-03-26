@@ -261,8 +261,8 @@ def observer_request(
 
 
 @observer_cli.command()
-@click.option("--force", is_flag=True, help="Skip confirmation prompt.")
-def clear(force: bool) -> None:
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
+def clear(yes: bool) -> None:
     """Clear all observer data"""
     query = Trace.query.all()
     trace_count = query.count()
@@ -271,7 +271,7 @@ def clear(force: bool) -> None:
         click.echo("No traces to clear.")
         return
 
-    if not force:
+    if not yes:
         confirm_msg = f"Are you sure you want to clear {trace_count} trace(s)? This will delete all observer data."
         click.confirm(confirm_msg, abort=True)
 

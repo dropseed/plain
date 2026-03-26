@@ -118,7 +118,7 @@ plain observer span <span_id>
 
 # Clear all trace data
 plain observer clear
-plain observer clear --force
+plain observer clear --yes
 ```
 
 The `observer request` command makes a request with tracing automatically enabled and returns structured JSON output including query counts, duplicate detection, issue analysis, and a span tree. The `--user` flag accepts a user ID or email.

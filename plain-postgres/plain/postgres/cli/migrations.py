@@ -777,8 +777,9 @@ def list_migrations(
 @cli.command("prune")
 @click.option(
     "--yes",
+    "-y",
     is_flag=True,
-    help="Skip confirmation prompt (for non-interactive use).",
+    help="Skip confirmation prompt.",
 )
 def prune(yes: bool) -> None:
     """Remove stale migration records from the database"""
