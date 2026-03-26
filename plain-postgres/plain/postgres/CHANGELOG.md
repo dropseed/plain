@@ -1,5 +1,17 @@
 # plain-postgres changelog
 
+## [0.89.1](https://github.com/dropseed/plain/releases/plain-postgres@0.89.1) (2026-03-26)
+
+### What's changed
+
+- Fixed `schema` command type mismatches for `time`, `timestamp`, and `DecimalField` types that caused false drift reports ([187e39e3faeb](https://github.com/dropseed/plain/commit/187e39e3faeb))
+- Fixed `schema` command crash on expression-based unique constraints (e.g. `UniqueConstraint` with `expressions` instead of `fields`) ([187e39e3faeb](https://github.com/dropseed/plain/commit/187e39e3faeb))
+- Improved 0.89.0 upgrade instructions with clearer ordering and step descriptions ([a59062327ed5](https://github.com/dropseed/plain/commit/a59062327ed5), [c0520bdca709](https://github.com/dropseed/plain/commit/c0520bdca709))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.89.0](https://github.com/dropseed/plain/releases/plain-postgres@0.89.0) (2026-03-25)
 
 ### What's changed
