@@ -51,10 +51,10 @@ def _show_model(conn: Any, cursor: Any, model: Any) -> int:
     for name, info in actual_constraints.items():
         if info.get("primary_key"):
             continue
-        if info.get("index"):
-            actual_indexes[name] = info
-        elif info.get("unique"):
+        if info.get("unique"):
             actual_unique[name] = info
+        elif info.get("index"):
+            actual_indexes[name] = info
 
     click.secho(model.model_options.label, bold=True, nl=False)
     click.secho(f"  →  {table_name}", dim=True)
