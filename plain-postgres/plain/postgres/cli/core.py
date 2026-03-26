@@ -13,7 +13,6 @@ from plain.cli import register_cli
 from ..backups.cli import cli as backups_cli
 from ..db import get_connection
 from ..dialect import quote_name
-from ..migrations.recorder import MIGRATION_TABLE_NAME
 from .diagnose import diagnose
 from .schema import schema
 
@@ -67,10 +66,10 @@ def shell(parameters: tuple[str, ...]) -> None:
 )
 def drop_unknown_tables(yes: bool) -> None:
     """Drop all tables not associated with a Plain model"""
+    from ..introspection import get_unknown_tables
+
     conn = get_connection()
-    db_tables = set(conn.table_names())
-    model_tables = set(conn.plain_table_names())
-    unknown_tables = sorted(db_tables - model_tables - {MIGRATION_TABLE_NAME})
+    unknown_tables = get_unknown_tables(conn)
 
     if not unknown_tables:
         click.echo("No unknown tables found.")

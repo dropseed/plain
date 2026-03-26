@@ -7,7 +7,7 @@ from typing import Any
 import click
 
 from ..db import get_connection
-from ..diagnose import CheckItem, CheckResult, build_table_owners, run_all_checks
+from ..introspection import CheckItem, CheckResult, build_table_owners, run_all_checks
 
 STATUS_SYMBOLS = {
     "ok": ("✓", "green"),
@@ -199,6 +199,6 @@ def diagnose(output_json: bool, show_all: bool) -> None:
     else:
         format_human(results, context, show_all=show_all)
 
-    # Exit 1 if any critical
-    if any(r["status"] == "critical" for r in results):
+    # Exit 1 if any critical (JSON mode always exits 0 — the data is the signal)
+    if not output_json and any(r["status"] == "critical" for r in results):
         sys.exit(1)

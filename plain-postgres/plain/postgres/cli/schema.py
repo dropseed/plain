@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
 import sys
-from typing import Any
 
 import click
 
 from ..db import get_connection
+from ..introspection import (
+    ModelSchemaResult,
+    check_model,
+    count_issues,
+    get_unknown_tables,
+)
 from ..registry import models_registry
 
 
@@ -17,165 +23,72 @@ def _err(msg: str) -> None:
     click.secho(f"  ✗ {msg}", fg="red")
 
 
-def _get_actual_columns(cursor: Any, table_name: str) -> dict[str, tuple[str, bool]]:
-    """Return {column_name: (type_string, is_not_null)} from the actual DB."""
-    cursor.execute(
-        """
-        SELECT a.attname, format_type(a.atttypid, a.atttypmod), a.attnotnull
-        FROM pg_attribute a
-        JOIN pg_class c ON a.attrelid = c.oid
-        WHERE c.relname = %s AND pg_catalog.pg_table_is_visible(c.oid)
-          AND a.attnum > 0 AND NOT a.attisdropped
-        ORDER BY a.attnum
-        """,
-        [table_name],
-    )
-    return {
-        name: (type_str, is_not_null)
-        for name, type_str, is_not_null in cursor.fetchall()
-    }
+def _render_model(result: ModelSchemaResult) -> None:
+    """Render a model schema result as human-readable output."""
+    click.secho(result["label"], bold=True, nl=False)
+    click.secho(f"  →  {result['table']}", dim=True)
 
-
-def _show_model(conn: Any, cursor: Any, model: Any) -> int:
-    """Print schema for a model, annotating any drift. Returns issue count."""
-    from ..constraints import UniqueConstraint
-
-    table_name = model.model_options.db_table
-    issues = 0
-
-    actual_columns = _get_actual_columns(cursor, table_name)
-    actual_constraints = conn.get_constraints(cursor, table_name)
-
-    actual_indexes: dict[str, dict[str, Any]] = {}
-    actual_unique: dict[str, dict[str, Any]] = {}
-    for name, info in actual_constraints.items():
-        if info.get("primary_key"):
-            continue
-        if info.get("unique"):
-            actual_unique[name] = info
-        elif info.get("index"):
-            actual_indexes[name] = info
-
-    click.secho(model.model_options.label, bold=True, nl=False)
-    click.secho(f"  →  {table_name}", dim=True)
-
-    if not actual_columns:
-        click.echo("  ", nl=False)
-        _err("table missing from database")
-        return 1
+    # Table missing — nothing else to show
+    if not result["columns"]:
+        for issue in result["issues"]:
+            click.echo("  ", nl=False)
+            _err(issue["detail"])
+        return
 
     # Columns
-    expected_col_names: set[str] = set()
+    for col in result["columns"]:
+        col_display = col["name"]
+        if col["field_name"] and col["field_name"] != col["name"]:
+            col_display = f"{col['field_name']} → {col['name']}"
 
-    for field in model._model_meta.local_fields:
-        db_type = field.db_type()
-        if db_type is None:
-            continue
-
-        expected_col_names.add(field.column)
-        expected_type = db_type
-
-        col_display = field.column
-        if field.column != field.name:
-            col_display = f"{field.name} → {field.column}"
-
-        type_parts = [click.style(db_type, fg="cyan")]
-        if field.allow_null:
+        type_parts = [click.style(col["type"], fg="cyan")]
+        if col["nullable"]:
             type_parts.append(click.style("NULL", dim=True))
-        if field.primary_key:
+        if col["primary_key"]:
             type_parts.append(click.style("PK", fg="yellow"))
-            suffix = field.db_type_suffix()
-            if suffix:
-                type_parts.append(click.style(suffix, dim=True))
+            if col["pk_suffix"]:
+                type_parts.append(click.style(col["pk_suffix"], dim=True))
 
         click.echo(f"  {col_display:30s}  {' '.join(type_parts)}", nl=False)
 
-        if field.column not in actual_columns:
-            _err("missing from database")
-            issues += 1
+        if col["issues"]:
+            _err("; ".join(i["detail"] for i in col["issues"]))
         else:
-            actual_type, actual_not_null = actual_columns[field.column]
-            col_issues = []
-            if expected_type != actual_type:
-                col_issues.append(
-                    f"type: expected {expected_type}, actual {actual_type}"
-                )
-            if (not field.allow_null) != actual_not_null:
-                exp = "NOT NULL" if not field.allow_null else "NULL"
-                act = "NOT NULL" if actual_not_null else "NULL"
-                col_issues.append(f"expected {exp}, actual {act}")
-            if col_issues:
-                _err("; ".join(col_issues))
-                issues += len(col_issues)
-            else:
-                _ok()
-
-    for col_name in sorted(actual_columns.keys() - expected_col_names):
-        click.echo(f"  {col_name:30s}  ", nl=False)
-        _err("extra column, not in model")
-        issues += 1
+            _ok()
 
     # Indexes
-    model_indexes = model.model_options.indexes
-    extra_indexes = actual_indexes.keys() - {idx.name for idx in model_indexes}
-
-    if model_indexes or extra_indexes:
+    if result["indexes"]:
         click.echo()
         click.secho("  Indexes:", dim=True)
 
-    for index in model_indexes:
-        fields_str = ", ".join(index.fields) if index.fields else "expressions"
-        click.echo(f"    {index.name}  ({fields_str})", nl=False)
+    for idx in result["indexes"]:
+        fields_str = ", ".join(idx["fields"]) if idx["fields"] else "expressions"
+        click.echo(f"    {idx['name']}  ({fields_str})", nl=False)
 
-        if index.name not in actual_indexes:
-            _err("missing from database")
-            issues += 1
+        if idx["issues"]:
+            _err(idx["issues"][0]["detail"])
         else:
             _ok()
 
-    for name in sorted(extra_indexes):
-        cols = actual_indexes[name].get("columns", [])
-        cols_str = ", ".join(cols) if cols else "expression"
-        click.echo(f"    {name}  ({cols_str})", nl=False)
-        _err("not in model")
-        issues += 1
-
-    # Unique constraints
-    model_constraints = [
-        c for c in model.model_options.constraints if isinstance(c, UniqueConstraint)
-    ]
-    extra_constraints = actual_unique.keys() - {c.name for c in model_constraints}
-
-    if model_constraints or extra_constraints:
+    # Constraints
+    if result["constraints"]:
         click.echo()
         click.secho("  Constraints:", dim=True)
 
-    for constraint in model_constraints:
-        if constraint.fields:
-            fields_str = ", ".join(constraint.fields)
-        else:
-            fields_str = "expressions"
-        click.echo(f"    {constraint.name}  UNIQUE ({fields_str})", nl=False)
+    for con in result["constraints"]:
+        fields_str = ", ".join(con["fields"]) if con["fields"] else "expressions"
+        click.echo(f"    {con['name']}  UNIQUE ({fields_str})", nl=False)
 
-        if constraint.name not in actual_unique:
-            _err("missing from database")
-            issues += 1
+        if con["issues"]:
+            _err(con["issues"][0]["detail"])
         else:
             _ok()
-
-    for name in sorted(extra_constraints):
-        cols = actual_unique[name].get("columns", [])
-        cols_str = ", ".join(cols) if cols else "?"
-        click.echo(f"    {name}  UNIQUE ({cols_str})", nl=False)
-        _err("not in model")
-        issues += 1
-
-    return issues
 
 
 @click.command()
 @click.argument("model_label", required=False)
-def schema(model_label: str | None) -> None:
+@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+def schema(model_label: str | None, output_json: bool) -> None:
     """Show database schema from models, compared against the actual database"""
     models = models_registry.get_models()
 
@@ -192,25 +105,52 @@ def schema(model_label: str | None) -> None:
             raise click.ClickException(f"No model found matching '{model_label}'")
 
     conn = get_connection()
-    total_issues = 0
-    models_checked = 0
 
+    # Collect structured results
+    results: list[ModelSchemaResult] = []
     with conn.cursor() as cursor:
-        for i, model in enumerate(models):
+        for model in models:
+            results.append(check_model(conn, cursor, model))
+
+    unknown_tables = get_unknown_tables(conn) if not model_label else []
+    total_issues = sum(count_issues(r) for r in results) + len(unknown_tables)
+
+    if output_json:
+        output = {
+            "models_checked": len(results),
+            "total_issues": total_issues,
+            "models": results,
+            "unknown_tables": unknown_tables,
+        }
+        click.echo(json.dumps(output, indent=2, default=str))
+    else:
+        for i, result in enumerate(results):
             if i > 0:
                 click.echo()
-            models_checked += 1
-            total_issues += _show_model(conn, cursor, model)
+            _render_model(result)
 
-    click.echo()
-    if total_issues == 0:
-        click.secho(
-            f"{models_checked} models, all match the database.",
-            fg="green",
-        )
-    else:
-        click.secho(
-            f"{models_checked} models, {total_issues} issue{'s' if total_issues != 1 else ''}.",
-            fg="red",
-        )
-        sys.exit(1)
+        if unknown_tables:
+            click.echo()
+            click.secho("Unknown tables", bold=True)
+            for table in unknown_tables:
+                click.echo(f"  {table:30s}  ", nl=False)
+                _err("not managed by any model")
+
+        click.echo()
+        parts = []
+        parts.append(f"{len(results)} model{'s' if len(results) != 1 else ''}")
+        if unknown_tables:
+            parts.append(
+                f"{len(unknown_tables)} unknown table{'s' if len(unknown_tables) != 1 else ''}"
+            )
+        if total_issues == 0:
+            click.secho(
+                f"{', '.join(parts)}, all match the database.",
+                fg="green",
+            )
+        else:
+            click.secho(
+                f"{', '.join(parts)}, {total_issues} issue{'s' if total_issues != 1 else ''}.",
+                fg="red",
+            )
+            sys.exit(1)

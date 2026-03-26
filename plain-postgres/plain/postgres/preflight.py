@@ -9,7 +9,6 @@ from plain.packages import packages_registry
 from plain.postgres.constraints import UniqueConstraint
 from plain.postgres.db import get_connection
 from plain.postgres.fields.related import ForeignKeyField
-from plain.postgres.migrations.recorder import MIGRATION_TABLE_NAME
 from plain.postgres.registry import ModelsRegistry, models_registry
 from plain.preflight import PreflightCheck, PreflightResult, register_check
 
@@ -251,17 +250,14 @@ class CheckDatabaseTables(PreflightCheck):
     """Checks for unknown tables in the database when plain.postgres is available."""
 
     def run(self) -> list[PreflightResult]:
-        conn = get_connection()
-        unknown_tables = (
-            set(conn.table_names())
-            - set(conn.plain_table_names())
-            - {MIGRATION_TABLE_NAME}
-        )
+        from .introspection import get_unknown_tables
+
+        unknown_tables = get_unknown_tables()
 
         if not unknown_tables:
             return []
 
-        table_names = ", ".join(sorted(unknown_tables))
+        table_names = ", ".join(unknown_tables)
         return [
             PreflightResult(
                 fix=f"Unknown tables in default database: {table_names}. "
