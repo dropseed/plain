@@ -1,5 +1,7 @@
 # Enforce 0001_initial migration naming
 
+> **Note:** The [migration-rethink](migration-rethink/ARC.md) arc eliminates sequential numbering entirely in favor of timestamps. This future becomes unnecessary if that arc is implemented.
+
 Guarantee that the first migration for every package is always named `0001_initial`. This simplifies the migration reset workflow by removing the conditional — if the name is guaranteed, reset is always just `migrations prune` (no `--fake` needed).
 
 ## Why

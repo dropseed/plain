@@ -19,7 +19,7 @@ from rich.table import Table
 from rich.tree import Tree
 
 FUTURE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "future"
-SKIP_FILES = {"ARC.md", "README.md", "CLAUDE.md", "TODO.md"}
+SKIP_FILES = {"ARC.md", "README.md", "CLAUDE.md"}
 
 
 def parse_frontmatter(path: Path) -> dict:
@@ -94,20 +94,6 @@ def load_futures() -> tuple[list[dict], dict[str, list[str]]]:
                 "depends_on": as_list(fm.get("depends_on")),
                 "related": as_list(fm.get("related")),
             })
-
-    # Load unassigned futures from top level
-    for path in sorted(FUTURE_DIR.glob("*.md")):
-        if path.name in SKIP_FILES:
-            continue
-        fm = parse_frontmatter(path)
-        items.append({
-            "path": path,
-            "stem": path.stem,
-            "title": get_title(path),
-            "arc": "",
-            "depends_on": as_list(fm.get("depends_on")),
-            "related": as_list(fm.get("related")),
-        })
 
     return items, arc_sequences
 

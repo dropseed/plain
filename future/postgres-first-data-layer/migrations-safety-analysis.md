@@ -3,9 +3,12 @@ related:
   - models-non-blocking-ddl
   - migrations-schema-check
   - postgres-cli-and-insights
+  - ../migration-rethink/schema-convergence
 ---
 
 # Migration safety analysis
+
+> **Note:** The [migration-rethink](../migration-rethink/ARC.md) arc subsumes this future. Convergence uses safe patterns by default, eliminating most unsafe operations from migration files entirely. Remaining safety warnings move into `makemigrations` output.
 
 ## Problem
 

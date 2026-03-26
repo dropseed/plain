@@ -2,9 +2,12 @@
 related:
   - models-index-suggestions
   - migrations-safety-analysis
+  - ../migration-rethink/schema-convergence
 ---
 
 # Non-blocking DDL for indexes, constraints, and foreign keys
+
+> **Note:** The [migration-rethink](../migration-rethink/ARC.md) arc subsumes this future. The convergence engine implements all non-blocking DDL patterns as its core mechanism.
 
 ## Problem
 

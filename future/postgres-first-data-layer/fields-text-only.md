@@ -46,15 +46,6 @@ When users upgrade and their CharField columns become TextField:
 - These produce `ALTER TABLE ... ALTER COLUMN ... TYPE text` — which is effectively a no-op in PostgreSQL (varchar and text are the same internally)
 - The `/plain-upgrade` agent rewrites `types.CharField(...)` → `types.TextField(...)` in user code
 
-### Forms CharField → TextField
-
-Rename forms `CharField` to `TextField` for consistency. There's no forms `TextField` today — the distinction between "char" and "text" never meant anything in the forms layer either.
-
-- Rename `plain.forms.CharField` to `plain.forms.TextField`
-- Subclasses (`EmailField`, `URLField`, `RegexField`, `UUIDField`, `JSONField`) inherit from `TextField` instead
-- Update `modelfield_to_formfield()` — the `isinstance(modelfield, postgres.CharField)` branch gets deleted, the `isinstance(modelfield, postgres.TextField)` branch returns `forms.TextField`
-- The `/plain-upgrade` agent handles the rename in user code
-
 ### Cleanup
 
 - Remove model `CharField` from `__all__`, exports, and type mappings

@@ -1,8 +1,3 @@
----
-related:
-  - preflight-log-warnings
----
-
 # plain-preflight: ALLOWED_HOSTS Pattern Validation
 
 - Add preflight check to validate `ALLOWED_HOSTS` patterns are correctly formatted

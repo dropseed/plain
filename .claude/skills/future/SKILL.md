@@ -19,15 +19,13 @@ future/
     ARC.md
     server-h2-websockets.md
     ...
-  email-filebased-viewing.md          # unassigned (no arc yet)
-  TODO.md                             # ordered work queue
 ```
 
 - **Arc directories** — narrative groupings, the big stories of where Plain is headed
 - **ARC.md** — each arc's vision and numbered sequence of futures
 - **Future files** — each one describes a possible future state of the project
-- **Unassigned futures** — top-level files that don't belong to an arc yet (proto-arcs)
-- **TODO.md** — immediate work queue (markdown checklist, line order = priority)
+
+Every future must belong to an arc — no top-level orphan files. If a future doesn't fit an existing arc, create a new arc for it.
 
 ## Futures
 
@@ -68,12 +66,10 @@ Format: `- [ ] [future-name](future-name.md)` — checked when done. The sequenc
 Current arcs:
 
 - `postgres-first-data-layer` — making the ORM truly postgres-native
+- `migration-rethink` — flat timestamps, convergence, advisory locks
 - `real-time-server` — HTTP/2, websockets, realtime, performance
-- `built-in-observability` — metrics, profiling, tracing
-- `background-processing` — jobs, workers, monitoring
-- `developer-inner-loop` — faster edit/save/see cycle
 - `production-hardening` — security, compliance, operational maturity
-- `postgres-insights` — diagnostics, health checks, optimization tools
+- `uncategorized` — futures that don't belong to a specific arc yet
 
 ## Scripts
 
@@ -116,9 +112,16 @@ When the user asks to start working on a future:
 4. Read any `related` or `depends_on` futures that provide useful background
 5. Proceed with implementation
 
+When a future is completed:
+
+1. Delete the future file
+2. If the entire arc is complete (all futures done), delete the arc directory
+3. Clean up `related` and `depends_on` references to deleted futures in other files
+4. Update the arc list in this skill if an arc was removed
+
 When creating a new future:
 
-1. Place it in the right arc directory (or top-level if unassigned)
+1. Place it in an arc directory — every future must belong to an arc. If no arc fits, create a new one.
 2. Add it to the arc's `ARC.md` sequence in the right position
 3. Add `related` to link conceptually connected futures
 4. Add `depends_on` only for hard cross-arc blocks

@@ -1,5 +1,7 @@
 # Rename `app` column to `package` in plainmigrations table
 
+> **Note:** The [migration-rethink](../migration-rethink/ARC.md) arc replaces the tracking table entirely — no `app` column at all. A `source` column identifies the package. This future becomes unnecessary if that arc is implemented.
+
 The `plainmigrations` table has an `app` column — a legacy Django term. In Plain it should be `package` to match `package_label`.
 
 ## What changes
