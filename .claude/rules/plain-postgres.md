@@ -69,9 +69,9 @@ Run `uv run plain docs postgres --section querying` for full patterns with code 
 
 Run `uv run plain docs postgres --section constraints` for full patterns with code examples.
 
-## Diagnostics
+## Database Doctor
 
-Use the `/plain-postgres-diagnose` skill to run database health checks (unused indexes, missing FK indexes, sequence exhaustion, etc.).
+Use the `/plain-postgres-doctor` skill to check overall database health — migration sync, schema correctness, and operational health.
 
 Run `uv run plain docs postgres --section diagnostics` for check details, thresholds, and production usage.
 
