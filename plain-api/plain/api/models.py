@@ -19,8 +19,8 @@ def generate_token() -> str:
 @postgres.register_model
 class APIKey(postgres.Model):
     uuid: UUID = types.UUIDField(default=uuid.uuid4)
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
-    updated_at: datetime = types.DateTimeField(auto_now=True)
+    created_at: datetime = types.CreatedAtField()
+    updated_at: datetime = types.UpdatedAtField()
     expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
     last_used_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
 

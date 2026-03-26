@@ -20,8 +20,8 @@ class Redirect(postgres.Model):
     http_status: int = types.PositiveSmallIntegerField(
         default=301
     )  # Default to permanent - could be choices?
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
-    updated_at: datetime = types.DateTimeField(auto_now=True)
+    created_at: datetime = types.CreatedAtField()
+    updated_at: datetime = types.UpdatedAtField()
     order: int = types.PositiveSmallIntegerField(default=0)
     enabled: bool = types.BooleanField(default=True)
     is_regex: bool = types.BooleanField(default=False)
@@ -98,7 +98,7 @@ class RedirectLog(postgres.Model):
     user_agent: str = types.CharField(required=False, max_length=512)
     referrer: str = types.CharField(required=False, max_length=512)
 
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.CreatedAtField()
 
     query: postgres.QuerySet[RedirectLog] = postgres.QuerySet()
 
@@ -147,7 +147,7 @@ class NotFoundLog(postgres.Model):
     user_agent: str = types.CharField(required=False, max_length=512)
     referrer: str = types.CharField(required=False, max_length=512)
 
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.CreatedAtField()
 
     query: postgres.QuerySet[NotFoundLog] = postgres.QuerySet()
 

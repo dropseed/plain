@@ -88,11 +88,6 @@ class MigrationQuestioner:
         """Was this model really renamed?"""
         return self.defaults.get("ask_rename_model", False)
 
-    def ask_auto_now_add_addition(self, field_name: str, model_name: str) -> Any:
-        """Adding an auto_now_add field to a model."""
-        # None means quit
-        return None
-
     def ask_unique_callable_default_addition(
         self, field_name: str, model_name: str
     ) -> Any:
@@ -246,26 +241,6 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
             default=False,
         )
 
-    def ask_auto_now_add_addition(self, field_name: str, model_name: str) -> Any:
-        """Adding an auto_now_add field to a model."""
-        if not self.dry_run:
-            choice = self._choice_input(
-                f"It is impossible to add the field '{field_name}' with "
-                f"'auto_now_add=True' to {model_name} without providing a "
-                f"default. This is because the database needs something to "
-                f"populate existing rows.\n",
-                [
-                    "Provide a one-off default now which will be set on all "
-                    "existing rows",
-                    "Quit and manually define a default value in models.py.",
-                ],
-            )
-            if choice == 2:
-                sys.exit(3)
-            else:
-                return self._ask_default(default="timezone.now")
-        return None
-
     def ask_unique_callable_default_addition(
         self, field_name: str, model_name: str
     ) -> Any:
@@ -328,13 +303,3 @@ class NonInteractiveMigrationQuestioner(MigrationQuestioner):
                 f"NOT PROVIDED and must be corrected."
             )
         return NOT_PROVIDED
-
-    def ask_auto_now_add_addition(self, field_name: str, model_name: str) -> Any:
-        # We can't ask the user, so act like the user aborted.
-        self.log_lack_of_migration(
-            field_name,
-            model_name,
-            "it is impossible to add a field with 'auto_now_add=True' without "
-            "specifying a default",
-        )
-        sys.exit(3)

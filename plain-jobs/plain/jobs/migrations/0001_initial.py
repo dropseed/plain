@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.CreatedAtField()),
                 ("started_at", postgres.DateTimeField(allow_null=True, required=False)),
                 ("job_request_uuid", postgres.UUIDField()),
                 ("job_class", postgres.CharField(max_length=255)),
@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
             name="JobRequest",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.CreatedAtField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
                 ("job_class", postgres.CharField(max_length=255)),
                 ("parameters", postgres.JSONField(allow_null=True, required=False)),
@@ -58,7 +58,7 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.CreatedAtField()),
                 ("job_uuid", postgres.UUIDField()),
                 ("started_at", postgres.DateTimeField(allow_null=True, required=False)),
                 ("ended_at", postgres.DateTimeField(allow_null=True, required=False)),

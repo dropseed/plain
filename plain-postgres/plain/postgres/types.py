@@ -23,6 +23,7 @@ from plain.postgres.fields import (
     BinaryField,
     BooleanField,
     CharField,
+    CreatedAtField,
     DateField,
     DateTimeField,
     DecimalField,
@@ -38,6 +39,7 @@ from plain.postgres.fields import (
     SmallIntegerField,
     TextField,
     TimeField,
+    UpdatedAtField,
     URLField,
     UUIDField,
 )
@@ -62,6 +64,7 @@ __all__ = [
     "BinaryField",
     "BooleanField",
     "CharField",
+    "CreatedAtField",
     "DateField",
     "DateTimeField",
     "DecimalField",
@@ -87,6 +90,7 @@ __all__ = [
     "TextField",
     "TimeField",
     "TimeZoneField",
+    "UpdatedAtField",
     "URLField",
     "UUIDField",
 ]

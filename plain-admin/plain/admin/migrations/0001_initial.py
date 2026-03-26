@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
             name="PinnedNavItem",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.CreatedAtField()),
                 ("order", postgres.SmallIntegerField(default=0)),
                 ("view_slug", postgres.CharField(max_length=255)),
                 (

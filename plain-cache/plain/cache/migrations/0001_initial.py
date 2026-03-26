@@ -17,8 +17,8 @@ class Migration(migrations.Migration):
                 ("key", postgres.CharField(max_length=255)),
                 ("value", postgres.JSONField(allow_null=True, required=False)),
                 ("expires_at", postgres.DateTimeField(allow_null=True, required=False)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
-                ("updated_at", postgres.DateTimeField(auto_now=True)),
+                ("created_at", postgres.CreatedAtField()),
+                ("updated_at", postgres.UpdatedAtField()),
             ],
         ),
         migrations.AddIndex(

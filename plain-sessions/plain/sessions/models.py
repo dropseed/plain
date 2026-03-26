@@ -12,7 +12,7 @@ __all__ = ["Session"]
 class Session(postgres.Model):
     session_key: str = types.CharField(max_length=40)
     session_data: dict = types.JSONField(default=dict, required=False)
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.CreatedAtField()
     expires_at: datetime | None = types.DateTimeField(allow_null=True)
 
     query: postgres.QuerySet[Session] = postgres.QuerySet()

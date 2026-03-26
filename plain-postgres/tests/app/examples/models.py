@@ -170,8 +170,8 @@ class CustomSpecialQuerySetModel(postgres.Model):
 class TimestampMixin:
     """Mixin that provides timestamp fields."""
 
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
-    updated_at: datetime = types.DateTimeField(auto_now=True)
+    created_at: datetime = types.CreatedAtField()
+    updated_at: datetime = types.UpdatedAtField()
 
 
 @postgres.register_model

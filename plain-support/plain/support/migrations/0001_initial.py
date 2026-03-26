@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ("name", postgres.CharField(max_length=255)),
                 ("email", postgres.EmailField(max_length=254)),
                 ("message", postgres.TextField()),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.CreatedAtField()),
                 ("form_slug", postgres.CharField(max_length=255)),
                 (
                     "user",

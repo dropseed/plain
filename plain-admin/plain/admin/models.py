@@ -17,7 +17,7 @@ class PinnedNavItem(postgres.Model):
     )
     view_slug: str = types.CharField(max_length=255)
     order: int = types.SmallIntegerField(default=0)
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.CreatedAtField()
 
     query: postgres.QuerySet[PinnedNavItem] = postgres.QuerySet()
 

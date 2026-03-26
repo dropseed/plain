@@ -46,7 +46,7 @@ class JobRequest(postgres.Model):
     Keep all pending job requests in a single table.
     """
 
-    created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime.datetime = types.CreatedAtField()
     uuid: UUID = types.UUIDField(default=uuid4)
 
     job_class: str = types.CharField(max_length=255)
@@ -170,7 +170,7 @@ class JobProcess(postgres.Model):
     """
 
     uuid: UUID = types.UUIDField(default=uuid4)
-    created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime.datetime = types.CreatedAtField()
     started_at: datetime.datetime | None = types.DateTimeField(
         required=False, allow_null=True
     )
@@ -511,7 +511,7 @@ class JobResult(postgres.Model):
     """
 
     uuid: UUID = types.UUIDField(default=uuid4)
-    created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime.datetime = types.CreatedAtField()
 
     # From the Job
     job_process_uuid: UUID = types.UUIDField()

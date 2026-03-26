@@ -7,10 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain.postgres.fields import (
     NOT_PROVIDED,
-    DateField,
-    DateTimeField,
     Field,
-    TimeField,
 )
 from plain.postgres.fields.related import ManyToManyField, RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
@@ -867,24 +864,18 @@ class MigrationAutodetector:
             )
         # You can't just add NOT NULL fields with no default or fields
         # which don't allow empty strings as default.
-        time_fields = (DateField, DateTimeField, TimeField)
         preserve_default = (
             field.allow_null
             or field.has_default()
             or isinstance(field, ManyToManyField)
             or (not field.required and field.empty_strings_allowed)
-            or (isinstance(field, time_fields) and field.auto_now)
+            or getattr(field, "db_default_sql", None)
         )
         if not preserve_default:
             field = field.clone()
-            if isinstance(field, time_fields) and field.auto_now_add:
-                field.default = self.questioner.ask_auto_now_add_addition(
-                    field_name, model_name
-                )
-            else:
-                field.default = self.questioner.ask_not_null_addition(
-                    field_name, model_name
-                )
+            field.default = self.questioner.ask_not_null_addition(
+                field_name, model_name
+            )
         if (
             field.primary_key
             and field.default is not NOT_PROVIDED

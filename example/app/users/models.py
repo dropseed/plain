@@ -12,6 +12,6 @@ class User(postgres.Model):
     email: str = types.EmailField()
     password: str = PasswordField()
     is_admin: bool = types.BooleanField(default=False)
-    created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime.datetime = types.CreatedAtField()
 
     query: postgres.QuerySet[User] = postgres.QuerySet()

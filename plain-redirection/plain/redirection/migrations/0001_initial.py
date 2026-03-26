@@ -18,8 +18,8 @@ class Migration(migrations.Migration):
                 ("from_pattern", postgres.CharField(max_length=255)),
                 ("to_pattern", postgres.CharField(max_length=255)),
                 ("http_status", postgres.PositiveSmallIntegerField(default=301)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
-                ("updated_at", postgres.DateTimeField(auto_now=True)),
+                ("created_at", postgres.CreatedAtField()),
+                ("updated_at", postgres.UpdatedAtField()),
                 ("order", postgres.PositiveSmallIntegerField(default=0)),
                 ("enabled", postgres.BooleanField(default=True)),
                 ("is_regex", postgres.BooleanField(default=False)),
@@ -38,7 +38,7 @@ class Migration(migrations.Migration):
                 ("ip_address", postgres.GenericIPAddressField()),
                 ("user_agent", postgres.CharField(max_length=512, required=False)),
                 ("referrer", postgres.CharField(max_length=512, required=False)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.CreatedAtField()),
             ],
             options={
                 "ordering": ["-created_at"],
@@ -52,7 +52,7 @@ class Migration(migrations.Migration):
                 ("ip_address", postgres.GenericIPAddressField()),
                 ("user_agent", postgres.CharField(max_length=512, required=False)),
                 ("referrer", postgres.CharField(max_length=512, required=False)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.CreatedAtField()),
             ],
             options={
                 "ordering": ["-created_at"],

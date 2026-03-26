@@ -3,7 +3,6 @@ from __future__ import annotations
 import operator
 from collections.abc import Callable, Generator
 from copy import deepcopy
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from psycopg import sql as psycopg_sql
@@ -29,7 +28,6 @@ from plain.postgres.indexes import Index
 from plain.postgres.sql import Query
 from plain.postgres.transaction import atomic
 from plain.postgres.utils import names_digest, split_identifier, strip_quotes
-from plain.utils import timezone
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -547,10 +545,14 @@ class DatabaseSchemaEditor:
         null = field.allow_null
         # Include a default value, if requested.
         if include_default:
-            default_value = self.effective_default(field)
-            if default_value is not None:
-                yield "DEFAULT %s"
-                params.append(default_value)
+            db_default_sql = getattr(field, "db_default_sql", None)
+            if db_default_sql:
+                yield f"DEFAULT {db_default_sql}"
+            else:
+                default_value = self.effective_default(field)
+                if default_value is not None:
+                    yield "DEFAULT %s"
+                    params.append(default_value)
 
         if not null:
             yield "NOT NULL"
@@ -601,16 +603,6 @@ class DatabaseSchemaEditor:
                 default = b""
             else:
                 default = ""
-        elif getattr(field, "auto_now", False) or getattr(field, "auto_now_add", False):
-            internal_type = field.get_internal_type()
-            if internal_type == "DateTimeField":
-                default = timezone.now()
-            else:
-                default = datetime.now()
-                if internal_type == "DateField":
-                    default = default.date()
-                elif internal_type == "TimeField":
-                    default = default.time()
         else:
             default = None
         return default

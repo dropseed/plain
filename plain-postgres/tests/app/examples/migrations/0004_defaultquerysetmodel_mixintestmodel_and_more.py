@@ -24,8 +24,8 @@ class Migration(migrations.Migration):
             name="MixinTestModel",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
-                ("updated_at", postgres.DateTimeField(auto_now=True)),
+                ("created_at", postgres.CreatedAtField()),
+                ("updated_at", postgres.UpdatedAtField()),
                 ("name", postgres.CharField(max_length=100)),
             ],
             options={

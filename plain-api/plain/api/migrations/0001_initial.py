@@ -3,6 +3,7 @@
 import uuid
 
 import plain.api.models
+import plain.postgres
 from plain import postgres
 from plain.postgres import migrations
 
@@ -18,8 +19,8 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
-                ("updated_at", postgres.DateTimeField(auto_now=True)),
+                ("created_at", postgres.CreatedAtField()),
+                ("updated_at", postgres.UpdatedAtField()),
                 ("expires_at", postgres.DateTimeField(allow_null=True, required=False)),
                 (
                     "last_used_at",

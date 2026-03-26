@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
                 ("id", postgres.PrimaryKeyField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
                 ("url", postgres.URLField(max_length=768)),
-                ("timestamp", postgres.DateTimeField(auto_now_add=True)),
+                ("timestamp", postgres.CreatedAtField()),
                 ("title", postgres.CharField(max_length=512, required=False)),
                 ("referrer", postgres.CharField(max_length=1024, required=False)),
                 ("user_id", postgres.CharField(max_length=255, required=False)),

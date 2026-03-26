@@ -882,10 +882,9 @@ class QuerySet[T: "Model"]:
             concrete_field_names = self.model._model_meta._non_pk_concrete_field_names
             # update_fields does not support non-concrete fields.
             if concrete_field_names.issuperset(update_fields):
-                # Add fields which are set on pre_save(), e.g. auto_now fields.
-                # This is to maintain backward compatibility as these fields
-                # are not updated unless explicitly specified in the
-                # update_fields list.
+                # Add fields which are set on pre_save(), e.g. UpdatedAtField.
+                # These fields are not updated unless explicitly specified in
+                # the update_fields list.
                 for field in self.model._model_meta.local_concrete_fields:
                     if not (
                         field.primary_key or field.__class__.pre_save is Field.pre_save

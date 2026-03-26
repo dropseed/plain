@@ -14,6 +14,7 @@ from .fields import (
     BinaryField,
     BooleanField,
     CharField,
+    CreatedAtField,
     DateField,
     DateTimeField,
     DecimalField,
@@ -29,6 +30,7 @@ from .fields import (
     SmallIntegerField,
     TextField,
     TimeField,
+    UpdatedAtField,
     URLField,
     UUIDField,
 )
@@ -64,6 +66,7 @@ __all__ = [
     "BinaryField",
     "BooleanField",
     "CharField",
+    "CreatedAtField",
     "DateField",
     "DateTimeField",
     "DecimalField",
@@ -79,6 +82,7 @@ __all__ = [
     "SmallIntegerField",
     "TextField",
     "TimeField",
+    "UpdatedAtField",
     "URLField",
     "UUIDField",
     # From fields.json

@@ -22,8 +22,8 @@ __all__ = ["OAuthConnection"]
 
 @postgres.register_model
 class OAuthConnection(postgres.Model):
-    created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
-    updated_at: datetime.datetime = types.DateTimeField(auto_now=True)
+    created_at: datetime.datetime = types.CreatedAtField()
+    updated_at: datetime.datetime = types.UpdatedAtField()
 
     user = types.ForeignKeyField(
         SettingsReference("AUTH_USER_MODEL"),

@@ -18,8 +18,8 @@ class Migration(migrations.Migration):
             name="OAuthConnection",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
-                ("updated_at", postgres.DateTimeField(auto_now=True)),
+                ("created_at", postgres.CreatedAtField()),
+                ("updated_at", postgres.UpdatedAtField()),
                 ("provider_key", postgres.CharField(max_length=100)),
                 ("provider_user_id", postgres.CharField(max_length=100)),
                 ("access_token", postgres.CharField(max_length=2000)),

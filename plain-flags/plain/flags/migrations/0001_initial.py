@@ -19,8 +19,8 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
-                ("updated_at", postgres.DateTimeField(auto_now=True)),
+                ("created_at", postgres.CreatedAtField()),
+                ("updated_at", postgres.UpdatedAtField()),
                 (
                     "name",
                     postgres.CharField(
@@ -38,8 +38,8 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
-                ("updated_at", postgres.DateTimeField(auto_now=True)),
+                ("created_at", postgres.CreatedAtField()),
+                ("updated_at", postgres.UpdatedAtField()),
                 ("key", postgres.CharField(max_length=255)),
                 ("value", postgres.JSONField()),
             ],

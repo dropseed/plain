@@ -352,8 +352,6 @@ def BooleanField(
 @overload
 def DateField(
     *,
-    auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
@@ -365,8 +363,6 @@ def DateField(
 @overload
 def DateField(
     *,
-    auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
@@ -378,8 +374,6 @@ def DateField(
 @overload
 def DateTimeField(
     *,
-    auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
@@ -391,8 +385,6 @@ def DateTimeField(
 @overload
 def DateTimeField(
     *,
-    auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
@@ -401,11 +393,11 @@ def DateTimeField(
     validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> datetime: ...
+def CreatedAtField() -> datetime: ...
+def UpdatedAtField() -> datetime: ...
 @overload
 def TimeField(
     *,
-    auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
@@ -417,8 +409,6 @@ def TimeField(
 @overload
 def TimeField(
     *,
-    auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
@@ -719,6 +709,7 @@ __all__ = [
     "BinaryField",
     "BooleanField",
     "CharField",
+    "CreatedAtField",
     "DateField",
     "DateTimeField",
     "DecimalField",
@@ -744,6 +735,7 @@ __all__ = [
     "TextField",
     "TimeField",
     "TimeZoneField",
+    "UpdatedAtField",
     "URLField",
     "UUIDField",
 ]
