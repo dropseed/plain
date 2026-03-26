@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.128.0](https://github.com/dropseed/plain/releases/plain@0.128.0) (2026-03-26)
+
+### What's changed
+
+- **Zero-downtime worker recycling** — when a worker hits `SERVER_MAX_REQUESTS`, it now signals for a replacement via a shared-memory flag and keeps serving traffic. The arbiter pre-spawns a replacement and only shuts down the retiring worker once the replacement is heartbeating, eliminating the capacity gap that previously occurred during worker recycling. ([9eaeded599fa](https://github.com/dropseed/plain/commit/9eaeded599fa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.127.2](https://github.com/dropseed/plain/releases/plain@0.127.2) (2026-03-24)
 
 ### What's changed

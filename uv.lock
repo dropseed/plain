@@ -493,7 +493,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.127.2"
+version = "0.128.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
