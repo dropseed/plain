@@ -4,7 +4,6 @@ import hmac
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain import signing
 from plain.auth import get_user_model
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
@@ -14,6 +13,7 @@ from plain.http import (
     BadRequestError400,
     RedirectResponse,
 )
+from plain.signing import BadSignature, SignatureExpired, TimestampSigner
 from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
 from plain.utils.encoding import force_bytes
@@ -37,14 +37,13 @@ class PasswordForgotView(FormView):
     reset_confirm_url_name: str
 
     def generate_password_reset_token(self, user: Any) -> str:
-        return signing.dumps(
+        return TimestampSigner(salt="password-reset").sign_object(
             {
                 "id": user.id,
                 "email": user.email,
                 "password": user.password,  # Hashed password
                 "timestamp": datetime.now().timestamp(),  # Makes each token unique
             },
-            salt="password-reset",
             compress=True,
         )
 
@@ -69,10 +68,12 @@ class PasswordResetView(AuthView, FormView):
         max_age = self.reset_token_max_age
 
         try:
-            data = signing.loads(token, salt="password-reset", max_age=max_age)
-        except signing.SignatureExpired:
+            data = TimestampSigner(salt="password-reset").unsign_object(
+                token, max_age=max_age
+            )
+        except SignatureExpired:
             return None
-        except signing.BadSignature:
+        except BadSignature:
             return None
 
         UserModel = get_user_model()

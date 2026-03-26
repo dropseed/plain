@@ -1,36 +1,15 @@
 """
-Functions for creating and restoring url-safe signed JSON objects.
+URL-safe signed JSON objects using HMAC/SHA-256.
 
-The format used looks like this:
+Use TimestampSigner for signing with expiration:
 
->>> signing.dumps("hello")
-'ImhlbGxvIg:1QaUZC:YIye-ze3TTx7gtSv422nZA4sgmk'
+    TimestampSigner(salt="my-salt").sign_object({"key": "value"})
+    TimestampSigner(salt="my-salt").unsign_object(token, max_age=3600)
 
-There are two components here, separated by a ':'. The first component is a
-URLsafe base64 encoded JSON of the object passed to dumps(). The second
-component is a base64 encoded hmac/SHA-256 hash of "$first_component:$secret"
+Use Signer for signing without expiration:
 
-signing.loads(s) checks the signature and returns the deserialized object.
-If the signature fails, a BadSignature exception is raised.
-
->>> signing.loads("ImhlbGxvIg:1QaUZC:YIye-ze3TTx7gtSv422nZA4sgmk")
-'hello'
->>> signing.loads("ImhlbGxvIg:1QaUZC:YIye-ze3TTx7gtSv42-modified")
-...
-BadSignature: Signature "ImhlbGxvIg:1QaUZC:YIye-ze3TTx7gtSv42-modified" does not match
-
-You can optionally compress the JSON prior to base64 encoding it to save
-space, using the compress=True argument. This checks if compression actually
-helps and only applies compression if the result is a shorter string:
-
->>> signing.dumps(list(range(1, 20)), compress=True)
-'.eJwFwcERACAIwLCF-rCiILN47r-GyZVJsNgkxaFxoDgxcOHGxMKD_T7vhAml:1QaUaL:BA0thEZrp4FQVXIXuOvYJtLJSrQ'
-
-The fact that the string is compressed is signalled by the prefixed '.' at the
-start of the base64 JSON.
-
-There are 65 url-safe characters: the 64 used by url-safe base64 and the ':'.
-These functions make use of all of them.
+    Signer(salt="my-salt").sign_object({"key": "value"})
+    Signer(salt="my-salt").unsign_object(token)
 """
 
 from __future__ import annotations
@@ -106,8 +85,8 @@ def base64_hmac(salt: str, value: str, key: str, algorithm: str = "sha1") -> str
 
 class JSONSerializer:
     """
-    Simple wrapper around json to be used in signing.dumps and
-    signing.loads.
+    Simple wrapper around json used by Signer.sign_object and
+    Signer.unsign_object.
     """
 
     def dumps(self, obj: Any) -> bytes:
@@ -115,56 +94,6 @@ class JSONSerializer:
 
     def loads(self, data: bytes) -> Any:
         return json.loads(data.decode("latin-1"))
-
-
-def dumps(
-    obj: Any,
-    key: str | None = None,
-    salt: str = "plain.signing",
-    serializer: type[JSONSerializer] = JSONSerializer,
-    compress: bool = False,
-) -> str:
-    """
-    Return URL-safe, hmac signed base64 compressed JSON string. If key is
-    None, use settings.SECRET_KEY instead. The hmac algorithm is the default
-    Signer algorithm.
-
-    If compress is True (not the default), check if compressing using zlib can
-    save some space. Prepend a '.' to signify compression. This is included
-    in the signature, to protect against zip bombs.
-
-    Salt can be used to namespace the hash, so that a signed string is
-    only valid for a given namespace. Leaving this at the default
-    value or re-using a salt value across different parts of your
-    application without good cause is a security risk.
-
-    The serializer is expected to return a bytestring.
-    """
-    return TimestampSigner(key=key, salt=salt).sign_object(
-        obj, serializer=serializer, compress=compress
-    )
-
-
-def loads(
-    s: str,
-    key: str | None = None,
-    salt: str = "plain.signing",
-    serializer: type[JSONSerializer] = JSONSerializer,
-    max_age: int | float | datetime.timedelta | None = None,
-    fallback_keys: list[str] | None = None,
-) -> Any:
-    """
-    Reverse of dumps(), raise BadSignature if signature fails.
-
-    The serializer is expected to accept a bytestring.
-    """
-    return TimestampSigner(
-        key=key, salt=salt, fallback_keys=fallback_keys
-    ).unsign_object(
-        s,
-        serializer=serializer,
-        max_age=max_age,
-    )
 
 
 class Signer:
