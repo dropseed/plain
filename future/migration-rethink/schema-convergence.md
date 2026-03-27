@@ -291,6 +291,21 @@ Model says `TextField()`, DB has `varchar(255)`. Is this convergence or migratio
 
 **Answer: migration.** Column type changes are imperative — they may need data transformation, they take ACCESS EXCLUSIVE + potential table rewrite, and the developer needs to consciously choose to do them. Convergence should **detect and report** type mismatches (as `postgres schema` already does) but never attempt to fix them.
 
+### Autodetector blind spot: db_type changes within the same field class
+
+The migration autodetector compares `deconstruct()` output (class path + kwargs) between old migration state and current models. It never calls `db_type()`. This means if a field class changes its SQL type without changing its deconstruct output, **no migration is generated** — existing databases silently diverge from new databases.
+
+This matters in practice when:
+
+- A field class changes its parent (e.g. EmailField moved from CharField to TextField — the db_type changed from `character varying(254)` to `text`, but deconstruct still says `plain.postgres.EmailField`)
+- A framework update changes `db_type_sql` on a field class without changing its kwargs
+
+The root cause: migration state loads the **current** class definition to reconstruct old state. There's no record of what SQL type a migration actually produced — it's always derived at runtime.
+
+`postgres schema` solves the **detection** side (comparing models against the actual DB catches these mismatches). But `makemigrations` can't **generate** the AlterField because both old and new resolve identically. The developer must write the ALTER manually or use `postgres schema` output to create a migration.
+
+A potential fix: `makemigrations` could compare the expected schema (from replaying migrations on a fresh DB) against model-derived DDL. If they differ, generate an AlterField. This is essentially `--replay` as a generation step rather than just a verification step.
+
 ### `db_default` changes
 
 **Note: `db_default` is a planned feature, not yet implemented.** Plain currently uses Python-side defaults only — when a column is created with a default, the schema editor drops the in-database default immediately after column creation. `db_default` would be a new field parameter that tells Postgres to maintain the default.
