@@ -1,5 +1,15 @@
 # plain-portal changelog
 
+## [0.2.1](https://github.com/dropseed/plain/releases/plain-portal@0.2.1) (2026-03-27)
+
+### What's changed
+
+- Added `--yes`/`-y` flag to `portal start` to skip the write-mode confirmation prompt ([0af36e101f03](https://github.com/dropseed/plain/commit/0af36e101f03))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.0](https://github.com/dropseed/plain/releases/plain-portal@0.2.0) (2026-03-24)
 
 ### What's changed
