@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.32.1](https://github.com/dropseed/plain/releases/plain-observer@0.32.1) (2026-03-27)
+
+### What's changed
+
+- Changed `observer clear` confirmation flag from `--force` to `--yes`/`-y` for consistency across all CLI commands ([0af36e101f03](https://github.com/dropseed/plain/commit/0af36e101f03))
+
+### Upgrade instructions
+
+- If you use `plain observer clear --force` in scripts, change it to `plain observer clear --yes`.
+
 ## [0.32.0](https://github.com/dropseed/plain/releases/plain-observer@0.32.0) (2026-03-25)
 
 ### What's changed
