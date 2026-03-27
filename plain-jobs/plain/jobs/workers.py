@@ -5,6 +5,7 @@ import multiprocessing
 import os
 import time
 from concurrent.futures import Future, ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
@@ -165,10 +166,22 @@ class Worker:
 
             job_process_uuid = str(job.uuid)  # Make a str copy
 
-            future = self.executor.submit(process_job, job_process_uuid)
-            future.add_done_callback(
-                partial(future_finished_callback, job_process_uuid)
-            )
+            try:
+                future = self.executor.submit(process_job, job_process_uuid)
+                future.add_done_callback(
+                    partial(future_finished_callback, job_process_uuid)
+                )
+            except (BrokenProcessPool, RuntimeError):
+                # BrokenProcessPool: child OOM, segfault, or other crash.
+                # RuntimeError: executor already shut down (shutdown race).
+                # Either way, the job was already converted from JobRequest
+                # to JobProcess, so re-enqueue it before exiting.
+                logger.warning(
+                    "Process pool broken, re-enqueuing job",
+                    extra={"job_process_uuid": job_process_uuid},
+                )
+                job.revert_to_job_request()
+                break
 
     def shutdown(self) -> None:
         if self._is_shutting_down:

@@ -231,6 +231,25 @@ class JobProcess(postgres.Model):
         ],
     )
 
+    def revert_to_job_request(self) -> JobRequest:
+        """Undo convert_to_job_process — put the job back in the request queue."""
+        with transaction.atomic():
+            job_request = JobRequest.query.create(
+                uuid=self.job_request_uuid,
+                job_class=self.job_class,
+                parameters=self.parameters,
+                priority=self.priority,
+                source=self.source,
+                queue=self.queue,
+                retries=self.retries,
+                retry_attempt=self.retry_attempt,
+                concurrency_key=self.concurrency_key,
+                trace_id=self.trace_id,
+                span_id=self.span_id,
+            )
+            self.delete()
+        return job_request
+
     def run(self) -> JobResult:
         links = []
         if self.trace_id and self.span_id:
