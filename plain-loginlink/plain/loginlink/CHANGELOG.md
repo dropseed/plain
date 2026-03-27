@@ -1,5 +1,16 @@
 # plain-loginlink changelog
 
+## [0.21.1](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.1) (2026-03-27)
+
+### What's changed
+
+- Replaced `signing.dumps`/`signing.loads` wrappers with direct `ExpiringSigner` usage for login link tokens ([99b0e57bc175](https://github.com/dropseed/plain/commit/99b0e57bc175))
+- Updated form fields from `CharField` to `TextField` ([4e29f5d6cade](https://github.com/dropseed/plain/commit/4e29f5d6cade))
+
+### Upgrade instructions
+
+- Requires `plain>=0.129.0`. No other changes required.
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-loginlink@0.21.0) (2026-03-12)
 
 ### What's changed
