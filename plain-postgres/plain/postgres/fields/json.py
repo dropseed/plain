@@ -27,6 +27,7 @@ __all__ = ["JSONField"]
 
 
 class JSONField(Field):
+    db_type_sql = "jsonb"
     empty_strings_allowed = False
     description = "A JSON object"
     default_error_messages = {
@@ -101,9 +102,6 @@ class JSONField(Field):
             return json.loads(value, cls=self.decoder)
         except json.JSONDecodeError:
             return value
-
-    def get_internal_type(self) -> str:
-        return "JSONField"
 
     def get_db_prep_value(
         self, value: Any, connection: DatabaseConnection, prepared: bool = False

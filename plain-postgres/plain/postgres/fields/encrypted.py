@@ -189,11 +189,8 @@ class EncryptedTextField(EncryptedFieldMixin, Field[str]):
     ciphertext stored in the database.
     """
 
+    db_type_sql = "text"
     description = "Encrypted text"
-
-    def get_internal_type(self) -> str:
-        # Always store as text — ciphertext is longer than plaintext
-        return "TextField"
 
     def to_python(self, value: Any) -> str | None:
         if isinstance(value, str) or value is None:
@@ -254,6 +251,7 @@ class EncryptedJSONField(EncryptedFieldMixin, Field):
     On read, it's decrypted and deserialized back to a Python object.
     """
 
+    db_type_sql = "text"
     empty_strings_allowed = False
     description = "Encrypted JSON"
     default_error_messages = {
@@ -275,10 +273,6 @@ class EncryptedJSONField(EncryptedFieldMixin, Field):
         self.encoder = encoder
         self.decoder = decoder
         super().__init__(**kwargs)
-
-    def get_internal_type(self) -> str:
-        # Store as text, not jsonb — we're storing encrypted ciphertext
-        return "TextField"
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()

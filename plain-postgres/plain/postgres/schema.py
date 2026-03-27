@@ -16,13 +16,19 @@ if TYPE_CHECKING:
 from plain.logs import get_framework_logger
 from plain.postgres.constraints import Deferrable
 from plain.postgres.dialect import (
-    DATA_TYPE_CHECK_CONSTRAINTS,
-    DATA_TYPES,
     DEFERRABLE_SQL,
     MAX_NAME_LENGTH,
     quote_name,
 )
-from plain.postgres.fields import DbParameters, Field
+from plain.postgres.fields import (
+    BinaryField,
+    DateField,
+    DateTimeField,
+    DbParameters,
+    Field,
+    PrimaryKeyField,
+    TimeField,
+)
 from plain.postgres.fields.related import ForeignKeyField, RelatedField
 from plain.postgres.fields.reverse_related import ForeignObjectRel, ManyToManyRel
 from plain.postgres.indexes import Index
@@ -597,19 +603,18 @@ class DatabaseSchemaEditor:
         elif (
             not field.allow_null and not field.required and field.empty_strings_allowed
         ):
-            if field.get_internal_type() == "BinaryField":
+            if isinstance(field, BinaryField):
                 default = b""
             else:
                 default = ""
         elif getattr(field, "auto_now", False) or getattr(field, "auto_now_add", False):
-            internal_type = field.get_internal_type()
-            if internal_type == "DateTimeField":
+            if isinstance(field, DateTimeField):
                 default = timezone.now()
             else:
                 default = datetime.now()
-                if internal_type == "DateField":
+                if isinstance(field, DateField):
                     default = default.date()
-                elif internal_type == "TimeField":
+                elif isinstance(field, TimeField):
                     default = default.time()
         else:
             default = None
@@ -851,22 +856,18 @@ class DatabaseSchemaEditor:
     ) -> str | None:
         # Always check constraints with the same mocked column name to avoid
         # recreating constrains when the column is renamed.
+        if field.db_check_sql is None:
+            return None
         data = field.db_type_parameters()
         data["column"] = "__column_name__"
-        try:
-            return DATA_TYPE_CHECK_CONSTRAINTS[field.get_internal_type()] % data
-        except KeyError:
-            return None
+        return field.db_check_sql % data
 
-    def _field_data_type(
-        self, field: Field
-    ) -> str | None | Callable[[dict[str, Any]], str]:
+    def _field_data_type(self, field: Field) -> str | None:
         if isinstance(field, RelatedField):
             return field.rel_db_type()
-        return DATA_TYPES.get(
-            field.get_internal_type(),
-            field.db_type(),
-        )
+        if field.db_type_sql is not None:
+            return field.db_type_sql
+        return field.db_type()
 
     def _get_sequence_name(self, table: str, column: str) -> str | None:
         with self.connection.cursor() as cursor:
@@ -1246,13 +1247,10 @@ class DatabaseSchemaEditor:
         # Cast when data type changed.
         if self._field_data_type(old_field) != self._field_data_type(new_field):
             self.sql_alter_column_type += " USING %(column)s::%(type)s"
-        new_internal_type = new_field.get_internal_type()
-        old_internal_type = old_field.get_internal_type()
         # Make ALTER TYPE with IDENTITY make sense.
         table = strip_quotes(model.model_options.db_table)
-        auto_field_types = {"PrimaryKeyField"}
-        old_is_auto = old_internal_type in auto_field_types
-        new_is_auto = new_internal_type in auto_field_types
+        old_is_auto = isinstance(old_field, PrimaryKeyField)
+        new_is_auto = isinstance(new_field, PrimaryKeyField)
         if new_is_auto and not old_is_auto:
             column = strip_quotes(new_field.column)
             return (
@@ -1303,12 +1301,11 @@ class DatabaseSchemaEditor:
                     )
                 ]
             return fragment, other_actions
-        elif new_is_auto and old_is_auto and old_internal_type != new_internal_type:
+        elif new_is_auto and old_is_auto and type(old_field) is not type(new_field):
             fragment, _ = self._alter_column_type_sql_base(
                 model, old_field, new_field, new_type
             )
             column = strip_quotes(new_field.column)
-            db_types = {"PrimaryKeyField": "bigint"}
             # Alter the sequence type if exists (Plain 4.1+ identity columns
             # don't have it).
             other_actions: list[tuple[str, list[Any]]] = []
@@ -1318,7 +1315,7 @@ class DatabaseSchemaEditor:
                         self.sql_alter_sequence_type
                         % {
                             "sequence": quote_name(sequence_name),
-                            "type": db_types[new_internal_type],
+                            "type": new_field.db_type_sql,
                         },
                         [],
                     ),

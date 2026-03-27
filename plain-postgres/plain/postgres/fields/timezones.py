@@ -54,6 +54,7 @@ class TimeZoneField(Field[zoneinfo.ZoneInfo]):
     zoneinfo.ZoneInfo objects when accessed.
     """
 
+    db_type_sql = "character varying"
     description = "A timezone (stored as string, accessed as ZoneInfo)"
 
     # Mapping of legacy timezone names to canonical IANA names
@@ -92,8 +93,10 @@ class TimeZoneField(Field[zoneinfo.ZoneInfo]):
         zones.sort(key=lambda x: x[1])
         return [("", "---------")] + zones
 
-    def get_internal_type(self) -> str:
-        return "CharField"
+    def db_type(self) -> str | None:
+        if self.max_length is None:
+            return "character varying"
+        return f"character varying({self.max_length})"
 
     def to_python(self, value: Any) -> zoneinfo.ZoneInfo | None:
         """Convert input to ZoneInfo object."""

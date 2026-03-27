@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from plain.postgres.dialect import DATA_TYPES
+from plain.postgres import fields
+from plain.postgres.fields.json import JSONField
 
 # Postgres short-form type aliases that should NOT appear in db_type() output.
-# If db_type() returns canonical forms, none of these will match.
 _SHORT_ALIASES = {
     "bool",
     "varchar",
@@ -21,73 +21,87 @@ _SHORT_ALIASES = {
     "timetz",
 }
 
-
-def _resolve_type(entry: object) -> str:
-    """Resolve a DATA_TYPES entry to a concrete type string."""
-    if isinstance(entry, str) and "%(" in entry:
-        # DecimalField template
-        return entry % {"max_digits": 10, "decimal_places": 2}
-    if isinstance(entry, str):
-        return entry
-    # Callable (e.g. CharField's _get_varchar_column)
-    result = entry({"max_length": 100})  # type: ignore[operator]
-    assert isinstance(result, str)
-    return result
+# All concrete field classes and their expected db_type_sql values
+_FIELD_TYPES = [
+    (fields.BooleanField, "boolean"),
+    (fields.CharField, "character varying"),
+    (fields.DateField, "date"),
+    (fields.DateTimeField, "timestamp with time zone"),
+    (fields.DecimalField, "numeric(%(max_digits)s,%(decimal_places)s)"),
+    (fields.DurationField, "interval"),
+    (fields.FloatField, "double precision"),
+    (fields.IntegerField, "integer"),
+    (fields.BigIntegerField, "bigint"),
+    (fields.SmallIntegerField, "smallint"),
+    (fields.GenericIPAddressField, "inet"),
+    (fields.TextField, "text"),
+    (fields.TimeField, "time without time zone"),
+    (fields.UUIDField, "uuid"),
+    (fields.BinaryField, "bytea"),
+    (fields.PrimaryKeyField, "bigint"),
+    (fields.PositiveIntegerField, "integer"),
+    (fields.PositiveBigIntegerField, "bigint"),
+    (fields.PositiveSmallIntegerField, "smallint"),
+    (JSONField, "jsonb"),
+]
 
 
 @pytest.mark.parametrize(
-    "field_type",
-    list(DATA_TYPES.keys()),
+    ("field_class", "expected_sql"),
+    _FIELD_TYPES,
+    ids=[cls.__name__ for cls, _ in _FIELD_TYPES],
 )
-def test_db_type_uses_canonical_form(field_type: str) -> None:
-    """db_type() output should use Postgres canonical type names, not short aliases."""
-    entry = DATA_TYPES[field_type]
-    type_str = _resolve_type(entry)
+def test_db_type_sql_set(field_class: type[fields.Field], expected_sql: str) -> None:
+    """Every concrete field class has db_type_sql set correctly."""
+    assert field_class.db_type_sql == expected_sql
 
-    # The first word of the type should not be a known short alias
-    base = type_str.split("(")[0].split()[0]
+
+@pytest.mark.parametrize(
+    ("field_class", "expected_sql"),
+    _FIELD_TYPES,
+    ids=[cls.__name__ for cls, _ in _FIELD_TYPES],
+)
+def test_db_type_uses_canonical_form(field_class: type, expected_sql: str) -> None:
+    """db_type_sql should use Postgres canonical type names, not short aliases."""
+    base = expected_sql.split("(")[0].split()[0]
     assert base not in _SHORT_ALIASES, (
-        f"{field_type} db_type() returns {type_str!r} which uses short alias {base!r}. "
+        f"{field_class.__name__}.db_type_sql = {expected_sql!r} uses short alias {base!r}. "
         f"Use the canonical Postgres form instead."
     )
 
 
-def test_varchar_without_max_length() -> None:
-    """CharField without max_length should also use canonical form."""
-    entry = DATA_TYPES["CharField"]
-    assert callable(entry)
-    type_str = entry({"max_length": None})
-    assert type_str == "character varying"
+def test_charfield_db_type_without_max_length() -> None:
+    """CharField without max_length produces 'character varying'."""
+    f = fields.CharField()
+    assert f.db_type() == "character varying"
 
 
-def test_varchar_with_max_length() -> None:
-    """CharField with max_length should use canonical form."""
-    entry = DATA_TYPES["CharField"]
-    assert callable(entry)
-    type_str = entry({"max_length": 255})
-    assert type_str == "character varying(255)"
+def test_charfield_db_type_with_max_length() -> None:
+    """CharField with max_length produces 'character varying(N)'."""
+    f = fields.CharField(max_length=255)
+    assert f.db_type() == "character varying(255)"
 
 
-# Verify specific types match what Postgres format_type() returns
+# Verify specific db_type() output matches Postgres format_type()
 @pytest.mark.parametrize(
-    ("field_type", "expected"),
+    ("field_class", "expected"),
     [
-        ("DateTimeField", "timestamp with time zone"),
-        ("TimeField", "time without time zone"),
-        ("FloatField", "double precision"),
-        ("BooleanField", "boolean"),
-        ("IntegerField", "integer"),
-        ("BigIntegerField", "bigint"),
-        ("SmallIntegerField", "smallint"),
-        ("TextField", "text"),
-        ("JSONField", "jsonb"),
-        ("UUIDField", "uuid"),
-        ("DateField", "date"),
-        ("DurationField", "interval"),
-        ("BinaryField", "bytea"),
-        ("PrimaryKeyField", "bigint"),
+        (fields.DateTimeField, "timestamp with time zone"),
+        (fields.TimeField, "time without time zone"),
+        (fields.FloatField, "double precision"),
+        (fields.BooleanField, "boolean"),
+        (fields.IntegerField, "integer"),
+        (fields.BigIntegerField, "bigint"),
+        (fields.SmallIntegerField, "smallint"),
+        (fields.TextField, "text"),
+        (fields.UUIDField, "uuid"),
+        (fields.DateField, "date"),
+        (fields.DurationField, "interval"),
+        (fields.BinaryField, "bytea"),
+        (fields.PrimaryKeyField, "bigint"),
     ],
+    ids=lambda x: x.__name__ if isinstance(x, type) else x,
 )
-def test_specific_type_matches_canonical(field_type: str, expected: str) -> None:
-    type_str = _resolve_type(DATA_TYPES[field_type])
-    assert type_str == expected
+def test_specific_type_matches_canonical(field_class: type, expected: str) -> None:
+    f = field_class()
+    assert f.db_type() == expected

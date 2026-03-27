@@ -408,20 +408,19 @@ class BaseExpression:
         from the one the database returns.
         """
         field = self.output_field
-        internal_type = field.get_internal_type()
-        if internal_type == "FloatField":
+        if isinstance(field, fields.FloatField):
             return (
                 lambda value, expression, connection: None
                 if value is None
                 else float(value)
             )
-        elif internal_type.endswith("IntegerField"):
+        elif isinstance(field, fields.IntegerField):
             return (
                 lambda value, expression, connection: None
                 if value is None
                 else int(value)
             )
-        elif internal_type == "DecimalField":
+        elif isinstance(field, fields.DecimalField):
             return (
                 lambda value, expression, connection: None
                 if value is None
@@ -769,19 +768,20 @@ class CombinedExpression(Expression):
         )
         if not isinstance(self, TemporalSubtraction):
             try:
-                lhs_type = lhs.output_field.get_internal_type()
+                lhs_field = lhs.output_field
             except (AttributeError, FieldError):
-                lhs_type = None
+                lhs_field = None
             try:
-                rhs_type = rhs.output_field.get_internal_type()
+                rhs_field = rhs.output_field
             except (AttributeError, FieldError):
-                rhs_type = None
-            datetime_fields = {"DateField", "DateTimeField", "TimeField"}
-            if (
-                self.connector == self.SUB
-                and lhs_type in datetime_fields
-                and lhs_type == rhs_type
-            ):
+                rhs_field = None
+            is_temporal = isinstance(lhs_field, fields.DateField | fields.TimeField)
+            same_type = (
+                lhs_field is not None
+                and rhs_field is not None
+                and type(lhs_field) is type(rhs_field)
+            )
+            if self.connector == self.SUB and is_temporal and same_type:
                 return TemporalSubtraction(self.lhs, self.rhs).resolve_expression(
                     query,
                     allow_joins,
@@ -807,9 +807,7 @@ class TemporalSubtraction(CombinedExpression):
     ) -> tuple[str, list[Any]]:
         lhs = compiler.compile(self.lhs)
         rhs = compiler.compile(self.rhs)
-        sql, params = subtract_temporals(
-            self.lhs.output_field.get_internal_type(), lhs, rhs
-        )
+        sql, params = subtract_temporals(self.lhs.output_field, lhs, rhs)
         return sql, list(params)
 
 
@@ -1028,7 +1026,7 @@ class Value(Expression):
            added into the sql parameter list and properly quoted.
 
          * output_field: an instance of the model field type that this
-           expression will return, such as IntegerField() or CharField().
+           expression will return, such as IntegerField() or TextField().
         """
         super().__init__(output_field=output_field)
         self.value = value
@@ -1069,7 +1067,7 @@ class Value(Expression):
 
     def _resolve_output_field(self) -> Field | None:
         if isinstance(self.value, str):
-            return fields.CharField()
+            return fields.TextField()
         if isinstance(self.value, bool):
             return fields.BooleanField()
         if isinstance(self.value, int):

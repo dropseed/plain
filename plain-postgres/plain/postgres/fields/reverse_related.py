@@ -115,9 +115,6 @@ class ForeignObjectRel(FieldCacheMixin):
     def get_lookup(self, lookup_name: str) -> type[Lookup] | None:
         return self.field.get_lookup(lookup_name)
 
-    def get_internal_type(self) -> str:
-        return self.field.get_internal_type()
-
     @property
     def db_type(self) -> str | None:
         return self.field.db_type

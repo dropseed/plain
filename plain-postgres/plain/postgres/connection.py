@@ -29,6 +29,7 @@ from plain.exceptions import ImproperlyConfigured
 from plain.logs import get_framework_logger
 from plain.postgres import utils
 from plain.postgres.dialect import MAX_NAME_LENGTH, quote_name
+from plain.postgres.fields import GenericIPAddressField, TimeField, UUIDField
 from plain.postgres.indexes import Index
 from plain.postgres.schema import DatabaseSchemaEditor
 from plain.postgres.transaction import TransactionManagementError
@@ -841,12 +842,7 @@ class DatabaseConnection:
         to that type. The resulting string should contain a '%s' placeholder
         for the expression being cast.
         """
-        internal_type = output_field.get_internal_type()
-        if internal_type in (
-            "GenericIPAddressField",
-            "TimeField",
-            "UUIDField",
-        ):
+        if isinstance(output_field, GenericIPAddressField | TimeField | UUIDField):
             # PostgreSQL will resolve a union as type 'text' if input types are
             # 'unknown'.
             # https://www.postgresql.org/docs/current/typeconv-union-case.html

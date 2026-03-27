@@ -8,7 +8,6 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.dialect import (
-    INTEGER_FIELD_RANGES,
     OPERATORS,
     PATTERN_ESC,
     PATTERN_OPS,
@@ -239,8 +238,7 @@ class BuiltinLookup(Lookup):
             "lookup_name must be set on Lookup subclass"
         )
         lhs_sql, params = super().process_lhs(compiler, connection, lhs)
-        field_internal_type = self.lhs.output_field.get_internal_type()
-        lhs_sql = lookup_cast(self.lookup_name, field_internal_type) % lhs_sql
+        lhs_sql = lookup_cast(self.lookup_name, self.lhs.output_field) % lhs_sql
         return lhs_sql, list(params)
 
     def as_sql(
@@ -438,8 +436,7 @@ class IntegerFieldOverflow:
     ) -> tuple[str, list[Any]]:
         rhs = self.rhs
         if isinstance(rhs, int):
-            field_internal_type = self.lhs.output_field.get_internal_type()
-            min_value, max_value = INTEGER_FIELD_RANGES[field_internal_type]
+            min_value, max_value = self.lhs.output_field.integer_range
             if min_value is not None and rhs < min_value:
                 raise self.underflow_exception
             if max_value is not None and rhs > max_value:
