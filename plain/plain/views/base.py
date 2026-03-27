@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 from http import HTTPMethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from plain.http import (
     JsonResponse,
@@ -23,6 +23,16 @@ logger = get_framework_logger("plain.request")
 class View:
     request: Request
     url_kwargs: dict[str, Any]
+
+    if TYPE_CHECKING:
+
+        def get(self) -> Any: ...
+        def post(self) -> Any: ...
+        def put(self) -> Any: ...
+        def patch(self) -> Any: ...
+        def delete(self) -> Any: ...
+        def head(self) -> Any: ...
+        def trace(self) -> Any: ...
 
     def __init__(
         self,
