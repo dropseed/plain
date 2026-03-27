@@ -1,12 +1,12 @@
 [project]
 name = "plain.support"
-version = "0.33.0"
+version = "0.33.1"
 description = "Provides support forms for your application."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
-dependencies = ["plain>=0.123.0,<1.0.0", "plain.postgres>=0.89.0,<1.0.0", "plain.auth<1.0.0"]
+dependencies = ["plain>=0.129.0,<1.0.0", "plain.postgres>=0.89.0,<1.0.0", "plain.auth<1.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

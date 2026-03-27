@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.33.1](https://github.com/dropseed/plain/releases/plain-support@0.33.1) (2026-03-27)
+
+### What's changed
+
+- Updated form field references from `CharField` to `TextField` in README example ([4e29f5d6cade](https://github.com/dropseed/plain/commit/4e29f5d6cade))
+
+### Upgrade instructions
+
+- Requires `plain>=0.129.0`. No other changes required.
+
 ## [0.33.0](https://github.com/dropseed/plain/releases/plain-support@0.33.0) (2026-03-25)
 
 ### What's changed
