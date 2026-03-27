@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.46.6](https://github.com/dropseed/plain/releases/plain-jobs@0.46.6) (2026-03-27)
+
+### What's changed
+
+- **Jobs are now re-enqueued when the process pool breaks** — if a child process crashes (OOM, segfault) or the executor shuts down during submit, the job is reverted from `JobProcess` back to `JobRequest` instead of being lost ([984cfe724da7](https://github.com/dropseed/plain/commit/984cfe724da7))
+- Changed `jobs purge` confirmation flag to `--yes`/`-y` for consistency across all CLI commands ([0af36e101f03](https://github.com/dropseed/plain/commit/0af36e101f03))
+
+### Upgrade instructions
+
+- If you use `plain jobs purge` in scripts without confirmation, add `--yes` to skip the prompt.
+
 ## [0.46.5](https://github.com/dropseed/plain/releases/plain-jobs@0.46.5) (2026-03-25)
 
 ### What's changed
