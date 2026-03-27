@@ -104,9 +104,11 @@ class Worker:
 
         # Worker recycling — gracefully restart after N requests to prevent
         # memory accumulation from fragmentation, C extension leaks, etc.
+        # Disabled in reload mode since file-change restarts already recycle workers,
+        # and retirement during reload causes unnecessary extra restart cycles.
         # Jitter is applied later in init_process() after util.seed() so
         # each forked worker gets a unique value.
-        self.max_requests: int = settings.SERVER_MAX_REQUESTS
+        self.max_requests: int = 0 if self.app.reload else settings.SERVER_MAX_REQUESTS
         self.total_requests: int = 0
 
     def __str__(self) -> str:
