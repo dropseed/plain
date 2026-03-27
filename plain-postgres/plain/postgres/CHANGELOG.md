@@ -1,5 +1,21 @@
 # plain-postgres changelog
 
+## [0.89.2](https://github.com/dropseed/plain/releases/plain-postgres@0.89.2) (2026-03-27)
+
+### What's changed
+
+- Fixed `schema` command miscategorizing expression-based unique constraints as missing columns ([93ab244416f8](https://github.com/dropseed/plain/commit/93ab244416f8))
+- Used canonical Postgres type names in `DATA_TYPES` mapping, removing the `_normalize_type` helper ([f581fe6009bd](https://github.com/dropseed/plain/commit/f581fe6009bd))
+- Moved `diagnose/` module to `introspection/`, consolidated into 2 files, added schema introspection functions used by `schema` and `drop-unknown-tables` commands ([86f7f5b85a87](https://github.com/dropseed/plain/commit/86f7f5b85a87))
+- `diagnose --json` now exits 0 — the JSON data is the signal, not the exit code ([86f7f5b85a87](https://github.com/dropseed/plain/commit/86f7f5b85a87))
+- Added migration reset documentation for replacing migration history with a fresh `0001_initial` ([2fa6203379e9](https://github.com/dropseed/plain/commit/2fa6203379e9))
+- Updated form field references from `CharField` to `TextField` in model forms ([4e29f5d6cade](https://github.com/dropseed/plain/commit/4e29f5d6cade))
+- Changed CLI confirmation flags to `--yes`/`-y` across all commands ([0af36e101f03](https://github.com/dropseed/plain/commit/0af36e101f03))
+
+### Upgrade instructions
+
+- Requires `plain>=0.129.0`. If you use `plain postgres diagnose --json` exit codes in CI, note that it now always exits 0 — check the JSON output for issues instead.
+
 ## [0.89.1](https://github.com/dropseed/plain/releases/plain-postgres@0.89.1) (2026-03-26)
 
 ### What's changed
