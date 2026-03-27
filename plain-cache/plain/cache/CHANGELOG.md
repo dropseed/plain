@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.26.3](https://github.com/dropseed/plain/releases/plain-cache@0.26.3) (2026-03-27)
+
+### What's changed
+
+- Changed `cache clear-all` confirmation flag from `--force` to `--yes`/`-y` for consistency across all CLI commands ([0af36e101f03](https://github.com/dropseed/plain/commit/0af36e101f03))
+
+### Upgrade instructions
+
+- If you use `plain cache clear-all --force` in scripts, change it to `plain cache clear-all --yes`.
+
 ## [0.26.2](https://github.com/dropseed/plain/releases/plain-cache@0.26.2) (2026-03-25)
 
 ### What's changed
