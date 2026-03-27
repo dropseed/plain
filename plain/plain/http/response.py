@@ -327,8 +327,23 @@ class Response(ResponseBase):
 
     streaming = False
 
-    def __init__(self, content: bytes | str | Iterator[bytes] = b"", **kwargs: Any):
-        super().__init__(**kwargs)
+    def __init__(
+        self,
+        content: bytes | str | Iterator[bytes] = b"",
+        *,
+        content_type: str | None = None,
+        status_code: int | None = None,
+        reason: str | None = None,
+        charset: str | None = None,
+        headers: dict[str, Any] | None = None,
+    ):
+        super().__init__(
+            content_type=content_type,
+            status_code=status_code,
+            reason=reason,
+            charset=charset,
+            headers=headers,
+        )
         # Content is a bytestring. See the `content` property methods.
         self.content = content
 
@@ -374,8 +389,23 @@ class StreamingResponse(ResponseBase):
 
     streaming = True
 
-    def __init__(self, streaming_content: Any = (), **kwargs: Any):
-        super().__init__(**kwargs)
+    def __init__(
+        self,
+        streaming_content: Any = (),
+        *,
+        content_type: str | None = None,
+        status_code: int | None = None,
+        reason: str | None = None,
+        charset: str | None = None,
+        headers: dict[str, Any] | None = None,
+    ):
+        super().__init__(
+            content_type=content_type,
+            status_code=status_code,
+            reason=reason,
+            charset=charset,
+            headers=headers,
+        )
         # `streaming_content` should be an iterable of bytestrings.
         # See the `streaming_content` property methods.
         self.streaming_content = streaming_content
@@ -423,8 +453,23 @@ class AsyncStreamingResponse(ResponseBase):
 
     streaming = True
 
-    def __init__(self, streaming_content: AsyncIterator[bytes | str], **kwargs: Any):
-        super().__init__(**kwargs)
+    def __init__(
+        self,
+        streaming_content: AsyncIterator[bytes | str],
+        *,
+        content_type: str | None = None,
+        status_code: int | None = None,
+        reason: str | None = None,
+        charset: str | None = None,
+        headers: dict[str, Any] | None = None,
+    ):
+        super().__init__(
+            content_type=content_type,
+            status_code=status_code,
+            reason=reason,
+            charset=charset,
+            headers=headers,
+        )
         self._async_iterator = streaming_content
 
     def __repr__(self) -> str:
@@ -460,14 +505,28 @@ class FileResponse(StreamingResponse):
     block_size = 4096
 
     def __init__(
-        self, *args: Any, as_attachment: bool = False, filename: str = "", **kwargs: Any
+        self,
+        streaming_content: Any = (),
+        *,
+        as_attachment: bool = False,
+        filename: str = "",
+        content_type: str | None = None,
+        status_code: int | None = None,
+        reason: str | None = None,
+        charset: str | None = None,
+        headers: dict[str, Any] | None = None,
     ):
         self.as_attachment = as_attachment
         self.filename = filename
-        self._no_explicit_content_type = (
-            "content_type" not in kwargs or kwargs["content_type"] is None
+        self._no_explicit_content_type = content_type is None
+        super().__init__(
+            streaming_content,
+            content_type=content_type,
+            status_code=status_code,
+            reason=reason,
+            charset=charset,
+            headers=headers,
         )
-        super().__init__(*args, **kwargs)
 
     def _set_streaming_content(self, value: Any) -> None:
         if not hasattr(value, "read"):
@@ -562,7 +621,15 @@ class RedirectResponse(Response):
     status_code = 302
 
     def __init__(
-        self, redirect_to: str, *, allow_external: bool = False, **kwargs: Any
+        self,
+        redirect_to: str,
+        *,
+        allow_external: bool = False,
+        content_type: str | None = None,
+        status_code: int | None = None,
+        reason: str | None = None,
+        charset: str | None = None,
+        headers: dict[str, Any] | None = None,
     ):
         if not allow_external and _is_external_url(redirect_to):
             raise ValueError(
@@ -571,7 +638,13 @@ class RedirectResponse(Response):
                 "Use allow_external=True if you intentionally want to redirect "
                 "to an external URL."
             )
-        super().__init__(**kwargs)
+        super().__init__(
+            content_type=content_type,
+            status_code=status_code,
+            reason=reason,
+            charset=charset,
+            headers=headers,
+        )
         self.headers["Location"] = iri_to_uri(redirect_to) or ""
 
     @property
@@ -595,8 +668,18 @@ class NotModifiedResponse(Response):
 
     status_code = 304
 
-    def __init__(self, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        *,
+        reason: str | None = None,
+        charset: str | None = None,
+        headers: dict[str, Any] | None = None,
+    ):
+        super().__init__(
+            reason=reason,
+            charset=charset,
+            headers=headers,
+        )
         del self.headers["content-type"]
 
     @Response.content.setter
@@ -613,8 +696,23 @@ class NotAllowedResponse(Response):
 
     status_code = 405
 
-    def __init__(self, permitted_methods: list[str], *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        permitted_methods: list[str],
+        *,
+        content_type: str | None = None,
+        status_code: int | None = None,
+        reason: str | None = None,
+        charset: str | None = None,
+        headers: dict[str, Any] | None = None,
+    ):
+        super().__init__(
+            content_type=content_type,
+            status_code=status_code,
+            reason=reason,
+            charset=charset,
+            headers=headers,
+        )
         self.headers["Allow"] = ", ".join(permitted_methods)
 
     def __repr__(self) -> str:
@@ -643,10 +741,15 @@ class JsonResponse(Response):
     def __init__(
         self,
         data: Any,
+        *,
         encoder: type[json.JSONEncoder] = PlainJSONEncoder,
         safe: bool = True,
         json_dumps_params: dict[str, Any] | None = None,
-        **kwargs: Any,
+        content_type: str = "application/json",
+        status_code: int | None = None,
+        reason: str | None = None,
+        charset: str | None = None,
+        headers: dict[str, Any] | None = None,
     ):
         if safe and not isinstance(data, dict):
             raise TypeError(
@@ -655,6 +758,12 @@ class JsonResponse(Response):
             )
         if json_dumps_params is None:
             json_dumps_params = {}
-        kwargs.setdefault("content_type", "application/json")
         data = json.dumps(data, cls=encoder, **json_dumps_params)
-        super().__init__(content=data, **kwargs)
+        super().__init__(
+            content=data,
+            content_type=content_type,
+            status_code=status_code,
+            reason=reason,
+            charset=charset,
+            headers=headers,
+        )

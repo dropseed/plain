@@ -311,7 +311,7 @@ class AssetView(View):
 
         if not range_header.startswith("bytes="):
             return Response(
-                status_code=416, headers=[("Content-Range", f"bytes */{file_size}")]
+                status_code=416, headers={"Content-Range": f"bytes */{file_size}"}
             )
 
         range_values = range_header.split("=")[1].split("-")
@@ -320,7 +320,7 @@ class AssetView(View):
 
         if start >= file_size:
             return Response(
-                status_code=416, headers=[("Content-Range", f"bytes */{file_size}")]
+                status_code=416, headers={"Content-Range": f"bytes */{file_size}"}
             )
 
         end = int(min(end, file_size - 1))
