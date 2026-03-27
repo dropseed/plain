@@ -1,5 +1,16 @@
 # plain-passwords changelog
 
+## [0.24.1](https://github.com/dropseed/plain/releases/plain-passwords@0.24.1) (2026-03-27)
+
+### What's changed
+
+- Switched password reset token signing from `signing.dumps`/`signing.loads` to `TimestampSigner` directly ([99b0e57bc175](https://github.com/dropseed/plain/commit/99b0e57bc175))
+- Updated form fields from `CharField` to `TextField` ([4e29f5d6cade](https://github.com/dropseed/plain/commit/4e29f5d6cade))
+
+### Upgrade instructions
+
+- Requires `plain>=0.129.0`. No other changes required.
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-passwords@0.24.0) (2026-03-12)
 
 ### What's changed
