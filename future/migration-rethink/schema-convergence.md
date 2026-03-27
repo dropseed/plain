@@ -97,10 +97,19 @@ Three concrete dependency chains exist:
 Convergence runs in five ordered passes. Each pass completes fully before the next begins. Within a pass, operations are independent and could be parallelized in the future.
 
 ```
+Pass 0: Defaults (SET DEFAULT, DROP DEFAULT)
+  - Applies defaults from model declarations — both static values and DB expressions
+    (e.g., SET DEFAULT 'pending', SET DEFAULT gen_random_uuid(), SET DEFAULT now())
+  - Runs FIRST to close the nullable window: after a migration adds a nullable column,
+    SET DEFAULT ensures new rows immediately get the correct value
+  - Catalog-only, instant — even for DB expression defaults like gen_random_uuid()
+  - See fields-db-defaults.md for the full design of DB expression defaults
+
 Pass 1: Indexes (CREATE INDEX CONCURRENTLY, DROP INDEX CONCURRENTLY)
   - Creates all missing indexes, including unique indexes needed by unique constraints
-  - Drops indexes that exist in DB but not in model declarations
   - Detects and replaces INVALID indexes (drop + recreate)
+  - Detects index definition changes (same name, different columns/type/condition)
+    and reports them — see "Index modification detection" below
 
 Pass 2: Constraints — initial (ADD CONSTRAINT ... NOT VALID, ADD CONSTRAINT ... USING INDEX)
   - FK constraints: ADD CONSTRAINT ... NOT VALID (SHARE ROW EXCLUSIVE lock, no scan)
@@ -117,8 +126,7 @@ Pass 4: NOT NULL finalization (SET NOT NULL)
   - Drops the temporary CHECK constraint after SET NOT NULL succeeds
   - Skipped if validation failed (constraint stays NOT VALID, retried next run)
 
-Pass 5: Defaults and cleanup (SET DEFAULT, DROP DEFAULT, constraint drops)
-  - Applies db_default changes (SET DEFAULT / DROP DEFAULT — catalog-only, instant)
+Pass 5: Cleanup (constraint/index drops)
   - Drops constraints/indexes no longer declared on models (with --prune or confirmation)
 ```
 
@@ -138,17 +146,37 @@ Each pass has different lock characteristics:
 
 | Pass           | Lock acquired                                                 | Duration                             | Blocks writes? |
 | -------------- | ------------------------------------------------------------- | ------------------------------------ | -------------- |
+| 0: Defaults    | ACCESS EXCLUSIVE                                              | Milliseconds (catalog-only)          | Briefly        |
 | 1: Indexes     | SHARE UPDATE EXCLUSIVE (concurrent)                           | Minutes for large tables             | No             |
 | 2: Constraints | SHARE ROW EXCLUSIVE (FK) or ACCESS EXCLUSIVE (CHECK/NOT NULL) | Milliseconds (no scan)               | Briefly        |
 | 3: Validation  | SHARE UPDATE EXCLUSIVE                                        | Seconds to minutes (scans data)      | No             |
 | 4: NOT NULL    | ACCESS EXCLUSIVE                                              | Milliseconds (scan skipped by CHECK) | Briefly        |
-| 5: Defaults    | ACCESS EXCLUSIVE                                              | Milliseconds (catalog-only)          | Briefly        |
+| 5: Cleanup     | Varies                                                        | Milliseconds                         | Briefly        |
 
-The expensive passes (1, 3) don't block writes. The blocking passes (2, 4, 5) complete in milliseconds because they skip scans. This is the whole point of the multi-pass approach.
+The expensive passes (1, 3) don't block writes. The blocking passes (0, 2, 4, 5) complete in milliseconds because they skip scans. Pass 0 runs first to close the nullable window immediately after migrations add new columns.
+
+### Index modification detection
+
+When a model's index declaration changes (different columns, different type, added WHERE clause) but keeps the same name, convergence sees the existing index doesn't match the declaration. It can't modify an index in place — Postgres requires drop + create.
+
+For small tables this is fine. For large tables, rebuilding an index CONCURRENTLY can take minutes. Convergence handles this by:
+
+1. Detecting the mismatch: "index `orders_status_idx` exists but definition differs from model"
+2. Creating a new index with a temporary name CONCURRENTLY (non-blocking)
+3. Dropping the old index CONCURRENTLY
+4. Renaming the new index to the declared name
+
+This avoids any window where the index doesn't exist. The old index serves queries while the new one builds. The rename is instant (catalog-only).
+
+If the index name itself changes (old name removed from model, new name added), convergence sees an unmanaged index and a missing index — it creates the new one and reports the old one for `--prune`.
 
 ## Backfill safety
 
 Auto-backfilling NULLs with model defaults sounds convenient, but silently running `UPDATE orders SET status = 'active' WHERE status IS NULL` on a 10M-row table during deploy is dangerous. Production concerns: long-running UPDATE holding row locks, WAL bloat and replication lag, checkpoint pressure, and connection pool exhaustion if the backfill blocks other operations.
+
+Backfills use the SQL expression from the model's default. Static defaults produce uniform values (`SET status = 'pending'`). DB expression defaults (see fields-db-defaults.md) produce per-row values (`SET uuid = gen_random_uuid()` — each row gets a unique UUID). This is strictly better than the current migration system where callable defaults are evaluated once in Python, giving every row the same value.
+
+Note: `ALTER TABLE ADD COLUMN ... DEFAULT gen_random_uuid() NOT NULL` as a single DDL statement would also give per-row values, but triggers a table rewrite for volatile defaults — ACCESS EXCLUSIVE for the duration. The convergence approach (add nullable column → SET DEFAULT → batch backfill → NOT NULL) avoids the rewrite by backfilling in batches outside a transaction. Safer for large tables.
 
 ### What production tools do
 
@@ -287,6 +315,48 @@ Tables from extensions (PostGIS geometry_columns, pg_trgm), materialized views, 
 Convergence creates 3 of 5 indexes, then fails on the 4th (e.g., unique index fails due to duplicate data). The 3 successful indexes are committed (non-transactional). Next run: convergence sees 3 exist, creates the remaining 2 (retrying the failed one). This is the "self-healing" property.
 
 For NOT VALID + VALIDATE patterns: if NOT VALID succeeds but VALIDATE fails (e.g., FK references nonexistent row), the unvalidated constraint exists. New writes are checked, but old data isn't proven valid. Next convergence run retries VALIDATE. The data issue must be fixed before VALIDATE can succeed.
+
+### Unique constraint window during CONCURRENTLY builds
+
+When convergence creates a unique constraint, it builds a unique index CONCURRENTLY (pass 1), then attaches it as a constraint (pass 2). During the index build, there's a window where duplicates can be inserted.
+
+**How Postgres CONCURRENTLY works internally:**
+
+```
+Transaction 1: Register index in catalog (indisready=false, indisvalid=false)
+                → index exists but is invisible, no writes go to it
+
+Transaction 2: First table scan — builds index entries from existing rows
+                → NEW INSERTS DO NOT CHECK UNIQUENESS (indisready=false)
+                → this is the vulnerable window
+                After scan: set indisready=true, commit
+
+Transaction 3: Second table scan — catches rows modified since first scan
+                → uniqueness IS enforced on new inserts (indisready=true)
+                → if duplicates were inserted during first scan, BUILD FAILS
+                After scan: set indisvalid=true
+```
+
+The window is the **first scan duration only** — not the full build. For a 1M-row table, that's seconds. For 100M rows, a minute or so.
+
+**Failure is loud, not silent.** If a duplicate IS inserted during the window:
+
+- The second scan discovers the violation
+- `CREATE INDEX CONCURRENTLY` fails, leaving an INVALID index
+- The INVALID index still blocks future duplicates (write overhead but enforces uniqueness)
+- Convergence detects the INVALID index on next run, drops it, retries
+- The duplicate rows exist in the table until discovered and cleaned up
+
+**No tool solves this differently.** pg-schema-diff (Stripe), Atlas, and pgroll all use the same CONCURRENTLY mechanism. There is no Postgres primitive for "start rejecting duplicates immediately but defer the full scan." `NOT VALID` is only supported for CHECK and FK constraints, not UNIQUE. The tradeoff is fundamental: non-concurrent (zero window, blocks all writes) vs concurrent (has window, allows writes).
+
+**Practical risk:** For small/medium tables (< 10M rows), the window is seconds. The probability of a duplicate being inserted during those seconds is low. For large tables with high write rates on uniqueness-critical columns, the risk is real but the consequence is a failed build (loud), not silent corruption.
+
+**Defense in depth:**
+
+1. **Application-level validation** — check for existing records before INSERT (forms, views, API endpoints). This is good practice regardless.
+2. **The CONCURRENTLY build's second scan** catches duplicates and fails loudly.
+3. **Convergence self-healing** — detects INVALID indexes, drops and retries on next run.
+4. **Dev mode** — in development, convergence skips CONCURRENTLY and uses regular `CREATE UNIQUE INDEX` inside a transaction. Zero window. The concurrent window only exists in production where it's an acceptable tradeoff.
 
 ### RunPython and fresh databases
 
@@ -432,9 +502,11 @@ All lock levels confirmed against the [PostgreSQL 18 ALTER TABLE documentation](
 
 ### Declarative schema tools
 
+- **Stripe's pg-schema-diff** ([github.com/stripe/pg-schema-diff](https://github.com/stripe/pg-schema-diff)): The closest prior art to Plain's convergence. Declarative Postgres schema diffing — you define desired state as SQL DDL, it diffs against the live DB, generates an ordered plan, and applies with safe DDL. Implements every pattern convergence uses: CONCURRENTLY for indexes, online index replacement (rename old → build new → drop old), NOT NULL via CHECK dance, FK/CHECK constraints via NOT VALID + VALIDATE. Per-statement `lock_timeout` (3s default) AND `statement_timeout` (3s default, 20min for index builds). A hazard system that **refuses to apply** unless you explicitly `--allow-hazards INDEX_BUILD,DELETES_DATA` — a gate, not a warning. Uses topological sort with priority-based tie-breaking for operation ordering. Renames explicitly unsupported (names are identity, same as convergence). MIT licensed, production-proven at Stripe scale.
 - **Atlas**: Generates migration plans by diffing desired schema against current DB state. Uses diff policies to control concurrent index creation. For unique constraints, requires a two-phase approach: create unique index concurrently first, then convert to constraint via `USING INDEX`. Plan structure (not a dependency graph) enforces ordering. 50+ safety analyzers detect destructive changes, table locks, and data loss risks.
 - **Prisma**: `db push` applies schema directly for prototyping; `migrate dev` generates migration files. No auto-backfill — adding a required column to a table with existing rows fails with an error. No safe DDL patterns (no CONCURRENTLY, no NOT VALID). Defaults are handled at the Prisma client level, not as `db_default`.
 - **pgroll**: Expand/contract pattern with dual-schema access during migration. Backfills in batches of 1,000 rows (configurable), with configurable inter-batch delay. v0.7.0 added batch size/delay configuration and 80% performance improvements to backfills.
+- **PlanetScale**: Their MySQL/Vitess product has deploy requests, safe DDL via ghost tables, schema diffing, and zero-downtime cutover. Their Postgres product (GA Sep 2025) has branching but **none** of the safe DDL features — no deploy requests, no automated schema changes, no linting. For Postgres, you handle schema safety yourself. This gap is exactly what Plain's convergence fills at the framework level.
 
 ### Rails ecosystem safety tools
 

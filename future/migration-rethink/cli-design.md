@@ -15,11 +15,21 @@ plain postgres schema --make     # generate migration files
 plain postgres sync              # apply everything
 ```
 
+For faster iteration, `--make` can chain into sync:
+
+```bash
+plain postgres schema --make --sync   # generate + apply in one step
+```
+
+The dev server could also detect unmigrated model changes and show a warning — similar to Django's "You have unapplied migrations" but earlier: "Model changes detected. Run `postgres schema --make`."
+
 ## The deploy
 
 ```bash
 plain postgres sync
 ```
+
+**`postgres sync` never generates migration files.** It only applies existing migrations and converges schema. If there are model changes with no corresponding migration, sync reports an error: "model changes detected with no migration — run `postgres schema --make`." This prevents accidental schema generation in production. File generation lives exclusively on `postgres schema --make`.
 
 ## Primary commands
 
@@ -47,19 +57,75 @@ On an empty database, creates everything from model definitions, replays RunPyth
 
 Handles stale migration records automatically. If convergence partially failed, run again to retry.
 
+Convergence blockers are actionable — every `⏸` tells you exactly what to do:
+
 ```
 $ plain postgres sync
 
 Schema:
-  ✗ orders.legacy_ref — NOT NULL, no default, 1,200 NULLs
-    Write a data migration to populate this column.
+  ⏸ orders.status — NOT NULL blocked
+    47 rows have NULLs, model has default 'active'
+    Below auto-backfill threshold (47 < 100,000) — will backfill automatically
+    Run: plain postgres sync  (backfill + apply in one step)
+
+  ⏸ orders.legacy_ref — NOT NULL blocked
+    1,200 rows have NULLs, no model default
+    Write a data migration to populate this column:
+    Run: plain postgres schema --make --empty --name backfill_legacy_ref
 ```
 
 **Flags:**
 
 - `--check` — exit non-zero if anything is pending (for CI: "is the DB fully in sync?")
-- `--dry-run` — show what would happen
+- `--dry-run` — show the full plan with exact SQL, lock levels, and estimated impact (see below)
+- `--replay` — apply all migrations from scratch on an empty DB, then verify the result matches model definitions. Catches divergence between migration history and models. For CI — see below.
 - `--fake <timestamp>` — mark a migration as applied without running it (escape hatch)
+- `--json` — machine-readable output for CI pipelines and monitoring
+
+### `--dry-run` plan output
+
+`postgres sync --dry-run` shows exactly what will execute, in order, with lock levels:
+
+```
+$ plain postgres sync --dry-run
+
+Migrations (batch transaction):
+  20240315_110000 add_status_to_orders
+    AddColumn("orders", "status", "varchar(50) NULL")
+    → ALTER TABLE orders ADD COLUMN status varchar(50) NULL;
+
+Schema convergence:
+  Pass 0: SET DEFAULT 'active' ON orders.status
+          catalog-only, <1ms, ACCESS EXCLUSIVE (brief)
+  Pass 1: CREATE INDEX CONCURRENTLY orders_status_idx ON orders (status)
+          ~1,247 rows, SHARE UPDATE EXCLUSIVE
+  Pass 2: ADD CONSTRAINT orders_author_fk FOREIGN KEY ... NOT VALID
+          <1ms, SHARE ROW EXCLUSIVE
+  Pass 3: VALIDATE CONSTRAINT orders_author_fk
+          ~1,247 rows, SHARE UPDATE EXCLUSIVE
+  Pass 4: SET NOT NULL ON orders.status
+          <1ms (scan skipped by CHECK), ACCESS EXCLUSIVE (brief)
+
+No blockers. Safe to run.
+```
+
+This is what operators review before running in production.
+
+### `--replay` migration verification
+
+Test databases use fresh-db-from-models (fast). Production databases are built by applying migrations incrementally over time. These are two different code paths to the same destination. `--replay` verifies they produce the same result:
+
+```
+$ plain postgres sync --replay
+
+Creating temporary database...
+Applying 47 migrations in order...
+Running convergence...
+Comparing result against model definitions...
+✓ Schema matches models. Migration history is consistent.
+```
+
+If migrations have diverged from models (a migration was edited after being applied, a model was changed without a migration, etc.), `--replay` catches it. Recommended as a CI step.
 
 ### `plain postgres schema`
 
@@ -96,11 +162,52 @@ Run `plain postgres sync` to apply all changes.
 
 **Flags:**
 
-- `--make` — generate `.sql` migration files for column/table changes
+- `--make` — generate migration file with thin operations for column/table changes
 - `--make --name <name>` — custom migration name suffix
-- `--make --empty` — create empty `.py` migration file (for data operations / RunPython)
+- `--make --empty` — create empty migration file for data operations (has `run()` instead of `operations`)
 - `--check` — exit non-zero if any differences (for CI: "are there unmigrated model changes?")
 - `--sql` — show the DDL that would be executed
+
+### Migration warnings
+
+`--make` warns about dangerous operations before writing the file:
+
+```
+$ plain postgres schema --make
+
+⚠ RemoveColumn: orders.legacy_email — permanently deletes data
+⚠ AlterColumnType: orders.amount text → integer — may lose data, add using= parameter
+
+Generated: app/migrations/20240315_110000_alter_orders.py
+```
+
+Because migrations use thin operations (not raw SQL), the framework knows exactly what each migration does. Warnings are structural, not pattern-matched:
+
+- **RemoveColumn / RemoveTable** — data loss
+- **AlterColumnType** with narrowing cast — may fail or truncate
+- **RunSQL** — escape hatch, flagged for review ("this migration contains raw SQL that bypasses the operation layer")
+
+The operation set itself enforces the migration/convergence boundary — there is no `CreateIndex` or `SetNotNull` operation. No SQL linting needed for boundary violations.
+
+### Convergence hazards
+
+`postgres sync` warns about convergence hazards at apply time:
+
+```
+$ plain postgres sync
+
+Schema convergence:
+  ⚠ INDEX_BUILD: CREATE INDEX CONCURRENTLY orders_status_idx
+    ~2,000,000 rows — CPU-intensive, may take several minutes
+  ⚠ DELETES_DATA: DROP INDEX CONCURRENTLY orders_legacy_idx (--prune)
+
+  Allow these hazards? [y/n]
+  Or: plain postgres sync --allow-hazards INDEX_BUILD,DELETES_DATA
+```
+
+Inspired by [pg-schema-diff](https://github.com/stripe/pg-schema-diff)'s hazard system (production-tested at Stripe): dangerous operations require explicit acknowledgment. In CI/deploy scripts, use `--allow-hazards` to pre-approve specific hazard types. Without it, sync pauses for confirmation on any hazardous operation.
+
+Migration warnings gate at generation time (before commit). Convergence hazards gate at apply time (before execution).
 
 ### `--make` discoverability: why not a top-level `makemigrations` command?
 
@@ -125,8 +232,8 @@ Plain's `--make` is closest to Prisma's approach (generation as part of the sche
 
 Both useful in CI, checking different things:
 
-- `postgres schema --check` — "are there model changes not yet captured in migration files?" (run after code changes, before merge)
-- `postgres sync --check` — "are there pending migrations or convergence work?" (run at deploy time)
+- `postgres schema --check` — "are there model changes not yet captured in migration files?" **Does not require a database** — replays operations in memory to compute expected state, compares against models. Safe for pre-commit hooks and lightweight CI.
+- `postgres sync --check` — "are there pending migrations or convergence work?" Requires a database (introspects actual state).
 
 ## Other commands
 
@@ -162,6 +269,58 @@ Run health checks — unused indexes, missing FK indexes, sequence exhaustion, b
 ### `plain postgres backups`
 
 Local database backups. Already exists as a subgroup: `list`, `create`, `restore`, `delete`, `clear`.
+
+## Observability
+
+### Structured output
+
+`--json` on `sync` and `schema` produces machine-readable output for CI pipelines and monitoring:
+
+```json
+{
+  "migrations": [
+    {"timestamp": "20240315_110000", "name": "add_status_to_orders", "status": "applied", "duration_ms": 12}
+  ],
+  "convergence": [
+    {"table": "orders", "operation": "create_index", "name": "orders_status_idx", "status": "applied", "duration_ms": 847},
+    {"table": "orders", "operation": "not_null", "column": "status", "status": "blocked", "reason": "47 NULLs, has default"}
+  ],
+  "blockers": 1,
+  "total_duration_ms": 1203
+}
+```
+
+### Exit codes
+
+| Code | Meaning                                                                                           |
+| ---- | ------------------------------------------------------------------------------------------------- |
+| 0    | Success — everything applied, no blockers                                                         |
+| 0    | Nothing to do — already in sync                                                                   |
+| 1    | Migration failure — batch rolled back                                                             |
+| 2    | Convergence blockers — migrations applied but schema not fully converged (NOT NULL blocked, etc.) |
+
+Code 2 is not a deploy failure — the application works, just with pending convergence. CI can choose to fail or warn on code 2.
+
+### Timing
+
+Every operation reports its duration. `postgres sync` prints a summary:
+
+```
+Completed in 2.1s (migrations: 0.1s, convergence: 2.0s)
+  Slowest: CREATE INDEX CONCURRENTLY orders_status_idx (1.8s)
+```
+
+## Migration directory integrity
+
+A `migrations.sum` file (similar to Atlas's `atlas.sum`) records a hash of the migration directory contents. This catches:
+
+- Migrations modified after being applied to any database
+- Migrations deleted without proper cleanup
+- Migrations reordered or renamed
+
+`postgres sync` verifies the checksum before running. If it doesn't match, sync refuses with a clear error. `postgres schema --make` updates the checksum when generating a new migration.
+
+This is cheap to implement (SHA-256 of sorted filenames + contents) and high value for trust — it guarantees the migration files in the repo are the same ones that were tested in CI.
 
 ## Preflight integration
 

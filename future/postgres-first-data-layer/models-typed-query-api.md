@@ -250,6 +250,126 @@ The trend across ecosystems is clear: stringly-typed ORMs are being replaced by 
 
 None of this changes the near-term design (the typed Python API works with today's typing), but it's worth watching for the SQL layer and model derivation use cases.
 
+## Explicit execution and SQL-ordered chaining
+
+### The problem with lazy querysets
+
+Django's querysets are lazy — they don't hit the database until iterated, sliced, or passed to `len()`/`bool()`. This is both the ORM's most powerful feature (composability across layers) and its worst footgun:
+
+- **Invisible query execution** — templates trigger queries, `if queryset` triggers a query, printing in a shell triggers a query. You can't look at code and see where the database is hit.
+- **N+1 by default** — accessing `book.author` in a loop silently fires one query per iteration. The fix (`select_related`) requires knowing ahead of time which relationships you'll access.
+- **Split personality** — reads are lazy, but `update()` and `delete()` are eager/terminal. Two execution models in one API.
+
+### Why SQL-ordered chaining demands explicit execution
+
+If the API mirrors SQL clause order, `update()` and `delete()` come _before_ `where()`:
+
+```
+SQL:    UPDATE users SET name = 'foo' WHERE active = true
+API:    User.query.update(...).where(...)
+
+SQL:    DELETE FROM users WHERE active = false
+API:    User.query.delete().where(...)
+
+SQL:    SELECT * FROM users WHERE active = true ORDER BY name
+API:    User.query.select().where(...).order_by(...)
+```
+
+But if `update()` comes before `where()`, it can't execute immediately — it doesn't have its conditions yet. It has to return a chainable query builder. And if it's a builder, something else has to trigger execution.
+
+This isn't just a write-query problem. If `select()` also follows SQL order, then _every_ query is a builder that needs explicit execution. The lazy queryset model doesn't fit.
+
+### Design direction: build, then execute
+
+Nearly every modern query builder has converged on this: build an inert query object, then call a terminal method to execute it.
+
+```python
+# SELECT
+users = User.query.select().where(
+    User.is_active.eq(True),
+).order_by(
+    User.name.asc(),
+).fetch()                                    # list[User]
+
+user = User.query.select().where(
+    User.email.eq("foo@bar.com"),
+).fetch_one()                                # User (raises if != 1)
+
+user = User.query.select().where(
+    User.email.eq("foo@bar.com"),
+).fetch_first()                              # User | None
+
+# UPDATE
+count = User.query.update(
+    User.name.set("redacted"),
+).where(
+    User.is_active.eq(False),
+).execute()                                  # int
+
+# DELETE
+count = User.query.delete().where(
+    User.is_active.eq(False),
+).execute()                                  # int
+
+# Aggregates remain terminal (they're already explicit today)
+count = User.query.where(...).count()        # int
+exists = User.query.where(...).exists()      # bool
+```
+
+The naming could vary — `fetch()`/`execute()`, `run()` for both, `all()`/`one()` — but the shape is the same: the chain builds, a terminal method executes.
+
+### Industry precedent
+
+This is the dominant pattern across modern ORMs and query builders:
+
+| System                  | Execution                               | Terminal methods                  |
+| ----------------------- | --------------------------------------- | --------------------------------- |
+| **Ecto** (Elixir)       | `Repo.all(query)`, `Repo.one(query)`    | External executor, query is data  |
+| **SQLAlchemy 2.0**      | `session.execute(stmt)`                 | External executor                 |
+| **JOOQ** (Java)         | `.fetch()`, `.fetchOne()`, `.execute()` | Terminal on the builder           |
+| **Kysely** (TypeScript) | `.execute()`, `.executeTakeFirst()`     | Terminal on the builder           |
+| **Diesel** (Rust)       | `.load(&conn)`, `.execute(&conn)`       | Terminal, connection at call site |
+
+ActiveRecord (Rails) is the notable holdout with truly lazy evaluation — and it shares all of Django's footguns.
+
+### What composability looks like without laziness
+
+The main argument for lazy querysets is composability — building queries across layers:
+
+```python
+# Today: lazy composition
+def get_base_queryset(self):
+    return User.query.filter(is_active=True)
+
+def get_queryset(self):
+    qs = self.get_base_queryset()
+    if self.request.user.is_staff:
+        return qs
+    return qs.filter(organization=self.request.user.organization)
+```
+
+This still works with explicit execution — the builder is composable, you just execute at the end:
+
+```python
+def get_base_query(self):
+    return User.query.select().where(User.is_active.eq(True))
+
+def get_query(self):
+    q = self.get_base_query()
+    if not self.request.user.is_staff:
+        q = q.where(User.organization.eq(self.request.user.organization))
+    return q.fetch()  # execution happens here, visibly
+```
+
+The difference is that `fetch()` makes the database hit visible. You can grep for it. You can see in a code review exactly where queries execute. Templates can never silently trigger queries because they only receive data, not live query objects.
+
+### Open trade-offs
+
+- **What are the terminal method names?** `fetch()`/`execute()` (reads vs writes), `run()` for everything, `all()`/`one()`? Reads and writes doing fundamentally different things (returning models vs returning counts) may warrant different names.
+- **Does `select()` need to be called explicitly?** `User.query.where(...).fetch()` is shorter than `User.query.select().where(...).fetch()`. But the explicit `select()` mirrors SQL and opens the door for column selection: `User.query.select(User.email, User.name).where(...).fetch()`.
+- **What's the return type of `fetch()`?** A `list` is simple and explicit. A custom `ResultSet` could carry metadata (query timing, row count) but adds abstraction.
+- **Can you still iterate a query object directly?** Some builders let `for row in query` work as sugar for `for row in query.fetch()`. This re-introduces invisible execution but is pragmatically convenient.
+
 ## Open questions
 
 - **Migration path**: Can `filter()` and `where()` coexist during transition? Or is it a clean break?

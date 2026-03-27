@@ -22,6 +22,7 @@ Making the ORM truly postgres-native rather than inheriting Django's database-ag
 - [ ] [fields-text-only](fields-text-only.md)
 - [ ] [models-field-max-length](models-field-max-length.md)
 - [ ] [models-choices-classes](models-choices-classes.md)
+- [ ] [fields-db-defaults](fields-db-defaults.md)
 - [ ] [models-db-level-on-delete](models-db-level-on-delete.md)
 - [ ] [models-non-blocking-ddl](models-non-blocking-ddl.md)
 - [ ] [models-index-suggestions](models-index-suggestions.md)

@@ -21,17 +21,17 @@ One flat list of timestamped migrations. No per-app directories. No dependency g
 ```
 app/
   migrations/
-    20240101_120000_create_users.sql          ← schema (auto-generated)
-    20240115_093000_add_email.sql             ← schema (auto-generated)
-    20240201_140000_create_orders.sql         ← schema (auto-generated)
-    20240215_100000_backfill_status.py        ← data (developer-written)
+    20240101_120000_create_users.py           ← schema (auto-generated, has operations)
+    20240115_093000_add_email.py              ← schema (auto-generated, has operations)
+    20240201_140000_create_orders.py          ← schema (auto-generated, has operations)
+    20240215_100000_backfill_status.py        ← data (developer-written, has run())
 ```
 
 Package migrations live in the package and get discovered:
 
 ```
-plain/sessions/migrations/20230601_000000_create_sessions.sql
-plain/auth/migrations/20230501_000000_create_users.sql
+plain/sessions/migrations/20230601_000000_create_sessions.py
+plain/auth/migrations/20230501_000000_create_users.py
 ```
 
 The runner collects all migrations from all sources, sorts by timestamp, runs in order.
@@ -52,12 +52,12 @@ CREATE TABLE plain_migrations (
 
 **Decision: `YYYYMMDD_HHMMSS` (14-digit, to the second). Detect collisions at generation time and bump the second.**
 
-Format: `{timestamp}_{description}.sql` (schema) or `{timestamp}_{description}.py` (data)
+Format: `{timestamp}_{description}.py`
 
 Examples:
 
-- `20240101_120000_create_users.sql`
-- `20240115_093000_add_email_to_users.sql`
+- `20240101_120000_create_users.py`
+- `20240115_093000_add_email_to_users.py`
 - `20240201_140000_backfill_status.py`
 
 The timestamp is the migration's identity and sort key. The description is for humans -- auto-generated from the operation (e.g., `create_users`, `add_email_to_users`) or user-provided via `--name`.

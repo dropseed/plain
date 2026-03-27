@@ -14,7 +14,7 @@ When `postgres sync` runs against an empty database:
 2. Generate `CREATE TABLE` statements with all columns, types, NOT NULL, and defaults (same DDL as CreateModel in a migration — see slim-migrations.md)
 3. Execute them in any order (no ordering issues — FK constraints come from convergence, not DDL)
 4. Run convergence to add indexes, FK constraints, CHECK constraints, unique constraints
-5. Replay RunPython/RunSQL operations from migration files (schema ops like AddField/CreateModel are skipped since the schema already exists)
+5. Replay data migrations — `.py` files with `run()` execute in timestamp order. Schema migrations (files with `operations`) are skipped since the schema already exists from model-based DDL.
 6. Mark all migration files as applied
 
 Step 5 is the key decision. A fresh database built from models is not truly migration-free — it still reads migration files and selectively executes data operations. This is correct because some RunPython migrations insert seed data (permission records, default config rows, lookup tables) that the application requires to function. Skipping them would leave a fresh database in a broken state.
@@ -66,7 +66,7 @@ This is dramatically faster than the current approach of replaying every migrati
 - **No schema dump file to maintain.** Rails needs `schema.rb` regenerated on every migrate. Laravel needs `schema:dump` run periodically. Plain just reads the models.
 - **Always current.** The dump file can go stale if someone forgets to regenerate it. Models are always the truth.
 - **Fast CI/test setup.** Test databases are created from models + dev-mode convergence. No migration replay.
-- **Schema-only migration files are deletable.** `.sql` files serve no purpose once all existing databases have applied them. `.py` data migration files persist as long as the data operation is needed for fresh database setup (backfills are typically no-ops on empty tables and can also be deleted; only seed data migrations persist long-term).
+- **Schema migration files are deletable.** Migrations with `operations` serve no purpose once all existing databases have applied them. Data migrations (with `run()`) persist as long as the data operation is needed for fresh database setup (backfills are typically no-ops on empty tables and can also be deleted; only seed data migrations persist long-term).
 - **One code path for fresh and incremental.** `postgres sync` does the right thing regardless of whether the database is empty or has history.
 
 ## What this replaces

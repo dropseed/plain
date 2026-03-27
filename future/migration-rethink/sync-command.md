@@ -40,13 +40,13 @@ If a sync process crashes while holding the lock, the lock is released automatic
 
 ## The batch transaction for migrations
 
-All pending migrations run in a single transaction. If any migration fails, all roll back. This works because slim migrations are catalog-only DDL (fast, no long locks) plus data operations. No CONCURRENTLY or NOT VALID operations in migrations — those are convergence concerns.
+All pending migrations run in a single transaction. If any migration fails, all roll back. For schema migrations, the runner executes each operation's generated SQL. For data migrations, it calls `run(connection)`. This works because slim migrations are catalog-only DDL (fast, no long locks) plus data operations. No CONCURRENTLY or NOT VALID operations in migrations — the operation set doesn't include them, and they're convergence concerns.
 
 This is a deliberate tradeoff: you can't have a partially-applied migration set. Either all pending migrations apply or none do. This eliminates the "stuck between migrations" state that plagues Django deployments with `atomic=False`.
 
 ## Convergence ordering
 
-Convergence uses a fixed five-pass execution order. Some operations have hard ordering requirements (unique constraints need their index built first, NOT NULL needs a validated CHECK to skip the table scan). See schema-convergence.md "Convergence ordering" for the full pass breakdown and lock budget.
+Convergence uses a fixed six-pass execution order (pass 0 through pass 5). Pass 0 applies defaults immediately after migrations to close the nullable window — new rows get the correct default before indexes and constraints are built. See schema-convergence.md "Convergence ordering" for the full pass breakdown and lock budget.
 
 ## Considerations
 
