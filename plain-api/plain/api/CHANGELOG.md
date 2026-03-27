@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.28.2](https://github.com/dropseed/plain/releases/plain-api@0.28.2) (2026-03-27)
+
+### What's changed
+
+- Updated OpenAPI schema generation to use `fields.TextField` instead of `fields.CharField` ([4e29f5d6cade](https://github.com/dropseed/plain/commit/4e29f5d6cade))
+
+### Upgrade instructions
+
+- Requires `plain>=0.129.0`. No other changes required.
+
 ## [0.28.1](https://github.com/dropseed/plain/releases/plain-api@0.28.1) (2026-03-20)
 
 ### What's changed

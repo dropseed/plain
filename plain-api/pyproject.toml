@@ -1,12 +1,12 @@
 [project]
 name = "plain.api"
-version = "0.28.1"
+version = "0.28.2"
 description = "Build APIs using class-based views."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
-dependencies = ["plain>=0.126.0,<1.0.0"]
+dependencies = ["plain>=0.129.0,<1.0.0"]
 
 [dependency-groups]
 dev = ["plain.pytest<1.0.0"]
