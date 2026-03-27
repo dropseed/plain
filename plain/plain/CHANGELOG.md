@@ -1,5 +1,21 @@
 # plain changelog
 
+## [0.129.0](https://github.com/dropseed/plain/releases/plain@0.129.0) (2026-03-27)
+
+### What's changed
+
+- **Renamed `forms.CharField` to `forms.TextField`** — all subclasses (`EmailField`, `URLField`, `UUIDField`, `JSONField`, `RegexField`) now extend `TextField` ([4e29f5d6cade](https://github.com/dropseed/plain/commit/4e29f5d6cade))
+- **Replaced `**kwargs`with explicit parameters in Response classes** —`Response`, `StreamingResponse`, `AsyncStreamingResponse`, `FileResponse`, `RedirectResponse`, `NotModifiedResponse`, `NotAllowedResponse`, and `JsonResponse` now declare all parameters explicitly ([7d1cb9af3a06](https://github.com/dropseed/plain/commit/7d1cb9af3a06))
+- **Removed `signing.dumps()` and `signing.loads()`** — use `TimestampSigner(salt=...).sign_object()` / `.unsign_object()` or `Signer` directly ([99b0e57bc175](https://github.com/dropseed/plain/commit/99b0e57bc175))
+- Disabled worker recycling in reload mode — file-change restarts already recycle workers, so `max_requests` retirement was causing unnecessary extra restart cycles during development ([8eb9c6da485e](https://github.com/dropseed/plain/commit/8eb9c6da485e))
+- Added `TYPE_CHECKING` stubs for View handler methods (`get`, `post`, `put`, `patch`, `delete`, `head`, `trace`) to improve IDE autocomplete and type checking ([ca7ee03424d1](https://github.com/dropseed/plain/commit/ca7ee03424d1))
+
+### Upgrade instructions
+
+- Rename `forms.CharField` to `forms.TextField` in all form definitions.
+- Replace `signing.dumps(obj, salt=..., ...)` with `TimestampSigner(salt=...).sign_object(obj, ...)` and `signing.loads(s, salt=..., ...)` with `TimestampSigner(salt=...).unsign_object(s, ...)`.
+- If you pass `**kwargs` to Response subclasses, switch to named keyword arguments (`content_type=`, `status_code=`, `headers=`, etc.).
+
 ## [0.128.0](https://github.com/dropseed/plain/releases/plain@0.128.0) (2026-03-26)
 
 ### What's changed
