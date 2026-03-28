@@ -19,7 +19,7 @@ Making the ORM truly postgres-native rather than inheriting Django's database-ag
 - [ ] [postgres-native-orm](postgres-native-orm.md)
 - [ ] [postgres-full-text-search](postgres-full-text-search.md)
 - [ ] [models-field-choices-mixin](models-field-choices-mixin.md)
-- [ ] [fields-text-only](fields-text-only.md)
+- [x] [fields-text-only](fields-text-only.md)
 - [ ] [models-field-max-length](models-field-max-length.md)
 - [ ] [models-choices-classes](models-choices-classes.md)
 - [ ] [fields-db-defaults](fields-db-defaults.md)
