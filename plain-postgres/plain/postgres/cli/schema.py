@@ -76,8 +76,13 @@ def _render_model(result: ModelSchemaResult) -> None:
         click.secho("  Constraints:", dim=True)
 
     for con in result["constraints"]:
-        fields_str = ", ".join(con["fields"]) if con["fields"] else "expressions"
-        click.echo(f"    {con['name']}  UNIQUE ({fields_str})", nl=False)
+        con_type = con["type"].upper()
+        if con["fields"]:
+            click.echo(
+                f"    {con['name']}  {con_type} ({', '.join(con['fields'])})", nl=False
+            )
+        else:
+            click.echo(f"    {con['name']}  {con_type}", nl=False)
 
         if con["issues"]:
             _err(con["issues"][0]["detail"])

@@ -87,7 +87,8 @@ def count_issues(result: ModelSchemaResult) -> int:
 
 def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
     """Compare model against actual database schema. Returns structured result."""
-    from ..constraints import UniqueConstraint
+    from ..constraints import CheckConstraint, UniqueConstraint
+    from ..fields.related import ForeignKeyField
 
     table_name = model.model_options.db_table
     columns: list[ColumnInfo] = []
@@ -116,11 +117,17 @@ def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
 
     actual_indexes: dict[str, dict[str, Any]] = {}
     actual_unique: dict[str, dict[str, Any]] = {}
+    actual_check: dict[str, dict[str, Any]] = {}
+    actual_fk: dict[str, dict[str, Any]] = {}
     for name, info in actual_constraints_raw.items():
         if info.get("primary_key"):
             continue
         if info.get("unique"):
             actual_unique[name] = info
+        elif info.get("check"):
+            actual_check[name] = info
+        elif info.get("foreign_key"):
+            actual_fk[name] = info
         elif info.get("index"):
             actual_indexes[name] = info
 
@@ -233,40 +240,103 @@ def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
             )
         )
 
-    # Unique constraints
-    model_constraints = [
-        c for c in model.model_options.constraints if isinstance(c, UniqueConstraint)
-    ]
+    # Unique and check constraints (both matched by name)
+    for constraint_cls, constraint_type, actual_dict in [
+        (UniqueConstraint, "unique", actual_unique),
+        (CheckConstraint, "check", actual_check),
+    ]:
+        model_constraints = [
+            c for c in model.model_options.constraints if isinstance(c, constraint_cls)
+        ]
+        expected_names = {c.name for c in model_constraints}
 
-    for constraint in model_constraints:
-        con_issues: list[SchemaIssue] = []
-        if constraint.name not in actual_unique:
-            con_issues.append(
-                SchemaIssue(
-                    kind="constraint_missing",
+        for constraint in model_constraints:
+            con_issues: list[SchemaIssue] = []
+            if constraint.name not in actual_dict:
+                con_issues.append(
+                    SchemaIssue(
+                        kind="constraint_missing",
+                        name=constraint.name,
+                        detail="missing from database",
+                    )
+                )
+            constraints.append(
+                ConstraintInfo(
                     name=constraint.name,
-                    detail="missing from database",
+                    type=constraint_type,
+                    fields=list(getattr(constraint, "fields", None) or []),
+                    issues=con_issues,
                 )
             )
-        constraints.append(
-            ConstraintInfo(
-                name=constraint.name,
-                type="unique",
-                fields=list(constraint.fields) if constraint.fields else [],
-                issues=con_issues,
-            )
-        )
 
-    for name in sorted(actual_unique.keys() - {c.name for c in model_constraints}):
-        cols = actual_unique[name].get("columns", [])
+        for name in sorted(actual_dict.keys() - expected_names):
+            constraints.append(
+                ConstraintInfo(
+                    name=name,
+                    type=constraint_type,
+                    fields=list(actual_dict[name].get("columns") or []),
+                    issues=[
+                        SchemaIssue(
+                            kind="constraint_extra",
+                            name=name,
+                            detail="not in model",
+                        )
+                    ],
+                )
+            )
+
+    # Foreign key constraints
+    # Match by (column, target_table, target_column) since constraint names are generated.
+    expected_fks: dict[tuple[str, str, str], str] = {}
+    for field in model._model_meta.local_fields:
+        if isinstance(field, ForeignKeyField) and field.db_constraint:
+            to_table = field.target_field.model.model_options.db_table
+            to_column = field.target_field.column
+            expected_fks[(field.column, to_table, to_column)] = field.name
+
+    # Index actual FKs by their shape for O(1) matching
+    actual_fk_by_shape: dict[tuple[str, str, str], str] = {}
+    for name, info in actual_fk.items():
+        fk_target = info.get("foreign_key", ())
+        fk_cols = info.get("columns", [])
+        if len(fk_cols) == 1 and len(fk_target) == 2:
+            actual_fk_by_shape[(fk_cols[0], fk_target[0], fk_target[1])] = name
+
+    matched_fk_names: set[str] = set()
+    for key, field_name in expected_fks.items():
+        if actual_name := actual_fk_by_shape.get(key):
+            matched_fk_names.add(actual_name)
+        else:
+            col, to_table, to_column = key
+            constraints.append(
+                ConstraintInfo(
+                    name=f"{field_name} → {to_table}.{to_column}",
+                    type="fk",
+                    fields=[col],
+                    issues=[
+                        SchemaIssue(
+                            kind="constraint_missing",
+                            name=col,
+                            detail="missing from database",
+                        )
+                    ],
+                )
+            )
+
+    for name in sorted(actual_fk.keys() - matched_fk_names):
+        info = actual_fk[name]
+        fk_target = info.get("foreign_key", ())
+        target_str = f"{fk_target[0]}.{fk_target[1]}" if len(fk_target) == 2 else "?"
         constraints.append(
             ConstraintInfo(
                 name=name,
-                type="unique",
-                fields=list(cols) if cols else [],
+                type="fk",
+                fields=list(info.get("columns") or []),
                 issues=[
                     SchemaIssue(
-                        kind="constraint_extra", name=name, detail="not in model"
+                        kind="constraint_extra",
+                        name=name,
+                        detail=f"not in model (→ {target_str})",
                     )
                 ],
             )
