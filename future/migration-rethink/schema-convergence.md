@@ -306,6 +306,8 @@ The root cause: migration state loads the **current** class definition to recons
 
 A potential fix: `makemigrations` could compare the expected schema (from replaying migrations on a fresh DB) against model-derived DDL. If they differ, generate an AlterField. This is essentially `--replay` as a generation step rather than just a verification step.
 
+**Current workaround:** `postgres converge` handles `character varying` → `text` conversions as a transitional bridge for the CharField removal in 0.90.0. This is outside convergence's intended scope (column type changes should be migrations) but was pragmatic because the migration system can't detect these changes. Once a proper `--replay`-as-generation mechanism exists, or once all databases have been converged, the varchar→text handling in `converge` can be removed.
+
 ### `db_default` changes
 
 **Note: `db_default` is a planned feature, not yet implemented.** Plain currently uses Python-side defaults only — when a column is created with a default, the schema editor drops the in-database default immediately after column creation. `db_default` would be a new field parameter that tells Postgres to maintain the default.
