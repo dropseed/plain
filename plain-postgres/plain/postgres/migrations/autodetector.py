@@ -151,7 +151,7 @@ class MigrationAutodetector:
         # resolve dependencies caused by M2Ms and FKs.
         self.generated_operations = {}
         self.altered_indexes = {}
-        self.altered_constraints = {}
+
         self.renamed_fields = {}
 
         # Prepare some old/new state and model lists, ignoring unmigrated packages.
@@ -191,9 +191,7 @@ class MigrationAutodetector:
         # This avoids the same computation in generate_removed_indexes()
         # and generate_added_indexes().
         self.create_altered_indexes()
-        self.create_altered_constraints()
         # Generate index removal operations before field is removed
-        self.generate_removed_constraints()
         self.generate_removed_indexes()
         # Generate field renaming operations.
         self.generate_renamed_fields()
@@ -203,7 +201,6 @@ class MigrationAutodetector:
         self.generate_added_fields()
         self.generate_altered_fields()
         self.generate_added_indexes()
-        self.generate_added_constraints()
         self.generate_altered_db_table()
 
         self._sort_migrations()
@@ -1109,59 +1106,6 @@ class MigrationAutodetector:
                         new_name=new_index_name,
                         old_name=old_index_name,
                         old_fields=old_fields,
-                    ),
-                )
-
-    def create_altered_constraints(self) -> None:
-        option_name = operations.AddConstraint.option_name
-        for package_label, model_name in sorted(self.kept_model_keys):
-            old_model_name = self.renamed_models.get(
-                (package_label, model_name), model_name
-            )
-            old_model_state = self.from_state.models[package_label, old_model_name]
-            new_model_state = self.to_state.models[package_label, model_name]
-
-            old_constraints = old_model_state.options[option_name]
-            new_constraints = new_model_state.options[option_name]
-            add_constraints = [c for c in new_constraints if c not in old_constraints]
-            rem_constraints = [c for c in old_constraints if c not in new_constraints]
-
-            self.altered_constraints.update(
-                {
-                    (package_label, model_name): {
-                        "added_constraints": add_constraints,
-                        "removed_constraints": rem_constraints,
-                    }
-                }
-            )
-
-    def generate_added_constraints(self) -> None:
-        for (
-            package_label,
-            model_name,
-        ), alt_constraints in self.altered_constraints.items():
-            dependencies = self._get_dependencies_for_model(package_label, model_name)
-            for constraint in alt_constraints["added_constraints"]:
-                self.add_operation(
-                    package_label,
-                    operations.AddConstraint(
-                        model_name=model_name,
-                        constraint=constraint,
-                    ),
-                    dependencies=dependencies,
-                )
-
-    def generate_removed_constraints(self) -> None:
-        for (
-            package_label,
-            model_name,
-        ), alt_constraints in self.altered_constraints.items():
-            for constraint in alt_constraints["removed_constraints"]:
-                self.add_operation(
-                    package_label,
-                    operations.RemoveConstraint(
-                        model_name=model_name,
-                        name=constraint.name,
                     ),
                 )
 
