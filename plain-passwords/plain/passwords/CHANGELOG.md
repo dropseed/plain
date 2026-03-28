@@ -1,5 +1,16 @@
 # plain-passwords changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-passwords@0.25.0) (2026-03-28)
+
+### What's changed
+
+- `PasswordField` now extends `TextField` instead of `CharField` ([5062ee4dd1fd](https://github.com/dropseed/plain/commit/5062ee4dd1fd))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.90.0`
+- If you subclass `PasswordField`, no changes needed — the API is unchanged
+
 ## [0.24.1](https://github.com/dropseed/plain/releases/plain-passwords@0.24.1) (2026-03-27)
 
 ### What's changed

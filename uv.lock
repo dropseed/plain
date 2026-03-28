@@ -877,7 +877,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-passwords"
-version = "0.24.1"
+version = "0.25.0"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
