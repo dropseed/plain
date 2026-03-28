@@ -9,22 +9,6 @@ from ..dialect import quote_name
 
 
 @dataclass
-class ColumnTypeFix:
-    table: str
-    column: str
-    actual: str
-    expected: str
-
-    def describe(self) -> str:
-        return f"{self.table}.{self.column}: {self.actual} → {self.expected}"
-
-    def apply(self, cursor: Any) -> str:
-        sql = f"ALTER TABLE {quote_name(self.table)} ALTER COLUMN {quote_name(self.column)} TYPE {self.expected}"
-        cursor.execute(sql)
-        return sql
-
-
-@dataclass
 class AddConstraintFix:
     """Add a missing constraint using NOT VALID for check constraints."""
 
@@ -81,4 +65,4 @@ class DropConstraintFix:
         return sql
 
 
-Fix = ColumnTypeFix | AddConstraintFix | ValidateConstraintFix | DropConstraintFix
+Fix = AddConstraintFix | ValidateConstraintFix | DropConstraintFix

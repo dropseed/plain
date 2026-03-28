@@ -8,7 +8,6 @@ from ..introspection import check_model
 from ..registry import models_registry
 from .fixes import (
     AddConstraintFix,
-    ColumnTypeFix,
     DropConstraintFix,
     Fix,
     ValidateConstraintFix,
@@ -32,14 +31,6 @@ def detect_model_fixes(conn: Any, cursor: Any, model: Any) -> list[Fix]:
     result = check_model(conn, cursor, model)
     table = result["table"]
     fixes: list[Fix] = []
-
-    for col in result["columns"]:
-        for issue in col["issues"]:
-            if issue["kind"] == "type_mismatch":
-                expected = issue["detail"].split("expected ")[1].split(",")[0]
-                actual = issue["detail"].split("actual ")[1]
-                if _is_safe_type_fix(actual, expected):
-                    fixes.append(ColumnTypeFix(table, col["name"], actual, expected))
 
     for con in result["constraints"]:
         for issue in con["issues"]:
@@ -69,10 +60,3 @@ def _find_model_constraint(model: Any, name: str) -> BaseConstraint | None:
         if constraint.name == name:
             return constraint
     return None
-
-
-def _is_safe_type_fix(actual: str, expected: str) -> bool:
-    """Return True if converting actual → expected is safe (no data loss, no rewrite)."""
-    if actual.startswith("character varying") and expected == "text":
-        return True
-    return False

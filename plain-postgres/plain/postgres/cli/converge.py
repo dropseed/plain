@@ -17,7 +17,6 @@ def converge(yes: bool) -> None:
     """Fix schema mismatches between models and the database.
 
     Detects and fixes:
-    - Column type mismatches (e.g. character varying → text)
     - Missing or extra constraints (check, unique)
     - NOT VALID constraints needing validation
 

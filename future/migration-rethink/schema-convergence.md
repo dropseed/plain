@@ -18,14 +18,14 @@ The `postgres schema` comparison engine becomes the foundation for the entire re
 
 ### What convergence manages
 
-| Declaration                           | Safe pattern used                                                                                      |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `Index(fields=["email"], name="idx")` | `CREATE INDEX CONCURRENTLY` / `DROP INDEX CONCURRENTLY`                                                |
-| `ForeignKeyField(User)` constraint    | `ADD CONSTRAINT FK NOT VALID` then `VALIDATE CONSTRAINT`                                               |
-| `CheckConstraint(...)`                | `ADD CONSTRAINT CHECK NOT VALID` then `VALIDATE CONSTRAINT`                                            |
-| `UniqueConstraint(...)`               | `CREATE UNIQUE INDEX CONCURRENTLY` then `ADD CONSTRAINT USING INDEX`                                   |
-| NOT NULL (field without `null=True`)  | Backfill NULLs with model default (if available) → `ADD CHECK NOT VALID` → `VALIDATE` → `SET NOT NULL` |
-| Removal of any of the above           | Safe drop pattern                                                                                      |
+| Declaration                           | Safe pattern used                                                                                      | Status                                                                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `CheckConstraint(...)`                | `ADD CONSTRAINT CHECK NOT VALID` then `VALIDATE CONSTRAINT`                                            | **Done** — two-phase with per-operation commits, NOT VALID detection/retry                                                      |
+| `UniqueConstraint(...)`               | `CREATE UNIQUE INDEX CONCURRENTLY` then `ADD CONSTRAINT USING INDEX`                                   | **Partial** — add/drop works, but uses direct ADD CONSTRAINT (not USING INDEX). Safe pattern needs indexes in convergence first |
+| `Index(fields=["email"], name="idx")` | `CREATE INDEX CONCURRENTLY` / `DROP INDEX CONCURRENTLY`                                                | Not started                                                                                                                     |
+| `ForeignKeyField(User)` constraint    | `ADD CONSTRAINT FK NOT VALID` then `VALIDATE CONSTRAINT`                                               | Not started — still managed by field-level migration ops                                                                        |
+| NOT NULL (field without `null=True`)  | Backfill NULLs with model default (if available) → `ADD CHECK NOT VALID` → `VALIDATE` → `SET NOT NULL` | Not started                                                                                                                     |
+| Removal of any of the above           | Safe drop pattern                                                                                      | **Done** for check/unique constraints                                                                                           |
 
 ### Behavior
 
@@ -40,7 +40,7 @@ In development (no concurrent traffic), convergence could skip CONCURRENTLY and 
 
 ### Current state of `postgres schema`
 
-`postgres schema` already exists and compares models against the DB. Today it checks columns (existence, type, nullability), indexes (by name), and unique constraints (by name). It does **not** yet check FK constraints or CHECK constraints. Convergence requires expanding the comparison engine to cover all managed object types.
+`postgres schema` already exists and compares models against the DB. It checks columns (existence, type, nullability), indexes (by name), unique constraints (by name), check constraints (by name), and FK constraints (by shape — column + target table/column). `postgres converge` already handles check and unique constraints — the autodetector no longer generates AddConstraint/RemoveConstraint. FK constraints are still managed by field-level migration operations (AddField/RemoveField/AlterField) since they're tied to the field lifecycle, not declared separately. Moving FK constraints to convergence is the next step — it requires the schema editor's FK creation logic (deferrable constraints, SET CONSTRAINTS IMMEDIATE) to be accessible from converge.
 
 ### How `postgres schema` evolves
 
@@ -74,7 +74,7 @@ Convergence only manages objects that match a declaration on a model. The **name
 
 All indexes and constraints require explicit names (`Index.name` and `UniqueConstraint.name` are required, not auto-generated). There is no `db_index=True` field shorthand and no `unique=True` field option — all indexes use `model_options.indexes`, all unique constraints use `model_options.constraints`. FK constraints are the exception: they're implied by `ForeignKeyField(db_constraint=True)` (the default).
 
-**Auto-generated field-level CHECK constraints** (e.g., `PositiveIntegerField` generates `CHECK (value >= 0)`) are currently created inline during AddField. These move to convergence — the field type implies the constraint, convergence applies it using the NOT VALID + VALIDATE pattern. The constraint name is derived from the field, not user-declared.
+**Note:** `PositiveIntegerField` was removed — users declare explicit `CheckConstraint` objects in `model_options.constraints` instead. These are already managed by convergence.
 
 This means: convergence never touches things it didn't create (or that aren't declared). No surprises from manual DB work, extensions, or legacy objects. The tradeoff is that duplicate indexes can exist (one convergence-managed, one legacy) — `postgres schema` should report these as informational.
 
@@ -306,7 +306,7 @@ The root cause: migration state loads the **current** class definition to recons
 
 A potential fix: `makemigrations` could compare the expected schema (from replaying migrations on a fresh DB) against model-derived DDL. If they differ, generate an AlterField. This is essentially `--replay` as a generation step rather than just a verification step.
 
-**Current workaround:** `postgres converge` handles `character varying` → `text` conversions as a transitional bridge for the CharField removal in 0.90.0. This is outside convergence's intended scope (column type changes should be migrations) but was pragmatic because the migration system can't detect these changes. Once a proper `--replay`-as-generation mechanism exists, or once all databases have been converged, the varchar→text handling in `converge` can be removed.
+**Previous workaround (removed):** `postgres converge` temporarily handled `character varying` → `text` conversions as a transitional bridge for the CharField removal in 0.90.0. This was removed — column type changes are migrations, not convergence.
 
 ### `db_default` changes
 
