@@ -18,10 +18,4 @@ class Migration(migrations.Migration):
                 ("model", postgres.TextField(max_length=100)),
             ],
         ),
-        migrations.AddConstraint(
-            model_name="car",
-            constraint=postgres.UniqueConstraint(
-                fields=("make", "model"), name="unique_make_model"
-            ),
-        ),
     ]

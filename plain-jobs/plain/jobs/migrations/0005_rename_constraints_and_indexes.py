@@ -1,7 +1,6 @@
 # Step 2: Rename constraints and indexes from plainworker_* to plainjobs_*
 # (Tables were renamed to plainjobs_* in migration 0004)
 
-from plain import postgres
 from plain.postgres import migrations
 
 
@@ -11,23 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Remove old constraints (on plainjobs_* tables now)
-        migrations.RemoveConstraint(
-            model_name="jobprocess",
-            name="plainworker_job_unique_uuid",
-        ),
-        migrations.RemoveConstraint(
-            model_name="jobrequest",
-            name="plainworker_jobrequest_unique_job_class_key",
-        ),
-        migrations.RemoveConstraint(
-            model_name="jobrequest",
-            name="plainworker_jobrequest_unique_uuid",
-        ),
-        migrations.RemoveConstraint(
-            model_name="jobresult",
-            name="plainworker_jobresult_unique_uuid",
-        ),
         # Rename indexes
         migrations.RenameIndex(
             model_name="jobprocess",
@@ -143,32 +125,5 @@ class Migration(migrations.Migration):
             model_name="jobresult",
             new_name="plainjobs_j_trace_i_02f370_idx",
             old_name="plainworker_trace_i_00c75f_idx",
-        ),
-        # Add new constraints (on plainworker_* tables, but with new names)
-        migrations.AddConstraint(
-            model_name="jobprocess",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainjobs_job_unique_uuid"
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="jobrequest",
-            constraint=postgres.UniqueConstraint(
-                condition=postgres.Q(("retry_attempt", 0), ("unique_key__gt", "")),
-                fields=("job_class", "unique_key"),
-                name="plainjobs_jobrequest_unique_job_class_key",
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="jobrequest",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainjobs_jobrequest_unique_uuid"
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="jobresult",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainjobs_jobresult_unique_uuid"
-            ),
         ),
     ]

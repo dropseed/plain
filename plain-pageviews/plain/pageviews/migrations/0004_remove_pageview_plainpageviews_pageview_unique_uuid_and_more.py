@@ -12,10 +12,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveConstraint(
-            model_name="pageview",
-            name="plainpageviews_pageview_unique_uuid",
-        ),
         migrations.RemoveField(
             model_name="pageview",
             name="uuid",

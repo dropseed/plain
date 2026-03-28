@@ -33,11 +33,4 @@ class Migration(migrations.Migration):
                 "ordering": ["order", "created_at"],
             },
         ),
-        migrations.AddConstraint(
-            model_name="pinnednavitem",
-            constraint=postgres.UniqueConstraint(
-                fields=("user", "view_slug"),
-                name="plainadmin_pinnednavitem_unique_user_view",
-            ),
-        ),
     ]

@@ -26,10 +26,4 @@ class Migration(migrations.Migration):
                 fields=["expires_at"], name="plainsessio_expires_d87cb5_idx"
             ),
         ),
-        migrations.AddConstraint(
-            model_name="session",
-            constraint=postgres.UniqueConstraint(
-                fields=("session_key",), name="unique_session_key"
-            ),
-        ),
     ]

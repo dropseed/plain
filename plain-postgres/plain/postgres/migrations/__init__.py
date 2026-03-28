@@ -1,7 +1,6 @@
 from ..schema import DatabaseSchemaEditor
 from .migration import Migration, settings_dependency
 from .operations import (
-    AddConstraint,
     AddField,
     AddIndex,
     AlterField,
@@ -9,7 +8,6 @@ from .operations import (
     AlterModelTable,
     CreateModel,
     DeleteModel,
-    RemoveConstraint,
     RemoveField,
     RemoveIndex,
     RenameField,
@@ -40,9 +38,6 @@ __all__ = [
     "AddIndex",
     "RemoveIndex",
     "RenameIndex",
-    # Constraint operations
-    "AddConstraint",
-    "RemoveConstraint",
     # Special operations
     "SeparateDatabaseAndState",
     "RunSQL",

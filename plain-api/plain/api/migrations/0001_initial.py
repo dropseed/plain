@@ -35,16 +35,4 @@ class Migration(migrations.Migration):
                 ("api_version", postgres.TextField(max_length=255, required=False)),
             ],
         ),
-        migrations.AddConstraint(
-            model_name="apikey",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainapi_apikey_unique_uuid"
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="apikey",
-            constraint=postgres.UniqueConstraint(
-                fields=("token",), name="plainapi_apikey_unique_token"
-            ),
-        ),
     ]

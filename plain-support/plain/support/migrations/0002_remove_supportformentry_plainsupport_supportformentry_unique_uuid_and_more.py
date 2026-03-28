@@ -9,10 +9,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveConstraint(
-            model_name="supportformentry",
-            name="plainsupport_supportformentry_unique_uuid",
-        ),
         migrations.RemoveField(
             model_name="supportformentry",
             name="uuid",

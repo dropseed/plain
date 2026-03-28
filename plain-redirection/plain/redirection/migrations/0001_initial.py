@@ -68,13 +68,6 @@ class Migration(migrations.Migration):
                 fields=["created_at"], name="plainredire_created_18c288_idx"
             ),
         ),
-        migrations.AddConstraint(
-            model_name="redirect",
-            constraint=postgres.UniqueConstraint(
-                fields=("from_pattern",),
-                name="plainredirects_redirect_unique_from_pattern",
-            ),
-        ),
         migrations.AddField(
             model_name="redirectlog",
             name="redirect",

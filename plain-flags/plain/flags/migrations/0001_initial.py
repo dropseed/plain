@@ -44,35 +44,11 @@ class Migration(migrations.Migration):
                 ("value", postgres.JSONField()),
             ],
         ),
-        migrations.AddConstraint(
-            model_name="flag",
-            constraint=postgres.UniqueConstraint(
-                fields=("name",), name="plainflags_flag_unique_name"
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="flag",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainflags_flag_unique_uuid"
-            ),
-        ),
         migrations.AddField(
             model_name="flagresult",
             name="flag",
             field=postgres.ForeignKeyField(
                 on_delete=plain.postgres.deletion.CASCADE, to="plainflags.flag"
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="flagresult",
-            constraint=postgres.UniqueConstraint(
-                fields=("flag", "key"), name="plainflags_flagresult_unique_key"
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="flagresult",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainflags_flagresult_unique_uuid"
             ),
         ),
     ]

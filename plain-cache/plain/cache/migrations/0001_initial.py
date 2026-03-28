@@ -27,10 +27,4 @@ class Migration(migrations.Migration):
                 fields=["expires_at"], name="plaincache__expires_5a9119_idx"
             ),
         ),
-        migrations.AddConstraint(
-            model_name="cacheditem",
-            constraint=postgres.UniqueConstraint(
-                fields=("key",), name="plaincache_cacheditem_unique_key"
-            ),
-        ),
     ]

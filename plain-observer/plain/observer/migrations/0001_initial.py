@@ -59,12 +59,6 @@ class Migration(migrations.Migration):
                 "ordering": ["-start_time"],
             },
         ),
-        migrations.AddConstraint(
-            model_name="trace",
-            constraint=postgres.UniqueConstraint(
-                fields=("trace_id",), name="observer_unique_trace_id"
-            ),
-        ),
         migrations.AddField(
             model_name="span",
             name="trace",
@@ -89,12 +83,6 @@ class Migration(migrations.Migration):
             model_name="span",
             index=postgres.Index(
                 fields=["start_time"], name="plainobserv_start_t_cb47a3_idx"
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="span",
-            constraint=postgres.UniqueConstraint(
-                fields=("trace", "span_id"), name="observer_unique_span_id"
             ),
         ),
     ]

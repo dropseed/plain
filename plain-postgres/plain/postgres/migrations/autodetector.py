@@ -576,9 +576,10 @@ class MigrationAutodetector:
                     if isinstance(field.remote_field, ManyToManyRel):
                         related_fields[field_name] = field
 
-            # Are there indexes to defer?
+            # Indexes are deferred to separate AddIndex operations.
+            # Constraints stay in CreateModel.options — they're created
+            # inline in CREATE TABLE and managed by convergence after that.
             indexes = model_state.options.pop("indexes")
-            constraints = model_state.options.pop("constraints")
             # Depend on the deletion of any possible proxy version of us
             dependencies: list[tuple[str, str, str | None, bool | str]] = [
                 (package_label, model_name, None, False),
@@ -670,15 +671,6 @@ class MigrationAutodetector:
                     operations.AddIndex(
                         model_name=model_name,
                         index=index,
-                    ),
-                    dependencies=related_dependencies,
-                )
-            for constraint in constraints:
-                self.add_operation(
-                    package_label,
-                    operations.AddConstraint(
-                        model_name=model_name,
-                        constraint=constraint,
                     ),
                     dependencies=related_dependencies,
                 )

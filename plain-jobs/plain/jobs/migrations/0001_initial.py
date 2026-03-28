@@ -133,12 +133,6 @@ class Migration(migrations.Migration):
                 fields=["job_class", "unique_key"], name="job_class_unique_key"
             ),
         ),
-        migrations.AddConstraint(
-            model_name="job",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainworker_job_unique_uuid"
-            ),
-        ),
         migrations.AddIndex(
             model_name="jobrequest",
             index=postgres.Index(
@@ -177,20 +171,6 @@ class Migration(migrations.Migration):
             model_name="jobrequest",
             index=postgres.Index(
                 fields=["job_class", "unique_key"], name="job_request_class_unique_key"
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="jobrequest",
-            constraint=postgres.UniqueConstraint(
-                condition=postgres.Q(("retry_attempt", 0), ("unique_key__gt", "")),
-                fields=("job_class", "unique_key"),
-                name="plainworker_jobrequest_unique_job_class_key",
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="jobrequest",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainworker_jobrequest_unique_uuid"
             ),
         ),
         migrations.AddIndex(
@@ -238,11 +218,5 @@ class Migration(migrations.Migration):
         migrations.AddIndex(
             model_name="jobresult",
             index=postgres.Index(fields=["queue"], name="plainworker_queue_23d8fe_idx"),
-        ),
-        migrations.AddConstraint(
-            model_name="jobresult",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainworker_jobresult_unique_uuid"
-            ),
         ),
     ]

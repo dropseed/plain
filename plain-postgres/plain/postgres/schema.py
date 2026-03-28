@@ -518,17 +518,10 @@ class DatabaseSchemaEditor:
                 )
             # Add the SQL to our big list.
             column_sqls.append(f"{quote_name(field.column)} {definition}")
-        constraints = [
-            constraint.constraint_sql(model, self)
-            for constraint in model.model_options.constraints
-        ]
+        # Constraints are not created inline — they're managed by convergence.
         sql = self.sql_create_table % {
             "table": quote_name(model.model_options.db_table),
-            "definition": ", ".join(
-                str(constraint)
-                for constraint in (*column_sqls, *constraints)
-                if constraint
-            ),
+            "definition": ", ".join(col for col in column_sqls if col),
         }
         return sql, params
 

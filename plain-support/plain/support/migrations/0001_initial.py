@@ -46,10 +46,4 @@ class Migration(migrations.Migration):
                 fields=["created_at"], name="plainsuppor_created_bda60d_idx"
             ),
         ),
-        migrations.AddConstraint(
-            model_name="supportformentry",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainsupport_supportformentry_unique_uuid"
-            ),
-        ),
     ]

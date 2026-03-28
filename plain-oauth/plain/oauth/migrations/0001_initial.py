@@ -44,11 +44,4 @@ class Migration(migrations.Migration):
                 "ordering": ("provider_key",),
             },
         ),
-        migrations.AddConstraint(
-            model_name="oauthconnection",
-            constraint=postgres.UniqueConstraint(
-                fields=("provider_key", "provider_user_id"),
-                name="plainoauth_oauthconnection_unique_provider_key_user_id",
-            ),
-        ),
     ]

@@ -50,10 +50,4 @@ class Migration(migrations.Migration):
             model_name="pageview",
             index=postgres.Index(fields=["url"], name="plainpagevi_url_d3e821_idx"),
         ),
-        migrations.AddConstraint(
-            model_name="pageview",
-            constraint=postgres.UniqueConstraint(
-                fields=("uuid",), name="plainpageviews_pageview_unique_uuid"
-            ),
-        ),
     ]

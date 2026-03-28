@@ -10,10 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveConstraint(
-            model_name="jobrequest",
-            name="plainjobs_jobrequest_unique_job_class_key",
-        ),
         migrations.RemoveIndex(
             model_name="jobprocess",
             name="plainjobs_j_unique__67172c_idx",

@@ -9,14 +9,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveConstraint(
-            model_name="flag",
-            name="plainflags_flag_unique_uuid",
-        ),
-        migrations.RemoveConstraint(
-            model_name="flagresult",
-            name="plainflags_flagresult_unique_uuid",
-        ),
         migrations.RemoveField(
             model_name="flag",
             name="uuid",
