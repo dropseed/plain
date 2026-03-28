@@ -730,9 +730,6 @@ def modelfield_to_formfield(
             **defaults,
         )
 
-    if issubclass(modelfield.__class__, postgres.fields.PositiveIntegerRelDbTypeMixin):
-        return fields.IntegerField(min_value=0, **defaults)
-
     if isinstance(modelfield, postgres.TextField):
         # Passing max_length to fields.TextField means that the value's length
         # will be validated twice. This is considered acceptable since we want

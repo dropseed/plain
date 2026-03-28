@@ -38,9 +38,6 @@ _FIELD_TYPES = [
     (fields.UUIDField, "uuid"),
     (fields.BinaryField, "bytea"),
     (fields.PrimaryKeyField, "bigint"),
-    (fields.PositiveIntegerField, "integer"),
-    (fields.PositiveBigIntegerField, "bigint"),
-    (fields.PositiveSmallIntegerField, "smallint"),
     (JSONField, "jsonb"),
 ]
 

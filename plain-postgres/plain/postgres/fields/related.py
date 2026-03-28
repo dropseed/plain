@@ -14,7 +14,7 @@ from plain.preflight import PreflightResult
 from plain.runtime import SettingsReference
 
 from ..registry import models_registry
-from . import DbParameters, Field
+from . import Field
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForwardForeignKeyDescriptor,
@@ -633,20 +633,11 @@ class ForeignKeyField(RelatedField):
     def get_prep_value(self, value: Any) -> Any:
         return self.target_field.get_prep_value(value)
 
-    def db_check(self) -> None:
-        return None
-
     def db_type(self) -> str | None:
         return self.target_field.rel_db_type()
 
     def cast_db_type(self) -> str | None:
         return self.target_field.cast_db_type()
-
-    def db_parameters(self) -> DbParameters:
-        return {
-            "type": self.db_type(),
-            "check": self.db_check(),
-        }
 
     def get_col(self, alias: str | None, output_field: Field | None = None) -> Any:
         if output_field is None:
@@ -1175,13 +1166,7 @@ class ManyToManyField(RelatedField):
     def save_form_data(self, instance: Model, data: Any) -> None:
         getattr(instance, self.attname).set(data)
 
-    def db_check(self) -> None:
-        return None
-
     def db_type(self) -> None:
         # A ManyToManyField is not represented by a single column,
         # so return None.
         return None
-
-    def db_parameters(self) -> DbParameters:
-        return {"type": None, "check": None}

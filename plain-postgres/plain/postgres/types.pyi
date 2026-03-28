@@ -164,72 +164,6 @@ def SmallIntegerField(
     error_messages: dict[str, str] | None = None,
 ) -> int: ...
 @overload
-def PositiveIntegerField(
-    *,
-    max_length: int | None = None,
-    required: bool = True,
-    allow_null: Literal[True],
-    default: Any = ...,
-    choices: Any = None,
-    validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
-) -> int | None: ...
-@overload
-def PositiveIntegerField(
-    *,
-    max_length: int | None = None,
-    required: bool = True,
-    allow_null: Literal[False] = False,
-    default: Any = ...,
-    choices: Any = None,
-    validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
-) -> int: ...
-@overload
-def PositiveBigIntegerField(
-    *,
-    max_length: int | None = None,
-    required: bool = True,
-    allow_null: Literal[True],
-    default: Any = ...,
-    choices: Any = None,
-    validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
-) -> int | None: ...
-@overload
-def PositiveBigIntegerField(
-    *,
-    max_length: int | None = None,
-    required: bool = True,
-    allow_null: Literal[False] = False,
-    default: Any = ...,
-    choices: Any = None,
-    validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
-) -> int: ...
-@overload
-def PositiveSmallIntegerField(
-    *,
-    max_length: int | None = None,
-    required: bool = True,
-    allow_null: Literal[True],
-    default: Any = ...,
-    choices: Any = None,
-    validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
-) -> int | None: ...
-@overload
-def PositiveSmallIntegerField(
-    *,
-    max_length: int | None = None,
-    required: bool = True,
-    allow_null: Literal[False] = False,
-    default: Any = ...,
-    choices: Any = None,
-    validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
-) -> int: ...
-@overload
 def PrimaryKeyField(
     *,
     max_length: int | None = None,
@@ -710,9 +644,6 @@ __all__ = [
     "JSONField",
     "ManyToManyField",
     "ManyToManyManager",
-    "PositiveBigIntegerField",
-    "PositiveIntegerField",
-    "PositiveSmallIntegerField",
     "PrimaryKeyField",
     "ReverseForeignKey",
     "ReverseForeignKeyManager",

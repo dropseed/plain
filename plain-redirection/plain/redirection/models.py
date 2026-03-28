@@ -17,12 +17,12 @@ __all__ = ["NotFoundLog", "Redirect", "RedirectLog"]
 class Redirect(postgres.Model):
     from_pattern: str = types.TextField(max_length=255)
     to_pattern: str = types.TextField(max_length=255)
-    http_status: int = types.PositiveSmallIntegerField(
+    http_status: int = types.SmallIntegerField(
         default=301
     )  # Default to permanent - could be choices?
     created_at: datetime = types.DateTimeField(auto_now_add=True)
     updated_at: datetime = types.DateTimeField(auto_now=True)
-    order: int = types.PositiveSmallIntegerField(default=0)
+    order: int = types.SmallIntegerField(default=0)
     enabled: bool = types.BooleanField(default=True)
     is_regex: bool = types.BooleanField(default=False)
 
@@ -46,6 +46,14 @@ class Redirect(postgres.Model):
             postgres.UniqueConstraint(
                 fields=["from_pattern"],
                 name="plainredirects_redirect_unique_from_pattern",
+            ),
+            postgres.CheckConstraint(
+                check=postgres.Q(http_status__gte=0),
+                name="plainredirection_redirect_http_status_check",
+            ),
+            postgres.CheckConstraint(
+                check=postgres.Q(order__gte=0),
+                name="plainredirection_redirect_order_check",
             ),
         ],
     )
@@ -91,7 +99,7 @@ class RedirectLog(postgres.Model):
     # The actuals that were used to redirect
     from_url: str = types.URLField(max_length=512)
     to_url: str = types.URLField(max_length=512)
-    http_status: int = types.PositiveSmallIntegerField(default=301)
+    http_status: int = types.SmallIntegerField(default=301)
 
     # Request metadata
     ip_address: str = types.GenericIPAddressField()
@@ -112,6 +120,12 @@ class RedirectLog(postgres.Model):
             postgres.Index(
                 name="plainredirection_redirectlog_redirect_id_idx",
                 fields=["redirect"],
+            ),
+        ],
+        constraints=[
+            postgres.CheckConstraint(
+                check=postgres.Q(http_status__gte=0),
+                name="plainredirection_redirectlog_http_status_check",
             ),
         ],
     )

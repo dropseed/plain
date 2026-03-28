@@ -566,9 +566,6 @@ class Product(postgres.Model):
 - [`IntegerField`](./fields/__init__.py#IntegerField) - Integer
 - [`BigIntegerField`](./fields/__init__.py#BigIntegerField) - Big (8 byte) integer
 - [`SmallIntegerField`](./fields/__init__.py#SmallIntegerField) - Small integer
-- [`PositiveIntegerField`](./fields/__init__.py#PositiveIntegerField) - Positive integer
-- [`PositiveBigIntegerField`](./fields/__init__.py#PositiveBigIntegerField) - Positive big integer
-- [`PositiveSmallIntegerField`](./fields/__init__.py#PositiveSmallIntegerField) - Positive small integer
 - [`FloatField`](./fields/__init__.py#FloatField) - Floating point number
 - [`DecimalField`](./fields/__init__.py#DecimalField) - Fixed precision decimal
 
