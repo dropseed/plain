@@ -6,6 +6,7 @@ from plain.postgres import CheckConstraint, Q, get_connection
 from plain.postgres.convergence import (
     AddConstraintFix,
     DropConstraintFix,
+    ValidateConstraintFix,
     detect_model_fixes,
 )
 
@@ -26,6 +27,20 @@ def _constraint_exists(table: str, name: str) -> bool:
             [table, name],
         )
         return cursor.fetchone() is not None
+
+
+def _constraint_is_valid(table: str, name: str) -> bool:
+    with get_connection().cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT c.convalidated FROM pg_constraint c
+            JOIN pg_class cl ON c.conrelid = cl.oid
+            WHERE cl.relname = %s AND c.conname = %s
+            """,
+            [table, name],
+        )
+        row = cursor.fetchone()
+        return row[0] if row else False
 
 
 class TestDetectConstraintFixes:
@@ -64,8 +79,6 @@ class TestDetectConstraintFixes:
         assert fix.name == "examples_car_extra_unique"
 
     def test_detects_missing_check_constraint(self, db):
-        """Add a CheckConstraint to the model's options, detect it as missing."""
-        # Temporarily add a constraint to the model
         original_constraints = list(Car.model_options.constraints)
         check = CheckConstraint(
             check=Q(id__gte=0),
@@ -86,7 +99,6 @@ class TestDetectConstraintFixes:
             Car.model_options.constraints = original_constraints
 
     def test_detects_missing_unique_constraint(self, db):
-        """Drop a constraint from the DB, detect it as missing."""
         _execute('ALTER TABLE "examples_car" DROP CONSTRAINT "unique_make_model"')
 
         conn = get_connection()
@@ -98,9 +110,36 @@ class TestDetectConstraintFixes:
         assert isinstance(fix, AddConstraintFix)
         assert fix.constraint.name == "unique_make_model"
 
+    def test_detects_not_valid_check_constraint(self, db):
+        """A NOT VALID constraint in the DB that matches the model needs validation."""
+        original_constraints = list(Car.model_options.constraints)
+        check = CheckConstraint(
+            check=Q(id__gte=0),
+            name="examples_car_id_nonneg",
+        )
+        Car.model_options.constraints = [*original_constraints, check]
+
+        # Create the constraint as NOT VALID
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0) NOT VALID'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+
+            assert len(fixes) == 1
+            fix = fixes[0]
+            assert isinstance(fix, ValidateConstraintFix)
+            assert fix.name == "examples_car_id_nonneg"
+        finally:
+            Car.model_options.constraints = original_constraints
+
 
 class TestApplyConstraintFixes:
-    def test_apply_add_check_constraint(self, db):
+    def test_add_check_constraint_uses_not_valid(self, db):
+        """AddConstraintFix for check constraints creates NOT VALID."""
         check = CheckConstraint(
             check=Q(id__gte=0),
             name="examples_car_id_nonneg",
@@ -109,13 +148,66 @@ class TestApplyConstraintFixes:
         Car.model_options.constraints = [*original_constraints, check]
 
         try:
-            assert not _constraint_exists("examples_car", "examples_car_id_nonneg")
-
             fix = AddConstraintFix(table="examples_car", constraint=check, model=Car)
             with get_connection().cursor() as cursor:
-                fix.apply(cursor)
+                sql = fix.apply(cursor)
 
+            assert "NOT VALID" in sql
             assert _constraint_exists("examples_car", "examples_car_id_nonneg")
+            assert not _constraint_is_valid("examples_car", "examples_car_id_nonneg")
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_validate_constraint(self, db):
+        """ValidateConstraintFix validates a NOT VALID constraint."""
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0) NOT VALID'
+        )
+        assert not _constraint_is_valid("examples_car", "examples_car_id_nonneg")
+
+        fix = ValidateConstraintFix(table="examples_car", name="examples_car_id_nonneg")
+        with get_connection().cursor() as cursor:
+            fix.apply(cursor)
+
+        assert _constraint_is_valid("examples_car", "examples_car_id_nonneg")
+
+    def test_full_check_constraint_lifecycle(self, db):
+        """Add NOT VALID → validate → fully valid constraint."""
+        check = CheckConstraint(
+            check=Q(id__gte=0),
+            name="examples_car_id_nonneg",
+        )
+        original_constraints = list(Car.model_options.constraints)
+        Car.model_options.constraints = [*original_constraints, check]
+
+        try:
+            # First converge pass: adds NOT VALID
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+            assert len(fixes) == 1
+            assert isinstance(fixes[0], AddConstraintFix)
+
+            with get_connection().cursor() as cursor:
+                fixes[0].apply(cursor)
+
+            assert not _constraint_is_valid("examples_car", "examples_car_id_nonneg")
+
+            # Second converge pass: detects NOT VALID, validates
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+            assert len(fixes) == 1
+            assert isinstance(fixes[0], ValidateConstraintFix)
+
+            with get_connection().cursor() as cursor:
+                fixes[0].apply(cursor)
+
+            assert _constraint_is_valid("examples_car", "examples_car_id_nonneg")
+
+            # Third pass: fully converged
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+            assert fixes == []
         finally:
             Car.model_options.constraints = original_constraints
 

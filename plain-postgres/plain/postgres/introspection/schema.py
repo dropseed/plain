@@ -260,6 +260,14 @@ def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
                         detail="missing from database",
                     )
                 )
+            elif not actual_dict[constraint.name].get("validated", True):
+                con_issues.append(
+                    SchemaIssue(
+                        kind="constraint_not_valid",
+                        name=constraint.name,
+                        detail="NOT VALID — needs validation",
+                    )
+                )
             constraints.append(
                 ConstraintInfo(
                     name=constraint.name,

@@ -19,6 +19,10 @@ def converge(yes: bool) -> None:
     Detects and fixes:
     - Column type mismatches (e.g. character varying → text)
     - Missing or extra constraints (check, unique)
+    - NOT VALID constraints needing validation
+
+    Each fix is applied and committed independently so partial
+    failures don't block subsequent fixes.
     """
     fixes = detect_fixes()
 
@@ -40,15 +44,27 @@ def converge(yes: bool) -> None:
 
     click.echo()
 
+    applied = 0
+    failed = 0
     conn = get_connection()
-    with conn.cursor() as cursor:
-        for fix in fixes:
-            sql = fix.apply(cursor)
-            click.echo(f"  {sql}")
 
-    conn.commit()
+    for fix in fixes:
+        try:
+            with conn.cursor() as cursor:
+                sql = fix.apply(cursor)
+            conn.commit()
+            click.echo(f"  {sql}")
+            applied += 1
+        except Exception as e:
+            conn.rollback()
+            click.secho(f"  FAILED: {fix.describe()} — {e}", fg="red")
+            failed += 1
 
     click.echo()
-    click.secho(
-        f"Applied {len(fixes)} fix{'es' if len(fixes) != 1 else ''}.", fg="green"
-    )
+    parts = []
+    if applied:
+        parts.append(f"{applied} applied")
+    if failed:
+        parts.append(f"{failed} failed")
+    color = "green" if not failed else "yellow"
+    click.secho(", ".join(parts) + ".", fg=color)

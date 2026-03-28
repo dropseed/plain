@@ -6,7 +6,13 @@ from ..constraints import BaseConstraint
 from ..db import get_connection
 from ..introspection import check_model
 from ..registry import models_registry
-from .fixes import AddConstraintFix, ColumnTypeFix, DropConstraintFix, Fix
+from .fixes import (
+    AddConstraintFix,
+    ColumnTypeFix,
+    DropConstraintFix,
+    Fix,
+    ValidateConstraintFix,
+)
 
 
 def detect_fixes() -> list[Fix]:
@@ -44,6 +50,11 @@ def detect_model_fixes(conn: Any, cursor: Any, model: Any) -> list[Fix]:
                 constraint_obj = _find_model_constraint(model, con["name"])
                 if constraint_obj:
                     fixes.append(AddConstraintFix(table, constraint_obj, model))
+            elif issue["kind"] == "constraint_not_valid" and con["type"] in (
+                "check",
+                "unique",
+            ):
+                fixes.append(ValidateConstraintFix(table, con["name"]))
             elif issue["kind"] == "constraint_extra" and con["type"] in (
                 "check",
                 "unique",

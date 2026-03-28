@@ -988,14 +988,22 @@ class DatabaseConnection:
                 FROM pg_attribute AS fka
                 JOIN pg_class AS fkc ON fka.attrelid = fkc.oid
                 WHERE fka.attrelid = c.confrelid AND fka.attnum = c.confkey[1]),
-                cl.reloptions
+                cl.reloptions,
+                c.convalidated
             FROM pg_constraint AS c
             JOIN pg_class AS cl ON c.conrelid = cl.oid
             WHERE cl.relname = %s AND pg_catalog.pg_table_is_visible(cl.oid)
         """,
             [table_name],
         )
-        for constraint, columns, kind, used_cols, options in cursor.fetchall():
+        for (
+            constraint,
+            columns,
+            kind,
+            used_cols,
+            options,
+            validated,
+        ) in cursor.fetchall():
             constraints[constraint] = {
                 "columns": columns,
                 "primary_key": kind == "p",
@@ -1005,6 +1013,7 @@ class DatabaseConnection:
                 "index": False,
                 "definition": None,
                 "options": options,
+                "validated": validated,
             }
         # Now get indexes
         cursor.execute(
