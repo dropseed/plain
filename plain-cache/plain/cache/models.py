@@ -23,7 +23,7 @@ class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
 
 @postgres.register_model
 class CachedItem(postgres.Model):
-    key: str = types.CharField(max_length=255)
+    key: str = types.TextField(max_length=255)
     value: Any = types.JSONField(required=False, allow_null=True)
     expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
     created_at: datetime = types.DateTimeField(auto_now_add=True)

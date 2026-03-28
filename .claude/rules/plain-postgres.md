@@ -12,7 +12,7 @@ Import fields via `from plain.postgres import types` and annotate with Python ty
 ```python
 from plain.postgres import types
 
-name: str = types.CharField(max_length=100)
+name: str = types.TextField(max_length=100)
 car: Car = types.ForeignKeyField("Car", on_delete=postgres.CASCADE)
 ```
 

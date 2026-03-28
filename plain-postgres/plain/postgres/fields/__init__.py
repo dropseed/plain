@@ -70,7 +70,6 @@ __all__ = [
     "BigIntegerField",
     "BinaryField",
     "BooleanField",
-    "CharField",
     "DateField",
     "DateTimeField",
     "DecimalField",
@@ -948,8 +947,8 @@ class BooleanField(Field[bool]):
         return self.to_python(value)
 
 
-class CharField(Field[str]):
-    db_type_sql = "character varying"
+class TextField(Field[str]):
+    db_type_sql = "text"
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -970,7 +969,6 @@ class CharField(Field[str]):
         ]
 
     def _check_max_length_attribute(self, **kwargs: Any) -> list[PreflightResult]:
-        # Unlimited VARCHAR is supported (no max_length required)
         if self.max_length is None:
             return []
         elif (
@@ -982,21 +980,11 @@ class CharField(Field[str]):
                 PreflightResult(
                     fix="'max_length' must be a positive integer.",
                     obj=self,
-                    id="fields.charfield_invalid_max_length",
+                    id="fields.textfield_invalid_max_length",
                 )
             ]
         else:
             return []
-
-    def db_type(self) -> str | None:
-        if self.max_length is None:
-            return "character varying"
-        return f"character varying({self.max_length})"
-
-    def cast_db_type(self) -> str | None:
-        if self.max_length is None:
-            return "character varying"
-        return super().cast_db_type()
 
     def to_python(self, value: Any) -> str | None:
         if isinstance(value, str) or value is None:
@@ -1503,20 +1491,9 @@ class DurationField(Field[datetime.timedelta]):
         return "" if val is None else duration_string(val)
 
 
-class EmailField(CharField):
+class EmailField(TextField):
     default_validators = [validators.validate_email]
     description = "Email address"
-
-    def __init__(self, **kwargs: Any):
-        # max_length=254 to be compliant with RFCs 3696 and 5321
-        kwargs.setdefault("max_length", 254)
-        super().__init__(**kwargs)
-
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        # We do not exclude max_length if it matches default as we want to change
-        # the default in future.
-        return name, path, args, kwargs
 
 
 class FloatField(Field[float]):
@@ -1795,20 +1772,6 @@ class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, SmallIntegerField
     description = "Positive small integer"
 
 
-class TextField(Field[str]):
-    db_type_sql = "text"
-    description = "Text"
-
-    def to_python(self, value: Any) -> str | None:
-        if isinstance(value, str) or value is None:
-            return value
-        return str(value)
-
-    def get_prep_value(self, value: Any) -> Any:
-        value = super().get_prep_value(value)
-        return self.to_python(value)
-
-
 class TimeField(DateTimeCheckMixin, Field[datetime.time]):
     db_type_sql = "time without time zone"
     empty_strings_allowed = False
@@ -1909,19 +1872,9 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
         return "" if val is None else val.isoformat()
 
 
-class URLField(CharField):
+class URLField(TextField):
     default_validators = [validators.URLValidator()]
     description = "URL"
-
-    def __init__(self, **kwargs: Any):
-        kwargs.setdefault("max_length", 200)
-        super().__init__(**kwargs)
-
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        if kwargs.get("max_length") == 200:
-            del kwargs["max_length"]
-        return name, path, args, kwargs
 
 
 class BinaryField(Field[bytes | memoryview]):

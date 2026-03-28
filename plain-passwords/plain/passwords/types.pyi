@@ -15,7 +15,7 @@ The return type is conditional on allow_null:
 from collections.abc import Callable, Sequence
 from typing import Any, Literal, overload
 
-# PasswordField extends CharField with password-specific hashing
+# PasswordField extends TextField with password-specific hashing
 @overload
 def PasswordField(
     *,

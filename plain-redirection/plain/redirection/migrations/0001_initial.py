@@ -15,8 +15,8 @@ class Migration(migrations.Migration):
             name="Redirect",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("from_pattern", postgres.CharField(max_length=255)),
-                ("to_pattern", postgres.CharField(max_length=255)),
+                ("from_pattern", postgres.TextField(max_length=255)),
+                ("to_pattern", postgres.TextField(max_length=255)),
                 ("http_status", postgres.PositiveSmallIntegerField(default=301)),
                 ("created_at", postgres.DateTimeField(auto_now_add=True)),
                 ("updated_at", postgres.DateTimeField(auto_now=True)),
@@ -36,8 +36,8 @@ class Migration(migrations.Migration):
                 ("to_url", postgres.URLField(max_length=512)),
                 ("http_status", postgres.PositiveSmallIntegerField(default=301)),
                 ("ip_address", postgres.GenericIPAddressField()),
-                ("user_agent", postgres.CharField(max_length=512, required=False)),
-                ("referrer", postgres.CharField(max_length=512, required=False)),
+                ("user_agent", postgres.TextField(max_length=512, required=False)),
+                ("referrer", postgres.TextField(max_length=512, required=False)),
                 ("created_at", postgres.DateTimeField(auto_now_add=True)),
             ],
             options={
@@ -50,8 +50,8 @@ class Migration(migrations.Migration):
                 ("id", postgres.PrimaryKeyField()),
                 ("url", postgres.URLField(max_length=512)),
                 ("ip_address", postgres.GenericIPAddressField()),
-                ("user_agent", postgres.CharField(max_length=512, required=False)),
-                ("referrer", postgres.CharField(max_length=512, required=False)),
+                ("user_agent", postgres.TextField(max_length=512, required=False)),
+                ("referrer", postgres.TextField(max_length=512, required=False)),
                 ("created_at", postgres.DateTimeField(auto_now_add=True)),
             ],
             options={

@@ -142,8 +142,8 @@ class PublishedQuerySet(postgres.QuerySet["Article"]):
 
 @postgres.register_model
 class Article(postgres.Model):
-    title: str = types.CharField(max_length=200)
-    status: str = types.CharField(max_length=20)
+    title: str = types.TextField(max_length=200)
+    status: str = types.TextField(max_length=20)
 
     query = PublishedQuerySet()
 
@@ -540,7 +540,7 @@ from plain.postgres import types
 
 class Product(postgres.Model):
     # Text fields
-    name: str = types.CharField(max_length=200)
+    name: str = types.TextField(max_length=200)
     description: str = types.TextField()
 
     # Numeric fields
@@ -557,8 +557,7 @@ class Product(postgres.Model):
 
 **Text fields:**
 
-- [`CharField`](./fields/__init__.py#CharField) - String with max length
-- [`TextField`](./fields/__init__.py#TextField) - Unlimited text
+- [`TextField`](./fields/__init__.py#TextField) - Text (with optional max length)
 - [`EmailField`](./fields/__init__.py#EmailField) - Email address (validated)
 - [`URLField`](./fields/__init__.py#URLField) - URL (validated)
 
@@ -647,7 +646,7 @@ from plain.postgres import types
 
 @postgres.register_model
 class Integration(postgres.Model):
-    name: str = types.CharField(max_length=100)
+    name: str = types.TextField(max_length=100)
     api_key: str = types.EncryptedTextField(max_length=200)
     credentials: dict = types.EncryptedJSONField(required=False, allow_null=True)
 ```
@@ -682,7 +681,7 @@ from plain.postgres import types
 
 @postgres.register_model
 class Book(postgres.Model):
-    title: str = types.CharField(max_length=200)
+    title: str = types.TextField(max_length=200)
     author: Author = types.ForeignKeyField("Author", on_delete=postgres.CASCADE)
     tags = types.ManyToManyField("Tag")
 ```
@@ -697,13 +696,13 @@ from plain.postgres import types
 
 @postgres.register_model
 class Author(postgres.Model):
-    name: str = types.CharField(max_length=200)
+    name: str = types.TextField(max_length=200)
     # Explicit reverse accessor for all books by this author
     books = types.ReverseForeignKey(to="Book", field="author")
 
 @postgres.register_model
 class Book(postgres.Model):
-    title: str = types.CharField(max_length=200)
+    title: str = types.TextField(max_length=200)
     author: Author = types.ForeignKeyField(Author, on_delete=postgres.CASCADE)
 
 # Usage
@@ -720,13 +719,13 @@ For many-to-many relationships:
 ```python
 @postgres.register_model
 class Feature(postgres.Model):
-    name: str = types.CharField(max_length=100)
+    name: str = types.TextField(max_length=100)
     # Explicit reverse accessor for all cars with this feature
     cars = types.ReverseManyToMany(to="Car", field="features")
 
 @postgres.register_model
 class Car(postgres.Model):
-    model: str = types.CharField(max_length=100)
+    model: str = types.TextField(max_length=100)
     features = types.ManyToManyField(Feature)
 
 # Usage
@@ -793,7 +792,7 @@ You can optimize queries and ensure data integrity with indexes and constraints:
 ```python
 class User(postgres.Model):
     email: str = types.EmailField()
-    username: str = types.CharField(max_length=150)
+    username: str = types.TextField(max_length=150)
     age: int = types.IntegerField()
 
     model_options = postgres.Options(
@@ -817,12 +816,12 @@ Add indexes for columns that appear in `.filter()`, `.order_by()`, or `.exclude(
 ```python
 # Bad — full table scan on every filtered query
 class Order(postgres.Model):
-    status: str = types.CharField(max_length=20)
+    status: str = types.TextField(max_length=20)
     created_at: datetime = types.DateTimeField()
 
 # Good — indexed for common queries
 class Order(postgres.Model):
-    status: str = types.CharField(max_length=20)
+    status: str = types.TextField(max_length=20)
     created_at: datetime = types.DateTimeField()
 
     model_options = postgres.Options(
@@ -864,10 +863,10 @@ Use `default=""` instead of `allow_null=True` to avoid two representations of "e
 
 ```python
 # Bad — NULL and "" both mean "empty"
-nickname: str = types.CharField(max_length=50, allow_null=True)
+nickname: str = types.TextField(max_length=50, allow_null=True)
 
 # Good — single empty representation
-nickname: str = types.CharField(max_length=50, default="")
+nickname: str = types.TextField(max_length=50, default="")
 ```
 
 ## Forms
@@ -1028,10 +1027,6 @@ See [`default_settings.py`](./default_settings.py) for more details.
 #### How do I add a field to an existing model?
 
 Add the field to your model class, then run `plain makemigrations` to create a migration. If the field is required (no default value and not nullable), you'll be prompted to provide a default value for existing rows.
-
-#### What's the difference between `CharField` and `TextField`?
-
-`CharField` requires a `max_length` and is typically used for short strings like names or emails. `TextField` has no length limit and is used for longer content like descriptions or body text.
 
 #### How do I create a unique constraint on multiple fields?
 

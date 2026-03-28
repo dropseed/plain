@@ -24,7 +24,6 @@ _SHORT_ALIASES = {
 # All concrete field classes and their expected db_type_sql values
 _FIELD_TYPES = [
     (fields.BooleanField, "boolean"),
-    (fields.CharField, "character varying"),
     (fields.DateField, "date"),
     (fields.DateTimeField, "timestamp with time zone"),
     (fields.DecimalField, "numeric(%(max_digits)s,%(decimal_places)s)"),
@@ -68,18 +67,6 @@ def test_db_type_uses_canonical_form(field_class: type, expected_sql: str) -> No
         f"{field_class.__name__}.db_type_sql = {expected_sql!r} uses short alias {base!r}. "
         f"Use the canonical Postgres form instead."
     )
-
-
-def test_charfield_db_type_without_max_length() -> None:
-    """CharField without max_length produces 'character varying'."""
-    f = fields.CharField()
-    assert f.db_type() == "character varying"
-
-
-def test_charfield_db_type_with_max_length() -> None:
-    """CharField with max_length produces 'character varying(N)'."""
-    f = fields.CharField(max_length=255)
-    assert f.db_type() == "character varying(255)"
 
 
 # Verify specific db_type() output matches Postgres format_type()

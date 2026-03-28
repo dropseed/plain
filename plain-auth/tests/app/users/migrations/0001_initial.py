@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             name="User",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("username", postgres.CharField(max_length=255)),
+                ("username", postgres.TextField(max_length=255)),
                 ("is_admin", postgres.BooleanField(default=False)),
             ],
         ),

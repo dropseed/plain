@@ -16,8 +16,8 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("timestamp", postgres.DateTimeField()),
-                ("level", postgres.CharField(max_length=20)),
-                ("logger", postgres.CharField(max_length=255)),
+                ("level", postgres.TextField(max_length=20)),
+                ("logger", postgres.TextField(max_length=255)),
                 ("message", postgres.TextField()),
                 (
                     "span",

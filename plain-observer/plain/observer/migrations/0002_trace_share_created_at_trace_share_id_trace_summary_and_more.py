@@ -18,12 +18,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="trace",
             name="share_id",
-            field=postgres.CharField(default="", max_length=32, required=False),
+            field=postgres.TextField(default="", max_length=32, required=False),
         ),
         migrations.AddField(
             model_name="trace",
             name="summary",
-            field=postgres.CharField(default="", max_length=255, required=False),
+            field=postgres.TextField(default="", max_length=255, required=False),
         ),
         migrations.AddIndex(
             model_name="trace",

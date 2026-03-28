@@ -734,21 +734,12 @@ def modelfield_to_formfield(
         return fields.IntegerField(min_value=0, **defaults)
 
     if isinstance(modelfield, postgres.TextField):
-        # Passing max_length to fields.CharField means that the value's length
-        # will be validated twice. This is considered acceptable since we want
-        # the value in the form field (to pass into widget for example).
-        return fields.TextField(max_length=modelfield.max_length, **defaults)
-
-    if isinstance(modelfield, postgres.CharField):
-        # Passing max_length to forms.TextField means that the value's length
+        # Passing max_length to fields.TextField means that the value's length
         # will be validated twice. This is considered acceptable since we want
         # the value in the form field (to pass into widget for example).
         if modelfield.allow_null:
             defaults["empty_value"] = None
-        return fields.TextField(
-            max_length=modelfield.max_length,
-            **defaults,
-        )
+        return fields.TextField(max_length=modelfield.max_length, **defaults)
 
     if isinstance(modelfield, postgres.JSONField):
         return fields.JSONField(
@@ -769,5 +760,5 @@ def modelfield_to_formfield(
         form_class = getattr(fields, modelfield.__class__.__name__)
         return form_class(**defaults)
 
-    # Default to CharField if we didn't find anything else
+    # Default to TextField if we didn't find anything else
     return fields.TextField(**defaults)

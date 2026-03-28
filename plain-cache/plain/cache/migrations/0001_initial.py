@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             name="CachedItem",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("key", postgres.CharField(max_length=255)),
+                ("key", postgres.TextField(max_length=255)),
                 ("value", postgres.JSONField(allow_null=True, required=False)),
                 ("expires_at", postgres.DateTimeField(allow_null=True, required=False)),
                 ("created_at", postgres.DateTimeField(auto_now_add=True)),

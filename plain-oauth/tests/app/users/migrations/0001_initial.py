@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("email", postgres.EmailField(max_length=254)),
-                ("username", postgres.CharField(max_length=100)),
+                ("username", postgres.TextField(max_length=100)),
             ],
         ),
     ]

@@ -36,18 +36,18 @@ class Pageview(postgres.Model):
     url: str = types.URLField(max_length=2048)
     timestamp: datetime = types.DateTimeField(auto_now_add=True)
 
-    title: str = types.CharField(max_length=512, required=False)
+    title: str = types.TextField(max_length=512, required=False)
     # Referrers may not always be valid URLs (e.g. `android-app://...`).
-    # Use a plain CharField so we don't validate the scheme or format.
-    referrer: str = types.CharField(max_length=1024, required=False)
+    # Use a plain TextField so we don't validate the scheme or format.
+    referrer: str = types.TextField(max_length=1024, required=False)
 
-    user_id: str = types.CharField(max_length=255, required=False)
-    session_id: str = types.CharField(max_length=255, required=False)
+    user_id: str = types.TextField(max_length=255, required=False)
+    session_id: str = types.TextField(max_length=255, required=False)
 
     # Attribution tracking
-    source: str = types.CharField(max_length=200, required=False)
-    medium: str = types.CharField(max_length=200, required=False)
-    campaign: str = types.CharField(max_length=200, required=False)
+    source: str = types.TextField(max_length=200, required=False)
+    medium: str = types.TextField(max_length=200, required=False)
+    campaign: str = types.TextField(max_length=200, required=False)
 
     query: postgres.QuerySet[Pageview] = postgres.QuerySet()
 

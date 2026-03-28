@@ -15,21 +15,21 @@ class Migration(migrations.Migration):
             name="Trace",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("trace_id", postgres.CharField(max_length=255)),
+                ("trace_id", postgres.TextField(max_length=255)),
                 ("start_time", postgres.DateTimeField()),
                 ("end_time", postgres.DateTimeField()),
                 ("root_span_name", postgres.TextField(default="", required=False)),
                 (
                     "request_id",
-                    postgres.CharField(default="", max_length=255, required=False),
+                    postgres.TextField(default="", max_length=255, required=False),
                 ),
                 (
                     "session_id",
-                    postgres.CharField(default="", max_length=255, required=False),
+                    postgres.TextField(default="", max_length=255, required=False),
                 ),
                 (
                     "user_id",
-                    postgres.CharField(default="", max_length=255, required=False),
+                    postgres.TextField(default="", max_length=255, required=False),
                 ),
             ],
             options={
@@ -40,18 +40,18 @@ class Migration(migrations.Migration):
             name="Span",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("span_id", postgres.CharField(max_length=255)),
-                ("name", postgres.CharField(max_length=255)),
-                ("kind", postgres.CharField(max_length=50)),
+                ("span_id", postgres.TextField(max_length=255)),
+                ("name", postgres.TextField(max_length=255)),
+                ("kind", postgres.TextField(max_length=50)),
                 (
                     "parent_id",
-                    postgres.CharField(default="", max_length=255, required=False),
+                    postgres.TextField(default="", max_length=255, required=False),
                 ),
                 ("start_time", postgres.DateTimeField()),
                 ("end_time", postgres.DateTimeField()),
                 (
                     "status",
-                    postgres.CharField(default="", max_length=50, required=False),
+                    postgres.TextField(default="", max_length=50, required=False),
                 ),
                 ("span_data", postgres.JSONField(default=dict, required=False)),
             ],

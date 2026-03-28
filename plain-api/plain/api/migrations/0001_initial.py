@@ -25,14 +25,14 @@ class Migration(migrations.Migration):
                     "last_used_at",
                     postgres.DateTimeField(allow_null=True, required=False),
                 ),
-                ("name", postgres.CharField(max_length=255, required=False)),
+                ("name", postgres.TextField(max_length=255, required=False)),
                 (
                     "token",
-                    postgres.CharField(
+                    postgres.TextField(
                         default=plain.api.models.generate_token, max_length=40
                     ),
                 ),
-                ("api_version", postgres.CharField(max_length=255, required=False)),
+                ("api_version", postgres.TextField(max_length=255, required=False)),
             ],
         ),
         migrations.AddConstraint(

@@ -21,11 +21,11 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
-                ("name", postgres.CharField(max_length=255)),
-                ("email", postgres.EmailField(max_length=254)),
+                ("name", postgres.TextField(max_length=255)),
+                ("email", postgres.EmailField()),
                 ("message", postgres.TextField()),
                 ("created_at", postgres.DateTimeField(auto_now_add=True)),
-                ("form_slug", postgres.CharField(max_length=255)),
+                ("form_slug", postgres.TextField(max_length=255)),
                 (
                     "user",
                     postgres.ForeignKeyField(

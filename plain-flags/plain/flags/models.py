@@ -20,7 +20,7 @@ class FlagResult(postgres.Model):
     created_at: datetime = types.DateTimeField(auto_now_add=True)
     updated_at: datetime = types.DateTimeField(auto_now=True)
     flag: Flag = types.ForeignKeyField("Flag", on_delete=postgres.CASCADE)
-    key: str = types.CharField(max_length=255)
+    key: str = types.TextField(max_length=255)
     value = types.JSONField()
 
     query: postgres.QuerySet[FlagResult] = postgres.QuerySet()
@@ -41,7 +41,7 @@ class FlagResult(postgres.Model):
 class Flag(postgres.Model):
     created_at: datetime = types.DateTimeField(auto_now_add=True)
     updated_at: datetime = types.DateTimeField(auto_now=True)
-    name: str = types.CharField(max_length=255, validators=[validate_flag_name])
+    name: str = types.TextField(max_length=255, validators=[validate_flag_name])
 
     # Optional description that can be filled in after the flag is used/created
     description: str = types.TextField(required=False)

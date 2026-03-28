@@ -24,11 +24,11 @@ class APIKey(postgres.Model):
     expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
     last_used_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
 
-    name: str = types.CharField(max_length=255, required=False)
+    name: str = types.TextField(max_length=255, required=False)
 
-    token: str = types.CharField(max_length=40, default=generate_token)
+    token: str = types.TextField(max_length=40, default=generate_token)
 
-    api_version: str = types.CharField(max_length=255, required=False)
+    api_version: str = types.TextField(max_length=255, required=False)
 
     query: postgres.QuerySet[APIKey] = postgres.QuerySet()
 

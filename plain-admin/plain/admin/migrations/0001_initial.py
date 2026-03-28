@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
                 ("id", postgres.PrimaryKeyField()),
                 ("created_at", postgres.DateTimeField(auto_now_add=True)),
                 ("order", postgres.SmallIntegerField(default=0)),
-                ("view_slug", postgres.CharField(max_length=255)),
+                ("view_slug", postgres.TextField(max_length=255)),
                 (
                     "user",
                     postgres.ForeignKeyField(

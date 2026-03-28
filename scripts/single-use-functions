@@ -1,0 +1,404 @@
+#!/usr/bin/env python3
+"""
+Find module-level functions that have only a single caller.
+
+These are candidates for inlining at the call site or converting to
+class/instance methods, rather than existing as standalone module-level
+helpers.
+
+Usage:
+    ./scripts/single-use-functions                  # all packages
+    ./scripts/single-use-functions plain-postgres    # one package
+    ./scripts/single-use-functions -v                # verbose
+"""
+
+from __future__ import annotations
+
+import ast
+import argparse
+import subprocess
+import sys
+from collections import defaultdict
+from dataclasses import dataclass
+from pathlib import Path
+
+
+class Colors:
+    GREEN = "\033[32m"
+    RED = "\033[31m"
+    YELLOW = "\033[33m"
+    DIM = "\033[2m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
+
+
+# ── Data types ────────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Scope:
+    """A lexical scope: function, class, or module level."""
+
+    name: str
+    kind: str  # "function", "class", "module"
+    line: int
+
+    def display(self) -> str:
+        if self.kind == "module":
+            return "<module level>"
+        return f"{self.name} (line {self.line})"
+
+
+MODULE_SCOPE = Scope("<module>", "module", 0)
+
+
+@dataclass
+class Finding:
+    func_name: str
+    file: Path
+    def_line: int
+    caller: Scope
+
+
+# ── Directories / files to skip ───────────────────────────────────────────────
+
+SKIP_DIRS = {
+    "__pycache__",
+    ".venv",
+    "agents",
+    "example",
+    "migrations",
+    "node_modules",
+    "scratch",
+    "server",
+    "test",
+    "tests",
+    "work",
+}
+
+SKIP_FILES = {"conftest.py"}
+
+
+# ── AST analysis ──────────────────────────────────────────────────────────────
+
+
+class ScopeTracker(ast.NodeVisitor):
+    """
+    Single-pass visitor that records, for each target name, the set of
+    distinct scopes that reference it.
+    """
+
+    def __init__(self, target_names: set[str]) -> None:
+        self.target_names = target_names
+        self.references: dict[str, set[Scope]] = {n: set() for n in target_names}
+        self._stack: list[Scope] = [MODULE_SCOPE]
+
+    # -- scope boundaries --
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._stack.append(Scope(node.name, "function", node.lineno))
+        self.generic_visit(node)
+        self._stack.pop()
+
+    visit_AsyncFunctionDef = visit_FunctionDef
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        self._stack.append(Scope(node.name, "class", node.lineno))
+        self.generic_visit(node)
+        self._stack.pop()
+
+    # -- name references --
+
+    def visit_Name(self, node: ast.Name) -> None:
+        if node.id in self.target_names:
+            self.references[node.id].add(self._stack[-1])
+        self.generic_visit(node)
+
+
+def _extract_all_names(tree: ast.Module) -> set[str]:
+    """Return the set of names declared in __all__, if present."""
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "__all__":
+                    if isinstance(node.value, (ast.List, ast.Tuple)):
+                        return {
+                            elt.value
+                            for elt in node.value.elts
+                            if isinstance(elt, ast.Constant)
+                            and isinstance(elt.value, str)
+                        }
+        # __all__ += [...]
+        if isinstance(node, ast.AugAssign):
+            if isinstance(node.target, ast.Name) and node.target.id == "__all__":
+                if isinstance(node.value, (ast.List, ast.Tuple)):
+                    return {
+                        elt.value
+                        for elt in node.value.elts
+                        if isinstance(elt, ast.Constant)
+                        and isinstance(elt.value, str)
+                    }
+    return set()
+
+
+def _should_skip_function(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    all_names: set[str],
+) -> bool:
+    """Return True if this function should not be analyzed."""
+    # Dunders (__init__, __str__, …)
+    if node.name.startswith("__") and node.name.endswith("__"):
+        return True
+    # Public API
+    if node.name in all_names:
+        return True
+    # Decorated — likely a framework hook / registration
+    if node.decorator_list:
+        return True
+    return False
+
+
+def analyze_file(
+    path: Path,
+) -> list[tuple[str, int, set[Scope]]]:
+    """
+    Parse *path* and return ``(func_name, def_line, caller_scopes)``
+    for each candidate module-level function.
+    """
+    try:
+        source = path.read_text()
+        tree = ast.parse(source, filename=str(path))
+    except (SyntaxError, UnicodeDecodeError):
+        return []
+
+    all_names = _extract_all_names(tree)
+
+    # Collect module-level function defs
+    candidates: dict[str, int] = {}  # name → line
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if not _should_skip_function(node, all_names):
+                candidates[node.name] = node.lineno
+
+    if not candidates:
+        return []
+
+    # Single-pass reference tracking
+    tracker = ScopeTracker(set(candidates))
+    tracker.visit(tree)
+
+    results: list[tuple[str, int, set[Scope]]] = []
+    for name, def_line in candidates.items():
+        callers = set(tracker.references[name])
+        # Discard self-references (recursion)
+        callers.discard(Scope(name, "function", def_line))
+        results.append((name, def_line, callers))
+
+    return results
+
+
+# ── Cross-file reference check ────────────────────────────────────────────────
+
+
+def _other_files_referencing(
+    func_name: str,
+    source_file: Path,
+    root: Path,
+) -> list[str]:
+    """
+    Use ``rg`` to find other source files that reference *func_name*.
+    Returns a (possibly empty) list of file paths.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "rg",
+                "-l",
+                "-w",
+                "--type",
+                "py",
+                "--glob",
+                "!**/tests/**",
+                "--glob",
+                "!**/test/**",
+                "--glob",
+                "!**/migrations/**",
+                "--glob",
+                "!**/conftest.py",
+                "--glob",
+                "!**/__pycache__/**",
+                "--glob",
+                "!**/example/**",
+                "--glob",
+                "!**/scratch/**",
+                "--glob",
+                "!**/agents/**",
+                func_name,
+                str(root),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return []
+
+    if result.returncode != 0:
+        return []
+
+    source_resolved = source_file.resolve()
+    return [
+        f
+        for f in result.stdout.strip().split("\n")
+        if f and Path(f).resolve() != source_resolved
+    ]
+
+
+# ── File collection ───────────────────────────────────────────────────────────
+
+
+def _should_skip_path(path: Path) -> bool:
+    for part in path.parts:
+        if part in SKIP_DIRS:
+            return True
+    return path.name in SKIP_FILES
+
+
+def collect_source_files(root: Path, target: str | None = None) -> list[Path]:
+    if target:
+        target_path = root / target
+        if not target_path.exists():
+            print(f"Error: {target} not found", file=sys.stderr)
+            sys.exit(1)
+        search_dirs = [target_path]
+    else:
+        search_dirs = []
+        core = root / "plain"
+        if core.exists():
+            search_dirs.append(core)
+        for pkg_dir in sorted(root.glob("plain-*")):
+            if pkg_dir.is_dir():
+                search_dirs.append(pkg_dir)
+
+    files: list[Path] = []
+    for d in search_dirs:
+        for py_file in d.rglob("*.py"):
+            if not _should_skip_path(py_file):
+                files.append(py_file)
+    return sorted(files)
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Find module-level functions with only a single caller",
+    )
+    parser.add_argument(
+        "target",
+        nargs="?",
+        help="Package or directory to check (default: all packages)",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Show extra detail (cross-file skips, possible dead code)",
+    )
+    args = parser.parse_args()
+
+    root = Path.cwd()
+    files = collect_source_files(root, args.target)
+    if not files:
+        print("No source files found")
+        sys.exit(0)
+
+    print(f"{Colors.BOLD}Scanning for single-caller module-level functions...{Colors.RESET}")
+    print(f"{Colors.DIM}{len(files)} files{Colors.RESET}")
+    print()
+
+    findings: list[Finding] = []
+    total_candidates = 0
+    skipped_cross_file = 0
+
+    for path in files:
+        results = analyze_file(path)
+        total_candidates += len(results)
+        relative = path.relative_to(root)
+
+        for func_name, def_line, callers in results:
+            n = len(callers)
+
+            if n == 0:
+                # Possibly unused — only flag in verbose mode
+                other = _other_files_referencing(func_name, path, root)
+                if not other and args.verbose:
+                    print(
+                        f"  {Colors.YELLOW}{relative}:{def_line} {func_name}"
+                        f" — no callers found (possibly dead code){Colors.RESET}"
+                    )
+
+            elif n == 1:
+                other = _other_files_referencing(func_name, path, root)
+                if other:
+                    skipped_cross_file += 1
+                    if args.verbose:
+                        print(
+                            f"  {Colors.DIM}{relative}:{def_line} {func_name}"
+                            f" — single in-file caller but referenced in"
+                            f" {len(other)} other file(s){Colors.RESET}"
+                        )
+                else:
+                    caller = next(iter(callers))
+                    findings.append(
+                        Finding(func_name, path, def_line, caller)
+                    )
+
+    # ── Output ──
+
+    by_file: dict[Path, list[Finding]] = defaultdict(list)
+    for f in findings:
+        by_file[f.file].append(f)
+
+    if findings:
+        for file_path in sorted(by_file):
+            relative = file_path.relative_to(root)
+            print(f"{Colors.BOLD}{relative}{Colors.RESET}")
+            for f in sorted(by_file[file_path], key=lambda x: x.def_line):
+                print(
+                    f"  {Colors.RED}line {f.def_line}:{Colors.RESET} "
+                    f"{f.func_name}"
+                    f" {Colors.DIM}← only caller: {f.caller.display()}{Colors.RESET}"
+                )
+            print()
+
+    # ── Summary ──
+
+    print(f"{Colors.BOLD}Summary{Colors.RESET}")
+    print(f"  Files scanned: {len(files)}")
+    print(f"  Functions analyzed: {total_candidates}")
+    if skipped_cross_file:
+        print(f"  Skipped (cross-file refs): {skipped_cross_file}")
+
+    if findings:
+        print(
+            f"  {Colors.RED}Single-caller functions: {len(findings)}{Colors.RESET}"
+        )
+        print()
+        print(
+            f"{Colors.DIM}These functions have exactly one caller and are not"
+            f" in __all__.{Colors.RESET}"
+        )
+        print(
+            f"{Colors.DIM}Consider inlining the logic or converting to a"
+            f" method.{Colors.RESET}"
+        )
+        sys.exit(1)
+    else:
+        print(f"  {Colors.GREEN}No single-caller functions found{Colors.RESET}")
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

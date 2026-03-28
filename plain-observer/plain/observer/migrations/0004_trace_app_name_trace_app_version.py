@@ -13,11 +13,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="trace",
             name="app_name",
-            field=postgres.CharField(default="", max_length=255, required=False),
+            field=postgres.TextField(default="", max_length=255, required=False),
         ),
         migrations.AddField(
             model_name="trace",
             name="app_version",
-            field=postgres.CharField(default="", max_length=255, required=False),
+            field=postgres.TextField(default="", max_length=255, required=False),
         ),
     ]

@@ -49,26 +49,26 @@ class JobRequest(postgres.Model):
     created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
     uuid: UUID = types.UUIDField(default=uuid4)
 
-    job_class: str = types.CharField(max_length=255)
+    job_class: str = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority: int = types.SmallIntegerField(default=0)
     source: str = types.TextField(required=False)
-    queue: str = types.CharField(default="default", max_length=255)
+    queue: str = types.TextField(default="default", max_length=255)
 
     retries: int = types.SmallIntegerField(default=0)
     retry_attempt: int = types.SmallIntegerField(default=0)
 
-    concurrency_key: str = types.CharField(max_length=255, required=False)
+    concurrency_key: str = types.TextField(max_length=255, required=False)
 
     start_at: datetime.datetime | None = types.DateTimeField(
         required=False, allow_null=True
     )
 
     # OpenTelemetry trace context
-    trace_id: str | None = types.CharField(
+    trace_id: str | None = types.TextField(
         max_length=34, required=False, allow_null=True
     )
-    span_id: str | None = types.CharField(
+    span_id: str | None = types.TextField(
         max_length=18, required=False, allow_null=True
     )
 
@@ -177,20 +177,20 @@ class JobProcess(postgres.Model):
 
     # From the JobRequest
     job_request_uuid: UUID = types.UUIDField()
-    job_class: str = types.CharField(max_length=255)
+    job_class: str = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority: int = types.SmallIntegerField(default=0)
     source: str = types.TextField(required=False)
-    queue: str = types.CharField(default="default", max_length=255)
+    queue: str = types.TextField(default="default", max_length=255)
     retries: int = types.SmallIntegerField(default=0)
     retry_attempt: int = types.SmallIntegerField(default=0)
-    concurrency_key: str = types.CharField(max_length=255, required=False)
+    concurrency_key: str = types.TextField(max_length=255, required=False)
 
     # OpenTelemetry trace context
-    trace_id: str | None = types.CharField(
+    trace_id: str | None = types.TextField(
         max_length=34, required=False, allow_null=True
     )
-    span_id: str | None = types.CharField(
+    span_id: str | None = types.TextField(
         max_length=18, required=False, allow_null=True
     )
 
@@ -541,21 +541,21 @@ class JobResult(postgres.Model):
         required=False, allow_null=True
     )
     error: str = types.TextField(required=False)
-    status: str = types.CharField(
+    status: str = types.TextField(
         max_length=20,
         choices=JobResultStatuses.choices,
     )
 
     # From the JobRequest
     job_request_uuid: UUID = types.UUIDField()
-    job_class: str = types.CharField(max_length=255)
+    job_class: str = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority: int = types.SmallIntegerField(default=0)
     source: str = types.TextField(required=False)
-    queue: str = types.CharField(default="default", max_length=255)
+    queue: str = types.TextField(default="default", max_length=255)
     retries: int = types.SmallIntegerField(default=0)
     retry_attempt: int = types.SmallIntegerField(default=0)
-    concurrency_key: str = types.CharField(max_length=255, required=False)
+    concurrency_key: str = types.TextField(max_length=255, required=False)
 
     # Retries
     retry_job_request_uuid: UUID | None = types.UUIDField(
@@ -563,10 +563,10 @@ class JobResult(postgres.Model):
     )
 
     # OpenTelemetry trace context
-    trace_id: str | None = types.CharField(
+    trace_id: str | None = types.TextField(
         max_length=34, required=False, allow_null=True
     )
-    span_id: str | None = types.CharField(
+    span_id: str | None = types.TextField(
         max_length=18, required=False, allow_null=True
     )
 

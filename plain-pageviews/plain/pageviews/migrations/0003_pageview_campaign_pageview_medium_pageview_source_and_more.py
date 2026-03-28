@@ -93,17 +93,17 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="pageview",
             name="campaign",
-            field=postgres.CharField(max_length=200, required=False),
+            field=postgres.TextField(max_length=200, required=False),
         ),
         migrations.AddField(
             model_name="pageview",
             name="medium",
-            field=postgres.CharField(max_length=200, required=False),
+            field=postgres.TextField(max_length=200, required=False),
         ),
         migrations.AddField(
             model_name="pageview",
             name="source",
-            field=postgres.CharField(max_length=200, required=False),
+            field=postgres.TextField(max_length=200, required=False),
         ),
         migrations.AddIndex(
             model_name="pageview",

@@ -11,7 +11,7 @@ from .hashers import (
 )
 
 
-class PasswordField(postgres.CharField):
+class PasswordField(postgres.TextField):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs["max_length"] = 128
         kwargs.setdefault(
