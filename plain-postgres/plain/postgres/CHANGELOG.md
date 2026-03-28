@@ -1,5 +1,22 @@
 # plain-postgres changelog
 
+## [0.90.0](https://github.com/dropseed/plain/releases/plain-postgres@0.90.0) (2026-03-28)
+
+### What's changed
+
+- **Removed `CharField`** — use `TextField` for all string fields. PostgreSQL treats `varchar` and `text` identically (same storage, same performance), so the distinction was unnecessary. `TextField` now accepts an optional `max_length` for Python-side validation via `MaxLengthValidator`, without affecting the database column type. ([5062ee4dd1fd](https://github.com/dropseed/plain/commit/5062ee4dd1fd))
+- **`EmailField` and `URLField` now extend `TextField`** instead of `CharField`. Their default `max_length` values (254 and 200 respectively) have been removed — pass `max_length` explicitly if you need validation. ([5062ee4dd1fd](https://github.com/dropseed/plain/commit/5062ee4dd1fd))
+- **Simplified field class internals** — removed the `get_internal_type()` method and 6 lookup dicts from `dialect.py`. Each field class now declares its SQL type directly via `db_type_sql` class attribute. String-based type comparisons replaced with `isinstance()` checks throughout. ([3ffdebe22250](https://github.com/dropseed/plain/commit/3ffdebe22250))
+- **Added `postgres converge` command** — detects and fixes safe schema mismatches between models and the database. Currently handles `character varying` → `text` conversions. ([fe8cf3995e95](https://github.com/dropseed/plain/commit/fe8cf3995e95))
+
+### Upgrade instructions
+
+- Replace `CharField` with `TextField` in model code (e.g. `types.CharField(max_length=100)` → `types.TextField(max_length=100)`)
+- Replace `CharField` with `TextField` in migration files (e.g. `postgres.CharField(max_length=255)` → `postgres.TextField(max_length=255)`)
+- If you subclass `CharField`, change the parent class to `TextField`
+- `EmailField` no longer defaults `max_length=254` and `URLField` no longer defaults `max_length=200` — remove these from migration files if present (e.g. `postgres.EmailField(max_length=254)` → `postgres.EmailField()`)
+- Run `plain postgres converge` to convert existing `character varying` columns to `text` (in development and production). The conversion is instant and safe — PostgreSQL treats them identically. Use `--yes` to skip confirmation in CI/deploy scripts.
+
 ## [0.89.2](https://github.com/dropseed/plain/releases/plain-postgres@0.89.2) (2026-03-27)
 
 ### What's changed
