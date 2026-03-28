@@ -1,5 +1,16 @@
 # plain-cache changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-cache@0.27.0) (2026-03-28)
+
+### What's changed
+
+- Replaced `CharField` with `TextField` in models and migration files to match plain-postgres 0.90.0 ([5062ee4dd1fd](https://github.com/dropseed/plain/commit/5062ee4dd1fd))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.90.0`
+- Replace `CharField` with `TextField` in migration files that reference this package's models
+
 ## [0.26.3](https://github.com/dropseed/plain/releases/plain-cache@0.26.3) (2026-03-27)
 
 ### What's changed
