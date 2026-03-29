@@ -11,7 +11,7 @@
 # first-party packages in a deterministic order.
 #
 # Flags:
-#   --skip-server  Skip server behavior and conformance tests (faster iteration)
+#   --server       Include server behavior and conformance tests
 #   --python 3.14  Run with a specific Python version (sets UV_PYTHON)
 ALL_PACKAGES="$(cat <<EOF
 plain
@@ -30,11 +30,11 @@ plain-pages
 EOF
 )"
 
-skip_server=false
+run_server=false
 remaining=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --skip-server) skip_server=true; shift ;;
+    --server) run_server=true; shift ;;
     --python) [ -z "${2:-}" ] && echo "Error: --python requires a version argument" >&2 && exit 1; export UV_PYTHON="$2"; shift 2 ;;
     *) remaining+=("$1"); shift ;;
   esac
@@ -92,9 +92,9 @@ cd "example"
 uv run --isolated $WITH python -m pytest "$@"
 cd ..
 
-if [ "$skip_server" = true ]; then
+if [ "$run_server" = false ]; then
   echo
-  bold "Skipping server tests (--skip-server)"
+  bold "Skipping server tests (use --server to include)"
 else
   # Server worker behavior tests
   echo

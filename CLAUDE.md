@@ -4,6 +4,7 @@
 
 1. **Format and lint**: `./scripts/fix` (always run this before committing)
 2. **Run tests**: `./scripts/test [package]`
+3. **Server tests**: Add `--server` when changes touch `plain/server/` or `tools/` server scripts
 
 ## Commands
 
@@ -13,7 +14,7 @@ Always use `./scripts/` commands from the repo root — never run `uv run plain 
 | ----------------------------- | ------------------------------------------------------------ |
 | `./scripts/fix`               | Format and lint code                                         |
 | `./scripts/pre-commit`        | Full pre-commit validation                                   |
-| `./scripts/test [package]`    | Run tests                                                    |
+| `./scripts/test [package]`    | Run tests (add `--server` when changing `plain/server/`)     |
 | `./scripts/server-test`       | Server conformance, load, and resilience tests               |
 | `./scripts/create-migrations` | Create database migrations (calls `plain migrations create`) |
 | `./scripts/type-check <dir>`  | Type check a directory                                       |
