@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from app.examples.models import Car
 
 from plain.postgres import CheckConstraint, Index, Q, UniqueConstraint, get_connection
@@ -361,12 +362,17 @@ class TestApplyConstraintFixes:
         assert "USING INDEX" in sql
         assert _constraint_exists("examples_car", "unique_make_model")
 
-    def test_add_deferrable_unique_constraint(self, isolated_db):
-        """Deferrable unique constraints include DEFERRABLE clause."""
+    @pytest.mark.parametrize(
+        "deferrable",
+        [Deferrable.DEFERRED, Deferrable.IMMEDIATE],
+        ids=["deferred", "immediate"],
+    )
+    def test_add_deferrable_unique_constraint(self, isolated_db, deferrable):
+        """Deferrable unique constraints include the appropriate DEFERRABLE clause."""
         constraint = UniqueConstraint(
             fields=["make"],
-            name="examples_car_make_deferred",
-            deferrable=Deferrable.DEFERRED,
+            name=f"examples_car_make_{deferrable.value}",
+            deferrable=deferrable,
         )
         original_constraints = list(Car.model_options.constraints)
         Car.model_options.constraints = [*original_constraints, constraint]
@@ -377,35 +383,9 @@ class TestApplyConstraintFixes:
             )
             sql = fix.apply()
 
-            assert "DEFERRABLE INITIALLY DEFERRED" in sql
-            assert _constraint_exists("examples_car", "examples_car_make_deferred")
-            assert _constraint_is_deferrable(
-                "examples_car", "examples_car_make_deferred"
-            )
-        finally:
-            Car.model_options.constraints = original_constraints
-
-    def test_add_immediate_unique_constraint(self, isolated_db):
-        """DEFERRABLE INITIALLY IMMEDIATE unique constraints."""
-        constraint = UniqueConstraint(
-            fields=["make"],
-            name="examples_car_make_immediate",
-            deferrable=Deferrable.IMMEDIATE,
-        )
-        original_constraints = list(Car.model_options.constraints)
-        Car.model_options.constraints = [*original_constraints, constraint]
-
-        try:
-            fix = AddConstraintFix(
-                table="examples_car", constraint=constraint, model=Car
-            )
-            sql = fix.apply()
-
-            assert "DEFERRABLE INITIALLY IMMEDIATE" in sql
-            assert _constraint_exists("examples_car", "examples_car_make_immediate")
-            assert _constraint_is_deferrable(
-                "examples_car", "examples_car_make_immediate"
-            )
+            assert f"DEFERRABLE INITIALLY {deferrable.name}" in sql
+            assert _constraint_exists("examples_car", constraint.name)
+            assert _constraint_is_deferrable("examples_car", constraint.name)
         finally:
             Car.model_options.constraints = original_constraints
 
