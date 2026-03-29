@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import click
 
-from ..convergence import detect_fixes
+from ..convergence import execute_fixes, plan_convergence
 
 
 @click.command()
@@ -31,7 +31,8 @@ def converge(yes: bool, prune: bool) -> None:
     Each fix is applied and committed independently so partial
     failures don't block subsequent fixes.
     """
-    fixes = detect_fixes(include_prunable=prune)
+    plan = plan_convergence()
+    fixes = plan.executable(prune=prune)
 
     if not fixes:
         click.secho("Schema is converged — nothing to fix.", fg="green")
@@ -51,23 +52,13 @@ def converge(yes: bool, prune: bool) -> None:
 
     click.echo()
 
-    applied = 0
-    failed = 0
+    result = execute_fixes(fixes)
 
-    for fix in fixes:
-        try:
-            sql = fix.apply()
-            click.echo(f"  {sql}")
-            applied += 1
-        except Exception as e:
-            click.secho(f"  FAILED: {fix.describe()} — {e}", fg="red")
-            failed += 1
+    for r in result.results:
+        if r.ok:
+            click.echo(f"  {r.sql}")
+        else:
+            click.secho(f"  FAILED: {r.fix.describe()} — {r.error}", fg="red")
 
     click.echo()
-    parts = []
-    if applied:
-        parts.append(f"{applied} applied")
-    if failed:
-        parts.append(f"{failed} failed")
-    color = "green" if not failed else "yellow"
-    click.secho(", ".join(parts) + ".", fg=color)
+    click.secho(result.summary, fg="green" if result.ok else "yellow")

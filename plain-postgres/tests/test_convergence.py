@@ -10,14 +10,16 @@ from plain.postgres.convergence import (
     CreateIndexFix,
     DropConstraintFix,
     DropIndexFix,
+    FixCategory,
     RebuildConstraintFix,
     RebuildIndexFix,
     RenameConstraintFix,
     RenameIndexFix,
     ValidateConstraintFix,
     analyze_model,
-    detect_fixes,
-    detect_model_fixes,
+    execute_fixes,
+    plan_convergence,
+    plan_model_convergence,
 )
 from plain.postgres.functions.text import Upper
 
@@ -105,7 +107,7 @@ def _index_is_valid(name: str) -> bool:
 
 class TestPassOrdering:
     def test_fixes_sorted_by_pass(self, db):
-        """detect_fixes() returns fixes in pass order: rebuild, create indexes,
+        """plan_convergence() returns fixes in pass order: rebuild, create indexes,
         add constraints, validate, drop constraints, drop indexes."""
         original_indexes = list(Car.model_options.indexes)
         original_constraints = list(Car.model_options.constraints)
@@ -132,7 +134,7 @@ class TestPassOrdering:
         )
 
         try:
-            fixes = detect_fixes(include_prunable=True)
+            fixes = plan_convergence().executable(prune=True)
             fix_types = [type(f) for f in fixes]
 
             # All six fix types should be present
@@ -172,7 +174,7 @@ class TestPassOrdering:
             assert drop_con_max < drop_idx
 
             # Without include_prunable, drop fixes should be excluded
-            default_fixes = detect_fixes()
+            default_fixes = plan_convergence().executable()
             default_types = [type(f) for f in default_fixes]
             assert DropConstraintFix not in default_types
             assert DropIndexFix not in default_types
@@ -190,7 +192,7 @@ class TestDetectConstraintFixes:
     def test_no_fixes_when_converged(self, db):
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = detect_model_fixes(conn, cursor, Car)
+            fixes = plan_model_convergence(conn, cursor, Car).executable()
         assert fixes == []
 
     def test_detects_extra_check_constraint_with_prune(self, db):
@@ -200,7 +202,7 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = detect_model_fixes(conn, cursor, Car, include_prunable=True)
+            fixes = plan_model_convergence(conn, cursor, Car).executable(prune=True)
 
         assert len(fixes) == 1
         fix = fixes[0]
@@ -214,7 +216,7 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = detect_model_fixes(conn, cursor, Car)
+            fixes = plan_model_convergence(conn, cursor, Car).executable()
 
         assert fixes == []
 
@@ -225,7 +227,7 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = detect_model_fixes(conn, cursor, Car, include_prunable=True)
+            fixes = plan_model_convergence(conn, cursor, Car).executable(prune=True)
 
         assert len(fixes) == 1
         fix = fixes[0]
@@ -239,7 +241,7 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = detect_model_fixes(conn, cursor, Car)
+            fixes = plan_model_convergence(conn, cursor, Car).executable()
 
         assert fixes == []
 
@@ -254,7 +256,7 @@ class TestDetectConstraintFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
 
             assert len(fixes) == 1
             fix = fixes[0]
@@ -268,7 +270,7 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = detect_model_fixes(conn, cursor, Car)
+            fixes = plan_model_convergence(conn, cursor, Car).executable()
 
         assert len(fixes) == 1
         fix = fixes[0]
@@ -291,7 +293,7 @@ class TestDetectConstraintFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
 
             assert len(fixes) == 1
             fix = fixes[0]
@@ -318,7 +320,7 @@ class TestDetectConstraintFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
 
             assert len(fixes) == 1
             assert isinstance(fixes[0], RebuildConstraintFix)
@@ -343,7 +345,7 @@ class TestDetectConstraintFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
 
             assert fixes == []
         finally:
@@ -395,7 +397,7 @@ class TestApplyConstraintFixes:
             # First converge pass: adds NOT VALID
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
             assert len(fixes) == 1
             assert isinstance(fixes[0], AddConstraintFix)
 
@@ -404,7 +406,7 @@ class TestApplyConstraintFixes:
 
             # Second converge pass: detects NOT VALID, validates
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
             assert len(fixes) == 1
             assert isinstance(fixes[0], ValidateConstraintFix)
 
@@ -413,7 +415,7 @@ class TestApplyConstraintFixes:
 
             # Third pass: fully converged
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
             assert fixes == []
         finally:
             Car.model_options.constraints = original_constraints
@@ -438,7 +440,7 @@ class TestApplyConstraintFixes:
 
             # First pass: detects definition change → rebuild (drop + add NOT VALID)
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
             assert len(fixes) == 1
             assert isinstance(fixes[0], RebuildConstraintFix)
 
@@ -449,7 +451,7 @@ class TestApplyConstraintFixes:
 
             # Second pass: NOT VALID → validate
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
             assert len(fixes) == 1
             assert isinstance(fixes[0], ValidateConstraintFix)
 
@@ -458,7 +460,7 @@ class TestApplyConstraintFixes:
 
             # Third pass: fully converged
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
             assert fixes == []
         finally:
             Car.model_options.constraints = original_constraints
@@ -562,7 +564,7 @@ class TestDetectIndexFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
 
             index_fixes = [f for f in fixes if isinstance(f, CreateIndexFix)]
             assert len(index_fixes) == 1
@@ -576,7 +578,7 @@ class TestDetectIndexFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = detect_model_fixes(conn, cursor, Car, include_prunable=True)
+            fixes = plan_model_convergence(conn, cursor, Car).executable(prune=True)
 
         index_fixes = [f for f in fixes if isinstance(f, DropIndexFix)]
         assert len(index_fixes) == 1
@@ -588,7 +590,7 @@ class TestDetectIndexFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = detect_model_fixes(conn, cursor, Car)
+            fixes = plan_model_convergence(conn, cursor, Car).executable()
 
         assert fixes == []
 
@@ -608,7 +610,7 @@ class TestDetectIndexFixes:
 
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
 
             rebuild_fixes = [f for f in fixes if isinstance(f, RebuildIndexFix)]
             assert len(rebuild_fixes) == 1
@@ -631,7 +633,7 @@ class TestDetectIndexFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
 
             rebuild_fixes = [f for f in fixes if isinstance(f, RebuildIndexFix)]
             assert len(rebuild_fixes) == 1
@@ -653,7 +655,7 @@ class TestDetectIndexFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
 
             assert fixes == []
         finally:
@@ -896,8 +898,8 @@ class TestAnalyzeModel:
         finally:
             Car.model_options.indexes = original_indexes
 
-    def test_detect_model_fixes_backward_compat(self, db):
-        """detect_model_fixes() still returns list[Fix] correctly."""
+    def test_plan_model_convergence(self, db):
+        """plan_model_convergence() returns a plan with correct fixes."""
         original_indexes = list(Car.model_options.indexes)
         Car.model_options.indexes = [
             *original_indexes,
@@ -907,7 +909,7 @@ class TestAnalyzeModel:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
 
             assert isinstance(fixes, list)
             assert len(fixes) == 1
@@ -970,7 +972,7 @@ class TestApplyRenameIndex:
 
             # First pass: detect rename
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
             assert len(fixes) == 1
             assert isinstance(fixes[0], RenameIndexFix)
 
@@ -980,7 +982,7 @@ class TestApplyRenameIndex:
 
             # Second pass: converged
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
             assert fixes == []
         finally:
             Car.model_options.indexes = original_indexes
@@ -1112,14 +1114,129 @@ class TestConstraintRename:
             conn = get_connection()
 
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
             assert len(fixes) == 1
             assert isinstance(fixes[0], RenameConstraintFix)
 
             fixes[0].apply()
 
             with conn.cursor() as cursor:
-                fixes = detect_model_fixes(conn, cursor, Car)
+                fixes = plan_model_convergence(conn, cursor, Car).executable()
             assert fixes == []
         finally:
             Car.model_options.constraints = original_constraints
+
+
+class TestFixCategories:
+    def test_forward_category(self):
+        assert CreateIndexFix.category == FixCategory.FORWARD
+        assert AddConstraintFix.category == FixCategory.FORWARD
+        assert RenameIndexFix.category == FixCategory.FORWARD
+        assert RenameConstraintFix.category == FixCategory.FORWARD
+        assert ValidateConstraintFix.category == FixCategory.FORWARD
+
+    def test_repair_category(self):
+        assert RebuildIndexFix.category == FixCategory.REPAIR
+        assert RebuildConstraintFix.category == FixCategory.REPAIR
+
+    def test_cleanup_category(self):
+        assert DropIndexFix.category == FixCategory.CLEANUP
+        assert DropConstraintFix.category == FixCategory.CLEANUP
+
+
+class TestConvergencePlan:
+    def test_executable_excludes_cleanup_by_default(self, db):
+        """Default mode excludes cleanup fixes."""
+        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+
+        plan = plan_convergence()
+        default = plan.executable()
+        with_prune = plan.executable(prune=True)
+
+        # The extra index should only appear with prune
+        drop_in_default = [f for f in default if isinstance(f, DropIndexFix)]
+        drop_in_prune = [f for f in with_prune if isinstance(f, DropIndexFix)]
+        assert drop_in_default == []
+        assert len(drop_in_prune) == 1
+
+    def test_has_work_ignores_cleanup_by_default(self, db):
+        """has_work() only counts cleanup fixes when prune=True."""
+        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+
+        plan = plan_convergence()
+        assert not plan.has_work()
+        assert plan.has_work(prune=True)
+
+    def test_has_work_counts_forward_fixes(self, db):
+        """has_work() sees forward fixes regardless of prune."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_idx"),
+        ]
+
+        try:
+            plan = plan_convergence()
+            assert plan.has_work()
+            assert plan.has_work(prune=True)
+        finally:
+            Car.model_options.indexes = original_indexes
+
+
+class TestExecuteFixes:
+    def test_collects_results(self, isolated_db):
+        """execute_fixes() collects SQL from successful fixes."""
+        _execute('CREATE INDEX "examples_car_temp_idx" ON "examples_car" ("make")')
+        fix = DropIndexFix(table="examples_car", name="examples_car_temp_idx")
+
+        result = execute_fixes([fix])
+
+        assert result.applied == 1
+        assert result.failed == 0
+        assert result.ok
+        assert len(result.results) == 1
+        assert result.results[0].ok
+        assert "examples_car_temp_idx" in (result.results[0].sql or "")
+
+    def test_handles_failure(self, isolated_db):
+        """execute_fixes() captures errors without raising."""
+        fix = DropConstraintFix(table="examples_car", name="nonexistent")
+
+        result = execute_fixes([fix])
+
+        assert result.applied == 0
+        assert result.failed == 1
+        assert not result.ok
+        assert result.results[0].error is not None
+
+    def test_continues_after_failure(self, isolated_db):
+        """A failed fix doesn't block subsequent fixes."""
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_real_check" CHECK ("id" >= 0)'
+        )
+
+        fixes = [
+            DropConstraintFix(table="examples_car", name="nonexistent"),
+            DropConstraintFix(table="examples_car", name="examples_car_real_check"),
+        ]
+
+        result = execute_fixes(fixes)
+
+        assert result.applied == 1
+        assert result.failed == 1
+        assert not _constraint_exists("examples_car", "examples_car_real_check")
+
+    def test_summary(self, isolated_db):
+        """ConvergenceResult.summary formats correctly."""
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_real_check" CHECK ("id" >= 0)'
+        )
+
+        fixes = [
+            DropConstraintFix(table="examples_car", name="nonexistent"),
+            DropConstraintFix(table="examples_car", name="examples_car_real_check"),
+        ]
+
+        result = execute_fixes(fixes)
+
+        assert result.summary == "1 applied, 1 failed."

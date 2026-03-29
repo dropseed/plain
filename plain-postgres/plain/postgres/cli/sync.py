@@ -6,7 +6,7 @@ import click
 
 from plain.runtime import settings
 
-from ..convergence import detect_fixes
+from ..convergence import execute_fixes, plan_convergence
 
 
 @click.command()
@@ -77,7 +77,8 @@ def _check(*, prune: bool) -> None:
         has_changes = True
 
     # Check for convergence fixes
-    if detect_fixes(include_prunable=prune):
+    plan = plan_convergence()
+    if plan.has_work(prune=prune):
         has_changes = True
 
     if has_changes:
@@ -118,27 +119,18 @@ def _migrate() -> None:
 def _converge(*, prune: bool) -> None:
     click.secho("Converging schema...", bold=True)
 
-    fixes = detect_fixes(include_prunable=prune)
+    plan = plan_convergence()
+    fixes = plan.executable(prune=prune)
     if not fixes:
         click.secho("Schema is converged.", fg="green")
         return
 
-    applied = 0
-    failed = 0
+    result = execute_fixes(fixes)
 
-    for fix in fixes:
-        try:
-            sql = fix.apply()
-            click.echo(f"  {sql}")
-            applied += 1
-        except Exception as e:
-            click.secho(f"  FAILED: {fix.describe()} — {e}", fg="red")
-            failed += 1
+    for r in result.results:
+        if r.ok:
+            click.echo(f"  {r.sql}")
+        else:
+            click.secho(f"  FAILED: {r.fix.describe()} — {r.error}", fg="red")
 
-    parts = []
-    if applied:
-        parts.append(f"{applied} applied")
-    if failed:
-        parts.append(f"{failed} failed")
-    color = "green" if not failed else "yellow"
-    click.secho(", ".join(parts) + ".", fg=color)
+    click.secho(result.summary, fg="green" if result.ok else "yellow")

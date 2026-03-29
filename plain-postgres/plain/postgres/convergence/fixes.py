@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar
 
 from ..constraints import BaseConstraint, CheckConstraint, UniqueConstraint
@@ -11,6 +12,12 @@ from ..indexes import Index
 
 if TYPE_CHECKING:
     from ..base import Model
+
+
+class FixCategory(StrEnum):
+    FORWARD = "forward"  # Create, add, rename — brings schema toward model
+    REPAIR = "repair"  # Rebuild invalid/stale — fixes broken declared objects
+    CLEANUP = "cleanup"  # Drop undeclared — removes objects not in model
 
 
 def _execute_and_commit(sql: str) -> None:
@@ -50,7 +57,7 @@ class Fix(ABC):
     """Base class for all convergence fixes."""
 
     pass_order: ClassVar[int]
-    is_prunable: ClassVar[bool] = False
+    category: ClassVar[FixCategory]
 
     @abstractmethod
     def describe(self) -> str: ...
@@ -64,6 +71,7 @@ class RebuildIndexFix(Fix):
     """Drop an INVALID index and recreate it CONCURRENTLY."""
 
     pass_order = 0
+    category = FixCategory.REPAIR
 
     table: str
     index: Index
@@ -85,6 +93,7 @@ class RebuildConstraintFix(Fix):
     """Drop a constraint with a stale definition and recreate it."""
 
     pass_order = 0
+    category = FixCategory.REPAIR
 
     table: str
     constraint: BaseConstraint
@@ -111,6 +120,7 @@ class RenameIndexFix(Fix):
     """Rename an index (catalog-only, instant)."""
 
     pass_order = 1
+    category = FixCategory.FORWARD
 
     table: str
     old_name: str
@@ -130,6 +140,7 @@ class CreateIndexFix(Fix):
     """Create a missing index using CONCURRENTLY (doesn't block writes)."""
 
     pass_order = 1
+    category = FixCategory.FORWARD
 
     table: str
     index: Index
@@ -154,6 +165,7 @@ class AddConstraintFix(Fix):
     """
 
     pass_order = 2
+    category = FixCategory.FORWARD
 
     table: str
     constraint: BaseConstraint
@@ -206,6 +218,7 @@ class RenameConstraintFix(Fix):
     """
 
     pass_order = 2
+    category = FixCategory.FORWARD
 
     table: str
     old_name: str
@@ -225,6 +238,7 @@ class ValidateConstraintFix(Fix):
     """Validate a NOT VALID constraint (SHARE UPDATE EXCLUSIVE — doesn't block writes)."""
 
     pass_order = 3
+    category = FixCategory.FORWARD
 
     table: str
     name: str
@@ -241,7 +255,7 @@ class ValidateConstraintFix(Fix):
 @dataclass
 class DropConstraintFix(Fix):
     pass_order = 4
-    is_prunable = True
+    category = FixCategory.CLEANUP
 
     table: str
     name: str
@@ -258,7 +272,7 @@ class DropConstraintFix(Fix):
 @dataclass
 class DropIndexFix(Fix):
     pass_order = 5
-    is_prunable = True
+    category = FixCategory.CLEANUP
 
     table: str
     name: str

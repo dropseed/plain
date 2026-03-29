@@ -1132,10 +1132,15 @@ class DatabaseConnection:
         )
 
         # Apply convergence fixes (constraints, indexes) after migrations.
-        from plain.postgres.convergence import detect_fixes
+        from plain.postgres.convergence import execute_fixes, plan_convergence
 
-        for fix in detect_fixes():
-            fix.apply()
+        plan = plan_convergence()
+        result = execute_fixes(plan.executable())
+        if not result.ok:
+            failed = [r for r in result.results if not r.ok]
+            raise RuntimeError(
+                f"Convergence failed during test DB setup: {failed[0].fix.describe()} — {failed[0].error}"
+            )
 
         # Ensure a connection for the side effect of initializing the test database.
         self.ensure_connection()

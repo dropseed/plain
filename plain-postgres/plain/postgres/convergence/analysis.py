@@ -5,7 +5,6 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from ..constraints import CheckConstraint, UniqueConstraint
-from ..db import get_connection
 from ..fields.related import ForeignKeyField
 from ..indexes import Index
 from ..introspection import (
@@ -15,7 +14,6 @@ from ..introspection import (
     normalize_check_definition,
     normalize_index_definition,
 )
-from ..registry import models_registry
 from .fixes import (
     AddConstraintFix,
     CreateIndexFix,
@@ -159,47 +157,6 @@ def analyze_model(
         columns=_compare_columns(model, db),
         indexes=_compare_indexes(model, db, table_name),
         constraints=_compare_constraints(model, db, table_name),
-    )
-
-
-def _filter_fixes(fixes: list[Fix], *, include_prunable: bool) -> list[Fix]:
-    """Filter and sort fixes. Excludes prunable fixes unless requested."""
-    if not include_prunable:
-        fixes = [f for f in fixes if not f.is_prunable]
-    fixes.sort(key=lambda f: f.pass_order)
-    return fixes
-
-
-def detect_fixes(*, include_prunable: bool = False) -> list[Fix]:
-    """Scan all models against the database and return fixes in pass order.
-
-    By default, prunable fixes (dropping undeclared indexes/constraints) are
-    excluded.  Pass ``include_prunable=True`` to include them (used by --prune).
-    """
-    conn = get_connection()
-    fixes: list[Fix] = []
-
-    with conn.cursor() as cursor:
-        for model in models_registry.get_models():
-            fixes.extend(analyze_model(conn, cursor, model).fixes)
-
-    return _filter_fixes(fixes, include_prunable=include_prunable)
-
-
-def detect_model_fixes(
-    conn: DatabaseConnection,
-    cursor: CursorWrapper,
-    model: type[Model],
-    *,
-    include_prunable: bool = False,
-) -> list[Fix]:
-    """Detect fixes for a single model.
-
-    By default, prunable fixes are excluded.  Pass ``include_prunable=True``
-    to include them.
-    """
-    return _filter_fixes(
-        analyze_model(conn, cursor, model).fixes, include_prunable=include_prunable
     )
 
 

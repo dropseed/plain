@@ -4,8 +4,6 @@ from .analysis import (
     IndexStatus,
     ModelAnalysis,
     analyze_model,
-    detect_fixes,
-    detect_model_fixes,
 )
 from .fixes import (
     AddConstraintFix,
@@ -13,21 +11,34 @@ from .fixes import (
     DropConstraintFix,
     DropIndexFix,
     Fix,
+    FixCategory,
     RebuildConstraintFix,
     RebuildIndexFix,
     RenameConstraintFix,
     RenameIndexFix,
     ValidateConstraintFix,
 )
+from .planning import (
+    ConvergencePlan,
+    ConvergenceResult,
+    FixResult,
+    execute_fixes,
+    plan_convergence,
+    plan_model_convergence,
+)
 
 __all__ = [
     "AddConstraintFix",
     "ColumnStatus",
     "ConstraintStatus",
+    "ConvergencePlan",
+    "ConvergenceResult",
     "CreateIndexFix",
     "DropConstraintFix",
     "DropIndexFix",
     "Fix",
+    "FixCategory",
+    "FixResult",
     "IndexStatus",
     "ModelAnalysis",
     "RebuildConstraintFix",
@@ -36,6 +47,7 @@ __all__ = [
     "RenameIndexFix",
     "ValidateConstraintFix",
     "analyze_model",
-    "detect_fixes",
-    "detect_model_fixes",
+    "execute_fixes",
+    "plan_convergence",
+    "plan_model_convergence",
 ]
