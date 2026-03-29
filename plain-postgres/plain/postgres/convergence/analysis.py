@@ -368,92 +368,156 @@ def _compare_constraints(
     model: type[Model], db: TableState, table: str
 ) -> list[ConstraintStatus]:
     statuses: list[ConstraintStatus] = []
+    statuses.extend(_compare_unique_constraints(model, db, table))
+    statuses.extend(_compare_check_constraints(model, db, table))
+    statuses.extend(_compare_foreign_keys(model, db))
+    return statuses
 
-    # Check and unique constraints (matched by name, with rename detection)
-    for constraint_cls, constraint_type, actual_dict in [
-        (UniqueConstraint, "unique", db.unique_constraints),
-        (CheckConstraint, "check", db.check_constraints),
-    ]:
-        model_constraints = [
-            c for c in model.model_options.constraints if isinstance(c, constraint_cls)
-        ]
-        expected_names = {c.name for c in model_constraints}
-        extra_names = sorted(actual_dict.keys() - expected_names)
 
-        missing: list[UniqueConstraint | CheckConstraint] = []
-        for constraint in model_constraints:
-            if constraint.name not in actual_dict:
-                missing.append(constraint)
-                continue
+def _compare_unique_constraints(
+    model: type[Model], db: TableState, table: str
+) -> list[ConstraintStatus]:
+    statuses: list[ConstraintStatus] = []
+    actual = db.unique_constraints
+    model_constraints = [
+        c for c in model.model_options.constraints if isinstance(c, UniqueConstraint)
+    ]
+    expected_names = {c.name for c in model_constraints}
+    extra_names = sorted(actual.keys() - expected_names)
 
-            issue: str | None = None
-            fix: Fix | None = None
+    missing: list[UniqueConstraint] = []
+    for constraint in model_constraints:
+        if constraint.name not in actual:
+            missing.append(constraint)
+            continue
 
-            if not actual_dict[constraint.name].validated:
-                issue = "NOT VALID — needs validation"
-                fix = ValidateConstraintFix(table, constraint.name)
-            elif (
-                constraint_type == "check"
-                and isinstance(constraint, CheckConstraint)
-                and (actual_def := actual_dict[constraint.name].definition)
-            ):
-                expected_def = _get_expected_check_definition(model, constraint)
-                if normalize_check_definition(actual_def) != normalize_check_definition(
-                    expected_def
-                ):
-                    issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
-                    fix = RebuildConstraintFix(table, constraint, model)
+        issue: str | None = None
+        fix: Fix | None = None
 
+        if not actual[constraint.name].validated:
+            issue = "NOT VALID — needs validation"
+            fix = ValidateConstraintFix(table, constraint.name)
+
+        statuses.append(
+            ConstraintStatus(
+                name=constraint.name,
+                type="unique",
+                fields=list(constraint.fields),
+                issue=issue,
+                fix=fix,
+            )
+        )
+
+    # Detect renames by columns
+    rename_statuses, renamed_missing, renamed_extra = _detect_unique_renames(
+        missing, extra_names, actual, model, table
+    )
+    statuses.extend(rename_statuses)
+
+    for constraint in missing:
+        if constraint.name not in renamed_missing:
             statuses.append(
                 ConstraintStatus(
                     name=constraint.name,
-                    type=constraint_type,
-                    fields=list(getattr(constraint, "fields", None) or []),
-                    issue=issue,
-                    fix=fix,
+                    type="unique",
+                    fields=list(constraint.fields),
+                    issue="missing from database",
+                    fix=AddConstraintFix(table, constraint, model),
                 )
             )
 
-        # Detect renames: cross-reference missing and extra by structure
-        if constraint_type == "unique":
-            rename_statuses, renamed_missing, renamed_extra = _detect_unique_renames(
-                missing, extra_names, actual_dict, model, table
-            )
-        elif constraint_type == "check":
-            rename_statuses, renamed_missing, renamed_extra = _detect_check_renames(
-                missing, extra_names, actual_dict, model, table
-            )
-        else:
-            rename_statuses, renamed_missing, renamed_extra = [], set(), set()
-        statuses.extend(rename_statuses)
-
-        # Remaining unmatched missing → AddConstraintFix
-        for constraint in missing:
-            if constraint.name not in renamed_missing:
-                statuses.append(
-                    ConstraintStatus(
-                        name=constraint.name,
-                        type=constraint_type,
-                        fields=list(getattr(constraint, "fields", None) or []),
-                        issue="missing from database",
-                        fix=AddConstraintFix(table, constraint, model),
-                    )
+    for name in extra_names:
+        if name not in renamed_extra:
+            statuses.append(
+                ConstraintStatus(
+                    name=name,
+                    type="unique",
+                    fields=actual[name].columns,
+                    issue="not in model",
+                    fix=DropConstraintFix(table, name),
                 )
+            )
 
-        # Remaining unmatched extra → DropConstraintFix
-        for name in extra_names:
-            if name not in renamed_extra:
-                statuses.append(
-                    ConstraintStatus(
-                        name=name,
-                        type=constraint_type,
-                        fields=actual_dict[name].columns,
-                        issue="not in model",
-                        fix=DropConstraintFix(table, name),
-                    )
+    return statuses
+
+
+def _compare_check_constraints(
+    model: type[Model], db: TableState, table: str
+) -> list[ConstraintStatus]:
+    statuses: list[ConstraintStatus] = []
+    actual = db.check_constraints
+    model_constraints = [
+        c for c in model.model_options.constraints if isinstance(c, CheckConstraint)
+    ]
+    expected_names = {c.name for c in model_constraints}
+    extra_names = sorted(actual.keys() - expected_names)
+
+    missing: list[CheckConstraint] = []
+    for constraint in model_constraints:
+        if constraint.name not in actual:
+            missing.append(constraint)
+            continue
+
+        issue: str | None = None
+        fix: Fix | None = None
+
+        if not actual[constraint.name].validated:
+            issue = "NOT VALID — needs validation"
+            fix = ValidateConstraintFix(table, constraint.name)
+        elif actual_def := actual[constraint.name].definition:
+            expected_def = _get_expected_check_definition(model, constraint)
+            if normalize_check_definition(actual_def) != normalize_check_definition(
+                expected_def
+            ):
+                issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
+                fix = RebuildConstraintFix(table, constraint, model)
+
+        statuses.append(
+            ConstraintStatus(
+                name=constraint.name,
+                type="check",
+                fields=[],
+                issue=issue,
+                fix=fix,
+            )
+        )
+
+    # Detect renames by definition
+    rename_statuses, renamed_missing, renamed_extra = _detect_check_renames(
+        missing, extra_names, actual, model, table
+    )
+    statuses.extend(rename_statuses)
+
+    for constraint in missing:
+        if constraint.name not in renamed_missing:
+            statuses.append(
+                ConstraintStatus(
+                    name=constraint.name,
+                    type="check",
+                    fields=[],
+                    issue="missing from database",
+                    fix=AddConstraintFix(table, constraint, model),
                 )
+            )
 
-    # Foreign key constraints (matched by shape, not name)
+    for name in extra_names:
+        if name not in renamed_extra:
+            statuses.append(
+                ConstraintStatus(
+                    name=name,
+                    type="check",
+                    fields=actual[name].columns,
+                    issue="not in model",
+                    fix=DropConstraintFix(table, name),
+                )
+            )
+
+    return statuses
+
+
+def _compare_foreign_keys(model: type[Model], db: TableState) -> list[ConstraintStatus]:
+    statuses: list[ConstraintStatus] = []
+
     expected_fks: dict[tuple[str, str, str], str] = {}
     for f in model._model_meta.local_fields:
         if isinstance(f, ForeignKeyField) and f.db_constraint:
@@ -496,7 +560,7 @@ def _compare_constraints(
 
 
 def _detect_unique_renames(
-    missing: list[UniqueConstraint | CheckConstraint],
+    missing: list[UniqueConstraint],
     extra_names: list[str],
     actual_dict: dict[str, ConstraintState],
     model: type[Model],
@@ -507,16 +571,13 @@ def _detect_unique_renames(
     renamed_missing: set[str] = set()
     renamed_extra: set[str] = set()
 
-    missing_by_cols: dict[
-        tuple[str, ...], list[UniqueConstraint | CheckConstraint]
-    ] = {}
+    missing_by_cols: dict[tuple[str, ...], list[UniqueConstraint]] = {}
     for constraint in missing:
-        fields = getattr(constraint, "fields", None)
-        if not fields:
+        if not constraint.fields:
             continue
         cols = tuple(
             model._model_meta.get_forward_field(field_name).column
-            for field_name in fields
+            for field_name in constraint.fields
         )
         missing_by_cols.setdefault(cols, []).append(constraint)
 
@@ -535,7 +596,7 @@ def _detect_unique_renames(
                 ConstraintStatus(
                     name=constraint.name,
                     type="unique",
-                    fields=list(getattr(constraint, "fields", None) or []),
+                    fields=list(constraint.fields),
                     issue=f"rename from {old_name}",
                     fix=RenameConstraintFix(table, old_name, constraint.name),
                 )
@@ -547,7 +608,7 @@ def _detect_unique_renames(
 
 
 def _detect_check_renames(
-    missing: list[UniqueConstraint | CheckConstraint],
+    missing: list[CheckConstraint],
     extra_names: list[str],
     actual_dict: dict[str, ConstraintState],
     model: type[Model],
@@ -558,10 +619,8 @@ def _detect_check_renames(
     renamed_missing: set[str] = set()
     renamed_extra: set[str] = set()
 
-    missing_by_def: dict[str, list[UniqueConstraint | CheckConstraint]] = {}
+    missing_by_def: dict[str, list[CheckConstraint]] = {}
     for constraint in missing:
-        if not isinstance(constraint, CheckConstraint):
-            continue
         expected_def = _get_expected_check_definition(model, constraint)
         norm = normalize_check_definition(expected_def)
         missing_by_def.setdefault(norm, []).append(constraint)
