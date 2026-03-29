@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.91.1](https://github.com/dropseed/plain/releases/plain-postgres@0.91.1) (2026-03-29)
+
+### What's changed
+
+- Indented `sync` and `converge` sub-items under section headers for readability in environments without ANSI colors (e.g. Heroku deploy logs). ([b6b494dcc698](https://github.com/dropseed/plain/commit/b6b494dcc698))
+- `sync` now uses `MigrationExecutor` directly instead of calling through the CLI layer, giving cleaner indented output. ([b6b494dcc698](https://github.com/dropseed/plain/commit/b6b494dcc698))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.91.0](https://github.com/dropseed/plain/releases/plain-postgres@0.91.0) (2026-03-29)
 
 ### What's changed
