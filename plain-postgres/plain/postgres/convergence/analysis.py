@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
@@ -14,23 +15,86 @@ from ..introspection import (
     normalize_check_definition,
     normalize_index_definition,
 )
-from .fixes import (
-    AddConstraintFix,
-    CreateIndexFix,
-    DropConstraintFix,
-    DropIndexFix,
-    Fix,
-    RebuildConstraintFix,
-    RebuildIndexFix,
-    RenameConstraintFix,
-    RenameIndexFix,
-    ValidateConstraintFix,
-)
 
 if TYPE_CHECKING:
     from ..base import Model
     from ..connection import DatabaseConnection
     from ..utils import CursorWrapper
+
+
+# Drift types — semantic descriptions of schema differences
+
+
+class DriftKind(StrEnum):
+    MISSING = "missing"
+    INVALID = "invalid"
+    CHANGED = "changed"
+    RENAMED = "renamed"
+    UNDECLARED = "undeclared"
+    UNVALIDATED = "unvalidated"
+
+
+@dataclass
+class IndexDrift:
+    """A schema difference for an index."""
+
+    kind: DriftKind
+    table: str
+    index: Index | None = None
+    model: type[Model] | None = None
+    old_name: str | None = None
+    new_name: str | None = None
+    name: str | None = None
+
+    def describe(self) -> str:
+        match self.kind:
+            case DriftKind.MISSING:
+                assert self.index is not None
+                return f"{self.table}: index {self.index.name} missing"
+            case DriftKind.INVALID:
+                assert self.index is not None
+                return f"{self.table}: index {self.index.name} INVALID"
+            case DriftKind.CHANGED:
+                assert self.index is not None
+                return f"{self.table}: index {self.index.name} definition changed"
+            case DriftKind.RENAMED:
+                return f"{self.table}: index {self.old_name} → {self.new_name}"
+            case _:
+                return f"{self.table}: index {self.name} not declared"
+
+
+@dataclass
+class ConstraintDrift:
+    """A schema difference for a constraint."""
+
+    kind: DriftKind
+    table: str
+    constraint: CheckConstraint | UniqueConstraint | None = None
+    model: type[Model] | None = None
+    old_name: str | None = None
+    new_name: str | None = None
+    name: str | None = None
+
+    def describe(self) -> str:
+        match self.kind:
+            case DriftKind.MISSING:
+                assert self.constraint is not None
+                return f"{self.table}: constraint {self.constraint.name} missing"
+            case DriftKind.UNVALIDATED:
+                return f"{self.table}: constraint {self.name} NOT VALID"
+            case DriftKind.CHANGED:
+                assert self.constraint is not None
+                return f"{self.table}: constraint {self.constraint.name} definition changed"
+            case DriftKind.RENAMED:
+                return f"{self.table}: constraint {self.old_name} → {self.new_name}"
+            case _:
+                return f"{self.table}: constraint {self.name} not declared"
+
+
+type Drift = IndexDrift | ConstraintDrift
+
+
+# Status objects — analysis results with optional drift
 
 
 @dataclass
@@ -49,7 +113,7 @@ class IndexStatus:
     name: str
     fields: list[str] = field(default_factory=list)
     issue: str | None = None
-    fix: Fix | None = None
+    drift: IndexDrift | None = None
 
 
 @dataclass
@@ -58,7 +122,7 @@ class ConstraintStatus:
     type: str
     fields: list[str] = field(default_factory=list)
     issue: str | None = None
-    fix: Fix | None = None
+    drift: ConstraintDrift | None = None
 
 
 @dataclass
@@ -71,16 +135,15 @@ class ModelAnalysis:
     constraints: list[ConstraintStatus] = field(default_factory=list)
 
     @cached_property
-    def fixes(self) -> list[Fix]:
-        """All auto-fixes, sorted by pass_order."""
-        result: list[Fix] = []
+    def drifts(self) -> list[Drift]:
+        """All detected schema drifts."""
+        result: list[Drift] = []
         for idx in self.indexes:
-            if idx.fix:
-                result.append(idx.fix)
+            if idx.drift:
+                result.append(idx.drift)
         for con in self.constraints:
-            if con.fix:
-                result.append(con.fix)
-        result.sort(key=lambda f: f.pass_order)
+            if con.drift:
+                result.append(con.drift)
         return result
 
     @cached_property
@@ -115,7 +178,7 @@ class ModelAnalysis:
                     "name": idx.name,
                     "fields": idx.fields,
                     "issue": idx.issue,
-                    "fix": idx.fix.describe() if idx.fix else None,
+                    "drift": idx.drift.describe() if idx.drift else None,
                 }
                 for idx in self.indexes
             ],
@@ -125,7 +188,7 @@ class ModelAnalysis:
                     "type": con.type,
                     "fields": con.fields,
                     "issue": con.issue,
-                    "fix": con.fix.describe() if con.fix else None,
+                    "drift": con.drift.describe() if con.drift else None,
                 }
                 for con in self.constraints
             ],
@@ -139,7 +202,7 @@ def analyze_model(
 
     Introspects the actual table state, compares it against model definitions,
     and produces a ModelAnalysis where each column/index/constraint carries its
-    issue (if any) and Fix object (if auto-fixable).
+    issue (if any) and drift object (if schema differs).
     """
     table_name = model.model_options.db_table
     db = introspect_table(conn, cursor, table_name)
@@ -243,7 +306,12 @@ def _compare_indexes(
                     name=index.name,
                     fields=list(index.fields) if index.fields else [],
                     issue="INVALID — needs drop and recreate",
-                    fix=RebuildIndexFix(table, index, model),
+                    drift=IndexDrift(
+                        kind=DriftKind.INVALID,
+                        table=table,
+                        index=index,
+                        model=model,
+                    ),
                 )
             )
             continue
@@ -260,7 +328,12 @@ def _compare_indexes(
                         name=index.name,
                         fields=list(index.fields),
                         issue=f"columns differ: DB has {db_idx.columns}, model expects {expected_columns}",
-                        fix=RebuildIndexFix(table, index, model),
+                        drift=IndexDrift(
+                            kind=DriftKind.CHANGED,
+                            table=table,
+                            index=index,
+                            model=model,
+                        ),
                     )
                 )
                 continue
@@ -308,7 +381,12 @@ def _compare_indexes(
                     name=index.name,
                     fields=list(index.fields),
                     issue=f"rename from {old_name}",
-                    fix=RenameIndexFix(table, old_name, index.name),
+                    drift=IndexDrift(
+                        kind=DriftKind.RENAMED,
+                        table=table,
+                        old_name=old_name,
+                        new_name=index.name,
+                    ),
                 )
             )
             renamed_missing.add(index.name)
@@ -341,7 +419,12 @@ def _compare_indexes(
                     name=index.name,
                     fields=[],
                     issue=f"rename from {old_name}",
-                    fix=RenameIndexFix(table, old_name, index.name),
+                    drift=IndexDrift(
+                        kind=DriftKind.RENAMED,
+                        table=table,
+                        old_name=old_name,
+                        new_name=index.name,
+                    ),
                 )
             )
             renamed_missing.add(index.name)
@@ -355,7 +438,12 @@ def _compare_indexes(
                     name=index.name,
                     fields=list(index.fields) if index.fields else [],
                     issue="missing from database",
-                    fix=CreateIndexFix(table, index, model),
+                    drift=IndexDrift(
+                        kind=DriftKind.MISSING,
+                        table=table,
+                        index=index,
+                        model=model,
+                    ),
                 )
             )
 
@@ -367,7 +455,11 @@ def _compare_indexes(
                     name=name,
                     fields=db.indexes[name].columns,
                     issue="not in model",
-                    fix=DropIndexFix(table, name),
+                    drift=IndexDrift(
+                        kind=DriftKind.UNDECLARED,
+                        table=table,
+                        name=name,
+                    ),
                 )
             )
 
@@ -405,11 +497,15 @@ def _compare_unique_constraints(
             continue
 
         issue: str | None = None
-        fix: Fix | None = None
+        drift: ConstraintDrift | None = None
 
         if not actual[constraint.name].validated:
             issue = "NOT VALID — needs validation"
-            fix = ValidateConstraintFix(table, constraint.name)
+            drift = ConstraintDrift(
+                kind=DriftKind.UNVALIDATED,
+                table=table,
+                name=constraint.name,
+            )
 
         statuses.append(
             ConstraintStatus(
@@ -417,7 +513,7 @@ def _compare_unique_constraints(
                 type="unique",
                 fields=list(constraint.fields),
                 issue=issue,
-                fix=fix,
+                drift=drift,
             )
         )
 
@@ -435,7 +531,12 @@ def _compare_unique_constraints(
                     type="unique",
                     fields=list(constraint.fields),
                     issue="missing from database",
-                    fix=AddConstraintFix(table, constraint, model),
+                    drift=ConstraintDrift(
+                        kind=DriftKind.MISSING,
+                        table=table,
+                        constraint=constraint,
+                        model=model,
+                    ),
                 )
             )
 
@@ -447,7 +548,11 @@ def _compare_unique_constraints(
                     type="unique",
                     fields=actual[name].columns,
                     issue="not in model",
-                    fix=DropConstraintFix(table, name),
+                    drift=ConstraintDrift(
+                        kind=DriftKind.UNDECLARED,
+                        table=table,
+                        name=name,
+                    ),
                 )
             )
 
@@ -472,18 +577,27 @@ def _compare_check_constraints(
             continue
 
         issue: str | None = None
-        fix: Fix | None = None
+        drift: ConstraintDrift | None = None
 
         if not actual[constraint.name].validated:
             issue = "NOT VALID — needs validation"
-            fix = ValidateConstraintFix(table, constraint.name)
+            drift = ConstraintDrift(
+                kind=DriftKind.UNVALIDATED,
+                table=table,
+                name=constraint.name,
+            )
         elif actual_def := actual[constraint.name].definition:
             expected_def = _get_expected_check_definition(model, constraint)
             if normalize_check_definition(actual_def) != normalize_check_definition(
                 expected_def
             ):
                 issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
-                fix = RebuildConstraintFix(table, constraint, model)
+                drift = ConstraintDrift(
+                    kind=DriftKind.CHANGED,
+                    table=table,
+                    constraint=constraint,
+                    model=model,
+                )
 
         statuses.append(
             ConstraintStatus(
@@ -491,7 +605,7 @@ def _compare_check_constraints(
                 type="check",
                 fields=[],
                 issue=issue,
-                fix=fix,
+                drift=drift,
             )
         )
 
@@ -509,7 +623,12 @@ def _compare_check_constraints(
                     type="check",
                     fields=[],
                     issue="missing from database",
-                    fix=AddConstraintFix(table, constraint, model),
+                    drift=ConstraintDrift(
+                        kind=DriftKind.MISSING,
+                        table=table,
+                        constraint=constraint,
+                        model=model,
+                    ),
                 )
             )
 
@@ -521,7 +640,11 @@ def _compare_check_constraints(
                     type="check",
                     fields=actual[name].columns,
                     issue="not in model",
-                    fix=DropConstraintFix(table, name),
+                    drift=ConstraintDrift(
+                        kind=DriftKind.UNDECLARED,
+                        table=table,
+                        name=name,
+                    ),
                 )
             )
 
@@ -611,7 +734,12 @@ def _detect_unique_renames(
                     type="unique",
                     fields=list(constraint.fields),
                     issue=f"rename from {old_name}",
-                    fix=RenameConstraintFix(table, old_name, constraint.name),
+                    drift=ConstraintDrift(
+                        kind=DriftKind.RENAMED,
+                        table=table,
+                        old_name=old_name,
+                        new_name=constraint.name,
+                    ),
                 )
             )
             renamed_missing.add(constraint.name)
@@ -655,7 +783,12 @@ def _detect_check_renames(
                     type="check",
                     fields=[],
                     issue=f"rename from {old_name}",
-                    fix=RenameConstraintFix(table, old_name, constraint.name),
+                    drift=ConstraintDrift(
+                        kind=DriftKind.RENAMED,
+                        table=table,
+                        old_name=old_name,
+                        new_name=constraint.name,
+                    ),
                 )
             )
             renamed_missing.add(constraint.name)

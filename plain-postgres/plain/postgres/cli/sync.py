@@ -6,7 +6,7 @@ import click
 
 from plain.runtime import settings
 
-from ..convergence import execute_fixes, plan_convergence
+from ..convergence import execute_plan, plan_convergence
 
 
 @click.command()
@@ -80,13 +80,13 @@ def _check(*, drop_undeclared: bool) -> None:
     except SystemExit:
         has_changes = True
 
-    # Check for convergence fixes
+    # Check for convergence
     plan = plan_convergence()
     if plan.has_work(drop_undeclared=drop_undeclared):
         has_changes = True
-
-    # Blocking cleanup prevents success even without --drop-undeclared
     if not drop_undeclared and plan.blocking_cleanup:
+        has_changes = True
+    if plan.blocked:
         has_changes = True
 
     if has_changes:
@@ -128,37 +128,46 @@ def _converge(*, drop_undeclared: bool) -> None:
     click.secho("Converging schema...", bold=True)
 
     plan = plan_convergence()
-    fixes = plan.executable(drop_undeclared=drop_undeclared)
+    items = plan.executable(drop_undeclared=drop_undeclared)
     success = True
 
-    if fixes:
-        result = execute_fixes(fixes)
+    if items:
+        result = execute_plan(items)
 
         for r in result.results:
             if r.ok:
                 click.echo(f"  {r.sql}")
             else:
-                click.secho(f"  FAILED: {r.fix.describe()} — {r.error}", fg="red")
+                click.secho(f"  FAILED: {r.item.describe()} — {r.error}", fg="red")
 
         click.secho(result.summary, fg="green" if result.ok else "yellow")
         if not result.ok_for_sync:
             success = False
 
+    if plan.blocked:
+        click.echo()
+        click.secho("Schema changes require a staged rollout:", fg="red", bold=True)
+        for item in plan.blocked:
+            click.secho(f"  {item.drift.describe()}", fg="red")
+            if item.guidance:
+                click.secho(f"    {item.guidance}", fg="red", dim=True)
+        success = False
+
     if not drop_undeclared and plan.blocking_cleanup:
         click.echo()
         click.secho("Undeclared constraints still in database:", fg="red", bold=True)
-        for fix in plan.blocking_cleanup:
-            click.secho(f"  {fix.describe()}", fg="red")
+        for item in plan.blocking_cleanup:
+            click.secho(f"  {item.describe()}", fg="red")
         click.secho("Rerun with --drop-undeclared to remove them.", fg="red")
         success = False
 
     if not drop_undeclared and plan.optional_cleanup:
         click.echo()
-        for fix in plan.optional_cleanup:
-            click.echo(f"  {fix.describe()}")
+        for item in plan.optional_cleanup:
+            click.echo(f"  {item.describe()}")
         click.echo("Run with --drop-undeclared to remove undeclared indexes.")
 
     if not success:
         sys.exit(1)
-    elif not fixes:
+    elif not items:
         click.secho("Schema is converged.", fg="green")

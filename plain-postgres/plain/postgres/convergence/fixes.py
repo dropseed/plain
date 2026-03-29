@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar
 
 from ..constraints import BaseConstraint, CheckConstraint, UniqueConstraint
@@ -12,13 +11,6 @@ from ..indexes import Index
 
 if TYPE_CHECKING:
     from ..base import Model
-
-
-class FixCategory(StrEnum):
-    FORWARD = "forward"  # Create, add, rename — brings schema toward model
-    REPAIR = "repair"  # Rebuild invalid/stale — fixes broken declared objects
-    CLEANUP = "cleanup"  # Drop undeclared non-behavioral objects (indexes)
-    CONTRACTION = "contraction"  # Drop undeclared behavioral objects (constraints)
 
 
 def _execute_and_commit(sql: str) -> None:
@@ -55,11 +47,9 @@ def _execute_autocommit(sql: str) -> None:
 
 
 class Fix(ABC):
-    """Base class for all convergence fixes."""
+    """Concrete executable SQL operation for convergence."""
 
     pass_order: ClassVar[int]
-    category: ClassVar[FixCategory]
-    blocks_sync: ClassVar[bool] = True
 
     @abstractmethod
     def describe(self) -> str: ...
@@ -73,15 +63,13 @@ class RebuildIndexFix(Fix):
     """Drop an INVALID index and recreate it CONCURRENTLY."""
 
     pass_order = 0
-    category = FixCategory.REPAIR
-    blocks_sync = False
 
     table: str
     index: Index
     model: type[Model]
 
     def describe(self) -> str:
-        return f"{self.table}: rebuild invalid index {self.index.name}"
+        return f"{self.table}: rebuild index {self.index.name}"
 
     def apply(self) -> str:
         drop_sql = f"DROP INDEX CONCURRENTLY IF EXISTS {quote_name(self.index.name)}"
@@ -92,39 +80,10 @@ class RebuildIndexFix(Fix):
 
 
 @dataclass
-class RebuildConstraintFix(Fix):
-    """Drop a constraint with a stale definition and recreate it."""
-
-    pass_order = 0
-    category = FixCategory.REPAIR
-
-    table: str
-    constraint: BaseConstraint
-    model: type[Model]
-
-    def describe(self) -> str:
-        return f"{self.table}: rebuild constraint {self.constraint.name}"
-
-    def apply(self) -> str:
-        # Drop the old constraint
-        drop_sql = f"ALTER TABLE {quote_name(self.table)} DROP CONSTRAINT {quote_name(self.constraint.name)}"
-        _execute_and_commit(drop_sql)
-        # Recreate with the model's current definition (NOT VALID for check)
-        if isinstance(self.constraint, CheckConstraint):
-            create_sql = self.constraint.to_sql(self.model, not_valid=True)
-        else:
-            create_sql = self.constraint.to_sql(self.model)
-        _execute_and_commit(create_sql)
-        return f"{drop_sql}; {create_sql}"
-
-
-@dataclass
 class RenameIndexFix(Fix):
     """Rename an index (catalog-only, instant)."""
 
     pass_order = 1
-    category = FixCategory.FORWARD
-    blocks_sync = False
 
     table: str
     old_name: str
@@ -144,8 +103,6 @@ class CreateIndexFix(Fix):
     """Create a missing index using CONCURRENTLY (doesn't block writes)."""
 
     pass_order = 1
-    category = FixCategory.FORWARD
-    blocks_sync = False
 
     table: str
     index: Index
@@ -170,7 +127,6 @@ class AddConstraintFix(Fix):
     """
 
     pass_order = 2
-    category = FixCategory.FORWARD
 
     table: str
     constraint: BaseConstraint
@@ -223,8 +179,6 @@ class RenameConstraintFix(Fix):
     """
 
     pass_order = 2
-    category = FixCategory.FORWARD
-    blocks_sync = False
 
     table: str
     old_name: str
@@ -244,7 +198,6 @@ class ValidateConstraintFix(Fix):
     """Validate a NOT VALID constraint (SHARE UPDATE EXCLUSIVE — doesn't block writes)."""
 
     pass_order = 3
-    category = FixCategory.FORWARD
 
     table: str
     name: str
@@ -261,7 +214,6 @@ class ValidateConstraintFix(Fix):
 @dataclass
 class DropConstraintFix(Fix):
     pass_order = 4
-    category = FixCategory.CONTRACTION
 
     table: str
     name: str
@@ -278,7 +230,6 @@ class DropConstraintFix(Fix):
 @dataclass
 class DropIndexFix(Fix):
     pass_order = 5
-    category = FixCategory.CLEANUP
 
     table: str
     name: str

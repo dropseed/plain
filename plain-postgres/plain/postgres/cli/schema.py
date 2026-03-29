@@ -6,6 +6,7 @@ import sys
 import click
 
 from ..convergence.analysis import ModelAnalysis, analyze_model
+from ..convergence.planning import can_auto_fix
 from ..db import get_connection
 from ..introspection import get_unknown_tables
 from ..registry import models_registry
@@ -65,7 +66,7 @@ def _render_model(analysis: ModelAnalysis) -> None:
         fields_str = ", ".join(idx.fields) if idx.fields else "expressions"
         click.echo(f"    {idx.name}  ({fields_str})", nl=False)
 
-        if idx.issue and idx.fix:
+        if idx.issue and idx.drift and can_auto_fix(idx.drift):
             _fixable(idx.issue)
         elif idx.issue:
             _err(idx.issue)
@@ -86,7 +87,7 @@ def _render_model(analysis: ModelAnalysis) -> None:
         else:
             click.echo(f"    {con.name}  {con_type}", nl=False)
 
-        if con.issue and con.fix:
+        if con.issue and con.drift and can_auto_fix(con.drift):
             _fixable(con.issue)
         elif con.issue:
             _err(con.issue)

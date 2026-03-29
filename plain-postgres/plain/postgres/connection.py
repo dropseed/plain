@@ -1132,20 +1132,21 @@ class DatabaseConnection:
         )
 
         # Apply convergence fixes (constraints, indexes) after migrations.
-        from plain.postgres.convergence import execute_fixes, plan_convergence
+        from plain.postgres.convergence import execute_plan, plan_convergence
 
         plan = plan_convergence()
-        result = execute_fixes(plan.executable())
+        result = execute_plan(plan.executable())
         if not result.ok:
             failed = [r for r in result.results if not r.ok]
             raise RuntimeError(
-                f"Convergence failed during test DB setup: {failed[0].fix.describe()} — {failed[0].error}"
+                f"Convergence failed during test DB setup: {failed[0].item.describe()} — {failed[0].error}"
             )
-        # Shouldn't happen — a fresh DB from migrations has no undeclared objects.
-        # Safety net so test setup doesn't silently diverge from sync policy.
-        if plan.blocking_cleanup:
+        # Shouldn't happen — a fresh DB from migrations has no undeclared objects
+        # or changed definitions. Safety net so test setup follows sync policy.
+        if plan.blocked or plan.blocking_cleanup:
+            problem = plan.blocked[0] if plan.blocked else plan.blocking_cleanup[0]
             raise RuntimeError(
-                f"Convergence blocked during test DB setup: {plan.blocking_cleanup[0].describe()}"
+                f"Convergence blocked during test DB setup: {problem.describe()}"
             )
 
         # Ensure a connection for the side effect of initializing the test database.

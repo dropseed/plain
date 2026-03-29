@@ -7,17 +7,20 @@ from plain.postgres import CheckConstraint, Index, Q, UniqueConstraint, get_conn
 from plain.postgres.constraints import Deferrable
 from plain.postgres.convergence import (
     AddConstraintFix,
+    ConstraintDrift,
     CreateIndexFix,
+    DriftKind,
     DropConstraintFix,
     DropIndexFix,
-    FixCategory,
-    RebuildConstraintFix,
+    IndexDrift,
+    PlanItem,
     RebuildIndexFix,
     RenameConstraintFix,
     RenameIndexFix,
     ValidateConstraintFix,
     analyze_model,
-    execute_fixes,
+    can_auto_fix,
+    execute_plan,
     plan_convergence,
     plan_model_convergence,
 )
@@ -107,7 +110,7 @@ def _index_is_valid(name: str) -> bool:
 
 class TestPassOrdering:
     def test_fixes_sorted_by_pass(self, db):
-        """plan_convergence() returns fixes in pass order: rebuild, create indexes,
+        """plan_convergence() returns items in pass order: rebuild, create indexes,
         add constraints, validate, drop constraints, drop indexes."""
         original_indexes = list(Car.model_options.indexes)
         original_constraints = list(Car.model_options.constraints)
@@ -134,8 +137,8 @@ class TestPassOrdering:
         )
 
         try:
-            fixes = plan_convergence().executable(drop_undeclared=True)
-            fix_types = [type(f) for f in fixes]
+            items = plan_convergence().executable(drop_undeclared=True)
+            fix_types = [type(item.fix) for item in items]
 
             # All six fix types should be present
             assert RebuildIndexFix in fix_types
@@ -173,12 +176,12 @@ class TestPassOrdering:
             assert validate_max < drop_con_min
             assert drop_con_max < drop_idx
 
-            # Without include_prunable, drop fixes should be excluded
-            default_fixes = plan_convergence().executable()
-            default_types = [type(f) for f in default_fixes]
+            # Without drop_undeclared, drop items should be excluded
+            default_items = plan_convergence().executable()
+            default_types = [type(item.fix) for item in default_items]
             assert DropConstraintFix not in default_types
             assert DropIndexFix not in default_types
-            # Non-prunable fixes should still be present
+            # Non-drop items should still be present
             assert RebuildIndexFix in default_types
             assert CreateIndexFix in default_types
             assert AddConstraintFix in default_types
@@ -192,8 +195,8 @@ class TestDetectConstraintFixes:
     def test_no_fixes_when_converged(self, db):
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable()
-        assert fixes == []
+            items = plan_model_convergence(conn, cursor, Car).executable()
+        assert items == []
 
     def test_detects_extra_check_constraint_with_prune(self, db):
         _execute(
@@ -202,14 +205,13 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable(
+            items = plan_model_convergence(conn, cursor, Car).executable(
                 drop_undeclared=True
             )
 
-        assert len(fixes) == 1
-        fix = fixes[0]
-        assert isinstance(fix, DropConstraintFix)
-        assert fix.name == "examples_car_test_check"
+        assert len(items) == 1
+        assert isinstance(items[0].fix, DropConstraintFix)
+        assert items[0].fix.name == "examples_car_test_check"
 
     def test_extra_check_constraint_excluded_by_default(self, db):
         _execute(
@@ -218,9 +220,9 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable()
+            items = plan_model_convergence(conn, cursor, Car).executable()
 
-        assert fixes == []
+        assert items == []
 
     def test_detects_extra_unique_constraint_with_prune(self, db):
         _execute(
@@ -229,14 +231,13 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable(
+            items = plan_model_convergence(conn, cursor, Car).executable(
                 drop_undeclared=True
             )
 
-        assert len(fixes) == 1
-        fix = fixes[0]
-        assert isinstance(fix, DropConstraintFix)
-        assert fix.name == "examples_car_extra_unique"
+        assert len(items) == 1
+        assert isinstance(items[0].fix, DropConstraintFix)
+        assert items[0].fix.name == "examples_car_extra_unique"
 
     def test_extra_unique_constraint_excluded_by_default(self, db):
         _execute(
@@ -245,9 +246,9 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable()
+            items = plan_model_convergence(conn, cursor, Car).executable()
 
-        assert fixes == []
+        assert items == []
 
     def test_detects_missing_check_constraint(self, db):
         original_constraints = list(Car.model_options.constraints)
@@ -260,12 +261,11 @@ class TestDetectConstraintFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
+                items = plan_model_convergence(conn, cursor, Car).executable()
 
-            assert len(fixes) == 1
-            fix = fixes[0]
-            assert isinstance(fix, AddConstraintFix)
-            assert fix.constraint.name == "examples_car_id_nonneg"
+            assert len(items) == 1
+            assert isinstance(items[0].fix, AddConstraintFix)
+            assert items[0].fix.constraint.name == "examples_car_id_nonneg"
         finally:
             Car.model_options.constraints = original_constraints
 
@@ -274,12 +274,11 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable()
+            items = plan_model_convergence(conn, cursor, Car).executable()
 
-        assert len(fixes) == 1
-        fix = fixes[0]
-        assert isinstance(fix, AddConstraintFix)
-        assert fix.constraint.name == "unique_make_model"
+        assert len(items) == 1
+        assert isinstance(items[0].fix, AddConstraintFix)
+        assert items[0].fix.constraint.name == "unique_make_model"
 
     def test_detects_not_valid_check_constraint(self, db):
         """A NOT VALID constraint in the DB that matches the model needs validation."""
@@ -297,17 +296,16 @@ class TestDetectConstraintFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
+                items = plan_model_convergence(conn, cursor, Car).executable()
 
-            assert len(fixes) == 1
-            fix = fixes[0]
-            assert isinstance(fix, ValidateConstraintFix)
-            assert fix.name == "examples_car_id_nonneg"
+            assert len(items) == 1
+            assert isinstance(items[0].fix, ValidateConstraintFix)
+            assert items[0].fix.name == "examples_car_id_nonneg"
         finally:
             Car.model_options.constraints = original_constraints
 
     def test_detects_check_constraint_definition_changed(self, db):
-        """A check constraint with matching name but different expression is detected."""
+        """A check constraint with matching name but different expression is blocked."""
         original_constraints = list(Car.model_options.constraints)
         # Model declares CHECK (id >= 1)
         check = CheckConstraint(
@@ -324,11 +322,14 @@ class TestDetectConstraintFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
+                plan = plan_model_convergence(conn, cursor, Car)
 
-            assert len(fixes) == 1
-            assert isinstance(fixes[0], RebuildConstraintFix)
-            assert fixes[0].constraint.name == "examples_car_id_nonneg"
+            # Changed constraint definition has no auto-fix
+            assert plan.executable() == []
+            assert len(plan.blocked) == 1
+            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
+            assert plan.blocked[0].fix is None
+            assert plan.blocked[0].guidance is not None
         finally:
             Car.model_options.constraints = original_constraints
 
@@ -349,9 +350,9 @@ class TestDetectConstraintFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
+                items = plan_model_convergence(conn, cursor, Car).executable()
 
-            assert fixes == []
+            assert items == []
         finally:
             Car.model_options.constraints = original_constraints
 
@@ -389,7 +390,7 @@ class TestApplyConstraintFixes:
         assert _constraint_is_valid("examples_car", "examples_car_id_nonneg")
 
     def test_full_check_constraint_lifecycle(self, isolated_db):
-        """Add NOT VALID → validate → fully valid constraint."""
+        """Add NOT VALID -> validate -> fully valid constraint."""
         check = CheckConstraint(
             check=Q(id__gte=0),
             name="examples_car_id_nonneg",
@@ -401,31 +402,31 @@ class TestApplyConstraintFixes:
             # First converge pass: adds NOT VALID
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
-            assert len(fixes) == 1
-            assert isinstance(fixes[0], AddConstraintFix)
+                items = plan_model_convergence(conn, cursor, Car).executable()
+            assert len(items) == 1
+            assert isinstance(items[0].fix, AddConstraintFix)
 
-            fixes[0].apply()
+            items[0].fix.apply()
             assert not _constraint_is_valid("examples_car", "examples_car_id_nonneg")
 
             # Second converge pass: detects NOT VALID, validates
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
-            assert len(fixes) == 1
-            assert isinstance(fixes[0], ValidateConstraintFix)
+                items = plan_model_convergence(conn, cursor, Car).executable()
+            assert len(items) == 1
+            assert isinstance(items[0].fix, ValidateConstraintFix)
 
-            fixes[0].apply()
+            items[0].fix.apply()
             assert _constraint_is_valid("examples_car", "examples_car_id_nonneg")
 
             # Third pass: fully converged
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
-            assert fixes == []
+                items = plan_model_convergence(conn, cursor, Car).executable()
+            assert items == []
         finally:
             Car.model_options.constraints = original_constraints
 
-    def test_definition_change_lifecycle(self, isolated_db):
-        """Changed check definition: rebuild → validate → converged."""
+    def test_definition_change_is_blocked(self, isolated_db):
+        """Changed check definition is blocked — no auto-fix available."""
         original_constraints = list(Car.model_options.constraints)
         # Model declares CHECK (id >= 1)
         check = CheckConstraint(
@@ -442,30 +443,17 @@ class TestApplyConstraintFixes:
         try:
             conn = get_connection()
 
-            # First pass: detects definition change → rebuild (drop + add NOT VALID)
+            # Detects definition change as blocked (no executable fix)
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
-            assert len(fixes) == 1
-            assert isinstance(fixes[0], RebuildConstraintFix)
+                plan = plan_model_convergence(conn, cursor, Car)
 
-            fixes[0].apply()
+            assert plan.executable() == []
+            assert len(plan.blocked) == 1
+            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
+            assert plan.blocked[0].fix is None
 
-            assert _constraint_exists("examples_car", "examples_car_id_nonneg")
-            assert not _constraint_is_valid("examples_car", "examples_car_id_nonneg")
-
-            # Second pass: NOT VALID → validate
-            with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
-            assert len(fixes) == 1
-            assert isinstance(fixes[0], ValidateConstraintFix)
-
-            fixes[0].apply()
-            assert _constraint_is_valid("examples_car", "examples_car_id_nonneg")
-
-            # Third pass: fully converged
-            with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
-            assert fixes == []
+            # can_auto_fix returns False for changed constraints
+            assert not can_auto_fix(plan.blocked[0].drift)
         finally:
             Car.model_options.constraints = original_constraints
 
@@ -568,11 +556,14 @@ class TestDetectIndexFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
+                items = plan_model_convergence(conn, cursor, Car).executable()
 
-            index_fixes = [f for f in fixes if isinstance(f, CreateIndexFix)]
-            assert len(index_fixes) == 1
-            assert index_fixes[0].index.name == "examples_car_make_idx"
+            index_items = [
+                item for item in items if isinstance(item.fix, CreateIndexFix)
+            ]
+            assert len(index_items) == 1
+            assert isinstance(index_items[0].fix, CreateIndexFix)
+            assert index_items[0].fix.index.name == "examples_car_make_idx"
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -582,23 +573,25 @@ class TestDetectIndexFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable(
+            items = plan_model_convergence(conn, cursor, Car).executable(
                 drop_undeclared=True
             )
 
-        index_fixes = [f for f in fixes if isinstance(f, DropIndexFix)]
-        assert len(index_fixes) == 1
-        assert index_fixes[0].name == "examples_car_extra_idx"
+        index_items = [item for item in items if isinstance(item.fix, DropIndexFix)]
+        assert len(index_items) == 1
+        fix = index_items[0].fix
+        assert isinstance(fix, DropIndexFix)
+        assert fix.name == "examples_car_extra_idx"
 
     def test_extra_index_excluded_by_default(self, db):
-        """An extra index produces no fix by default."""
+        """An extra index produces no item by default."""
         _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable()
+            items = plan_model_convergence(conn, cursor, Car).executable()
 
-        assert fixes == []
+        assert items == []
 
     def test_detects_invalid_index(self, isolated_db):
         """An INVALID index matching a model index produces a RebuildIndexFix."""
@@ -616,11 +609,15 @@ class TestDetectIndexFixes:
 
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
+                items = plan_model_convergence(conn, cursor, Car).executable()
 
-            rebuild_fixes = [f for f in fixes if isinstance(f, RebuildIndexFix)]
-            assert len(rebuild_fixes) == 1
-            assert rebuild_fixes[0].index.name == "examples_car_make_idx"
+            rebuild_items = [
+                item for item in items if isinstance(item.fix, RebuildIndexFix)
+            ]
+            assert len(rebuild_items) == 1
+            fix = rebuild_items[0].fix
+            assert isinstance(fix, RebuildIndexFix)
+            assert fix.index.name == "examples_car_make_idx"
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -639,11 +636,15 @@ class TestDetectIndexFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
+                items = plan_model_convergence(conn, cursor, Car).executable()
 
-            rebuild_fixes = [f for f in fixes if isinstance(f, RebuildIndexFix)]
-            assert len(rebuild_fixes) == 1
-            assert rebuild_fixes[0].index.name == "examples_car_make_idx"
+            rebuild_items = [
+                item for item in items if isinstance(item.fix, RebuildIndexFix)
+            ]
+            assert len(rebuild_items) == 1
+            fix = rebuild_items[0].fix
+            assert isinstance(fix, RebuildIndexFix)
+            assert fix.index.name == "examples_car_make_idx"
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -661,9 +662,9 @@ class TestDetectIndexFixes:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
+                items = plan_model_convergence(conn, cursor, Car).executable()
 
-            assert fixes == []
+            assert items == []
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -741,14 +742,24 @@ class TestAnalyzeModel:
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Car)
 
-            rename_fixes = [f for f in analysis.fixes if isinstance(f, RenameIndexFix)]
-            assert len(rename_fixes) == 1
-            assert rename_fixes[0].old_name == "examples_car_make_old_idx"
-            assert rename_fixes[0].new_name == "examples_car_make_new_idx"
+            rename_drifts = [
+                d
+                for d in analysis.drifts
+                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+            ]
+            assert len(rename_drifts) == 1
+            assert rename_drifts[0].old_name == "examples_car_make_old_idx"
+            assert rename_drifts[0].new_name == "examples_car_make_new_idx"
 
-            # No separate create or drop
-            assert not any(isinstance(f, CreateIndexFix) for f in analysis.fixes)
-            assert not any(isinstance(f, DropIndexFix) for f in analysis.fixes)
+            # No separate create or drop drifts
+            assert not any(
+                isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
+                for d in analysis.drifts
+            )
+            assert not any(
+                isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+                for d in analysis.drifts
+            )
 
             # Schema shows the rename as a single index entry
             renamed = [
@@ -758,7 +769,8 @@ class TestAnalyzeModel:
             ]
             assert len(renamed) == 1
             assert renamed[0].issue == "rename from examples_car_make_old_idx"
-            assert isinstance(renamed[0].fix, RenameIndexFix)
+            assert renamed[0].drift is not None
+            assert renamed[0].drift.kind == DriftKind.RENAMED
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -780,10 +792,14 @@ class TestAnalyzeModel:
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, CarFeature)
 
-            rename_fixes = [f for f in analysis.fixes if isinstance(f, RenameIndexFix)]
-            assert len(rename_fixes) == 1
-            assert rename_fixes[0].old_name == "examples_carfeature_car_old_idx"
-            assert rename_fixes[0].new_name == "examples_carfeature_car_new_idx"
+            rename_drifts = [
+                d
+                for d in analysis.drifts
+                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+            ]
+            assert len(rename_drifts) == 1
+            assert rename_drifts[0].old_name == "examples_carfeature_car_old_idx"
+            assert rename_drifts[0].new_name == "examples_carfeature_car_new_idx"
         finally:
             CarFeature.model_options.indexes = original_indexes
 
@@ -804,10 +820,14 @@ class TestAnalyzeModel:
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Car)
 
-            rename_fixes = [f for f in analysis.fixes if isinstance(f, RenameIndexFix)]
-            assert len(rename_fixes) == 1
-            assert rename_fixes[0].old_name == "examples_car_make_model_old_idx"
-            assert rename_fixes[0].new_name == "examples_car_make_model_new_idx"
+            rename_drifts = [
+                d
+                for d in analysis.drifts
+                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+            ]
+            assert len(rename_drifts) == 1
+            assert rename_drifts[0].old_name == "examples_car_make_model_old_idx"
+            assert rename_drifts[0].new_name == "examples_car_make_model_new_idx"
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -825,9 +845,18 @@ class TestAnalyzeModel:
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Car)
 
-            assert any(isinstance(f, CreateIndexFix) for f in analysis.fixes)
-            assert any(isinstance(f, DropIndexFix) for f in analysis.fixes)
-            assert not any(isinstance(f, RenameIndexFix) for f in analysis.fixes)
+            assert any(
+                isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
+                for d in analysis.drifts
+            )
+            assert any(
+                isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+                for d in analysis.drifts
+            )
+            assert not any(
+                isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+                for d in analysis.drifts
+            )
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -847,11 +876,22 @@ class TestAnalyzeModel:
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Car)
 
-            assert not any(isinstance(f, RenameIndexFix) for f in analysis.fixes)
-            create_fixes = [f for f in analysis.fixes if isinstance(f, CreateIndexFix)]
-            drop_fixes = [f for f in analysis.fixes if isinstance(f, DropIndexFix)]
-            assert len(create_fixes) == 2
-            assert len(drop_fixes) == 2
+            assert not any(
+                isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+                for d in analysis.drifts
+            )
+            missing_drifts = [
+                d
+                for d in analysis.drifts
+                if isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
+            ]
+            undeclared_drifts = [
+                d
+                for d in analysis.drifts
+                if isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+            ]
+            assert len(missing_drifts) == 2
+            assert len(undeclared_drifts) == 2
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -872,18 +912,28 @@ class TestAnalyzeModel:
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Car)
 
-            rename_fixes = [f for f in analysis.fixes if isinstance(f, RenameIndexFix)]
-            assert len(rename_fixes) == 1
-            assert rename_fixes[0].old_name == "examples_car_make_upper_old_idx"
-            assert rename_fixes[0].new_name == "examples_car_make_upper_new_idx"
+            rename_drifts = [
+                d
+                for d in analysis.drifts
+                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+            ]
+            assert len(rename_drifts) == 1
+            assert rename_drifts[0].old_name == "examples_car_make_upper_old_idx"
+            assert rename_drifts[0].new_name == "examples_car_make_upper_new_idx"
 
-            assert not any(isinstance(f, CreateIndexFix) for f in analysis.fixes)
-            assert not any(isinstance(f, DropIndexFix) for f in analysis.fixes)
+            assert not any(
+                isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
+                for d in analysis.drifts
+            )
+            assert not any(
+                isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+                for d in analysis.drifts
+            )
         finally:
             Car.model_options.indexes = original_indexes
 
     def test_fixable_index_annotated(self, db):
-        """A missing index has a fix on its IndexStatus."""
+        """A missing index has a drift on its IndexStatus."""
         original_indexes = list(Car.model_options.indexes)
         Car.model_options.indexes = [
             *original_indexes,
@@ -900,12 +950,13 @@ class TestAnalyzeModel:
             ]
             assert len(missing) == 1
             assert missing[0].issue is not None
-            assert isinstance(missing[0].fix, CreateIndexFix)
+            assert missing[0].drift is not None
+            assert missing[0].drift.kind == DriftKind.MISSING
         finally:
             Car.model_options.indexes = original_indexes
 
     def test_plan_model_convergence(self, db):
-        """plan_model_convergence() returns a plan with correct fixes."""
+        """plan_model_convergence() returns a plan with correct items."""
         original_indexes = list(Car.model_options.indexes)
         Car.model_options.indexes = [
             *original_indexes,
@@ -915,11 +966,11 @@ class TestAnalyzeModel:
         try:
             conn = get_connection()
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
+                items = plan_model_convergence(conn, cursor, Car).executable()
 
-            assert isinstance(fixes, list)
-            assert len(fixes) == 1
-            assert isinstance(fixes[0], CreateIndexFix)
+            assert isinstance(items, list)
+            assert len(items) == 1
+            assert isinstance(items[0].fix, CreateIndexFix)
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -978,18 +1029,18 @@ class TestApplyRenameIndex:
 
             # First pass: detect rename
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
-            assert len(fixes) == 1
-            assert isinstance(fixes[0], RenameIndexFix)
+                items = plan_model_convergence(conn, cursor, Car).executable()
+            assert len(items) == 1
+            assert isinstance(items[0].fix, RenameIndexFix)
 
-            fixes[0].apply()
+            items[0].fix.apply()
             assert _index_exists("examples_car_make_new_idx")
             assert not _index_exists("examples_car_make_old_idx")
 
             # Second pass: converged
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
-            assert fixes == []
+                items = plan_model_convergence(conn, cursor, Car).executable()
+            assert items == []
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -1012,15 +1063,23 @@ class TestConstraintRename:
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Car)
 
-            rename_fixes = [
-                f for f in analysis.fixes if isinstance(f, RenameConstraintFix)
+            rename_drifts = [
+                d
+                for d in analysis.drifts
+                if isinstance(d, ConstraintDrift) and d.kind == DriftKind.RENAMED
             ]
-            assert len(rename_fixes) == 1
-            assert rename_fixes[0].old_name == "examples_car_id_old"
-            assert rename_fixes[0].new_name == "examples_car_id_new"
+            assert len(rename_drifts) == 1
+            assert rename_drifts[0].old_name == "examples_car_id_old"
+            assert rename_drifts[0].new_name == "examples_car_id_new"
 
-            assert not any(isinstance(f, AddConstraintFix) for f in analysis.fixes)
-            assert not any(isinstance(f, DropConstraintFix) for f in analysis.fixes)
+            assert not any(
+                isinstance(d, ConstraintDrift) and d.kind == DriftKind.MISSING
+                for d in analysis.drifts
+            )
+            assert not any(
+                isinstance(d, ConstraintDrift) and d.kind == DriftKind.UNDECLARED
+                for d in analysis.drifts
+            )
         finally:
             Car.model_options.constraints = original_constraints
 
@@ -1036,10 +1095,14 @@ class TestConstraintRename:
         with conn.cursor() as cursor:
             analysis = analyze_model(conn, cursor, Car)
 
-        rename_fixes = [f for f in analysis.fixes if isinstance(f, RenameConstraintFix)]
-        assert len(rename_fixes) == 1
-        assert rename_fixes[0].old_name == "old_unique_make_model"
-        assert rename_fixes[0].new_name == "unique_make_model"
+        rename_drifts = [
+            d
+            for d in analysis.drifts
+            if isinstance(d, ConstraintDrift) and d.kind == DriftKind.RENAMED
+        ]
+        assert len(rename_drifts) == 1
+        assert rename_drifts[0].old_name == "old_unique_make_model"
+        assert rename_drifts[0].new_name == "unique_make_model"
 
     def test_no_rename_when_expression_differs(self, db):
         """Different check expressions means separate add + drop, not rename."""
@@ -1058,9 +1121,18 @@ class TestConstraintRename:
             with conn.cursor() as cursor:
                 analysis = analyze_model(conn, cursor, Car)
 
-            assert not any(isinstance(f, RenameConstraintFix) for f in analysis.fixes)
-            assert any(isinstance(f, AddConstraintFix) for f in analysis.fixes)
-            assert any(isinstance(f, DropConstraintFix) for f in analysis.fixes)
+            assert not any(
+                isinstance(d, ConstraintDrift) and d.kind == DriftKind.RENAMED
+                for d in analysis.drifts
+            )
+            assert any(
+                isinstance(d, ConstraintDrift) and d.kind == DriftKind.MISSING
+                for d in analysis.drifts
+            )
+            assert any(
+                isinstance(d, ConstraintDrift) and d.kind == DriftKind.UNDECLARED
+                for d in analysis.drifts
+            )
         finally:
             Car.model_options.constraints = original_constraints
 
@@ -1120,68 +1192,167 @@ class TestConstraintRename:
             conn = get_connection()
 
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
-            assert len(fixes) == 1
-            assert isinstance(fixes[0], RenameConstraintFix)
+                items = plan_model_convergence(conn, cursor, Car).executable()
+            assert len(items) == 1
+            assert isinstance(items[0].fix, RenameConstraintFix)
 
-            fixes[0].apply()
+            items[0].fix.apply()
 
             with conn.cursor() as cursor:
-                fixes = plan_model_convergence(conn, cursor, Car).executable()
-            assert fixes == []
+                items = plan_model_convergence(conn, cursor, Car).executable()
+            assert items == []
         finally:
             Car.model_options.constraints = original_constraints
 
 
-class TestFixCategories:
-    def test_forward_category(self):
-        assert CreateIndexFix.category == FixCategory.FORWARD
-        assert AddConstraintFix.category == FixCategory.FORWARD
-        assert RenameIndexFix.category == FixCategory.FORWARD
-        assert RenameConstraintFix.category == FixCategory.FORWARD
-        assert ValidateConstraintFix.category == FixCategory.FORWARD
+class TestDriftPolicy:
+    """Tests for blocks_sync and DriftKind policy via PlanItem."""
 
-    def test_repair_category(self):
-        assert RebuildIndexFix.category == FixCategory.REPAIR
-        assert RebuildConstraintFix.category == FixCategory.REPAIR
+    def test_index_fixes_do_not_block_sync(self, db):
+        """Index operations (create, rebuild, rename) do not block sync."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_idx"),
+        ]
 
-    def test_cleanup_category(self):
-        assert DropIndexFix.category == FixCategory.CLEANUP
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
 
-    def test_contraction_category(self):
-        assert DropConstraintFix.category == FixCategory.CONTRACTION
+            assert len(items) == 1
+            assert isinstance(items[0].fix, CreateIndexFix)
+            assert items[0].blocks_sync is False
+        finally:
+            Car.model_options.indexes = original_indexes
 
-    def test_blocks_sync(self):
-        # Correctness fixes block sync
-        assert AddConstraintFix.blocks_sync is True
-        assert ValidateConstraintFix.blocks_sync is True
-        assert RebuildConstraintFix.blocks_sync is True
-        # Performance/cosmetic fixes do not
-        assert CreateIndexFix.blocks_sync is False
-        assert RenameIndexFix.blocks_sync is False
-        assert RenameConstraintFix.blocks_sync is False
-        assert RebuildIndexFix.blocks_sync is False
-        # Cleanup/contraction inherit default (True) — conservative
-        assert DropConstraintFix.blocks_sync is True
-        assert DropIndexFix.blocks_sync is True
+    def test_constraint_add_blocks_sync(self, db):
+        """Adding a missing constraint blocks sync."""
+        original_constraints = list(Car.model_options.constraints)
+        check = CheckConstraint(
+            check=Q(id__gte=0),
+            name="examples_car_id_nonneg",
+        )
+        Car.model_options.constraints = [*original_constraints, check]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
+
+            assert len(items) == 1
+            assert isinstance(items[0].fix, AddConstraintFix)
+            assert items[0].blocks_sync is True
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_constraint_validate_blocks_sync(self, db):
+        """Validating a NOT VALID constraint blocks sync."""
+        original_constraints = list(Car.model_options.constraints)
+        check = CheckConstraint(
+            check=Q(id__gte=0),
+            name="examples_car_id_nonneg",
+        )
+        Car.model_options.constraints = [*original_constraints, check]
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0) NOT VALID'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
+
+            assert len(items) == 1
+            assert isinstance(items[0].fix, ValidateConstraintFix)
+            assert items[0].blocks_sync is True
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_rename_does_not_block_sync(self, db):
+        """Renames (index and constraint) do not block sync."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_new_idx"),
+        ]
+        _execute('CREATE INDEX "examples_car_make_old_idx" ON "examples_car" ("make")')
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
+
+            assert len(items) == 1
+            assert isinstance(items[0].fix, RenameIndexFix)
+            assert items[0].blocks_sync is False
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_undeclared_constraint_is_blocking_cleanup(self, db):
+        """Undeclared constraints are drop_undeclared + blocks_sync."""
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
+        )
+
+        plan = plan_convergence()
+        undeclared = [
+            item
+            for item in plan.items
+            if isinstance(item.drift, ConstraintDrift)
+            and item.drift.kind == DriftKind.UNDECLARED
+        ]
+        assert len(undeclared) == 1
+        assert undeclared[0].drop_undeclared is True
+        assert undeclared[0].blocks_sync is True
+
+    def test_undeclared_index_is_optional_cleanup(self, db):
+        """Undeclared indexes are drop_undeclared + not blocks_sync."""
+        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+
+        plan = plan_convergence()
+        undeclared = [
+            item
+            for item in plan.items
+            if isinstance(item.drift, IndexDrift)
+            and item.drift.kind == DriftKind.UNDECLARED
+        ]
+        assert len(undeclared) == 1
+        assert undeclared[0].drop_undeclared is True
+        assert undeclared[0].blocks_sync is False
+
+    def test_can_auto_fix_for_missing(self, db):
+        """can_auto_fix returns True for missing indexes and constraints."""
+        assert can_auto_fix(IndexDrift(kind=DriftKind.MISSING, table="t"))
+        assert can_auto_fix(ConstraintDrift(kind=DriftKind.MISSING, table="t"))
+
+    def test_can_auto_fix_false_for_changed_constraint(self):
+        """can_auto_fix returns False for changed constraint definitions."""
+        drift = ConstraintDrift(kind=DriftKind.CHANGED, table="t")
+        assert not can_auto_fix(drift)
 
 
 class TestConvergencePlan:
     def test_executable_excludes_cleanup_by_default(self, db):
-        """Default mode excludes cleanup fixes."""
+        """Default mode excludes cleanup items."""
         _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         plan = plan_convergence()
         default = plan.executable()
         with_drop = plan.executable(drop_undeclared=True)
 
-        drop_in_default = [f for f in default if isinstance(f, DropIndexFix)]
-        drop_in_drop = [f for f in with_drop if isinstance(f, DropIndexFix)]
+        drop_in_default = [
+            item for item in default if isinstance(item.fix, DropIndexFix)
+        ]
+        drop_in_drop = [
+            item for item in with_drop if isinstance(item.fix, DropIndexFix)
+        ]
         assert drop_in_default == []
         assert len(drop_in_drop) == 1
 
     def test_has_work_ignores_cleanup_by_default(self, db):
-        """has_work() only counts cleanup fixes when drop_undeclared=True."""
+        """has_work() only counts cleanup items when drop_undeclared=True."""
         _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         plan = plan_convergence()
@@ -1246,14 +1417,44 @@ class TestConvergencePlan:
         assert plan.blocking_cleanup == []
         assert plan.optional_cleanup == []
 
+    def test_blocked_for_changed_constraint(self, db):
+        """Changed constraint definition appears in plan.blocked."""
+        original_constraints = list(Car.model_options.constraints)
+        check = CheckConstraint(
+            check=Q(id__gte=1),
+            name="examples_car_id_nonneg",
+        )
+        Car.model_options.constraints = [*original_constraints, check]
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0)'
+        )
 
-class TestExecuteFixes:
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            assert len(plan.blocked) == 1
+            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
+            assert plan.blocked[0].fix is None
+            assert plan.blocked[0].guidance is not None
+        finally:
+            Car.model_options.constraints = original_constraints
+
+
+class TestExecutePlan:
     def test_collects_results(self, isolated_db):
-        """execute_fixes() collects SQL from successful fixes."""
+        """execute_plan() collects SQL from successful items."""
         _execute('CREATE INDEX "examples_car_temp_idx" ON "examples_car" ("make")')
         fix = DropIndexFix(table="examples_car", name="examples_car_temp_idx")
+        drift = IndexDrift(
+            kind=DriftKind.UNDECLARED,
+            table="examples_car",
+            name="examples_car_temp_idx",
+        )
+        item = PlanItem(drift=drift, fix=fix, blocks_sync=False, drop_undeclared=True)
 
-        result = execute_fixes([fix])
+        result = execute_plan([item])
 
         assert result.applied == 1
         assert result.failed == 0
@@ -1263,10 +1464,14 @@ class TestExecuteFixes:
         assert "examples_car_temp_idx" in (result.results[0].sql or "")
 
     def test_handles_failure(self, isolated_db):
-        """execute_fixes() captures errors without raising."""
+        """execute_plan() captures errors without raising."""
         fix = DropConstraintFix(table="examples_car", name="nonexistent")
+        drift = ConstraintDrift(
+            kind=DriftKind.UNDECLARED, table="examples_car", name="nonexistent"
+        )
+        item = PlanItem(drift=drift, fix=fix, drop_undeclared=True)
 
-        result = execute_fixes([fix])
+        result = execute_plan([item])
 
         assert result.applied == 0
         assert result.failed == 1
@@ -1274,17 +1479,33 @@ class TestExecuteFixes:
         assert result.results[0].error is not None
 
     def test_continues_after_failure(self, isolated_db):
-        """A failed fix doesn't block subsequent fixes."""
+        """A failed item doesn't block subsequent items."""
         _execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_real_check" CHECK ("id" >= 0)'
         )
 
-        fixes = [
-            DropConstraintFix(table="examples_car", name="nonexistent"),
-            DropConstraintFix(table="examples_car", name="examples_car_real_check"),
+        items = [
+            PlanItem(
+                drift=ConstraintDrift(
+                    kind=DriftKind.UNDECLARED, table="examples_car", name="nonexistent"
+                ),
+                fix=DropConstraintFix(table="examples_car", name="nonexistent"),
+                drop_undeclared=True,
+            ),
+            PlanItem(
+                drift=ConstraintDrift(
+                    kind=DriftKind.UNDECLARED,
+                    table="examples_car",
+                    name="examples_car_real_check",
+                ),
+                fix=DropConstraintFix(
+                    table="examples_car", name="examples_car_real_check"
+                ),
+                drop_undeclared=True,
+            ),
         ]
 
-        result = execute_fixes(fixes)
+        result = execute_plan(items)
 
         assert result.applied == 1
         assert result.failed == 1
@@ -1296,14 +1517,45 @@ class TestExecuteFixes:
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_real_check" CHECK ("id" >= 0)'
         )
 
-        fixes = [
-            DropConstraintFix(table="examples_car", name="nonexistent"),
-            DropConstraintFix(table="examples_car", name="examples_car_real_check"),
+        items = [
+            PlanItem(
+                drift=ConstraintDrift(
+                    kind=DriftKind.UNDECLARED, table="examples_car", name="nonexistent"
+                ),
+                fix=DropConstraintFix(table="examples_car", name="nonexistent"),
+                drop_undeclared=True,
+            ),
+            PlanItem(
+                drift=ConstraintDrift(
+                    kind=DriftKind.UNDECLARED,
+                    table="examples_car",
+                    name="examples_car_real_check",
+                ),
+                fix=DropConstraintFix(
+                    table="examples_car", name="examples_car_real_check"
+                ),
+                drop_undeclared=True,
+            ),
         ]
 
-        result = execute_fixes(fixes)
+        result = execute_plan(items)
 
         assert result.summary == "1 applied, 1 failed."
+
+    def test_result_item_reference(self, isolated_db):
+        """FixResult.item references the PlanItem."""
+        _execute('CREATE INDEX "examples_car_temp_idx" ON "examples_car" ("make")')
+        fix = DropIndexFix(table="examples_car", name="examples_car_temp_idx")
+        drift = IndexDrift(
+            kind=DriftKind.UNDECLARED,
+            table="examples_car",
+            name="examples_car_temp_idx",
+        )
+        item = PlanItem(drift=drift, fix=fix, blocks_sync=False, drop_undeclared=True)
+
+        result = execute_plan([item])
+
+        assert result.results[0].item is item
 
 
 class TestSyncPolicy:
@@ -1312,7 +1564,12 @@ class TestSyncPolicy:
     def test_blocking_failure_fails_sync(self, isolated_db):
         """A failed constraint fix (blocks_sync=True) makes ok_for_sync False."""
         fix = DropConstraintFix(table="examples_car", name="nonexistent")
-        result = execute_fixes([fix])
+        drift = ConstraintDrift(
+            kind=DriftKind.UNDECLARED, table="examples_car", name="nonexistent"
+        )
+        item = PlanItem(drift=drift, fix=fix, blocks_sync=True, drop_undeclared=True)
+
+        result = execute_plan([item])
 
         assert not result.ok
         assert not result.ok_for_sync
@@ -1326,10 +1583,15 @@ class TestSyncPolicy:
             index=Index(fields=["make"], name="examples_car_will_fail_idx"),
             model=Car,
         )
+        drift = IndexDrift(
+            kind=DriftKind.MISSING, table="examples_car", index=fix.index, model=Car
+        )
+        item = PlanItem(drift=drift, fix=fix, blocks_sync=False)
+
         # Create it first so the CONCURRENTLY create will fail (duplicate)
         _execute('CREATE INDEX "examples_car_will_fail_idx" ON "examples_car" ("make")')
 
-        result = execute_fixes([fix])
+        result = execute_plan([item])
 
         assert not result.ok
         assert result.ok_for_sync
@@ -1339,18 +1601,29 @@ class TestSyncPolicy:
     def test_mixed_failures(self, isolated_db):
         """Blocking + non-blocking failures: ok_for_sync reflects only blocking."""
         _execute('CREATE INDEX "examples_car_will_fail_idx" ON "examples_car" ("make")')
-        fixes = [
+
+        index = Index(fields=["make"], name="examples_car_will_fail_idx")
+        items = [
             # Non-blocking: will fail (duplicate index)
-            CreateIndexFix(
-                table="examples_car",
-                index=Index(fields=["make"], name="examples_car_will_fail_idx"),
-                model=Car,
+            PlanItem(
+                drift=IndexDrift(
+                    kind=DriftKind.MISSING, table="examples_car", index=index, model=Car
+                ),
+                fix=CreateIndexFix(table="examples_car", index=index, model=Car),
+                blocks_sync=False,
             ),
             # Blocking: will fail (nonexistent constraint)
-            DropConstraintFix(table="examples_car", name="nonexistent"),
+            PlanItem(
+                drift=ConstraintDrift(
+                    kind=DriftKind.UNDECLARED, table="examples_car", name="nonexistent"
+                ),
+                fix=DropConstraintFix(table="examples_car", name="nonexistent"),
+                blocks_sync=True,
+                drop_undeclared=True,
+            ),
         ]
 
-        result = execute_fixes(fixes)
+        result = execute_plan(items)
 
         assert not result.ok
         assert not result.ok_for_sync
@@ -1358,17 +1631,22 @@ class TestSyncPolicy:
         assert len(result.non_blocking_failures) == 1
 
     def test_all_success_passes_sync(self, isolated_db):
-        """All fixes succeeding means ok_for_sync is True."""
+        """All items succeeding means ok_for_sync is True."""
         _execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_temp" CHECK ("id" >= 0)'
         )
         fix = DropConstraintFix(table="examples_car", name="examples_car_temp")
-        result = execute_fixes([fix])
+        drift = ConstraintDrift(
+            kind=DriftKind.UNDECLARED, table="examples_car", name="examples_car_temp"
+        )
+        item = PlanItem(drift=drift, fix=fix, drop_undeclared=True)
+
+        result = execute_plan([item])
 
         assert result.ok
         assert result.ok_for_sync
 
     def test_empty_result_passes_sync(self):
-        """No fixes executed means ok_for_sync is True."""
-        result = execute_fixes([])
+        """No items executed means ok_for_sync is True."""
+        result = execute_plan([])
         assert result.ok_for_sync
