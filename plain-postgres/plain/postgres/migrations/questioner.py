@@ -93,13 +93,6 @@ class MigrationQuestioner:
         # None means quit
         return None
 
-    def ask_unique_callable_default_addition(
-        self, field_name: str, model_name: str
-    ) -> Any:
-        """Adding a unique field with a callable default."""
-        # None means continue.
-        return None
-
 
 class InteractiveMigrationQuestioner(MigrationQuestioner):
     def __init__(
@@ -264,25 +257,6 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
                 sys.exit(3)
             else:
                 return self._ask_default(default="timezone.now")
-        return None
-
-    def ask_unique_callable_default_addition(
-        self, field_name: str, model_name: str
-    ) -> Any:
-        """Adding a unique field with a callable default."""
-        if not self.dry_run:
-            choice = self._choice_input(
-                f"Callable default on unique field {model_name}.{field_name} "
-                f"will not generate unique values upon migrating.\n"
-                f"Please choose how to proceed:\n",
-                [
-                    "Continue making this migration as the first step in "
-                    "writing a manual migration to generate unique values.",
-                    "Quit and edit field options in models.py.",
-                ],
-            )
-            if choice == 2:
-                sys.exit(3)
         return None
 
 

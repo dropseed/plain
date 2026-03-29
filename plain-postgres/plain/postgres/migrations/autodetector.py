@@ -555,14 +555,10 @@ class MigrationAutodetector:
             model_state = self.to_state.models[package_label, model_name]
             # Gather related fields
             related_fields = {}
-            primary_key_rel = None
             for field_name, field in model_state.fields.items():
                 if isinstance(field, RelatedField):
                     if field.remote_field.model:
-                        if field.primary_key:
-                            primary_key_rel = field.remote_field.model
-                        else:
-                            related_fields[field_name] = field
+                        related_fields[field_name] = field
                     if isinstance(field.remote_field, ManyToManyRel):
                         related_fields[field_name] = field
 
@@ -601,14 +597,6 @@ class MigrationAutodetector:
                                     False,
                                 )
                             )
-            # Depend on the other end of the primary key if it's a relation
-            if primary_key_rel:
-                dep_pl, dep_mn = resolve_relation(
-                    primary_key_rel,
-                    package_label,
-                    model_name,
-                )
-                dependencies.append((dep_pl, dep_mn, None, True))
             # Generate creation operation
             self.add_operation(
                 package_label,
@@ -852,12 +840,6 @@ class MigrationAutodetector:
                 field.default = self.questioner.ask_not_null_addition(
                     field_name, model_name
                 )
-        if (
-            field.primary_key
-            and field.default is not NOT_PROVIDED
-            and callable(field.default)
-        ):
-            self.questioner.ask_unique_callable_default_addition(field_name, model_name)
         self.add_operation(
             package_label,
             operations.AddField(
