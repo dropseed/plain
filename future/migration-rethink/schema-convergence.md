@@ -14,18 +14,19 @@ Indexes, constraints, and NOT NULL are currently managed through migration files
 
 A convergence engine that compares model declarations against the actual database schema and applies the difference using safe Postgres patterns. Builds on the existing `postgres schema` command which already does the comparison — this adds the ability to act on it.
 
-The `postgres schema` comparison engine becomes the foundation for the entire rethink. The same model-vs-DB diff drives `postgres schema` (read-only view), `makemigrations` (generate SQL for column/table changes), and `postgres converge` (apply indexes/constraints/NOT NULL). One engine, three modes.
+The `postgres schema` comparison engine becomes the foundation for the entire rethink. The same model-vs-DB diff drives `postgres schema` (read-only view), `migrations create` (generate SQL for column/table changes), and `postgres converge` (apply indexes/constraints/NOT NULL). One engine, three modes.
 
 ### What convergence manages
 
-| Declaration                           | Safe pattern used                                                                                      | Status                                                                                                                          |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `CheckConstraint(...)`                | `ADD CONSTRAINT CHECK NOT VALID` then `VALIDATE CONSTRAINT`                                            | **Done** — two-phase with per-operation commits, NOT VALID detection/retry                                                      |
-| `UniqueConstraint(...)`               | `CREATE UNIQUE INDEX CONCURRENTLY` then `ADD CONSTRAINT USING INDEX`                                   | **Partial** — add/drop works, but uses direct ADD CONSTRAINT (not USING INDEX). Safe pattern needs indexes in convergence first |
-| `Index(fields=["email"], name="idx")` | `CREATE INDEX CONCURRENTLY` / `DROP INDEX CONCURRENTLY`                                                | Not started                                                                                                                     |
-| `ForeignKeyField(User)` constraint    | `ADD CONSTRAINT FK NOT VALID` then `VALIDATE CONSTRAINT`                                               | Not started — still managed by field-level migration ops                                                                        |
-| NOT NULL (field without `null=True`)  | Backfill NULLs with model default (if available) → `ADD CHECK NOT VALID` → `VALIDATE` → `SET NOT NULL` | Not started                                                                                                                     |
-| Removal of any of the above           | Safe drop pattern                                                                                      | **Done** for check/unique constraints                                                                                           |
+| Declaration                           | Safe pattern used                                                                                      | Status                                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `CheckConstraint(...)`                | `ADD CONSTRAINT CHECK NOT VALID` then `VALIDATE CONSTRAINT`                                            | **Done** — two-phase, NOT VALID detection/retry, per-op commits with rollback                           |
+| `UniqueConstraint(...)`               | `CREATE UNIQUE INDEX CONCURRENTLY` then `ADD CONSTRAINT USING INDEX`                                   | **Done** — handles all features (condition, include, opclasses, expressions), orphan cleanup on failure |
+| `Index(fields=["email"], name="idx")` | `CREATE INDEX CONCURRENTLY` / `DROP INDEX CONCURRENTLY`                                                | **Done** — autocommit mode, INVALID index detection + rebuild                                           |
+| `ForeignKeyField(User)` constraint    | `ADD CONSTRAINT FK NOT VALID` then `VALIDATE CONSTRAINT`                                               | Not started — still managed by field-level migration ops (AddField/RemoveField)                         |
+| NOT NULL (field without `null=True`)  | Backfill NULLs with model default (if available) → `ADD CHECK NOT VALID` → `VALIDATE` → `SET NOT NULL` | Not started                                                                                             |
+| Defaults (`db_default`)               | `SET DEFAULT` / `DROP DEFAULT`                                                                         | Not started                                                                                             |
+| Removal of any of the above           | Safe drop pattern                                                                                      | **Done** for indexes and constraints                                                                    |
 
 ### Behavior
 
@@ -98,12 +99,17 @@ Convergence runs in five ordered passes. Each pass completes fully before the ne
 
 ```
 Pass 0: Defaults (SET DEFAULT, DROP DEFAULT)
-  - Applies defaults from model declarations — both static values and DB expressions
+  - Serves two purposes:
+    1. Closing the nullable window — after a slim migration adds a nullable column,
+       SET DEFAULT ensures new rows immediately get the correct value. Works with
+       existing `default=` when it has a SQL equivalent. See slim-migrations.md
+       "The nullable window tradeoff" for the full rationale.
+    2. Managing `db_default` changes — when a model changes its `db_default`, convergence
+       applies SET DEFAULT / DROP DEFAULT. Requires the future `db_default` field parameter
+       (see "db_default changes" below and fields-db-defaults.md).
+  - Applies both static values and DB expressions
     (e.g., SET DEFAULT 'pending', SET DEFAULT gen_random_uuid(), SET DEFAULT now())
-  - Runs FIRST to close the nullable window: after a migration adds a nullable column,
-    SET DEFAULT ensures new rows immediately get the correct value
   - Catalog-only, instant — even for DB expression defaults like gen_random_uuid()
-  - See fields-db-defaults.md for the full design of DB expression defaults
 
 Pass 1: Indexes (CREATE INDEX CONCURRENTLY, DROP INDEX CONCURRENTLY)
   - Creates all missing indexes, including unique indexes needed by unique constraints
@@ -155,20 +161,20 @@ Each pass has different lock characteristics:
 
 The expensive passes (1, 3) don't block writes. The blocking passes (0, 2, 4, 5) complete in milliseconds because they skip scans. Pass 0 runs first to close the nullable window immediately after migrations add new columns.
 
-### Index modification detection
+### Known detection gaps
 
-When a model's index declaration changes (different columns, different type, added WHERE clause) but keeps the same name, convergence sees the existing index doesn't match the declaration. It can't modify an index in place — Postgres requires drop + create.
+**Index/constraint definition changes:** Convergence currently matches by name only. If you change an index's columns or a check constraint's expression but keep the same name, convergence sees the name matches and reports no issue. The DB object has the stale definition. Detecting this requires comparing the actual definition (from `pg_get_indexdef` / `pg_get_constraintdef`) against what the model would generate.
 
-For small tables this is fine. For large tables, rebuilding an index CONCURRENTLY can take minutes. Convergence handles this by:
+**Index renames:** If you rename an index (change `name` but keep the same fields), convergence sees an extra index (old name) and a missing index (new name). It drops the old and creates the new CONCURRENTLY. This works but is slower than `ALTER INDEX RENAME` (instant, catalog-only). A rename detection heuristic (same fields, different name) could optimize this.
 
-1. Detecting the mismatch: "index `orders_status_idx` exists but definition differs from model"
-2. Creating a new index with a temporary name CONCURRENTLY (non-blocking)
-3. Dropping the old index CONCURRENTLY
-4. Renaming the new index to the declared name
+**Desired behavior for definition changes (not yet implemented):**
 
-This avoids any window where the index doesn't exist. The old index serves queries while the new one builds. The rename is instant (catalog-only).
+1. Detect the mismatch: "index `orders_status_idx` exists but definition differs from model"
+2. Create a new index with a temporary name CONCURRENTLY (non-blocking)
+3. Drop the old index CONCURRENTLY
+4. Rename the new index to the declared name
 
-If the index name itself changes (old name removed from model, new name added), convergence sees an unmanaged index and a missing index — it creates the new one and reports the old one for `--prune`.
+This avoids any window where the index doesn't exist. The old index serves queries while the new one builds.
 
 ## Backfill safety
 
@@ -302,9 +308,9 @@ This matters in practice when:
 
 The root cause: migration state loads the **current** class definition to reconstruct old state. There's no record of what SQL type a migration actually produced — it's always derived at runtime.
 
-`postgres schema` solves the **detection** side (comparing models against the actual DB catches these mismatches). But `makemigrations` can't **generate** the AlterField because both old and new resolve identically. The developer must write the ALTER manually or use `postgres schema` output to create a migration.
+`postgres schema` solves the **detection** side (comparing models against the actual DB catches these mismatches). But `migrations create` can't **generate** the AlterField because both old and new resolve identically. The developer must write the ALTER manually or use `postgres schema` output to create a migration.
 
-A potential fix: `makemigrations` could compare the expected schema (from replaying migrations on a fresh DB) against model-derived DDL. If they differ, generate an AlterField. This is essentially `--replay` as a generation step rather than just a verification step.
+A potential fix: `migrations create` could compare the expected schema (from replaying migrations on a fresh DB) against model-derived DDL. If they differ, generate an AlterField. This is essentially `--replay` as a generation step rather than just a verification step.
 
 **Previous workaround (removed):** `postgres converge` temporarily handled `character varying` → `text` conversions as a transitional bridge for the CharField removal in 0.90.0. This was removed — column type changes are migrations, not convergence.
 
@@ -399,7 +405,7 @@ The pattern across all of these: **snapshot current state, mark it as the starti
 
 ### Design for Plain
 
-The transition is a one-time `postgres adopt-convergence` command. It requires a database connection (same as `makemigrations` in the new system — you're doing database work).
+The transition is a one-time `postgres adopt-convergence` command. It requires a database connection (same as `migrations create` in the new system — you're doing database work).
 
 **What it does:**
 
@@ -436,7 +442,7 @@ Comparing against database...
 All model-declared objects verified in database.
 
 Going forward:
-  - `makemigrations` will skip index/constraint/NOT NULL operations
+  - `migrations create` will skip index/constraint/NOT NULL operations
   - `postgres converge` will manage these objects declaratively
   - `postgres sync` will run migrations then converge
   - Old migration files are untouched — they're history
@@ -465,7 +471,7 @@ Fix: apply pending migrations first, or remove the index declaration from the mo
 
 A migration or marker file would be the Django instinct — "record the transition as a migration operation." But convergence is stateless by design (it always compares desired vs actual). Convergence doesn't need a marker to know what to do — it diffs models against the DB every time.
 
-The question is whether `makemigrations` needs to know. The answer: **no, because `makemigrations` always generates slim migrations in the new system.** The switch from full to slim migrations is a framework version change, not a per-project configuration. When you upgrade to the version of Plain that includes convergence, `makemigrations` stops generating index/constraint operations. Period.
+The question is whether `migrations create` needs to know. The answer: **no, because `migrations create` always generates slim migrations in the new system.** The switch from full to slim migrations is a framework version change, not a per-project configuration. When you upgrade to the version of Plain that includes convergence, `migrations create` stops generating index/constraint operations. Period.
 
 This means `adopt-convergence` is **a validation command, not a state transition.** It confirms the DB matches models before you start using `postgres converge`. It's strongly recommended but the system works without it — convergence will diff models against the DB regardless.
 
@@ -475,7 +481,7 @@ This is the same approach Atlas takes with its declarative mode. `atlas schema a
 
 If a developer upgrades to the convergence-aware version of Plain without running `adopt-convergence`:
 
-- `makemigrations` generates slim migrations (no index/constraint operations). This is correct — those operations are now convergence's job.
+- `migrations create` generates slim migrations (no index/constraint operations). This is correct — those operations are now convergence's job.
 - `postgres converge` compares models to DB. If the DB already has all the right indexes/constraints (from old migrations), convergence says "everything matches" and does nothing. This is also correct.
 - The only risk is if the DB is missing objects that old migrations should have created. `postgres schema` will report these, and `postgres converge` will create them.
 
@@ -534,3 +540,59 @@ All lock levels confirmed against the [PostgreSQL 18 ALTER TABLE documentation](
 ### Django autodetector ordering
 
 Django's `MigrationAutodetector` uses a fixed generation order (not a dependency graph) for operation _types_: renames first, then deletes, creates, field operations, and finally indexes/constraints. Within an app, it uses `TopologicalSorter` from `graphlib` to resolve intra-app dependencies (e.g., FK field depends on target model existing). The generation order is: `generate_removed_constraints` → `generate_removed_indexes` → `generate_removed_fields` → `generate_added_fields` → `generate_altered_fields` → `generate_added_indexes` → `generate_added_constraints`. This is analogous to the multi-pass approach — fixed type ordering with dependency resolution only where truly needed.
+
+## Schema editor refactor: SQL generation into Index/Constraint classes
+
+### Problem
+
+Convergence uses the schema editor as a SQL generation library via `collect_sql=True`:
+
+```python
+conn = get_connection()
+with conn.schema_editor(collect_sql=True) as editor:
+    sql = index.create_sql(self.model, editor, concurrently=True)
+sql_str = str(sql)
+# execute sql_str ourselves in autocommit mode
+```
+
+The schema editor was designed to be both SQL generator and executor. Now that convergence handles execution separately (per-operation commits, autocommit for CONCURRENTLY), the editor is just baggage — we create it, ask for SQL, throw it away.
+
+The delegation chain is indirect:
+
+- `Index.create_sql(model, editor)` → `editor._create_index_sql(model, fields, ...)`
+- `UniqueConstraint.create_sql(model, editor)` → `editor._create_unique_sql(model, fields, ...)`
+- `CheckConstraint.create_sql(model, editor)` → `editor._create_check_sql(model, name, check)`
+
+The actual SQL generation logic (column resolution, quoting, template interpolation) lives on the schema editor. The Index/Constraint objects are just pass-throughs.
+
+### Goal
+
+Move SQL generation onto the objects themselves:
+
+```python
+sql = index.to_sql(model, concurrently=True)  # no editor needed
+sql = constraint.to_sql(model)                 # no editor needed
+```
+
+### What moves where
+
+| Current (on schema editor)                      | Target (on object)                                   | Notes                                                                                                                                                                                                  |
+| ----------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `_create_index_sql(model, fields, name, ...)`   | `Index.to_sql(model, concurrently=False)`            | Column resolution via `model._model_meta.get_forward_field()`, quoting via `quote_name()` — both available without editor                                                                              |
+| `_create_unique_sql(model, fields, name, ...)`  | `UniqueConstraint.to_sql(model, concurrently=False)` | Same as above                                                                                                                                                                                          |
+| `_create_check_sql(model, name, check)`         | `CheckConstraint.to_sql(model)`                      | The `_get_check_sql` method uses `Query` compiler + `quote_value()` to turn Q objects into SQL. `quote_value` needs a connection (not an editor). Could accept a connection or use `get_connection()`. |
+| `_delete_index_sql(model, name, ...)`           | `Index.drop_sql(name, concurrently=False)`           | Just template interpolation                                                                                                                                                                            |
+| `_delete_constraint_sql(template, model, name)` | `BaseConstraint.drop_sql(model)`                     | Just template interpolation                                                                                                                                                                            |
+
+### Challenges
+
+- **`quote_value` needs a connection** — `CheckConstraint._get_check_sql` compiles Q objects into SQL with literal values via `schema_editor.quote_value(p)`. This calls `psycopg.sql.quote(value, connection)`. The refactored version would need `get_connection()` or accept a connection parameter.
+- **`Statement` class** — the current SQL generation returns `Statement` objects (lazy string interpolation for table/column references). These would need to be resolved to strings at generation time, or `to_sql` could return `Statement` objects and the caller `.str()` them.
+- **Migration operations still use the editor** — `_alter_field` and field-level FK operations still use `add_index`/`remove_index`/`add_constraint`/`remove_constraint` on the schema editor. These are being removed as features move to convergence, but FK constraints and `_alter_field` still rely on the editor for now.
+
+### Incremental approach
+
+1. Add `to_sql()` methods to Index, CheckConstraint, UniqueConstraint that do their own SQL generation
+2. Update convergence fixes to use `to_sql()` instead of `collect_sql=True` editor
+3. Keep the schema editor methods as wrappers that call `to_sql()` (for remaining migration-level callers)
+4. Eventually remove the schema editor methods as all callers move away
