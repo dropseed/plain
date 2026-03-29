@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.130.1](https://github.com/dropseed/plain/releases/plain@0.130.1) (2026-03-29)
+
+### What's changed
+
+- Indented preflight check lines and summary under the "Running preflight checks..." header for readability in environments without ANSI colors. ([b6b494dcc698](https://github.com/dropseed/plain/commit/b6b494dcc698))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.130.0](https://github.com/dropseed/plain/releases/plain@0.130.0) (2026-03-29)
 
 ### What's changed
