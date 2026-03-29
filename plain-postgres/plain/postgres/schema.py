@@ -22,7 +22,7 @@ from plain.postgres.fields import (
     Field,
     TimeField,
 )
-from plain.postgres.fields.related import ForeignKeyField, RelatedField
+from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.sql import Query
 from plain.postgres.transaction import atomic
@@ -261,13 +261,6 @@ class DatabaseSchemaEditor:
         "UNIQUE (%(columns)s)%(deferrable)s"
     )
     sql_delete_unique = sql_delete_constraint
-
-    # Setting the constraint to IMMEDIATE runs any deferred checks to allow
-    # dropping it in the same transaction.
-    sql_delete_fk = (
-        "SET CONSTRAINTS %(name)s IMMEDIATE; "
-        "ALTER TABLE %(table)s DROP CONSTRAINT %(name)s"
-    )
 
     sql_create_index = (
         "CREATE INDEX %(name)s ON %(table)s%(using)s "
@@ -631,24 +624,7 @@ class DatabaseSchemaEditor:
         new_type: str,
     ) -> None:
         """Perform a "physical" (non-ManyToMany) field update."""
-        # FK constraints are managed by convergence — drop them before altering
-        # only when the column type is changing (Postgres won't let you change
-        # a column type while an FK references it).
-        if (
-            isinstance(old_field, ForeignKeyField)
-            and old_field.db_constraint
-            and self._field_should_be_altered(old_field, new_field)
-        ):
-            old_fk_type = old_field.db_type()
-            new_fk_type = new_field.db_type()
-            if old_fk_type != new_fk_type:
-                fk_names = self._constraint_names(
-                    model, [old_field.column], foreign_key=True
-                )
-                for fk_name in fk_names:
-                    self.execute(
-                        self._delete_constraint_sql(self.sql_delete_fk, model, fk_name)
-                    )
+        # FK constraints are managed by convergence, not the schema editor.
         # Have they renamed the column?
         if old_field.column != new_field.column:
             self.execute(
