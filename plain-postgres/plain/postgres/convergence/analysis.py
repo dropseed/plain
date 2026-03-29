@@ -13,6 +13,7 @@ from ..introspection import (
     TableState,
     introspect_table,
     normalize_check_definition,
+    normalize_index_definition,
 )
 from ..registry import models_registry
 from .fixes import (
@@ -297,7 +298,11 @@ def _compare_indexes(
     # Extra indexes (in DB but not in model)
     extra_names = sorted(db.indexes.keys() - model_index_names)
 
-    # Detect renames: cross-reference missing and extra by resolved columns
+    # Detect renames: cross-reference missing and extra by structure
+    renamed_missing: set[str] = set()
+    renamed_extra: set[str] = set()
+
+    # Field-based indexes: match by resolved column tuple
     missing_by_cols: dict[tuple[str, ...], list[Index]] = {}
     for index in missing:
         if not index.fields:
@@ -315,18 +320,48 @@ def _compare_indexes(
             continue
         extra_by_cols.setdefault(cols, []).append(name)
 
-    renamed_missing: set[str] = set()
-    renamed_extra: set[str] = set()
-
-    for cols, missing_list in missing_by_cols.items():
-        extra_list = extra_by_cols.get(cols)
-        if extra_list and len(missing_list) == 1 and len(extra_list) == 1:
-            index = missing_list[0]
-            old_name = extra_list[0]
+    for cols, m_list in missing_by_cols.items():
+        e_list = extra_by_cols.get(cols)
+        if e_list and len(m_list) == 1 and len(e_list) == 1:
+            index = m_list[0]
+            old_name = e_list[0]
             statuses.append(
                 IndexStatus(
                     name=index.name,
                     fields=list(index.fields),
+                    issue=f"rename from {old_name}",
+                    fix=RenameIndexFix(table, old_name, index.name),
+                )
+            )
+            renamed_missing.add(index.name)
+            renamed_extra.add(old_name)
+
+    # Expression-based indexes: match by normalized definition
+    missing_by_def: dict[str, list[Index]] = {}
+    for index in missing:
+        if index.fields or index.name in renamed_missing:
+            continue
+        norm = normalize_index_definition(index.to_sql(model))
+        missing_by_def.setdefault(norm, []).append(index)
+
+    extra_by_def: dict[str, list[str]] = {}
+    for name in extra_names:
+        if name in renamed_extra:
+            continue
+        defn = db.indexes[name].definition
+        if defn and not db.indexes[name].columns:
+            norm = normalize_index_definition(defn)
+            extra_by_def.setdefault(norm, []).append(name)
+
+    for norm, m_list in missing_by_def.items():
+        e_list = extra_by_def.get(norm)
+        if e_list and len(m_list) == 1 and len(e_list) == 1:
+            index = m_list[0]
+            old_name = e_list[0]
+            statuses.append(
+                IndexStatus(
+                    name=index.name,
+                    fields=[],
                     issue=f"rename from {old_name}",
                     fix=RenameIndexFix(table, old_name, index.name),
                 )

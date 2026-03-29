@@ -8,6 +8,7 @@ from plain.postgres.introspection import (
     IndexState,
     introspect_table,
     normalize_check_definition,
+    normalize_index_definition,
 )
 
 
@@ -174,3 +175,37 @@ class TestNormalizeCheckDefinition:
 
     def test_handles_bare_expression(self):
         assert normalize_check_definition("id > 0") == "id > 0"
+
+
+class TestNormalizeIndexDefinition:
+    def test_strips_prefix_with_using(self):
+        result = normalize_index_definition(
+            "CREATE INDEX foo ON bar USING btree (upper(email))"
+        )
+        assert result == "upper(email)"
+
+    def test_strips_prefix_without_using(self):
+        result = normalize_index_definition(
+            'CREATE INDEX CONCURRENTLY "foo" ON "bar" (UPPER("email"))'
+        )
+        assert result == "upper(email)"
+
+    def test_strips_schema_prefix(self):
+        result = normalize_index_definition(
+            "CREATE INDEX foo ON public.bar USING btree (upper(email))"
+        )
+        assert result == "upper(email)"
+
+    def test_multi_expression(self):
+        result = normalize_index_definition(
+            "CREATE INDEX foo ON bar USING btree (lower(name), upper(email))"
+        )
+        assert result == "lower(name), upper(email)"
+
+    def test_matching_definitions(self):
+        """pg_get_indexdef and model-generated SQL normalize to the same string."""
+        db_def = "CREATE INDEX foo ON public.bar USING btree (upper(email))"
+        model_def = 'CREATE INDEX CONCURRENTLY "new_foo" ON "bar" (UPPER("email"))'
+        assert normalize_index_definition(db_def) == normalize_index_definition(
+            model_def
+        )

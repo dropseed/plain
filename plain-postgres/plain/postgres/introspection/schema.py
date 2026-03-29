@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import sqlparse
+
 from ..db import get_connection
 
 if TYPE_CHECKING:
@@ -21,6 +23,7 @@ class ColumnState:
 class IndexState:
     columns: list[str]
     valid: bool
+    definition: str | None = None
 
 
 @dataclass
@@ -93,6 +96,7 @@ def introspect_table(
             indexes[name] = IndexState(
                 columns=list(info.get("columns") or []),
                 valid=info.get("valid", True),
+                definition=info.get("definition"),
             )
 
     return TableState(
@@ -116,28 +120,10 @@ def get_unknown_tables(conn: DatabaseConnection | None = None) -> list[str]:
     )
 
 
-def normalize_check_definition(s: str) -> str:
-    """Normalize a constraint definition for comparison.
-
-    Strips outer CHECK(...) wrapper, collapses whitespace, removes
-    double-quote identifiers, and strips redundant parentheses so that
-    minor formatting differences between pg_get_constraintdef output and
-    the schema-editor-generated SQL don't cause false positives.
-    """
-    s = s.strip()
-    # Strip outer CHECK(...)
-    if s.upper().startswith("CHECK"):
-        s = s[5:].strip()
-        if s.startswith("(") and s.endswith(")"):
-            s = s[1:-1].strip()
-    # Remove double-quoted identifiers (pg may or may not quote column names)
-    s = s.replace('"', "")
-    # Collapse whitespace
-    s = re.sub(r"\s+", " ", s)
-    # Strip outer redundant parens (pg_get_constraintdef often adds an extra layer)
+def _strip_balanced_parens(s: str) -> str:
+    """Strip redundant outermost parentheses when they wrap the entire expression."""
     while s.startswith("(") and s.endswith(")"):
         inner = s[1:-1]
-        # Only strip if the parens are balanced (i.e. they truly wrap the whole expr)
         depth = 0
         balanced = True
         for ch in inner:
@@ -152,7 +138,59 @@ def normalize_check_definition(s: str) -> str:
             s = inner.strip()
         else:
             break
-    return s.lower()
+    return s
+
+
+def _normalize_sql(s: str) -> str:
+    """Lowercase keywords/identifiers, strip quotes, collapse whitespace."""
+    s = sqlparse.format(
+        s, keyword_case="lower", identifier_case="lower", strip_whitespace=True
+    )
+    s = s.replace('"', "")
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def normalize_check_definition(s: str) -> str:
+    """Normalize a CHECK constraint definition for comparison.
+
+    Strips the CHECK(...) wrapper and redundant parentheses so that
+    pg_get_constraintdef output and model-generated SQL can be compared.
+    """
+    s = _normalize_sql(s)
+    # Strip outer check(...)
+    if s.startswith("check"):
+        s = s[5:].strip()
+        if s.startswith("(") and s.endswith(")"):
+            s = s[1:-1].strip()
+    s = _strip_balanced_parens(s)
+    return s
+
+
+def normalize_index_definition(s: str) -> str:
+    """Extract and normalize the expression part of a CREATE INDEX definition.
+
+    Strips the CREATE INDEX ... ON table [USING method] prefix, leaving just
+    the expression spec so that pg_get_indexdef output and model-generated SQL
+    can be compared.
+
+    Example: 'CREATE INDEX foo ON bar USING btree (upper(email))'
+           → '(upper(email))'
+    """
+    s = _normalize_sql(s)
+    # Strip prefix: find USING <method> or fall back to first ( after ON
+    m = re.search(r"\busing \w+ ", s)
+    if m:
+        s = s[m.end() :]
+    else:
+        on_pos = s.find(" on ")
+        if on_pos >= 0:
+            paren = s.find("(", on_pos)
+            if paren >= 0:
+                s = s[paren:]
+    # Strip redundant outer parens — model may generate ((UPPER(col)))
+    # while DB has (upper(col))
+    s = _strip_balanced_parens(s)
+    return s
 
 
 def _get_columns(cursor: CursorWrapper, table_name: str) -> dict[str, ColumnState]:

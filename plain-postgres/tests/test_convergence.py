@@ -19,6 +19,7 @@ from plain.postgres.convergence import (
     detect_fixes,
     detect_model_fixes,
 )
+from plain.postgres.functions.text import Upper
 
 
 def _execute(sql: str) -> None:
@@ -800,6 +801,33 @@ class TestAnalyzeModel:
             drop_fixes = [f for f in analysis.fixes if isinstance(f, DropIndexFix)]
             assert len(create_fixes) == 2
             assert len(drop_fixes) == 2
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_rename_expression_index(self, db):
+        """Expression-based indexes are matched by normalized definition."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(Upper("make"), name="examples_car_make_upper_new_idx"),
+        ]
+        _execute(
+            'CREATE INDEX "examples_car_make_upper_old_idx"'
+            ' ON "examples_car" (UPPER("make"))'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            rename_fixes = [f for f in analysis.fixes if isinstance(f, RenameIndexFix)]
+            assert len(rename_fixes) == 1
+            assert rename_fixes[0].old_name == "examples_car_make_upper_old_idx"
+            assert rename_fixes[0].new_name == "examples_car_make_upper_new_idx"
+
+            assert not any(isinstance(f, CreateIndexFix) for f in analysis.fixes)
+            assert not any(isinstance(f, DropIndexFix) for f in analysis.fixes)
         finally:
             Car.model_options.indexes = original_indexes
 

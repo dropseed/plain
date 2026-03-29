@@ -14,6 +14,7 @@ from .schema import (
     get_unknown_tables,
     introspect_table,
     normalize_check_definition,
+    normalize_index_definition,
 )
 
 __all__ = [
@@ -29,5 +30,6 @@ __all__ = [
     "get_unknown_tables",
     "introspect_table",
     "normalize_check_definition",
+    "normalize_index_definition",
     "run_all_checks",
 ]
