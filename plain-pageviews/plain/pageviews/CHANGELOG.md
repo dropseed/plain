@@ -1,5 +1,16 @@
 # plain-pageviews changelog
 
+## [0.35.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.1) (2026-03-29)
+
+### What's changed
+
+- Removed `AddIndex` and `AddConstraint` operations from migrations — indexes and constraints are now managed by convergence. ([c58b4ba1fec9](https://github.com/dropseed/plain/commit/c58b4ba1fec9), [1f15538b008f](https://github.com/dropseed/plain/commit/1f15538b008f))
+- Updated docs to reference `plain migrations create` instead of `plain makemigrations`. ([adf021688bf3](https://github.com/dropseed/plain/commit/adf021688bf3))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.91.0`.
+
 ## [0.35.0](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.0) (2026-03-28)
 
 ### What's changed
