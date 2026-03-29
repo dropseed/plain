@@ -324,7 +324,10 @@ class UniqueConstraint(BaseConstraint):
         )
 
     def create_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
+        self,
+        model: type[Model],
+        schema_editor: DatabaseSchemaEditor,
+        concurrently: bool = False,
     ) -> Statement | None:
         fields = [
             model._model_meta.get_forward_field(field_name)
@@ -345,6 +348,7 @@ class UniqueConstraint(BaseConstraint):
             include=include,
             opclasses=tuple(self.opclasses) if self.opclasses else None,
             expressions=expressions,
+            concurrently=concurrently,
         )
 
     def remove_sql(

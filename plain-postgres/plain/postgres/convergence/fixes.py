@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..constraints import BaseConstraint, CheckConstraint
+from ..constraints import BaseConstraint, CheckConstraint, UniqueConstraint
 from ..db import get_connection
 from ..dialect import quote_name
 from ..indexes import Index
@@ -22,14 +22,24 @@ def _execute_and_commit(sql: str) -> None:
 
 
 def _execute_autocommit(sql: str) -> None:
-    """Execute SQL in autocommit mode (required for CONCURRENTLY operations)."""
+    """Execute SQL in autocommit mode (required for CONCURRENTLY operations).
+
+    Commits any pending transaction first, since Postgres doesn't allow
+    switching to autocommit while a transaction is active.
+    """
     conn = get_connection()
-    conn.set_autocommit(True)
+    if conn.in_atomic_block:
+        raise RuntimeError("Cannot use CONCURRENTLY inside an atomic block")
+    old_autocommit = conn.get_autocommit()
+    if not old_autocommit:
+        conn.commit()
+        conn.set_autocommit(True)
     try:
         with conn.cursor() as cursor:
             cursor.execute(sql)
     finally:
-        conn.set_autocommit(False)
+        if not old_autocommit:
+            conn.set_autocommit(False)
 
 
 @dataclass
@@ -83,7 +93,12 @@ class CreateIndexFix:
 
 @dataclass
 class AddConstraintFix:
-    """Add a missing constraint using NOT VALID for check constraints."""
+    """Add a missing constraint.
+
+    Check constraints use NOT VALID to avoid a table scan.
+    Unique constraints use CREATE UNIQUE INDEX CONCURRENTLY + USING INDEX
+    to avoid blocking writes.
+    """
 
     pass_order = 2
 
@@ -92,10 +107,42 @@ class AddConstraintFix:
     model: Any
 
     def describe(self) -> str:
-        suffix = " (NOT VALID)" if isinstance(self.constraint, CheckConstraint) else ""
-        return f"{self.table}: add constraint {self.constraint.name}{suffix}"
+        if isinstance(self.constraint, CheckConstraint):
+            return f"{self.table}: add constraint {self.constraint.name} (NOT VALID)"
+        return f"{self.table}: add constraint {self.constraint.name}"
 
     def apply(self) -> str:
+        if isinstance(self.constraint, UniqueConstraint):
+            return self._apply_unique()
+        return self._apply_other()
+
+    def _apply_unique(self) -> str:
+        assert isinstance(self.constraint, UniqueConstraint)
+        conn = get_connection()
+        name = quote_name(self.constraint.name)
+        table = quote_name(self.table)
+
+        # Step 1: Create unique index concurrently (non-blocking, handles all
+        # UniqueConstraint features: condition, include, opclasses, expressions)
+        with conn.schema_editor(collect_sql=True) as editor:
+            sql = self.constraint.create_sql(self.model, editor, concurrently=True)
+        create_idx = str(sql)
+        _execute_autocommit(create_idx)
+
+        # Step 2: Attach as constraint using the index (instant)
+        add_constraint = (
+            f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE USING INDEX {name}"
+        )
+        try:
+            _execute_and_commit(add_constraint)
+        except Exception:
+            # Clean up the orphaned index if the constraint attachment fails
+            _execute_autocommit(f"DROP INDEX CONCURRENTLY IF EXISTS {name}")
+            raise
+
+        return f"{create_idx}; {add_constraint}"
+
+    def _apply_other(self) -> str:
         conn = get_connection()
         with conn.schema_editor(collect_sql=True) as editor:
             sql = self.constraint.create_sql(self.model, editor)

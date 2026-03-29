@@ -410,6 +410,10 @@ class DatabaseSchemaEditor:
         "CREATE UNIQUE INDEX %(name)s ON %(table)s "
         "(%(columns)s)%(include)s%(condition)s"
     )
+    sql_create_unique_index_concurrently = (
+        "CREATE UNIQUE INDEX CONCURRENTLY %(name)s ON %(table)s "
+        "(%(columns)s)%(include)s%(condition)s"
+    )
     sql_rename_index = "ALTER INDEX %(old_name)s RENAME TO %(new_name)s"
     sql_delete_index = "DROP INDEX IF EXISTS %(name)s"
     sql_delete_index_concurrently = "DROP INDEX CONCURRENTLY IF EXISTS %(name)s"
@@ -1597,6 +1601,7 @@ class DatabaseSchemaEditor:
         include: list[str] | None = None,
         opclasses: tuple[str, ...] | None = None,
         expressions: Any = None,
+        concurrently: bool = False,
     ) -> Statement | None:
         compiler = Query(model, alias_cols=False).get_compiler()
         table = model.model_options.db_table
@@ -1606,7 +1611,9 @@ class DatabaseSchemaEditor:
             constraint_name = self._unique_constraint_name(table, columns, quote=True)
         else:
             constraint_name = quote_name(name)
-        if condition or include or opclasses or expressions:
+        if concurrently:
+            sql = self.sql_create_unique_index_concurrently
+        elif condition or include or opclasses or expressions:
             sql = self.sql_create_unique_index
         else:
             sql = self.sql_create_unique

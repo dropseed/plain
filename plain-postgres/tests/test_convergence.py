@@ -286,8 +286,9 @@ class TestApplyConstraintFixes:
 
         assert not _constraint_exists("examples_car", "examples_car_temp_check")
 
-    def test_apply_add_unique_constraint(self, isolated_db):
-        """Drop a unique constraint, then re-add it via fix."""
+    def test_add_unique_using_index(self, isolated_db):
+        """Unique constraints use CONCURRENTLY + USING INDEX."""
+        # Drop the constraint AND its backing index
         _execute('ALTER TABLE "examples_car" DROP CONSTRAINT "unique_make_model"')
         assert not _constraint_exists("examples_car", "unique_make_model")
 
@@ -299,8 +300,10 @@ class TestApplyConstraintFixes:
         assert constraint is not None
 
         fix = AddConstraintFix(table="examples_car", constraint=constraint, model=Car)
-        fix.apply()
+        sql = fix.apply()
 
+        assert "CONCURRENTLY" in sql
+        assert "USING INDEX" in sql
         assert _constraint_exists("examples_car", "unique_make_model")
 
 
