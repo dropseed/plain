@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from app.examples.models import Car
+from app.examples.models import Car, CarFeature
 
 from plain.postgres import CheckConstraint, Index, Q, UniqueConstraint, get_connection
 from plain.postgres.constraints import Deferrable
@@ -12,7 +12,9 @@ from plain.postgres.convergence import (
     DropIndexFix,
     RebuildConstraintFix,
     RebuildIndexFix,
+    RenameIndexFix,
     ValidateConstraintFix,
+    analyze_model,
     detect_fixes,
     detect_model_fixes,
 )
@@ -285,7 +287,7 @@ class TestDetectConstraintFixes:
 
             assert len(fixes) == 1
             assert isinstance(fixes[0], RebuildConstraintFix)
-            assert fixes[0].name == "examples_car_id_nonneg"
+            assert fixes[0].constraint.name == "examples_car_id_nonneg"
         finally:
             Car.model_options.constraints = original_constraints
 
@@ -565,7 +567,7 @@ class TestDetectIndexFixes:
 
             rebuild_fixes = [f for f in fixes if isinstance(f, RebuildIndexFix)]
             assert len(rebuild_fixes) == 1
-            assert rebuild_fixes[0].name == "examples_car_make_idx"
+            assert rebuild_fixes[0].index.name == "examples_car_make_idx"
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -588,7 +590,7 @@ class TestDetectIndexFixes:
 
             rebuild_fixes = [f for f in fixes if isinstance(f, RebuildIndexFix)]
             assert len(rebuild_fixes) == 1
-            assert rebuild_fixes[0].name == "examples_car_make_idx"
+            assert rebuild_fixes[0].index.name == "examples_car_make_idx"
         finally:
             Car.model_options.indexes = original_indexes
 
@@ -658,7 +660,6 @@ class TestApplyIndexFixes:
                 table="examples_car",
                 index=index,
                 model=Car,
-                name="examples_car_make_idx",
             )
             sql = fix.apply()
 
@@ -666,5 +667,248 @@ class TestApplyIndexFixes:
             assert "CONCURRENTLY" in sql
             assert _index_exists("examples_car_make_idx")
             assert _index_is_valid("examples_car_make_idx")
+        finally:
+            Car.model_options.indexes = original_indexes
+
+
+class TestAnalyzeModel:
+    """Tests for the unified analysis layer (analyze_model)."""
+
+    def test_rename_detection(self, db):
+        """A missing index + extra index with same columns is detected as a rename."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_new_idx"),
+        ]
+        _execute('CREATE INDEX "examples_car_make_old_idx" ON "examples_car" ("make")')
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            rename_fixes = [f for f in analysis.fixes if isinstance(f, RenameIndexFix)]
+            assert len(rename_fixes) == 1
+            assert rename_fixes[0].old_name == "examples_car_make_old_idx"
+            assert rename_fixes[0].new_name == "examples_car_make_new_idx"
+
+            # No separate create or drop
+            assert not any(isinstance(f, CreateIndexFix) for f in analysis.fixes)
+            assert not any(isinstance(f, DropIndexFix) for f in analysis.fixes)
+
+            # Schema shows the rename as a single index entry
+            renamed = [
+                idx
+                for idx in analysis.indexes
+                if idx.name == "examples_car_make_new_idx"
+            ]
+            assert len(renamed) == 1
+            assert renamed[0].issue == "rename from examples_car_make_old_idx"
+            assert isinstance(renamed[0].fix, RenameIndexFix)
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_rename_with_fk_columns(self, db):
+        """Rename detection resolves model field names to DB column names."""
+        original_indexes = list(CarFeature.model_options.indexes)
+        # Model field is "car", DB column is "car_id"
+        CarFeature.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["car"], name="examples_carfeature_car_new_idx"),
+        ]
+        _execute(
+            'CREATE INDEX "examples_carfeature_car_old_idx"'
+            ' ON "examples_carfeature" ("car_id")'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, CarFeature)
+
+            rename_fixes = [f for f in analysis.fixes if isinstance(f, RenameIndexFix)]
+            assert len(rename_fixes) == 1
+            assert rename_fixes[0].old_name == "examples_carfeature_car_old_idx"
+            assert rename_fixes[0].new_name == "examples_carfeature_car_new_idx"
+        finally:
+            CarFeature.model_options.indexes = original_indexes
+
+    def test_rename_multi_column(self, db):
+        """Rename detection works for multi-column indexes."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make", "model"], name="examples_car_make_model_new_idx"),
+        ]
+        _execute(
+            'CREATE INDEX "examples_car_make_model_old_idx"'
+            ' ON "examples_car" ("make", "model")'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            rename_fixes = [f for f in analysis.fixes if isinstance(f, RenameIndexFix)]
+            assert len(rename_fixes) == 1
+            assert rename_fixes[0].old_name == "examples_car_make_model_old_idx"
+            assert rename_fixes[0].new_name == "examples_car_make_model_new_idx"
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_no_rename_when_columns_differ(self, db):
+        """Different columns means separate create + drop, not a rename."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["model"], name="examples_car_model_idx"),
+        ]
+        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            assert any(isinstance(f, CreateIndexFix) for f in analysis.fixes)
+            assert any(isinstance(f, DropIndexFix) for f in analysis.fixes)
+            assert not any(isinstance(f, RenameIndexFix) for f in analysis.fixes)
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_no_rename_when_ambiguous(self, db):
+        """Two missing + two extra with same columns: no rename, all create/drop."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_idx_a"),
+            Index(fields=["make"], name="examples_car_idx_b"),
+        ]
+        _execute('CREATE INDEX "examples_car_old_a" ON "examples_car" ("make")')
+        _execute('CREATE INDEX "examples_car_old_b" ON "examples_car" ("make")')
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            assert not any(isinstance(f, RenameIndexFix) for f in analysis.fixes)
+            create_fixes = [f for f in analysis.fixes if isinstance(f, CreateIndexFix)]
+            drop_fixes = [f for f in analysis.fixes if isinstance(f, DropIndexFix)]
+            assert len(create_fixes) == 2
+            assert len(drop_fixes) == 2
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_fixable_index_annotated(self, db):
+        """A missing index has a fix on its IndexStatus."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_idx"),
+        ]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            missing = [
+                idx for idx in analysis.indexes if idx.name == "examples_car_make_idx"
+            ]
+            assert len(missing) == 1
+            assert missing[0].issue is not None
+            assert isinstance(missing[0].fix, CreateIndexFix)
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_detect_model_fixes_backward_compat(self, db):
+        """detect_model_fixes() still returns list[Fix] correctly."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_idx"),
+        ]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+
+            assert isinstance(fixes, list)
+            assert len(fixes) == 1
+            assert isinstance(fixes[0], CreateIndexFix)
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_issue_count(self, db):
+        """ModelAnalysis.issue_count counts issues correctly."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_idx"),
+        ]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            # Missing index = 1 issue
+            assert analysis.issue_count >= 1
+            missing = [
+                idx for idx in analysis.indexes if idx.name == "examples_car_make_idx"
+            ]
+            assert len(missing) == 1
+            assert missing[0].issue is not None
+        finally:
+            Car.model_options.indexes = original_indexes
+
+
+class TestApplyRenameIndex:
+    def test_rename_index(self, isolated_db):
+        """RenameIndexFix renames using ALTER INDEX ... RENAME TO."""
+        _execute('CREATE INDEX "examples_car_old_idx" ON "examples_car" ("make")')
+        assert _index_exists("examples_car_old_idx")
+
+        fix = RenameIndexFix(
+            table="examples_car",
+            old_name="examples_car_old_idx",
+            new_name="examples_car_new_idx",
+        )
+        sql = fix.apply()
+
+        assert "RENAME TO" in sql
+        assert not _index_exists("examples_car_old_idx")
+        assert _index_exists("examples_car_new_idx")
+
+    def test_rename_lifecycle(self, isolated_db):
+        """Full cycle: detect rename -> apply -> detect again -> converged."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_new_idx"),
+        ]
+        _execute('CREATE INDEX "examples_car_make_old_idx" ON "examples_car" ("make")')
+
+        try:
+            conn = get_connection()
+
+            # First pass: detect rename
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+            assert len(fixes) == 1
+            assert isinstance(fixes[0], RenameIndexFix)
+
+            fixes[0].apply()
+            assert _index_exists("examples_car_make_new_idx")
+            assert not _index_exists("examples_car_make_old_idx")
+
+            # Second pass: converged
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+            assert fixes == []
         finally:
             Car.model_options.indexes = original_indexes

@@ -5,13 +5,9 @@ import sys
 
 import click
 
+from ..convergence.analysis import ModelAnalysis, analyze_model
 from ..db import get_connection
-from ..introspection import (
-    ModelSchemaResult,
-    check_model,
-    count_issues,
-    get_unknown_tables,
-)
+from ..introspection import get_unknown_tables
 from ..registry import models_registry
 
 
@@ -23,69 +19,77 @@ def _err(msg: str) -> None:
     click.secho(f"  ✗ {msg}", fg="red")
 
 
-def _render_model(result: ModelSchemaResult) -> None:
-    """Render a model schema result as human-readable output."""
-    click.secho(result["label"], bold=True, nl=False)
-    click.secho(f"  →  {result['table']}", dim=True)
+def _fixable(msg: str) -> None:
+    click.secho(f"  ~ {msg} (auto-fix)", fg="yellow")
+
+
+def _render_model(analysis: ModelAnalysis) -> None:
+    """Render a model analysis result as human-readable output."""
+    click.secho(analysis.label, bold=True, nl=False)
+    click.secho(f"  →  {analysis.table}", dim=True)
 
     # Table missing — nothing else to show
-    if not result["columns"]:
-        for issue in result["issues"]:
+    if not analysis.columns:
+        for issue in analysis.table_issues:
             click.echo("  ", nl=False)
-            _err(issue["detail"])
+            _err(issue)
         return
 
     # Columns
-    for col in result["columns"]:
-        col_display = col["name"]
-        if col["field_name"] and col["field_name"] != col["name"]:
-            col_display = f"{col['field_name']} → {col['name']}"
+    for col in analysis.columns:
+        col_display = col.name
+        if col.field_name and col.field_name != col.name:
+            col_display = f"{col.field_name} → {col.name}"
 
-        type_parts = [click.style(col["type"], fg="cyan")]
-        if col["nullable"]:
+        type_parts = [click.style(col.type, fg="cyan")]
+        if col.nullable:
             type_parts.append(click.style("NULL", dim=True))
-        if col["primary_key"]:
+        if col.primary_key:
             type_parts.append(click.style("PK", fg="yellow"))
-            if col["pk_suffix"]:
-                type_parts.append(click.style(col["pk_suffix"], dim=True))
+            if col.pk_suffix:
+                type_parts.append(click.style(col.pk_suffix, dim=True))
 
         click.echo(f"  {col_display:30s}  {' '.join(type_parts)}", nl=False)
 
-        if col["issues"]:
-            _err("; ".join(i["detail"] for i in col["issues"]))
+        if col.issue:
+            _err(col.issue)
         else:
             _ok()
 
     # Indexes
-    if result["indexes"]:
+    if analysis.indexes:
         click.echo()
         click.secho("  Indexes:", dim=True)
 
-    for idx in result["indexes"]:
-        fields_str = ", ".join(idx["fields"]) if idx["fields"] else "expressions"
-        click.echo(f"    {idx['name']}  ({fields_str})", nl=False)
+    for idx in analysis.indexes:
+        fields_str = ", ".join(idx.fields) if idx.fields else "expressions"
+        click.echo(f"    {idx.name}  ({fields_str})", nl=False)
 
-        if idx["issues"]:
-            _err(idx["issues"][0]["detail"])
+        if idx.issue and idx.fix:
+            _fixable(idx.issue)
+        elif idx.issue:
+            _err(idx.issue)
         else:
             _ok()
 
     # Constraints
-    if result["constraints"]:
+    if analysis.constraints:
         click.echo()
         click.secho("  Constraints:", dim=True)
 
-    for con in result["constraints"]:
-        con_type = con["type"].upper()
-        if con["fields"]:
+    for con in analysis.constraints:
+        con_type = con.type.upper()
+        if con.fields:
             click.echo(
-                f"    {con['name']}  {con_type} ({', '.join(con['fields'])})", nl=False
+                f"    {con.name}  {con_type} ({', '.join(con.fields)})", nl=False
             )
         else:
-            click.echo(f"    {con['name']}  {con_type}", nl=False)
+            click.echo(f"    {con.name}  {con_type}", nl=False)
 
-        if con["issues"]:
-            _err(con["issues"][0]["detail"])
+        if con.issue and con.fix:
+            _fixable(con.issue)
+        elif con.issue:
+            _err(con.issue)
         else:
             _ok()
 
@@ -112,27 +116,27 @@ def schema(model_label: str | None, output_json: bool) -> None:
     conn = get_connection()
 
     # Collect structured results
-    results: list[ModelSchemaResult] = []
+    analyses: list[ModelAnalysis] = []
     with conn.cursor() as cursor:
         for model in models:
-            results.append(check_model(conn, cursor, model))
+            analyses.append(analyze_model(conn, cursor, model))
 
     unknown_tables = get_unknown_tables(conn) if not model_label else []
-    total_issues = sum(count_issues(r) for r in results) + len(unknown_tables)
+    total_issues = sum(a.issue_count for a in analyses) + len(unknown_tables)
 
     if output_json:
         output = {
-            "models_checked": len(results),
+            "models_checked": len(analyses),
             "total_issues": total_issues,
-            "models": results,
+            "models": [a.to_dict() for a in analyses],
             "unknown_tables": unknown_tables,
         }
         click.echo(json.dumps(output, indent=2, default=str))
     else:
-        for i, result in enumerate(results):
+        for i, analysis in enumerate(analyses):
             if i > 0:
                 click.echo()
-            _render_model(result)
+            _render_model(analysis)
 
         if unknown_tables:
             click.echo()
@@ -143,7 +147,7 @@ def schema(model_label: str | None, output_json: bool) -> None:
 
         click.echo()
         parts = []
-        parts.append(f"{len(results)} model{'s' if len(results) != 1 else ''}")
+        parts.append(f"{len(analyses)} model{'s' if len(analyses) != 1 else ''}")
         if unknown_tables:
             parts.append(
                 f"{len(unknown_tables)} unknown table{'s' if len(unknown_tables) != 1 else ''}"

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from ..constraints import BaseConstraint, CheckConstraint, UniqueConstraint
 from ..db import get_connection
@@ -45,8 +46,20 @@ def _execute_autocommit(sql: str) -> None:
             conn.set_autocommit(False)
 
 
+class Fix(ABC):
+    """Base class for all convergence fixes."""
+
+    pass_order: ClassVar[int]
+
+    @abstractmethod
+    def describe(self) -> str: ...
+
+    @abstractmethod
+    def apply(self) -> str: ...
+
+
 @dataclass
-class RebuildIndexFix:
+class RebuildIndexFix(Fix):
     """Drop an INVALID index and recreate it CONCURRENTLY."""
 
     pass_order = 0
@@ -54,23 +67,20 @@ class RebuildIndexFix:
     table: str
     index: Index
     model: type[Model]
-    name: str
 
     def describe(self) -> str:
-        return f"{self.table}: rebuild invalid index {self.name}"
+        return f"{self.table}: rebuild invalid index {self.index.name}"
 
     def apply(self) -> str:
-        # Drop the invalid index first
-        drop_sql = f"DROP INDEX CONCURRENTLY IF EXISTS {quote_name(self.name)}"
+        drop_sql = f"DROP INDEX CONCURRENTLY IF EXISTS {quote_name(self.index.name)}"
         _execute_autocommit(drop_sql)
-        # Recreate it
         create_sql = self.index.to_sql(self.model)
         _execute_autocommit(create_sql)
         return f"{drop_sql}; {create_sql}"
 
 
 @dataclass
-class RebuildConstraintFix:
+class RebuildConstraintFix(Fix):
     """Drop a constraint with a stale definition and recreate it."""
 
     pass_order = 0
@@ -78,14 +88,13 @@ class RebuildConstraintFix:
     table: str
     constraint: BaseConstraint
     model: type[Model]
-    name: str
 
     def describe(self) -> str:
-        return f"{self.table}: rebuild constraint {self.name}"
+        return f"{self.table}: rebuild constraint {self.constraint.name}"
 
     def apply(self) -> str:
         # Drop the old constraint
-        drop_sql = f"ALTER TABLE {quote_name(self.table)} DROP CONSTRAINT {quote_name(self.name)}"
+        drop_sql = f"ALTER TABLE {quote_name(self.table)} DROP CONSTRAINT {quote_name(self.constraint.name)}"
         _execute_and_commit(drop_sql)
         # Recreate with the model's current definition (NOT VALID for check)
         if isinstance(self.constraint, CheckConstraint):
@@ -97,7 +106,26 @@ class RebuildConstraintFix:
 
 
 @dataclass
-class CreateIndexFix:
+class RenameIndexFix(Fix):
+    """Rename an index (catalog-only, instant)."""
+
+    pass_order = 1
+
+    table: str
+    old_name: str
+    new_name: str
+
+    def describe(self) -> str:
+        return f"{self.table}: rename index {self.old_name} -> {self.new_name}"
+
+    def apply(self) -> str:
+        sql = f"ALTER INDEX {quote_name(self.old_name)} RENAME TO {quote_name(self.new_name)}"
+        _execute_and_commit(sql)
+        return sql
+
+
+@dataclass
+class CreateIndexFix(Fix):
     """Create a missing index using CONCURRENTLY (doesn't block writes)."""
 
     pass_order = 1
@@ -116,7 +144,7 @@ class CreateIndexFix:
 
 
 @dataclass
-class AddConstraintFix:
+class AddConstraintFix(Fix):
     """Add a missing constraint.
 
     Check constraints use NOT VALID to avoid a table scan.
@@ -170,7 +198,7 @@ class AddConstraintFix:
 
 
 @dataclass
-class ValidateConstraintFix:
+class ValidateConstraintFix(Fix):
     """Validate a NOT VALID constraint (SHARE UPDATE EXCLUSIVE — doesn't block writes)."""
 
     pass_order = 3
@@ -188,7 +216,7 @@ class ValidateConstraintFix:
 
 
 @dataclass
-class DropConstraintFix:
+class DropConstraintFix(Fix):
     pass_order = 4
 
     table: str
@@ -204,7 +232,7 @@ class DropConstraintFix:
 
 
 @dataclass
-class DropIndexFix:
+class DropIndexFix(Fix):
     pass_order = 5
 
     table: str
@@ -217,14 +245,3 @@ class DropIndexFix:
         sql = f"DROP INDEX CONCURRENTLY IF EXISTS {quote_name(self.name)}"
         _execute_autocommit(sql)
         return sql
-
-
-Fix = (
-    RebuildIndexFix
-    | RebuildConstraintFix
-    | CreateIndexFix
-    | AddConstraintFix
-    | ValidateConstraintFix
-    | DropConstraintFix
-    | DropIndexFix
-)
