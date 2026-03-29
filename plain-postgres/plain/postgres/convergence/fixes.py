@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING
 
 from ..constraints import BaseConstraint, CheckConstraint, UniqueConstraint
 from ..db import get_connection
 from ..dialect import quote_name
 from ..indexes import Index
+
+if TYPE_CHECKING:
+    from ..base import Model
 
 
 def _execute_and_commit(sql: str) -> None:
@@ -50,7 +53,7 @@ class RebuildIndexFix:
 
     table: str
     index: Index
-    model: Any
+    model: type[Model]
     name: str
 
     def describe(self) -> str:
@@ -74,7 +77,7 @@ class RebuildConstraintFix:
 
     table: str
     constraint: BaseConstraint
-    model: Any
+    model: type[Model]
     name: str
 
     def describe(self) -> str:
@@ -101,7 +104,7 @@ class CreateIndexFix:
 
     table: str
     index: Index
-    model: Any
+    model: type[Model]
 
     def describe(self) -> str:
         return f"{self.table}: create index {self.index.name}"
@@ -125,7 +128,7 @@ class AddConstraintFix:
 
     table: str
     constraint: BaseConstraint
-    model: Any
+    model: type[Model]
 
     def describe(self) -> str:
         if isinstance(self.constraint, CheckConstraint):

@@ -15,6 +15,7 @@ import psycopg.sql
 from plain.postgres.db import get_connection
 from plain.postgres.dialect import quote_name
 from plain.postgres.expressions import ExpressionList
+from plain.postgres.query_utils import Q
 from plain.postgres.sql.query import Query
 
 if TYPE_CHECKING:
@@ -49,7 +50,7 @@ def deferrable_sql(deferrable: Deferrable | None) -> str:
     return ""
 
 
-def compile_expression_sql(model: type[Model], expression_q: Any) -> str:
+def compile_expression_sql(model: type[Model], expression_q: Q) -> str:
     """Compile a Q expression to a SQL string with quoted literal params."""
     query = Query(model=model, alias_cols=False)
     where = query.build_where(expression_q)
@@ -59,7 +60,9 @@ def compile_expression_sql(model: type[Model], expression_q: Any) -> str:
     return sql % tuple(quote_value(p) for p in params)
 
 
-def compile_index_expressions_sql(model: type[Model], expressions: Any) -> str:
+def compile_index_expressions_sql(
+    model: type[Model], expressions: tuple[Any, ...]
+) -> str:
     """Compile index/constraint expressions (e.g. F(), OrderBy) to SQL."""
     from plain.postgres.indexes import IndexExpression  # circular: indexes imports ddl
 

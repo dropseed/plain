@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import re
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from ..db import get_connection
+
+if TYPE_CHECKING:
+    from ..base import Model
+    from ..connection import DatabaseConnection
+    from ..constraints import CheckConstraint
+    from ..utils import CursorWrapper
 
 
 class SchemaIssue(TypedDict):
@@ -44,7 +50,9 @@ class ModelSchemaResult(TypedDict):
     issues: list[SchemaIssue]
 
 
-def get_actual_columns(cursor: Any, table_name: str) -> dict[str, tuple[str, bool]]:
+def get_actual_columns(
+    cursor: CursorWrapper, table_name: str
+) -> dict[str, tuple[str, bool]]:
     """Return {column_name: (type_string, is_not_null)} from the actual DB."""
     cursor.execute(
         """
@@ -63,7 +71,7 @@ def get_actual_columns(cursor: Any, table_name: str) -> dict[str, tuple[str, boo
     }
 
 
-def get_unknown_tables(conn: Any | None = None) -> list[str]:
+def get_unknown_tables(conn: DatabaseConnection | None = None) -> list[str]:
     """Return sorted list of database tables not managed by any Plain model."""
     from ..migrations.recorder import MIGRATION_TABLE_NAME
 
@@ -125,7 +133,9 @@ def _normalize_constraint_def(s: str) -> str:
     return s.lower()
 
 
-def _get_expected_check_definition(model: Any, constraint: Any) -> str:
+def _get_expected_check_definition(
+    model: type[Model], constraint: CheckConstraint
+) -> str:
     """Generate the CHECK expression that the model would produce."""
     from plain.postgres.ddl import compile_expression_sql
 
@@ -133,7 +143,9 @@ def _get_expected_check_definition(model: Any, constraint: Any) -> str:
     return f"CHECK ({check_sql})"
 
 
-def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
+def check_model(
+    conn: DatabaseConnection, cursor: CursorWrapper, model: type[Model]
+) -> ModelSchemaResult:
     """Compare model against actual database schema. Returns structured result."""
     from ..constraints import CheckConstraint, UniqueConstraint
     from ..fields.related import ForeignKeyField
@@ -223,6 +235,7 @@ def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
         if field.primary_key:
             pk_suffix = field.db_type_suffix() or ""
 
+        assert field.name is not None
         columns.append(
             ColumnInfo(
                 name=field.column,
@@ -342,8 +355,10 @@ def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
                         detail="NOT VALID — needs validation",
                     )
                 )
-            elif constraint_type == "check" and (
-                actual_def := actual_dict[constraint.name].get("definition")
+            elif (
+                constraint_type == "check"
+                and isinstance(constraint, CheckConstraint)
+                and (actual_def := actual_dict[constraint.name].get("definition"))
             ):
                 expected_def = _get_expected_check_definition(model, constraint)
                 if _normalize_constraint_def(actual_def) != _normalize_constraint_def(
@@ -386,6 +401,7 @@ def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
     expected_fks: dict[tuple[str, str, str], str] = {}
     for field in model._model_meta.local_fields:
         if isinstance(field, ForeignKeyField) and field.db_constraint:
+            assert field.name is not None
             to_table = field.target_field.model.model_options.db_table
             to_column = field.target_field.column
             expected_fks[(field.column, to_table, to_column)] = field.name

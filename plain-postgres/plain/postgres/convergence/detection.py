@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from ..constraints import BaseConstraint
 from ..db import get_connection
 from ..indexes import Index
 from ..introspection import check_model
+
+if TYPE_CHECKING:
+    from ..base import Model
+    from ..connection import DatabaseConnection
+    from ..utils import CursorWrapper
 from ..registry import models_registry
 from .fixes import (
     AddConstraintFix,
@@ -36,7 +41,9 @@ def detect_fixes() -> list[Fix]:
     return fixes
 
 
-def detect_model_fixes(conn: Any, cursor: Any, model: Any) -> list[Fix]:
+def detect_model_fixes(
+    conn: DatabaseConnection, cursor: CursorWrapper, model: type[Model]
+) -> list[Fix]:
     """Detect fixes for a single model."""
     result = check_model(conn, cursor, model)
     table = result["table"]
@@ -86,14 +93,14 @@ def detect_model_fixes(conn: Any, cursor: Any, model: Any) -> list[Fix]:
     return fixes
 
 
-def _find_model_constraint(model: Any, name: str) -> BaseConstraint | None:
+def _find_model_constraint(model: type[Model], name: str) -> BaseConstraint | None:
     for constraint in model.model_options.constraints:
         if constraint.name == name:
             return constraint
     return None
 
 
-def _find_model_index(model: Any, name: str) -> Index | None:
+def _find_model_index(model: type[Model], name: str) -> Index | None:
     for index in model.model_options.indexes:
         if index.name == name:
             return index
