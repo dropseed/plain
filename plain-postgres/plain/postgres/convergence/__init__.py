@@ -4,6 +4,7 @@ from .analysis import (
     ConstraintStatus,
     Drift,
     DriftKind,
+    ForeignKeyDrift,
     IndexDrift,
     IndexStatus,
     ModelAnalysis,
@@ -11,6 +12,7 @@ from .analysis import (
 )
 from .fixes import (
     AddConstraintFix,
+    AddForeignKeyFix,
     CreateIndexFix,
     DropConstraintFix,
     DropIndexFix,
@@ -33,6 +35,7 @@ from .planning import (
 
 __all__ = [
     "AddConstraintFix",
+    "AddForeignKeyFix",
     "ColumnStatus",
     "ConstraintDrift",
     "ConstraintStatus",
@@ -45,6 +48,7 @@ __all__ = [
     "DropIndexFix",
     "Fix",
     "FixResult",
+    "ForeignKeyDrift",
     "IndexDrift",
     "IndexStatus",
     "ModelAnalysis",

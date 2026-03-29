@@ -10,6 +10,7 @@ from ..fields.related import ForeignKeyField
 from ..indexes import Index
 from ..introspection import (
     ConstraintState,
+    ForeignKeyState,
     TableState,
     introspect_table,
     normalize_check_definition,
@@ -91,7 +92,28 @@ class ConstraintDrift:
                 return f"{self.table}: constraint {self.name} not declared"
 
 
-type Drift = IndexDrift | ConstraintDrift
+@dataclass
+class ForeignKeyDrift:
+    """A schema difference for a foreign key constraint."""
+
+    kind: DriftKind
+    table: str
+    name: str | None = None
+    column: str | None = None
+    target_table: str | None = None
+    target_column: str | None = None
+
+    def describe(self) -> str:
+        match self.kind:
+            case DriftKind.MISSING:
+                return f"{self.table}: FK {self.name} missing ({self.column} → {self.target_table}.{self.target_column})"
+            case DriftKind.UNVALIDATED:
+                return f"{self.table}: FK {self.name} NOT VALID"
+            case _:
+                return f"{self.table}: FK {self.name} not declared"
+
+
+type Drift = IndexDrift | ConstraintDrift | ForeignKeyDrift
 
 
 # Status objects — analysis results with optional drift
@@ -122,7 +144,7 @@ class ConstraintStatus:
     type: str
     fields: list[str] = field(default_factory=list)
     issue: str | None = None
-    drift: ConstraintDrift | None = None
+    drift: ConstraintDrift | ForeignKeyDrift | None = None
 
 
 @dataclass
@@ -475,7 +497,7 @@ def _compare_constraints(
     statuses: list[ConstraintStatus] = []
     statuses.extend(_compare_unique_constraints(model, db, table))
     statuses.extend(_compare_check_constraints(model, db, table))
-    statuses.extend(_compare_foreign_keys(model, db))
+    statuses.extend(_compare_foreign_keys(model, db, table))
     return statuses
 
 
@@ -651,25 +673,54 @@ def _compare_check_constraints(
     return statuses
 
 
-def _compare_foreign_keys(model: type[Model], db: TableState) -> list[ConstraintStatus]:
+def _compare_foreign_keys(
+    model: type[Model], db: TableState, table: str
+) -> list[ConstraintStatus]:
     statuses: list[ConstraintStatus] = []
 
-    expected_fks: dict[tuple[str, str, str], str] = {}
+    # Build expected FKs from model fields: shape → (field_name, constraint_name)
+    expected_fks: dict[tuple[str, str, str], tuple[str, str]] = {}
     for f in model._model_meta.local_fields:
         if isinstance(f, ForeignKeyField) and f.db_constraint:
             assert f.name is not None
             to_table = f.target_field.model.model_options.db_table
             to_column = f.target_field.column
-            expected_fks[(f.column, to_table, to_column)] = f.name
+            constraint_name = generate_fk_constraint_name(
+                table, f.column, to_table, to_column
+            )
+            expected_fks[(f.column, to_table, to_column)] = (f.name, constraint_name)
 
-    actual_fk_by_shape: dict[tuple[str, str, str], str] = {}
+    # Build actual FKs from DB: shape → (constraint_name, ForeignKeyState)
+    actual_fk_by_shape: dict[tuple[str, str, str], tuple[str, ForeignKeyState]] = {}
     for name, fk in db.foreign_keys.items():
-        actual_fk_by_shape[(fk.column, fk.target_table, fk.target_column)] = name
+        actual_fk_by_shape[(fk.column, fk.target_table, fk.target_column)] = (name, fk)
 
     matched_fk_names: set[str] = set()
-    for key, field_name in expected_fks.items():
-        if actual_name := actual_fk_by_shape.get(key):
+    for key, (field_name, constraint_name) in expected_fks.items():
+        if match := actual_fk_by_shape.get(key):
+            actual_name, fk_state = match
             matched_fk_names.add(actual_name)
+
+            # Check validation state
+            issue: str | None = None
+            drift: ForeignKeyDrift | None = None
+            if not fk_state.validated:
+                issue = "NOT VALID — needs validation"
+                drift = ForeignKeyDrift(
+                    kind=DriftKind.UNVALIDATED,
+                    table=table,
+                    name=actual_name,
+                )
+
+            statuses.append(
+                ConstraintStatus(
+                    name=actual_name,
+                    type="fk",
+                    fields=[key[0]],
+                    issue=issue,
+                    drift=drift,
+                )
+            )
         else:
             col, to_table, to_column = key
             statuses.append(
@@ -678,6 +729,14 @@ def _compare_foreign_keys(model: type[Model], db: TableState) -> list[Constraint
                     type="fk",
                     fields=[col],
                     issue="missing from database",
+                    drift=ForeignKeyDrift(
+                        kind=DriftKind.MISSING,
+                        table=table,
+                        name=constraint_name,
+                        column=col,
+                        target_table=to_table,
+                        target_column=to_column,
+                    ),
                 )
             )
 
@@ -689,10 +748,30 @@ def _compare_foreign_keys(model: type[Model], db: TableState) -> list[Constraint
                 type="fk",
                 fields=[fk.column],
                 issue=f"not in model (→ {fk.target_table}.{fk.target_column})",
+                drift=ForeignKeyDrift(
+                    kind=DriftKind.UNDECLARED,
+                    table=table,
+                    name=name,
+                ),
             )
         )
 
     return statuses
+
+
+def generate_fk_constraint_name(
+    table: str, column: str, target_table: str, target_column: str
+) -> str:
+    """Generate a deterministic FK constraint name.
+
+    Uses the same naming algorithm as the schema editor so that
+    convergence-created FKs match migration-created ones.
+    """
+    from ..utils import generate_identifier_name, split_identifier
+
+    _, target_table_name = split_identifier(target_table)
+    suffix = f"_fk_{target_table_name}_{target_column}"
+    return generate_identifier_name(table, [column], suffix)
 
 
 def _detect_unique_renames(

@@ -38,6 +38,7 @@ class ForeignKeyState:
     column: str
     target_table: str
     target_column: str
+    validated: bool = True
 
 
 @dataclass
@@ -91,6 +92,7 @@ def introspect_table(
                     column=fk_cols[0],
                     target_table=fk_target[0],
                     target_column=fk_target[1],
+                    validated=info.get("validated", True),
                 )
         elif info.get("index"):
             indexes[name] = IndexState(

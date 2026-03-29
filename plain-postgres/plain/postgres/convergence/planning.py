@@ -6,9 +6,17 @@ from typing import TYPE_CHECKING
 
 from ..db import get_connection
 from ..registry import models_registry
-from .analysis import ConstraintDrift, Drift, DriftKind, IndexDrift, analyze_model
+from .analysis import (
+    ConstraintDrift,
+    Drift,
+    DriftKind,
+    ForeignKeyDrift,
+    IndexDrift,
+    analyze_model,
+)
 from .fixes import (
     AddConstraintFix,
+    AddForeignKeyFix,
     CreateIndexFix,
     DropConstraintFix,
     DropIndexFix,
@@ -77,6 +85,19 @@ def _plan_drift(drift: Drift) -> PlanItem:
         ):
             return PlanItem(drift, RenameConstraintFix(t, old, new), blocks_sync=False)
         case ConstraintDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
+            return PlanItem(drift, DropConstraintFix(t, n), drop_undeclared=True)
+        case ForeignKeyDrift(
+            kind=DriftKind.MISSING,
+            table=t,
+            name=cn,
+            column=col,
+            target_table=tt,
+            target_column=tc,
+        ):
+            return PlanItem(drift, AddForeignKeyFix(t, cn, col, tt, tc))
+        case ForeignKeyDrift(kind=DriftKind.UNVALIDATED, table=t, name=n):
+            return PlanItem(drift, ValidateConstraintFix(t, n))
+        case ForeignKeyDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
             return PlanItem(drift, DropConstraintFix(t, n), drop_undeclared=True)
         case _:
             raise ValueError(f"Unhandled drift: {drift}")

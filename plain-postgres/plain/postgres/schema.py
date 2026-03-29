@@ -15,11 +15,7 @@ if TYPE_CHECKING:
 
 from plain.logs import get_framework_logger
 from plain.postgres.constraints import Deferrable
-from plain.postgres.dialect import (
-    DEFERRABLE_SQL,
-    MAX_NAME_LENGTH,
-    quote_name,
-)
+from plain.postgres.dialect import quote_name
 from plain.postgres.fields import (
     BinaryField,
     DateField,
@@ -32,7 +28,7 @@ from plain.postgres.fields.related import ForeignKeyField, RelatedField
 from plain.postgres.fields.reverse_related import ForeignObjectRel, ManyToManyRel
 from plain.postgres.sql import Query
 from plain.postgres.transaction import atomic
-from plain.postgres.utils import names_digest, split_identifier, strip_quotes
+from plain.postgres.utils import strip_quotes
 from plain.utils import timezone
 
 if TYPE_CHECKING:
@@ -146,54 +142,6 @@ class IndexName(TableColumns):
 
     def __str__(self) -> str:
         return self.create_index_name(self.table, self.columns, self.suffix)
-
-
-class ForeignKeyName(TableColumns):
-    """Hold a reference to a foreign key name."""
-
-    def __init__(
-        self,
-        from_table: str,
-        from_columns: list[str],
-        to_table: str,
-        to_columns: list[str],
-        suffix_template: str,
-        create_fk_name: Callable[[str, list[str], str], str],
-    ) -> None:
-        self.to_reference = TableColumns(to_table, to_columns)
-        self.suffix_template = suffix_template
-        self.create_fk_name = create_fk_name
-        super().__init__(
-            from_table,
-            from_columns,
-        )
-
-    def references_table(self, table: str) -> bool:
-        return super().references_table(table) or self.to_reference.references_table(
-            table
-        )
-
-    def references_column(self, table: str, column: str) -> bool:
-        return super().references_column(
-            table, column
-        ) or self.to_reference.references_column(table, column)
-
-    def rename_table_references(self, old_table: str, new_table: str) -> None:
-        super().rename_table_references(old_table, new_table)
-        self.to_reference.rename_table_references(old_table, new_table)
-
-    def rename_column_references(
-        self, table: str, old_column: str, new_column: str
-    ) -> None:
-        super().rename_column_references(table, old_column, new_column)
-        self.to_reference.rename_column_references(table, old_column, new_column)
-
-    def __str__(self) -> str:
-        suffix = self.suffix_template % {
-            "to_table": self.to_reference.table,
-            "to_column": self.to_reference.columns[0],
-        }
-        return self.create_fk_name(self.table, self.columns, suffix)
 
 
 class Statement:
@@ -376,15 +324,6 @@ class DatabaseSchemaEditor:
     )
     sql_delete_unique = sql_delete_constraint
 
-    sql_create_fk = (
-        "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s FOREIGN KEY (%(column)s) "
-        "REFERENCES %(to_table)s (%(to_column)s)%(deferrable)s"
-    )
-    # Setting the constraint to IMMEDIATE to allow changing data in the same transaction.
-    sql_create_column_inline_fk = (
-        "CONSTRAINT %(name)s REFERENCES %(to_table)s(%(to_column)s)%(deferrable)s"
-        "; SET CONSTRAINTS %(namespace)s%(name)s IMMEDIATE"
-    )
     # Setting the constraint to IMMEDIATE runs any deferred checks to allow
     # dropping it in the same transaction.
     sql_delete_fk = (
@@ -508,11 +447,7 @@ class DatabaseSchemaEditor:
                 definition += f" {col_type_suffix}"
             if extra_params:
                 params.extend(extra_params)
-            # PostgreSQL creates FK constraints via deferred ALTER TABLE
-            if isinstance(field, ForeignKeyField) and field.db_constraint:
-                self.deferred_sql.append(
-                    self._create_fk_sql(model, field, "_fk_%(to_table)s_%(to_column)s")
-                )
+            # FK constraints are handled by convergence, not during table creation.
             # Add the SQL to our big list.
             column_sqls.append(f"{quote_name(field.column)} {definition}")
         # Constraints are not created inline — they're managed by convergence.
@@ -668,26 +603,7 @@ class DatabaseSchemaEditor:
             return
         if col_type_suffix := field.db_type_suffix():
             definition += f" {col_type_suffix}"
-        if isinstance(field, ForeignKeyField) and field.db_constraint:
-            # Add FK constraint inline (PostgreSQL always supports this).
-            constraint_suffix = "_fk_%(to_table)s_%(to_column)s"
-            to_table = field.remote_field.model.model_options.db_table
-            field_name = field.remote_field.field_name
-            if field_name is None:
-                raise ValueError("Foreign key field_name cannot be None")
-            to_field = field.remote_field.model._model_meta.get_forward_field(
-                field_name
-            )
-            to_column = to_field.column
-            namespace, _ = split_identifier(model.model_options.db_table)
-            definition += " " + self.sql_create_column_inline_fk % {
-                "name": self._fk_constraint_name(model, field, constraint_suffix),
-                "namespace": f"{quote_name(namespace)}." if namespace else "",
-                "column": quote_name(field.column),
-                "to_table": quote_name(to_table),
-                "to_column": quote_name(to_column),
-                "deferrable": DEFERRABLE_SQL,
-            }
+        # FK constraints are handled by convergence, not inline during add_field.
         # Build the SQL and run it
         sql = self.sql_create_column % {
             "table": quote_name(model.model_options.db_table),
@@ -717,13 +633,7 @@ class DatabaseSchemaEditor:
         # It might not actually have a column behind it
         if field.db_type() is None:
             return
-        # Drop any FK constraints
-        if isinstance(field, RelatedField):
-            fk_names = self._constraint_names(model, [field.column], foreign_key=True)
-            for fk_name in fk_names:
-                self.execute(
-                    self._delete_constraint_sql(self.sql_delete_fk, model, fk_name)
-                )
+        # FK constraints are dropped automatically by CASCADE on DROP COLUMN.
         # Delete the column
         sql = self.sql_delete_column % {
             "table": quote_name(model.model_options.db_table),
@@ -813,28 +723,26 @@ class DatabaseSchemaEditor:
         strict: bool = False,
     ) -> None:
         """Perform a "physical" (non-ManyToMany) field update."""
-        # Drop any FK constraints, we'll remake them later
+        # FK constraints are managed by convergence — drop them before altering
+        # only when the column type is changing (Postgres won't let you change
+        # a column type while an FK references it).
         fks_dropped = set()
         if (
             isinstance(old_field, ForeignKeyField)
             and old_field.db_constraint
-            and self._field_should_be_altered(
-                old_field,
-                new_field,
-            )
+            and self._field_should_be_altered(old_field, new_field)
         ):
-            fk_names = self._constraint_names(
-                model, [old_field.column], foreign_key=True
-            )
-            if strict and len(fk_names) != 1:
-                raise ValueError(
-                    f"Found wrong number ({len(fk_names)}) of foreign key constraints for {model.model_options.db_table}.{old_field.column}"
+            old_fk_type = old_field.db_type()
+            new_fk_type = new_field.db_type()
+            if old_fk_type != new_fk_type:
+                fk_names = self._constraint_names(
+                    model, [old_field.column], foreign_key=True
                 )
-            for fk_name in fk_names:
-                fks_dropped.add((old_field.column,))
-                self.execute(
-                    self._delete_constraint_sql(self.sql_delete_fk, model, fk_name)
-                )
+                for fk_name in fk_names:
+                    fks_dropped.add((old_field.column,))
+                    self.execute(
+                        self._delete_constraint_sql(self.sql_delete_fk, model, fk_name)
+                    )
         # Has unique been removed?
         if old_field.primary_key and (
             not new_field.primary_key
@@ -1007,26 +915,8 @@ class DatabaseSchemaEditor:
             )
             for sql, params in other_actions:
                 self.execute(sql, params)
-        # Does it have a foreign key?
-        if (
-            isinstance(new_field, ForeignKeyField)
-            and (
-                fks_dropped
-                or not isinstance(old_field, ForeignKeyField)
-                or not old_field.db_constraint
-            )
-            and new_field.db_constraint
-        ):
-            self.execute(
-                self._create_fk_sql(model, new_field, "_fk_%(to_table)s_%(to_column)s")
-            )
-        # Rebuild FKs that pointed to us if we previously had to drop them
-        if drop_foreign_keys:
-            for _, rel in rels_to_update:
-                if isinstance(rel.field, ForeignKeyField) and rel.field.db_constraint:
-                    self.execute(
-                        self._create_fk_sql(rel.related_model, rel.field, "_fk")
-                    )
+        # FK constraints are managed by convergence — no recreation needed here.
+        # Convergence will detect the missing FK and create it on next sync.
         # Drop the default if we need to
         # (Plain usually does not use in-database defaults)
         if needs_database_default:
@@ -1237,37 +1127,10 @@ class DatabaseSchemaEditor:
     def _create_index_name(
         self, table_name: str, column_names: list[str], suffix: str = ""
     ) -> str:
-        """
-        Generate a unique name for an index/unique constraint.
+        """Generate a unique name for an index/unique constraint."""
+        from plain.postgres.utils import generate_identifier_name
 
-        The name is divided into 3 parts: the table name, the column names,
-        and a unique digest and suffix.
-        """
-        _, table_name = split_identifier(table_name)
-        hash_suffix_part = (
-            f"{names_digest(table_name, *column_names, length=8)}{suffix}"
-        )
-        max_length = MAX_NAME_LENGTH
-        # If everything fits into max_length, use that name.
-        index_name = "{}_{}_{}".format(
-            table_name, "_".join(column_names), hash_suffix_part
-        )
-        if len(index_name) <= max_length:
-            return index_name
-        # Shorten a long suffix.
-        if len(hash_suffix_part) > max_length / 3:
-            hash_suffix_part = hash_suffix_part[: max_length // 3]
-        other_length = (max_length - len(hash_suffix_part)) // 2 - 1
-        index_name = "{}_{}_{}".format(
-            table_name[:other_length],
-            "_".join(column_names)[:other_length],
-            hash_suffix_part,
-        )
-        # Prepend D if needed to prevent the name from starting with an
-        # underscore or a number.
-        if index_name[0] == "_" or index_name[0].isdigit():
-            index_name = f"D{index_name[:-1]}"
-        return index_name
+        return generate_identifier_name(table_name, column_names, suffix)
 
     def _index_include_sql(
         self, model: type[Model], columns: list[str] | None
@@ -1456,43 +1319,6 @@ class DatabaseSchemaEditor:
             "new_column": quote_name(new_field.column),
             "type": new_type,
         }
-
-    def _create_fk_sql(
-        self, model: type[Model], field: ForeignKeyField, suffix: str
-    ) -> Statement:
-        table = Table(model.model_options.db_table)
-        name = self._fk_constraint_name(model, field, suffix)
-        column = Columns(model.model_options.db_table, [field.column])
-        to_table = Table(field.target_field.model.model_options.db_table)
-        to_column = Columns(
-            field.target_field.model.model_options.db_table,
-            [field.target_field.column],
-        )
-        deferrable = DEFERRABLE_SQL
-        return Statement(
-            self.sql_create_fk,
-            table=table,
-            name=name,
-            column=column,
-            to_table=to_table,
-            to_column=to_column,
-            deferrable=deferrable,
-        )
-
-    def _fk_constraint_name(
-        self, model: type[Model], field: ForeignKeyField, suffix: str
-    ) -> ForeignKeyName:
-        def create_fk_name(*args: Any, **kwargs: Any) -> str:
-            return quote_name(self._create_index_name(*args, **kwargs))
-
-        return ForeignKeyName(
-            model.model_options.db_table,
-            [field.column],
-            split_identifier(field.target_field.model.model_options.db_table)[1],
-            [field.target_field.column],
-            suffix,
-            create_fk_name,
-        )
 
     def _deferrable_constraint_sql(self, deferrable: Deferrable | None) -> str:
         if deferrable is None:

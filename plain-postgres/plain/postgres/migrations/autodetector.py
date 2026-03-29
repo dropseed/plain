@@ -1026,24 +1026,6 @@ class MigrationAutodetector:
             )
         return dependencies
 
-    def _get_dependencies_for_model(
-        self, package_label: str, model_name: str
-    ) -> list[tuple[str, str, str | None, bool | str]]:
-        """Return foreign key dependencies of the given model."""
-        dependencies = []
-        model_state = self.to_state.models[package_label, model_name]
-        for field in model_state.fields.values():
-            if isinstance(field, RelatedField):
-                dependencies.extend(
-                    self._get_dependencies_for_foreign_key(
-                        package_label,
-                        model_name,
-                        field,
-                        self.to_state,
-                    )
-                )
-        return dependencies
-
     def generate_altered_db_table(self) -> None:
         for package_label, model_name in sorted(self.kept_model_keys):
             old_model_name = self.renamed_models.get(

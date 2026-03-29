@@ -172,6 +172,48 @@ class AddConstraintFix(Fix):
 
 
 @dataclass
+class AddForeignKeyFix(Fix):
+    """Add a missing FK constraint using NOT VALID, then validate immediately.
+
+    Step 1: ADD CONSTRAINT ... NOT VALID (SHARE ROW EXCLUSIVE, no scan)
+    Step 2: VALIDATE CONSTRAINT (SHARE UPDATE EXCLUSIVE, scans data)
+
+    Both steps run in a single apply() because the validate lock is weaker
+    than the add lock — there's no benefit to deferring validation.
+    """
+
+    pass_order = 2
+
+    table: str
+    constraint_name: str
+    column: str
+    target_table: str
+    target_column: str
+
+    def describe(self) -> str:
+        return f"{self.table}: add FK {self.constraint_name} ({self.column} → {self.target_table}.{self.target_column})"
+
+    def apply(self) -> str:
+        add_sql = (
+            f"ALTER TABLE {quote_name(self.table)}"
+            f" ADD CONSTRAINT {quote_name(self.constraint_name)}"
+            f" FOREIGN KEY ({quote_name(self.column)})"
+            f" REFERENCES {quote_name(self.target_table)} ({quote_name(self.target_column)})"
+            f" DEFERRABLE INITIALLY DEFERRED"
+            f" NOT VALID"
+        )
+        _execute_and_commit(add_sql)
+
+        validate_sql = (
+            f"ALTER TABLE {quote_name(self.table)}"
+            f" VALIDATE CONSTRAINT {quote_name(self.constraint_name)}"
+        )
+        _execute_and_commit(validate_sql)
+
+        return f"{add_sql}; {validate_sql}"
+
+
+@dataclass
 class RenameConstraintFix(Fix):
     """Rename a constraint (catalog-only, instant).
 

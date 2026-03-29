@@ -315,6 +315,31 @@ def names_digest(*args: str, length: int) -> str:
     return h.hexdigest()[:length]
 
 
+def generate_identifier_name(
+    table_name: str, column_names: list[str], suffix: str = ""
+) -> str:
+    """Generate a deterministic name for an index or constraint.
+
+    The name is composed of the table name, column names, a hash digest,
+    and an optional suffix. Long names are truncated proportionally.
+    """
+    from .dialect import MAX_NAME_LENGTH
+
+    _, table_name = split_identifier(table_name)
+    hash_suffix_part = f"{names_digest(table_name, *column_names, length=8)}{suffix}"
+    max_length = MAX_NAME_LENGTH
+    name = f"{table_name}_{'_'.join(column_names)}_{hash_suffix_part}"
+    if len(name) <= max_length:
+        return name
+    if len(hash_suffix_part) > max_length / 3:
+        hash_suffix_part = hash_suffix_part[: max_length // 3]
+    other_length = (max_length - len(hash_suffix_part)) // 2 - 1
+    name = f"{table_name[:other_length]}_{'_'.join(column_names)[:other_length]}_{hash_suffix_part}"
+    if name[0] == "_" or name[0].isdigit():
+        name = f"D{name[:-1]}"
+    return name
+
+
 def strip_quotes(table_name: str) -> str:
     """
     Strip quotes off of quoted table names to make them safe for use in index
