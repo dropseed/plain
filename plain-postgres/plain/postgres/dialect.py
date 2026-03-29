@@ -1,8 +1,8 @@
 """
 PostgreSQL-specific SQL generation functions.
 
-Most functions in this module are stateless. Functions that need a database
-connection (quote_value, compile_expression_sql) use get_connection() internally.
+All functions in this module are stateless — they don't depend on connection state.
+Higher-level SQL builders that need connections live in ddl.py.
 """
 
 from __future__ import annotations
@@ -15,7 +15,6 @@ from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any
 
 import psycopg
-import psycopg.sql
 from psycopg.types.json import Jsonb
 
 from plain.postgres.constants import OnConflict
@@ -558,68 +557,3 @@ def on_conflict_suffix_sql(
             ),
         )
     return ""
-
-
-def quote_value(value: Any) -> str:
-    """Quote a value for safe inclusion in a SQL string.
-
-    Not safe against injection from user code — intended only for SQL scripts,
-    default values, and constraint expressions (which are not user-defined).
-    """
-    from plain.postgres.db import get_connection
-
-    if isinstance(value, str):
-        value = value.replace("%", "%%")
-    conn = get_connection()
-    return psycopg.sql.quote(value, conn.connection)
-
-
-def deferrable_sql(deferrable: Any) -> str:
-    """Return the DEFERRABLE clause for a constraint, or empty string."""
-    from plain.postgres.constraints import Deferrable
-
-    if deferrable is None:
-        return ""
-    if deferrable == Deferrable.DEFERRED:
-        return " DEFERRABLE INITIALLY DEFERRED"
-    if deferrable == Deferrable.IMMEDIATE:
-        return " DEFERRABLE INITIALLY IMMEDIATE"
-    return ""
-
-
-def compile_expression_sql(model: Any, expression_q: Any) -> str:
-    """Compile a Q expression to a SQL string with quoted literal params."""
-    from plain.postgres.db import get_connection
-    from plain.postgres.sql.query import Query
-
-    query = Query(model=model, alias_cols=False)
-    where = query.build_where(expression_q)
-    compiler = query.get_compiler()
-    conn = get_connection()
-    sql, params = where.as_sql(compiler, conn)
-    return sql % tuple(quote_value(p) for p in params)
-
-
-def compile_index_expressions_sql(model: Any, expressions: Any) -> str:
-    """Compile index/constraint expressions (e.g. F(), OrderBy) to SQL."""
-    # Inline: these modules import from dialect.py at top level
-    from plain.postgres.expressions import ExpressionList
-    from plain.postgres.indexes import IndexExpression
-    from plain.postgres.sql.query import Query
-
-    query = Query(model, alias_cols=False)
-    compiler = query.get_compiler()
-    index_expressions = [IndexExpression(expr) for expr in expressions]
-    expr_list = ExpressionList(*index_expressions).resolve_expression(query)
-    sql, params = compiler.compile(expr_list)
-    return sql % tuple(quote_value(p) for p in params)
-
-
-def build_include_sql(model: Any, include: tuple[str, ...]) -> str:
-    """Build the INCLUDE clause for an index or constraint, or empty string."""
-    if not include:
-        return ""
-    include_cols = [
-        quote_name(model._model_meta.get_forward_field(f).column) for f in include
-    ]
-    return " INCLUDE ({})".format(", ".join(include_cols))

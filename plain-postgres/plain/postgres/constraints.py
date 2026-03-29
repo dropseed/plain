@@ -5,13 +5,13 @@ from types import NoneType
 from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ValidationError
-from plain.postgres.dialect import (
+from plain.postgres.ddl import (
     build_include_sql,
     compile_expression_sql,
     compile_index_expressions_sql,
     deferrable_sql,
-    quote_name,
 )
+from plain.postgres.dialect import quote_name
 from plain.postgres.exceptions import FieldError
 from plain.postgres.expressions import (
     Exists,

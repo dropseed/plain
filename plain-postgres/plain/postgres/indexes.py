@@ -3,12 +3,12 @@ from __future__ import annotations
 from types import NoneType
 from typing import TYPE_CHECKING, Any, Self
 
-from plain.postgres.dialect import (
+from plain.postgres.ddl import (
     build_include_sql,
     compile_expression_sql,
     compile_index_expressions_sql,
-    quote_name,
 )
+from plain.postgres.dialect import quote_name
 from plain.postgres.expressions import Col, ExpressionList, F, Func, OrderBy
 from plain.postgres.query_utils import Q
 from plain.postgres.sql.query import Query
