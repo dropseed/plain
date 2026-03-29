@@ -57,7 +57,7 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
         if format == "text":
             if not quiet:
                 # Print check name without newline
-                click.echo("Check:", nl=False, err=use_stderr)
+                click.echo("  Check:", nl=False, err=use_stderr)
                 click.secho(f"{check_name} ", bold=True, nl=False, err=use_stderr)
 
             # Determine status icon based on issue severity
@@ -88,10 +88,10 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
                     if quiet:
                         # In quiet mode, show check name once, then issues
                         if i == 0:
-                            click.secho(f"{check_name}:", err=use_stderr)
+                            click.secho(f"  {check_name}:", err=use_stderr)
                         # Show ID and fix on separate lines with same indentation
                         click.secho(
-                            f"  [{issue_type}] {issue.id}:",
+                            f"    [{issue_type}] {issue.id}:",
                             fg=issue_color,
                             bold=True,
                             err=use_stderr,
@@ -101,7 +101,7 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
                     else:
                         # Show ID and fix on separate lines with same indentation
                         click.secho(
-                            f"    [{issue_type}] {issue.id}: ",
+                            f"      [{issue_type}] {issue.id}: ",
                             fg=issue_color,
                             bold=True,
                             err=use_stderr,
@@ -192,7 +192,7 @@ def preflight_cli(deploy: bool, format: str, quiet: bool) -> None:
 
         summary_text = ", ".join(summary_parts) if summary_parts else "no issues"
 
-        click.secho(f"{icon}{summary_text}", fg=summary_color, err=use_stderr)
+        click.secho(f"  {icon}{summary_text}", fg=summary_color, err=use_stderr)
 
     # Exit with error if there are any errors (not warnings)
     if has_errors:

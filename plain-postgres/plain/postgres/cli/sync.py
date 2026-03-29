@@ -109,19 +109,24 @@ def _create_migrations() -> None:
 
 
 def _migrate() -> None:
-    from .migrations import apply
+    from ..db import get_connection
+    from ..migrations.executor import MigrationExecutor
 
     click.secho("Applying migrations...", bold=True)
-    apply.callback(
-        package_label=None,
-        migration_name=None,
-        fake=False,
-        plan=False,
-        check_unapplied=False,
-        no_input=False,
-        atomic_batch=None,
-        quiet=False,
-    )
+
+    conn = get_connection()
+    conn.ensure_connection()
+    executor = MigrationExecutor(conn)
+    targets = executor.loader.graph.leaf_nodes()
+    migration_plan = executor.migration_plan(targets)
+
+    if not migration_plan:
+        click.echo("  No migrations to apply.")
+        return
+
+    click.echo(f"  Applying {len(migration_plan)} migration(s)...")
+    executor.migrate(targets, plan=migration_plan)
+    click.echo(f"  Applied {len(migration_plan)} migration(s).")
 
 
 def _converge(*, drop_undeclared: bool) -> None:
@@ -136,38 +141,38 @@ def _converge(*, drop_undeclared: bool) -> None:
 
         for r in result.results:
             if r.ok:
-                click.echo(f"  {r.sql}")
+                click.echo(f"    {r.sql}")
             else:
-                click.secho(f"  FAILED: {r.item.describe()} — {r.error}", fg="red")
+                click.secho(f"    FAILED: {r.item.describe()} — {r.error}", fg="red")
 
-        click.secho(result.summary, fg="green" if result.ok else "yellow")
+        click.secho(f"  {result.summary}", fg="green" if result.ok else "yellow")
         if not result.ok_for_sync:
             success = False
 
     if plan.blocked:
         click.echo()
-        click.secho("Schema changes require a staged rollout:", fg="red", bold=True)
+        click.secho("  Schema changes require a staged rollout:", fg="red", bold=True)
         for item in plan.blocked:
-            click.secho(f"  {item.drift.describe()}", fg="red")
+            click.secho(f"    {item.drift.describe()}", fg="red")
             if item.guidance:
-                click.secho(f"    {item.guidance}", fg="red", dim=True)
+                click.secho(f"      {item.guidance}", fg="red", dim=True)
         success = False
 
     if not drop_undeclared and plan.blocking_cleanup:
         click.echo()
-        click.secho("Undeclared constraints still in database:", fg="red", bold=True)
+        click.secho("  Undeclared constraints still in database:", fg="red", bold=True)
         for item in plan.blocking_cleanup:
-            click.secho(f"  {item.describe()}", fg="red")
-        click.secho("Rerun with --drop-undeclared to remove them.", fg="red")
+            click.secho(f"    {item.describe()}", fg="red")
+        click.secho("  Rerun with --drop-undeclared to remove them.", fg="red")
         success = False
 
     if not drop_undeclared and plan.optional_cleanup:
         click.echo()
         for item in plan.optional_cleanup:
-            click.echo(f"  {item.describe()}")
-        click.echo("Run with --drop-undeclared to remove undeclared indexes.")
+            click.echo(f"    {item.describe()}")
+        click.echo("  Run with --drop-undeclared to remove undeclared indexes.")
 
     if not success:
         sys.exit(1)
     elif not items:
-        click.secho("Schema is converged.", fg="green")
+        click.echo("  Schema is converged.")

@@ -22,7 +22,7 @@
 
 1. **Replace `migrate` with `postgres sync` in deploy scripts and CI.** `postgres sync` applies migrations and runs convergence in a single step. For CI checks, use `postgres sync --check` instead of `migrate --check` / `makemigrations --check`. The lower-level commands are still available as `migrations create` and `migrations apply`.
 
-2. **Remove index/constraint operations from migration files.** Delete any `AddIndex`, `RemoveIndex`, `RenameIndex`, `AddConstraint`, and `RemoveConstraint` operations from your migration files — these classes no longer exist and will cause import errors. If removing an operation leaves `operations = []`, delete the migration file and run `plain migrations prune --yes`. Indexes and constraints declared on your models will be created automatically by convergence.
+2. **Remove index/constraint operations from migration files.** Delete any `AddIndex`, `RemoveIndex`, `RenameIndex`, `AddConstraint`, and `RemoveConstraint` operations from your migration files — these classes no longer exist and will cause import errors. It's fine to leave a migration with `operations = []`. Indexes and constraints declared on your models will be created automatically by convergence.
 
 3. **Replace `PositiveIntegerField`** (and `PositiveBigIntegerField`, `PositiveSmallIntegerField`) with `IntegerField` (or `BigIntegerField`, `SmallIntegerField`) in both models and migration files. Add a `CheckConstraint` if you need to enforce positive values.
 
