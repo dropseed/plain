@@ -9,10 +9,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveIndex(
-            model_name="trace",
-            name="plainobserv_share_i_754f3c_idx",
-        ),
         migrations.RemoveField(
             model_name="trace",
             name="share_created_at",

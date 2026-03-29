@@ -8,13 +8,4 @@ class Migration(migrations.Migration):
         ("plainjobs", "0008_alter_jobrequest_options"),
     ]
 
-    operations = [
-        migrations.RemoveIndex(
-            model_name="jobprocess",
-            name="plainjobs_j_job_cla_19f3c1_idx",
-        ),
-        migrations.RemoveIndex(
-            model_name="jobrequest",
-            name="plainjobs_j_job_cla_a18abf_idx",
-        ),
-    ]
+    operations = []

@@ -8,35 +8,4 @@ class Migration(migrations.Migration):
         ("plainpageviews", "0005_alter_pageview_url"),
     ]
 
-    operations = [
-        migrations.RenameIndex(
-            model_name="pageview",
-            new_name="plainpageviews_pageview_timestamp_idx",
-            old_name="plainpagevi_timesta_da4eb2_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="pageview",
-            new_name="plainpageviews_pageview_user_id_idx",
-            old_name="plainpagevi_user_id_b40ca5_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="pageview",
-            new_name="plainpageviews_pageview_session_id_idx",
-            old_name="plainpagevi_session_5b738a_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="pageview",
-            new_name="plainpageviews_pageview_url_idx",
-            old_name="plainpagevi_url_d3e821_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="pageview",
-            new_name="plainpageviews_pageview_source_idx",
-            old_name="plainpagevi_source_23e80d_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="pageview",
-            new_name="plainpageviews_pageview_medium_idx",
-            old_name="plainpagevi_medium_370c1b_idx",
-        ),
-    ]
+    operations = []

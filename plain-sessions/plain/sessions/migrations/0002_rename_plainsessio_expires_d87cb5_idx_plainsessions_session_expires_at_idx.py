@@ -8,10 +8,4 @@ class Migration(migrations.Migration):
         ("plainsessions", "0001_initial"),
     ]
 
-    operations = [
-        migrations.RenameIndex(
-            model_name="session",
-            new_name="plainsessions_session_expires_at_idx",
-            old_name="plainsessio_expires_d87cb5_idx",
-        ),
-    ]
+    operations = []

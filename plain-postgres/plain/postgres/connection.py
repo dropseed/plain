@@ -1126,13 +1126,11 @@ class DatabaseConnection:
             quiet=verbosity < 2,  # Show migration output when verbosity is 2+
         )
 
-        # Apply convergence fixes (constraints, type mismatches) after migrations.
+        # Apply convergence fixes (constraints, indexes) after migrations.
         from plain.postgres.convergence import detect_fixes
 
         for fix in detect_fixes():
-            with self.cursor() as cursor:
-                fix.apply(cursor)
-            self.commit()
+            fix.apply()
 
         # Ensure a connection for the side effect of initializing the test database.
         self.ensure_connection()

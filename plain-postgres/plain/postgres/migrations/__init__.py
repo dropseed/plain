@@ -2,16 +2,13 @@ from ..schema import DatabaseSchemaEditor
 from .migration import Migration, settings_dependency
 from .operations import (
     AddField,
-    AddIndex,
     AlterField,
     AlterModelOptions,
     AlterModelTable,
     CreateModel,
     DeleteModel,
     RemoveField,
-    RemoveIndex,
     RenameField,
-    RenameIndex,
     RenameModel,
     RunPython,
     RunSQL,
@@ -34,10 +31,6 @@ __all__ = [
     "RemoveField",
     "AlterField",
     "RenameField",
-    # Index operations
-    "AddIndex",
-    "RemoveIndex",
-    "RenameIndex",
     # Special operations
     "SeparateDatabaseAndState",
     "RunSQL",

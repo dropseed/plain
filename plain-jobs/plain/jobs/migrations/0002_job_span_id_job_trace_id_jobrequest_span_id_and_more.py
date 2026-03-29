@@ -40,22 +40,4 @@ class Migration(migrations.Migration):
             name="trace_id",
             field=postgres.TextField(allow_null=True, max_length=34, required=False),
         ),
-        migrations.AddIndex(
-            model_name="job",
-            index=postgres.Index(
-                fields=["trace_id"], name="plainworker_trace_i_d2b645_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="jobrequest",
-            index=postgres.Index(
-                fields=["trace_id"], name="plainworker_trace_i_e9dfc5_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="jobresult",
-            index=postgres.Index(
-                fields=["trace_id"], name="plainworker_trace_i_00c75f_idx"
-            ),
-        ),
     ]

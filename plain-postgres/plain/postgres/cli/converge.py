@@ -3,7 +3,6 @@ from __future__ import annotations
 import click
 
 from ..convergence import detect_fixes
-from ..db import get_connection
 
 
 @click.command()
@@ -17,6 +16,7 @@ def converge(yes: bool) -> None:
     """Fix schema mismatches between models and the database.
 
     Detects and fixes:
+    - Missing or extra indexes (using CONCURRENTLY)
     - Missing or extra constraints (check, unique)
     - NOT VALID constraints needing validation
 
@@ -45,17 +45,13 @@ def converge(yes: bool) -> None:
 
     applied = 0
     failed = 0
-    conn = get_connection()
 
     for fix in fixes:
         try:
-            with conn.cursor() as cursor:
-                sql = fix.apply(cursor)
-            conn.commit()
+            sql = fix.apply()
             click.echo(f"  {sql}")
             applied += 1
         except Exception as e:
-            conn.rollback()
             click.secho(f"  FAILED: {fix.describe()} — {e}", fg="red")
             failed += 1
 

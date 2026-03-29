@@ -67,22 +67,4 @@ class Migration(migrations.Migration):
                 to="plainobserver.trace",
             ),
         ),
-        migrations.AddIndex(
-            model_name="span",
-            index=postgres.Index(
-                fields=["trace", "span_id"], name="plainobserv_trace_i_89a97c_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="span",
-            index=postgres.Index(
-                fields=["trace"], name="plainobserv_trace_i_84958a_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="span",
-            index=postgres.Index(
-                fields=["start_time"], name="plainobserv_start_t_cb47a3_idx"
-            ),
-        ),
     ]

@@ -11,10 +11,4 @@ class Migration(migrations.Migration):
         ),
     ]
 
-    operations = [
-        migrations.RenameIndex(
-            model_name="supportformentry",
-            new_name="plainsupport_supportformentry_created_at_idx",
-            old_name="plainsuppor_created_bda60d_idx",
-        ),
-    ]
+    operations = []

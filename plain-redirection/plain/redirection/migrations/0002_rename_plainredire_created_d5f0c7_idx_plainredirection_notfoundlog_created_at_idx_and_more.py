@@ -8,25 +8,4 @@ class Migration(migrations.Migration):
         ("plainredirection", "0001_initial"),
     ]
 
-    operations = [
-        migrations.RenameIndex(
-            model_name="notfoundlog",
-            new_name="plainredirection_notfoundlog_created_at_idx",
-            old_name="plainredire_created_d5f0c7_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="redirect",
-            new_name="plainredirection_redirect_order_idx",
-            old_name="plainredire_order_44dde0_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="redirect",
-            new_name="plainredirection_redirect_created_at_idx",
-            old_name="plainredire_created_18c288_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="redirectlog",
-            new_name="plainredirection_redirectlog_created_at_idx",
-            old_name="plainredire_created_5d75f4_idx",
-        ),
-    ]
+    operations = []

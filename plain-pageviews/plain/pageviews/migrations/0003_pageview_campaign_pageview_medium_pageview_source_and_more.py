@@ -105,18 +105,6 @@ class Migration(migrations.Migration):
             name="source",
             field=postgres.TextField(max_length=200, required=False),
         ),
-        migrations.AddIndex(
-            model_name="pageview",
-            index=postgres.Index(
-                fields=["source"], name="plainpagevi_source_23e80d_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="pageview",
-            index=postgres.Index(
-                fields=["medium"], name="plainpagevi_medium_370c1b_idx"
-            ),
-        ),
         migrations.RunPython(
             populate_attribution_fields,
         ),

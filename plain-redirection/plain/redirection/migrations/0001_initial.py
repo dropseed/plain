@@ -58,34 +58,12 @@ class Migration(migrations.Migration):
                 "ordering": ["-created_at"],
             },
         ),
-        migrations.AddIndex(
-            model_name="redirect",
-            index=postgres.Index(fields=["order"], name="plainredire_order_44dde0_idx"),
-        ),
-        migrations.AddIndex(
-            model_name="redirect",
-            index=postgres.Index(
-                fields=["created_at"], name="plainredire_created_18c288_idx"
-            ),
-        ),
         migrations.AddField(
             model_name="redirectlog",
             name="redirect",
             field=postgres.ForeignKeyField(
                 on_delete=plain.postgres.deletion.CASCADE,
                 to="plainredirection.redirect",
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="notfoundlog",
-            index=postgres.Index(
-                fields=["created_at"], name="plainredire_created_d5f0c7_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="redirectlog",
-            index=postgres.Index(
-                fields=["created_at"], name="plainredire_created_5d75f4_idx"
             ),
         ),
     ]

@@ -150,8 +150,6 @@ class MigrationAutodetector:
         # Then go through that list, order it, and split into migrations to
         # resolve dependencies caused by M2Ms and FKs.
         self.generated_operations = {}
-        self.altered_indexes = {}
-
         self.renamed_fields = {}
 
         # Prepare some old/new state and model lists, ignoring unmigrated packages.
@@ -187,20 +185,12 @@ class MigrationAutodetector:
         # generate_removed_altered_index(), and
         # generate_altered_index().
         self.create_renamed_fields()
-        # Create the altered indexes and store them in self.altered_indexes.
-        # This avoids the same computation in generate_removed_indexes()
-        # and generate_added_indexes().
-        self.create_altered_indexes()
-        # Generate index removal operations before field is removed
-        self.generate_removed_indexes()
         # Generate field renaming operations.
         self.generate_renamed_fields()
-        self.generate_renamed_indexes()
         # Generate field operations.
         self.generate_removed_fields()
         self.generate_added_fields()
         self.generate_altered_fields()
-        self.generate_added_indexes()
         self.generate_altered_db_table()
 
         self._sort_migrations()
@@ -576,10 +566,7 @@ class MigrationAutodetector:
                     if isinstance(field.remote_field, ManyToManyRel):
                         related_fields[field_name] = field
 
-            # Indexes are deferred to separate AddIndex operations.
-            # Constraints stay in CreateModel.options — they're created
-            # inline in CREATE TABLE and managed by convergence after that.
-            indexes = model_state.options.pop("indexes")
+            # Indexes and constraints are managed by convergence, not migrations.
             # Depend on the deletion of any possible proxy version of us
             dependencies: list[tuple[str, str, str | None, bool | str]] = [
                 (package_label, model_name, None, False),
@@ -665,15 +652,6 @@ class MigrationAutodetector:
                 for name in sorted(related_fields)
             ]
             related_dependencies.append((package_label, model_name, None, True))
-            for index in indexes:
-                self.add_operation(
-                    package_label,
-                    operations.AddIndex(
-                        model_name=model_name,
-                        index=index,
-                    ),
-                    dependencies=related_dependencies,
-                )
 
     def generate_deleted_models(self) -> None:
         """
@@ -1009,97 +987,6 @@ class MigrationAutodetector:
                     # We cannot alter between m2m and concrete fields
                     self._generate_removed_field(package_label, model_name, field_name)
                     self._generate_added_field(package_label, model_name, field_name)
-
-    def create_altered_indexes(self) -> None:
-        option_name = operations.AddIndex.option_name
-
-        for package_label, model_name in sorted(self.kept_model_keys):
-            old_model_name = self.renamed_models.get(
-                (package_label, model_name), model_name
-            )
-            old_model_state = self.from_state.models[package_label, old_model_name]
-            new_model_state = self.to_state.models[package_label, model_name]
-
-            old_indexes = old_model_state.options[option_name]
-            new_indexes = new_model_state.options[option_name]
-            added_indexes = [idx for idx in new_indexes if idx not in old_indexes]
-            removed_indexes = [idx for idx in old_indexes if idx not in new_indexes]
-            renamed_indexes = []
-            # Find renamed indexes.
-            remove_from_added = []
-            remove_from_removed = []
-            for new_index in added_indexes:
-                new_index_dec = new_index.deconstruct()
-                new_index_name = new_index_dec[2].pop("name")
-                for old_index in removed_indexes:
-                    old_index_dec = old_index.deconstruct()
-                    old_index_name = old_index_dec[2].pop("name")
-                    # Indexes are the same except for the names.
-                    if (
-                        new_index_dec == old_index_dec
-                        and new_index_name != old_index_name
-                    ):
-                        renamed_indexes.append((old_index_name, new_index_name, None))
-                        remove_from_added.append(new_index)
-                        remove_from_removed.append(old_index)
-
-            # Remove renamed indexes from the lists of added and removed
-            # indexes.
-            added_indexes = [
-                idx for idx in added_indexes if idx not in remove_from_added
-            ]
-            removed_indexes = [
-                idx for idx in removed_indexes if idx not in remove_from_removed
-            ]
-
-            self.altered_indexes.update(
-                {
-                    (package_label, model_name): {
-                        "added_indexes": added_indexes,
-                        "removed_indexes": removed_indexes,
-                        "renamed_indexes": renamed_indexes,
-                    }
-                }
-            )
-
-    def generate_added_indexes(self) -> None:
-        for (package_label, model_name), alt_indexes in self.altered_indexes.items():
-            dependencies = self._get_dependencies_for_model(package_label, model_name)
-            for index in alt_indexes["added_indexes"]:
-                self.add_operation(
-                    package_label,
-                    operations.AddIndex(
-                        model_name=model_name,
-                        index=index,
-                    ),
-                    dependencies=dependencies,
-                )
-
-    def generate_removed_indexes(self) -> None:
-        for (package_label, model_name), alt_indexes in self.altered_indexes.items():
-            for index in alt_indexes["removed_indexes"]:
-                self.add_operation(
-                    package_label,
-                    operations.RemoveIndex(
-                        model_name=model_name,
-                        name=index.name,
-                    ),
-                )
-
-    def generate_renamed_indexes(self) -> None:
-        for (package_label, model_name), alt_indexes in self.altered_indexes.items():
-            for old_index_name, new_index_name, old_fields in alt_indexes[
-                "renamed_indexes"
-            ]:
-                self.add_operation(
-                    package_label,
-                    operations.RenameIndex(
-                        model_name=model_name,
-                        new_name=new_index_name,
-                        old_name=old_index_name,
-                        old_fields=old_fields,
-                    ),
-                )
 
     @staticmethod
     def _get_dependencies_for_foreign_key(

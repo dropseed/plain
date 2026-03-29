@@ -21,10 +21,4 @@ class Migration(migrations.Migration):
                 ("updated_at", postgres.DateTimeField(auto_now=True)),
             ],
         ),
-        migrations.AddIndex(
-            model_name="cacheditem",
-            index=postgres.Index(
-                fields=["expires_at"], name="plaincache__expires_5a9119_idx"
-            ),
-        ),
     ]

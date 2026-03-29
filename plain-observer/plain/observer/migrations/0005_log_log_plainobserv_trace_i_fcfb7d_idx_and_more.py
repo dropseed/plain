@@ -40,28 +40,4 @@ class Migration(migrations.Migration):
                 "ordering": ["timestamp"],
             },
         ),
-        migrations.AddIndex(
-            model_name="log",
-            index=postgres.Index(
-                fields=["trace", "timestamp"], name="plainobserv_trace_i_fcfb7d_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="log",
-            index=postgres.Index(
-                fields=["trace", "span"], name="plainobserv_trace_i_1166af_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="log",
-            index=postgres.Index(
-                fields=["timestamp"], name="plainobserv_timesta_64f0dc_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="log",
-            index=postgres.Index(
-                fields=["trace"], name="plainobserv_trace_i_c64ee0_idx"
-            ),
-        ),
     ]

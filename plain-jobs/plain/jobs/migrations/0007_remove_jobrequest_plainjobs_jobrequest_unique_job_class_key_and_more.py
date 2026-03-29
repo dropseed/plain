@@ -10,22 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveIndex(
-            model_name="jobprocess",
-            name="plainjobs_j_unique__67172c_idx",
-        ),
-        migrations.RemoveIndex(
-            model_name="jobprocess",
-            name="job_class_unique_key",
-        ),
-        migrations.RemoveIndex(
-            model_name="jobrequest",
-            name="plainjobs_j_unique__42f6a6_idx",
-        ),
-        migrations.RemoveIndex(
-            model_name="jobrequest",
-            name="job_request_class_unique_key",
-        ),
         migrations.RenameField(
             model_name="jobprocess",
             old_name="unique_key",
@@ -99,42 +83,5 @@ class Migration(migrations.Migration):
                 ],
                 max_length=20,
             ),
-        ),
-        migrations.AddIndex(
-            model_name="jobprocess",
-            index=postgres.Index(
-                fields=["concurrency_key"], name="plainjobs_j_concurr_ad4464_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="jobprocess",
-            index=postgres.Index(fields=["uuid"], name="plainjobs_j_uuid_cd8cd3_idx"),
-        ),
-        migrations.AddIndex(
-            model_name="jobprocess",
-            index=postgres.Index(
-                fields=["job_class", "concurrency_key"], name="job_concurrency_key"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="jobrequest",
-            index=postgres.Index(
-                fields=["concurrency_key"], name="plainjobs_j_concurr_c10926_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="jobrequest",
-            index=postgres.Index(fields=["uuid"], name="plainjobs_j_uuid_c41c85_idx"),
-        ),
-        migrations.AddIndex(
-            model_name="jobrequest",
-            index=postgres.Index(
-                fields=["job_class", "concurrency_key"],
-                name="job_request_concurrency_key",
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="jobresult",
-            index=postgres.Index(fields=["uuid"], name="plainjobs_j_uuid_b33b4c_idx"),
         ),
     ]

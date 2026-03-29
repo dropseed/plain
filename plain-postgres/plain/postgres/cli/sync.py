@@ -7,7 +7,6 @@ import click
 from plain.runtime import settings
 
 from ..convergence import detect_fixes
-from ..db import get_connection
 
 
 @click.command()
@@ -116,19 +115,15 @@ def _converge() -> None:
         click.secho("Schema is converged.", fg="green")
         return
 
-    conn = get_connection()
     applied = 0
     failed = 0
 
     for fix in fixes:
         try:
-            with conn.cursor() as cursor:
-                sql = fix.apply(cursor)
-            conn.commit()
+            sql = fix.apply()
             click.echo(f"  {sql}")
             applied += 1
         except Exception as e:
-            conn.rollback()
             click.secho(f"  FAILED: {fix.describe()} — {e}", fg="red")
             failed += 1
 

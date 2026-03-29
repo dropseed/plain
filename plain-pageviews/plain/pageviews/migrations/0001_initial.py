@@ -28,26 +28,4 @@ class Migration(migrations.Migration):
                 "ordering": ["-timestamp"],
             },
         ),
-        migrations.AddIndex(
-            model_name="pageview",
-            index=postgres.Index(
-                fields=["timestamp"], name="plainpagevi_timesta_da4eb2_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="pageview",
-            index=postgres.Index(
-                fields=["user_id"], name="plainpagevi_user_id_b40ca5_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="pageview",
-            index=postgres.Index(
-                fields=["session_key"], name="plainpagevi_session_5545cf_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="pageview",
-            index=postgres.Index(fields=["url"], name="plainpagevi_url_d3e821_idx"),
-        ),
     ]

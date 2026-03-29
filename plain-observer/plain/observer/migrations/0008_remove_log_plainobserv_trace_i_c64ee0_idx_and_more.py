@@ -11,18 +11,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveIndex(
-            model_name="log",
-            name="plainobserv_trace_i_c64ee0_idx",
-        ),
-        migrations.RemoveIndex(
-            model_name="span",
-            name="plainobserv_trace_i_89a97c_idx",
-        ),
-        migrations.RemoveIndex(
-            model_name="span",
-            name="plainobserv_trace_i_84958a_idx",
-        ),
         migrations.AlterField(
             model_name="log",
             name="trace",

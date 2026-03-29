@@ -20,10 +20,4 @@ class Migration(migrations.Migration):
                 ("expires_at", postgres.DateTimeField(allow_null=True)),
             ],
         ),
-        migrations.AddIndex(
-            model_name="session",
-            index=postgres.Index(
-                fields=["expires_at"], name="plainsessio_expires_d87cb5_idx"
-            ),
-        ),
     ]

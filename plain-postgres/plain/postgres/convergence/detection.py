@@ -4,11 +4,14 @@ from typing import Any
 
 from ..constraints import BaseConstraint
 from ..db import get_connection
+from ..indexes import Index
 from ..introspection import check_model
 from ..registry import models_registry
 from .fixes import (
     AddConstraintFix,
+    CreateIndexFix,
     DropConstraintFix,
+    DropIndexFix,
     Fix,
     ValidateConstraintFix,
 )
@@ -31,6 +34,15 @@ def detect_model_fixes(conn: Any, cursor: Any, model: Any) -> list[Fix]:
     result = check_model(conn, cursor, model)
     table = result["table"]
     fixes: list[Fix] = []
+
+    for idx in result["indexes"]:
+        for issue in idx["issues"]:
+            if issue["kind"] == "index_missing":
+                index_obj = _find_model_index(model, idx["name"])
+                if index_obj:
+                    fixes.append(CreateIndexFix(table, index_obj, model))
+            elif issue["kind"] == "index_extra":
+                fixes.append(DropIndexFix(table, idx["name"]))
 
     for con in result["constraints"]:
         for issue in con["issues"]:
@@ -59,4 +71,11 @@ def _find_model_constraint(model: Any, name: str) -> BaseConstraint | None:
     for constraint in model.model_options.constraints:
         if constraint.name == name:
             return constraint
+    return None
+
+
+def _find_model_index(model: Any, name: str) -> Index | None:
+    for index in model.model_options.indexes:
+        if index.name == name:
+            return index
     return None

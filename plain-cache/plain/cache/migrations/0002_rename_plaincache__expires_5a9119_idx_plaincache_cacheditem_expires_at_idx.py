@@ -8,10 +8,4 @@ class Migration(migrations.Migration):
         ("plaincache", "0001_initial"),
     ]
 
-    operations = [
-        migrations.RenameIndex(
-            model_name="cacheditem",
-            new_name="plaincache_cacheditem_expires_at_idx",
-            old_name="plaincache__expires_5a9119_idx",
-        ),
-    ]
+    operations = []

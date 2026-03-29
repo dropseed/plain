@@ -25,34 +25,4 @@ class Migration(migrations.Migration):
             name="summary",
             field=postgres.TextField(default="", max_length=255, required=False),
         ),
-        migrations.AddIndex(
-            model_name="trace",
-            index=postgres.Index(
-                fields=["trace_id"], name="plainobserv_trace_i_075b48_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="trace",
-            index=postgres.Index(
-                fields=["start_time"], name="plainobserv_start_t_636c80_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="trace",
-            index=postgres.Index(
-                fields=["request_id"], name="plainobserv_request_d1d5b2_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="trace",
-            index=postgres.Index(
-                fields=["share_id"], name="plainobserv_share_i_754f3c_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="trace",
-            index=postgres.Index(
-                fields=["session_id"], name="plainobserv_session_350f42_idx"
-            ),
-        ),
     ]

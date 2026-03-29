@@ -40,10 +40,4 @@ class Migration(migrations.Migration):
                 "ordering": ["-created_at"],
             },
         ),
-        migrations.AddIndex(
-            model_name="supportformentry",
-            index=postgres.Index(
-                fields=["created_at"], name="plainsuppor_created_bda60d_idx"
-            ),
-        ),
     ]
