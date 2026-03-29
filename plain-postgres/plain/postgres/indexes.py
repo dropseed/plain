@@ -3,6 +3,12 @@ from __future__ import annotations
 from types import NoneType
 from typing import TYPE_CHECKING, Any, Self
 
+from plain.postgres.dialect import (
+    build_include_sql,
+    compile_expression_sql,
+    compile_index_expressions_sql,
+    quote_name,
+)
 from plain.postgres.expressions import Col, ExpressionList, F, Func, OrderBy
 from plain.postgres.query_utils import Q
 from plain.postgres.sql.query import Query
@@ -89,6 +95,35 @@ class Index:
         compiler = query.get_compiler()
         sql, params = where.as_sql(compiler, schema_editor.connection)
         return sql % tuple(schema_editor.quote_value(p) for p in params)
+
+    def to_sql(self, model: type[Model]) -> str:
+        """Generate CREATE INDEX CONCURRENTLY SQL as a plain string."""
+        table = model.model_options.db_table
+        condition = (
+            compile_expression_sql(model, self.condition)
+            if self.condition is not None
+            else None
+        )
+
+        if self.expressions:
+            columns_sql = compile_index_expressions_sql(model, self.expressions)
+        else:
+            col_parts = []
+            for i, (field_name, suffix) in enumerate(self.fields_orders):
+                field = model._model_meta.get_forward_field(field_name)
+                col = quote_name(field.column)
+                if self.opclasses:
+                    col = f"{col} {self.opclasses[i]}"
+                if suffix:
+                    col = f"{col} {suffix}"
+                col_parts.append(col)
+            columns_sql = ", ".join(col_parts)
+
+        include_sql = build_include_sql(model, self.include)
+        name = quote_name(self.name)
+        table = quote_name(table)
+        condition_sql = f" WHERE {condition}" if condition else ""
+        return f"CREATE INDEX CONCURRENTLY {name} ON {table} ({columns_sql}){include_sql}{condition_sql}"
 
     def create_sql(
         self, model: type[Model], schema_editor: DatabaseSchemaEditor, **kwargs: Any

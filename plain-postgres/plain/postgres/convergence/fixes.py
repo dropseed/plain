@@ -57,16 +57,13 @@ class RebuildIndexFix:
         return f"{self.table}: rebuild invalid index {self.name}"
 
     def apply(self) -> str:
-        conn = get_connection()
         # Drop the invalid index first
         drop_sql = f"DROP INDEX CONCURRENTLY IF EXISTS {quote_name(self.name)}"
         _execute_autocommit(drop_sql)
         # Recreate it
-        with conn.schema_editor(collect_sql=True) as editor:
-            create_sql = self.index.create_sql(self.model, editor, concurrently=True)
-        create_sql_str = str(create_sql)
-        _execute_autocommit(create_sql_str)
-        return f"{drop_sql}; {create_sql_str}"
+        create_sql = self.index.to_sql(self.model)
+        _execute_autocommit(create_sql)
+        return f"{drop_sql}; {create_sql}"
 
 
 @dataclass
@@ -88,12 +85,10 @@ class RebuildConstraintFix:
         drop_sql = f"ALTER TABLE {quote_name(self.table)} DROP CONSTRAINT {quote_name(self.name)}"
         _execute_and_commit(drop_sql)
         # Recreate with the model's current definition (NOT VALID for check)
-        conn = get_connection()
-        with conn.schema_editor(collect_sql=True) as editor:
-            sql = self.constraint.create_sql(self.model, editor)
-        create_sql = str(sql)
         if isinstance(self.constraint, CheckConstraint):
-            create_sql += " NOT VALID"
+            create_sql = self.constraint.to_sql(self.model, not_valid=True)
+        else:
+            create_sql = self.constraint.to_sql(self.model)
         _execute_and_commit(create_sql)
         return f"{drop_sql}; {create_sql}"
 
@@ -112,12 +107,9 @@ class CreateIndexFix:
         return f"{self.table}: create index {self.index.name}"
 
     def apply(self) -> str:
-        conn = get_connection()
-        with conn.schema_editor(collect_sql=True) as editor:
-            sql = self.index.create_sql(self.model, editor, concurrently=True)
-        sql_str = str(sql)
-        _execute_autocommit(sql_str)
-        return sql_str
+        sql = self.index.to_sql(self.model)
+        _execute_autocommit(sql)
+        return sql
 
 
 @dataclass
@@ -147,43 +139,31 @@ class AddConstraintFix:
 
     def _apply_unique(self) -> str:
         assert isinstance(self.constraint, UniqueConstraint)
-        conn = get_connection()
-        name = quote_name(self.constraint.name)
-        table = quote_name(self.table)
 
         # Step 1: Create unique index concurrently (non-blocking, handles all
         # UniqueConstraint features: condition, include, opclasses, expressions)
-        with conn.schema_editor(collect_sql=True) as editor:
-            sql = self.constraint.create_sql(self.model, editor, concurrently=True)
-        create_idx = str(sql)
+        create_idx = self.constraint.to_sql(self.model, concurrently=True)
         _execute_autocommit(create_idx)
 
         # Step 2: Attach as constraint using the index (instant)
-        add_constraint = (
-            f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE USING INDEX {name}"
-        )
-        if self.constraint.deferrable:
-            add_constraint += f" DEFERRABLE INITIALLY {self.constraint.deferrable.name}"
+        add_constraint = self.constraint.to_attach_sql(self.model)
         try:
             _execute_and_commit(add_constraint)
         except Exception:
             # Clean up the orphaned index if the constraint attachment fails
+            name = quote_name(self.constraint.name)
             _execute_autocommit(f"DROP INDEX CONCURRENTLY IF EXISTS {name}")
             raise
 
         return f"{create_idx}; {add_constraint}"
 
     def _apply_other(self) -> str:
-        conn = get_connection()
-        with conn.schema_editor(collect_sql=True) as editor:
-            sql = self.constraint.create_sql(self.model, editor)
-        sql_str = str(sql)
-
         if isinstance(self.constraint, CheckConstraint):
-            sql_str += " NOT VALID"
-
-        _execute_and_commit(sql_str)
-        return sql_str
+            sql = self.constraint.to_sql(self.model, not_valid=True)
+        else:
+            sql = self.constraint.to_sql(self.model)
+        _execute_and_commit(sql)
+        return sql
 
 
 @dataclass

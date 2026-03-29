@@ -5,6 +5,13 @@ from types import NoneType
 from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ValidationError
+from plain.postgres.dialect import (
+    build_include_sql,
+    compile_expression_sql,
+    compile_index_expressions_sql,
+    deferrable_sql,
+    quote_name,
+)
 from plain.postgres.exceptions import FieldError
 from plain.postgres.expressions import (
     Exists,
@@ -48,6 +55,11 @@ class BaseConstraint:
     @property
     def contains_expressions(self) -> bool:
         return False
+
+    def to_sql(self, model: type[Model]) -> str:
+        raise NotImplementedError(
+            "subclasses of BaseConstraint must provide a to_sql() method"
+        )
 
     def create_sql(
         self, model: type[Model], schema_editor: DatabaseSchemaEditor
@@ -120,6 +132,16 @@ class CheckConstraint(BaseConstraint):
         compiler = query.get_compiler()
         sql, params = where.as_sql(compiler, schema_editor.connection)
         return sql % tuple(schema_editor.quote_value(p) for p in params)
+
+    def to_sql(self, model: type[Model], *, not_valid: bool = False) -> str:
+        """Generate ALTER TABLE ADD CONSTRAINT CHECK SQL as a plain string."""
+        check = compile_expression_sql(model, self.check)
+        table = quote_name(model.model_options.db_table)
+        name = quote_name(self.name)
+        sql = f"ALTER TABLE {table} ADD CONSTRAINT {name} CHECK ({check})"
+        if not_valid:
+            sql += " NOT VALID"
+        return sql
 
     def create_sql(
         self, model: type[Model], schema_editor: DatabaseSchemaEditor
@@ -285,6 +307,50 @@ class UniqueConstraint(BaseConstraint):
         return ExpressionList(*index_expressions).resolve_expression(
             Query(model, alias_cols=False),
         )
+
+    def to_sql(self, model: type[Model], *, concurrently: bool = False) -> str:
+        """Generate CREATE UNIQUE INDEX or ALTER TABLE ADD CONSTRAINT UNIQUE SQL."""
+        table = quote_name(model.model_options.db_table)
+        name = quote_name(self.name)
+        condition = (
+            compile_expression_sql(model, self.condition)
+            if self.condition is not None
+            else None
+        )
+
+        if self.expressions:
+            columns_sql = compile_index_expressions_sql(model, self.expressions)
+        else:
+            col_parts = []
+            for i, field_name in enumerate(self.fields):
+                field = model._model_meta.get_forward_field(field_name)
+                col = quote_name(field.column)
+                if self.opclasses:
+                    col = f"{col} {self.opclasses[i]}"
+                col_parts.append(col)
+            columns_sql = ", ".join(col_parts)
+
+        include_sql = build_include_sql(model, self.include)
+        condition_sql = f" WHERE {condition}" if condition else ""
+
+        if concurrently:
+            return f"CREATE UNIQUE INDEX CONCURRENTLY {name} ON {table} ({columns_sql}){include_sql}{condition_sql}"
+        elif condition or self.include or self.opclasses or self.expressions:
+            return f"CREATE UNIQUE INDEX {name} ON {table} ({columns_sql}){include_sql}{condition_sql}"
+        else:
+            return f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE ({columns_sql}){deferrable_sql(self.deferrable)}"
+
+    def to_attach_sql(self, model: type[Model]) -> str:
+        """Generate ALTER TABLE ADD CONSTRAINT UNIQUE USING INDEX SQL.
+
+        Used after creating the unique index concurrently to attach it
+        as a named constraint.
+        """
+        table = quote_name(model.model_options.db_table)
+        name = quote_name(self.name)
+        sql = f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE USING INDEX {name}"
+        sql += deferrable_sql(self.deferrable)
+        return sql
 
     def create_sql(
         self,
