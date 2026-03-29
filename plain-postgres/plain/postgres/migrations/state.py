@@ -223,44 +223,6 @@ class ProjectState:
         model_state.options[option_name] = [obj for obj in objs if obj.name != obj_name]
         self.reload_model(package_label, model_name, delay=True)
 
-    def add_index(self, package_label: str, model_name: str, index: Any) -> None:
-        self._append_option(package_label, model_name, "indexes", index)
-
-    def remove_index(
-        self, package_label: str, model_name: str, index_name: str
-    ) -> None:
-        self._remove_option(package_label, model_name, "indexes", index_name)
-
-    def rename_index(
-        self,
-        package_label: str,
-        model_name: str,
-        old_index_name: str,
-        new_index_name: str,
-    ) -> None:
-        model_state = self.models[package_label, model_name]
-        objs = model_state.options["indexes"]
-
-        new_indexes = []
-        for obj in objs:
-            if obj.name == old_index_name:
-                obj = obj.clone()
-                obj.name = new_index_name
-            new_indexes.append(obj)
-
-        model_state.options["indexes"] = new_indexes
-        self.reload_model(package_label, model_name, delay=True)
-
-    def add_constraint(
-        self, package_label: str, model_name: str, constraint: Any
-    ) -> None:
-        self._append_option(package_label, model_name, "constraints", constraint)
-
-    def remove_constraint(
-        self, package_label: str, model_name: str, constraint_name: str
-    ) -> None:
-        self._remove_option(package_label, model_name, "constraints", constraint_name)
-
     def add_field(
         self,
         package_label: str,
@@ -847,18 +809,6 @@ class ModelState:
         register_model(model_class)
 
         return model_class
-
-    def get_index_by_name(self, name: str) -> Any:
-        for index in self.options["indexes"]:
-            if index.name == name:
-                return index
-        raise ValueError(f"No index named {name} on model {self.name}")
-
-    def get_constraint_by_name(self, name: str) -> Any:
-        for constraint in self.options["constraints"]:
-            if constraint.name == name:
-                return constraint
-        raise ValueError(f"No constraint named {name} on model {self.name}")
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: '{self.package_label}.{self.name}'>"

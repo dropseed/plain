@@ -30,7 +30,6 @@ from plain.postgres.fields import (
 )
 from plain.postgres.fields.related import ForeignKeyField, RelatedField
 from plain.postgres.fields.reverse_related import ForeignObjectRel, ManyToManyRel
-from plain.postgres.indexes import Index
 from plain.postgres.sql import Query
 from plain.postgres.transaction import atomic
 from plain.postgres.utils import names_digest, split_identifier, strip_quotes
@@ -41,7 +40,6 @@ if TYPE_CHECKING:
 
     from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.constraints import BaseConstraint
     from plain.postgres.fields import Field
     from plain.postgres.fields.related import ForeignKeyField
     from plain.postgres.fields.reverse_related import ManyToManyRel
@@ -368,11 +366,7 @@ class DatabaseSchemaEditor:
         "; SET CONSTRAINTS ALL IMMEDIATE"
     )
 
-    sql_unique_constraint = "UNIQUE (%(columns)s)%(deferrable)s"
-    sql_check_constraint = "CHECK (%(check)s)"
     sql_delete_constraint = "ALTER TABLE %(table)s DROP CONSTRAINT %(name)s"
-    sql_constraint = "CONSTRAINT %(name)s %(constraint)s"
-
     sql_create_check = "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s CHECK (%(check)s)"
     sql_delete_check = sql_delete_constraint
 
@@ -414,7 +408,6 @@ class DatabaseSchemaEditor:
         "CREATE UNIQUE INDEX CONCURRENTLY %(name)s ON %(table)s "
         "(%(columns)s)%(include)s%(condition)s"
     )
-    sql_rename_index = "ALTER INDEX %(old_name)s RENAME TO %(new_name)s"
     sql_delete_index = "DROP INDEX IF EXISTS %(name)s"
     sql_delete_index_concurrently = "DROP INDEX CONCURRENTLY IF EXISTS %(name)s"
 
@@ -644,42 +637,6 @@ class DatabaseSchemaEditor:
                 model.model_options.db_table
             ):
                 self.deferred_sql.remove(sql)
-
-    def add_index(
-        self, model: type[Model], index: Index, concurrently: bool = False
-    ) -> None:
-        """Add an index on a model."""
-        self.execute(
-            index.create_sql(model, self, concurrently=concurrently), params=None
-        )
-
-    def remove_index(
-        self, model: type[Model], index: Index, concurrently: bool = False
-    ) -> None:
-        """Remove an index from a model."""
-        self.execute(index.remove_sql(model, self, concurrently=concurrently))
-
-    def rename_index(
-        self, model: type[Model], old_index: Index, new_index: Index
-    ) -> None:
-        self.execute(
-            self._rename_index_sql(model, old_index.name, new_index.name),
-            params=None,
-        )
-
-    def add_constraint(self, model: type[Model], constraint: BaseConstraint) -> None:
-        """Add a constraint to a model."""
-        sql = constraint.create_sql(model, self)
-        if sql:
-            # Constraint.create_sql returns interpolated SQL which makes
-            # params=None a necessity to avoid escaping attempts on execution.
-            self.execute(sql, params=None)
-
-    def remove_constraint(self, model: type[Model], constraint: BaseConstraint) -> None:
-        """Remove a constraint from a model."""
-        sql = constraint.remove_sql(model, self)
-        if sql:
-            self.execute(sql)
 
     def alter_db_table(
         self, model: type[Model], old_db_table: str, new_db_table: str
@@ -1395,16 +1352,6 @@ class DatabaseSchemaEditor:
             name=quote_name(name),
         )
 
-    def _rename_index_sql(
-        self, model: type[Model], old_name: str, new_name: str
-    ) -> Statement:
-        return Statement(
-            self.sql_rename_index,
-            table=Table(model.model_options.db_table),
-            old_name=quote_name(old_name),
-            new_name=quote_name(new_name),
-        )
-
     def _index_columns(
         self,
         table: str,
@@ -1556,41 +1503,6 @@ class DatabaseSchemaEditor:
             return " DEFERRABLE INITIALLY IMMEDIATE"
         return ""
 
-    def _unique_sql(
-        self,
-        model: type[Model],
-        fields: Iterable[Field],
-        name: str,
-        condition: str | None = None,
-        deferrable: Deferrable | None = None,
-        include: list[str] | None = None,
-        opclasses: tuple[str, ...] | None = None,
-        expressions: Any = None,
-    ) -> str | None:
-        if condition or include or opclasses or expressions:
-            # Databases support conditional, covering, and functional unique
-            # constraints via a unique index.
-            sql = self._create_unique_sql(
-                model,
-                fields,
-                name=name,
-                condition=condition,
-                include=include,
-                opclasses=opclasses,
-                expressions=expressions,
-            )
-            if sql:
-                self.deferred_sql.append(sql)
-            return None
-        constraint = self.sql_unique_constraint % {
-            "columns": ", ".join([quote_name(field.column) for field in fields]),
-            "deferrable": self._deferrable_constraint_sql(deferrable),
-        }
-        return self.sql_constraint % {
-            "name": quote_name(name),
-            "constraint": constraint,
-        }
-
     def _create_unique_sql(
         self,
         model: type[Model],
@@ -1661,12 +1573,6 @@ class DatabaseSchemaEditor:
         else:
             sql = self.sql_delete_unique
         return self._delete_constraint_sql(sql, model, name)
-
-    def _check_sql(self, name: str, check: str) -> str:
-        return self.sql_constraint % {
-            "name": quote_name(name),
-            "constraint": self.sql_check_constraint % {"check": check},
-        }
 
     def _create_check_sql(self, model: type[Model], name: str, check: str) -> Statement:
         return Statement(

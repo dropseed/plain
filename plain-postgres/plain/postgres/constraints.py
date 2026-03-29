@@ -49,13 +49,6 @@ class BaseConstraint:
     def contains_expressions(self) -> bool:
         return False
 
-    def constraint_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str | None:
-        raise NotImplementedError(
-            "subclasses of BaseConstraint must provide a constraint_sql() method"
-        )
-
     def create_sql(
         self, model: type[Model], schema_editor: DatabaseSchemaEditor
     ) -> str | Statement | None:
@@ -127,12 +120,6 @@ class CheckConstraint(BaseConstraint):
         compiler = query.get_compiler()
         sql, params = where.as_sql(compiler, schema_editor.connection)
         return sql % tuple(schema_editor.quote_value(p) for p in params)
-
-    def constraint_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str:
-        check = self._get_check_sql(model, schema_editor)
-        return schema_editor._check_sql(self.name, check)
 
     def create_sql(
         self, model: type[Model], schema_editor: DatabaseSchemaEditor
@@ -297,30 +284,6 @@ class UniqueConstraint(BaseConstraint):
             index_expressions.append(index_expression)
         return ExpressionList(*index_expressions).resolve_expression(
             Query(model, alias_cols=False),
-        )
-
-    def constraint_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str | None:
-        fields = [
-            model._model_meta.get_forward_field(field_name)
-            for field_name in self.fields
-        ]
-        include = [
-            model._model_meta.get_forward_field(field_name).column
-            for field_name in self.include
-        ]
-        condition = self._get_condition_sql(model, schema_editor)
-        expressions = self._get_index_expressions(model, schema_editor)
-        return schema_editor._unique_sql(
-            model,
-            fields,
-            self.name,
-            condition=condition,
-            deferrable=self.deferrable,
-            include=include,
-            opclasses=tuple(self.opclasses) if self.opclasses else None,
-            expressions=expressions,
         )
 
     def create_sql(
