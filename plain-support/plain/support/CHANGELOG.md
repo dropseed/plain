@@ -1,5 +1,16 @@
 # plain-support changelog
 
+## [0.34.1](https://github.com/dropseed/plain/releases/plain-support@0.34.1) (2026-03-29)
+
+### What's changed
+
+- Removed `AddIndex`, `RenameIndex`, and `AddConstraint` operations from migrations — indexes and constraints are now managed by convergence. ([c58b4ba1fec9](https://github.com/dropseed/plain/commit/c58b4ba1fec9), [1f15538b008f](https://github.com/dropseed/plain/commit/1f15538b008f))
+- Updated docs to reference `plain postgres sync` instead of `plain migrate`. ([b026895edc4c](https://github.com/dropseed/plain/commit/b026895edc4c))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.91.0`.
+
 ## [0.34.0](https://github.com/dropseed/plain/releases/plain-support@0.34.0) (2026-03-28)
 
 ### What's changed
