@@ -59,6 +59,7 @@ class Fix(ABC):
 
     pass_order: ClassVar[int]
     category: ClassVar[FixCategory]
+    blocks_sync: ClassVar[bool] = True
 
     @abstractmethod
     def describe(self) -> str: ...
@@ -73,6 +74,7 @@ class RebuildIndexFix(Fix):
 
     pass_order = 0
     category = FixCategory.REPAIR
+    blocks_sync = False
 
     table: str
     index: Index
@@ -122,6 +124,7 @@ class RenameIndexFix(Fix):
 
     pass_order = 1
     category = FixCategory.FORWARD
+    blocks_sync = False
 
     table: str
     old_name: str
@@ -142,6 +145,7 @@ class CreateIndexFix(Fix):
 
     pass_order = 1
     category = FixCategory.FORWARD
+    blocks_sync = False
 
     table: str
     index: Index
@@ -220,6 +224,7 @@ class RenameConstraintFix(Fix):
 
     pass_order = 2
     category = FixCategory.FORWARD
+    blocks_sync = False
 
     table: str
     old_name: str

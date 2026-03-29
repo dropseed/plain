@@ -141,7 +141,7 @@ def _converge(*, drop_undeclared: bool) -> None:
                 click.secho(f"  FAILED: {r.fix.describe()} — {r.error}", fg="red")
 
         click.secho(result.summary, fg="green" if result.ok else "yellow")
-        if not result.ok:
+        if not result.ok_for_sync:
             success = False
 
     if not drop_undeclared and plan.blocking_cleanup:
@@ -158,7 +158,7 @@ def _converge(*, drop_undeclared: bool) -> None:
             click.echo(f"  {fix.describe()}")
         click.echo("Run with --drop-undeclared to remove undeclared indexes.")
 
-    if success and not fixes:
-        click.secho("Schema is converged.", fg="green")
-    elif not success:
+    if not success:
         sys.exit(1)
+    elif not fixes:
+        click.secho("Schema is converged.", fg="green")

@@ -78,6 +78,19 @@ class ConvergenceResult:
         return all(r.ok for r in self.results)
 
     @property
+    def ok_for_sync(self) -> bool:
+        """True if no sync-blocking fixes failed."""
+        return all(r.ok for r in self.results if r.fix.blocks_sync)
+
+    @property
+    def blocking_failures(self) -> list[FixResult]:
+        return [r for r in self.results if not r.ok and r.fix.blocks_sync]
+
+    @property
+    def non_blocking_failures(self) -> list[FixResult]:
+        return [r for r in self.results if not r.ok and not r.fix.blocks_sync]
+
+    @property
     def summary(self) -> str:
         parts = []
         if self.applied:

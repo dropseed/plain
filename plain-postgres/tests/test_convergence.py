@@ -1151,6 +1151,20 @@ class TestFixCategories:
     def test_contraction_category(self):
         assert DropConstraintFix.category == FixCategory.CONTRACTION
 
+    def test_blocks_sync(self):
+        # Correctness fixes block sync
+        assert AddConstraintFix.blocks_sync is True
+        assert ValidateConstraintFix.blocks_sync is True
+        assert RebuildConstraintFix.blocks_sync is True
+        # Performance/cosmetic fixes do not
+        assert CreateIndexFix.blocks_sync is False
+        assert RenameIndexFix.blocks_sync is False
+        assert RenameConstraintFix.blocks_sync is False
+        assert RebuildIndexFix.blocks_sync is False
+        # Cleanup/contraction inherit default (True) — conservative
+        assert DropConstraintFix.blocks_sync is True
+        assert DropIndexFix.blocks_sync is True
+
 
 class TestConvergencePlan:
     def test_executable_excludes_cleanup_by_default(self, db):
@@ -1290,3 +1304,71 @@ class TestExecuteFixes:
         result = execute_fixes(fixes)
 
         assert result.summary == "1 applied, 1 failed."
+
+
+class TestSyncPolicy:
+    """Tests for blocks_sync and ok_for_sync semantics."""
+
+    def test_blocking_failure_fails_sync(self, isolated_db):
+        """A failed constraint fix (blocks_sync=True) makes ok_for_sync False."""
+        fix = DropConstraintFix(table="examples_car", name="nonexistent")
+        result = execute_fixes([fix])
+
+        assert not result.ok
+        assert not result.ok_for_sync
+        assert len(result.blocking_failures) == 1
+        assert result.non_blocking_failures == []
+
+    def test_non_blocking_failure_passes_sync(self, isolated_db):
+        """A failed index fix (blocks_sync=False) keeps ok_for_sync True."""
+        fix = CreateIndexFix(
+            table="examples_car",
+            index=Index(fields=["make"], name="examples_car_will_fail_idx"),
+            model=Car,
+        )
+        # Create it first so the CONCURRENTLY create will fail (duplicate)
+        _execute('CREATE INDEX "examples_car_will_fail_idx" ON "examples_car" ("make")')
+
+        result = execute_fixes([fix])
+
+        assert not result.ok
+        assert result.ok_for_sync
+        assert result.blocking_failures == []
+        assert len(result.non_blocking_failures) == 1
+
+    def test_mixed_failures(self, isolated_db):
+        """Blocking + non-blocking failures: ok_for_sync reflects only blocking."""
+        _execute('CREATE INDEX "examples_car_will_fail_idx" ON "examples_car" ("make")')
+        fixes = [
+            # Non-blocking: will fail (duplicate index)
+            CreateIndexFix(
+                table="examples_car",
+                index=Index(fields=["make"], name="examples_car_will_fail_idx"),
+                model=Car,
+            ),
+            # Blocking: will fail (nonexistent constraint)
+            DropConstraintFix(table="examples_car", name="nonexistent"),
+        ]
+
+        result = execute_fixes(fixes)
+
+        assert not result.ok
+        assert not result.ok_for_sync
+        assert len(result.blocking_failures) == 1
+        assert len(result.non_blocking_failures) == 1
+
+    def test_all_success_passes_sync(self, isolated_db):
+        """All fixes succeeding means ok_for_sync is True."""
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_temp" CHECK ("id" >= 0)'
+        )
+        fix = DropConstraintFix(table="examples_car", name="examples_car_temp")
+        result = execute_fixes([fix])
+
+        assert result.ok
+        assert result.ok_for_sync
+
+    def test_empty_result_passes_sync(self):
+        """No fixes executed means ok_for_sync is True."""
+        result = execute_fixes([])
+        assert result.ok_for_sync
