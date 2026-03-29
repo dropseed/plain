@@ -1,5 +1,15 @@
 # plainx-dev changelog
 
+## [0.1.4](https://github.com/dropseed/plain/releases/plainx-dev@0.1.4) (2026-03-29)
+
+### What's changed
+
+- Updated references from `migrations make` to `migrations create`. ([adf021688bf3](https://github.com/dropseed/plain/commit/adf021688bf3))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.3](https://github.com/dropseed/plain/releases/plainx-dev@0.1.3) (2026-03-25)
 
 ### What's changed
