@@ -4,8 +4,9 @@ from .analysis import (
     IndexStatus,
     ModelAnalysis,
     analyze_model,
+    detect_fixes,
+    detect_model_fixes,
 )
-from .detection import detect_fixes, detect_model_fixes
 from .fixes import (
     AddConstraintFix,
     CreateIndexFix,

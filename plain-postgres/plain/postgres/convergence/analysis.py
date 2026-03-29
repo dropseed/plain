@@ -5,12 +5,14 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from ..constraints import BaseConstraint
+from ..db import get_connection
 from ..indexes import Index
 from ..introspection import (
     IndexInfo,
     ModelSchemaResult,
     check_model,
 )
+from ..registry import models_registry
 from .fixes import (
     AddConstraintFix,
     CreateIndexFix,
@@ -170,7 +172,24 @@ def analyze_model(
     return analysis
 
 
-# Index analysis
+def detect_fixes() -> list[Fix]:
+    """Scan all models against the database and return fixes in pass order."""
+    conn = get_connection()
+    fixes: list[Fix] = []
+
+    with conn.cursor() as cursor:
+        for model in models_registry.get_models():
+            fixes.extend(analyze_model(conn, cursor, model).fixes)
+
+    fixes.sort(key=lambda f: f.pass_order)
+    return fixes
+
+
+def detect_model_fixes(
+    conn: DatabaseConnection, cursor: CursorWrapper, model: type[Model]
+) -> list[Fix]:
+    """Detect fixes for a single model."""
+    return analyze_model(conn, cursor, model).fixes
 
 
 def _analyze_indexes(
