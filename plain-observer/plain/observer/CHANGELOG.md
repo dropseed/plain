@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.33.1](https://github.com/dropseed/plain/releases/plain-observer@0.33.1) (2026-03-29)
+
+### What's changed
+
+- Removed `AddIndex` and `RenameIndex` operations from migrations — indexes are now managed by convergence. ([c58b4ba1fec9](https://github.com/dropseed/plain/commit/c58b4ba1fec9))
+- Updated docs to reference `plain postgres sync` instead of `plain migrate`. ([b026895edc4c](https://github.com/dropseed/plain/commit/b026895edc4c))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.33.0](https://github.com/dropseed/plain/releases/plain-observer@0.33.0) (2026-03-28)
 
 ### What's changed
