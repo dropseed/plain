@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 import click
 
 from plain.runtime import settings
@@ -10,23 +12,69 @@ from ..db import get_connection
 
 @click.command()
 @click.option(
-    "--backup/--no-backup",
-    "backup",
+    "--check",
     is_flag=True,
-    default=None,
-    help="Explicitly enable/disable pre-migration backups.",
+    help="Exit with non-zero status if sync would make any database changes.",
 )
-def sync(backup: bool | None) -> None:
+def sync(check: bool) -> None:
     """Sync the database schema with models.
 
     In DEBUG mode: generates migrations, applies them, then converges constraints.
     In production: applies migrations, then converges constraints.
     """
+    if check:
+        _check()
+        return
+
     if settings.DEBUG:
         _create_migrations()
 
-    _migrate(backup=backup)
+    _migrate()
     _converge()
+
+
+def _check() -> None:
+    """Exit non-zero if sync would make any database changes."""
+    from .migrations import apply, create
+
+    has_changes = False
+
+    # Check if migrations would be created (DEBUG only)
+    if settings.DEBUG:
+        try:
+            create.callback(
+                package_labels=(),
+                dry_run=False,
+                empty=False,
+                no_input=True,
+                name=None,
+                check=True,
+                verbosity=0,
+            )
+        except SystemExit:
+            has_changes = True
+
+    # Check for unapplied migrations
+    try:
+        apply.callback(
+            package_label=None,
+            migration_name=None,
+            fake=False,
+            plan=False,
+            check_unapplied=True,
+            no_input=True,
+            atomic_batch=None,
+            quiet=True,
+        )
+    except SystemExit:
+        has_changes = True
+
+    # Check for convergence fixes
+    if detect_fixes():
+        has_changes = True
+
+    if has_changes:
+        sys.exit(1)
 
 
 def _create_migrations() -> None:
@@ -44,7 +92,7 @@ def _create_migrations() -> None:
     )
 
 
-def _migrate(*, backup: bool | None) -> None:
+def _migrate() -> None:
     from .migrations import apply
 
     click.secho("Applying migrations...", bold=True)
@@ -54,7 +102,6 @@ def _migrate(*, backup: bool | None) -> None:
         fake=False,
         plan=False,
         check_unapplied=False,
-        backup=backup,
         no_input=False,
         atomic_batch=None,
         quiet=False,
