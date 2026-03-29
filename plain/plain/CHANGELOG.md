@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.130.0](https://github.com/dropseed/plain/releases/plain@0.130.0) (2026-03-29)
+
+### What's changed
+
+- **`plain check` now uses `postgres sync --check`** instead of separate `migrate --check` and `makemigrations --check` calls. This validates migrations, pending model changes, and convergence in a single step. ([13bd4b963394](https://github.com/dropseed/plain/commit/13bd4b963394))
+- Removed the top-level `makemigrations` and `migrate` shortcut commands. Use `migrations create` and `migrations apply` (under `plain postgres`), or `plain postgres sync` for the combined workflow. ([adf021688bf3](https://github.com/dropseed/plain/commit/adf021688bf3), [b026895edc4c](https://github.com/dropseed/plain/commit/b026895edc4c))
+
+### Upgrade instructions
+
+- Replace `plain migrate` with `plain postgres sync` and `plain makemigrations` with `plain migrations create` in scripts and CI. Requires `plain-postgres>=0.91.0`.
+
 ## [0.129.0](https://github.com/dropseed/plain/releases/plain@0.129.0) (2026-03-27)
 
 ### What's changed
