@@ -10,6 +10,7 @@ from plain.postgres.convergence import (
     CreateIndexFix,
     DropConstraintFix,
     DropIndexFix,
+    RebuildConstraintFix,
     RebuildIndexFix,
     ValidateConstraintFix,
     detect_fixes,
@@ -262,6 +263,55 @@ class TestDetectConstraintFixes:
         finally:
             Car.model_options.constraints = original_constraints
 
+    def test_detects_check_constraint_definition_changed(self, db):
+        """A check constraint with matching name but different expression is detected."""
+        original_constraints = list(Car.model_options.constraints)
+        # Model declares CHECK (id >= 1)
+        check = CheckConstraint(
+            check=Q(id__gte=1),
+            name="examples_car_id_nonneg",
+        )
+        Car.model_options.constraints = [*original_constraints, check]
+
+        # DB has CHECK (id >= 0) — different expression, same name
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0)'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+
+            assert len(fixes) == 1
+            assert isinstance(fixes[0], RebuildConstraintFix)
+            assert fixes[0].name == "examples_car_id_nonneg"
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_no_false_positive_for_matching_check_constraint(self, db):
+        """A check constraint with matching name and matching expression has no issues."""
+        original_constraints = list(Car.model_options.constraints)
+        check = CheckConstraint(
+            check=Q(id__gte=0),
+            name="examples_car_id_nonneg",
+        )
+        Car.model_options.constraints = [*original_constraints, check]
+
+        # DB has the same expression
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0)'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+
+            assert fixes == []
+        finally:
+            Car.model_options.constraints = original_constraints
+
 
 class TestApplyConstraintFixes:
     def test_add_check_constraint_uses_not_valid(self, isolated_db):
@@ -316,6 +366,51 @@ class TestApplyConstraintFixes:
             assert not _constraint_is_valid("examples_car", "examples_car_id_nonneg")
 
             # Second converge pass: detects NOT VALID, validates
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+            assert len(fixes) == 1
+            assert isinstance(fixes[0], ValidateConstraintFix)
+
+            fixes[0].apply()
+            assert _constraint_is_valid("examples_car", "examples_car_id_nonneg")
+
+            # Third pass: fully converged
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+            assert fixes == []
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_definition_change_lifecycle(self, isolated_db):
+        """Changed check definition: rebuild → validate → converged."""
+        original_constraints = list(Car.model_options.constraints)
+        # Model declares CHECK (id >= 1)
+        check = CheckConstraint(
+            check=Q(id__gte=1),
+            name="examples_car_id_nonneg",
+        )
+        Car.model_options.constraints = [*original_constraints, check]
+
+        # DB has CHECK (id >= 0) — old expression
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0)'
+        )
+
+        try:
+            conn = get_connection()
+
+            # First pass: detects definition change → rebuild (drop + add NOT VALID)
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+            assert len(fixes) == 1
+            assert isinstance(fixes[0], RebuildConstraintFix)
+
+            fixes[0].apply()
+
+            assert _constraint_exists("examples_car", "examples_car_id_nonneg")
+            assert not _constraint_is_valid("examples_car", "examples_car_id_nonneg")
+
+            # Second pass: NOT VALID → validate
             with conn.cursor() as cursor:
                 fixes = detect_model_fixes(conn, cursor, Car)
             assert len(fixes) == 1
@@ -471,6 +566,49 @@ class TestDetectIndexFixes:
             rebuild_fixes = [f for f in fixes if isinstance(f, RebuildIndexFix)]
             assert len(rebuild_fixes) == 1
             assert rebuild_fixes[0].name == "examples_car_make_idx"
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_detects_index_definition_changed(self, db):
+        """An index with the same name but different columns produces a RebuildIndexFix."""
+        original_indexes = list(Car.model_options.indexes)
+        # Model declares index on "make" field
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_idx"),
+        ]
+
+        # DB has index on "model" column instead
+        _execute('CREATE INDEX "examples_car_make_idx" ON "examples_car" ("model")')
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+
+            rebuild_fixes = [f for f in fixes if isinstance(f, RebuildIndexFix)]
+            assert len(rebuild_fixes) == 1
+            assert rebuild_fixes[0].name == "examples_car_make_idx"
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_no_false_positive_for_matching_index(self, db):
+        """An index with matching name and matching columns produces no issues."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_idx"),
+        ]
+
+        # DB has index on "make" column — matches the model
+        _execute('CREATE INDEX "examples_car_make_idx" ON "examples_car" ("make")')
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+
+            assert fixes == []
         finally:
             Car.model_options.indexes = original_indexes
 

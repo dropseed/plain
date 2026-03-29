@@ -989,7 +989,8 @@ class DatabaseConnection:
                 JOIN pg_class AS fkc ON fka.attrelid = fkc.oid
                 WHERE fka.attrelid = c.confrelid AND fka.attnum = c.confkey[1]),
                 cl.reloptions,
-                c.convalidated
+                c.convalidated,
+                pg_get_constraintdef(c.oid)
             FROM pg_constraint AS c
             JOIN pg_class AS cl ON c.conrelid = cl.oid
             WHERE cl.relname = %s AND pg_catalog.pg_table_is_visible(cl.oid)
@@ -1003,6 +1004,7 @@ class DatabaseConnection:
             used_cols,
             options,
             validated,
+            constraintdef,
         ) in cursor.fetchall():
             constraints[constraint] = {
                 "columns": columns,
@@ -1011,7 +1013,7 @@ class DatabaseConnection:
                 "foreign_key": tuple(used_cols.split(".", 1)) if kind == "f" else None,
                 "check": kind == "c",
                 "index": False,
-                "definition": None,
+                "definition": constraintdef,
                 "options": options,
                 "validated": validated,
             }

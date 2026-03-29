@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, TypedDict
 
 from ..db import get_connection
@@ -83,6 +84,52 @@ def count_issues(result: ModelSchemaResult) -> int:
     for con in result["constraints"]:
         count += len(con["issues"])
     return count
+
+
+def _normalize_constraint_def(s: str) -> str:
+    """Normalize a constraint definition for comparison.
+
+    Strips outer CHECK(...) wrapper, collapses whitespace, removes
+    double-quote identifiers, and strips redundant parentheses so that
+    minor formatting differences between pg_get_constraintdef output and
+    the schema-editor-generated SQL don't cause false positives.
+    """
+    s = s.strip()
+    # Strip outer CHECK(...)
+    if s.upper().startswith("CHECK"):
+        s = s[5:].strip()
+        if s.startswith("(") and s.endswith(")"):
+            s = s[1:-1].strip()
+    # Remove double-quoted identifiers (pg may or may not quote column names)
+    s = s.replace('"', "")
+    # Collapse whitespace
+    s = re.sub(r"\s+", " ", s)
+    # Strip outer redundant parens (pg_get_constraintdef often adds an extra layer)
+    while s.startswith("(") and s.endswith(")"):
+        inner = s[1:-1]
+        # Only strip if the parens are balanced (i.e. they truly wrap the whole expr)
+        depth = 0
+        balanced = True
+        for ch in inner:
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            if depth < 0:
+                balanced = False
+                break
+        if balanced and depth == 0:
+            s = inner.strip()
+        else:
+            break
+    return s.lower()
+
+
+def _get_expected_check_definition(conn: Any, model: Any, constraint: Any) -> str:
+    """Generate the CHECK expression that the model would produce."""
+    with conn.schema_editor(collect_sql=True) as editor:
+        check_sql = constraint._get_check_sql(model, editor)
+    return f"CHECK ({check_sql})"
 
 
 def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
@@ -228,6 +275,24 @@ def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
                     detail="INVALID — needs drop and recreate",
                 )
             )
+        else:
+            # Index exists and is valid — check if columns match
+            if index.fields:
+                expected_columns = [
+                    model._model_meta.get_forward_field(field_name).column
+                    for field_name in index.fields
+                ]
+                actual_columns_list = list(
+                    actual_indexes[index.name].get("columns") or []
+                )
+                if expected_columns != actual_columns_list:
+                    idx_issues.append(
+                        SchemaIssue(
+                            kind="index_definition_changed",
+                            name=index.name,
+                            detail=f"columns differ: DB has {actual_columns_list}, model expects {expected_columns}",
+                        )
+                    )
         indexes.append(
             IndexInfo(
                 name=index.name,
@@ -276,6 +341,20 @@ def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
                         detail="NOT VALID — needs validation",
                     )
                 )
+            elif constraint_type == "check" and (
+                actual_def := actual_dict[constraint.name].get("definition")
+            ):
+                expected_def = _get_expected_check_definition(conn, model, constraint)
+                if _normalize_constraint_def(actual_def) != _normalize_constraint_def(
+                    expected_def
+                ):
+                    con_issues.append(
+                        SchemaIssue(
+                            kind="constraint_definition_changed",
+                            name=constraint.name,
+                            detail=f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}",
+                        )
+                    )
             constraints.append(
                 ConstraintInfo(
                     name=constraint.name,

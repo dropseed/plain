@@ -70,6 +70,35 @@ class RebuildIndexFix:
 
 
 @dataclass
+class RebuildConstraintFix:
+    """Drop a constraint with a stale definition and recreate it."""
+
+    pass_order = 0
+
+    table: str
+    constraint: BaseConstraint
+    model: Any
+    name: str
+
+    def describe(self) -> str:
+        return f"{self.table}: rebuild constraint {self.name}"
+
+    def apply(self) -> str:
+        # Drop the old constraint
+        drop_sql = f"ALTER TABLE {quote_name(self.table)} DROP CONSTRAINT {quote_name(self.name)}"
+        _execute_and_commit(drop_sql)
+        # Recreate with the model's current definition (NOT VALID for check)
+        conn = get_connection()
+        with conn.schema_editor(collect_sql=True) as editor:
+            sql = self.constraint.create_sql(self.model, editor)
+        create_sql = str(sql)
+        if isinstance(self.constraint, CheckConstraint):
+            create_sql += " NOT VALID"
+        _execute_and_commit(create_sql)
+        return f"{drop_sql}; {create_sql}"
+
+
+@dataclass
 class CreateIndexFix:
     """Create a missing index using CONCURRENTLY (doesn't block writes)."""
 
@@ -209,6 +238,7 @@ class DropIndexFix:
 
 Fix = (
     RebuildIndexFix
+    | RebuildConstraintFix
     | CreateIndexFix
     | AddConstraintFix
     | ValidateConstraintFix

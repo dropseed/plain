@@ -13,6 +13,7 @@ from .fixes import (
     DropConstraintFix,
     DropIndexFix,
     Fix,
+    RebuildConstraintFix,
     RebuildIndexFix,
     ValidateConstraintFix,
 )
@@ -47,7 +48,7 @@ def detect_model_fixes(conn: Any, cursor: Any, model: Any) -> list[Fix]:
                 index_obj = _find_model_index(model, idx["name"])
                 if index_obj:
                     fixes.append(CreateIndexFix(table, index_obj, model))
-            elif issue["kind"] == "index_invalid":
+            elif issue["kind"] in ("index_invalid", "index_definition_changed"):
                 index_obj = _find_model_index(model, idx["name"])
                 if index_obj:
                     fixes.append(RebuildIndexFix(table, index_obj, model, idx["name"]))
@@ -68,6 +69,14 @@ def detect_model_fixes(conn: Any, cursor: Any, model: Any) -> list[Fix]:
                 "unique",
             ):
                 fixes.append(ValidateConstraintFix(table, con["name"]))
+            elif issue["kind"] == "constraint_definition_changed" and con["type"] in (
+                "check",
+            ):
+                constraint_obj = _find_model_constraint(model, con["name"])
+                if constraint_obj:
+                    fixes.append(
+                        RebuildConstraintFix(table, constraint_obj, model, con["name"])
+                    )
             elif issue["kind"] == "constraint_extra" and con["type"] in (
                 "check",
                 "unique",
