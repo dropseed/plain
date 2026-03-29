@@ -33,8 +33,32 @@ def _execute_autocommit(sql: str) -> None:
 
 
 @dataclass
+class CreateIndexFix:
+    """Create a missing index using CONCURRENTLY (doesn't block writes)."""
+
+    pass_order = 1
+
+    table: str
+    index: Index
+    model: Any
+
+    def describe(self) -> str:
+        return f"{self.table}: create index {self.index.name}"
+
+    def apply(self) -> str:
+        conn = get_connection()
+        with conn.schema_editor(collect_sql=True) as editor:
+            sql = self.index.create_sql(self.model, editor, concurrently=True)
+        sql_str = str(sql)
+        _execute_autocommit(sql_str)
+        return sql_str
+
+
+@dataclass
 class AddConstraintFix:
     """Add a missing constraint using NOT VALID for check constraints."""
+
+    pass_order = 2
 
     table: str
     constraint: BaseConstraint
@@ -61,6 +85,8 @@ class AddConstraintFix:
 class ValidateConstraintFix:
     """Validate a NOT VALID constraint (SHARE UPDATE EXCLUSIVE — doesn't block writes)."""
 
+    pass_order = 3
+
     table: str
     name: str
 
@@ -75,6 +101,8 @@ class ValidateConstraintFix:
 
 @dataclass
 class DropConstraintFix:
+    pass_order = 4
+
     table: str
     name: str
 
@@ -88,27 +116,9 @@ class DropConstraintFix:
 
 
 @dataclass
-class CreateIndexFix:
-    """Create a missing index using CONCURRENTLY (doesn't block writes)."""
-
-    table: str
-    index: Index
-    model: Any
-
-    def describe(self) -> str:
-        return f"{self.table}: create index {self.index.name}"
-
-    def apply(self) -> str:
-        conn = get_connection()
-        with conn.schema_editor(collect_sql=True) as editor:
-            sql = self.index.create_sql(self.model, editor, concurrently=True)
-        sql_str = str(sql)
-        _execute_autocommit(sql_str)
-        return sql_str
-
-
-@dataclass
 class DropIndexFix:
+    pass_order = 5
+
     table: str
     name: str
 
@@ -122,9 +132,9 @@ class DropIndexFix:
 
 
 Fix = (
-    AddConstraintFix
+    CreateIndexFix
+    | AddConstraintFix
     | ValidateConstraintFix
     | DropConstraintFix
-    | CreateIndexFix
     | DropIndexFix
 )

@@ -9,6 +9,7 @@ from plain.postgres.convergence import (
     DropConstraintFix,
     DropIndexFix,
     ValidateConstraintFix,
+    detect_fixes,
     detect_model_fixes,
 )
 
@@ -52,6 +53,64 @@ def _index_exists(name: str) -> bool:
             [name],
         )
         return cursor.fetchone() is not None
+
+
+class TestPassOrdering:
+    def test_fixes_sorted_by_pass(self, db):
+        """detect_fixes() returns fixes in pass order: create indexes, add
+        constraints, validate, drop constraints, drop indexes."""
+        # Set up a model with a missing index, a missing constraint,
+        # an extra index, and an extra constraint
+        original_indexes = list(Car.model_options.indexes)
+        original_constraints = list(Car.model_options.constraints)
+
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_idx"),
+        ]
+        Car.model_options.constraints = [
+            *original_constraints,
+            CheckConstraint(check=Q(id__gte=0), name="examples_car_id_nonneg"),
+        ]
+
+        # Add extras to the DB
+        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("model")')
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_check" CHECK ("id" >= 0)'
+        )
+
+        try:
+            fixes = detect_fixes()
+            fix_types = [type(f) for f in fixes]
+
+            # All four fix types should be present
+            assert CreateIndexFix in fix_types
+            assert AddConstraintFix in fix_types
+            assert DropConstraintFix in fix_types
+            assert DropIndexFix in fix_types
+
+            # Verify pass ordering
+            create_idx = max(i for i, t in enumerate(fix_types) if t is CreateIndexFix)
+            add_con_min = min(
+                i for i, t in enumerate(fix_types) if t is AddConstraintFix
+            )
+            add_con_max = max(
+                i for i, t in enumerate(fix_types) if t is AddConstraintFix
+            )
+            drop_con_min = min(
+                i for i, t in enumerate(fix_types) if t is DropConstraintFix
+            )
+            drop_con_max = max(
+                i for i, t in enumerate(fix_types) if t is DropConstraintFix
+            )
+            drop_idx = min(i for i, t in enumerate(fix_types) if t is DropIndexFix)
+
+            assert create_idx < add_con_min
+            assert add_con_max < drop_con_min
+            assert drop_con_max < drop_idx
+        finally:
+            Car.model_options.indexes = original_indexes
+            Car.model_options.constraints = original_constraints
 
 
 class TestDetectConstraintFixes:

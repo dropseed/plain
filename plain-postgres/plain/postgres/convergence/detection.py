@@ -18,7 +18,11 @@ from .fixes import (
 
 
 def detect_fixes() -> list[Fix]:
-    """Scan all models against the database and return fixes for mismatches."""
+    """Scan all models against the database and return fixes in pass order.
+
+    Indexes are created before constraints (constraints may reference them),
+    and drops happen last.
+    """
     conn = get_connection()
     fixes: list[Fix] = []
 
@@ -26,6 +30,7 @@ def detect_fixes() -> list[Fix]:
         for model in models_registry.get_models():
             fixes.extend(detect_model_fixes(conn, cursor, model))
 
+    fixes.sort(key=lambda f: f.pass_order)
     return fixes
 
 
