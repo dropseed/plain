@@ -1,5 +1,35 @@
 # plain-postgres changelog
 
+## [0.91.0](https://github.com/dropseed/plain/releases/plain-postgres@0.91.0) (2026-03-29)
+
+### What's changed
+
+- **New `postgres sync` command** — the primary command for both development and deployment. In DEBUG mode it creates migrations, applies them, and converges. In production it applies migrations and converges. Use `--check` in CI to verify the database is fully synced. ([b026895edc4c](https://github.com/dropseed/plain/commit/b026895edc4c), [b348a5af0867](https://github.com/dropseed/plain/commit/b348a5af0867))
+
+- **Indexes and constraints are now managed by convergence, not migrations.** The migration autodetector no longer generates `AddIndex`, `RemoveIndex`, `RenameIndex`, `AddConstraint`, or `RemoveConstraint` operations — these classes have been removed. Convergence (`postgres sync` or `postgres converge`) creates, renames, rebuilds, and validates indexes and constraints using safe strategies: `CREATE INDEX CONCURRENTLY`, `NOT VALID` + `VALIDATE CONSTRAINT` for check constraints, and `CONCURRENTLY` + `USING INDEX` for unique constraints. ([c58b4ba1fec9](https://github.com/dropseed/plain/commit/c58b4ba1fec9), [f6506d263f3f](https://github.com/dropseed/plain/commit/f6506d263f3f), [1f15538b008f](https://github.com/dropseed/plain/commit/1f15538b008f))
+
+- **Command renames**: `makemigrations` → `migrations create`, `migrate` → `migrations apply`. The old top-level `makemigrations` and `migrate` shortcuts have been removed. ([adf021688bf3](https://github.com/dropseed/plain/commit/adf021688bf3))
+
+- **Removed `--backup` flag from `migrations apply`** — database backups have moved to `plain-dev`. ([50773a50f674](https://github.com/dropseed/plain/commit/50773a50f674))
+
+- **Removed `PositiveIntegerField`, `PositiveBigIntegerField`, and `PositiveSmallIntegerField`** — use `IntegerField`, `BigIntegerField`, or `SmallIntegerField` with a `CheckConstraint` if you need positivity enforcement. The `db_check` pipeline has also been removed. ([738a1efbca59](https://github.com/dropseed/plain/commit/738a1efbca59))
+
+- **Convergence overhaul** — rewritten into analysis, planning, and execution layers. Now detects index/constraint renames, stale definitions, INVALID indexes, and NOT VALID constraints. Each fix is applied and committed independently so partial failures don't block subsequent fixes. The `--prune` flag has been renamed to `--drop-undeclared`, which distinguishes between indexes (non-blocking) and constraints (blocking) when undeclared objects remain. ([987791d345cb](https://github.com/dropseed/plain/commit/987791d345cb), [66ac1152be0d](https://github.com/dropseed/plain/commit/66ac1152be0d), [f2f46e1a6054](https://github.com/dropseed/plain/commit/f2f46e1a6054), [5bb1472acf0f](https://github.com/dropseed/plain/commit/5bb1472acf0f))
+
+- Fixed test database names exceeding Postgres's 63-character identifier limit. ([4a8937ba2758](https://github.com/dropseed/plain/commit/4a8937ba2758))
+
+### Upgrade instructions
+
+1. **Replace `migrate` with `postgres sync` in deploy scripts and CI.** `postgres sync` applies migrations and runs convergence in a single step. For CI checks, use `postgres sync --check` instead of `migrate --check` / `makemigrations --check`. The lower-level commands are still available as `migrations create` and `migrations apply`.
+
+2. **Remove index/constraint operations from migration files.** Delete any `AddIndex`, `RemoveIndex`, `RenameIndex`, `AddConstraint`, and `RemoveConstraint` operations from your migration files — these classes no longer exist and will cause import errors. If removing an operation leaves `operations = []`, delete the migration file and run `plain migrations prune --yes`. Indexes and constraints declared on your models will be created automatically by convergence.
+
+3. **Replace `PositiveIntegerField`** (and `PositiveBigIntegerField`, `PositiveSmallIntegerField`) with `IntegerField` (or `BigIntegerField`, `SmallIntegerField`) in both models and migration files. Add a `CheckConstraint` if you need to enforce positive values.
+
+4. **Run `plain postgres sync`** after upgrading to create indexes and constraints via convergence.
+
+5. If you used `plain postgres backups`, install `plain-dev>=0.60.0` — backups have moved to `plain dev backups`.
+
 ## [0.90.0](https://github.com/dropseed/plain/releases/plain-postgres@0.90.0) (2026-03-28)
 
 ### What's changed
