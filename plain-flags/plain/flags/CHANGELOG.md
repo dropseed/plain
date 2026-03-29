@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.36.1](https://github.com/dropseed/plain/releases/plain-flags@0.36.1) (2026-03-29)
+
+### What's changed
+
+- Removed `AddConstraint` operation from migrations — constraints are now managed by convergence. ([1f15538b008f](https://github.com/dropseed/plain/commit/1f15538b008f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.36.0](https://github.com/dropseed/plain/releases/plain-flags@0.36.0) (2026-03-28)
 
 ### What's changed
