@@ -63,22 +63,14 @@ def run_core_checks(*, skip_test: bool = False) -> None:
     if find_spec("plain.code"):
         check_short("plain code check", "plain", "code", "check")
 
+    check_short("plain preflight", "plain", "preflight", "--quiet")
+
     if plain_db_connected():
-        check_short("plain preflight", "plain", "preflight", "--quiet")
         check_short(
-            "plain migrations apply --check", "plain", "migrations", "apply", "--check"
-        )
-        check_short(
-            "plain migrations create --dry-run --check",
-            "plain",
-            "migrations",
-            "create",
-            "--dry-run",
-            "--check",
+            "plain postgres sync --check", "plain", "postgres", "sync", "--check"
         )
     else:
-        check_short("plain preflight", "plain", "preflight", "--quiet")
-        click.secho("--> Skipping migration checks", bold=True, fg="yellow")
+        click.secho("--> Skipping sync check", bold=True, fg="yellow")
 
     if not skip_test and find_spec("plain.pytest"):
         print_event("plain test")
