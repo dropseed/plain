@@ -34,7 +34,7 @@ from plain.postgres.indexes import Index
 from plain.postgres.schema import DatabaseSchemaEditor
 from plain.postgres.transaction import TransactionManagementError
 from plain.postgres.utils import CursorDebugWrapper as BaseCursorDebugWrapper
-from plain.postgres.utils import CursorWrapper, debug_transaction
+from plain.postgres.utils import CursorWrapper, debug_transaction, names_digest
 from plain.runtime import settings
 
 if TYPE_CHECKING:
@@ -1154,7 +1154,11 @@ class DatabaseConnection:
             self.settings_dict["TEST"]["DATABASE"] or self.settings_dict["DATABASE"]
         )
         if prefix:
-            return f"{prefix}_{base_name}"
+            name = f"{prefix}_{base_name}"
+            if len(name) > MAX_NAME_LENGTH:
+                hash_suffix = names_digest(name, length=8)
+                name = name[: MAX_NAME_LENGTH - 9] + "_" + hash_suffix
+            return name
         if self.settings_dict["TEST"]["DATABASE"]:
             return self.settings_dict["TEST"]["DATABASE"]
         name = self.settings_dict["DATABASE"]
