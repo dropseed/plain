@@ -13,6 +13,7 @@ from .fixes import (
     DropConstraintFix,
     DropIndexFix,
     Fix,
+    RebuildIndexFix,
     ValidateConstraintFix,
 )
 
@@ -46,6 +47,10 @@ def detect_model_fixes(conn: Any, cursor: Any, model: Any) -> list[Fix]:
                 index_obj = _find_model_index(model, idx["name"])
                 if index_obj:
                     fixes.append(CreateIndexFix(table, index_obj, model))
+            elif issue["kind"] == "index_invalid":
+                index_obj = _find_model_index(model, idx["name"])
+                if index_obj:
+                    fixes.append(RebuildIndexFix(table, index_obj, model, idx["name"]))
             elif issue["kind"] == "index_extra":
                 fixes.append(DropIndexFix(table, idx["name"]))
 

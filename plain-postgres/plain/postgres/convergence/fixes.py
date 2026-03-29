@@ -33,6 +33,33 @@ def _execute_autocommit(sql: str) -> None:
 
 
 @dataclass
+class RebuildIndexFix:
+    """Drop an INVALID index and recreate it CONCURRENTLY."""
+
+    pass_order = 0
+
+    table: str
+    index: Index
+    model: Any
+    name: str
+
+    def describe(self) -> str:
+        return f"{self.table}: rebuild invalid index {self.name}"
+
+    def apply(self) -> str:
+        conn = get_connection()
+        # Drop the invalid index first
+        drop_sql = f"DROP INDEX CONCURRENTLY IF EXISTS {quote_name(self.name)}"
+        _execute_autocommit(drop_sql)
+        # Recreate it
+        with conn.schema_editor(collect_sql=True) as editor:
+            create_sql = self.index.create_sql(self.model, editor, concurrently=True)
+        create_sql_str = str(create_sql)
+        _execute_autocommit(create_sql_str)
+        return f"{drop_sql}; {create_sql_str}"
+
+
+@dataclass
 class CreateIndexFix:
     """Create a missing index using CONCURRENTLY (doesn't block writes)."""
 
@@ -132,7 +159,8 @@ class DropIndexFix:
 
 
 Fix = (
-    CreateIndexFix
+    RebuildIndexFix
+    | CreateIndexFix
     | AddConstraintFix
     | ValidateConstraintFix
     | DropConstraintFix

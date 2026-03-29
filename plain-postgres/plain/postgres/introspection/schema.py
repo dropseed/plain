@@ -220,6 +220,14 @@ def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
                     detail="missing from database",
                 )
             )
+        elif not actual_indexes[index.name].get("valid", True):
+            idx_issues.append(
+                SchemaIssue(
+                    kind="index_invalid",
+                    name=index.name,
+                    detail="INVALID — needs drop and recreate",
+                )
+            )
         indexes.append(
             IndexInfo(
                 name=index.name,

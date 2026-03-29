@@ -1026,7 +1026,8 @@ class DatabaseConnection:
                 array_agg(ordering ORDER BY arridx),
                 amname,
                 exprdef,
-                s2.attoptions
+                s2.attoptions,
+                s2.indisvalid
             FROM (
                 SELECT
                     c2.relname as indexname, idx.*, attr.attname, am.amname,
@@ -1055,7 +1056,7 @@ class DatabaseConnection:
                     pg_attribute attr ON attr.attrelid = c.oid AND attr.attnum = idx.key
                 WHERE c.relname = %s AND pg_catalog.pg_table_is_visible(c.oid)
             ) s2
-            GROUP BY indexname, indisunique, indisprimary, amname, exprdef, attoptions;
+            GROUP BY indexname, indisunique, indisprimary, amname, exprdef, attoptions, indisvalid;
         """,
             [self.index_default_access_method, table_name],
         )
@@ -1068,6 +1069,7 @@ class DatabaseConnection:
             type_,
             definition,
             options,
+            valid,
         ) in cursor.fetchall():
             if index not in constraints:
                 basic_index = (
@@ -1084,6 +1086,7 @@ class DatabaseConnection:
                     "type": Index.suffix if basic_index else type_,
                     "definition": definition,
                     "options": options,
+                    "valid": valid,
                 }
         return constraints
 

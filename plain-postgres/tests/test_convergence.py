@@ -8,6 +8,7 @@ from plain.postgres.convergence import (
     CreateIndexFix,
     DropConstraintFix,
     DropIndexFix,
+    RebuildIndexFix,
     ValidateConstraintFix,
     detect_fixes,
     detect_model_fixes,
@@ -331,6 +332,32 @@ class TestFixFailureRecovery:
         assert not _constraint_exists("examples_car", "examples_car_real_check")
 
 
+def _create_invalid_index(name: str) -> None:
+    """Create a normal index then mark it INVALID via pg_catalog."""
+    _execute(f'CREATE INDEX "{name}" ON "examples_car" ("make")')
+    _execute(
+        f"""
+        UPDATE pg_index SET indisvalid = false
+        WHERE indexrelid = (SELECT oid FROM pg_class WHERE relname = '{name}')
+        """
+    )
+
+
+def _index_is_valid(name: str) -> bool:
+    with get_connection().cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT i.indisvalid
+            FROM pg_index i
+            JOIN pg_class c ON i.indexrelid = c.oid
+            WHERE c.relname = %s
+            """,
+            [name],
+        )
+        row = cursor.fetchone()
+        return row[0] if row else False
+
+
 class TestDetectIndexFixes:
     def test_detects_missing_index(self, db):
         """Add an index to the model, detect it as missing."""
@@ -363,6 +390,30 @@ class TestDetectIndexFixes:
         assert len(index_fixes) == 1
         assert index_fixes[0].name == "examples_car_extra_idx"
 
+    def test_detects_invalid_index(self, isolated_db):
+        """An INVALID index matching a model index produces a RebuildIndexFix."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_idx"),
+        ]
+
+        _create_invalid_index("examples_car_make_idx")
+
+        try:
+            assert _index_exists("examples_car_make_idx")
+            assert not _index_is_valid("examples_car_make_idx")
+
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+
+            rebuild_fixes = [f for f in fixes if isinstance(f, RebuildIndexFix)]
+            assert len(rebuild_fixes) == 1
+            assert rebuild_fixes[0].name == "examples_car_make_idx"
+        finally:
+            Car.model_options.indexes = original_indexes
+
 
 class TestApplyIndexFixes:
     def test_create_index(self, isolated_db):
@@ -392,3 +443,30 @@ class TestApplyIndexFixes:
 
         assert "CONCURRENTLY" in sql
         assert not _index_exists("examples_car_temp_idx")
+
+    def test_rebuild_invalid_index(self, isolated_db):
+        """RebuildIndexFix drops an INVALID index and recreates it."""
+        original_indexes = list(Car.model_options.indexes)
+        index = Index(fields=["make"], name="examples_car_make_idx")
+        Car.model_options.indexes = [*original_indexes, index]
+
+        _create_invalid_index("examples_car_make_idx")
+
+        try:
+            assert _index_exists("examples_car_make_idx")
+            assert not _index_is_valid("examples_car_make_idx")
+
+            fix = RebuildIndexFix(
+                table="examples_car",
+                index=index,
+                model=Car,
+                name="examples_car_make_idx",
+            )
+            sql = fix.apply()
+
+            assert "DROP" in sql
+            assert "CONCURRENTLY" in sql
+            assert _index_exists("examples_car_make_idx")
+            assert _index_is_valid("examples_car_make_idx")
+        finally:
+            Car.model_options.indexes = original_indexes

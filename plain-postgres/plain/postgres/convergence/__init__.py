@@ -5,6 +5,7 @@ from .fixes import (
     DropConstraintFix,
     DropIndexFix,
     Fix,
+    RebuildIndexFix,
     ValidateConstraintFix,
 )
 
@@ -14,6 +15,7 @@ __all__ = [
     "DropConstraintFix",
     "DropIndexFix",
     "Fix",
+    "RebuildIndexFix",
     "ValidateConstraintFix",
     "detect_fixes",
     "detect_model_fixes",
