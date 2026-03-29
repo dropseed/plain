@@ -42,7 +42,6 @@ def cli() -> None:
 
 
 @common_command
-@register_cli("makemigrations", shortcut_for="migrations make")
 @cli.command("make")
 @click.argument("package_labels", nargs=-1)
 @click.option(
@@ -296,13 +295,12 @@ def make(
         click.echo()
         click.echo(
             "To create initial migrations, add the directory and run "
-            + click.style("plain makemigrations", bold=True)
+            + click.style("plain migrations make", bold=True)
             + " again."
         )
 
 
 @common_command
-@register_cli("migrate", shortcut_for="migrations apply")
 @cli.command("apply")
 @click.argument("package_label", required=False)
 @click.argument("migration_name", required=False)
@@ -625,7 +623,7 @@ def apply(
                     f"Your models have changes that are not yet reflected in migrations ({packages})."
                 )
                 click.echo(
-                    "Run 'plain makemigrations' to create migrations for these changes."
+                    "Run 'plain migrations make' to create migrations for these changes."
                 )
 
 
@@ -706,7 +704,9 @@ def list_migrations(
                             if plan_node in recorded_migrations:
                                 output = f" [X] {title}"
                             else:
-                                title += " Run `plain migrate` to finish recording."
+                                title += (
+                                    " Run `plain migrations apply` to finish recording."
+                                )
                                 output = f" [-] {title}"
                             if verbosity >= 2 and hasattr(applied_migration, "applied"):
                                 output += f" (applied at {applied_migration.applied.strftime('%Y-%m-%d %H:%M:%S')})"

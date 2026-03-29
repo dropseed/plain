@@ -30,7 +30,7 @@ class CLIRegistry:
         Args:
             cmd: The click command or group to register
             name: The name to register the command under
-            shortcut_for: Optional parent command this is a shortcut for (e.g., "postgres" for migrate)
+            shortcut_for: Optional parent command this is a shortcut for (e.g., "postgres" for sync)
             is_common: Whether this is a commonly used command to show in the "Common Commands" section
         """
         self._commands[name] = CommandMetadata(
@@ -98,8 +98,8 @@ def register_cli(
     Args:
         name: The name to register the command under
         shortcut_for: Optional parent command this is a shortcut for.
-                     For example, @register_cli("migrate", shortcut_for="postgres")
-                     indicates that "plain migrate" is a shortcut for "plain postgres migrate"
+                     For example, @register_cli("sync", shortcut_for="postgres")
+                     indicates that "plain sync" is a shortcut for "plain postgres sync"
         common: Whether this is a commonly used command to show in the "Common Commands" section
 
     Usage:
@@ -110,9 +110,9 @@ def register_cli(
             pass
 
         # Register a shortcut command
-        @register_cli("migrate", shortcut_for="postgres", common=True)
+        @register_cli("sync", shortcut_for="postgres", common=True)
         @click.command()
-        def migrate():
+        def sync():
             pass
 
         # Register a common command

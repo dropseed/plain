@@ -187,8 +187,8 @@ MIDDLEWARE = [
 ]
 ```
 
-Run migrations to create the session table:
+Sync the database to create the session table:
 
 ```bash
-plain migrate plain.sessions
+plain postgres sync
 ```

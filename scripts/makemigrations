@@ -5,4 +5,4 @@
 source scripts/start-postgres plain_example
 
 cd example
-uv run plain makemigrations "$@"
+uv run plain migrations make "$@"

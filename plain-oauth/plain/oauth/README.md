@@ -271,10 +271,10 @@ class AppRouter(Router):
     ]
 ```
 
-Run migrations:
+Sync the database:
 
 ```bash
-plain migrate
+plain postgres sync
 ```
 
 Create an OAuth app on your provider's site (GitHub, Google, etc.) and note the client ID and client secret. Set the callback URL to match your configuration, for example `http://localhost:8000/oauth/github/callback/` for local development.

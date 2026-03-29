@@ -192,10 +192,10 @@ MIDDLEWARE = [
 ]
 ```
 
-Run migrations to create the database tables:
+Sync the database to create the tables:
 
 ```console
-plain migrate
+plain postgres sync
 ```
 
 You can now create redirects through the admin interface or programmatically using the `Redirect` model.

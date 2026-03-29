@@ -205,10 +205,10 @@ class AppRouter(Router):
     ]
 ```
 
-Run migrations to create the necessary database tables:
+Sync the database to create the necessary tables:
 
 ```bash
-plain migrate
+plain postgres sync
 ```
 
 After installation, Observer will automatically integrate with your application's toolbar (if using `plain.toolbar`). You can access the web interface at `/observer/traces/` or use the CLI commands to analyze traces.

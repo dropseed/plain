@@ -33,12 +33,13 @@ Get approval before writing any model code or generating migrations.
 
 ## Migrations
 
-- `uv run plain makemigrations` — create migrations (`--dry-run` to preview, `--check` for CI)
-- `uv run plain migrate --backup` — apply migrations
-- `uv run plain migrations list` — view status (not `migrate --list`)
+- `uv run plain postgres sync` — the primary command: makes migrations (in DEBUG), applies them, and converges
+- `uv run plain migrations make` — create migrations (`--dry-run` to preview, `--check` for CI)
+- `uv run plain migrations apply --backup` — apply migrations
+- `uv run plain migrations list` — view status
 - Before committing, consolidate multiple uncommitted migrations into one:
   delete the intermediate files, run `migrations prune --yes` to clean stale DB records,
-  run `makemigrations` fresh, then `migrate --fake` to mark it applied
+  run `migrations make` fresh, then `migrations apply --fake` to mark it applied
 - Use `migrations squash` only for already-committed/deployed migrations — never for dev cleanup
 - Only write migrations by hand for custom data migrations
 

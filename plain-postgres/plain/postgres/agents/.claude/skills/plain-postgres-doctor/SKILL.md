@@ -7,7 +7,7 @@ description: Check overall database health — schema correctness and operationa
 
 Check database health by running schema and operational checks, then fix any issues found.
 
-**All checks are read-only.** Fixes are local code changes. Never run database mutations (`migrate`, direct SQL) without explicit user approval.
+**All checks are read-only.** Fixes are local code changes. Never run database mutations (`migrations apply`, direct SQL) without explicit user approval.
 
 ## 1. Dev only or production too?
 
@@ -37,7 +37,7 @@ The JSON output includes `suggestion` fields for each finding. If findings are o
 
 ## 3. Fix issues
 
-Make code and migration changes in the local codebase. For app-owned items, this is typically model changes + `uv run plain makemigrations`. For unknown tables, present `uv run plain postgres drop-unknown-tables` to the user — it shows what will be dropped and asks for confirmation. Use `--yes` to skip the prompt if the user wants the agent to run it directly. For other unmanaged items, the suggestions include exact DDL — present these to the user for review, do not run SQL directly.
+Make code and migration changes in the local codebase. For app-owned items, this is typically model changes + `uv run plain migrations make`. For unknown tables, present `uv run plain postgres drop-unknown-tables` to the user — it shows what will be dropped and asks for confirmation. Use `--yes` to skip the prompt if the user wants the agent to run it directly. For other unmanaged items, the suggestions include exact DDL — present these to the user for review, do not run SQL directly.
 
 ## 4. Verify
 

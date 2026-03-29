@@ -65,11 +65,14 @@ def run_core_checks(*, skip_test: bool = False) -> None:
 
     if plain_db_connected():
         check_short("plain preflight", "plain", "preflight", "--quiet")
-        check_short("plain migrate --check", "plain", "migrate", "--check")
         check_short(
-            "plain makemigrations --dry-run --check",
+            "plain migrations apply --check", "plain", "migrations", "apply", "--check"
+        )
+        check_short(
+            "plain migrations make --dry-run --check",
             "plain",
-            "makemigrations",
+            "migrations",
+            "make",
             "--dry-run",
             "--check",
         )

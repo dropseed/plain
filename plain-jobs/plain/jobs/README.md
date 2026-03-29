@@ -49,10 +49,10 @@ Workers are run using the `plain jobs worker` command.
 
 Jobs can be defined in any Python file, but it is suggested to use `app/jobs.py` or `app/{pkg}/jobs.py` as those will be imported automatically so the [`@register_job`](./registry.py#register_job) decorator will fire.
 
-Run database migrations after installation:
+Sync the database after installation:
 
 ```bash
-plain migrate
+plain postgres sync
 ```
 
 ## Local development

@@ -176,10 +176,10 @@ class AppRouter(Router):
     ]
 ```
 
-Run migrations to create the `SupportFormEntry` table:
+Sync the database to create the `SupportFormEntry` table:
 
 ```bash
-uv run plain migrate
+uv run plain postgres sync
 ```
 
 Create the required templates. At minimum, you need a form template:

@@ -435,7 +435,7 @@ Migrations track changes to your models and update the database schema according
 ### Creating migrations
 
 ```bash
-plain makemigrations
+plain migrations make
 ```
 
 Key flags:
@@ -451,7 +451,7 @@ Only write migrations by hand if they are custom data migrations.
 ### Running migrations
 
 ```bash
-plain migrate --backup
+plain migrations apply --backup
 ```
 
 Key flags:
@@ -467,7 +467,7 @@ Key flags:
 plain migrations list
 ```
 
-`migrate` has no `--list` or `--status` flag. Use `plain migrations list`.
+`migrations apply` has no `--list` or `--status` flag. Use `plain migrations list`.
 
 - `--format plan` — Show in dependency order instead of grouped by package
 
@@ -481,8 +481,8 @@ Use this when migrations exist only in your local dev environment and haven't be
 
 1. Delete the intermediate migration files (keep the initial 0001 and any previously committed migrations)
 2. `plain migrations prune --yes` — removes stale DB records for the deleted files
-3. `plain makemigrations` — creates a single fresh migration with all the changes
-4. `plain migrate --fake` — marks the new migration as applied (the schema is already correct from the old migrations)
+3. `plain migrations make` — creates a single fresh migration with all the changes
+4. `plain migrations apply --fake` — marks the new migration as applied (the schema is already correct from the old migrations)
 
 **Consolidating committed migrations (squash):**
 
@@ -511,16 +511,16 @@ Over time a package can accumulate dozens of migrations. Once **every environmen
 
 1. Run `plain migrations list` locally and verify everything is applied.
 2. Delete every file in the package's `migrations/` directory except `__init__.py`.
-3. Run `plain makemigrations` to generate a fresh `0001_initial`.
+3. Run `plain migrations make` to generate a fresh `0001_initial`.
 4. Run `plain migrations prune --yes` to remove stale DB records. The existing `0001_initial` record matches the new file, so the database is immediately up to date.
-5. Verify with `plain postgres schema` (zero issues means the reset is clean) and `plain makemigrations --check` (no pending changes).
+5. Verify with `plain postgres schema` (zero issues means the reset is clean) and `plain migrations make --check` (no pending changes).
 6. Commit and deploy. On every other environment, run `plain migrations prune --yes`. No actual SQL runs — it only cleans up migration history records. If `migrations prune` is already in your deploy steps, no changes are needed.
 
 **Things to keep in mind:**
 
 - If resetting multiple packages, process depended-on packages first — the new `0001_initial` may have cross-package FK dependencies.
 - Data migrations (`RunPython`) in the deleted history are gone, which is fine since they've already run everywhere.
-- If CI runs `makemigrations --check` or `migrate --check`, the reset PR must be merged and deployed before those checks pass in other branches.
+- If CI runs `migrations make --check` or `migrations apply --check`, the reset PR must be merged and deployed before those checks pass in other branches.
 
 ### Other migration commands
 
@@ -1023,7 +1023,7 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 #### How do I add a field to an existing model?
 
-Add the field to your model class, then run `plain makemigrations` to create a migration. If the field is required (no default value and not nullable), you'll be prompted to provide a default value for existing rows.
+Add the field to your model class, then run `plain migrations make` to create a migration. If the field is required (no default value and not nullable), you'll be prompted to provide a default value for existing rows.
 
 #### How do I create a unique constraint on multiple fields?
 

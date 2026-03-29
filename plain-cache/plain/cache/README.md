@@ -148,10 +148,10 @@ INSTALLED_PACKAGES = [
 ]
 ```
 
-Run migrations to create the cache tables:
+Sync the database to create the cache tables:
 
 ```bash
-plain migrate
+plain postgres sync
 ```
 
 Try it out:

@@ -16,6 +16,7 @@ from ..dialect import quote_name
 from .converge import converge
 from .diagnose import diagnose
 from .schema import schema
+from .sync import sync
 
 
 @register_cli("postgres")
@@ -28,6 +29,7 @@ cli.add_command(backups_cli)
 cli.add_command(converge)
 cli.add_command(diagnose)
 cli.add_command(schema)
+cli.add_command(sync)
 
 
 @cli.command()

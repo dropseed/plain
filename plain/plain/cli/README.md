@@ -76,17 +76,17 @@ This creates `plain users create` and `plain users list` commands.
 
 ### Register a shortcut command
 
-Some commands are used frequently enough to warrant a top-level shortcut. You can indicate that a command is a shortcut for a subcommand by passing `shortcut_for`:
+Use `shortcut_for` to create a top-level alias for a subcommand:
 
 ```python
-@register_cli("migrate", shortcut_for="models")
-@click.command()
-def migrate():
-    """Run database migrations"""
+@register_cli("fix", shortcut_for="code fix")
+@cli.command("fix")
+def fix():
+    """Fix formatting and linting issues"""
     # ...
 ```
 
-This makes `plain migrate` available as a shortcut for `plain models migrate`. The shortcut relationship is shown in help output.
+This registers `plain fix` as a shortcut for `plain code fix`. Both commands work identically. The shortcut appears in `plain --help` with a note showing the full command path.
 
 ### Mark commands as common
 
@@ -210,7 +210,7 @@ Plain includes several built-in commands:
 | `plain upgrade`       | Upgrade Plain packages                   |
 | `plain memory`        | Memory profiling tools                   |
 
-Additional commands are added by installed packages (like `plain models migrate` from plain.postgres).
+Additional commands are added by installed packages (like `plain migrations apply` from plain.postgres).
 
 ### `plain check`
 
@@ -219,8 +219,8 @@ Runs core validation checks in order, stopping on first failure:
 1. Custom commands (see below)
 2. `plain code check` (if `plain.code` is installed)
 3. `plain preflight --quiet`
-4. `plain migrate --check` (if DB connected)
-5. `plain makemigrations --dry-run --check` (if DB connected)
+4. `plain migrations apply --check` (if DB connected)
+5. `plain migrations make --dry-run --check` (if DB connected)
 6. `plain test` (if `plain.pytest` is installed)
 
 Use `--skip-test` to skip tests for faster iteration.
