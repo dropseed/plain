@@ -125,10 +125,11 @@ def _normalize_constraint_def(s: str) -> str:
     return s.lower()
 
 
-def _get_expected_check_definition(conn: Any, model: Any, constraint: Any) -> str:
+def _get_expected_check_definition(model: Any, constraint: Any) -> str:
     """Generate the CHECK expression that the model would produce."""
-    with conn.schema_editor(collect_sql=True) as editor:
-        check_sql = constraint._get_check_sql(model, editor)
+    from plain.postgres.ddl import compile_expression_sql
+
+    check_sql = compile_expression_sql(model, constraint.check)
     return f"CHECK ({check_sql})"
 
 
@@ -344,7 +345,7 @@ def check_model(conn: Any, cursor: Any, model: Any) -> ModelSchemaResult:
             elif constraint_type == "check" and (
                 actual_def := actual_dict[constraint.name].get("definition")
             ):
-                expected_def = _get_expected_check_definition(conn, model, constraint)
+                expected_def = _get_expected_check_definition(model, constraint)
                 if _normalize_constraint_def(actual_def) != _normalize_constraint_def(
                     expected_def
                 ):

@@ -15,19 +15,15 @@ from plain.postgres.dialect import quote_name
 from plain.postgres.exceptions import FieldError
 from plain.postgres.expressions import (
     Exists,
-    ExpressionList,
     F,
     OrderBy,
     ReplaceableExpression,
 )
-from plain.postgres.indexes import IndexExpression
 from plain.postgres.lookups import Exact
 from plain.postgres.query_utils import Q
-from plain.postgres.sql.query import Query
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
-    from plain.postgres.schema import DatabaseSchemaEditor, Statement
 
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]
 
@@ -59,20 +55,6 @@ class BaseConstraint:
     def to_sql(self, model: type[Model]) -> str:
         raise NotImplementedError(
             "subclasses of BaseConstraint must provide a to_sql() method"
-        )
-
-    def create_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str | Statement | None:
-        raise NotImplementedError(
-            "subclasses of BaseConstraint must provide a create_sql() method"
-        )
-
-    def remove_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str | Statement | None:
-        raise NotImplementedError(
-            "subclasses of BaseConstraint must provide a remove_sql() method"
         )
 
     def validate(
@@ -124,15 +106,6 @@ class CheckConstraint(BaseConstraint):
             violation_error_message=violation_error_message,
         )
 
-    def _get_check_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str:
-        query = Query(model=model, alias_cols=False)
-        where = query.build_where(self.check)
-        compiler = query.get_compiler()
-        sql, params = where.as_sql(compiler, schema_editor.connection)
-        return sql % tuple(schema_editor.quote_value(p) for p in params)
-
     def to_sql(self, model: type[Model], *, not_valid: bool = False) -> str:
         """Generate ALTER TABLE ADD CONSTRAINT CHECK SQL as a plain string."""
         check = compile_expression_sql(model, self.check)
@@ -142,19 +115,6 @@ class CheckConstraint(BaseConstraint):
         if not_valid:
             sql += " NOT VALID"
         return sql
-
-    def create_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> Statement | None:
-        check = self._get_check_sql(model, schema_editor)
-        return schema_editor._create_check_sql(model, self.name, check)
-
-    def remove_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> Statement | None:
-        return schema_editor._delete_constraint_sql(
-            schema_editor.sql_delete_check, model, self.name
-        )
 
     def validate(
         self, model: type[Model], instance: Model, exclude: set[str] | None = None
@@ -284,30 +244,6 @@ class UniqueConstraint(BaseConstraint):
     def contains_expressions(self) -> bool:
         return bool(self.expressions)
 
-    def _get_condition_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str | None:
-        if self.condition is None:
-            return None
-        query = Query(model=model, alias_cols=False)
-        where = query.build_where(self.condition)
-        compiler = query.get_compiler()
-        sql, params = where.as_sql(compiler, schema_editor.connection)
-        return sql % tuple(schema_editor.quote_value(p) for p in params)
-
-    def _get_index_expressions(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> Any:
-        if not self.expressions:
-            return None
-        index_expressions = []
-        for expression in self.expressions:
-            index_expression = IndexExpression(expression)
-            index_expressions.append(index_expression)
-        return ExpressionList(*index_expressions).resolve_expression(
-            Query(model, alias_cols=False),
-        )
-
     def to_sql(self, model: type[Model], *, concurrently: bool = False) -> str:
         """Generate CREATE UNIQUE INDEX or ALTER TABLE ADD CONSTRAINT UNIQUE SQL."""
         table = quote_name(model.model_options.db_table)
@@ -351,53 +287,6 @@ class UniqueConstraint(BaseConstraint):
         sql = f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE USING INDEX {name}"
         sql += deferrable_sql(self.deferrable)
         return sql
-
-    def create_sql(
-        self,
-        model: type[Model],
-        schema_editor: DatabaseSchemaEditor,
-        concurrently: bool = False,
-    ) -> Statement | None:
-        fields = [
-            model._model_meta.get_forward_field(field_name)
-            for field_name in self.fields
-        ]
-        include = [
-            model._model_meta.get_forward_field(field_name).column
-            for field_name in self.include
-        ]
-        condition = self._get_condition_sql(model, schema_editor)
-        expressions = self._get_index_expressions(model, schema_editor)
-        return schema_editor._create_unique_sql(
-            model,
-            fields,
-            self.name,
-            condition=condition,
-            deferrable=self.deferrable,
-            include=include,
-            opclasses=tuple(self.opclasses) if self.opclasses else None,
-            expressions=expressions,
-            concurrently=concurrently,
-        )
-
-    def remove_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> Statement | None:
-        condition = self._get_condition_sql(model, schema_editor)
-        include = [
-            model._model_meta.get_forward_field(field_name).column
-            for field_name in self.include
-        ]
-        expressions = self._get_index_expressions(model, schema_editor)
-        return schema_editor._delete_unique_sql(
-            model,
-            self.name,
-            condition=condition,
-            deferrable=self.deferrable,
-            include=include,
-            opclasses=tuple(self.opclasses) if self.opclasses else None,
-            expressions=expressions,
-        )
 
     def __repr__(self) -> str:
         return "<{}:{}{}{}{}{}{}{}{}{}>".format(

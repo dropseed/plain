@@ -163,11 +163,6 @@ class Index:
             **kwargs,
         )
 
-    def remove_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor, **kwargs: Any
-    ) -> Statement:
-        return schema_editor._delete_index_sql(model, self.name, **kwargs)
-
     def deconstruct(self) -> tuple[str, tuple[Expression, ...], dict[str, Any]]:
         path = f"{self.__class__.__module__}.{self.__class__.__name__}"
         path = path.replace("plain.postgres.indexes", "plain.postgres")
