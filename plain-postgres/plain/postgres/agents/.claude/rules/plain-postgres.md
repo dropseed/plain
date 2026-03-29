@@ -35,7 +35,7 @@ Get approval before writing any model code or generating migrations.
 
 - `uv run plain postgres sync` — the primary command: makes migrations (in DEBUG), applies them, and converges
 - `uv run plain migrations create` — create migrations (`--dry-run` to preview, `--check` for CI)
-- `uv run plain migrations apply --backup` — apply migrations
+- `uv run plain migrations apply` — apply migrations
 - `uv run plain migrations list` — view status
 - Before committing, consolidate multiple uncommitted migrations into one:
   delete the intermediate files, run `migrations prune --yes` to clean stale DB records,

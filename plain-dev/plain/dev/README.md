@@ -11,6 +11,7 @@
         - [Custom processes](#custom-processes)
     - [`plain dev services`](#plain-dev-services)
     - [`plain dev logs`](#plain-dev-logs)
+    - [`plain dev backups`](#plain-dev-backups)
     - [`plain pre-commit`](#plain-pre-commit)
 - [Settings](#settings)
 - [FAQs](#faqs)
@@ -87,6 +88,25 @@ plain dev logs -f     # follow the latest log
 plain dev logs --pid 1234
 plain dev logs --path
 ```
+
+### `plain dev backups`
+
+Manage local database backups. Requires [`plain.postgres`](../../plain-postgres/plain/postgres/README.md).
+
+A backup is automatically created when `plain dev` detects pending migrations, so you can easily restore your database if a migration changes something unexpectedly.
+
+```bash
+plain dev backups list              # List all backups
+plain dev backups list --branch     # Filter to current branch
+plain dev backups create            # Create a manual backup
+plain dev backups create my-backup  # Create with a specific name
+plain dev backups restore --latest  # Restore the most recent backup
+plain dev backups restore my-backup # Restore a specific backup
+plain dev backups delete my-backup  # Delete a specific backup
+plain dev backups clear             # Delete all backups
+```
+
+Backups are stored in `.plain/backups/` and automatically pruned to the 20 most recent per branch.
 
 ### `plain pre-commit`
 

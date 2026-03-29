@@ -1121,7 +1121,6 @@ class DatabaseConnection:
             fake=False,
             plan=False,
             check_unapplied=False,
-            backup=False,
             no_input=True,
             atomic_batch=False,  # No need for atomic batch when creating test database
             quiet=verbosity < 2,  # Show migration output when verbosity is 2+

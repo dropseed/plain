@@ -451,12 +451,11 @@ Only write migrations by hand if they are custom data migrations.
 ### Running migrations
 
 ```bash
-plain migrations apply --backup
+plain migrations apply
 ```
 
 Key flags:
 
-- `--backup` / `--no-backup` — Create a database backup before applying (default: on in DEBUG)
 - `--plan` — Show what migrations would run without applying them
 - `--check` — Exit non-zero if unapplied migrations exist (for CI)
 - `--fake` — Mark migrations as applied without running them

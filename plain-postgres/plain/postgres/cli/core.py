@@ -10,7 +10,6 @@ import psycopg
 
 from plain.cli import register_cli
 
-from ..backups.cli import cli as backups_cli
 from ..db import get_connection
 from ..dialect import quote_name
 from .converge import converge
@@ -25,7 +24,6 @@ def cli() -> None:
     """Postgres operations"""
 
 
-cli.add_command(backups_cli)
 cli.add_command(converge)
 cli.add_command(diagnose)
 cli.add_command(schema)

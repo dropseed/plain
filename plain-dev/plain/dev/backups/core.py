@@ -9,7 +9,6 @@ from typing import Any
 
 from plain.runtime import PLAIN_TEMP_PATH
 
-from ..db import get_connection
 from .clients import PostgresBackupClient
 
 
@@ -115,6 +114,8 @@ class DatabaseBackup:
         return self.path.exists()
 
     def create(self, *, source: str = "manual", pg_dump: str = "pg_dump") -> Path:
+        from plain.postgres.db import get_connection
+
         self.path.mkdir(parents=True, exist_ok=True)
 
         backup_path = self.path / "default.backup"
@@ -138,6 +139,8 @@ class DatabaseBackup:
         return self.path
 
     def restore(self, *, pg_restore: str = "pg_restore") -> None:
+        from plain.postgres.db import get_connection
+
         backup_file = self.path / "default.backup"
 
         PostgresBackupClient(get_connection()).restore_backup(

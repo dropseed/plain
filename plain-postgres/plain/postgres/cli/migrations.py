@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import sys
-import time
 from typing import TYPE_CHECKING, Any
 
 import click
@@ -10,11 +9,9 @@ import click
 from plain.cli import register_cli
 from plain.cli.runtime import common_command
 from plain.packages import packages_registry
-from plain.runtime import settings
 from plain.utils.text import Truncator
 
 from .. import migrations
-from ..backups.core import DatabaseBackups
 from ..db import get_connection
 from ..migrations.autodetector import MigrationAutodetector
 from ..migrations.executor import MigrationExecutor
@@ -319,13 +316,6 @@ def create(
     help="Exits with a non-zero status if unapplied migrations exist and does not actually apply migrations.",
 )
 @click.option(
-    "--backup/--no-backup",
-    "backup",
-    is_flag=True,
-    default=None,
-    help="Explicitly enable/disable pre-migration backups.",
-)
-@click.option(
     "--no-input",
     "--noinput",
     "no_input",
@@ -348,7 +338,6 @@ def apply(
     fake: bool,
     plan: bool,
     check_unapplied: bool,
-    backup: bool | None,
     no_input: bool,
     atomic_batch: bool | None,
     quiet: bool,
@@ -551,26 +540,8 @@ def apply(
                     if len(migration_plan) > 1:
                         atomic_batch_message = f"Running {len(migration_plan)} migrations separately (some have atomic=False)"
 
-        if backup or (backup is None and settings.DEBUG):
-            backup_name = time.strftime("%Y%m%d_%H%M%S")
-            if not quiet:
-                click.secho("Creating backup: ", bold=True, nl=False)
-                click.secho(f"{backup_name}", dim=True, nl=False)
-                click.secho("... ", dim=True, nl=False)
-
-            backups_handler = DatabaseBackups()
-            backups_handler.create(
-                backup_name,
-                source="migrate",
-                pg_dump=os.environ.get("PG_DUMP", "pg_dump"),
-            )
-
-            if not quiet:
-                click.echo(click.style("OK", fg="green"))
-                click.echo()  # Add blank line after backup output
-        else:
-            if not quiet:
-                click.echo()  # Add blank line after packages/target info
+        if not quiet:
+            click.echo()  # Add blank line before applying
 
         if not quiet:
             if atomic_batch_message:

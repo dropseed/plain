@@ -3,6 +3,7 @@ import platform
 import socket
 import subprocess
 import sys
+import time
 import tomllib
 from importlib.metadata import entry_points
 from importlib.util import find_spec
@@ -16,6 +17,7 @@ from rich.text import Text
 from plain.cli.print import print_event
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
+from .backups.core import DatabaseBackups
 from .mkcert import MkcertManager
 from .process import ProcessManager
 from .utils import has_pyproject_toml
@@ -162,6 +164,27 @@ class DevProcess(ProcessManager):
                 env=self.plain_env,
                 check=True,
             )
+
+            # Backup before syncing if sync would make changes
+            check_result = subprocess.run(
+                [sys.executable, "-m", "plain", "postgres", "sync", "--check"],
+                env=self.plain_env,
+                capture_output=True,
+            )
+
+            if check_result.returncode != 0:
+                backup_name = time.strftime("%Y%m%d_%H%M%S")
+                print_event(f"Backing up database ({backup_name})...", newline=False)
+                try:
+                    DatabaseBackups().create(
+                        backup_name,
+                        source="dev",
+                        pg_dump=os.environ.get("PG_DUMP", "pg_dump"),
+                    )
+                    click.secho("✔", fg="green")
+                except Exception:
+                    click.secho("skipped", dim=True)
+
             print_event("Syncing database...")
             subprocess.run(
                 [sys.executable, "-m", "plain", "postgres", "sync"],
