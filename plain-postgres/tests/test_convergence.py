@@ -132,7 +132,7 @@ class TestPassOrdering:
         )
 
         try:
-            fixes = detect_fixes()
+            fixes = detect_fixes(include_prunable=True)
             fix_types = [type(f) for f in fixes]
 
             # All six fix types should be present
@@ -170,6 +170,17 @@ class TestPassOrdering:
             assert add_con_max < validate_min
             assert validate_max < drop_con_min
             assert drop_con_max < drop_idx
+
+            # Without include_prunable, drop fixes should be excluded
+            default_fixes = detect_fixes()
+            default_types = [type(f) for f in default_fixes]
+            assert DropConstraintFix not in default_types
+            assert DropIndexFix not in default_types
+            # Non-prunable fixes should still be present
+            assert RebuildIndexFix in default_types
+            assert CreateIndexFix in default_types
+            assert AddConstraintFix in default_types
+            assert ValidateConstraintFix in default_types
         finally:
             Car.model_options.indexes = original_indexes
             Car.model_options.constraints = original_constraints
@@ -182,7 +193,21 @@ class TestDetectConstraintFixes:
             fixes = detect_model_fixes(conn, cursor, Car)
         assert fixes == []
 
-    def test_detects_extra_check_constraint(self, db):
+    def test_detects_extra_check_constraint_with_prune(self, db):
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            fixes = detect_model_fixes(conn, cursor, Car, include_prunable=True)
+
+        assert len(fixes) == 1
+        fix = fixes[0]
+        assert isinstance(fix, DropConstraintFix)
+        assert fix.name == "examples_car_test_check"
+
+    def test_extra_check_constraint_excluded_by_default(self, db):
         _execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
         )
@@ -191,12 +216,23 @@ class TestDetectConstraintFixes:
         with conn.cursor() as cursor:
             fixes = detect_model_fixes(conn, cursor, Car)
 
+        assert fixes == []
+
+    def test_detects_extra_unique_constraint_with_prune(self, db):
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_unique" UNIQUE ("make")'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            fixes = detect_model_fixes(conn, cursor, Car, include_prunable=True)
+
         assert len(fixes) == 1
         fix = fixes[0]
         assert isinstance(fix, DropConstraintFix)
-        assert fix.name == "examples_car_test_check"
+        assert fix.name == "examples_car_extra_unique"
 
-    def test_detects_extra_unique_constraint(self, db):
+    def test_extra_unique_constraint_excluded_by_default(self, db):
         _execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_unique" UNIQUE ("make")'
         )
@@ -205,10 +241,7 @@ class TestDetectConstraintFixes:
         with conn.cursor() as cursor:
             fixes = detect_model_fixes(conn, cursor, Car)
 
-        assert len(fixes) == 1
-        fix = fixes[0]
-        assert isinstance(fix, DropConstraintFix)
-        assert fix.name == "examples_car_extra_unique"
+        assert fixes == []
 
     def test_detects_missing_check_constraint(self, db):
         original_constraints = list(Car.model_options.constraints)
@@ -537,17 +570,27 @@ class TestDetectIndexFixes:
         finally:
             Car.model_options.indexes = original_indexes
 
-    def test_detects_extra_index(self, db):
-        """An index in the DB not declared on the model is extra."""
+    def test_detects_extra_index_with_prune(self, db):
+        """An index in the DB not declared on the model is extra (requires prune)."""
+        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            fixes = detect_model_fixes(conn, cursor, Car, include_prunable=True)
+
+        index_fixes = [f for f in fixes if isinstance(f, DropIndexFix)]
+        assert len(index_fixes) == 1
+        assert index_fixes[0].name == "examples_car_extra_idx"
+
+    def test_extra_index_excluded_by_default(self, db):
+        """An extra index produces no fix by default."""
         _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         conn = get_connection()
         with conn.cursor() as cursor:
             fixes = detect_model_fixes(conn, cursor, Car)
 
-        index_fixes = [f for f in fixes if isinstance(f, DropIndexFix)]
-        assert len(index_fixes) == 1
-        assert index_fixes[0].name == "examples_car_extra_idx"
+        assert fixes == []
 
     def test_detects_invalid_index(self, isolated_db):
         """An INVALID index matching a model index produces a RebuildIndexFix."""

@@ -12,18 +12,26 @@ from ..convergence import detect_fixes
     is_flag=True,
     help="Skip confirmation prompt.",
 )
-def converge(yes: bool) -> None:
+@click.option(
+    "--prune",
+    is_flag=True,
+    help="Also drop indexes and constraints not declared on any model.",
+)
+def converge(yes: bool, prune: bool) -> None:
     """Fix schema mismatches between models and the database.
 
     Detects and fixes:
-    - Missing or extra indexes (using CONCURRENTLY)
-    - Missing or extra constraints (check, unique)
+    - Missing indexes (using CONCURRENTLY)
+    - Missing constraints (check, unique)
     - NOT VALID constraints needing validation
+
+    With --prune, also drops indexes and constraints that exist in the
+    database but are not declared on any model.
 
     Each fix is applied and committed independently so partial
     failures don't block subsequent fixes.
     """
-    fixes = detect_fixes()
+    fixes = detect_fixes(include_prunable=prune)
 
     if not fixes:
         click.secho("Schema is converged — nothing to fix.", fg="green")

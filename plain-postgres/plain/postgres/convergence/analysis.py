@@ -162,8 +162,20 @@ def analyze_model(
     )
 
 
-def detect_fixes() -> list[Fix]:
-    """Scan all models against the database and return fixes in pass order."""
+def _filter_fixes(fixes: list[Fix], *, include_prunable: bool) -> list[Fix]:
+    """Filter and sort fixes. Excludes prunable fixes unless requested."""
+    if not include_prunable:
+        fixes = [f for f in fixes if not f.is_prunable]
+    fixes.sort(key=lambda f: f.pass_order)
+    return fixes
+
+
+def detect_fixes(*, include_prunable: bool = False) -> list[Fix]:
+    """Scan all models against the database and return fixes in pass order.
+
+    By default, prunable fixes (dropping undeclared indexes/constraints) are
+    excluded.  Pass ``include_prunable=True`` to include them (used by --prune).
+    """
     conn = get_connection()
     fixes: list[Fix] = []
 
@@ -171,15 +183,24 @@ def detect_fixes() -> list[Fix]:
         for model in models_registry.get_models():
             fixes.extend(analyze_model(conn, cursor, model).fixes)
 
-    fixes.sort(key=lambda f: f.pass_order)
-    return fixes
+    return _filter_fixes(fixes, include_prunable=include_prunable)
 
 
 def detect_model_fixes(
-    conn: DatabaseConnection, cursor: CursorWrapper, model: type[Model]
+    conn: DatabaseConnection,
+    cursor: CursorWrapper,
+    model: type[Model],
+    *,
+    include_prunable: bool = False,
 ) -> list[Fix]:
-    """Detect fixes for a single model."""
-    return analyze_model(conn, cursor, model).fixes
+    """Detect fixes for a single model.
+
+    By default, prunable fixes are excluded.  Pass ``include_prunable=True``
+    to include them.
+    """
+    return _filter_fixes(
+        analyze_model(conn, cursor, model).fixes, include_prunable=include_prunable
+    )
 
 
 # Column comparison

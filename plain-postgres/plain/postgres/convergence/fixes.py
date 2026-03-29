@@ -50,6 +50,7 @@ class Fix(ABC):
     """Base class for all convergence fixes."""
 
     pass_order: ClassVar[int]
+    is_prunable: ClassVar[bool] = False
 
     @abstractmethod
     def describe(self) -> str: ...
@@ -240,6 +241,7 @@ class ValidateConstraintFix(Fix):
 @dataclass
 class DropConstraintFix(Fix):
     pass_order = 4
+    is_prunable = True
 
     table: str
     name: str
@@ -256,6 +258,7 @@ class DropConstraintFix(Fix):
 @dataclass
 class DropIndexFix(Fix):
     pass_order = 5
+    is_prunable = True
 
     table: str
     name: str

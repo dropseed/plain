@@ -15,24 +15,32 @@ from ..convergence import detect_fixes
     is_flag=True,
     help="Exit with non-zero status if sync would make any database changes.",
 )
-def sync(check: bool) -> None:
+@click.option(
+    "--prune",
+    is_flag=True,
+    help="Also drop indexes and constraints not declared on any model.",
+)
+def sync(check: bool, prune: bool) -> None:
     """Sync the database schema with models.
 
     In DEBUG mode: generates migrations, applies them, then converges constraints.
     In production: applies migrations, then converges constraints.
+
+    With --prune, also drops indexes and constraints that exist in the
+    database but are not declared on any model.
     """
     if check:
-        _check()
+        _check(prune=prune)
         return
 
     if settings.DEBUG:
         _create_migrations()
 
     _migrate()
-    _converge()
+    _converge(prune=prune)
 
 
-def _check() -> None:
+def _check(*, prune: bool) -> None:
     """Exit non-zero if sync would make any database changes."""
     from .migrations import apply, create
 
@@ -69,7 +77,7 @@ def _check() -> None:
         has_changes = True
 
     # Check for convergence fixes
-    if detect_fixes():
+    if detect_fixes(include_prunable=prune):
         has_changes = True
 
     if has_changes:
@@ -107,10 +115,10 @@ def _migrate() -> None:
     )
 
 
-def _converge() -> None:
+def _converge(*, prune: bool) -> None:
     click.secho("Converging schema...", bold=True)
 
-    fixes = detect_fixes()
+    fixes = detect_fixes(include_prunable=prune)
     if not fixes:
         click.secho("Schema is converged.", fg="green")
         return
