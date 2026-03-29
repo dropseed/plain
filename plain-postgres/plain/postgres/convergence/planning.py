@@ -34,15 +34,29 @@ class ConvergencePlan:
 
     fixes: list[Fix]
 
-    def executable(self, *, prune: bool = False) -> list[Fix]:
+    def executable(self, *, drop_undeclared: bool = False) -> list[Fix]:
         """Fixes to apply in this mode, sorted by pass_order."""
-        if prune:
+        if drop_undeclared:
             return list(self.fixes)
-        return [f for f in self.fixes if f.category != FixCategory.CLEANUP]
+        return [
+            f
+            for f in self.fixes
+            if f.category not in {FixCategory.CLEANUP, FixCategory.CONTRACTION}
+        ]
 
-    def has_work(self, *, prune: bool = False) -> bool:
+    def has_work(self, *, drop_undeclared: bool = False) -> bool:
         """Would this mode produce any fixes to apply?"""
-        return bool(self.executable(prune=prune))
+        return bool(self.executable(drop_undeclared=drop_undeclared))
+
+    @property
+    def blocking_cleanup(self) -> list[Fix]:
+        """Contraction fixes that block success — leaving them changes DB behavior."""
+        return [f for f in self.fixes if f.category == FixCategory.CONTRACTION]
+
+    @property
+    def optional_cleanup(self) -> list[Fix]:
+        """Cleanup fixes safe to defer — stale but non-behavioral."""
+        return [f for f in self.fixes if f.category == FixCategory.CLEANUP]
 
 
 @dataclass

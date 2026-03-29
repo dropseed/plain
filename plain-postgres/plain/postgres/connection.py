@@ -1141,6 +1141,12 @@ class DatabaseConnection:
             raise RuntimeError(
                 f"Convergence failed during test DB setup: {failed[0].fix.describe()} — {failed[0].error}"
             )
+        # Shouldn't happen — a fresh DB from migrations has no undeclared objects.
+        # Safety net so test setup doesn't silently diverge from sync policy.
+        if plan.blocking_cleanup:
+            raise RuntimeError(
+                f"Convergence blocked during test DB setup: {plan.blocking_cleanup[0].describe()}"
+            )
 
         # Ensure a connection for the side effect of initializing the test database.
         self.ensure_connection()

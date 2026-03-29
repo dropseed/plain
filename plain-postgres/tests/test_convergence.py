@@ -134,7 +134,7 @@ class TestPassOrdering:
         )
 
         try:
-            fixes = plan_convergence().executable(prune=True)
+            fixes = plan_convergence().executable(drop_undeclared=True)
             fix_types = [type(f) for f in fixes]
 
             # All six fix types should be present
@@ -202,7 +202,9 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable(prune=True)
+            fixes = plan_model_convergence(conn, cursor, Car).executable(
+                drop_undeclared=True
+            )
 
         assert len(fixes) == 1
         fix = fixes[0]
@@ -227,7 +229,9 @@ class TestDetectConstraintFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable(prune=True)
+            fixes = plan_model_convergence(conn, cursor, Car).executable(
+                drop_undeclared=True
+            )
 
         assert len(fixes) == 1
         fix = fixes[0]
@@ -578,7 +582,9 @@ class TestDetectIndexFixes:
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            fixes = plan_model_convergence(conn, cursor, Car).executable(prune=True)
+            fixes = plan_model_convergence(conn, cursor, Car).executable(
+                drop_undeclared=True
+            )
 
         index_fixes = [f for f in fixes if isinstance(f, DropIndexFix)]
         assert len(index_fixes) == 1
@@ -1141,7 +1147,9 @@ class TestFixCategories:
 
     def test_cleanup_category(self):
         assert DropIndexFix.category == FixCategory.CLEANUP
-        assert DropConstraintFix.category == FixCategory.CLEANUP
+
+    def test_contraction_category(self):
+        assert DropConstraintFix.category == FixCategory.CONTRACTION
 
 
 class TestConvergencePlan:
@@ -1151,24 +1159,23 @@ class TestConvergencePlan:
 
         plan = plan_convergence()
         default = plan.executable()
-        with_prune = plan.executable(prune=True)
+        with_drop = plan.executable(drop_undeclared=True)
 
-        # The extra index should only appear with prune
         drop_in_default = [f for f in default if isinstance(f, DropIndexFix)]
-        drop_in_prune = [f for f in with_prune if isinstance(f, DropIndexFix)]
+        drop_in_drop = [f for f in with_drop if isinstance(f, DropIndexFix)]
         assert drop_in_default == []
-        assert len(drop_in_prune) == 1
+        assert len(drop_in_drop) == 1
 
     def test_has_work_ignores_cleanup_by_default(self, db):
-        """has_work() only counts cleanup fixes when prune=True."""
+        """has_work() only counts cleanup fixes when drop_undeclared=True."""
         _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         plan = plan_convergence()
         assert not plan.has_work()
-        assert plan.has_work(prune=True)
+        assert plan.has_work(drop_undeclared=True)
 
     def test_has_work_counts_forward_fixes(self, db):
-        """has_work() sees forward fixes regardless of prune."""
+        """has_work() sees forward fixes regardless of drop_undeclared."""
         original_indexes = list(Car.model_options.indexes)
         Car.model_options.indexes = [
             *original_indexes,
@@ -1178,9 +1185,52 @@ class TestConvergencePlan:
         try:
             plan = plan_convergence()
             assert plan.has_work()
-            assert plan.has_work(prune=True)
+            assert plan.has_work(drop_undeclared=True)
         finally:
             Car.model_options.indexes = original_indexes
+
+    def test_blocking_cleanup_for_extra_constraint(self, db):
+        """Extra constraint is blocking cleanup."""
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
+        )
+
+        plan = plan_convergence()
+        assert len(plan.blocking_cleanup) == 1
+        assert (
+            plan.blocking_cleanup[0].describe()
+            == "examples_car: drop constraint examples_car_test_check"
+        )
+        assert plan.optional_cleanup == []
+
+    def test_optional_cleanup_for_extra_index(self, db):
+        """Extra index is optional cleanup."""
+        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+
+        plan = plan_convergence()
+        assert plan.blocking_cleanup == []
+        assert len(plan.optional_cleanup) == 1
+        assert (
+            plan.optional_cleanup[0].describe()
+            == "examples_car: drop index examples_car_extra_idx"
+        )
+
+    def test_blocking_and_optional_together(self, db):
+        """Both blocking and optional cleanup can coexist."""
+        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
+        )
+
+        plan = plan_convergence()
+        assert len(plan.blocking_cleanup) == 1
+        assert len(plan.optional_cleanup) == 1
+
+    def test_no_cleanup_when_converged(self, db):
+        """Fully converged schema has no cleanup."""
+        plan = plan_convergence()
+        assert plan.blocking_cleanup == []
+        assert plan.optional_cleanup == []
 
 
 class TestExecuteFixes:

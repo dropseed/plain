@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 class FixCategory(StrEnum):
     FORWARD = "forward"  # Create, add, rename — brings schema toward model
     REPAIR = "repair"  # Rebuild invalid/stale — fixes broken declared objects
-    CLEANUP = "cleanup"  # Drop undeclared — removes objects not in model
+    CLEANUP = "cleanup"  # Drop undeclared non-behavioral objects (indexes)
+    CONTRACTION = "contraction"  # Drop undeclared behavioral objects (constraints)
 
 
 def _execute_and_commit(sql: str) -> None:
@@ -255,7 +256,7 @@ class ValidateConstraintFix(Fix):
 @dataclass
 class DropConstraintFix(Fix):
     pass_order = 4
-    category = FixCategory.CLEANUP
+    category = FixCategory.CONTRACTION
 
     table: str
     name: str

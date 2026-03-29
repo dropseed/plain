@@ -16,31 +16,35 @@ from ..convergence import execute_fixes, plan_convergence
     help="Exit with non-zero status if sync would make any database changes.",
 )
 @click.option(
-    "--prune",
+    "--drop-undeclared",
     is_flag=True,
-    help="Also drop indexes and constraints not declared on any model.",
+    help="Drop indexes and constraints not declared on any model.",
 )
-def sync(check: bool, prune: bool) -> None:
+def sync(check: bool, drop_undeclared: bool) -> None:
     """Sync the database schema with models.
 
     In DEBUG mode: generates migrations, applies them, then converges constraints.
     In production: applies migrations, then converges constraints.
 
-    With --prune, also drops indexes and constraints that exist in the
+    With --drop-undeclared, also drops indexes and constraints that exist in the
     database but are not declared on any model.
+
+    Without --drop-undeclared, exits non-zero if undeclared constraints remain
+    (constraints affect database behavior). Undeclared indexes are reported but
+    do not block success.
     """
     if check:
-        _check(prune=prune)
+        _check(drop_undeclared=drop_undeclared)
         return
 
     if settings.DEBUG:
         _create_migrations()
 
     _migrate()
-    _converge(prune=prune)
+    _converge(drop_undeclared=drop_undeclared)
 
 
-def _check(*, prune: bool) -> None:
+def _check(*, drop_undeclared: bool) -> None:
     """Exit non-zero if sync would make any database changes."""
     from .migrations import apply, create
 
@@ -78,7 +82,11 @@ def _check(*, prune: bool) -> None:
 
     # Check for convergence fixes
     plan = plan_convergence()
-    if plan.has_work(prune=prune):
+    if plan.has_work(drop_undeclared=drop_undeclared):
+        has_changes = True
+
+    # Blocking cleanup prevents success even without --drop-undeclared
+    if not drop_undeclared and plan.blocking_cleanup:
         has_changes = True
 
     if has_changes:
@@ -116,21 +124,41 @@ def _migrate() -> None:
     )
 
 
-def _converge(*, prune: bool) -> None:
+def _converge(*, drop_undeclared: bool) -> None:
     click.secho("Converging schema...", bold=True)
 
     plan = plan_convergence()
-    fixes = plan.executable(prune=prune)
-    if not fixes:
+    fixes = plan.executable(drop_undeclared=drop_undeclared)
+    success = True
+
+    if fixes:
+        result = execute_fixes(fixes)
+
+        for r in result.results:
+            if r.ok:
+                click.echo(f"  {r.sql}")
+            else:
+                click.secho(f"  FAILED: {r.fix.describe()} — {r.error}", fg="red")
+
+        click.secho(result.summary, fg="green" if result.ok else "yellow")
+        if not result.ok:
+            success = False
+
+    if not drop_undeclared and plan.blocking_cleanup:
+        click.echo()
+        click.secho("Undeclared constraints still in database:", fg="red", bold=True)
+        for fix in plan.blocking_cleanup:
+            click.secho(f"  {fix.describe()}", fg="red")
+        click.secho("Rerun with --drop-undeclared to remove them.", fg="red")
+        success = False
+
+    if not drop_undeclared and plan.optional_cleanup:
+        click.echo()
+        for fix in plan.optional_cleanup:
+            click.echo(f"  {fix.describe()}")
+        click.echo("Run with --drop-undeclared to remove undeclared indexes.")
+
+    if success and not fixes:
         click.secho("Schema is converged.", fg="green")
-        return
-
-    result = execute_fixes(fixes)
-
-    for r in result.results:
-        if r.ok:
-            click.echo(f"  {r.sql}")
-        else:
-            click.secho(f"  FAILED: {r.fix.describe()} — {r.error}", fg="red")
-
-    click.secho(result.summary, fg="green" if result.ok else "yellow")
+    elif not success:
+        sys.exit(1)
