@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from app.examples.models import Car
 
-from plain.postgres import CheckConstraint, Index, Q, get_connection
+from plain.postgres import CheckConstraint, Index, Q, UniqueConstraint, get_connection
+from plain.postgres.constraints import Deferrable
 from plain.postgres.convergence import (
     AddConstraintFix,
     CreateIndexFix,
@@ -47,6 +48,31 @@ def _constraint_is_valid(table: str, name: str) -> bool:
         return row[0] if row else False
 
 
+def _constraint_is_deferrable(table: str, name: str) -> bool:
+    with get_connection().cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT c.condeferrable FROM pg_constraint c
+            JOIN pg_class cl ON c.conrelid = cl.oid
+            WHERE cl.relname = %s AND c.conname = %s
+            """,
+            [table, name],
+        )
+        row = cursor.fetchone()
+        return row[0] if row else False
+
+
+def _create_invalid_index(name: str) -> None:
+    """Create a normal index then mark it INVALID via pg_catalog."""
+    _execute(f'CREATE INDEX "{name}" ON "examples_car" ("make")')
+    _execute(
+        f"""
+        UPDATE pg_index SET indisvalid = false
+        WHERE indexrelid = (SELECT oid FROM pg_class WHERE relname = '{name}')
+        """
+    )
+
+
 def _index_exists(name: str) -> bool:
     with get_connection().cursor() as cursor:
         cursor.execute(
@@ -56,25 +82,44 @@ def _index_exists(name: str) -> bool:
         return cursor.fetchone() is not None
 
 
+def _index_is_valid(name: str) -> bool:
+    with get_connection().cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT i.indisvalid
+            FROM pg_index i
+            JOIN pg_class c ON i.indexrelid = c.oid
+            WHERE c.relname = %s
+            """,
+            [name],
+        )
+        row = cursor.fetchone()
+        return row[0] if row else False
+
+
 class TestPassOrdering:
     def test_fixes_sorted_by_pass(self, db):
-        """detect_fixes() returns fixes in pass order: create indexes, add
-        constraints, validate, drop constraints, drop indexes."""
-        # Set up a model with a missing index, a missing constraint,
-        # an extra index, and an extra constraint
+        """detect_fixes() returns fixes in pass order: rebuild, create indexes,
+        add constraints, validate, drop constraints, drop indexes."""
         original_indexes = list(Car.model_options.indexes)
         original_constraints = list(Car.model_options.constraints)
 
         Car.model_options.indexes = [
             *original_indexes,
             Index(fields=["make"], name="examples_car_make_idx"),
+            Index(fields=["model"], name="examples_car_model_idx"),
         ]
         Car.model_options.constraints = [
             *original_constraints,
             CheckConstraint(check=Q(id__gte=0), name="examples_car_id_nonneg"),
+            CheckConstraint(check=Q(id__lte=999999), name="examples_car_id_max"),
         ]
 
-        # Add extras to the DB
+        _create_invalid_index("examples_car_model_idx")
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_max"'
+            ' CHECK ("id" <= 999999) NOT VALID'
+        )
         _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("model")')
         _execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_check" CHECK ("id" >= 0)'
@@ -84,19 +129,27 @@ class TestPassOrdering:
             fixes = detect_fixes()
             fix_types = [type(f) for f in fixes]
 
-            # All four fix types should be present
+            # All six fix types should be present
+            assert RebuildIndexFix in fix_types
             assert CreateIndexFix in fix_types
             assert AddConstraintFix in fix_types
+            assert ValidateConstraintFix in fix_types
             assert DropConstraintFix in fix_types
             assert DropIndexFix in fix_types
 
-            # Verify pass ordering
-            create_idx = max(i for i, t in enumerate(fix_types) if t is CreateIndexFix)
-            add_con_min = min(
-                i for i, t in enumerate(fix_types) if t is AddConstraintFix
+            # Verify full pass ordering
+            rebuild_idx = max(
+                i for i, t in enumerate(fix_types) if t is RebuildIndexFix
             )
+            create_idx = max(i for i, t in enumerate(fix_types) if t is CreateIndexFix)
             add_con_max = max(
                 i for i, t in enumerate(fix_types) if t is AddConstraintFix
+            )
+            validate_min = min(
+                i for i, t in enumerate(fix_types) if t is ValidateConstraintFix
+            )
+            validate_max = max(
+                i for i, t in enumerate(fix_types) if t is ValidateConstraintFix
             )
             drop_con_min = min(
                 i for i, t in enumerate(fix_types) if t is DropConstraintFix
@@ -106,8 +159,10 @@ class TestPassOrdering:
             )
             drop_idx = min(i for i, t in enumerate(fix_types) if t is DropIndexFix)
 
-            assert create_idx < add_con_min
-            assert add_con_max < drop_con_min
+            assert rebuild_idx < create_idx
+            assert create_idx < add_con_max
+            assert add_con_max < validate_min
+            assert validate_max < drop_con_min
             assert drop_con_max < drop_idx
         finally:
             Car.model_options.indexes = original_indexes
@@ -306,6 +361,54 @@ class TestApplyConstraintFixes:
         assert "USING INDEX" in sql
         assert _constraint_exists("examples_car", "unique_make_model")
 
+    def test_add_deferrable_unique_constraint(self, isolated_db):
+        """Deferrable unique constraints include DEFERRABLE clause."""
+        constraint = UniqueConstraint(
+            fields=["make"],
+            name="examples_car_make_deferred",
+            deferrable=Deferrable.DEFERRED,
+        )
+        original_constraints = list(Car.model_options.constraints)
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        try:
+            fix = AddConstraintFix(
+                table="examples_car", constraint=constraint, model=Car
+            )
+            sql = fix.apply()
+
+            assert "DEFERRABLE INITIALLY DEFERRED" in sql
+            assert _constraint_exists("examples_car", "examples_car_make_deferred")
+            assert _constraint_is_deferrable(
+                "examples_car", "examples_car_make_deferred"
+            )
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_add_immediate_unique_constraint(self, isolated_db):
+        """DEFERRABLE INITIALLY IMMEDIATE unique constraints."""
+        constraint = UniqueConstraint(
+            fields=["make"],
+            name="examples_car_make_immediate",
+            deferrable=Deferrable.IMMEDIATE,
+        )
+        original_constraints = list(Car.model_options.constraints)
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        try:
+            fix = AddConstraintFix(
+                table="examples_car", constraint=constraint, model=Car
+            )
+            sql = fix.apply()
+
+            assert "DEFERRABLE INITIALLY IMMEDIATE" in sql
+            assert _constraint_exists("examples_car", "examples_car_make_immediate")
+            assert _constraint_is_deferrable(
+                "examples_car", "examples_car_make_immediate"
+            )
+        finally:
+            Car.model_options.constraints = original_constraints
+
 
 class TestFixFailureRecovery:
     def test_failed_fix_continues(self, isolated_db):
@@ -333,32 +436,6 @@ class TestFixFailureRecovery:
 
         assert results == ["failed", "ok"]
         assert not _constraint_exists("examples_car", "examples_car_real_check")
-
-
-def _create_invalid_index(name: str) -> None:
-    """Create a normal index then mark it INVALID via pg_catalog."""
-    _execute(f'CREATE INDEX "{name}" ON "examples_car" ("make")')
-    _execute(
-        f"""
-        UPDATE pg_index SET indisvalid = false
-        WHERE indexrelid = (SELECT oid FROM pg_class WHERE relname = '{name}')
-        """
-    )
-
-
-def _index_is_valid(name: str) -> bool:
-    with get_connection().cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT i.indisvalid
-            FROM pg_index i
-            JOIN pg_class c ON i.indexrelid = c.oid
-            WHERE c.relname = %s
-            """,
-            [name],
-        )
-        row = cursor.fetchone()
-        return row[0] if row else False
 
 
 class TestDetectIndexFixes:

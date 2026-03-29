@@ -133,6 +133,8 @@ class AddConstraintFix:
         add_constraint = (
             f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE USING INDEX {name}"
         )
+        if self.constraint.deferrable:
+            add_constraint += f" DEFERRABLE INITIALLY {self.constraint.deferrable.name}"
         try:
             _execute_and_commit(add_constraint)
         except Exception:
