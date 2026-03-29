@@ -4,13 +4,14 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from ..constraints import BaseConstraint
+from ..constraints import CheckConstraint, UniqueConstraint
 from ..db import get_connection
+from ..fields.related import ForeignKeyField
 from ..indexes import Index
 from ..introspection import (
-    IndexInfo,
-    ModelSchemaResult,
-    check_model,
+    TableState,
+    introspect_table,
+    normalize_check_definition,
 )
 from ..registry import models_registry
 from .fixes import (
@@ -133,43 +134,29 @@ class ModelAnalysis:
 def analyze_model(
     conn: DatabaseConnection, cursor: CursorWrapper, model: type[Model]
 ) -> ModelAnalysis:
-    """Analyze a model's schema and produce enriched results with fixes.
+    """Compare a model against the database and classify each difference.
 
-    Wraps check_model() to classify each schema difference as auto-fixable
-    (with a Fix object) or unfixable (needs a migration). Also detects
-    index renames by cross-referencing missing and extra indexes by columns.
+    Introspects the actual table state, compares it against model definitions,
+    and produces a ModelAnalysis where each column/index/constraint carries its
+    issue (if any) and Fix object (if auto-fixable).
     """
-    result = check_model(conn, cursor, model)
-    table = result["table"]
+    table_name = model.model_options.db_table
+    db = introspect_table(conn, cursor, table_name)
 
-    analysis = ModelAnalysis(
-        label=result["label"],
-        table=table,
-        table_issues=[issue["detail"] for issue in result["issues"]],
-    )
-
-    # Columns — never auto-fixable
-    for col in result["columns"]:
-        issues = col["issues"]
-        analysis.columns.append(
-            ColumnStatus(
-                name=col["name"],
-                field_name=col["field_name"],
-                type=col["type"],
-                nullable=col["nullable"],
-                primary_key=col["primary_key"],
-                pk_suffix=col["pk_suffix"],
-                issue=issues[0]["detail"] if issues else None,
-            )
+    if not db.exists:
+        return ModelAnalysis(
+            label=model.model_options.label,
+            table=table_name,
+            table_issues=["table missing from database"],
         )
 
-    # Indexes — with rename detection
-    analysis.indexes = _analyze_indexes(result, model, table)
-
-    # Constraints
-    analysis.constraints = _analyze_constraints(result, model, table)
-
-    return analysis
+    return ModelAnalysis(
+        label=model.model_options.label,
+        table=table_name,
+        columns=_compare_columns(model, db),
+        indexes=_compare_indexes(model, db, table_name),
+        constraints=_compare_constraints(model, db, table_name),
+    )
 
 
 def detect_fixes() -> list[Fix]:
@@ -192,195 +179,294 @@ def detect_model_fixes(
     return analyze_model(conn, cursor, model).fixes
 
 
-def _analyze_indexes(
-    result: ModelSchemaResult, model: type[Model], table: str
-) -> list[IndexStatus]:
-    """Process raw index issues into IndexStatus objects with fixes.
+# Column comparison
 
-    Detects renames by cross-referencing missing and extra indexes that
-    share the same columns.
-    """
-    statuses: list[IndexStatus] = []
 
-    # Partition indexes by issue kind
-    missing: list[tuple[IndexInfo, Index]] = []
-    extra: list[IndexInfo] = []
+def _compare_columns(model: type[Model], db: TableState) -> list[ColumnStatus]:
+    statuses: list[ColumnStatus] = []
+    expected_col_names: set[str] = set()
 
-    for idx in result["indexes"]:
-        issues = idx["issues"]
-        if not issues:
-            statuses.append(IndexStatus(name=idx["name"], fields=idx["fields"]))
+    for f in model._model_meta.local_fields:
+        db_type = f.db_type()
+        if db_type is None:
             continue
 
-        kind = issues[0]["kind"]
+        expected_col_names.add(f.column)
+        issue: str | None = None
 
-        if kind == "index_missing":
-            index_obj = _find_model_index(model, idx["name"])
-            if index_obj:
-                missing.append((idx, index_obj))
-            else:
+        if f.column not in db.columns:
+            issue = "missing from database"
+        else:
+            actual = db.columns[f.column]
+            if db_type != actual.type:
+                issue = f"expected {db_type}, actual {actual.type}"
+            elif (not f.allow_null) != actual.not_null:
+                exp = "NOT NULL" if not f.allow_null else "NULL"
+                act = "NOT NULL" if actual.not_null else "NULL"
+                issue = f"expected {exp}, actual {act}"
+
+        pk_suffix = ""
+        if f.primary_key:
+            pk_suffix = f.db_type_suffix() or ""
+
+        assert f.name is not None
+        statuses.append(
+            ColumnStatus(
+                name=f.column,
+                field_name=f.name,
+                type=db_type,
+                nullable=f.allow_null,
+                primary_key=f.primary_key,
+                pk_suffix=pk_suffix,
+                issue=issue,
+            )
+        )
+
+    for col_name in sorted(db.columns.keys() - expected_col_names):
+        actual = db.columns[col_name]
+        statuses.append(
+            ColumnStatus(
+                name=col_name,
+                field_name="",
+                type=actual.type,
+                nullable=not actual.not_null,
+                primary_key=False,
+                pk_suffix="",
+                issue="extra column, not in model",
+            )
+        )
+
+    return statuses
+
+
+# Index comparison with rename detection
+
+
+def _compare_indexes(
+    model: type[Model], db: TableState, table: str
+) -> list[IndexStatus]:
+    statuses: list[IndexStatus] = []
+    missing: list[Index] = []
+    model_index_names = {idx.name for idx in model.model_options.indexes}
+
+    for index in model.model_options.indexes:
+        if index.name not in db.indexes:
+            missing.append(index)
+            continue
+
+        db_idx = db.indexes[index.name]
+
+        if not db_idx.valid:
+            statuses.append(
+                IndexStatus(
+                    name=index.name,
+                    fields=list(index.fields) if index.fields else [],
+                    issue="INVALID — needs drop and recreate",
+                    fix=RebuildIndexFix(table, index, model),
+                )
+            )
+            continue
+
+        # Check if columns match
+        if index.fields:
+            expected_columns = [
+                model._model_meta.get_forward_field(field_name).column
+                for field_name in index.fields
+            ]
+            if expected_columns != db_idx.columns:
                 statuses.append(
                     IndexStatus(
-                        name=idx["name"],
-                        fields=idx["fields"],
-                        issue=issues[0]["detail"],
+                        name=index.name,
+                        fields=list(index.fields),
+                        issue=f"columns differ: DB has {db_idx.columns}, model expects {expected_columns}",
+                        fix=RebuildIndexFix(table, index, model),
                     )
                 )
+                continue
 
-        elif kind in ("index_invalid", "index_definition_changed"):
-            index_obj = _find_model_index(model, idx["name"])
-            fix = RebuildIndexFix(table, index_obj, model) if index_obj else None
-            statuses.append(
-                IndexStatus(
-                    name=idx["name"],
-                    fields=idx["fields"],
-                    issue=issues[0]["detail"],
-                    fix=fix,
-                )
+        # Index exists and matches
+        statuses.append(
+            IndexStatus(
+                name=index.name,
+                fields=list(index.fields) if index.fields else [],
             )
+        )
 
-        elif kind == "index_extra":
-            extra.append(idx)
-
-        else:
-            statuses.append(
-                IndexStatus(
-                    name=idx["name"],
-                    fields=idx["fields"],
-                    issue=issues[0]["detail"],
-                )
-            )
+    # Extra indexes (in DB but not in model)
+    extra_names = sorted(db.indexes.keys() - model_index_names)
 
     # Detect renames: cross-reference missing and extra by resolved columns
-    missing_by_cols: dict[tuple[str, ...], list[tuple[IndexInfo, Index]]] = {}
-    for idx, index_obj in missing:
-        if not index_obj.fields:
-            continue  # skip expression-based indexes
+    missing_by_cols: dict[tuple[str, ...], list[Index]] = {}
+    for index in missing:
+        if not index.fields:
+            continue
         cols = tuple(
             model._model_meta.get_forward_field(field_name).column
-            for field_name in index_obj.fields
+            for field_name in index.fields
         )
-        missing_by_cols.setdefault(cols, []).append((idx, index_obj))
+        missing_by_cols.setdefault(cols, []).append(index)
 
-    extra_by_cols: dict[tuple[str, ...], list[IndexInfo]] = {}
-    for idx in extra:
-        cols = tuple(idx["fields"])
+    extra_by_cols: dict[tuple[str, ...], list[str]] = {}
+    for name in extra_names:
+        cols = tuple(db.indexes[name].columns)
         if not cols:
-            continue  # skip expression-based indexes
-        extra_by_cols.setdefault(cols, []).append(idx)
+            continue
+        extra_by_cols.setdefault(cols, []).append(name)
 
-    renamed_missing_names: set[str] = set()
-    renamed_extra_names: set[str] = set()
+    renamed_missing: set[str] = set()
+    renamed_extra: set[str] = set()
 
     for cols, missing_list in missing_by_cols.items():
         extra_list = extra_by_cols.get(cols)
         if extra_list and len(missing_list) == 1 and len(extra_list) == 1:
-            _, index_obj = missing_list[0]
-            extra_idx = extra_list[0]
-            old_name = extra_idx["name"]
-            new_name = index_obj.name
+            index = missing_list[0]
+            old_name = extra_list[0]
             statuses.append(
                 IndexStatus(
-                    name=new_name,
-                    fields=list(index_obj.fields),
+                    name=index.name,
+                    fields=list(index.fields),
                     issue=f"rename from {old_name}",
-                    fix=RenameIndexFix(table, old_name, new_name),
+                    fix=RenameIndexFix(table, old_name, index.name),
                 )
             )
-            renamed_missing_names.add(new_name)
-            renamed_extra_names.add(old_name)
+            renamed_missing.add(index.name)
+            renamed_extra.add(old_name)
 
-    # Remaining unmatched missing → CreateIndexFix
-    for idx, index_obj in missing:
-        if index_obj.name not in renamed_missing_names:
+    # Remaining unmatched missing
+    for index in missing:
+        if index.name not in renamed_missing:
             statuses.append(
                 IndexStatus(
-                    name=idx["name"],
-                    fields=idx["fields"],
+                    name=index.name,
+                    fields=list(index.fields) if index.fields else [],
                     issue="missing from database",
-                    fix=CreateIndexFix(table, index_obj, model),
+                    fix=CreateIndexFix(table, index, model),
                 )
             )
 
-    # Remaining unmatched extra → DropIndexFix
-    for idx in extra:
-        if idx["name"] not in renamed_extra_names:
+    # Remaining unmatched extra
+    for name in extra_names:
+        if name not in renamed_extra:
             statuses.append(
                 IndexStatus(
-                    name=idx["name"],
-                    fields=idx["fields"],
+                    name=name,
+                    fields=db.indexes[name].columns,
                     issue="not in model",
-                    fix=DropIndexFix(table, idx["name"]),
+                    fix=DropIndexFix(table, name),
                 )
             )
 
     return statuses
 
 
-# Constraint analysis
+# Constraint comparison
 
 
-def _analyze_constraints(
-    result: ModelSchemaResult, model: type[Model], table: str
+def _compare_constraints(
+    model: type[Model], db: TableState, table: str
 ) -> list[ConstraintStatus]:
-    """Process raw constraint issues into ConstraintStatus objects with fixes."""
     statuses: list[ConstraintStatus] = []
 
-    for con in result["constraints"]:
-        issues = con["issues"]
-        con_type = con["type"]
+    # Check and unique constraints (matched by name)
+    for constraint_cls, constraint_type, actual_dict in [
+        (UniqueConstraint, "unique", db.unique_constraints),
+        (CheckConstraint, "check", db.check_constraints),
+    ]:
+        model_constraints = [
+            c for c in model.model_options.constraints if isinstance(c, constraint_cls)
+        ]
+        expected_names = {c.name for c in model_constraints}
 
-        if not issues:
+        for constraint in model_constraints:
+            issue: str | None = None
+            fix: Fix | None = None
+
+            if constraint.name not in actual_dict:
+                issue = "missing from database"
+                fix = AddConstraintFix(table, constraint, model)
+            elif not actual_dict[constraint.name].validated:
+                issue = "NOT VALID — needs validation"
+                fix = ValidateConstraintFix(table, constraint.name)
+            elif (
+                constraint_type == "check"
+                and isinstance(constraint, CheckConstraint)
+                and (actual_def := actual_dict[constraint.name].definition)
+            ):
+                expected_def = _get_expected_check_definition(model, constraint)
+                if normalize_check_definition(actual_def) != normalize_check_definition(
+                    expected_def
+                ):
+                    issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
+                    fix = RebuildConstraintFix(table, constraint, model)
+
             statuses.append(
-                ConstraintStatus(name=con["name"], type=con_type, fields=con["fields"])
+                ConstraintStatus(
+                    name=constraint.name,
+                    type=constraint_type,
+                    fields=list(getattr(constraint, "fields", None) or []),
+                    issue=issue,
+                    fix=fix,
+                )
             )
-            continue
 
-        kind = issues[0]["kind"]
-        detail = issues[0]["detail"]
-        fix: Fix | None = None
+        for name in sorted(actual_dict.keys() - expected_names):
+            statuses.append(
+                ConstraintStatus(
+                    name=name,
+                    type=constraint_type,
+                    fields=actual_dict[name].columns,
+                    issue="not in model",
+                    fix=DropConstraintFix(table, name),
+                )
+            )
 
-        if kind == "constraint_missing" and con_type in ("check", "unique"):
-            constraint_obj = _find_model_constraint(model, con["name"])
-            if constraint_obj:
-                fix = AddConstraintFix(table, constraint_obj, model)
+    # Foreign key constraints (matched by shape, not name)
+    expected_fks: dict[tuple[str, str, str], str] = {}
+    for f in model._model_meta.local_fields:
+        if isinstance(f, ForeignKeyField) and f.db_constraint:
+            assert f.name is not None
+            to_table = f.target_field.model.model_options.db_table
+            to_column = f.target_field.column
+            expected_fks[(f.column, to_table, to_column)] = f.name
 
-        elif kind == "constraint_not_valid" and con_type in ("check", "unique"):
-            fix = ValidateConstraintFix(table, con["name"])
+    actual_fk_by_shape: dict[tuple[str, str, str], str] = {}
+    for name, fk in db.foreign_keys.items():
+        actual_fk_by_shape[(fk.column, fk.target_table, fk.target_column)] = name
 
-        elif kind == "constraint_definition_changed" and con_type == "check":
-            constraint_obj = _find_model_constraint(model, con["name"])
-            if constraint_obj:
-                fix = RebuildConstraintFix(table, constraint_obj, model)
+    matched_fk_names: set[str] = set()
+    for key, field_name in expected_fks.items():
+        if actual_name := actual_fk_by_shape.get(key):
+            matched_fk_names.add(actual_name)
+        else:
+            col, to_table, to_column = key
+            statuses.append(
+                ConstraintStatus(
+                    name=f"{field_name} → {to_table}.{to_column}",
+                    type="fk",
+                    fields=[col],
+                    issue="missing from database",
+                )
+            )
 
-        elif kind == "constraint_extra" and con_type in ("check", "unique"):
-            fix = DropConstraintFix(table, con["name"])
-
+    for name in sorted(db.foreign_keys.keys() - matched_fk_names):
+        fk = db.foreign_keys[name]
         statuses.append(
             ConstraintStatus(
-                name=con["name"],
-                type=con_type,
-                fields=con["fields"],
-                issue=detail,
-                fix=fix,
+                name=name,
+                type="fk",
+                fields=[fk.column],
+                issue=f"not in model (→ {fk.target_table}.{fk.target_column})",
             )
         )
 
     return statuses
 
 
-# Helpers
+def _get_expected_check_definition(
+    model: type[Model], constraint: CheckConstraint
+) -> str:
+    """Generate the CHECK expression that the model would produce."""
+    from ..ddl import compile_expression_sql
 
-
-def _find_model_index(model: type[Model], name: str) -> Index | None:
-    for index in model.model_options.indexes:
-        if index.name == name:
-            return index
-    return None
-
-
-def _find_model_constraint(model: type[Model], name: str) -> BaseConstraint | None:
-    for constraint in model.model_options.constraints:
-        if constraint.name == name:
-            return constraint
-    return None
+    check_sql = compile_expression_sql(model, constraint.check)
+    return f"CHECK ({check_sql})"
