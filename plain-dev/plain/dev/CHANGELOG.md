@@ -1,5 +1,16 @@
 # plain-dev changelog
 
+## [0.60.0](https://github.com/dropseed/plain/releases/plain-dev@0.60.0) (2026-03-29)
+
+### What's changed
+
+- **Database backups moved here from `plain-postgres`.** Available as `plain dev backups` (list, create, restore, delete, clear). Backups are automatically created before syncing when pending changes are detected. ([50773a50f674](https://github.com/dropseed/plain/commit/50773a50f674))
+- **Dev server now uses `postgres sync`** instead of `migrate --backup`. Creates a backup first if sync would make changes, then runs sync (migrations + convergence) in one step. ([adf021688bf3](https://github.com/dropseed/plain/commit/adf021688bf3))
+
+### Upgrade instructions
+
+- If you used `plain postgres backups`, use `plain dev backups` instead. Requires `plain>=0.130.0`.
+
 ## [0.59.2](https://github.com/dropseed/plain/releases/plain-dev@0.59.2) (2026-03-25)
 
 ### What's changed

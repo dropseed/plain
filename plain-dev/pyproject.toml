@@ -1,12 +1,12 @@
 [project]
 name = "plain.dev"
-version = "0.59.2"
+version = "0.60.0"
 description = "A single command that runs everything you need for local development."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["plain>=0.113.0,<1.0.0", "click>=8.0.0", "requests>=2.0.0", "rich", "inotify"]
+dependencies = ["plain>=0.130.0,<1.0.0", "click>=8.0.0", "requests>=2.0.0", "rich", "inotify"]
 
 [project.entry-points."plain.setup"]
 "dev-setup" = "plain.dev.entrypoints:setup"
