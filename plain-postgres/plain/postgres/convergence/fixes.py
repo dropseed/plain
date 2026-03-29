@@ -198,6 +198,28 @@ class AddConstraintFix(Fix):
 
 
 @dataclass
+class RenameConstraintFix(Fix):
+    """Rename a constraint (catalog-only, instant).
+
+    For unique constraints, Postgres automatically renames the backing index.
+    """
+
+    pass_order = 2
+
+    table: str
+    old_name: str
+    new_name: str
+
+    def describe(self) -> str:
+        return f"{self.table}: rename constraint {self.old_name} -> {self.new_name}"
+
+    def apply(self) -> str:
+        sql = f"ALTER TABLE {quote_name(self.table)} RENAME CONSTRAINT {quote_name(self.old_name)} TO {quote_name(self.new_name)}"
+        _execute_and_commit(sql)
+        return sql
+
+
+@dataclass
 class ValidateConstraintFix(Fix):
     """Validate a NOT VALID constraint (SHARE UPDATE EXCLUSIVE — doesn't block writes)."""
 

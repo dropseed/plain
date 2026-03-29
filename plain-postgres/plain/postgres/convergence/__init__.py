@@ -15,6 +15,7 @@ from .fixes import (
     Fix,
     RebuildConstraintFix,
     RebuildIndexFix,
+    RenameConstraintFix,
     RenameIndexFix,
     ValidateConstraintFix,
 )
@@ -31,6 +32,7 @@ __all__ = [
     "ModelAnalysis",
     "RebuildConstraintFix",
     "RebuildIndexFix",
+    "RenameConstraintFix",
     "RenameIndexFix",
     "ValidateConstraintFix",
     "analyze_model",

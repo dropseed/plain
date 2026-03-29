@@ -12,6 +12,7 @@ from plain.postgres.convergence import (
     DropIndexFix,
     RebuildConstraintFix,
     RebuildIndexFix,
+    RenameConstraintFix,
     RenameIndexFix,
     ValidateConstraintFix,
     analyze_model,
@@ -126,7 +127,7 @@ class TestPassOrdering:
         )
         _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("model")')
         _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_check" CHECK ("id" >= 0)'
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_check" CHECK ("id" >= -1)'
         )
 
         try:
@@ -912,3 +913,142 @@ class TestApplyRenameIndex:
             assert fixes == []
         finally:
             Car.model_options.indexes = original_indexes
+
+
+class TestConstraintRename:
+    def test_rename_check_constraint(self, db):
+        """A missing + extra check constraint with same expression is a rename."""
+        original_constraints = list(Car.model_options.constraints)
+        Car.model_options.constraints = [
+            *original_constraints,
+            CheckConstraint(check=Q(id__gte=0), name="examples_car_id_new"),
+        ]
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_old"'
+            ' CHECK ("id" >= 0)'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            rename_fixes = [
+                f for f in analysis.fixes if isinstance(f, RenameConstraintFix)
+            ]
+            assert len(rename_fixes) == 1
+            assert rename_fixes[0].old_name == "examples_car_id_old"
+            assert rename_fixes[0].new_name == "examples_car_id_new"
+
+            assert not any(isinstance(f, AddConstraintFix) for f in analysis.fixes)
+            assert not any(isinstance(f, DropConstraintFix) for f in analysis.fixes)
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_rename_unique_constraint(self, db):
+        """A missing + extra unique constraint with same columns is a rename."""
+        _execute('ALTER TABLE "examples_car" DROP CONSTRAINT "unique_make_model"')
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "old_unique_make_model"'
+            ' UNIQUE ("make", "model")'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Car)
+
+        rename_fixes = [f for f in analysis.fixes if isinstance(f, RenameConstraintFix)]
+        assert len(rename_fixes) == 1
+        assert rename_fixes[0].old_name == "old_unique_make_model"
+        assert rename_fixes[0].new_name == "unique_make_model"
+
+    def test_no_rename_when_expression_differs(self, db):
+        """Different check expressions means separate add + drop, not rename."""
+        original_constraints = list(Car.model_options.constraints)
+        Car.model_options.constraints = [
+            *original_constraints,
+            CheckConstraint(check=Q(id__gte=1), name="examples_car_id_new"),
+        ]
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_old"'
+            ' CHECK ("id" >= 0)'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            assert not any(isinstance(f, RenameConstraintFix) for f in analysis.fixes)
+            assert any(isinstance(f, AddConstraintFix) for f in analysis.fixes)
+            assert any(isinstance(f, DropConstraintFix) for f in analysis.fixes)
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_apply_rename_constraint(self, isolated_db):
+        """RenameConstraintFix renames using ALTER TABLE RENAME CONSTRAINT."""
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "old_check" CHECK ("id" >= 0)'
+        )
+        assert _constraint_exists("examples_car", "old_check")
+
+        fix = RenameConstraintFix(
+            table="examples_car",
+            old_name="old_check",
+            new_name="new_check",
+        )
+        sql = fix.apply()
+
+        assert "RENAME CONSTRAINT" in sql
+        assert not _constraint_exists("examples_car", "old_check")
+        assert _constraint_exists("examples_car", "new_check")
+
+    def test_rename_unique_renames_backing_index(self, isolated_db):
+        """Renaming a unique constraint also renames its backing index."""
+        _execute('ALTER TABLE "examples_car" DROP CONSTRAINT "unique_make_model"')
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "old_unique"'
+            ' UNIQUE ("make", "model")'
+        )
+        assert _constraint_exists("examples_car", "old_unique")
+        assert _index_exists("old_unique")
+
+        fix = RenameConstraintFix(
+            table="examples_car",
+            old_name="old_unique",
+            new_name="new_unique",
+        )
+        fix.apply()
+
+        assert _constraint_exists("examples_car", "new_unique")
+        assert _index_exists("new_unique")
+        assert not _constraint_exists("examples_car", "old_unique")
+        assert not _index_exists("old_unique")
+
+    def test_rename_constraint_lifecycle(self, isolated_db):
+        """Full cycle: detect rename -> apply -> detect again -> converged."""
+        original_constraints = list(Car.model_options.constraints)
+        Car.model_options.constraints = [
+            *original_constraints,
+            CheckConstraint(check=Q(id__gte=0), name="examples_car_id_new"),
+        ]
+        _execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_old"'
+            ' CHECK ("id" >= 0)'
+        )
+
+        try:
+            conn = get_connection()
+
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+            assert len(fixes) == 1
+            assert isinstance(fixes[0], RenameConstraintFix)
+
+            fixes[0].apply()
+
+            with conn.cursor() as cursor:
+                fixes = detect_model_fixes(conn, cursor, Car)
+            assert fixes == []
+        finally:
+            Car.model_options.constraints = original_constraints
