@@ -162,22 +162,12 @@ class DevProcess(ProcessManager):
                 env=self.plain_env,
                 check=True,
             )
-            print_event("Checking migrations...", newline=False)
-            check_result = subprocess.run(
-                [sys.executable, "-m", "plain", "migrate", "--check"],
+            print_event("Syncing database...")
+            subprocess.run(
+                [sys.executable, "-m", "plain", "postgres", "sync"],
                 env=self.plain_env,
-                capture_output=True,
+                check=True,
             )
-            if check_result.returncode != 0:
-                click.echo("applying")
-                subprocess.run(
-                    [sys.executable, "-m", "plain", "migrate", "--backup"],
-                    env=self.plain_env,
-                    check=True,
-                )
-                click.echo()
-            else:
-                click.secho("✔ Up to date", fg="green")
 
         print_event("Starting app...")
 

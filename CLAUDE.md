@@ -9,15 +9,15 @@
 
 Always use `./scripts/` commands from the repo root — never run `uv run plain fix`, `uv run plain pre-commit`, etc. directly in the `example/` directory.
 
-| Command                      | Purpose                                                    |
-| ---------------------------- | ---------------------------------------------------------- |
-| `./scripts/fix`              | Format and lint code                                       |
-| `./scripts/pre-commit`       | Full pre-commit validation                                 |
-| `./scripts/test [package]`   | Run tests                                                  |
-| `./scripts/server-test`      | Server conformance, load, and resilience tests             |
-| `./scripts/makemigrations`   | Create database migrations (calls `plain migrations make`) |
-| `./scripts/type-check <dir>` | Type check a directory                                     |
-| `uv run python`              | Open Python shell                                          |
+| Command                       | Purpose                                                      |
+| ----------------------------- | ------------------------------------------------------------ |
+| `./scripts/fix`               | Format and lint code                                         |
+| `./scripts/pre-commit`        | Full pre-commit validation                                   |
+| `./scripts/test [package]`    | Run tests                                                    |
+| `./scripts/server-test`       | Server conformance, load, and resilience tests               |
+| `./scripts/create-migrations` | Create database migrations (calls `plain migrations create`) |
+| `./scripts/type-check <dir>`  | Type check a directory                                       |
+| `uv run python`               | Open Python shell                                            |
 
 ## Scratch directory
 

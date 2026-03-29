@@ -7,7 +7,7 @@ paths:
 
 ## SettingsReference fields
 
-If your package has FK fields pointing to `SettingsReference("AUTH_USER_MODEL")`, `makemigrations` will hardcode the host app's concrete model in the generated migration (e.g., `to="users.user"` and a dependency on `("users", "0002_...")`).
+If your package has FK fields pointing to `SettingsReference("AUTH_USER_MODEL")`, `migrations create` will hardcode the host app's concrete model in the generated migration (e.g., `to="users.user"` and a dependency on `("users", "0002_...")`).
 
 You must manually fix these before committing:
 

@@ -69,10 +69,10 @@ def run_core_checks(*, skip_test: bool = False) -> None:
             "plain migrations apply --check", "plain", "migrations", "apply", "--check"
         )
         check_short(
-            "plain migrations make --dry-run --check",
+            "plain migrations create --dry-run --check",
             "plain",
             "migrations",
-            "make",
+            "create",
             "--dry-run",
             "--check",
         )

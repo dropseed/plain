@@ -42,7 +42,7 @@ def cli() -> None:
 
 
 @common_command
-@cli.command("make")
+@cli.command("create")
 @click.argument("package_labels", nargs=-1)
 @click.option(
     "--dry-run",
@@ -70,7 +70,7 @@ def cli() -> None:
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
-def make(
+def create(
     package_labels: tuple[str, ...],
     dry_run: bool,
     empty: bool,
@@ -272,7 +272,7 @@ def make(
 
     # Warn about packages that have models but no migrations directory.
     # These are silently skipped by the autodetector, which can be confusing
-    # when setting up a new app (makemigrations says "No changes detected").
+    # when setting up a new app ("No changes detected").
     unmigrated_with_models = []
     for package_label in sorted(loader.unmigrated_packages):
         module_name, _explicit = MigrationLoader.migrations_module(package_label)
@@ -295,7 +295,7 @@ def make(
         click.echo()
         click.echo(
             "To create initial migrations, add the directory and run "
-            + click.style("plain migrations make", bold=True)
+            + click.style("plain migrations create", bold=True)
             + " again."
         )
 
@@ -623,7 +623,7 @@ def apply(
                     f"Your models have changes that are not yet reflected in migrations ({packages})."
                 )
                 click.echo(
-                    "Run 'plain migrations make' to create migrations for these changes."
+                    "Run 'plain migrations create' to create migrations for these changes."
                 )
 
 

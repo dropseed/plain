@@ -188,7 +188,7 @@ class MigrationLoader:
             return key
         # Special-case __first__, which means "the first migration" for
         # migrated packages, and is ignored for unmigrated packages. It allows
-        # makemigrations to declare dependencies on packages before they even have
+        # migrations create to declare dependencies on packages before they even have
         # migrations.
         if key[0] == current_package:
             # Ignore __first__ references to the same app (#22325)

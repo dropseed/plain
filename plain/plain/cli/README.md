@@ -220,7 +220,7 @@ Runs core validation checks in order, stopping on first failure:
 2. `plain code check` (if `plain.code` is installed)
 3. `plain preflight --quiet`
 4. `plain migrations apply --check` (if DB connected)
-5. `plain migrations make --dry-run --check` (if DB connected)
+5. `plain migrations create --dry-run --check` (if DB connected)
 6. `plain test` (if `plain.pytest` is installed)
 
 Use `--skip-test` to skip tests for faster iteration.

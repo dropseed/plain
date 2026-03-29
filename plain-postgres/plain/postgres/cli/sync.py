@@ -23,17 +23,17 @@ def sync(backup: bool | None) -> None:
     In production: applies migrations, then converges constraints.
     """
     if settings.DEBUG:
-        _makemigrations()
+        _create_migrations()
 
     _migrate(backup=backup)
     _converge()
 
 
-def _makemigrations() -> None:
-    from .migrations import make
+def _create_migrations() -> None:
+    from .migrations import create
 
     click.secho("Checking for model changes...", bold=True)
-    make.callback(
+    create.callback(
         package_labels=(),
         dry_run=False,
         empty=False,

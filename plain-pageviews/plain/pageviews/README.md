@@ -218,7 +218,7 @@ INSTALLED_PACKAGES = [
 Run migrations to create the database table:
 
 ```bash
-plain models migrate
+plain postgres sync
 ```
 
 Add the router to your URLs:

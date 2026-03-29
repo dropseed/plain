@@ -32,8 +32,6 @@ def auto_start_services() -> None:
     service_commands = {
         "postgres",
         "dev",
-        "makemigrations",
-        "migrate",
         "migrations",
         "preflight",
         "request",

@@ -298,7 +298,7 @@ def check_duplicate_indexes(
                         and not unique_s  # unique indexes serve a constraint purpose
                     ):
                         source, package = _table_source(table_name, table_owners)
-                        app_suggestion = f'Remove "{name_s}" from model indexes/constraints, then run makemigrations'
+                        app_suggestion = f'Remove "{name_s}" from model indexes/constraints, then run plain postgres sync'
 
                         items.append(
                             CheckItem(
@@ -390,7 +390,7 @@ def check_unused_indexes(
                 suggestion=_index_suggestion(
                     source=source,
                     package=package,
-                    app_suggestion=f'Remove "{index_name}" from model indexes/constraints, then run makemigrations',
+                    app_suggestion=f'Remove "{index_name}" from model indexes/constraints, then run plain postgres sync',
                     unmanaged_suggestion=f'DROP INDEX CONCURRENTLY "{index_name}";',
                 ),
             )
@@ -452,7 +452,7 @@ def check_missing_fk_indexes(
                 suggestion=_index_suggestion(
                     source=source,
                     package=package,
-                    app_suggestion=f'Add an Index on ["{column_name}"] to the model, then run makemigrations',
+                    app_suggestion=f'Add an Index on ["{column_name}"] to the model, then run plain postgres sync',
                     unmanaged_suggestion=f'CREATE INDEX CONCURRENTLY ON "{table_name}" ("{column_name}");',
                 ),
             )
