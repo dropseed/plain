@@ -20,9 +20,9 @@ The remote side must be running first. Either start it yourself (if you have acc
 | Docker     | `docker exec -it container plain portal start`      |
 | SSH        | `ssh server plain portal start`                     |
 
-The remote side prints a portal code (e.g. `7-crossword-pineapple`). If you ran the command yourself, read the code from the output. If the user ran it, ask them for the code.
+**Both `start` and `connect` are long-running foreground processes.** If you run `start` yourself, use `run_in_background` so you don't block. Once it prints a portal code (e.g. `7-crossword-pineapple`), read the code from the output. If the user ran it, ask them for the code.
 
-Then connect (runs in the foreground — use `run_in_background` so you can continue working):
+Then connect (also use `run_in_background`):
 
 ```
 uv run plain portal connect <code>
