@@ -27,6 +27,8 @@ from ..introspection import (
 if TYPE_CHECKING:
     from ..base import Model
     from ..connection import DatabaseConnection
+    from ..expressions import Expression, ReplaceableExpression
+    from ..query_utils import Q
     from ..utils import CursorWrapper
 
 
@@ -1130,10 +1132,10 @@ def _compare_index_only_unique(
 def _compare_parsed_index(
     *,
     model: type[Model],
-    expressions: tuple[Any, ...],
+    expressions: tuple[Expression | ReplaceableExpression, ...],
     fields: list[str],
     opclasses: list[str],
-    condition: Any | None,
+    condition: Q | None,
     actual_def: str,
 ) -> str | None:
     """Structured comparison of a model index/constraint against pg_get_indexdef.
