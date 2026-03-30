@@ -234,6 +234,13 @@ class TestNormalizeCheckDefinition:
     def test_handles_bare_expression(self):
         assert normalize_check_definition("id > 0") == "id > 0"
 
+    def test_strips_type_casts(self):
+        """PG adds explicit type casts to stored definitions."""
+        assert (
+            normalize_check_definition("CHECK (username <> ''::text)")
+            == "username <> ''"
+        )
+
 
 class TestNormalizeIndexDefinition:
     def test_strips_prefix_with_using(self):
@@ -267,3 +274,12 @@ class TestNormalizeIndexDefinition:
         assert normalize_index_definition(db_def) == normalize_index_definition(
             model_def
         )
+
+    def test_with_where_clause(self):
+        """normalize_index_definition preserves WHERE clause as-is (structured
+        comparison handles WHERE separately)."""
+        result = normalize_index_definition(
+            "CREATE UNIQUE INDEX foo ON public.bar USING btree (lower(username)) WHERE (NOT (username = ''::text))"
+        )
+        assert "where" in result
+        assert "lower(username)" in result

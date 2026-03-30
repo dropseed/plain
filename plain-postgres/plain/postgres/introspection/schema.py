@@ -214,13 +214,25 @@ def _normalize_sql(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-def normalize_check_definition(s: str) -> str:
-    """Normalize a CHECK constraint definition for comparison.
+def _strip_type_casts(s: str) -> str:
+    """Strip PostgreSQL type casts (e.g. ''::text, 0::integer).
 
-    Strips the CHECK(...) wrapper and redundant parentheses so that
-    pg_get_constraintdef output and model-generated SQL can be compared.
+    PostgreSQL adds explicit casts to stored definitions (pg_get_indexdef,
+    pg_get_constraintdef) but the ORM compiler omits them.  Only used for
+    expression/condition comparison where the two generators diverge.
+    """
+    return re.sub(r"::\w+", "", s)
+
+
+def normalize_check_definition(s: str) -> str:
+    """Normalize a CHECK/condition definition for comparison.
+
+    Strips the CHECK(...) wrapper, redundant parentheses, and PG type casts
+    so that pg_get_constraintdef/pg_get_indexdef output and model-generated
+    SQL can be compared.
     """
     s = _normalize_sql(s)
+    s = _strip_type_casts(s)
     # Strip outer check(...)
     if s.startswith("check"):
         s = s[5:].strip()
@@ -241,6 +253,16 @@ def normalize_unique_definition(s: str) -> str:
     if s.startswith("unique"):
         s = s[6:].strip()
     return s
+
+
+def normalize_expression(s: str) -> str:
+    """Normalize an index expression for comparison.
+
+    Lowercases, strips quotes, collapses whitespace, and strips redundant
+    outer parentheses.  Used for comparing the expression portion of index
+    definitions (e.g. 'LOWER("col")' vs 'lower(col)').
+    """
+    return _strip_balanced_parens(_normalize_sql(s))
 
 
 def normalize_index_definition(s: str) -> str:

@@ -25,7 +25,7 @@ from plain.postgres.convergence import (
     plan_convergence,
     plan_model_convergence,
 )
-from plain.postgres.functions.text import Upper
+from plain.postgres.functions.text import Lower, Upper
 from plain.postgres.introspection import ConType
 
 
@@ -811,6 +811,41 @@ class TestIndexBackedUniqueConstraints:
             ]
             assert constraint_drifts == [], (
                 f"Expected no drift for matching expression unique, got: "
+                f"{[d.describe() for d in constraint_drifts]}"
+            )
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_matching_expression_with_condition_no_drift(self, db):
+        """Expression unique with a WHERE clause should not report false-positive drift.
+
+        PG adds type casts (e.g. ''::text) and the ORM adds extra parens around
+        expressions.  Structured comparison handles both.
+        """
+        original_constraints = list(Car.model_options.constraints)
+        constraint = UniqueConstraint(
+            Lower("make"),
+            condition=~Q(make=""),
+            name="examples_car_make_lower_cond_uq",
+        )
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        execute(constraint.to_sql(Car))
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            constraint_drifts = [
+                d
+                for d in plan.items
+                if isinstance(d.drift, ConstraintDrift)
+                and d.drift.constraint is not None
+                and d.drift.constraint.name == "examples_car_make_lower_cond_uq"
+            ]
+            assert constraint_drifts == [], (
+                f"Expected no drift for matching expression+condition unique, got: "
                 f"{[d.describe() for d in constraint_drifts]}"
             )
         finally:

@@ -7,6 +7,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from ..constraints import CheckConstraint, UniqueConstraint
+from ..ddl import compile_expression_sql, compile_index_expressions_sql
 from ..dialect import quote_name
 from ..fields.related import ForeignKeyField
 from ..indexes import Index
@@ -18,6 +19,7 @@ from ..introspection import (
     TableState,
     introspect_table,
     normalize_check_definition,
+    normalize_expression,
     normalize_index_definition,
     normalize_unique_definition,
 )
@@ -421,21 +423,8 @@ def _compare_indexes(
 
         # Check if definition matches
         if db_idx.definition:
-            expected_def = normalize_index_definition(index.to_sql(model))
-            actual_def = normalize_index_definition(db_idx.definition)
-            if expected_def != actual_def:
-                if index.fields:
-                    expected_columns = [
-                        model._model_meta.get_forward_field(field_name).column
-                        for field_name in index.fields
-                    ]
-                    issue = (
-                        f"columns differ: DB has {db_idx.columns}, model expects {expected_columns}"
-                        if expected_columns != db_idx.columns
-                        else f"definition differs: DB has {db_idx.definition!r}"
-                    )
-                else:
-                    issue = f"definition differs: DB has {db_idx.definition!r}"
+            issue = _compare_index_definition(model, index, db_idx.definition)
+            if issue:
                 statuses.append(
                     IndexStatus(
                         name=index.name,
@@ -552,6 +541,23 @@ def _compare_indexes(
             )
 
     return statuses
+
+
+def _compare_index_definition(
+    model: type[Model], index: Index, actual_def: str
+) -> str | None:
+    """Compare a model index against its pg_get_indexdef output.
+
+    Returns an issue string if definitions differ, None if they match.
+    """
+    return _compare_parsed_index(
+        model=model,
+        expressions=index.expressions,
+        fields=[name for name, _ in index.fields_orders],
+        opclasses=list(index.opclasses) if index.opclasses else [],
+        condition=index.condition,
+        actual_def=actual_def,
+    )
 
 
 # Constraint comparison
@@ -1099,67 +1105,78 @@ def _compare_index_only_unique(
     Index-only variants (condition, expressions, opclasses) live as unique
     indexes in PostgreSQL, not pg_constraint rows.  Their ConstraintState
     comes from the pg_index query path with a pg_get_indexdef definition.
-
-    For expression-based constraints we compare normalized index definitions.
-    For field-based (condition/opclass) we parse pg_get_indexdef into
-    structured components and compare each, avoiding fragile cross-format
-    SQL normalization between the ORM and PostgreSQL.
     """
     actual_def = actual_state.definition
     if not actual_def:
         return None, None
 
-    changed = ConstraintDrift(
-        kind=DriftKind.CHANGED, table=table, constraint=constraint, model=model
+    issue = _compare_parsed_index(
+        model=model,
+        expressions=constraint.expressions,
+        fields=list(constraint.fields),
+        opclasses=list(constraint.opclasses) if constraint.opclasses else [],
+        condition=constraint.condition,
+        actual_def=actual_def,
     )
-
-    if constraint.expressions:
-        # Expression-based: the expression IS the core structure, so
-        # normalized-definition comparison is the right tool.
-        expected_def = constraint.to_sql(model)
-        if normalize_index_definition(actual_def) != normalize_index_definition(
-            expected_def
-        ):
-            return f"definition differs: DB has {actual_def!r}", changed
-    else:
-        # Field-based with condition/opclasses: compare structured components
-        # parsed from pg_get_indexdef rather than normalizing full SQL strings.
-        db_parts = _parse_index_definition(actual_def)
-        expected_columns = [
-            model._model_meta.get_forward_field(f).column for f in constraint.fields
-        ]
-        if db_parts.columns != expected_columns:
-            return (
-                f"columns differ: DB has {db_parts.columns}, model expects {expected_columns}",
-                changed,
-            )
-        expected_opclasses = list(constraint.opclasses) if constraint.opclasses else []
-        if db_parts.opclasses != expected_opclasses:
-            return (
-                f"opclasses differ: DB has {db_parts.opclasses}, model expects {expected_opclasses}",
-                changed,
-            )
-        has_condition = constraint.condition is not None
-        if has_condition != db_parts.has_where:
-            where_desc = "has WHERE" if db_parts.has_where else "no WHERE"
-            return (
-                f"condition differs: DB {where_desc}, model {'has' if has_condition else 'no'} condition",
-                changed,
-            )
-        if has_condition and db_parts.where_clause:
-            from ..ddl import compile_expression_sql
-
-            assert constraint.condition is not None
-            expected_where = compile_expression_sql(model, constraint.condition)
-            if normalize_check_definition(
-                db_parts.where_clause
-            ) != normalize_check_definition(expected_where):
-                return (
-                    f"condition differs: DB has WHERE ({db_parts.where_clause})",
-                    changed,
-                )
+    if issue:
+        changed = ConstraintDrift(
+            kind=DriftKind.CHANGED, table=table, constraint=constraint, model=model
+        )
+        return issue, changed
 
     return None, None
+
+
+def _compare_parsed_index(
+    *,
+    model: type[Model],
+    expressions: tuple[Any, ...],
+    fields: list[str],
+    opclasses: list[str],
+    condition: Any | None,
+    actual_def: str,
+) -> str | None:
+    """Structured comparison of a model index/constraint against pg_get_indexdef.
+
+    Parses the DB definition into components (expression text, columns,
+    opclasses, WHERE clause) and compares each independently, avoiding
+    fragile full-SQL normalization between the ORM and PostgreSQL.
+
+    Returns an issue string if definitions differ, None if they match.
+    """
+    db_parts = _parse_index_definition(actual_def)
+
+    if expressions:
+        expected_expr = normalize_expression(
+            compile_index_expressions_sql(model, expressions)
+        )
+        actual_expr = normalize_expression(db_parts.expression_text)
+        if actual_expr != expected_expr:
+            return f"definition differs: DB has {actual_def!r}"
+    else:
+        expected_columns = [
+            model._model_meta.get_forward_field(f).column for f in fields
+        ]
+        if db_parts.columns != expected_columns:
+            return f"columns differ: DB has {db_parts.columns}, model expects {expected_columns}"
+
+        if db_parts.opclasses != opclasses:
+            return f"opclasses differ: DB has {db_parts.opclasses}, model expects {opclasses}"
+
+    # Compare WHERE clause
+    has_condition = condition is not None
+    if has_condition != db_parts.has_where:
+        where_desc = "has WHERE" if db_parts.has_where else "no WHERE"
+        return f"condition differs: DB {where_desc}, model {'has' if has_condition else 'no'} condition"
+    if has_condition and db_parts.where_clause:
+        assert condition is not None
+        expected_where = compile_expression_sql(model, condition)
+        if normalize_check_definition(
+            db_parts.where_clause
+        ) != normalize_check_definition(expected_where):
+            return f"condition differs: DB has WHERE ({db_parts.where_clause})"
+
+    return None
 
 
 @dataclass
@@ -1170,6 +1187,7 @@ class _IndexParts:
     opclasses: list[str]
     has_where: bool
     where_clause: str | None
+    expression_text: str  # raw text between the column-list parens
 
 
 def _parse_index_definition(definition: str) -> _IndexParts:
@@ -1202,6 +1220,7 @@ def _parse_index_definition(definition: str) -> _IndexParts:
     # Find the column list: content between parens after USING method
     columns: list[str] = []
     opclasses: list[str] = []
+    expression_text = ""
     using_match = re.search(r"\busing\s+\w+\s*\(", s)
     if using_match:
         start = using_match.end()
@@ -1212,8 +1231,8 @@ def _parse_index_definition(definition: str) -> _IndexParts:
             elif s[i] == ")":
                 depth -= 1
                 if depth == 0:
-                    col_str = s[start:i].strip()
-                    for part in col_str.split(","):
+                    expression_text = s[start:i].strip()
+                    for part in expression_text.split(","):
                         part = part.strip()
                         # "col opclass" or just "col"
                         tokens = part.split()
@@ -1231,6 +1250,7 @@ def _parse_index_definition(definition: str) -> _IndexParts:
         opclasses=opclasses,
         has_where=has_where,
         where_clause=where_clause,
+        expression_text=expression_text,
     )
 
 
@@ -1238,8 +1258,6 @@ def _get_expected_check_definition(
     model: type[Model], constraint: CheckConstraint
 ) -> str:
     """Generate the CHECK expression that the model would produce."""
-    from ..ddl import compile_expression_sql
-
     check_sql = compile_expression_sql(model, constraint.check)
     return f"CHECK ({check_sql})"
 
