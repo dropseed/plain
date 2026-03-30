@@ -61,11 +61,18 @@ async def connect(
         sys.exit(1)
 
     if os.path.exists(SOCKET_PATH):
-        print(
-            "A portal session is already active.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        # Socket may be stale after SIGKILL — verify something is listening.
+        try:
+            _, w = await asyncio.open_unix_connection(SOCKET_PATH)
+            w.close()
+            await w.wait_closed()
+            print(
+                "A portal session is already active.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        except (ConnectionError, FileNotFoundError):
+            _cleanup()
 
     cid = channel_id(code)
     relay_url = make_relay_url(relay_host, cid, "connect")
@@ -79,11 +86,6 @@ async def connect(
     encryptor = await perform_key_exchange(ws, code, side="connect")
 
     print("Connected to remote. Session active.")
-
-    try:
-        os.unlink(SOCKET_PATH)
-    except FileNotFoundError:
-        pass
 
     # Exec requests use queues (for streaming exec_stdout + exec_result).
     # All other request types use single-shot futures.
