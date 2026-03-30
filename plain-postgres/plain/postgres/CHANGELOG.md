@@ -1,5 +1,17 @@
 # plain-postgres changelog
 
+## [0.92.1](https://github.com/dropseed/plain/releases/plain-postgres@0.92.1) (2026-03-30)
+
+### What's changed
+
+- **Fixed false-positive "definition differs" for UniqueConstraint with expressions and conditions.** A `UniqueConstraint` using both expressions (e.g. `Lower("username")`) and a `condition` (e.g. `~Q(username="")`) was incorrectly flagged as drifted. PostgreSQL adds type casts (`''::text`) and the ORM adds extra parentheses around expressions — the old full-SQL-string comparison couldn't reconcile these differences. ([e03f3496a49a](https://github.com/dropseed/plain/commit/e03f3496a49a))
+
+- **Replaced fragile full-SQL comparison with structured comparison for all index and constraint definitions.** Instead of normalizing entire `CREATE INDEX` statements, convergence now parses `pg_get_indexdef` output into components (expression text, columns, opclasses, WHERE clause) and compares each independently. Both regular indexes and unique constraints share a single comparison core. ([e03f3496a49a](https://github.com/dropseed/plain/commit/e03f3496a49a))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.92.0](https://github.com/dropseed/plain/releases/plain-postgres@0.92.0) (2026-03-30)
 
 ### What's changed
