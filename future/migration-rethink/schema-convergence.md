@@ -42,15 +42,15 @@ This leads to the core contract:
 
 ### What convergence manages
 
-| Declaration                           | Online-safe pattern used                                                                               | Status                                                                                                  |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `CheckConstraint(...)`                | `ADD CONSTRAINT CHECK NOT VALID` then `VALIDATE CONSTRAINT`                                            | **Done** — two-phase, NOT VALID detection/retry, per-op commits with rollback                           |
-| `UniqueConstraint(...)`               | `CREATE UNIQUE INDEX CONCURRENTLY` then `ADD CONSTRAINT USING INDEX`                                   | **Done** — handles all features (condition, include, opclasses, expressions), orphan cleanup on failure |
-| `Index(fields=["email"], name="idx")` | `CREATE INDEX CONCURRENTLY` / `DROP INDEX CONCURRENTLY`                                                | **Done** — autocommit mode, INVALID index detection + rebuild                                           |
-| `ForeignKeyField(User)` constraint    | `ADD CONSTRAINT FK NOT VALID` then `VALIDATE CONSTRAINT`                                               | Not started — still managed by field-level migration ops (AddField/RemoveField)                         |
-| NOT NULL (field without `null=True`)  | Backfill NULLs with model default (if available) → `ADD CHECK NOT VALID` → `VALIDATE` → `SET NOT NULL` | Not started                                                                                             |
-| Defaults (`db_default`)               | `SET DEFAULT` / `DROP DEFAULT`                                                                         | Not started                                                                                             |
-| Removal of any of the above           | Online-safe drop pattern                                                                               | **Done** for indexes and constraints                                                                    |
+| Declaration                           | Online-safe pattern used                                             | Status                                                                                                  |
+| ------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `CheckConstraint(...)`                | `ADD CONSTRAINT CHECK NOT VALID` then `VALIDATE CONSTRAINT`          | **Done** — two-phase, NOT VALID detection/retry, per-op commits with rollback                           |
+| `UniqueConstraint(...)`               | `CREATE UNIQUE INDEX CONCURRENTLY` then `ADD CONSTRAINT USING INDEX` | **Done** — handles all features (condition, include, opclasses, expressions), orphan cleanup on failure |
+| `Index(fields=["email"], name="idx")` | `CREATE INDEX CONCURRENTLY` / `DROP INDEX CONCURRENTLY`              | **Done** — autocommit mode, INVALID index detection + rebuild                                           |
+| `ForeignKeyField(User)` constraint    | `ADD CONSTRAINT FK NOT VALID` then `VALIDATE CONSTRAINT`             | **Done** — NOT VALID + immediate VALIDATE, undeclared detection                                         |
+| NOT NULL (field without `null=True`)  | `ADD CHECK NOT VALID` → `VALIDATE` → `SET NOT NULL`                  | **Done** — three-step safe pattern, blocks when NULL rows exist (no auto-backfill yet)                  |
+| Defaults (`db_default`)               | `SET DEFAULT` / `DROP DEFAULT`                                       | Not started                                                                                             |
+| Removal of any of the above           | Online-safe drop pattern                                             | **Done** for indexes and constraints                                                                    |
 
 ### Behavior
 
