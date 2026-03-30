@@ -1,5 +1,17 @@
 # plain-portal changelog
 
+## [0.2.2](https://github.com/dropseed/plain/releases/plain-portal@0.2.2) (2026-03-30)
+
+### What's changed
+
+- Detect stale socket files after SIGKILL instead of blocking new sessions — `connect` now probes the existing socket and cleans it up if nothing is listening, rather than refusing to start ([461da76c8c78](https://github.com/dropseed/plain/commit/461da76c8c78))
+- Handle unclean websocket disconnects gracefully — remote sessions now catch `ConnectionClosed` instead of crashing when the relay or network drops the connection ([5b7995df2f6d](https://github.com/dropseed/plain/commit/5b7995df2f6d))
+- Updated agent skill to clarify that both `start` and `connect` are blocking foreground processes ([6a6b1ccff532](https://github.com/dropseed/plain/commit/6a6b1ccff532))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.1](https://github.com/dropseed/plain/releases/plain-portal@0.2.1) (2026-03-27)
 
 ### What's changed
