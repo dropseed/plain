@@ -1033,10 +1033,7 @@ class DatabaseConnection:
             FROM (
                 SELECT
                     c2.relname as indexname, idx.*, attr.attname, am.amname,
-                    CASE
-                        WHEN idx.indexprs IS NOT NULL OR idx.indisunique THEN
-                            pg_get_indexdef(idx.indexrelid)
-                    END AS exprdef,
+                    pg_get_indexdef(idx.indexrelid) AS exprdef,
                     CASE am.amname
                         WHEN %s THEN
                             CASE (option & 1)

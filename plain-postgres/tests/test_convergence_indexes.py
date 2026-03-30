@@ -8,7 +8,7 @@ from conftest_convergence import (
     index_is_valid,
 )
 
-from plain.postgres import Index, get_connection
+from plain.postgres import Index, Q, get_connection
 from plain.postgres.convergence import (
     CreateIndexFix,
     DropIndexFix,
@@ -16,6 +16,8 @@ from plain.postgres.convergence import (
     RenameIndexFix,
     plan_model_convergence,
 )
+from plain.postgres.convergence.analysis import DriftKind, IndexDrift, analyze_model
+from plain.postgres.functions.text import Upper
 
 
 class TestDetectIndexFixes:
@@ -122,6 +124,59 @@ class TestDetectIndexFixes:
         finally:
             Car.model_options.indexes = original_indexes
 
+    def test_detects_expression_index_definition_changed(self, db):
+        """An expression index with the same name but different expression produces a RebuildIndexFix."""
+        original_indexes = list(Car.model_options.indexes)
+        # Model declares UPPER(make)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(Upper("make"), name="examples_car_make_expr_idx"),
+        ]
+
+        # DB has LOWER(make) under the same name
+        execute(
+            'CREATE INDEX "examples_car_make_expr_idx"'
+            ' ON "examples_car" (LOWER("make"))'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
+
+            rebuild_items = [
+                item for item in items if isinstance(item.fix, RebuildIndexFix)
+            ]
+            assert len(rebuild_items) == 1
+            fix = rebuild_items[0].fix
+            assert isinstance(fix, RebuildIndexFix)
+            assert fix.index.name == "examples_car_make_expr_idx"
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_no_false_positive_for_matching_expression_index(self, db):
+        """An expression index with matching name and definition produces no issues."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(Upper("make"), name="examples_car_make_expr_idx"),
+        ]
+
+        # DB has the same expression
+        execute(
+            'CREATE INDEX "examples_car_make_expr_idx"'
+            ' ON "examples_car" (UPPER("make"))'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
+
+            assert items == []
+        finally:
+            Car.model_options.indexes = original_indexes
+
     def test_no_false_positive_for_matching_index(self, db):
         """An index with matching name and matching columns produces no issues."""
         original_indexes = list(Car.model_options.indexes)
@@ -139,6 +194,107 @@ class TestDetectIndexFixes:
                 items = plan_model_convergence(conn, cursor, Car).executable()
 
             assert items == []
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_detects_partial_index_condition_changed(self, db):
+        """A partial index with same name/columns but different WHERE produces a RebuildIndexFix."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(
+                fields=["make"],
+                condition=Q(id__gt=100),
+                name="examples_car_make_partial_idx",
+            ),
+        ]
+
+        # DB has partial index on same column but different condition
+        execute(
+            'CREATE INDEX "examples_car_make_partial_idx"'
+            ' ON "examples_car" ("make") WHERE ("id" > 50)'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
+
+            rebuild_items = [
+                item for item in items if isinstance(item.fix, RebuildIndexFix)
+            ]
+            assert len(rebuild_items) == 1
+            fix = rebuild_items[0].fix
+            assert isinstance(fix, RebuildIndexFix)
+            assert fix.index.name == "examples_car_make_partial_idx"
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_no_false_positive_for_matching_partial_index(self, db):
+        """A partial index with matching name, columns, and condition produces no issues."""
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(
+                fields=["make"],
+                condition=Q(id__gt=100),
+                name="examples_car_make_partial_idx",
+            ),
+        ]
+
+        # DB has the matching partial index
+        execute(
+            'CREATE INDEX "examples_car_make_partial_idx"'
+            ' ON "examples_car" ("make") WHERE ("id" > 100)'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
+
+            assert items == []
+        finally:
+            Car.model_options.indexes = original_indexes
+
+    def test_no_false_rename_when_condition_differs(self, db):
+        """Two indexes on same column but different conditions should not be detected as a rename."""
+        original_indexes = list(Car.model_options.indexes)
+        # Model has a partial index with a condition
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(
+                fields=["make"],
+                condition=Q(id__gt=100),
+                name="examples_car_make_new_idx",
+            ),
+        ]
+
+        # DB has an index on same column but no condition, under a different name
+        execute('CREATE INDEX "examples_car_make_old_idx" ON "examples_car" ("make")')
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            # Should NOT be a rename — definitions differ
+            rename_drifts = [
+                d
+                for d in analysis.drifts
+                if isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+            ]
+            assert len(rename_drifts) == 0
+
+            # Should be a missing + undeclared instead
+            missing = [
+                d
+                for d in analysis.drifts
+                if isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
+            ]
+            assert len(missing) == 1
+            assert missing[0].index is not None
+            assert missing[0].index.name == "examples_car_make_new_idx"
         finally:
             Car.model_options.indexes = original_indexes
 

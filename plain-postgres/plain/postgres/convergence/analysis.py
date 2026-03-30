@@ -393,18 +393,28 @@ def _compare_indexes(
             )
             continue
 
-        # Check if columns match
-        if index.fields:
-            expected_columns = [
-                model._model_meta.get_forward_field(field_name).column
-                for field_name in index.fields
-            ]
-            if expected_columns != db_idx.columns:
+        # Check if definition matches
+        if db_idx.definition:
+            expected_def = normalize_index_definition(index.to_sql(model))
+            actual_def = normalize_index_definition(db_idx.definition)
+            if expected_def != actual_def:
+                if index.fields:
+                    expected_columns = [
+                        model._model_meta.get_forward_field(field_name).column
+                        for field_name in index.fields
+                    ]
+                    issue = (
+                        f"columns differ: DB has {db_idx.columns}, model expects {expected_columns}"
+                        if expected_columns != db_idx.columns
+                        else f"definition differs: DB has {db_idx.definition!r}"
+                    )
+                else:
+                    issue = f"definition differs: DB has {db_idx.definition!r}"
                 statuses.append(
                     IndexStatus(
                         name=index.name,
-                        fields=list(index.fields),
-                        issue=f"columns differ: DB has {db_idx.columns}, model expects {expected_columns}",
+                        fields=list(index.fields) if index.fields else [],
+                        issue=issue,
                         drift=IndexDrift(
                             kind=DriftKind.CHANGED,
                             table=table,
@@ -426,63 +436,19 @@ def _compare_indexes(
     # Extra indexes (in DB but not in model)
     extra_names = sorted(db.indexes.keys() - model_index_names)
 
-    # Detect renames: cross-reference missing and extra by structure
+    # Detect renames: match missing and extra by normalized definition
     renamed_missing: set[str] = set()
     renamed_extra: set[str] = set()
 
-    # Field-based indexes: match by resolved column tuple
-    missing_by_cols: dict[tuple[str, ...], list[Index]] = {}
-    for index in missing:
-        if not index.fields:
-            continue
-        cols = tuple(
-            model._model_meta.get_forward_field(field_name).column
-            for field_name in index.fields
-        )
-        missing_by_cols.setdefault(cols, []).append(index)
-
-    extra_by_cols: dict[tuple[str, ...], list[str]] = {}
-    for name in extra_names:
-        cols = tuple(db.indexes[name].columns)
-        if not cols:
-            continue
-        extra_by_cols.setdefault(cols, []).append(name)
-
-    for cols, m_list in missing_by_cols.items():
-        e_list = extra_by_cols.get(cols)
-        if e_list and len(m_list) == 1 and len(e_list) == 1:
-            index = m_list[0]
-            old_name = e_list[0]
-            statuses.append(
-                IndexStatus(
-                    name=index.name,
-                    fields=list(index.fields),
-                    issue=f"rename from {old_name}",
-                    drift=IndexDrift(
-                        kind=DriftKind.RENAMED,
-                        table=table,
-                        old_name=old_name,
-                        new_name=index.name,
-                    ),
-                )
-            )
-            renamed_missing.add(index.name)
-            renamed_extra.add(old_name)
-
-    # Expression-based indexes: match by normalized definition
     missing_by_def: dict[str, list[Index]] = {}
     for index in missing:
-        if index.fields or index.name in renamed_missing:
-            continue
         norm = normalize_index_definition(index.to_sql(model))
         missing_by_def.setdefault(norm, []).append(index)
 
     extra_by_def: dict[str, list[str]] = {}
     for name in extra_names:
-        if name in renamed_extra:
-            continue
         defn = db.indexes[name].definition
-        if defn and not db.indexes[name].columns:
+        if defn:
             norm = normalize_index_definition(defn)
             extra_by_def.setdefault(norm, []).append(name)
 
@@ -494,7 +460,7 @@ def _compare_indexes(
             statuses.append(
                 IndexStatus(
                     name=index.name,
-                    fields=[],
+                    fields=list(index.fields) if index.fields else [],
                     issue=f"rename from {old_name}",
                     drift=IndexDrift(
                         kind=DriftKind.RENAMED,
