@@ -20,6 +20,7 @@ from datetime import datetime
 
 from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.client import connect as ws_connect
+from websockets.exceptions import ConnectionClosed
 
 from .codegen import generate_code
 from .crypto import PortalEncryptor, channel_id, perform_key_exchange
@@ -378,6 +379,8 @@ async def run_remote(
                 else:
                     _log(f"Unknown message type: {msg_type}")
 
+        except ConnectionClosed:
+            pass  # Normal when relay or network drops the connection
         finally:
             timeout_task.cancel()
             keepalive_task.cancel()
