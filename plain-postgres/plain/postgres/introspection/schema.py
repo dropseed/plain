@@ -31,6 +31,7 @@ class ConstraintState:
     columns: list[str]
     validated: bool
     definition: str | None = None
+    from_index: bool = False
 
 
 @dataclass
@@ -77,6 +78,7 @@ def introspect_table(
                 columns=list(info.get("columns") or []),
                 validated=info.get("validated", True),
                 definition=info.get("definition"),
+                from_index=info.get("index", False),
             )
         elif info.get("check"):
             check_constraints[name] = ConstraintState(
@@ -165,6 +167,19 @@ def normalize_check_definition(s: str) -> str:
         if s.startswith("(") and s.endswith(")"):
             s = s[1:-1].strip()
     s = _strip_balanced_parens(s)
+    return s
+
+
+def normalize_unique_definition(s: str) -> str:
+    """Normalize a UNIQUE constraint definition for comparison.
+
+    Strips the UNIQUE keyword so that pg_get_constraintdef output and
+    model-generated definitions can be compared.  Handles INCLUDE and
+    DEFERRABLE clauses that PostgreSQL emits.
+    """
+    s = _normalize_sql(s)
+    if s.startswith("unique"):
+        s = s[6:].strip()
     return s
 
 

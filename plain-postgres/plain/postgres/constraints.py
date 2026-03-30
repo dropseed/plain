@@ -244,6 +244,16 @@ class UniqueConstraint(BaseConstraint):
     def contains_expressions(self) -> bool:
         return bool(self.expressions)
 
+    @property
+    def index_only(self) -> bool:
+        """Whether PostgreSQL can only store this as a unique index, not a constraint.
+
+        PostgreSQL rejects ALTER TABLE ADD CONSTRAINT UNIQUE USING INDEX for
+        partial indexes, expression indexes, and indexes with non-default
+        operator classes.
+        """
+        return bool(self.condition or self.expressions or self.opclasses)
+
     def to_sql(self, model: type[Model], *, concurrently: bool = False) -> str:
         """Generate CREATE UNIQUE INDEX or ALTER TABLE ADD CONSTRAINT UNIQUE SQL."""
         table = quote_name(model.model_options.db_table)
@@ -267,7 +277,7 @@ class UniqueConstraint(BaseConstraint):
             columns_sql = ", ".join(col_parts)
 
         include_sql = build_include_sql(model, self.include)
-        condition_sql = f" WHERE {condition}" if condition else ""
+        condition_sql = f" WHERE ({condition})" if condition else ""
 
         if concurrently:
             return f"CREATE UNIQUE INDEX CONCURRENTLY {name} ON {table} ({columns_sql}){include_sql}{condition_sql}"

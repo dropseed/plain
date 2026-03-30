@@ -145,12 +145,17 @@ class AddConstraintFix(Fix):
     def _apply_unique(self) -> str:
         assert isinstance(self.constraint, UniqueConstraint)
 
-        # Step 1: Create unique index concurrently (non-blocking, handles all
-        # UniqueConstraint features: condition, include, opclasses, expressions)
+        # Step 1: Create unique index concurrently (non-blocking)
         create_idx = self.constraint.to_sql(self.model, concurrently=True)
         _execute_autocommit(create_idx)
 
-        # Step 2: Attach as constraint using the index (instant)
+        # Step 2: Attach as constraint — but only for variants PostgreSQL
+        # accepts.  Partial indexes, expression indexes, and non-default
+        # operator class indexes cannot be attached as constraints; they
+        # remain as unique indexes (same enforcement, no pg_constraint row).
+        if self.constraint.index_only:
+            return create_idx
+
         add_constraint = self.constraint.to_attach_sql(self.model)
         try:
             _execute_and_commit(add_constraint)

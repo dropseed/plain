@@ -1034,7 +1034,7 @@ class DatabaseConnection:
                 SELECT
                     c2.relname as indexname, idx.*, attr.attname, am.amname,
                     CASE
-                        WHEN idx.indexprs IS NOT NULL THEN
+                        WHEN idx.indexprs IS NOT NULL OR idx.indisunique THEN
                             pg_get_indexdef(idx.indexrelid)
                     END AS exprdef,
                     CASE am.amname

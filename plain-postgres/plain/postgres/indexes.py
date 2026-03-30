@@ -109,7 +109,7 @@ class Index:
         include_sql = build_include_sql(model, self.include)
         name = quote_name(self.name)
         table = quote_name(table)
-        condition_sql = f" WHERE {condition}" if condition else ""
+        condition_sql = f" WHERE ({condition})" if condition else ""
         return f"CREATE INDEX CONCURRENTLY {name} ON {table} ({columns_sql}){include_sql}{condition_sql}"
 
     def deconstruct(self) -> tuple[str, tuple[Expression, ...], dict[str, Any]]:

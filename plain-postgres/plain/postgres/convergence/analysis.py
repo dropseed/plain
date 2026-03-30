@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
@@ -16,6 +17,7 @@ from ..introspection import (
     introspect_table,
     normalize_check_definition,
     normalize_index_definition,
+    normalize_unique_definition,
 )
 
 if TYPE_CHECKING:
@@ -165,7 +167,7 @@ class ConstraintStatus:
     type: str
     fields: list[str] = field(default_factory=list)
     issue: str | None = None
-    drift: ConstraintDrift | ForeignKeyDrift | None = None
+    drift: ConstraintDrift | ForeignKeyDrift | IndexDrift | None = None
 
 
 @dataclass
@@ -581,6 +583,22 @@ def _compare_unique_constraints(
                 table=table,
                 name=constraint.name,
             )
+        elif constraint.index_only:
+            issue, drift = _compare_index_only_unique(
+                model, constraint, actual[constraint.name], table
+            )
+        elif actual_def := actual[constraint.name].definition:
+            expected_def = _get_expected_unique_definition(model, constraint)
+            if normalize_unique_definition(actual_def) != normalize_unique_definition(
+                expected_def
+            ):
+                issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
+                drift = ConstraintDrift(
+                    kind=DriftKind.CHANGED,
+                    table=table,
+                    constraint=constraint,
+                    model=model,
+                )
 
         statuses.append(
             ConstraintStatus(
@@ -617,17 +635,24 @@ def _compare_unique_constraints(
 
     for name in extra_names:
         if name not in renamed_extra:
+            # Index-only entries (from pg_index, not pg_constraint) need
+            # IndexDrift so the planner uses DROP INDEX, not DROP CONSTRAINT.
+            undeclared_drift: Drift
+            if actual[name].from_index:
+                undeclared_drift = IndexDrift(
+                    kind=DriftKind.UNDECLARED, table=table, name=name
+                )
+            else:
+                undeclared_drift = ConstraintDrift(
+                    kind=DriftKind.UNDECLARED, table=table, name=name
+                )
             statuses.append(
                 ConstraintStatus(
                     name=name,
                     type="unique",
                     fields=actual[name].columns,
                     issue="not in model",
-                    drift=ConstraintDrift(
-                        kind=DriftKind.UNDECLARED,
-                        table=table,
-                        name=name,
-                    ),
+                    drift=undeclared_drift,
                 )
             )
 
@@ -854,11 +879,19 @@ def _detect_unique_renames(
     model: type[Model],
     table: str,
 ) -> tuple[list[ConstraintStatus], set[str], set[str]]:
-    """Match missing and extra unique constraints by resolved column tuple."""
+    """Match missing and extra unique constraints by structure.
+
+    Constraint-backed (not index_only): matched by resolved column tuple.
+    Index-only (condition/expression/opclass): matched by normalized index
+    definition, which captures the full semantics including WHERE clauses,
+    opclasses, and expressions.
+    """
     statuses: list[ConstraintStatus] = []
     renamed_missing: set[str] = set()
     renamed_extra: set[str] = set()
 
+    # Phase 1: Field-based — match by resolved column tuple.
+    # Covers both constraint-backed and index-only field-based constraints.
     missing_by_cols: dict[tuple[str, ...], list[UniqueConstraint]] = {}
     for constraint in missing:
         if not constraint.fields:
@@ -880,13 +913,65 @@ def _detect_unique_renames(
         if e_list and len(m_list) == 1 and len(e_list) == 1:
             constraint = m_list[0]
             old_name = e_list[0]
+            # For index-only uniques, same columns isn't enough — the
+            # condition or opclass may have changed.  Verify the full
+            # definition matches before accepting a rename, otherwise
+            # let both sides fall through as separate missing + undeclared.
+            if constraint.index_only:
+                old_def = actual_dict[old_name].definition
+                if not old_def or normalize_index_definition(
+                    old_def
+                ) != normalize_index_definition(constraint.to_sql(model)):
+                    continue
+            DriftType = IndexDrift if constraint.index_only else ConstraintDrift
             statuses.append(
                 ConstraintStatus(
                     name=constraint.name,
                     type="unique",
                     fields=list(constraint.fields),
                     issue=f"rename from {old_name}",
-                    drift=ConstraintDrift(
+                    drift=DriftType(
+                        kind=DriftKind.RENAMED,
+                        table=table,
+                        old_name=old_name,
+                        new_name=constraint.name,
+                    ),
+                )
+            )
+            renamed_missing.add(constraint.name)
+            renamed_extra.add(old_name)
+
+    # Phase 2: Expression-based — match by normalized index definition.
+    missing_by_def: dict[str, list[UniqueConstraint]] = {}
+    for constraint in missing:
+        if constraint.fields or constraint.name in renamed_missing:
+            continue
+        norm = normalize_index_definition(constraint.to_sql(model))
+        missing_by_def.setdefault(norm, []).append(constraint)
+
+    extra_by_def: dict[str, list[str]] = {}
+    for name in extra_names:
+        if name in renamed_extra:
+            continue
+        defn = actual_dict[name].definition
+        if defn:
+            norm = normalize_index_definition(defn)
+            extra_by_def.setdefault(norm, []).append(name)
+
+    for norm, m_list in missing_by_def.items():
+        e_list = extra_by_def.get(norm)
+        if e_list and len(m_list) == 1 and len(e_list) == 1:
+            constraint = m_list[0]
+            old_name = e_list[0]
+            # Index-only uniques live as indexes, not constraints, so
+            # emit IndexDrift so the planner uses ALTER INDEX RENAME.
+            statuses.append(
+                ConstraintStatus(
+                    name=constraint.name,
+                    type="unique",
+                    fields=list(constraint.fields),
+                    issue=f"rename from {old_name}",
+                    drift=IndexDrift(
                         kind=DriftKind.RENAMED,
                         table=table,
                         old_name=old_name,
@@ -949,6 +1034,152 @@ def _detect_check_renames(
     return statuses, renamed_missing, renamed_extra
 
 
+def _compare_index_only_unique(
+    model: type[Model],
+    constraint: UniqueConstraint,
+    actual_state: ConstraintState,
+    table: str,
+) -> tuple[str | None, ConstraintDrift | None]:
+    """Compare an index-only unique constraint against the DB.
+
+    Index-only variants (condition, expressions, opclasses) live as unique
+    indexes in PostgreSQL, not pg_constraint rows.  Their ConstraintState
+    comes from the pg_index query path with a pg_get_indexdef definition.
+
+    For expression-based constraints we compare normalized index definitions.
+    For field-based (condition/opclass) we parse pg_get_indexdef into
+    structured components and compare each, avoiding fragile cross-format
+    SQL normalization between the ORM and PostgreSQL.
+    """
+    actual_def = actual_state.definition
+    if not actual_def:
+        return None, None
+
+    changed = ConstraintDrift(
+        kind=DriftKind.CHANGED, table=table, constraint=constraint, model=model
+    )
+
+    if constraint.expressions:
+        # Expression-based: the expression IS the core structure, so
+        # normalized-definition comparison is the right tool.
+        expected_def = constraint.to_sql(model)
+        if normalize_index_definition(actual_def) != normalize_index_definition(
+            expected_def
+        ):
+            return f"definition differs: DB has {actual_def!r}", changed
+    else:
+        # Field-based with condition/opclasses: compare structured components
+        # parsed from pg_get_indexdef rather than normalizing full SQL strings.
+        db_parts = _parse_index_definition(actual_def)
+        expected_columns = [
+            model._model_meta.get_forward_field(f).column for f in constraint.fields
+        ]
+        if db_parts.columns != expected_columns:
+            return (
+                f"columns differ: DB has {db_parts.columns}, model expects {expected_columns}",
+                changed,
+            )
+        expected_opclasses = list(constraint.opclasses) if constraint.opclasses else []
+        if db_parts.opclasses != expected_opclasses:
+            return (
+                f"opclasses differ: DB has {db_parts.opclasses}, model expects {expected_opclasses}",
+                changed,
+            )
+        has_condition = constraint.condition is not None
+        if has_condition != db_parts.has_where:
+            where_desc = "has WHERE" if db_parts.has_where else "no WHERE"
+            return (
+                f"condition differs: DB {where_desc}, model {'has' if has_condition else 'no'} condition",
+                changed,
+            )
+        if has_condition and db_parts.where_clause:
+            from ..ddl import compile_expression_sql
+
+            assert constraint.condition is not None
+            expected_where = compile_expression_sql(model, constraint.condition)
+            if normalize_check_definition(
+                db_parts.where_clause
+            ) != normalize_check_definition(expected_where):
+                return (
+                    f"condition differs: DB has WHERE ({db_parts.where_clause})",
+                    changed,
+                )
+
+    return None, None
+
+
+@dataclass
+class _IndexParts:
+    """Structured components parsed from pg_get_indexdef output."""
+
+    columns: list[str]
+    opclasses: list[str]
+    has_where: bool
+    where_clause: str | None
+
+
+def _parse_index_definition(definition: str) -> _IndexParts:
+    """Parse pg_get_indexdef output into structured components.
+
+    Extracts columns, opclasses, and WHERE clause from definitions like:
+      CREATE UNIQUE INDEX name ON schema.table USING btree (col1, col2 opclass) WHERE (condition)
+    """
+    s = definition.lower().replace('"', "")
+
+    # Extract WHERE clause (everything after WHERE keyword)
+    where_clause = None
+    has_where = False
+    where_match = re.search(r"\bwhere\s*\(", s)
+    if where_match:
+        has_where = True
+        # Extract the balanced WHERE expression
+        start = where_match.end() - 1  # include the opening paren
+        depth = 0
+        for i in range(start, len(s)):
+            if s[i] == "(":
+                depth += 1
+            elif s[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    where_clause = s[start + 1 : i].strip()
+                    s = s[: where_match.start()].strip()
+                    break
+
+    # Find the column list: content between parens after USING method
+    columns: list[str] = []
+    opclasses: list[str] = []
+    using_match = re.search(r"\busing\s+\w+\s*\(", s)
+    if using_match:
+        start = using_match.end()
+        depth = 1
+        for i in range(start, len(s)):
+            if s[i] == "(":
+                depth += 1
+            elif s[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    col_str = s[start:i].strip()
+                    for part in col_str.split(","):
+                        part = part.strip()
+                        # "col opclass" or just "col"
+                        tokens = part.split()
+                        if tokens:
+                            columns.append(tokens[0])
+                            opclasses.append(tokens[1] if len(tokens) > 1 else "")
+                    break
+
+    # Strip empty opclasses if none are set
+    if all(oc == "" for oc in opclasses):
+        opclasses = []
+
+    return _IndexParts(
+        columns=columns,
+        opclasses=opclasses,
+        has_where=has_where,
+        where_clause=where_clause,
+    )
+
+
 def _get_expected_check_definition(
     model: type[Model], constraint: CheckConstraint
 ) -> str:
@@ -957,3 +1188,24 @@ def _get_expected_check_definition(
 
     check_sql = compile_expression_sql(model, constraint.check)
     return f"CHECK ({check_sql})"
+
+
+def _get_expected_unique_definition(
+    model: type[Model], constraint: UniqueConstraint
+) -> str:
+    """Generate the UNIQUE definition in pg_get_constraintdef format.
+
+    PostgreSQL only stores field-based unique constraints (with optional
+    INCLUDE and DEFERRABLE) in pg_constraint. Expression-based, conditional,
+    and opclass constraints cannot be attached as constraints — they remain
+    as indexes only.
+    """
+    from ..ddl import build_include_sql, deferrable_sql
+
+    columns_sql = ", ".join(
+        quote_name(model._model_meta.get_forward_field(f).column)
+        for f in constraint.fields
+    )
+    include_sql = build_include_sql(model, constraint.include)
+    defer_sql = deferrable_sql(constraint.deferrable)
+    return f"UNIQUE ({columns_sql}){include_sql}{defer_sql}"

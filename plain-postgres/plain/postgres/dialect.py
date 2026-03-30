@@ -306,15 +306,10 @@ def lookup_cast(lookup_type: str, field: Field | None = None) -> str:
     the column being searched against.
     """
     from plain.postgres.fields import (
-        EmailField,
         GenericIPAddressField,
-        TextField,
     )
 
     lookup = "%s"
-
-    if lookup_type == "isnull" and isinstance(field, EmailField | TextField):
-        return "%s::text"
 
     # Cast text lookups to text to allow things like filter(x__contains=4)
     if lookup_type in (

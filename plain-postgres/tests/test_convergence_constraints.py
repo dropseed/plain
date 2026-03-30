@@ -17,12 +17,15 @@ from plain.postgres.convergence import (
     ConstraintDrift,
     DriftKind,
     DropConstraintFix,
+    IndexDrift,
     RenameConstraintFix,
     ValidateConstraintFix,
     analyze_model,
     can_auto_fix,
+    plan_convergence,
     plan_model_convergence,
 )
+from plain.postgres.functions.text import Upper
 
 
 class TestDetectConstraintFixes:
@@ -191,6 +194,97 @@ class TestDetectConstraintFixes:
         finally:
             Car.model_options.constraints = original_constraints
 
+    def test_detects_unique_constraint_definition_changed(self, db):
+        """A unique constraint with matching name but different columns is blocked."""
+        # DB already has unique_make_model on ("make", "model")
+        # Model declares unique on ("make") only — same name, different columns
+        original_constraints = list(Car.model_options.constraints)
+        Car.model_options.constraints = [
+            UniqueConstraint(fields=["make"], name="unique_make_model"),
+        ]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            assert plan.executable() == []
+            assert len(plan.blocked) == 1
+            assert isinstance(plan.blocked[0].drift, ConstraintDrift)
+            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
+            assert plan.blocked[0].fix is None
+            assert plan.blocked[0].guidance is not None
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_no_false_positive_for_matching_unique_constraint(self, db):
+        """A unique constraint with matching name and matching columns has no issues."""
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            plan = plan_model_convergence(conn, cursor, Car)
+
+        # The existing unique_make_model on ("make", "model") matches the model
+        assert plan.executable() == []
+        assert plan.blocked == []
+
+    def test_detects_unique_deferrable_changed(self, db):
+        """Same columns but different deferrable setting is a definition change."""
+        # DB has non-deferrable unique_make_model; model declares it deferrable
+        original_constraints = list(Car.model_options.constraints)
+        Car.model_options.constraints = [
+            UniqueConstraint(
+                fields=["make", "model"],
+                name="unique_make_model",
+                deferrable=Deferrable.DEFERRED,
+            ),
+        ]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            assert plan.executable() == []
+            assert len(plan.blocked) == 1
+            assert isinstance(plan.blocked[0].drift, ConstraintDrift)
+            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_detects_unique_include_changed(self, isolated_db):
+        """Same columns but added INCLUDE column is a definition change."""
+        # Drop the existing constraint and recreate with INCLUDE
+        execute('ALTER TABLE "examples_car" DROP CONSTRAINT "unique_make_model"')
+        execute(
+            'CREATE UNIQUE INDEX "unique_make_model" ON "examples_car" ("make", "model")'
+        )
+        execute(
+            'ALTER TABLE "examples_car" ADD CONSTRAINT "unique_make_model"'
+            ' UNIQUE USING INDEX "unique_make_model"'
+        )
+
+        # Model now expects INCLUDE ("id") — DB has no INCLUDE
+        original_constraints = list(Car.model_options.constraints)
+        Car.model_options.constraints = [
+            UniqueConstraint(
+                fields=["make", "model"],
+                name="unique_make_model",
+                include=["id"],
+            ),
+        ]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            assert plan.executable() == []
+            assert len(plan.blocked) == 1
+            assert isinstance(plan.blocked[0].drift, ConstraintDrift)
+            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
+        finally:
+            Car.model_options.constraints = original_constraints
+
 
 class TestApplyConstraintFixes:
     def test_add_check_constraint_uses_not_valid(self, isolated_db):
@@ -260,7 +354,7 @@ class TestApplyConstraintFixes:
         finally:
             Car.model_options.constraints = original_constraints
 
-    def test_definition_change_is_blocked(self, isolated_db):
+    def test_check_definition_change_is_blocked(self, isolated_db):
         """Changed check definition is blocked — no auto-fix available."""
         original_constraints = list(Car.model_options.constraints)
         # Model declares CHECK (id >= 1)
@@ -289,6 +383,30 @@ class TestApplyConstraintFixes:
             assert plan.blocked[0].fix is None
 
             # can_auto_fix returns False for changed constraints
+            assert not can_auto_fix(plan.blocked[0].drift)
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_unique_definition_change_is_blocked(self, isolated_db):
+        """Changed unique columns is blocked — no auto-fix available."""
+        # DB has unique_make_model on ("make", "model")
+        # Model declares unique on ("make") only — same name, different columns
+        original_constraints = list(Car.model_options.constraints)
+        Car.model_options.constraints = [
+            UniqueConstraint(fields=["make"], name="unique_make_model"),
+        ]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            assert plan.executable() == []
+            assert len(plan.blocked) == 1
+            assert isinstance(plan.blocked[0].drift, ConstraintDrift)
+            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
+            assert plan.blocked[0].fix is None
+
             assert not can_auto_fix(plan.blocked[0].drift)
         finally:
             Car.model_options.constraints = original_constraints
@@ -508,5 +626,300 @@ class TestConstraintRename:
             with conn.cursor() as cursor:
                 items = plan_model_convergence(conn, cursor, Car).executable()
             assert items == []
+        finally:
+            Car.model_options.constraints = original_constraints
+
+
+class TestIndexBackedUniqueConstraints:
+    """Tests for UniqueConstraint variants that PostgreSQL can only store as
+    indexes (condition, expressions, opclasses).  These must go through the
+    index creation path, not the constraint attachment path."""
+
+    # -- Gap 1: AddConstraintFix should not try USING INDEX for these --
+
+    def test_add_conditional_unique_succeeds(self, isolated_db):
+        """A conditional unique constraint should be created as an index, not fail."""
+        original_constraints = list(Car.model_options.constraints)
+        constraint = UniqueConstraint(
+            fields=["make"],
+            condition=Q(model__isnull=False),
+            name="examples_car_make_conditional_uq",
+        )
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
+
+            # Should produce a fix
+            assert len(items) >= 1
+            fix = next(
+                i.fix for i in items if getattr(i.fix, "constraint", None) is constraint
+            )
+            assert fix is not None
+            sql = fix.apply()
+            assert "CONCURRENTLY" in sql
+            assert index_exists("examples_car_make_conditional_uq")
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_add_expression_unique_succeeds(self, isolated_db):
+        """An expression-based unique constraint should be created as an index."""
+        original_constraints = list(Car.model_options.constraints)
+        constraint = UniqueConstraint(
+            Upper("make"),
+            name="examples_car_make_upper_uq",
+        )
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
+
+            assert len(items) >= 1
+            fix = next(
+                i.fix for i in items if getattr(i.fix, "constraint", None) is constraint
+            )
+            assert fix is not None
+            sql = fix.apply()
+            assert "CONCURRENTLY" in sql
+            assert index_exists("examples_car_make_upper_uq")
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    # -- Gap 2: matching index-backed unique should not produce false drift --
+
+    def test_matching_conditional_unique_no_drift(self, db):
+        """An existing partial unique index matching the model has no issues."""
+        original_constraints = list(Car.model_options.constraints)
+        constraint = UniqueConstraint(
+            fields=["make"],
+            condition=Q(model__isnull=False),
+            name="examples_car_make_partial_uq",
+        )
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        # Create the index using the model's own to_sql so the definition matches
+        execute(constraint.to_sql(Car))
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            # Should be fully converged — no missing, no changed
+            constraint_drifts = [
+                d
+                for d in plan.items
+                if isinstance(d.drift, ConstraintDrift)
+                and d.drift.constraint is not None
+                and d.drift.constraint.name == "examples_car_make_partial_uq"
+            ]
+            assert constraint_drifts == [], (
+                f"Expected no drift for matching partial unique, got: "
+                f"{[d.describe() for d in constraint_drifts]}"
+            )
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_matching_expression_unique_no_drift(self, db):
+        """An existing expression unique index matching the model has no issues."""
+        original_constraints = list(Car.model_options.constraints)
+        constraint = UniqueConstraint(
+            Upper("make"),
+            name="examples_car_make_upper_uq",
+        )
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        execute(
+            'CREATE UNIQUE INDEX "examples_car_make_upper_uq"'
+            ' ON "examples_car" (UPPER("make"))'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            constraint_drifts = [
+                d
+                for d in plan.items
+                if isinstance(d.drift, ConstraintDrift)
+                and d.drift.constraint is not None
+                and d.drift.constraint.name == "examples_car_make_upper_uq"
+            ]
+            assert constraint_drifts == [], (
+                f"Expected no drift for matching expression unique, got: "
+                f"{[d.describe() for d in constraint_drifts]}"
+            )
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    # -- Gap 3: full lifecycle converges (create → re-check → no work) --
+
+    def test_conditional_unique_lifecycle(self, isolated_db):
+        """Create conditional unique → re-check → converged (no perpetual failure)."""
+        original_constraints = list(Car.model_options.constraints)
+        constraint = UniqueConstraint(
+            fields=["make"],
+            condition=Q(model__isnull=False),
+            name="examples_car_make_partial_uq",
+        )
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        try:
+            conn = get_connection()
+
+            # First pass: creates the index
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(conn, cursor, Car).executable()
+            assert any(getattr(i.fix, "constraint", None) is constraint for i in items)
+            for item in items:
+                if getattr(item.fix, "constraint", None) is constraint:
+                    assert item.fix is not None
+                    item.fix.apply()
+
+            # Second pass: should be fully converged
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            remaining = [
+                d
+                for d in plan.items
+                if isinstance(d.drift, ConstraintDrift | IndexDrift)
+                and getattr(d.drift, "name", None) == "examples_car_make_partial_uq"
+            ]
+            assert remaining == [], (
+                f"Expected convergence after creation, got: "
+                f"{[d.drift.describe() for d in remaining]}"
+            )
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    # -- Gap 4: condition/opclass changes detected as CHANGED --
+
+    def test_detects_condition_change_on_partial_unique(self, db):
+        """Same name and columns but different WHERE clause is a definition change."""
+        original_constraints = list(Car.model_options.constraints)
+        # Model declares WHERE (model IS NOT NULL)
+        constraint = UniqueConstraint(
+            fields=["make"],
+            condition=Q(model__isnull=False),
+            name="examples_car_make_partial_uq",
+        )
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        # DB has a different condition: WHERE (id > 100)
+        execute(
+            'CREATE UNIQUE INDEX "examples_car_make_partial_uq"'
+            ' ON "examples_car" ("make")'
+            ' WHERE ("id" > 100)'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            assert plan.executable() == []
+            assert len(plan.blocked) == 1
+            assert isinstance(plan.blocked[0].drift, ConstraintDrift)
+            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    # -- Gap 5: rename/drop use correct fix types for index-only --
+
+    def test_undeclared_index_only_unique_uses_drop_index(self, db):
+        """Undeclared index-only unique should use DropIndexFix, not DropConstraintFix."""
+        from plain.postgres.convergence import DropIndexFix
+
+        execute(
+            'CREATE UNIQUE INDEX "examples_car_old_partial_uq"'
+            ' ON "examples_car" ("make")'
+            ' WHERE ("id" > 0)'
+        )
+
+        plan = plan_convergence()
+        undeclared = [
+            item
+            for item in plan.items
+            if isinstance(item.drift, IndexDrift)
+            and item.drift.kind == DriftKind.UNDECLARED
+            and item.drift.name == "examples_car_old_partial_uq"
+        ]
+        assert len(undeclared) == 1
+        assert isinstance(undeclared[0].fix, DropIndexFix)
+
+    def test_rename_index_only_unique_uses_rename_index(self, db):
+        """Renaming an index-only unique should use RenameIndexFix."""
+        from plain.postgres.convergence import RenameIndexFix
+
+        original_constraints = list(Car.model_options.constraints)
+        constraint = UniqueConstraint(
+            fields=["make"],
+            condition=Q(model__isnull=False),
+            name="examples_car_make_partial_new",
+        )
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        # Create the matching index under the old name
+        execute(constraint.to_sql(Car).replace("_new", "_old"))
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, Car)
+
+            rename_items = [
+                item
+                for item in plan.items
+                if isinstance(item.drift, IndexDrift)
+                and item.drift.kind == DriftKind.RENAMED
+            ]
+            assert len(rename_items) == 1
+            assert isinstance(rename_items[0].fix, RenameIndexFix)
+        finally:
+            Car.model_options.constraints = original_constraints
+
+    def test_no_rename_when_condition_differs(self, db):
+        """Same columns + different condition + different name is NOT a rename."""
+        original_constraints = list(Car.model_options.constraints)
+        constraint = UniqueConstraint(
+            fields=["make"],
+            condition=Q(id__gt=0),
+            name="examples_car_make_partial_new",
+        )
+        Car.model_options.constraints = [*original_constraints, constraint]
+
+        # DB has the same columns but a different condition
+        execute(
+            'CREATE UNIQUE INDEX "examples_car_make_partial_old"'
+            ' ON "examples_car" ("make")'
+            ' WHERE ("id" > 100)'
+        )
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            # Should NOT be classified as a rename — semantics differ
+            assert not any(
+                isinstance(d, ConstraintDrift | IndexDrift)
+                and d.kind == DriftKind.RENAMED
+                for d in analysis.drifts
+            )
+            # Should see separate missing + undeclared instead
+            assert any(
+                isinstance(d, ConstraintDrift) and d.kind == DriftKind.MISSING
+                for d in analysis.drifts
+            )
+            assert any(
+                isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+                for d in analysis.drifts
+            )
         finally:
             Car.model_options.constraints = original_constraints
