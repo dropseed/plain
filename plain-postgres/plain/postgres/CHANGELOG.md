@@ -1,5 +1,31 @@
 # plain-postgres changelog
 
+## [0.92.0](https://github.com/dropseed/plain/releases/plain-postgres@0.92.0) (2026-03-30)
+
+### What's changed
+
+- **Foreign key constraints are now managed by convergence, not migrations.** The schema editor no longer creates, drops, or alters FK constraints — convergence handles them declaratively using `ADD CONSTRAINT ... NOT VALID` followed by `VALIDATE CONSTRAINT`. FK constraint names are deterministic and match the old migration-generated names. ([b2b968297fea](https://github.com/dropseed/plain/commit/b2b968297fea), [8658be035a46](https://github.com/dropseed/plain/commit/8658be035a46))
+
+- **NOT NULL enforcement is now managed by convergence.** Column nullability drift is detected and fixed automatically — convergence uses the safe `CHECK NOT VALID → VALIDATE → SET NOT NULL` pattern to avoid long table locks. Columns with existing NULL rows are reported as blocked, requiring a backfill before convergence can proceed. ([5ea3dc589453](https://github.com/dropseed/plain/commit/5ea3dc589453))
+
+- **Managed type boundaries** — convergence now distinguishes managed vs unmanaged index types and constraint types. Only btree/hash indexes and check/unique/FK constraints participate in drift detection and rename matching. Unmanaged types (GIN, GiST, BRIN, exclusion, trigger) are displayed for informational purposes but are never modified or reported as undeclared. ([f123eae2fa56](https://github.com/dropseed/plain/commit/f123eae2fa56))
+
+- **Unique constraint drift detection** — convergence now compares unique constraint definitions (not just column lists), detecting behavioral changes like modified WHERE clauses, opclasses, or expressions. Index-only uniques (partial, expression, or opclass) are correctly handled through both pg_constraint and pg_index. ([09b439e8448a](https://github.com/dropseed/plain/commit/09b439e8448a))
+
+- **Full index definition matching** — index drift detection now compares normalized `CREATE INDEX` definitions instead of just column lists, catching changes to conditions, expressions, opclasses, and include columns. ([70d7a6725498](https://github.com/dropseed/plain/commit/70d7a6725498))
+
+- Removed dead index/constraint/deferred SQL infrastructure and primary-key transition code from the schema editor. ([266b0635f0bf](https://github.com/dropseed/plain/commit/266b0635f0bf), [4a92f5479e4e](https://github.com/dropseed/plain/commit/4a92f5479e4e))
+
+- Rewrote the introspection layer to mirror Postgres catalog structures — `TableState` now uses a unified `constraints` dict keyed by constraint name with `ConType` enum, replacing the separate `unique_constraints`, `check_constraints`, and `foreign_keys` dicts. ([f123eae2fa56](https://github.com/dropseed/plain/commit/f123eae2fa56))
+
+- Expanded schema management documentation with a comprehensive overview of the migrations + convergence split, sync workflow, and convergence behavior. ([57caeee5ff89](https://github.com/dropseed/plain/commit/57caeee5ff89))
+
+### Upgrade instructions
+
+- If you have custom code that interacts with `TableState.unique_constraints`, `TableState.check_constraints`, or `TableState.foreign_keys`, update it to use the unified `TableState.constraints` dict with `ConType` filtering instead.
+- FK constraints in existing databases are left as-is. New FKs will be created by convergence on the next `postgres sync`.
+- NOT NULL enforcement is automatic — `postgres sync` will detect and fix nullability drift. If columns have existing NULL rows, you'll need to backfill before convergence can apply NOT NULL.
+
 ## [0.91.1](https://github.com/dropseed/plain/releases/plain-postgres@0.91.1) (2026-03-29)
 
 ### What's changed
