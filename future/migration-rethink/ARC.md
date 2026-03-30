@@ -71,7 +71,7 @@ Indexes and constraints are fully managed by convergence. The migration autodete
 
 ### Remaining: Convergence expansion
 
-- [ ] Defaults convergence (SET DEFAULT / DROP DEFAULT)
+- [ ] [fields-db-defaults](fields-db-defaults.md) — DB expressions for defaults, SET DEFAULT / DROP DEFAULT convergence
 - [ ] Remove historical model reconstruction from RunPython — change signature to `(schema_editor,)`, use real imports instead of reconstructed state. Once nothing consumes ProjectState, stop generating migrations for `choices`, `validators`, `default` (non-db), `on_delete`, `related_name`, `ordering`
 
 ### Remaining: Safety
@@ -131,8 +131,14 @@ None of these combine declarative convergence with imperative migrations the way
 
 The obvious next step beyond `--prune` is a deploy-aware rollout model where Plain can automate contraction after cutover/rollback windows rather than relying on an explicit contraction command. That is intentionally out of scope for the current rethink. See deploy-aware-rollouts.md.
 
+### Remaining: Cleanup
+
+- [ ] [migrations-rename-app-column](migrations-rename-app-column.md) — rename `app` to `package` in plainmigrations table
+- [ ] [constraint-timestamp-type-mismatch](constraint-timestamp-type-mismatch.md) — type mismatch in unique constraint validation with timestamp fields
+
 ## What this replaced
 
 - `migrations-safety-analysis` future → convergence uses safe patterns by default
 - `models-non-blocking-ddl` future → the convergence engine implements all non-blocking DDL patterns
 - `fk-auto-index-removal` arc → convergence manages all indexes from model declarations
+- `simplify-pk-alter-field` future → dead PK transition code removed in 4a92f547

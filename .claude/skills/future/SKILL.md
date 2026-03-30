@@ -33,6 +33,7 @@ Individual markdown files with optional YAML frontmatter:
 
 ```yaml
 ---
+branch: pool
 related:
   - server-performance
 depends_on:
@@ -46,6 +47,7 @@ Content...
 
 ### Frontmatter fields
 
+- `branch` (optional): git branch with work-in-progress for this future. One branch per future — if a future needs multiple branches, split the future.
 - `related` (optional): linked futures — conceptual connections (bidirectional)
 - `depends_on` (optional): hard dependency — this future is blocked until the dependency is done. Mostly used for cross-arc blocks.
 
@@ -65,8 +67,12 @@ Format: `- [ ] [future-name](future-name.md)` — checked when done. The sequenc
 
 Current arcs:
 
-- `postgres-first-data-layer` — making the ORM truly postgres-native
-- `migration-rethink` — flat timestamps, convergence, advisory locks
+- `migration-rethink` — convergence, migration safety, migration format
+- `model-api` — explicit create/persist, PK prevention, default querysets
+- `related-fields` — descriptor consolidation, deferred FK loading, N+1 prevention
+- `query-api` — typed query interface, cursor pagination
+- `postgres-native` — connection pooling, psycopg3, native schema, FTS, DB-level ON DELETE
+- `field-api` — field parameter cleanup (choices, max_length, enums)
 - `real-time-server` — HTTP/2, websockets, realtime, performance
 - `production-hardening` — security, compliance, operational maturity
 - `uncategorized` — futures that don't belong to a specific arc yet

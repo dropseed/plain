@@ -1,8 +1,6 @@
 ---
 related:
   - observer-testing
-  - postgres-cli-and-insights
-  - models-non-blocking-ddl
 ---
 
 # Plain Models Index Suggestions
@@ -85,14 +83,9 @@ Could be:
 
 Functions wrapping indexed columns kill index usage. The observer could detect patterns like `WHERE date_trunc('day', created_at) = '2023-01-01'` and suggest either a range rewrite or a functional index. This is one of the most common "why isn't my index being used?" issues.
 
-### Invalid Index Detection
+### ~~Invalid Index Detection~~ ✓
 
-Failed `CREATE INDEX CONCURRENTLY` leaves INVALID indexes — maintained on writes, never used for reads. These are pure overhead and should be flagged for cleanup. See `models-non-blocking-ddl` for the full failure mode.
-
-```sql
-SELECT indexrelname FROM pg_stat_user_indexes s
-JOIN pg_index i ON s.indexrelid = i.indexrelid WHERE NOT i.indisvalid;
-```
+Done — convergence detects INVALID indexes and rebuilds them automatically.
 
 ### HOT Update Analysis
 

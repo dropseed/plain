@@ -1,4 +1,5 @@
 ---
+branch: claude/psycopg3-savepoint-transaction-UKUBY
 related:
   - db-connection-pool
 ---
@@ -9,13 +10,9 @@ Now that Plain is PostgreSQL-only, we should lean into psycopg3's native capabil
 
 ## Remove abstraction / lean on psycopg3
 
-### Server-side cursors → `cursor.stream()`
+### ~~Server-side cursors → `cursor.stream()`~~ ✓
 
-Currently `chunked_cursor()` creates a named cursor with a manually generated unique name (`_plain_curs_{thread}_{task}_{idx}`), then `cursor_iter()` calls `fetchmany(itersize)` in a loop with a sentinel value `[]` hardcoded as "empty_fetchmany_value for PostgreSQL" — a multi-DB fossil.
-
-psycopg3's `cursor.stream(query, params)` replaces all of that with a lazy generator over server-side results. The "must fully consume" caveat is a non-issue since the current code already uses `try/finally: cursor.close()`.
-
-Removes: `chunked_cursor()`, `cursor_iter()`, named cursor index tracking, sentinel value.
+Done — `cursor.stream()` is used for server-side cursor iteration when `chunked_fetch=True`.
 
 ### Savepoint SQL → `connection.transaction()`
 

@@ -2,7 +2,6 @@
 related:
   - postgres-native-orm
   - models-db-level-on-delete
-  - postgres-cli-and-insights
 ---
 
 # Postgres-native schema

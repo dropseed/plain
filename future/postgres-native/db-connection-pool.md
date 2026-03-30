@@ -1,7 +1,7 @@
 ---
+branch: pool
 related:
   - remove-signals
-  - postgres-cli-and-insights
 ---
 
 # DB connection pooling
