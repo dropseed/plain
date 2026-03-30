@@ -5,7 +5,10 @@
 - [Overview](#overview)
 - [Database connection](#database-connection)
 - [Querying](#querying)
-- [Migrations](#migrations)
+- [Schema management](#schema-management)
+    - [Syncing](#syncing)
+    - [Migrations](#migrations)
+    - [Convergence](#convergence)
 - [Fields](#fields)
 - [Relationships](#relationships)
 - [Constraints](#constraints)
@@ -428,11 +431,59 @@ conn.set_read_only(False)  # back to normal
 
 Read-only mode must be set outside a transaction — calling it inside `atomic()` raises `TransactionManagementError`.
 
-## Migrations
+## Schema management
 
-Migrations track changes to your models and update the database schema accordingly. They are Python files stored in your app's `migrations/` directory.
+Your database schema is managed by two complementary systems: **migrations** and **convergence**. Migrations handle structural changes — creating tables, adding columns, renaming things. Convergence handles everything declarative — indexes, constraints, foreign keys, and NOT NULL enforcement. You declare these on your models and convergence makes the database match.
 
-### Creating migrations
+```
+Migrations                      Convergence
+(imperative, ordered)           (declarative, idempotent)
+─────────────────────────────   ─────────────────────────────
+Create / drop tables            Indexes
+Add / remove / rename columns   Check constraints
+Change column types             Unique constraints
+Data migrations (RunPython)     Foreign key constraints
+Custom SQL (RunSQL)             NOT NULL enforcement
+```
+
+This split exists because structural changes (adding a column) must happen in a specific order and can't be retried, while declarative objects (indexes, constraints) can be compared against model definitions and fixed automatically — even if a previous attempt failed.
+
+### Syncing
+
+The primary command for all schema management is `postgres sync`. It runs migrations and convergence together:
+
+```bash
+plain postgres sync
+```
+
+```
+plain postgres sync
+│
+├─ 1. Create migrations (development only)
+│     Detects model changes, generates migration files
+│
+├─ 2. Apply migrations
+│     Runs pending migrations in a single transaction
+│
+└─ 3. Converge
+      Compares indexes, constraints, FKs, and nullability
+      against model declarations — applies fixes independently
+```
+
+In development (`DEBUG=True`), sync auto-generates migrations before applying them. In production, it only applies existing migrations and converges.
+
+| Command                                 | Purpose                                                               |
+| --------------------------------------- | --------------------------------------------------------------------- |
+| `plain postgres sync`                   | Create + apply migrations + converge (the one command for everything) |
+| `plain postgres sync --check`           | Exit non-zero if anything would change (for CI)                       |
+| `plain postgres sync --drop-undeclared` | Also remove indexes/constraints not declared on any model             |
+| `plain postgres schema`                 | Show schema state with drift detection                                |
+| `plain postgres schema --json`          | Machine-readable schema output                                        |
+| `plain postgres converge`               | Run convergence alone (advanced)                                      |
+
+### Migrations
+
+Migrations track structural changes to your models. They are Python files stored in your app's `migrations/` directory.
 
 ```bash
 plain migrations create
@@ -444,33 +495,22 @@ Key flags:
 - `--check` — Exit non-zero if migrations are needed (for CI)
 - `--empty <package>` — Create an empty migration for custom data migrations
 - `--name <name>` — Set the migration filename
-- `-v 3` — Show full migration file contents
 
 Only write migrations by hand if they are custom data migrations.
 
-### Running migrations
+Other migration commands:
 
-```bash
-plain migrations apply
-```
+| Command                                     | Purpose                                              |
+| ------------------------------------------- | ---------------------------------------------------- |
+| `plain migrations apply`                    | Apply pending migrations                             |
+| `plain migrations apply --plan`             | Preview what would run                               |
+| `plain migrations apply --check`            | Exit non-zero if unapplied migrations exist (for CI) |
+| `plain migrations apply --fake`             | Mark as applied without running SQL                  |
+| `plain migrations list`                     | View migration status by package                     |
+| `plain migrations squash <pkg> <migration>` | Squash migrations into one                           |
+| `plain migrations prune`                    | Remove stale migration records                       |
 
-Key flags:
-
-- `--plan` — Show what migrations would run without applying them
-- `--check` — Exit non-zero if unapplied migrations exist (for CI)
-- `--fake` — Mark migrations as applied without running them
-
-### Viewing migration status
-
-```bash
-plain migrations list
-```
-
-`migrations apply` has no `--list` or `--status` flag. Use `plain migrations list`.
-
-- `--format plan` — Show in dependency order instead of grouped by package
-
-### Development workflow
+#### Development workflow
 
 During development, iterating on models often produces multiple small migrations (0002, 0003, 0004...). Clean these up before committing.
 
@@ -497,7 +537,7 @@ Use this when migrations have already been committed or deployed to other enviro
 | Migrations are committed but not deployed | Delete-and-recreate (if all developers reset) or squash |
 | Migrations are deployed to production     | Squash or full reset                                    |
 
-### Resetting migrations
+#### Resetting migrations
 
 Over time a package can accumulate dozens of migrations. Once **every environment** (dev, staging, production) has applied all of them, you can replace the entire history with a single fresh `0001_initial`.
 
@@ -521,10 +561,61 @@ Over time a package can accumulate dozens of migrations. Once **every environmen
 - Data migrations (`RunPython`) in the deleted history are gone, which is fine since they've already run everywhere.
 - If CI runs `migrations create --check` or `migrations apply --check`, the reset PR must be merged and deployed before those checks pass in other branches.
 
-### Other migration commands
+### Convergence
 
-- `plain migrations squash <package> <migration>` — Squash migrations into one
-- `plain migrations prune` — Remove stale migration records
+Convergence compares the indexes, constraints, foreign keys, and nullability declared on your models against what actually exists in the database, then applies fixes to make them match. You don't need to create migrations for these — just declare them on your model and run `postgres sync`.
+
+```python
+@postgres.register_model
+class User(postgres.Model):
+    email: str = types.EmailField()
+    username: str = types.TextField(max_length=150)
+    age: int = types.IntegerField()
+
+    model_options = postgres.Options(
+        indexes=[
+            postgres.Index(fields=["email"], name="users_email_idx"),
+        ],
+        constraints=[
+            postgres.UniqueConstraint(fields=["email"], name="users_email_uniq"),
+            postgres.CheckConstraint(check=postgres.Q(age__gte=0), name="users_age_positive"),
+        ],
+    )
+```
+
+When you run `postgres sync`, convergence detects that these indexes and constraints are missing and creates them — using non-blocking DDL operations where possible (e.g. `CREATE INDEX CONCURRENTLY`, `ADD CONSTRAINT ... NOT VALID` followed by `VALIDATE CONSTRAINT`).
+
+**Key properties:**
+
+- **Idempotent** — safe to run repeatedly. If the database already matches, nothing happens.
+- **Non-blocking** — indexes are built with `CONCURRENTLY`, constraints use `NOT VALID` + `VALIDATE` to avoid locking writes.
+- **Per-operation commits** — each fix is committed independently so a single failure doesn't roll back other fixes.
+- **Self-healing** — detects and rebuilds `INVALID` indexes (e.g. from a previously failed `CREATE INDEX CONCURRENTLY`).
+- **Rename-aware** — detects renamed indexes and constraints by matching their structure, avoiding unnecessary drop + recreate.
+
+**Inspecting schema state:**
+
+Use `postgres schema` to see what convergence would do. It shows every model's columns, indexes, and constraints compared against the database, with issues highlighted:
+
+```bash
+plain postgres schema           # all models
+plain postgres schema User      # single model
+plain postgres schema --json    # machine-readable output
+```
+
+**Staged rollouts:**
+
+Some changes can't be applied automatically. For example, if you add `NOT NULL` to a column that has existing `NULL` rows, convergence will report this as a blocked change and tell you to backfill the data first. Run `postgres sync` again after the backfill.
+
+**Cleanup:**
+
+When you remove an index or constraint from a model, the database object still exists. By default, `postgres sync` reports undeclared objects but doesn't drop them. Use `--drop-undeclared` to remove them:
+
+```bash
+plain postgres sync --drop-undeclared
+```
+
+Undeclared constraints block sync (they affect query behavior), while undeclared indexes are just reported as warnings.
 
 ## Fields
 
@@ -783,7 +874,7 @@ Field-level validation happens automatically based on field types and constraint
 
 ### Indexes and constraints
 
-You can optimize queries and ensure data integrity with indexes and constraints:
+You can optimize queries and ensure data integrity with indexes and constraints. These are managed automatically by [convergence](#convergence) — just declare them on the model and run `postgres sync`.
 
 ```python
 class User(postgres.Model):
