@@ -1,6 +1,6 @@
 # Migration rethink
 
-Replace Django's migration system with two complementary systems: **migrations** for imperative schema changes that code depends on, and **schema convergence** for declarative state (indexes, constraints, NOT NULL) that the framework applies automatically using safe Postgres patterns.
+Replace Django's migration system with two complementary systems: **migrations** for imperative schema changes that code depends on, and **schema convergence** for declarative state (indexes, constraints, NOT NULL) that the framework applies automatically using online-safe Postgres patterns.
 
 The current system bundles everything into migration files — schema changes, index creation, constraint management, dependency graphs — and wraps it all in transactions that hold dangerous locks. The rethink separates what _must_ be imperative (adding/removing columns, data operations) from what can be _declarative_ (the database should match the model definitions), and handles each appropriately.
 
@@ -12,14 +12,14 @@ Plain manages your database with two systems: **migrations** for structural chan
 
 ```bash
 # Edit your model, then:
-plain postgres schema --make --sync   # generate migration + apply everything
+plain migrations create && plain postgres sync   # generate migration + apply everything
 ```
 
 Or step by step:
 
 ```bash
 plain postgres schema            # see what changed
-plain postgres schema --make     # generate a migration
+plain migrations create          # generate a migration
 plain postgres sync              # apply everything
 ```
 
@@ -35,7 +35,7 @@ class Order(postgres.Model):
 ```
 
 ```
-$ plain postgres schema --make
+$ plain migrations create
 Created: app/migrations/20240315_110000_add_status_to_orders.py
 ```
 
@@ -51,7 +51,7 @@ class Migration:
 
 Each operation maps to exactly one SQL statement. There's no `CreateIndex` or `SetNotNull` operation — those are convergence concerns. The boundary is enforced by the API, not by convention.
 
-Migrations run in a single transaction — all pending migrations succeed together or all roll back. No partial state.
+Migrations run in a single transaction — all pending migrations succeed together or all roll back. No partial state. Generated migrations are expected to be atomic-only; any future escape hatch for bespoke non-atomic work is outside the normal `postgres sync` contract.
 
 For data operations, create a `.py` migration with `--empty`. You can use the ORM — models are imported directly, no historical reconstruction:
 
@@ -65,7 +65,7 @@ class Migration:
 
 ### Schema convergence
 
-Indexes, constraints, and NOT NULL are declared on your models. The framework applies them automatically using safe Postgres DDL patterns — you never write migrations for these.
+Indexes, constraints, and NOT NULL are declared on your models. The framework applies them automatically using online-safe Postgres DDL patterns — you never write migrations for these.
 
 ```python
 @postgres.register_model
@@ -101,7 +101,7 @@ Schema:
   ✓ orders.status — applied NOT NULL
 ```
 
-Behind the scenes, convergence uses `CREATE INDEX CONCURRENTLY`, `ADD CONSTRAINT ... NOT VALID` + `VALIDATE`, and the CHECK-then-SET-NOT-NULL pattern. If an operation fails (lock timeout, transient error), it retries on the next `postgres sync`.
+Behind the scenes, convergence uses `CREATE INDEX CONCURRENTLY`, `ADD CONSTRAINT ... NOT VALID` + `VALIDATE`, and the CHECK-then-SET-NOT-NULL pattern. In production, normal `postgres sync` should only do forward, non-destructive convergence work. If required correctness convergence fails, the command exits non-zero, the deploy aborts, and the next run picks up from the partial forward progress already made. Cleanup and contraction stay behind `--prune`.
 
 ### Deploying
 
@@ -130,7 +130,7 @@ Then apply:
 plain postgres sync
 ```
 
-One command. Applies pending migrations, then converges schema. Idempotent — safe to run any number of times.
+One command. Applies pending migrations, then converges schema. In production this is the pre-deploy gate: migration failure means rollback and abort; required convergence failure means abort with safe partial forward progress left in place. Idempotent — safe to run any number of times.
 
 ### Inspecting
 
@@ -153,7 +153,7 @@ orders (4 columns, 1,247 rows, 96 kB)
     ✓ orders_status_idx (status)
     + orders_priority_idx (priority)          ← missing
 
-Run `plain postgres schema --make` to create a migration.
+Run `plain migrations create` to create a migration.
 Run `plain postgres sync` to apply all changes.
 ```
 
@@ -206,9 +206,9 @@ _Counter:_ Convergence applies defaults in pass 0 — immediately after migratio
 
 **"Auto-applying schema changes during deploy is scary."** Convergence creates indexes and constraints automatically. What if it starts building a huge index during peak traffic? What if a constraint validation scans a 100M-row table?
 
-_Counter:_ Convergence uses CONCURRENTLY (doesn't block writes), lock_timeout (fails fast if it can't acquire a lock), and the backfill threshold (reports instead of acting on large tables). These are the same patterns that production teams apply manually today — convergence just automates them. The scary alternative is developers forgetting to use CONCURRENTLY and taking the site down with a regular CREATE INDEX.
+_Counter:_ Convergence uses CONCURRENTLY (doesn't block writes), lock_timeout (fails fast if it can't acquire a lock), and the backfill threshold (reports instead of acting on large tables). These are online-safety patterns — they keep DDL from taking the site down. Rollout safety is still handled by deploy sequencing and truthful model declarations. The scary alternative is developers forgetting to use CONCURRENTLY and taking the site down with a regular CREATE INDEX.
 
-**"DB introspection for makemigrations is fragile."** Alembic does this and has documented caveats. If the dev DB drifts, you generate wrong migrations. Every other auto-detecting tool (Prisma, Atlas) uses a clean ephemeral DB instead.
+**"DB introspection for `migrations create` is fragile."** Alembic does this and has documented caveats. If the dev DB drifts, you generate wrong migrations. Every other auto-detecting tool (Prisma, Atlas) uses a clean ephemeral DB instead.
 
 _Counter:_ The drift check (refuse to generate if DB doesn't match migration state) is the key safeguard that Alembic lacks. And convergence actively keeps the DB in shape — drift is less likely because `postgres sync` is always converging toward the correct state. The ephemeral DB approach (Option C) remains available as an escape hatch if needed.
 
@@ -225,67 +225,66 @@ _Counter:_ Fair. The sequence is designed so each piece delivers value independe
 ## Vision
 
 - **Migrations are simple.** They contain AddField, RemoveField, CreateModel, DeleteModel, and RunPython. No indexes, no constraints, no NOT NULL. Flat timestamped list, no per-app directories, no dependency graph.
-- **Schema convergence handles the rest.** Indexes, FK constraints, CHECK constraints, unique constraints, and NOT NULL are declared on models and applied by the framework using safe Postgres patterns (CONCURRENTLY, NOT VALID + VALIDATE, CHECK-then-SET-NOT-NULL). Self-healing — run it repeatedly and it converges.
-- **One command to sync.** Something like `postgres sync` that runs pending migrations then converges schema, with clear output about what it did and what's still pending (e.g., NOT NULL blocked by existing NULLs).
-- **Fresh databases don't need migration history.** `postgres sync` on an empty database creates everything from model definitions. Migrations only matter for incremental changes to existing databases.
+- **Schema convergence handles the rest.** Indexes, FK constraints, CHECK constraints, unique constraints, and NOT NULL are declared on models and applied by the framework using online-safe Postgres patterns (CONCURRENTLY, NOT VALID + VALIDATE, CHECK-then-SET-NOT-NULL). Self-healing — run it repeatedly and it converges.
+- **One command to sync.** Something like `postgres sync` that runs pending migrations, applies required correctness convergence, and reports best-effort performance work separately.
+- **Fresh databases don't need schema history.** `postgres sync` on an empty database creates everything from model definitions, then converges the declared schema. Historical data migrations are incremental concerns, not part of fresh setup. App seeding/init is a separate concern.
 - **Safe by default.** `lock_timeout` on all DDL. Advisory locks for migration coordination. Non-blocking DDL for convergence operations. No expert knowledge required.
 
-## Implementation phases
+## Implementation status
 
-The rethink ships in four phases. Each phase delivers standalone value. Users don't need to adopt the full vision at once — Phase 1 and 2 improve the existing system without breaking changes. Phase 3 is the major version boundary where migrations change format. Phase 4 is polish.
+The original plan had four sequential phases. In practice, we collapsed Phases 2 and 3 — moving features from migrations to convergence incrementally rather than shipping convergence as opt-in first. The migration system's constraint/index operations were removed entirely, not deprecated.
 
-### Phase 1: Safety (no user-facing changes)
+The migration format changes (thin operations, flat timestamps) are deferred indefinitely. The strategy is to keep expanding convergence using the existing Django-derived migration format and see how far that gets us. As convergence takes over indexes, constraints, NOT NULL, defaults, and FKs, migrations naturally get simpler without requiring a format overhaul.
 
-Works with the existing migration system. Each is a standalone PR.
+### Done: Convergence core
 
-- [ ] [lock-timeout-default](lock-timeout-default.md) — `SET lock_timeout` and `SET statement_timeout` on every DDL statement. One-line change to the schema editor. Biggest safety improvement per line of code.
-- [ ] [advisory-locks](advisory-locks.md) — Replace the table lock with session-level advisory lock. Decouples coordination from the transaction. Prerequisite for non-transactional DDL.
-- [ ] No-op migration elimination — stop generating migrations for `choices`, `validators`, `default` (non-db), `on_delete`, `related_name`, `ordering`. Autodetector change.
+Indexes and constraints are fully managed by convergence. The migration autodetector no longer generates operations for them, and the operation classes (AddConstraint, RemoveConstraint, AddIndex, RemoveIndex, RenameIndex) have been removed.
 
-### Phase 2: Convergence (opt-in, coexists with existing migrations)
+- [x] `postgres schema` comparison engine — check, unique, FK constraint + INVALID index detection
+- [x] `postgres converge` — constraints (NOT VALID + VALIDATE, USING INDEX) and indexes (CONCURRENTLY)
+- [x] Removed constraint/index operations from migration system and all existing migration files
+- [x] `postgres sync` = `migrations create` (DEBUG) + `migrations apply` + `converge`
+- [x] Pass ordering (rebuild invalid → create indexes → add constraints → validate → drop constraints → drop indexes)
+- [x] INVALID index detection + rebuild
+- [x] Per-operation commits with rollback on failure
+- [x] Test DB setup runs convergence after migrations
+- [x] Dev server uses `postgres sync`
+- [x] CLI: `migrations create` (was `makemigrations`), removed `plain migrate` shortcut
 
-Ship convergence as a NEW command alongside the existing migration system. Users adopt it gradually.
+### Remaining: Convergence expansion
 
-- [ ] Expand `postgres schema` comparison engine — add FK constraint, CHECK constraint, and default checking
-- [ ] [schema-convergence](schema-convergence.md) — the convergence engine (pass 0-5, safe DDL, backfill safety, INVALID index handling)
-- [ ] `postgres converge` command — applies what's missing using safe DDL patterns
-- [ ] `postgres sync` = existing `migrate` + new `converge`
+More things to move from migrations to convergence. Each of these removes operations from the autodetector and lets the existing migration format get thinner organically.
 
-**Key property:** convergence is purely additive. It reads model declarations and applies what's missing. If an index already exists (created by an old migration), convergence sees it and does nothing. Users can:
+- [ ] Move FK constraints from field-level migration operations to convergence
+- [ ] NOT NULL convergence (backfill + CHECK NOT VALID + VALIDATE + SET NOT NULL)
+- [ ] Defaults convergence (SET DEFAULT / DROP DEFAULT)
+- [ ] Remove historical model reconstruction from RunPython — change signature to `(schema_editor,)`, use real imports instead of reconstructed state. Once nothing consumes ProjectState, stop generating migrations for `choices`, `validators`, `default` (non-db), `on_delete`, `related_name`, `ordering`
 
-- Keep writing index migrations the old way (everything works)
-- OR declare indexes on models and let convergence handle them (new way)
-- Both approaches coexist in the same project, same database
+### Remaining: Safety
 
-This is the biggest code effort (convergence engine, comparison engine expansion) but the safest to ship — it's a new command, not a change to existing behavior. Users who never run `postgres converge` see no difference.
+Standalone improvements to the migration/convergence system.
 
-### Phase 3: New migration format (breaking change, major version boundary)
+- [ ] [lock-timeout-default](lock-timeout-default.md) — `SET lock_timeout` on DDL
+- [ ] [advisory-locks](advisory-locks.md) — session-level advisory lock for migration coordination
+- [ ] [failure-handling](failure-handling.md) — batch transaction for migrations, per-operation for convergence
 
-`makemigrations` changes format. Convergence becomes the required path for indexes/constraints. Ships as one release with `/plain-upgrade` handling the transition.
+### Deferred: Migration format
+
+These are possible future improvements but not actively planned. The existing Django-derived migration format works fine — as convergence takes over more responsibilities, migrations naturally get simpler without requiring a format change. We'll see where convergence expansion gets us before deciding if any of this is worth doing.
 
 - [ ] [thin-operations](thin-operations.md) — new migration format (thin operation classes, boundary enforcement)
-- [ ] [slim-migrations](slim-migrations.md) — makemigrations stops generating index/constraint/NOT NULL operations
 - [ ] [flat-timestamps](flat-timestamps.md) — single directory, timestamp-based, new tracking table
-- [ ] [cli-design](cli-design.md) — `postgres schema --make`, `postgres sync`, hazard gates, `--dry-run` plan
-- [ ] [sync-command](sync-command.md) — sync behavior and semantics
-- [ ] [failure-handling](failure-handling.md) — batch transaction for migrations, per-operation for convergence, deploy rollback story
-- [ ] `postgres adopt-convergence` — one-time validation command for existing projects
+- [ ] Schema editor refactor — SQL generation into Index/Constraint classes
 
-**Transition for existing projects:**
+### Deferred: Benefits that require migration format changes
 
-1. Upgrade Plain to the Phase 3 release
-2. `postgres adopt-convergence` — validates DB matches models, reports any discrepancies
-3. Going forward: `postgres schema --make` generates thin operations, convergence handles indexes/constraints
-4. Old migration files keep working (runner supports both formats)
-5. Delete old files whenever convenient (optional cleanup)
-
-### Phase 4: Benefits that fall out
+These depend on the migration format work above. They are follow-on optimizations, not required to prove the main rethink.
 
 - [ ] [fresh-db-from-models](fresh-db-from-models.md) — fast test setup, no migration replay
-- [ ] [remove-squash](remove-squash.md) — no longer needed
-- [ ] DB-free `--check` via operation replay (only after old migration files are cleaned up)
+- [ ] [generated-baseline](generated-baseline.md) — optional release artifact for fresh installs and upgrade support windows
+- [ ] [remove-squash](remove-squash.md) — no longer needed once fresh-db-from-models exists
+- [ ] DB-free `--check` via operation replay
 - [ ] `--replay` CI verification (migration history matches models)
-- [ ] Migration directory integrity (checksums)
 
 ## Key design decisions
 
@@ -295,14 +294,14 @@ Earlier exploration considered Ecto's automatic/manual migration directories. Th
 
 ### Why convergence works for indexes/constraints but not columns
 
-The split comes down to **what the code depends on.** A missing index means slower queries. A missing column means a hard crash. This drives two different failure models:
+The split comes down to **what the code depends on.** A missing column means a hard crash. A missing secondary index means slower queries. Constraints and defaults sit between those extremes: they are declarative like indexes, but correctness-critical like schema shape.
 
-- **Convergence** (indexes, constraints, NOT NULL): per-operation, non-transactional, retry on failure. Partial convergence is degraded but functional.
+- **Convergence** (indexes, constraints, NOT NULL): per-operation and non-transactional, but with two result classes. Correctness convergence must succeed; performance convergence can degrade and retry.
 - **Migrations** (tables, columns, renames, type changes): batch transaction, all-or-nothing. Either all structural changes apply or none do.
 
 We considered making AddColumn and CreateTable convergence-managed too (they're unambiguous — model declares a column, DB doesn't have it, add it). But this creates ordering and transaction problems. A data migration that backfills a new column must run AFTER the column exists. With migrations, this is natural — both are in the batch transaction, timestamp-ordered. With convergence, you'd need structural convergence → data migrations → schema convergence — three phases instead of two, plus logic to distinguish rename migrations (which must run before structural convergence) from data migrations (which run after). The current two-phase design (migrations → convergence) is simpler and safer.
 
-The DX concern (too many commands for the common case) is addressed by `postgres schema --make --sync` — auto-generate the migration AND apply in one step. You get one-command convenience without the ordering complexity.
+The DX concern (too many commands for the common case) is addressed by `postgres sync` running `migrations create` automatically in DEBUG mode. You get one-command convenience without the ordering complexity.
 
 ### Flat timestamps, no dependency graph
 
@@ -313,24 +312,47 @@ The dependency graph exists primarily to coordinate cross-app constraint creatio
 Today's migration system forces a choice: `atomic=True` (safe rollback but can't use CONCURRENTLY/VALIDATE) or `atomic=False` (enables safe DDL but partial failure leaves you stuck). The split eliminates this tradeoff:
 
 - **Migrations**: batch transaction, all-or-nothing. If any fails, roll back everything. This works because slim migrations are all catalog-only DDL — fast, no long locks. Same safety as today without the downsides.
-- **Convergence**: per-operation, non-transactional. If one fails, the rest still succeed. Retry failed operations on next run. Failure isn't a deploy blocker — a missing index means slower queries, not broken code.
+- **Convergence**: split by semantics, not just mechanism. Correctness convergence (UNIQUE, FK, CHECK, NOT NULL, defaults) is part of "the DB matches the code" and should make `postgres sync` fail if it can't reach the declared state. Performance convergence (secondary indexes) is best-effort — warn, retry later, don't block deploys. "Online-safe" does not automatically mean "rollout-safe"; stricter contracts still need to be declared in the right deploy.
+
+### Rollback story: explicit, not magical
+
+Reverse migrations have a chicken-and-egg problem: the reverse migration lives in the code you just rolled back. To run it, you either need the new code (which you're trying to undo) or git surgery to cherry-pick the migration file into the old code. Every path requires manual intervention during an incident.
+
+The improvement here is not "automatic reverse schema changes." The improvement is a clearer contract:
+
+- Normal `postgres sync` adds and validates declared state. It does **not** auto-drop undeclared indexes/constraints as part of a rollback.
+- Cleanup is explicit via `--prune` (or manual SQL / `RunSQL`) because dropping objects in production is a deliberate operation, even when the model no longer declares them.
+- Restrictive convergence changes should only be declared in the contract deploy, after old code is gone. If rolling back the code would require dropping a newly-added constraint, that constraint was tightened too early.
+
+This keeps rollback boring: roll back the code, leave additive schema in place, and use explicit cleanup only when you actually want to contract the schema.
+
+For the current scope, that means two deploy shapes:
+
+- Ordinary deploy: `plain postgres sync`
+- Contraction deploy: `plain postgres sync --prune`
+
+`--prune` is not meant to be a routine post-deploy cleanup step. It is the explicit marker that this deploy removes convergence-owned schema objects. A more automatic, deploy-aware approach is possible later, but it is a separate design problem. See deploy-aware-rollouts.md.
+
+`postgres schema` completes the picture — after a rollback, it shows exactly what differs between your models and the database, so you can verify the state before and after `postgres sync`.
+
+The two-system split gives you the right rollback behavior for each category: additive changes can remain in place, cleanup is explicit, and destructive structural changes stay fix-forward.
 
 ### One comparison engine, three tools
 
-`postgres schema` already diffs models against the actual DB (columns, indexes, unique constraints). The engine needs expansion to also cover FK constraints, CHECK constraints, and `db_default` values before it can drive convergence fully. That same engine drives everything:
+`postgres schema` diffs models against the actual DB (columns, indexes, unique constraints, check constraints, FK constraints). Remaining expansion: `db_default` values. That same engine drives everything:
 
 - `postgres schema` — read-only diff ("here's what's different")
-- `makemigrations` — generates SQL for the imperative parts (columns, tables)
+- `migrations create` — generates SQL for the imperative parts (columns, tables)
 - `postgres converge` — applies the declarative parts (indexes, constraints, NOT NULL)
 - `postgres sync` — runs all three in sequence
 
-This means `makemigrations` requires a database connection and a DB in known-good state. Reasonable — you're doing database work, and `postgres schema` / convergence keep the DB in shape. The payoff: no operation abstraction layer, no state replay, no ModelState/ProjectState. The entire state reconstruction machinery is eliminated.
+This means `migrations create` requires a database connection and a DB in known-good state. Reasonable — you're doing database work, and `postgres schema` / convergence keep the DB in shape. The payoff: no operation abstraction layer, no state replay, no ModelState/ProjectState. The entire state reconstruction machinery is eliminated.
 
 All migrations are `.py` files. Schema migrations use thin operation classes (auto-generated). Data migrations use `run()` (developer-written). The operation set enforces the migration/convergence boundary — there is no `CreateIndex` or `SetNotNull` operation. See slim-migrations.md for details.
 
 ### No no-op migrations
 
-Only DB-relevant changes produce migrations. Changing `choices`, `validators`, `default` (non-db), `on_delete`, `related_name`, `ordering`, etc. does NOT generate a migration. The model code is the truth for Python-level properties. RunPython uses current model code via regular imports, not historical reconstruction.
+Only DB-relevant changes produce migrations. Changing `choices`, `validators`, `default` (non-db), `on_delete`, `related_name`, `ordering`, etc. does NOT generate a migration. The model code is the truth for Python-level properties.
 
 ### What migrations contain vs what convergence handles
 
@@ -345,7 +367,7 @@ Only DB-relevant changes produce migrations. Changing `choices`, `validators`, `
 
 - Indexes (CREATE INDEX CONCURRENTLY)
 - FK constraints (NOT VALID + VALIDATE) — currently created inline by AddField, moves to convergence
-- CHECK constraints (NOT VALID + VALIDATE) — includes auto-generated field-level checks (e.g., PositiveIntegerField)
+- CHECK constraints (NOT VALID + VALIDATE) — already moved to convergence, autodetector no longer generates AddConstraint/RemoveConstraint
 - Unique constraints (concurrent index + USING INDEX)
 - NOT NULL (CHECK NOT VALID + VALIDATE + SET NOT NULL, only when no NULLs exist)
 - `db_default` (SET DEFAULT / DROP DEFAULT) — new feature, Plain currently uses Python-side defaults only
@@ -353,7 +375,7 @@ Only DB-relevant changes produce migrations. Changing `choices`, `validators`, `
 
 ### Package migrations
 
-Packages ship migrations for CreateModel/AddField/RunPython. Indexes and constraints are declared on models and handled by convergence when the package is installed. Package data operations (backfills) are RunPython migrations that get discovered and run in timestamp order alongside the project's own migrations.
+Packages ship migrations for CreateModel/AddField plus explicit data operations. Indexes and constraints are declared on models and handled by convergence when the package is installed.
 
 ## Industry context
 
@@ -366,12 +388,16 @@ Packages ship migrations for CreateModel/AddField/RunPython. Indexes and constra
 
 None of these combine declarative convergence with imperative migrations the way this design does. Atlas is the closest parallel for the declarative side but doesn't separate convergence from migrations — everything goes through its plan engine. The Rails safety gems prove the individual patterns work at scale but require manual orchestration that convergence automates.
 
+## Future direction
+
+The obvious next step beyond `--prune` is a deploy-aware rollout model where Plain can automate contraction after cutover/rollback windows rather than relying on an explicit contraction command. That is intentionally out of scope for the current rethink. See deploy-aware-rollouts.md.
+
 ## What this replaces/subsumes
 
-- `migrations-safety-analysis` future → convergence uses safe patterns by default; remaining safety warnings move into `makemigrations` output
+- `migrations-safety-analysis` future → convergence uses safe patterns by default; remaining safety warnings move into `migrations create` output
 - `models-non-blocking-ddl` future → the convergence engine implements all non-blocking DDL patterns
 - `enforce-0001-initial-naming` future → no sequential numbering at all
 - `migrations-rename-app-column` future → no app column in tracking table
 - `migrations squash` command → removed, no longer needed
-- `migrations reset` skill → trivial (delete files, makemigrations, prune)
+- `migrations reset` skill → trivial (delete files, `migrations create`, prune)
 - `fk-auto-index-removal` arc lessons → convergence manages all indexes from model declarations

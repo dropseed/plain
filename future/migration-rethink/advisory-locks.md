@@ -11,7 +11,7 @@ The current migration system locks the `plain_migrations` table with `SHARE UPDA
 
 ## Solution
 
-Use `pg_advisory_lock` on a separate connection (session-level, not transaction-bound) to coordinate migration runs. This decouples the "only one migrator at a time" guarantee from the DDL transaction.
+Use `pg_advisory_lock` on a separate connection (session-level, not transaction-bound) to coordinate `postgres sync` and other schema-changing commands. This decouples the "only one schema writer at a time" guarantee from the DDL transaction.
 
 ```python
 # Connection 1: hold advisory lock
@@ -24,38 +24,31 @@ CREATE INDEX CONCURRENTLY ...;
 SELECT pg_advisory_unlock(78770566);
 ```
 
-This is what Ecto added in v3.9. It unblocks non-transactional DDL while maintaining the single-migrator guarantee.
+This is what Ecto added in v3.9. It unblocks non-transactional DDL while maintaining the single-writer guarantee.
 
-## Two locks: migrations and convergence
+## One sync lock
 
-`postgres sync` coordinates two distinct systems that need their own locking:
+The earlier idea of separate migration and convergence locks was too clever. `postgres sync` is a single contract: "make the database match the current code." If one process is still applying migrations while another is already converging, the second process can act on stale assumptions and report misleading success.
 
-**Migration lock** (key `78770566`): serializes migration runs. Only one process applies migrations at a time. The batch transaction provides rollback safety; the advisory lock provides single-writer guarantee.
+Use one advisory lock for any schema-changing command (`postgres sync`, `migrations apply`, `postgres converge`). That keeps the behavior obvious:
 
-**Convergence lock** (key `78770567`): serializes convergence operations. Without this, two `postgres sync` processes could race on `CREATE INDEX CONCURRENTLY` -- one fails, leaves an INVALID index, and the other's `IF NOT EXISTS` silently succeeds against the broken index. Serializing convergence avoids this entirely.
+- Process A running `postgres sync` blocks Process B from starting another schema-changing command
+- No node can converge against pre-migration state while another node is still migrating
+- Index creation races and INVALID index traps are avoided because convergence is serialized too
 
-### Why separate locks, not one
-
-Using a single lock for both would work but is unnecessarily restrictive. The two systems are sequential within a single `postgres sync` run (migrations first, then convergence), but across processes they don't need to block each other:
-
-- Process A running migrations should block Process B's migrations (same schema changes must serialize).
-- Process A running convergence should block Process B's convergence (avoid index creation races).
-- Process A running migrations should NOT block Process B's convergence (convergence on already-migrated schema is safe).
-
-In practice, multi-node deploys usually run `postgres sync` from a single deploy step (not from every app instance). But when they don't -- Kubernetes init containers, Heroku release phase across dynos -- the separate locks allow more concurrency without sacrificing correctness.
+This is slightly more restrictive than separate locks, but the clarity is worth it. If performance-only convergence later proves worth parallelizing, that can be an explicit future optimization rather than the default contract.
 
 ### Lock key selection rationale
 
 Fixed integer constants, not hashed strings.
 
-- **78770566** for migrations (the value already in Plain's codebase, carried forward)
-- **78770567** for convergence (adjacent integer, easy to identify in `pg_locks`)
+- **78770566** for sync/schema changes (the value already in Plain's codebase, carried forward)
 
 Why not hash the database name (like Rails) or the repo module (like Ecto)?
 
 - Plain targets a single database per project. No multi-database disambiguation needed.
 - Fixed constants are debuggable. `SELECT * FROM pg_locks WHERE objid = 78770566` immediately tells you what's happening.
-- The two-integer advisory lock variant (`pg_advisory_lock(classid, objid)`) could namespace by "plain" in the first 32 bits, but single-int is simpler and sufficient for two locks.
+- The two-integer advisory lock variant (`pg_advisory_lock(classid, objid)`) could namespace by "plain" in the first 32 bits, but single-int is simpler and sufficient for one lock.
 
 If Plain ever supports multiple databases per project, the key generation should incorporate the database identifier -- but that's a bridge to cross then.
 
@@ -73,12 +66,12 @@ if not acquired:
 
 ### Retry settings
 
-| Setting        | Default              | Rationale                                                                                            |
-| -------------- | -------------------- | ---------------------------------------------------------------------------------------------------- |
-| Retry interval | 5 seconds            | Long enough to avoid busy-waiting, short enough to notice when the lock clears                       |
-| Max retries    | 60 (5 minutes total) | Migrations should be fast (catalog-only DDL). If the lock is held for 5 minutes, something is wrong. |
+| Setting        | Default            | Rationale                                                                                                                        |
+| -------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Retry interval | 5 seconds          | Long enough to avoid busy-waiting, short enough to notice when the lock clears                                                   |
+| Max retries    | 720 (1 hour total) | Full syncs can legitimately hold the lock during long index builds. Wait for the active schema writer rather than failing early. |
 
-Configurable via settings: `MIGRATIONS_LOCK_RETRY_INTERVAL_MS` and `MIGRATIONS_LOCK_MAX_RETRIES`.
+Configurable via settings: `POSTGRES_SYNC_LOCK_RETRY_INTERVAL_MS` and `POSTGRES_SYNC_LOCK_MAX_RETRIES`.
 
 On max retries exceeded: fail with a clear error message including the PID of the lock holder (queryable from `pg_locks`).
 
@@ -104,7 +97,7 @@ DATABASE_URL=postgres://user:pass@db-host:5432/mydb plain postgres sync
 
 **Option 2: Session pooling pool.** Run a separate PgBouncer pool in session mode for admin operations. Route migration commands to this pool. This is the pattern PgBouncer's own docs recommend for session-dependent features.
 
-**Option 3: Disable locking.** If you guarantee single-writer at the deployment level (e.g., a single deploy job, not multiple concurrent processes), you can disable the advisory lock entirely. This is a last resort -- the lock exists because "I promise only one thing runs migrations" is a guarantee that breaks silently.
+**Option 3: Disable locking.** If you guarantee single-writer at the deployment level (e.g., a single deploy job, not multiple concurrent processes), you can disable the advisory lock entirely. This is a last resort -- the lock exists because "I promise only one thing runs schema changes" is a guarantee that breaks silently.
 
 We will NOT attempt workarounds like `server_reset_query_always` or transaction-level advisory locks (`pg_advisory_xact_lock`). Transaction-level locks re-introduce the original problem: the lock is bound to a transaction, preventing non-transactional DDL. Flyway tried both approaches and the result is a maze of configuration flags and known issues.
 
@@ -140,8 +133,8 @@ def advisory_lock(lock_key: int, cursor_factory) -> Iterator[None]:
     Acquire a session-level advisory lock with retry.
     Uses a dedicated connection (cursor_factory) separate from the DDL connection.
     """
-    max_retries = settings.MIGRATIONS_LOCK_MAX_RETRIES  # default 60
-    retry_interval = settings.MIGRATIONS_LOCK_RETRY_INTERVAL_MS / 1000  # default 5s
+    max_retries = settings.POSTGRES_SYNC_LOCK_MAX_RETRIES  # default 720
+    retry_interval = settings.POSTGRES_SYNC_LOCK_RETRY_INTERVAL_MS / 1000  # default 5s
 
     with cursor_factory() as cursor:
         for attempt in range(max_retries):
@@ -159,13 +152,12 @@ def advisory_lock(lock_key: int, cursor_factory) -> Iterator[None]:
         # Failed to acquire after all retries
         holder_info = _get_lock_holder_info(cursor, lock_key)
         raise MigrationLockTimeout(
-            f"Could not acquire migration lock after {max_retries} retries "
+            f"Could not acquire sync lock after {max_retries} retries "
             f"({max_retries * retry_interval:.0f}s). Lock holder: {holder_info}"
         )
 
 
-MIGRATION_LOCK_KEY = 78770566
-CONVERGENCE_LOCK_KEY = 78770567
+SYNC_LOCK_KEY = 78770566
 ```
 
 ## Industry comparison
@@ -203,5 +195,5 @@ CONVERGENCE_LOCK_KEY = 78770567
 1. **Session-level advisory lock** (Ecto, Rails, Atlas) -- not transaction-level (Flyway's mistake) or table-level (Django, Liquibase).
 2. **Non-blocking with retry** (Ecto) -- not blocking (Rails' operational pain) or table flag (Liquibase's stale lock problem).
 3. **Fixed key constants** -- simpler than hash-based (Rails' CRC32, Ecto's phash2) since we don't need multi-database support.
-4. **Separate lock for convergence** -- no other framework has this because no other framework has a convergence system. It's a natural extension of the same pattern.
+4. **One schema-writing lock** -- clearer contract than trying to overlap migrations and convergence.
 5. **Direct connection for PgBouncer** -- the only clean solution. Don't try to make session features work through transaction pooling.

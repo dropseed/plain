@@ -109,35 +109,23 @@ class Migration:
             cursor.execute("UPDATE users SET email = LOWER(email) WHERE email != LOWER(email)")
 ```
 
+### No historical model reconstruction
+
+The current `RunPython` receives `(models_registry, schema_editor)` where `models_registry` is a reconstructed historical model registry built by replaying state mutations from every prior migration. This is why the autodetector generates migrations for changes that produce no DDL (`choices`, `validators`, `default`, `on_delete`, `related_name`, `ordering`) — they exist solely to keep the reconstructed state accurate.
+
+The reconstructed models are barely useful: no custom methods, managers, or properties. Most developers import the real model class anyway. And the accuracy goal is questionable — reconstructed state silently drifts from reality in subtle ways.
+
+Data migrations should use real imports. The `run(self, connection)` signature replaces `RunPython(fn)` with `fn(models_registry, schema_editor)`. Once nothing consumes the historical state, the autodetector stops generating state-only migrations, and the entire `ModelState`/`ProjectState` replay machinery becomes dead weight that can be removed incrementally.
+
 ### ORM vs raw SQL in data migrations
 
-Data migrations use the **current** model code, not a historical snapshot. This means if you write a migration referencing `Order.status` and someone later renames the field to `Order.state`, the old migration breaks.
+Data migrations use the **current** model code, not a historical snapshot.
 
-In practice this is fine because:
+**When to use ORM:** Most data migrations — backfills, data transformations, anything where the model API makes the intent clear.
 
-- Data migrations are short-lived — backfills become no-ops on empty tables and can be deleted once all databases have applied them
-- The failure is loud (AttributeError, not silent corruption)
-- Django's historical models were "pale shadows" anyway — no custom methods, no managers, no properties — so most developers already used real imports or raw SQL
+**When to use raw SQL:** When you need precise control over the SQL, or when the operation doesn't map to model methods (e.g., bulk updates with complex expressions).
 
-**When to use ORM:** one-time backfills you'll delete soon. The ORM is nicer to write and read.
-
-**When to use raw SQL:** long-lived migrations that might outlive the model code they reference (seed data, operations shared across many environments that won't all be updated at once). Raw SQL references table/column names, which are more stable than Python attribute names.
-
-### Runner behavior
-
-The runner globs for `*.py`, extracts timestamps from filenames, sorts by timestamp, and runs in order within the batch transaction:
-
-- Has `operations` → execute each operation's SQL
-- Has `run()` → call `Migration.run(connection)`
-
-### Fresh-db discrimination
-
-Migration class structure determines behavior on fresh databases:
-
-- Has `operations` → schema migration → **skip** (schema already exists from model-based DDL)
-- Has `run()` → data migration → **run** (seed data, backfills needed for app to function)
-
-Backfill migrations that touch existing data are no-ops on empty tables. See fresh-db-from-models.md.
+These migrations are incremental-only. If fresh-db-from-models is implemented later, fresh databases should not replay historical data operations at all. Application seed/init data is a separate concern and is out of scope here.
 
 ### Transition from current format
 
@@ -173,7 +161,7 @@ For these, convergence can't do `UPDATE ... SET col = <sql_expr>` because there'
 
 The long-term direction is to deprecate and eventually block Python callable defaults entirely, requiring DB expressions or static values. See [fields-db-defaults](../postgres-first-data-layer/fields-db-defaults.md) for the full design.
 
-Note: the current migration framework (pre-rethink) has a related bug — `AddField` with a callable default evaluates the callable once in Python and uses the single result as a static SQL `DEFAULT` for all existing rows. This means `default=uuid.uuid4` gives every existing row the same UUID.
+Note: the current migration framework (pre-rethink) has a related bug — `AddField` with a callable default evaluates the callable once in Python and uses the single result as a static SQL `DEFAULT` for all existing rows. This means `default=uuid.uuid4` gives every existing row the same UUID. In Plain that becomes especially visible once a later `UniqueConstraint` is declared on the field: convergence tries to add the unique constraint and fails on the duplicated backfilled values.
 
 ### Column type changes
 

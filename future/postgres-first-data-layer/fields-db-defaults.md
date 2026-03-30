@@ -4,6 +4,15 @@
 
 The `default` field parameter currently only accepts Python values and callables. When a migration adds a non-nullable field with a callable default (like `default=uuid.uuid4`) to a table with existing rows, the callable is evaluated **once** in Python and used as a static SQL `DEFAULT` for all existing rows. Every row gets the same UUID. This is a data integrity bug for any field where uniqueness matters.
 
+In Plain specifically, that usually means fields later covered by `UniqueConstraint`, not `unique=True` on the field. The failure mode is:
+
+1. Add a field with `default=uuid.uuid4`
+2. Existing rows all get the same UUID value
+3. A `UniqueConstraint` on that field is added later
+4. Convergence fails when it tries to create the unique index/constraint
+
+So the problem is broader than "UUID fields are awkward" or "callable defaults are a little surprising" — it is a real schema-transition hazard in the current model.
+
 Django solved this in 5.0 by adding a separate `db_default` parameter. But having both `default` and `db_default` creates confusion — users reach for the familiar `default=timezone.now` and hit the migration bug. Two params means explaining precedence rules, sentinel objects for unsaved instances, and when to use which.
 
 ## Solution
@@ -70,7 +79,11 @@ Before save, accessing a field with a DB expression default returns a sentinel (
 
 In the current migration system: the schema editor uses the SQL expression directly in `ALTER TABLE ADD COLUMN ... DEFAULT <expr>`. The callable-evaluated-once problem goes away.
 
+This also fixes the `UniqueConstraint` case above for DB expressions: Postgres evaluates `gen_random_uuid()` or `now()` per row during the backfill, so convergence can safely add the later uniqueness/constraint step.
+
 In the convergence future: `default=Now()` is desired state on the column. Convergence applies `SET DEFAULT now()` and manages backfills using the DB function per-row. Migrations never touch defaults at all.
+
+Python-only callables remain a separate problem. `default=get_random_string` still has no SQL equivalent, so convergence cannot safely backfill existing rows or guarantee compatibility with later uniqueness constraints. Those defaults either need a manual data migration during transition or need to be deprecated away entirely.
 
 ## `updated_at` — the remaining special case
 

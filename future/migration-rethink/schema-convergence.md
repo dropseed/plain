@@ -5,20 +5,44 @@
 Indexes, constraints, and NOT NULL are currently managed through migration files. This means:
 
 - Developers must know about CONCURRENTLY, NOT VALID, and the CHECK-then-NOT-NULL pattern
-- The migration system wraps everything in transactions that prevent safe DDL patterns
+- The migration system wraps everything in transactions that prevent online-safe DDL patterns
 - Migration files accumulate index/constraint operations that bloat the history
 - Cross-app FK dependencies exist solely because the migration creating a FK constraint needs the target table
 - Adding an index requires generating a migration file for what is purely a declarative statement
 
 ## Solution
 
-A convergence engine that compares model declarations against the actual database schema and applies the difference using safe Postgres patterns. Builds on the existing `postgres schema` command which already does the comparison — this adds the ability to act on it.
+A convergence engine that compares model declarations against the actual database schema and applies the difference using online-safe Postgres patterns. Builds on the existing `postgres schema` command which already does the comparison — this adds the ability to act on it.
 
 The `postgres schema` comparison engine becomes the foundation for the entire rethink. The same model-vs-DB diff drives `postgres schema` (read-only view), `migrations create` (generate SQL for column/table changes), and `postgres converge` (apply indexes/constraints/NOT NULL). One engine, three modes.
 
+## What "safe" means
+
+The word "safe" is overloaded in schema tooling. This design needs three separate meanings:
+
+- **Online-safe**: the Postgres operation uses a low-lock or non-blocking pattern (`CONCURRENTLY`, `NOT VALID` + `VALIDATE`, CHECK-then-`SET NOT NULL`). This is about traffic and lock impact.
+- **Failure-safe**: if `postgres sync` stops halfway, the database is left in a retryable forward state. This is about partial application.
+- **Rollout-safe**: old code and mixed-version deploys can still run against the resulting schema. This is about deploy sequencing and backward compatibility.
+
+These are different axes. An operation can be online-safe but not rollout-safe.
+
+| Operation                                        | Online-safe?             | Failure-safe in normal `sync`?    | Rollout-safe?                                                  |
+| ------------------------------------------------ | ------------------------ | --------------------------------- | -------------------------------------------------------------- |
+| `CREATE INDEX CONCURRENTLY`                      | Usually yes              | Yes                               | Usually yes                                                    |
+| `ADD CONSTRAINT ... NOT VALID` + `VALIDATE`      | Yes                      | Yes                               | Only if old code already obeys the rule                        |
+| `SET NOT NULL` after backfill + CHECK validation | Yes                      | Yes                               | No, unless old code is already gone or already writes non-NULL |
+| `DROP INDEX` / `DROP CONSTRAINT`                 | Often online-safe enough | No for ordinary pre-deploy `sync` | Depends                                                        |
+| Rebuild existing constraint/index in place       | Sometimes                | No for ordinary pre-deploy `sync` | Depends                                                        |
+
+This leads to the core contract:
+
+- Normal pre-deploy `postgres sync` auto-runs work that is **online-safe** and **failure-safe**.
+- Correctness work still has to be **declared at the right time** to be rollout-safe.
+- Contraction and rebuild work require explicit intent because they are not failure-safe for the ordinary deploy path.
+
 ### What convergence manages
 
-| Declaration                           | Safe pattern used                                                                                      | Status                                                                                                  |
+| Declaration                           | Online-safe pattern used                                                                               | Status                                                                                                  |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | `CheckConstraint(...)`                | `ADD CONSTRAINT CHECK NOT VALID` then `VALIDATE CONSTRAINT`                                            | **Done** — two-phase, NOT VALID detection/retry, per-op commits with rollback                           |
 | `UniqueConstraint(...)`               | `CREATE UNIQUE INDEX CONCURRENTLY` then `ADD CONSTRAINT USING INDEX`                                   | **Done** — handles all features (condition, include, opclasses, expressions), orphan cleanup on failure |
@@ -26,18 +50,22 @@ The `postgres schema` comparison engine becomes the foundation for the entire re
 | `ForeignKeyField(User)` constraint    | `ADD CONSTRAINT FK NOT VALID` then `VALIDATE CONSTRAINT`                                               | Not started — still managed by field-level migration ops (AddField/RemoveField)                         |
 | NOT NULL (field without `null=True`)  | Backfill NULLs with model default (if available) → `ADD CHECK NOT VALID` → `VALIDATE` → `SET NOT NULL` | Not started                                                                                             |
 | Defaults (`db_default`)               | `SET DEFAULT` / `DROP DEFAULT`                                                                         | Not started                                                                                             |
-| Removal of any of the above           | Safe drop pattern                                                                                      | **Done** for indexes and constraints                                                                    |
+| Removal of any of the above           | Online-safe drop pattern                                                                               | **Done** for indexes and constraints                                                                    |
 
 ### Behavior
 
 - **Idempotent**: run repeatedly, it converges. Failed operations are retried on next run.
 - **Self-healing**: detects INVALID indexes from failed CONCURRENTLY builds, drops and retries them.
-- **Auto-backfills with safety limits**: if a NOT NULL column has NULLs and the model declares a default, convergence can backfill before applying the constraint — but only when safe. See "Backfill safety" section below for thresholds and behavior. Reports a blocker when there's no default and NULLs exist (requires a RunPython migration with custom logic), or when the table exceeds the auto-backfill threshold.
-- **Non-destructive by default**: adding things is automatic, but dropping an index/constraint that exists in DB but not in model could prompt for confirmation (or have a `--prune` flag).
+- **Required vs best-effort**: correctness convergence (FK, CHECK, UNIQUE, NOT NULL, `db_default`) is part of "`postgres sync` succeeded". Secondary indexes are best-effort — warn and retry, but don't silently redefine deploy success.
+- **Auto-backfills with safety limits**: if a NOT NULL column has NULLs and the model declares a default, convergence can backfill before applying the constraint — but only when row counts stay within the configured operational threshold. See "Backfill safety" section below for thresholds and behavior. If the model declares a correctness constraint that convergence cannot reach, `postgres sync` should fail with an actionable message rather than claiming the DB is fully in sync.
+- **Cleanup is explicit**: adding/validating declared state is automatic; dropping undeclared indexes/constraints is a separate `--prune` decision.
+- **Normal pre-deploy sync is monotonic**: the ordinary `postgres sync` path should only create/add/validate/finalize declared state. Destructive cleanup or rebuild work is explicit maintenance, not part of the default deploy gate.
+
+Another way to say this: convergence owns the **how** of online-safe DDL, but the model/deploy sequence still owns the **when** for rollout safety.
 
 ### Dev vs production behavior
 
-In development (no concurrent traffic), convergence could skip CONCURRENTLY and use simpler patterns for speed. In production, always use the safe patterns. Detection could be based on a setting or `--dev` flag.
+In development (no concurrent traffic), convergence could skip CONCURRENTLY and use simpler patterns for speed. In production, always use the online-safe patterns. Detection could be based on a setting or `--dev` flag.
 
 ### Current state of `postgres schema`
 
@@ -59,8 +87,8 @@ Convergence is the write mode:
 ```
 $ plain postgres converge
 ✓ Created index orders_user_id_idx (CONCURRENTLY)
-⏸ orders.status: NOT NULL blocked — 12 rows have NULLs
-  Run: plain postgres backfill orders.status
+✗ orders.status: NOT NULL cannot be applied — 12 rows have NULLs
+  Fix the data, or keep the model nullable until the contract deploy
 ```
 
 ## Ownership: what convergence manages vs ignores
@@ -133,7 +161,8 @@ Pass 4: NOT NULL finalization (SET NOT NULL)
   - Skipped if validation failed (constraint stays NOT VALID, retried next run)
 
 Pass 5: Cleanup (constraint/index drops)
-  - Drops constraints/indexes no longer declared on models (with --prune or confirmation)
+  - Drops constraints/indexes no longer declared on models
+  - Only runs with `--prune` or another explicit maintenance mode, not in ordinary pre-deploy `postgres sync`
 ```
 
 ### Why five passes, not a dependency graph
@@ -160,6 +189,8 @@ Each pass has different lock characteristics:
 | 5: Cleanup     | Varies                                                        | Milliseconds                         | Briefly        |
 
 The expensive passes (1, 3) don't block writes. The blocking passes (0, 2, 4, 5) complete in milliseconds because they skip scans. Pass 0 runs first to close the nullable window immediately after migrations add new columns.
+
+In practice, ordinary pre-deploy `postgres sync` stops after pass 4 and reports pass-5 cleanup opportunities separately. That keeps the default deploy path forward-only.
 
 ### Known detection gaps
 
@@ -208,7 +239,7 @@ $ plain postgres converge
 
 # Table has 2M NULL rows
 $ plain postgres converge
-⏸ orders.status: NOT NULL blocked — 2,000,000 rows have NULLs (exceeds auto-backfill threshold of 100,000)
+✗ orders.status: NOT NULL cannot be applied — 2,000,000 rows have NULLs (exceeds auto-backfill threshold of 100,000)
   Run: plain postgres backfill orders.status --batch-size 10000
 ```
 
@@ -255,7 +286,7 @@ Two deploy instances run `postgres sync` simultaneously. Migrations are serializ
 
 **The INVALID index trap**: if the first one fails mid-build and leaves an INVALID index, the second one's `IF NOT EXISTS` silently succeeds — it sees the name exists and stops, even though the index is INVALID. Both nodes think it's done.
 
-**Solution**: convergence must check `pg_index.indisvalid` after creating, not just `IF NOT EXISTS`. If an index exists but is INVALID, drop it and retry. Convergence also needs its own advisory lock (separate key from the migration lock) to serialize convergence operations.
+**Solution**: convergence must check `pg_index.indisvalid` after creating, not just `IF NOT EXISTS`. If an index exists but is INVALID, drop it and retry. In practice this is simplest when `postgres sync` already holds the schema-writing advisory lock for the full run.
 
 ### Branch switching
 
@@ -279,17 +310,17 @@ Switch back to branch A:
 
 ### Rolling deploys and NOT NULL
 
-During a rolling deploy, old code doesn't write to a new column. New code does.
+The important improvement here is: **model declarations should reflect what can be enforced now, not what you hope to enforce later.**
 
-1. Migration adds nullable column (applied first, by one node)
-2. Old nodes: still running, create rows with NULL in new column
-3. New nodes: start writing values to new column
-4. Convergence checks NOT NULL: NULLs exist → skips, reports
-5. Eventually all nodes on new code, NULLs stop appearing
-6. Developer runs backfill for old rows
-7. Next convergence: zero NULLs → applies NOT NULL safely
+For a rolling deploy:
 
-This works naturally. Convergence's "check before acting" approach handles rolling deploys without coordination. The question is visibility — the operator needs to know that NOT NULL is pending and why.
+1. Deploy 1: add the column as nullable in both the migration and the model.
+2. Roll out code that starts writing values.
+3. Backfill old NULL rows.
+4. Deploy 2: change the model to `null=False`.
+5. `postgres sync` applies NOT NULL and fails if it cannot.
+
+This keeps `postgres sync` honest. If the model says NOT NULL, the database should leave the command with NOT NULL actually enforced. Deferred contract work should be represented as a later model change, not as a permanently "pending" mismatch between model and DB.
 
 ### Column type mismatches
 
@@ -335,9 +366,9 @@ Tables from extensions (PostGIS geometry_columns, pg_trgm), materialized views, 
 
 ### Partially applied convergence
 
-Convergence creates 3 of 5 indexes, then fails on the 4th (e.g., unique index fails due to duplicate data). The 3 successful indexes are committed (non-transactional). Next run: convergence sees 3 exist, creates the remaining 2 (retrying the failed one). This is the "self-healing" property.
+Convergence creates 3 of 5 secondary indexes, then fails on the 4th. The 3 successful indexes are committed (non-transactional). Next run: convergence sees 3 exist, creates the remaining 2. This is the "self-healing" property for best-effort work.
 
-For NOT VALID + VALIDATE patterns: if NOT VALID succeeds but VALIDATE fails (e.g., FK references nonexistent row), the unvalidated constraint exists. New writes are checked, but old data isn't proven valid. Next convergence run retries VALIDATE. The data issue must be fixed before VALIDATE can succeed.
+For correctness convergence, partial state is still possible at the Postgres level, but it should not count as a successful sync. If `NOT VALID` succeeds but `VALIDATE` fails (e.g., FK references nonexistent rows), the unvalidated constraint exists and new writes are checked, but the database is still not at the declared state. The data issue must be fixed and `postgres sync` re-run.
 
 ### Unique constraint window during CONCURRENTLY builds
 
@@ -370,6 +401,8 @@ The window is the **first scan duration only** — not the full build. For a 1M-
 - Convergence detects the INVALID index on next run, drops it, retries
 - The duplicate rows exist in the table until discovered and cleaned up
 
+Because uniqueness is a correctness invariant, this should make `postgres sync` fail for that run. The retry/self-healing behavior is useful, but it is not a reason to declare success.
+
 **No tool solves this differently.** pg-schema-diff (Stripe), Atlas, and pgroll all use the same CONCURRENTLY mechanism. There is no Postgres primitive for "start rejecting duplicates immediately but defer the full scan." `NOT VALID` is only supported for CHECK and FK constraints, not UNIQUE. The tradeoff is fundamental: non-concurrent (zero window, blocks all writes) vs concurrent (has window, allows writes).
 
 **Practical risk:** For small/medium tables (< 10M rows), the window is seconds. The probability of a duplicate being inserted during those seconds is low. For large tables with high write rates on uniqueness-critical columns, the risk is real but the consequence is a failed build (loud), not silent corruption.
@@ -381,11 +414,9 @@ The window is the **first scan duration only** — not the full build. For a 1M-
 3. **Convergence self-healing** — detects INVALID indexes, drops and retries on next run.
 4. **Dev mode** — in development, convergence skips CONCURRENTLY and uses regular `CREATE UNIQUE INDEX` inside a transaction. Zero window. The concurrent window only exists in production where it's an acceptable tradeoff.
 
-### RunPython and fresh databases
+### Fresh databases and historical data operations
 
-**Decision: all RunPython/RunSQL operations replay on fresh databases.** Schema operations (AddField, CreateModel) are skipped since the schema already exists from model-based DDL. No flag, no separate seed mechanism, no classification burden.
-
-Backfill migrations are no-ops on empty tables. Seed migrations insert the data the application needs. See fresh-db-from-models.md for the full rationale and industry comparison.
+> **Deferred.** If fresh-db-from-models is implemented later, fresh databases should only build current schema state. Historical data migrations should remain incremental-only, and app seed/init data stays out of scope here. See fresh-db-from-models.md.
 
 ## Transition from existing projects
 

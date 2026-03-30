@@ -68,7 +68,7 @@ No more sequential numbers. No more 0001_initial. No merge migrations.
 
 **Decision: bump the second on collision. No random suffixes, no microseconds.**
 
-When `makemigrations` generates a new migration:
+When `migrations create` generates a new migration:
 
 1. Generate the timestamp from the current UTC time: `YYYYMMDD_HHMMSS`
 2. Scan all existing migration files (across all sources) for timestamps
@@ -101,7 +101,7 @@ Microseconds (`YYYYMMDD_HHMMSS_ffffff`) would virtually eliminate collisions but
 
 #### Why not random suffixes?
 
-Random suffixes (`20240101_120000_a3f2`) break determinism. Running `makemigrations` twice in the same state should produce the same file. Random suffixes also make the ordering within a second arbitrary, when the natural "first one created gets the second, next one gets second+1" is more intuitive.
+Random suffixes (`20240101_120000_a3f2`) break determinism. Running `migrations create` twice in the same state should produce the same file. Random suffixes also make the ordering within a second arbitrary, when the natural "first one created gets the second, next one gets second+1" is more intuitive.
 
 ### What about ordering guarantees?
 
@@ -158,5 +158,5 @@ The conversion maps old records to the new format:
 
 ## Remaining considerations
 
-- `makemigrations` needs to detect which model changes haven't been captured yet, without per-app state tracking. With Option A (DB introspection), this is the model-vs-DB diff with a drift check.
+- `migrations create` needs to detect which model changes haven't been captured yet, without per-app state tracking. With Option A (DB introspection), this is the model-vs-DB diff with a drift check.
 - Package migrations need a convention for where they live within the package directory structure.

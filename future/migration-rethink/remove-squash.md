@@ -7,7 +7,7 @@ The `migrations squash` command exists to consolidate migration history. With th
 - **Fresh databases don't replay migrations** — they're created from model definitions
 - **Migration files are simple** — just AddField/RemoveField/CreateModel, no index/constraint bloat
 - **No dependency graph** — nothing complex to untangle when consolidating
-- **Migration reset is trivial** — delete files, `makemigrations`, `prune`
+- **Migration reset is trivial** — delete files, `migrations create`, `prune`
 
 The `replaces` mechanism (Django's squash approach) added significant complexity to the migration loader and executor for a problem that no longer exists.
 
