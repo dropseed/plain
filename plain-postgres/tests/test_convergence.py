@@ -1,33 +1,20 @@
 from __future__ import annotations
 
-import pytest
-from app.examples.models import (
-    Car,
-    CarFeature,
-    ChildSetNull,
-    TreeNode,
-    UnconstrainedChild,
-)
+from app.examples.models import Car, CarFeature
+from conftest_convergence import constraint_exists, create_invalid_index, execute
 
-from plain.postgres import CheckConstraint, Index, Q, UniqueConstraint, get_connection
-from plain.postgres.constraints import Deferrable
+from plain.postgres import CheckConstraint, Index, Q, get_connection
 from plain.postgres.convergence import (
     AddConstraintFix,
-    AddForeignKeyFix,
     ConstraintDrift,
     CreateIndexFix,
     DriftKind,
     DropConstraintFix,
     DropIndexFix,
-    DropNotNullFix,
-    ForeignKeyDrift,
     IndexDrift,
-    NullabilityDrift,
     PlanItem,
     RebuildIndexFix,
-    RenameConstraintFix,
     RenameIndexFix,
-    SetNotNullFix,
     ValidateConstraintFix,
     analyze_model,
     can_auto_fix,
@@ -35,89 +22,7 @@ from plain.postgres.convergence import (
     plan_convergence,
     plan_model_convergence,
 )
-from plain.postgres.convergence.analysis import generate_fk_constraint_name
 from plain.postgres.functions.text import Upper
-
-
-def _execute(sql: str) -> None:
-    with get_connection().cursor() as cursor:
-        cursor.execute(sql)
-
-
-def _constraint_exists(table: str, name: str) -> bool:
-    with get_connection().cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT 1 FROM pg_constraint c
-            JOIN pg_class cl ON c.conrelid = cl.oid
-            WHERE cl.relname = %s AND c.conname = %s
-            """,
-            [table, name],
-        )
-        return cursor.fetchone() is not None
-
-
-def _constraint_is_valid(table: str, name: str) -> bool:
-    with get_connection().cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT c.convalidated FROM pg_constraint c
-            JOIN pg_class cl ON c.conrelid = cl.oid
-            WHERE cl.relname = %s AND c.conname = %s
-            """,
-            [table, name],
-        )
-        row = cursor.fetchone()
-        return row[0] if row else False
-
-
-def _constraint_is_deferrable(table: str, name: str) -> bool:
-    with get_connection().cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT c.condeferrable FROM pg_constraint c
-            JOIN pg_class cl ON c.conrelid = cl.oid
-            WHERE cl.relname = %s AND c.conname = %s
-            """,
-            [table, name],
-        )
-        row = cursor.fetchone()
-        return row[0] if row else False
-
-
-def _create_invalid_index(name: str) -> None:
-    """Create a normal index then mark it INVALID via pg_catalog."""
-    _execute(f'CREATE INDEX "{name}" ON "examples_car" ("make")')
-    _execute(
-        f"""
-        UPDATE pg_index SET indisvalid = false
-        WHERE indexrelid = (SELECT oid FROM pg_class WHERE relname = '{name}')
-        """
-    )
-
-
-def _index_exists(name: str) -> bool:
-    with get_connection().cursor() as cursor:
-        cursor.execute(
-            "SELECT 1 FROM pg_indexes WHERE indexname = %s",
-            [name],
-        )
-        return cursor.fetchone() is not None
-
-
-def _index_is_valid(name: str) -> bool:
-    with get_connection().cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT i.indisvalid
-            FROM pg_index i
-            JOIN pg_class c ON i.indexrelid = c.oid
-            WHERE c.relname = %s
-            """,
-            [name],
-        )
-        row = cursor.fetchone()
-        return row[0] if row else False
 
 
 class TestPassOrdering:
@@ -138,13 +43,13 @@ class TestPassOrdering:
             CheckConstraint(check=Q(id__lte=999999), name="examples_car_id_max"),
         ]
 
-        _create_invalid_index("examples_car_model_idx")
-        _execute(
+        create_invalid_index("examples_car_model_idx")
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_max"'
             ' CHECK ("id" <= 999999) NOT VALID'
         )
-        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("model")')
-        _execute(
+        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("model")')
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_check" CHECK ("id" >= -1)'
         )
 
@@ -203,341 +108,14 @@ class TestPassOrdering:
             Car.model_options.constraints = original_constraints
 
 
-class TestDetectConstraintFixes:
-    def test_no_fixes_when_converged(self, db):
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable()
-        assert items == []
-
-    def test_detects_extra_check_constraint_with_prune(self, db):
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable(
-                drop_undeclared=True
-            )
-
-        assert len(items) == 1
-        assert isinstance(items[0].fix, DropConstraintFix)
-        assert items[0].fix.name == "examples_car_test_check"
-
-    def test_extra_check_constraint_excluded_by_default(self, db):
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable()
-
-        assert items == []
-
-    def test_detects_extra_unique_constraint_with_prune(self, db):
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_unique" UNIQUE ("make")'
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable(
-                drop_undeclared=True
-            )
-
-        assert len(items) == 1
-        assert isinstance(items[0].fix, DropConstraintFix)
-        assert items[0].fix.name == "examples_car_extra_unique"
-
-    def test_extra_unique_constraint_excluded_by_default(self, db):
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_unique" UNIQUE ("make")'
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable()
-
-        assert items == []
-
-    def test_detects_missing_check_constraint(self, db):
-        original_constraints = list(Car.model_options.constraints)
-        check = CheckConstraint(
-            check=Q(id__gte=0),
-            name="examples_car_id_nonneg",
-        )
-        Car.model_options.constraints = [*original_constraints, check]
-
-        try:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-
-            assert len(items) == 1
-            assert isinstance(items[0].fix, AddConstraintFix)
-            assert items[0].fix.constraint.name == "examples_car_id_nonneg"
-        finally:
-            Car.model_options.constraints = original_constraints
-
-    def test_detects_missing_unique_constraint(self, db):
-        _execute('ALTER TABLE "examples_car" DROP CONSTRAINT "unique_make_model"')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable()
-
-        assert len(items) == 1
-        assert isinstance(items[0].fix, AddConstraintFix)
-        assert items[0].fix.constraint.name == "unique_make_model"
-
-    def test_detects_not_valid_check_constraint(self, db):
-        """A NOT VALID constraint in the DB that matches the model needs validation."""
-        original_constraints = list(Car.model_options.constraints)
-        check = CheckConstraint(
-            check=Q(id__gte=0),
-            name="examples_car_id_nonneg",
-        )
-        Car.model_options.constraints = [*original_constraints, check]
-
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0) NOT VALID'
-        )
-
-        try:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-
-            assert len(items) == 1
-            assert isinstance(items[0].fix, ValidateConstraintFix)
-            assert items[0].fix.name == "examples_car_id_nonneg"
-        finally:
-            Car.model_options.constraints = original_constraints
-
-    def test_detects_check_constraint_definition_changed(self, db):
-        """A check constraint with matching name but different expression is blocked."""
-        original_constraints = list(Car.model_options.constraints)
-        # Model declares CHECK (id >= 1)
-        check = CheckConstraint(
-            check=Q(id__gte=1),
-            name="examples_car_id_nonneg",
-        )
-        Car.model_options.constraints = [*original_constraints, check]
-
-        # DB has CHECK (id >= 0) — different expression, same name
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0)'
-        )
-
-        try:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                plan = plan_model_convergence(conn, cursor, Car)
-
-            # Changed constraint definition has no auto-fix
-            assert plan.executable() == []
-            assert len(plan.blocked) == 1
-            assert isinstance(plan.blocked[0].drift, ConstraintDrift)
-            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
-            assert plan.blocked[0].fix is None
-            assert plan.blocked[0].guidance is not None
-        finally:
-            Car.model_options.constraints = original_constraints
-
-    def test_no_false_positive_for_matching_check_constraint(self, db):
-        """A check constraint with matching name and matching expression has no issues."""
-        original_constraints = list(Car.model_options.constraints)
-        check = CheckConstraint(
-            check=Q(id__gte=0),
-            name="examples_car_id_nonneg",
-        )
-        Car.model_options.constraints = [*original_constraints, check]
-
-        # DB has the same expression
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0)'
-        )
-
-        try:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-
-            assert items == []
-        finally:
-            Car.model_options.constraints = original_constraints
-
-
-class TestApplyConstraintFixes:
-    def test_add_check_constraint_uses_not_valid(self, isolated_db):
-        """AddConstraintFix for check constraints creates NOT VALID."""
-        check = CheckConstraint(
-            check=Q(id__gte=0),
-            name="examples_car_id_nonneg",
-        )
-        original_constraints = list(Car.model_options.constraints)
-        Car.model_options.constraints = [*original_constraints, check]
-
-        try:
-            fix = AddConstraintFix(table="examples_car", constraint=check, model=Car)
-            sql = fix.apply()
-
-            assert "NOT VALID" in sql
-            assert _constraint_exists("examples_car", "examples_car_id_nonneg")
-            assert not _constraint_is_valid("examples_car", "examples_car_id_nonneg")
-        finally:
-            Car.model_options.constraints = original_constraints
-
-    def test_validate_constraint(self, isolated_db):
-        """ValidateConstraintFix validates a NOT VALID constraint."""
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0) NOT VALID'
-        )
-        assert not _constraint_is_valid("examples_car", "examples_car_id_nonneg")
-
-        fix = ValidateConstraintFix(table="examples_car", name="examples_car_id_nonneg")
-        fix.apply()
-
-        assert _constraint_is_valid("examples_car", "examples_car_id_nonneg")
-
-    def test_full_check_constraint_lifecycle(self, isolated_db):
-        """Add NOT VALID -> validate -> fully valid constraint."""
-        check = CheckConstraint(
-            check=Q(id__gte=0),
-            name="examples_car_id_nonneg",
-        )
-        original_constraints = list(Car.model_options.constraints)
-        Car.model_options.constraints = [*original_constraints, check]
-
-        try:
-            # First converge pass: adds NOT VALID
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-            assert len(items) == 1
-            assert isinstance(items[0].fix, AddConstraintFix)
-
-            items[0].fix.apply()
-            assert not _constraint_is_valid("examples_car", "examples_car_id_nonneg")
-
-            # Second converge pass: detects NOT VALID, validates
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-            assert len(items) == 1
-            assert isinstance(items[0].fix, ValidateConstraintFix)
-
-            items[0].fix.apply()
-            assert _constraint_is_valid("examples_car", "examples_car_id_nonneg")
-
-            # Third pass: fully converged
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-            assert items == []
-        finally:
-            Car.model_options.constraints = original_constraints
-
-    def test_definition_change_is_blocked(self, isolated_db):
-        """Changed check definition is blocked — no auto-fix available."""
-        original_constraints = list(Car.model_options.constraints)
-        # Model declares CHECK (id >= 1)
-        check = CheckConstraint(
-            check=Q(id__gte=1),
-            name="examples_car_id_nonneg",
-        )
-        Car.model_options.constraints = [*original_constraints, check]
-
-        # DB has CHECK (id >= 0) — old expression
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0)'
-        )
-
-        try:
-            conn = get_connection()
-
-            # Detects definition change as blocked (no executable fix)
-            with conn.cursor() as cursor:
-                plan = plan_model_convergence(conn, cursor, Car)
-
-            assert plan.executable() == []
-            assert len(plan.blocked) == 1
-            assert isinstance(plan.blocked[0].drift, ConstraintDrift)
-            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
-            assert plan.blocked[0].fix is None
-
-            # can_auto_fix returns False for changed constraints
-            assert not can_auto_fix(plan.blocked[0].drift)
-        finally:
-            Car.model_options.constraints = original_constraints
-
-    def test_apply_drop_constraint(self, isolated_db):
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_temp_check" CHECK ("id" >= 0)'
-        )
-        assert _constraint_exists("examples_car", "examples_car_temp_check")
-
-        fix = DropConstraintFix(table="examples_car", name="examples_car_temp_check")
-        fix.apply()
-
-        assert not _constraint_exists("examples_car", "examples_car_temp_check")
-
-    def test_add_unique_using_index(self, isolated_db):
-        """Unique constraints use CONCURRENTLY + USING INDEX."""
-        # Drop the constraint AND its backing index
-        _execute('ALTER TABLE "examples_car" DROP CONSTRAINT "unique_make_model"')
-        assert not _constraint_exists("examples_car", "unique_make_model")
-
-        constraint = None
-        for c in Car.model_options.constraints:
-            if c.name == "unique_make_model":
-                constraint = c
-                break
-        assert constraint is not None
-
-        fix = AddConstraintFix(table="examples_car", constraint=constraint, model=Car)
-        sql = fix.apply()
-
-        assert "CONCURRENTLY" in sql
-        assert "USING INDEX" in sql
-        assert _constraint_exists("examples_car", "unique_make_model")
-
-    @pytest.mark.parametrize(
-        "deferrable",
-        [Deferrable.DEFERRED, Deferrable.IMMEDIATE],
-        ids=["deferred", "immediate"],
-    )
-    def test_add_deferrable_unique_constraint(self, isolated_db, deferrable):
-        """Deferrable unique constraints include the appropriate DEFERRABLE clause."""
-        constraint = UniqueConstraint(
-            fields=["make"],
-            name=f"examples_car_make_{deferrable.value}",
-            deferrable=deferrable,
-        )
-        original_constraints = list(Car.model_options.constraints)
-        Car.model_options.constraints = [*original_constraints, constraint]
-
-        try:
-            fix = AddConstraintFix(
-                table="examples_car", constraint=constraint, model=Car
-            )
-            sql = fix.apply()
-
-            assert f"DEFERRABLE INITIALLY {deferrable.name}" in sql
-            assert _constraint_exists("examples_car", constraint.name)
-            assert _constraint_is_deferrable("examples_car", constraint.name)
-        finally:
-            Car.model_options.constraints = original_constraints
-
-
 class TestFixFailureRecovery:
     def test_failed_fix_continues(self, isolated_db):
         """A failed fix rolls back, and the next fix still succeeds."""
         # Add a real constraint to drop
-        _execute(
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_real_check" CHECK ("id" >= 0)'
         )
-        assert _constraint_exists("examples_car", "examples_car_real_check")
+        assert constraint_exists("examples_car", "examples_car_real_check")
 
         fixes = [
             # This one will fail — constraint doesn't exist
@@ -555,188 +133,7 @@ class TestFixFailureRecovery:
                 results.append("failed")
 
         assert results == ["failed", "ok"]
-        assert not _constraint_exists("examples_car", "examples_car_real_check")
-
-
-class TestDetectIndexFixes:
-    def test_detects_missing_index(self, db):
-        """Add an index to the model, detect it as missing."""
-        original_indexes = list(Car.model_options.indexes)
-        Car.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["make"], name="examples_car_make_idx"),
-        ]
-
-        try:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-
-            index_items = [
-                item for item in items if isinstance(item.fix, CreateIndexFix)
-            ]
-            assert len(index_items) == 1
-            assert isinstance(index_items[0].fix, CreateIndexFix)
-            assert index_items[0].fix.index.name == "examples_car_make_idx"
-        finally:
-            Car.model_options.indexes = original_indexes
-
-    def test_detects_extra_index_with_prune(self, db):
-        """An index in the DB not declared on the model is extra (requires prune)."""
-        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable(
-                drop_undeclared=True
-            )
-
-        index_items = [item for item in items if isinstance(item.fix, DropIndexFix)]
-        assert len(index_items) == 1
-        fix = index_items[0].fix
-        assert isinstance(fix, DropIndexFix)
-        assert fix.name == "examples_car_extra_idx"
-
-    def test_extra_index_excluded_by_default(self, db):
-        """An extra index produces no item by default."""
-        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable()
-
-        assert items == []
-
-    def test_detects_invalid_index(self, isolated_db):
-        """An INVALID index matching a model index produces a RebuildIndexFix."""
-        original_indexes = list(Car.model_options.indexes)
-        Car.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["make"], name="examples_car_make_idx"),
-        ]
-
-        _create_invalid_index("examples_car_make_idx")
-
-        try:
-            assert _index_exists("examples_car_make_idx")
-            assert not _index_is_valid("examples_car_make_idx")
-
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-
-            rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
-            ]
-            assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_car_make_idx"
-        finally:
-            Car.model_options.indexes = original_indexes
-
-    def test_detects_index_definition_changed(self, db):
-        """An index with the same name but different columns produces a RebuildIndexFix."""
-        original_indexes = list(Car.model_options.indexes)
-        # Model declares index on "make" field
-        Car.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["make"], name="examples_car_make_idx"),
-        ]
-
-        # DB has index on "model" column instead
-        _execute('CREATE INDEX "examples_car_make_idx" ON "examples_car" ("model")')
-
-        try:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-
-            rebuild_items = [
-                item for item in items if isinstance(item.fix, RebuildIndexFix)
-            ]
-            assert len(rebuild_items) == 1
-            fix = rebuild_items[0].fix
-            assert isinstance(fix, RebuildIndexFix)
-            assert fix.index.name == "examples_car_make_idx"
-        finally:
-            Car.model_options.indexes = original_indexes
-
-    def test_no_false_positive_for_matching_index(self, db):
-        """An index with matching name and matching columns produces no issues."""
-        original_indexes = list(Car.model_options.indexes)
-        Car.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["make"], name="examples_car_make_idx"),
-        ]
-
-        # DB has index on "make" column — matches the model
-        _execute('CREATE INDEX "examples_car_make_idx" ON "examples_car" ("make")')
-
-        try:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-
-            assert items == []
-        finally:
-            Car.model_options.indexes = original_indexes
-
-
-class TestApplyIndexFixes:
-    def test_create_index(self, isolated_db):
-        """CreateIndexFix creates an index using CONCURRENTLY."""
-        original_indexes = list(Car.model_options.indexes)
-        index = Index(fields=["make"], name="examples_car_make_idx")
-        Car.model_options.indexes = [*original_indexes, index]
-
-        try:
-            assert not _index_exists("examples_car_make_idx")
-
-            fix = CreateIndexFix(table="examples_car", index=index, model=Car)
-            sql = fix.apply()
-
-            assert "CONCURRENTLY" in sql
-            assert _index_exists("examples_car_make_idx")
-        finally:
-            Car.model_options.indexes = original_indexes
-
-    def test_drop_index(self, isolated_db):
-        """DropIndexFix drops an index using CONCURRENTLY."""
-        _execute('CREATE INDEX "examples_car_temp_idx" ON "examples_car" ("make")')
-        assert _index_exists("examples_car_temp_idx")
-
-        fix = DropIndexFix(table="examples_car", name="examples_car_temp_idx")
-        sql = fix.apply()
-
-        assert "CONCURRENTLY" in sql
-        assert not _index_exists("examples_car_temp_idx")
-
-    def test_rebuild_invalid_index(self, isolated_db):
-        """RebuildIndexFix drops an INVALID index and recreates it."""
-        original_indexes = list(Car.model_options.indexes)
-        index = Index(fields=["make"], name="examples_car_make_idx")
-        Car.model_options.indexes = [*original_indexes, index]
-
-        _create_invalid_index("examples_car_make_idx")
-
-        try:
-            assert _index_exists("examples_car_make_idx")
-            assert not _index_is_valid("examples_car_make_idx")
-
-            fix = RebuildIndexFix(
-                table="examples_car",
-                index=index,
-                model=Car,
-            )
-            sql = fix.apply()
-
-            assert "DROP" in sql
-            assert "CONCURRENTLY" in sql
-            assert _index_exists("examples_car_make_idx")
-            assert _index_is_valid("examples_car_make_idx")
-        finally:
-            Car.model_options.indexes = original_indexes
+        assert not constraint_exists("examples_car", "examples_car_real_check")
 
 
 class TestAnalyzeModel:
@@ -749,7 +146,7 @@ class TestAnalyzeModel:
             *original_indexes,
             Index(fields=["make"], name="examples_car_make_new_idx"),
         ]
-        _execute('CREATE INDEX "examples_car_make_old_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_make_old_idx" ON "examples_car" ("make")')
 
         try:
             conn = get_connection()
@@ -796,7 +193,7 @@ class TestAnalyzeModel:
             *original_indexes,
             Index(fields=["car"], name="examples_carfeature_car_new_idx"),
         ]
-        _execute(
+        execute(
             'CREATE INDEX "examples_carfeature_car_old_idx"'
             ' ON "examples_carfeature" ("car_id")'
         )
@@ -824,7 +221,7 @@ class TestAnalyzeModel:
             *original_indexes,
             Index(fields=["make", "model"], name="examples_car_make_model_new_idx"),
         ]
-        _execute(
+        execute(
             'CREATE INDEX "examples_car_make_model_old_idx"'
             ' ON "examples_car" ("make", "model")'
         )
@@ -852,7 +249,7 @@ class TestAnalyzeModel:
             *original_indexes,
             Index(fields=["model"], name="examples_car_model_idx"),
         ]
-        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         try:
             conn = get_connection()
@@ -882,8 +279,8 @@ class TestAnalyzeModel:
             Index(fields=["make"], name="examples_car_idx_a"),
             Index(fields=["make"], name="examples_car_idx_b"),
         ]
-        _execute('CREATE INDEX "examples_car_old_a" ON "examples_car" ("make")')
-        _execute('CREATE INDEX "examples_car_old_b" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_old_a" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_old_b" ON "examples_car" ("make")')
 
         try:
             conn = get_connection()
@@ -916,7 +313,7 @@ class TestAnalyzeModel:
             *original_indexes,
             Index(Upper("make"), name="examples_car_make_upper_new_idx"),
         ]
-        _execute(
+        execute(
             'CREATE INDEX "examples_car_make_upper_old_idx"'
             ' ON "examples_car" (UPPER("make"))'
         )
@@ -1012,213 +409,6 @@ class TestAnalyzeModel:
             Car.model_options.indexes = original_indexes
 
 
-class TestApplyRenameIndex:
-    def test_rename_index(self, isolated_db):
-        """RenameIndexFix renames using ALTER INDEX ... RENAME TO."""
-        _execute('CREATE INDEX "examples_car_old_idx" ON "examples_car" ("make")')
-        assert _index_exists("examples_car_old_idx")
-
-        fix = RenameIndexFix(
-            table="examples_car",
-            old_name="examples_car_old_idx",
-            new_name="examples_car_new_idx",
-        )
-        sql = fix.apply()
-
-        assert "RENAME TO" in sql
-        assert not _index_exists("examples_car_old_idx")
-        assert _index_exists("examples_car_new_idx")
-
-    def test_rename_lifecycle(self, isolated_db):
-        """Full cycle: detect rename -> apply -> detect again -> converged."""
-        original_indexes = list(Car.model_options.indexes)
-        Car.model_options.indexes = [
-            *original_indexes,
-            Index(fields=["make"], name="examples_car_make_new_idx"),
-        ]
-        _execute('CREATE INDEX "examples_car_make_old_idx" ON "examples_car" ("make")')
-
-        try:
-            conn = get_connection()
-
-            # First pass: detect rename
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-            assert len(items) == 1
-            assert isinstance(items[0].fix, RenameIndexFix)
-
-            items[0].fix.apply()
-            assert _index_exists("examples_car_make_new_idx")
-            assert not _index_exists("examples_car_make_old_idx")
-
-            # Second pass: converged
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-            assert items == []
-        finally:
-            Car.model_options.indexes = original_indexes
-
-
-class TestConstraintRename:
-    def test_rename_check_constraint(self, db):
-        """A missing + extra check constraint with same expression is a rename."""
-        original_constraints = list(Car.model_options.constraints)
-        Car.model_options.constraints = [
-            *original_constraints,
-            CheckConstraint(check=Q(id__gte=0), name="examples_car_id_new"),
-        ]
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_old"'
-            ' CHECK ("id" >= 0)'
-        )
-
-        try:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                analysis = analyze_model(conn, cursor, Car)
-
-            rename_drifts = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, ConstraintDrift) and d.kind == DriftKind.RENAMED
-            ]
-            assert len(rename_drifts) == 1
-            assert rename_drifts[0].old_name == "examples_car_id_old"
-            assert rename_drifts[0].new_name == "examples_car_id_new"
-
-            assert not any(
-                isinstance(d, ConstraintDrift) and d.kind == DriftKind.MISSING
-                for d in analysis.drifts
-            )
-            assert not any(
-                isinstance(d, ConstraintDrift) and d.kind == DriftKind.UNDECLARED
-                for d in analysis.drifts
-            )
-        finally:
-            Car.model_options.constraints = original_constraints
-
-    def test_rename_unique_constraint(self, db):
-        """A missing + extra unique constraint with same columns is a rename."""
-        _execute('ALTER TABLE "examples_car" DROP CONSTRAINT "unique_make_model"')
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "old_unique_make_model"'
-            ' UNIQUE ("make", "model")'
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, Car)
-
-        rename_drifts = [
-            d
-            for d in analysis.drifts
-            if isinstance(d, ConstraintDrift) and d.kind == DriftKind.RENAMED
-        ]
-        assert len(rename_drifts) == 1
-        assert rename_drifts[0].old_name == "old_unique_make_model"
-        assert rename_drifts[0].new_name == "unique_make_model"
-
-    def test_no_rename_when_expression_differs(self, db):
-        """Different check expressions means separate add + drop, not rename."""
-        original_constraints = list(Car.model_options.constraints)
-        Car.model_options.constraints = [
-            *original_constraints,
-            CheckConstraint(check=Q(id__gte=1), name="examples_car_id_new"),
-        ]
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_old"'
-            ' CHECK ("id" >= 0)'
-        )
-
-        try:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                analysis = analyze_model(conn, cursor, Car)
-
-            assert not any(
-                isinstance(d, ConstraintDrift) and d.kind == DriftKind.RENAMED
-                for d in analysis.drifts
-            )
-            assert any(
-                isinstance(d, ConstraintDrift) and d.kind == DriftKind.MISSING
-                for d in analysis.drifts
-            )
-            assert any(
-                isinstance(d, ConstraintDrift) and d.kind == DriftKind.UNDECLARED
-                for d in analysis.drifts
-            )
-        finally:
-            Car.model_options.constraints = original_constraints
-
-    def test_apply_rename_constraint(self, isolated_db):
-        """RenameConstraintFix renames using ALTER TABLE RENAME CONSTRAINT."""
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "old_check" CHECK ("id" >= 0)'
-        )
-        assert _constraint_exists("examples_car", "old_check")
-
-        fix = RenameConstraintFix(
-            table="examples_car",
-            old_name="old_check",
-            new_name="new_check",
-        )
-        sql = fix.apply()
-
-        assert "RENAME CONSTRAINT" in sql
-        assert not _constraint_exists("examples_car", "old_check")
-        assert _constraint_exists("examples_car", "new_check")
-
-    def test_rename_unique_renames_backing_index(self, isolated_db):
-        """Renaming a unique constraint also renames its backing index."""
-        _execute('ALTER TABLE "examples_car" DROP CONSTRAINT "unique_make_model"')
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "old_unique"'
-            ' UNIQUE ("make", "model")'
-        )
-        assert _constraint_exists("examples_car", "old_unique")
-        assert _index_exists("old_unique")
-
-        fix = RenameConstraintFix(
-            table="examples_car",
-            old_name="old_unique",
-            new_name="new_unique",
-        )
-        fix.apply()
-
-        assert _constraint_exists("examples_car", "new_unique")
-        assert _index_exists("new_unique")
-        assert not _constraint_exists("examples_car", "old_unique")
-        assert not _index_exists("old_unique")
-
-    def test_rename_constraint_lifecycle(self, isolated_db):
-        """Full cycle: detect rename -> apply -> detect again -> converged."""
-        original_constraints = list(Car.model_options.constraints)
-        Car.model_options.constraints = [
-            *original_constraints,
-            CheckConstraint(check=Q(id__gte=0), name="examples_car_id_new"),
-        ]
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_old"'
-            ' CHECK ("id" >= 0)'
-        )
-
-        try:
-            conn = get_connection()
-
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-            assert len(items) == 1
-            assert isinstance(items[0].fix, RenameConstraintFix)
-
-            items[0].fix.apply()
-
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Car).executable()
-            assert items == []
-        finally:
-            Car.model_options.constraints = original_constraints
-
-
 class TestDriftPolicy:
     """Tests for blocks_sync and DriftKind policy via PlanItem."""
 
@@ -1269,7 +459,7 @@ class TestDriftPolicy:
             name="examples_car_id_nonneg",
         )
         Car.model_options.constraints = [*original_constraints, check]
-        _execute(
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0) NOT VALID'
         )
 
@@ -1291,7 +481,7 @@ class TestDriftPolicy:
             *original_indexes,
             Index(fields=["make"], name="examples_car_make_new_idx"),
         ]
-        _execute('CREATE INDEX "examples_car_make_old_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_make_old_idx" ON "examples_car" ("make")')
 
         try:
             conn = get_connection()
@@ -1306,7 +496,7 @@ class TestDriftPolicy:
 
     def test_undeclared_constraint_is_blocking_cleanup(self, db):
         """Undeclared constraints are drop_undeclared + blocks_sync."""
-        _execute(
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
         )
 
@@ -1323,7 +513,7 @@ class TestDriftPolicy:
 
     def test_undeclared_index_is_optional_cleanup(self, db):
         """Undeclared indexes are drop_undeclared + not blocks_sync."""
-        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         plan = plan_convergence()
         undeclared = [
@@ -1350,7 +540,7 @@ class TestDriftPolicy:
 class TestConvergencePlan:
     def test_executable_excludes_cleanup_by_default(self, db):
         """Default mode excludes cleanup items."""
-        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         plan = plan_convergence()
         default = plan.executable()
@@ -1367,7 +557,7 @@ class TestConvergencePlan:
 
     def test_has_work_ignores_cleanup_by_default(self, db):
         """has_work() only counts cleanup items when drop_undeclared=True."""
-        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         plan = plan_convergence()
         assert not plan.has_work()
@@ -1390,7 +580,7 @@ class TestConvergencePlan:
 
     def test_blocking_cleanup_for_extra_constraint(self, db):
         """Extra constraint is blocking cleanup."""
-        _execute(
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
         )
 
@@ -1404,7 +594,7 @@ class TestConvergencePlan:
 
     def test_optional_cleanup_for_extra_index(self, db):
         """Extra index is optional cleanup."""
-        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         plan = plan_convergence()
         assert plan.blocking_cleanup == []
@@ -1416,8 +606,8 @@ class TestConvergencePlan:
 
     def test_blocking_and_optional_together(self, db):
         """Both blocking and optional cleanup can coexist."""
-        _execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
-        _execute(
+        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
         )
 
@@ -1439,7 +629,7 @@ class TestConvergencePlan:
             name="examples_car_id_nonneg",
         )
         Car.model_options.constraints = [*original_constraints, check]
-        _execute(
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_id_nonneg" CHECK ("id" >= 0)'
         )
 
@@ -1460,7 +650,7 @@ class TestConvergencePlan:
 class TestExecutePlan:
     def test_collects_results(self, isolated_db):
         """execute_plan() collects SQL from successful items."""
-        _execute('CREATE INDEX "examples_car_temp_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_temp_idx" ON "examples_car" ("make")')
         fix = DropIndexFix(table="examples_car", name="examples_car_temp_idx")
         drift = IndexDrift(
             kind=DriftKind.UNDECLARED,
@@ -1495,7 +685,7 @@ class TestExecutePlan:
 
     def test_continues_after_failure(self, isolated_db):
         """A failed item doesn't block subsequent items."""
-        _execute(
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_real_check" CHECK ("id" >= 0)'
         )
 
@@ -1524,11 +714,11 @@ class TestExecutePlan:
 
         assert result.applied == 1
         assert result.failed == 1
-        assert not _constraint_exists("examples_car", "examples_car_real_check")
+        assert not constraint_exists("examples_car", "examples_car_real_check")
 
     def test_summary(self, isolated_db):
         """ConvergenceResult.summary formats correctly."""
-        _execute(
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_real_check" CHECK ("id" >= 0)'
         )
 
@@ -1559,7 +749,7 @@ class TestExecutePlan:
 
     def test_result_item_reference(self, isolated_db):
         """FixResult.item references the PlanItem."""
-        _execute('CREATE INDEX "examples_car_temp_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_temp_idx" ON "examples_car" ("make")')
         fix = DropIndexFix(table="examples_car", name="examples_car_temp_idx")
         drift = IndexDrift(
             kind=DriftKind.UNDECLARED,
@@ -1604,7 +794,7 @@ class TestSyncPolicy:
         item = PlanItem(drift=drift, fix=fix, blocks_sync=False)
 
         # Create it first so the CONCURRENTLY create will fail (duplicate)
-        _execute('CREATE INDEX "examples_car_will_fail_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_will_fail_idx" ON "examples_car" ("make")')
 
         result = execute_plan([item])
 
@@ -1615,7 +805,7 @@ class TestSyncPolicy:
 
     def test_mixed_failures(self, isolated_db):
         """Blocking + non-blocking failures: ok_for_sync reflects only blocking."""
-        _execute('CREATE INDEX "examples_car_will_fail_idx" ON "examples_car" ("make")')
+        execute('CREATE INDEX "examples_car_will_fail_idx" ON "examples_car" ("make")')
 
         index = Index(fields=["make"], name="examples_car_will_fail_idx")
         items = [
@@ -1647,7 +837,7 @@ class TestSyncPolicy:
 
     def test_all_success_passes_sync(self, isolated_db):
         """All items succeeding means ok_for_sync is True."""
-        _execute(
+        execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_temp" CHECK ("id" >= 0)'
         )
         fix = DropConstraintFix(table="examples_car", name="examples_car_temp")
@@ -1665,663 +855,3 @@ class TestSyncPolicy:
         """No items executed means ok_for_sync is True."""
         result = execute_plan([])
         assert result.ok_for_sync
-
-
-def _get_fk_constraint_names(table: str) -> list[str]:
-    """Return FK constraint names for a table."""
-    with get_connection().cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT c.conname
-            FROM pg_constraint c
-            JOIN pg_class cl ON c.conrelid = cl.oid
-            WHERE cl.relname = %s AND c.contype = 'f'
-            ORDER BY c.conname
-            """,
-            [table],
-        )
-        return [row[0] for row in cursor.fetchall()]
-
-
-class TestForeignKeyDetection:
-    def test_no_drift_when_fk_exists(self, db):
-        """Existing FK constraints from migrations produce no drifts."""
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, CarFeature)
-
-        fk_drifts = [d for d in analysis.drifts if isinstance(d, ForeignKeyDrift)]
-        assert fk_drifts == []
-
-    def test_detects_missing_fk(self, db):
-        """Dropping an FK constraint produces a MISSING drift."""
-        fk_names = _get_fk_constraint_names("examples_carfeature")
-        assert len(fk_names) >= 1
-
-        # Drop one FK constraint
-        _execute(f'ALTER TABLE "examples_carfeature" DROP CONSTRAINT "{fk_names[0]}"')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, CarFeature)
-
-        missing = [
-            d
-            for d in analysis.drifts
-            if isinstance(d, ForeignKeyDrift) and d.kind == DriftKind.MISSING
-        ]
-        assert len(missing) == 1
-        assert missing[0].table == "examples_carfeature"
-        assert missing[0].name is not None
-
-    def test_detects_undeclared_fk(self, db):
-        """A manual FK constraint not in the model is UNDECLARED."""
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_fake_fk"'
-            ' FOREIGN KEY ("id") REFERENCES "examples_feature" ("id")'
-            " DEFERRABLE INITIALLY DEFERRED"
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, Car)
-
-        undeclared = [
-            d
-            for d in analysis.drifts
-            if isinstance(d, ForeignKeyDrift) and d.kind == DriftKind.UNDECLARED
-        ]
-        assert len(undeclared) == 1
-        assert undeclared[0].name == "examples_car_fake_fk"
-
-    def test_detects_not_valid_fk(self, db):
-        """A NOT VALID FK matching the model shape needs validation."""
-        fk_names = _get_fk_constraint_names("examples_carfeature")
-        assert len(fk_names) >= 1
-        fk_name = fk_names[0]
-
-        # Drop and recreate as NOT VALID
-        with get_connection().cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT pg_get_constraintdef(c.oid)
-                FROM pg_constraint c
-                JOIN pg_class cl ON c.conrelid = cl.oid
-                WHERE cl.relname = 'examples_carfeature' AND c.conname = %s
-                """,
-                [fk_name],
-            )
-            row = cursor.fetchone()
-            assert row is not None
-            constraintdef = row[0]
-
-        _execute(f'ALTER TABLE "examples_carfeature" DROP CONSTRAINT "{fk_name}"')
-        _execute(
-            f'ALTER TABLE "examples_carfeature" ADD CONSTRAINT "{fk_name}"'
-            f" {constraintdef} NOT VALID"
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, CarFeature)
-
-        unvalidated = [
-            d
-            for d in analysis.drifts
-            if isinstance(d, ForeignKeyDrift) and d.kind == DriftKind.UNVALIDATED
-        ]
-        assert len(unvalidated) == 1
-        assert unvalidated[0].name == fk_name
-
-    def test_fk_constraint_name_matches_schema_editor(self, db):
-        """generate_fk_constraint_name produces names matching existing migration FKs."""
-        fk_names = _get_fk_constraint_names("examples_carfeature")
-
-        # CarFeature has car_id → examples_car.id and feature_id → examples_feature.id
-        expected_car_fk = generate_fk_constraint_name(
-            "examples_carfeature", "car_id", "examples_car", "id"
-        )
-        expected_feature_fk = generate_fk_constraint_name(
-            "examples_carfeature", "feature_id", "examples_feature", "id"
-        )
-
-        assert expected_car_fk in fk_names
-        assert expected_feature_fk in fk_names
-
-
-class TestForeignKeyFixes:
-    def test_add_fk_creates_and_validates(self, isolated_db):
-        """AddForeignKeyFix creates NOT VALID then validates in one apply()."""
-        fk_names = _get_fk_constraint_names("examples_carfeature")
-        car_fk = generate_fk_constraint_name(
-            "examples_carfeature", "car_id", "examples_car", "id"
-        )
-
-        # Drop the existing FK so we can recreate it
-        if car_fk in fk_names:
-            _execute(f'ALTER TABLE "examples_carfeature" DROP CONSTRAINT "{car_fk}"')
-
-        assert not _constraint_exists("examples_carfeature", car_fk)
-
-        fix = AddForeignKeyFix(
-            table="examples_carfeature",
-            constraint_name=car_fk,
-            column="car_id",
-            target_table="examples_car",
-            target_column="id",
-        )
-        sql = fix.apply()
-
-        assert "NOT VALID" in sql
-        assert "VALIDATE CONSTRAINT" in sql
-        assert "DEFERRABLE INITIALLY DEFERRED" in sql
-        assert _constraint_exists("examples_carfeature", car_fk)
-        assert _constraint_is_valid("examples_carfeature", car_fk)
-
-    def test_validate_fk_after_add(self, isolated_db):
-        """ValidateConstraintFix validates a NOT VALID FK."""
-        car_fk = generate_fk_constraint_name(
-            "examples_carfeature", "car_id", "examples_car", "id"
-        )
-
-        # Drop and recreate as NOT VALID
-        fk_names = _get_fk_constraint_names("examples_carfeature")
-        if car_fk in fk_names:
-            _execute(f'ALTER TABLE "examples_carfeature" DROP CONSTRAINT "{car_fk}"')
-
-        _execute(
-            f'ALTER TABLE "examples_carfeature" ADD CONSTRAINT "{car_fk}"'
-            f' FOREIGN KEY ("car_id") REFERENCES "examples_car" ("id")'
-            f" DEFERRABLE INITIALLY DEFERRED NOT VALID"
-        )
-        assert not _constraint_is_valid("examples_carfeature", car_fk)
-
-        fix = ValidateConstraintFix(table="examples_carfeature", name=car_fk)
-        fix.apply()
-
-        assert _constraint_is_valid("examples_carfeature", car_fk)
-
-    def test_fk_is_deferrable(self, isolated_db):
-        """Convergence-created FK constraints are DEFERRABLE INITIALLY DEFERRED."""
-        car_fk = generate_fk_constraint_name(
-            "examples_carfeature", "car_id", "examples_car", "id"
-        )
-
-        # Drop and recreate via convergence fix
-        fk_names = _get_fk_constraint_names("examples_carfeature")
-        if car_fk in fk_names:
-            _execute(f'ALTER TABLE "examples_carfeature" DROP CONSTRAINT "{car_fk}"')
-
-        fix = AddForeignKeyFix(
-            table="examples_carfeature",
-            constraint_name=car_fk,
-            column="car_id",
-            target_table="examples_car",
-            target_column="id",
-        )
-        fix.apply()
-
-        assert _constraint_is_deferrable("examples_carfeature", car_fk)
-
-    def test_undeclared_fk_drop(self, isolated_db):
-        """DropConstraintFix drops an undeclared FK."""
-        _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_fake_fk"'
-            ' FOREIGN KEY ("id") REFERENCES "examples_feature" ("id")'
-            " DEFERRABLE INITIALLY DEFERRED"
-        )
-        assert _constraint_exists("examples_car", "examples_car_fake_fk")
-
-        fix = DropConstraintFix(table="examples_car", name="examples_car_fake_fk")
-        fix.apply()
-
-        assert not _constraint_exists("examples_car", "examples_car_fake_fk")
-
-    def test_fk_lifecycle(self, isolated_db):
-        """Full cycle: drop FK → detect missing → add + validate → converged."""
-        car_fk = generate_fk_constraint_name(
-            "examples_carfeature", "car_id", "examples_car", "id"
-        )
-
-        # Drop existing FK
-        fk_names = _get_fk_constraint_names("examples_carfeature")
-        if car_fk in fk_names:
-            _execute(f'ALTER TABLE "examples_carfeature" DROP CONSTRAINT "{car_fk}"')
-
-        conn = get_connection()
-
-        # Detect missing FK and apply fix (creates + validates in one step)
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, CarFeature).executable()
-
-        add_fk_items = [
-            item for item in items if isinstance(item.fix, AddForeignKeyFix)
-        ]
-        assert len(add_fk_items) == 1
-        fix = add_fk_items[0].fix
-        assert isinstance(fix, AddForeignKeyFix)
-        assert fix.constraint_name == car_fk
-
-        result = execute_plan(items)
-        assert result.ok
-
-        # FK is created and fully valid after one pass
-        assert _constraint_exists("examples_carfeature", car_fk)
-        assert _constraint_is_valid("examples_carfeature", car_fk)
-
-        # Fully converged — no more work
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, CarFeature).executable()
-        assert items == []
-
-    def test_fk_pass_ordering(self, db):
-        """FK add (pass 2) comes before FK validate (pass 3)."""
-        car_fk = generate_fk_constraint_name(
-            "examples_carfeature", "car_id", "examples_car", "id"
-        )
-        fk_names = _get_fk_constraint_names("examples_carfeature")
-
-        # Drop one FK and leave another as NOT VALID to get both in one plan
-        feature_fk = generate_fk_constraint_name(
-            "examples_carfeature", "feature_id", "examples_feature", "id"
-        )
-
-        if car_fk in fk_names:
-            _execute(f'ALTER TABLE "examples_carfeature" DROP CONSTRAINT "{car_fk}"')
-
-        if feature_fk in fk_names:
-            _execute(
-                f'ALTER TABLE "examples_carfeature" DROP CONSTRAINT "{feature_fk}"'
-            )
-            _execute(
-                f'ALTER TABLE "examples_carfeature" ADD CONSTRAINT "{feature_fk}"'
-                f' FOREIGN KEY ("feature_id") REFERENCES "examples_feature" ("id")'
-                f" DEFERRABLE INITIALLY DEFERRED NOT VALID"
-            )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, CarFeature).executable()
-
-        fix_types = [type(item.fix) for item in items]
-        if AddForeignKeyFix in fix_types and ValidateConstraintFix in fix_types:
-            add_idx = max(i for i, t in enumerate(fix_types) if t is AddForeignKeyFix)
-            validate_idx = min(
-                i for i, t in enumerate(fix_types) if t is ValidateConstraintFix
-            )
-            assert add_idx < validate_idx
-
-    def test_fk_blocks_sync(self, db):
-        """Missing FK blocks sync (correctness convergence)."""
-        car_fk = generate_fk_constraint_name(
-            "examples_carfeature", "car_id", "examples_car", "id"
-        )
-        fk_names = _get_fk_constraint_names("examples_carfeature")
-        if car_fk in fk_names:
-            _execute(f'ALTER TABLE "examples_carfeature" DROP CONSTRAINT "{car_fk}"')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, CarFeature).executable()
-
-        fk_items = [item for item in items if isinstance(item.fix, AddForeignKeyFix)]
-        assert len(fk_items) == 1
-        assert fk_items[0].blocks_sync is True
-
-
-class TestSelfReferentialFK:
-    def test_self_referential_fk_converged(self, db):
-        """Self-referential FK (TreeNode.parent → TreeNode) is fully converged."""
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, TreeNode)
-
-        fk_drifts = [d for d in analysis.drifts if isinstance(d, ForeignKeyDrift)]
-        assert fk_drifts == []
-
-    def test_self_referential_fk_exists(self, db):
-        """Self-referential FK constraint exists in the database."""
-        fk_names = _get_fk_constraint_names("examples_treenode")
-        expected = generate_fk_constraint_name(
-            "examples_treenode", "parent_id", "examples_treenode", "id"
-        )
-        assert expected in fk_names
-
-    def test_self_referential_fk_lifecycle(self, isolated_db):
-        """Drop and recreate self-referential FK via convergence."""
-        expected = generate_fk_constraint_name(
-            "examples_treenode", "parent_id", "examples_treenode", "id"
-        )
-        fk_names = _get_fk_constraint_names("examples_treenode")
-        if expected in fk_names:
-            _execute(f'ALTER TABLE "examples_treenode" DROP CONSTRAINT "{expected}"')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, TreeNode).executable()
-
-        add_items = [item for item in items if isinstance(item.fix, AddForeignKeyFix)]
-        assert len(add_items) == 1
-        fix = add_items[0].fix
-        assert isinstance(fix, AddForeignKeyFix)
-        assert fix.table == "examples_treenode"
-        assert fix.target_table == "examples_treenode"
-
-        result = execute_plan(items)
-        assert result.ok
-        assert _constraint_exists("examples_treenode", expected)
-        assert _constraint_is_valid("examples_treenode", expected)
-
-
-class TestDbConstraintFalse:
-    def test_no_fk_constraint_for_unconstrained(self, db):
-        """db_constraint=False produces no FK constraint and no drift."""
-        fk_names = _get_fk_constraint_names("examples_unconstrainedchild")
-        assert fk_names == []
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, UnconstrainedChild)
-
-        fk_drifts = [d for d in analysis.drifts if isinstance(d, ForeignKeyDrift)]
-        assert fk_drifts == []
-
-
-def _column_is_not_null(table: str, column: str) -> bool:
-    with get_connection().cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT a.attnotnull
-            FROM pg_attribute a
-            JOIN pg_class c ON a.attrelid = c.oid
-            WHERE c.relname = %s AND a.attname = %s
-            """,
-            [table, column],
-        )
-        row = cursor.fetchone()
-        return row[0] if row else False
-
-
-class TestNotNullDetection:
-    def test_detects_nullable_drift(self, db):
-        """Non-nullable model field + nullable DB column creates NullabilityDrift."""
-        _execute('ALTER TABLE "examples_car" ALTER COLUMN "make" DROP NOT NULL')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, Car)
-
-        null_drifts = [d for d in analysis.drifts if isinstance(d, NullabilityDrift)]
-        assert len(null_drifts) == 1
-        assert null_drifts[0].table == "examples_car"
-        assert null_drifts[0].column == "make"
-        assert not null_drifts[0].has_null_rows
-
-    def test_no_drift_when_converged(self, db):
-        """Non-nullable model field + NOT NULL DB column creates no drift."""
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, Car)
-
-        null_drifts = [d for d in analysis.drifts if isinstance(d, NullabilityDrift)]
-        assert null_drifts == []
-
-    def test_no_drift_for_nullable_field(self, db):
-        """Nullable model field + nullable DB column creates no drift."""
-        # TreeNode.parent is allow_null=True, DB column is nullable
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, TreeNode)
-
-        null_drifts = [d for d in analysis.drifts if isinstance(d, NullabilityDrift)]
-        assert null_drifts == []
-
-    def test_has_null_rows_flag(self, db):
-        """Drift correctly reports whether NULL rows exist."""
-        _execute('ALTER TABLE "examples_car" ALTER COLUMN "make" DROP NOT NULL')
-        _execute("""INSERT INTO "examples_car" ("model") VALUES ('test')""")
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, Car)
-
-        null_drifts = [d for d in analysis.drifts if isinstance(d, NullabilityDrift)]
-        assert len(null_drifts) == 1
-        assert null_drifts[0].has_null_rows is True
-
-    def test_column_status_carries_drift(self, db):
-        """ColumnStatus has the drift object for nullable columns."""
-        _execute('ALTER TABLE "examples_car" ALTER COLUMN "make" DROP NOT NULL')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, Car)
-
-        make_col = [c for c in analysis.columns if c.name == "make"]
-        assert len(make_col) == 1
-        assert make_col[0].drift is not None
-        assert isinstance(make_col[0].drift, NullabilityDrift)
-        assert make_col[0].issue == "expected NOT NULL, actual NULL"
-
-    def test_issue_text_with_null_rows(self, db):
-        """Issue text mentions NULL rows when they exist."""
-        _execute('ALTER TABLE "examples_car" ALTER COLUMN "make" DROP NOT NULL')
-        _execute("""INSERT INTO "examples_car" ("model") VALUES ('test')""")
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, Car)
-
-        make_col = [c for c in analysis.columns if c.name == "make"]
-        assert len(make_col) == 1
-        assert make_col[0].issue == "expected NOT NULL, actual NULL (NULL rows exist)"
-
-    def test_issue_count_includes_nullability(self, db):
-        """Nullability issues are counted in issue_count."""
-        _execute('ALTER TABLE "examples_car" ALTER COLUMN "make" DROP NOT NULL')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, Car)
-
-        assert analysis.issue_count >= 1
-
-
-class TestNotNullPlanning:
-    def test_executable_when_no_null_rows(self, db):
-        """No NULL rows → executable SetNotNullFix."""
-        _execute('ALTER TABLE "examples_car" ALTER COLUMN "make" DROP NOT NULL')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            plan = plan_model_convergence(conn, cursor, Car)
-
-        items = plan.executable()
-        null_fixes = [i for i in items if isinstance(i.fix, SetNotNullFix)]
-        assert len(null_fixes) == 1
-        fix = null_fixes[0].fix
-        assert isinstance(fix, SetNotNullFix)
-        assert fix.table == "examples_car"
-        assert fix.column == "make"
-
-    def test_blocked_when_null_rows_exist(self, db):
-        """NULL rows → blocked plan item with guidance."""
-        _execute('ALTER TABLE "examples_car" ALTER COLUMN "make" DROP NOT NULL')
-        _execute("""INSERT INTO "examples_car" ("model") VALUES ('test')""")
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            plan = plan_model_convergence(conn, cursor, Car)
-
-        null_fixes = [i for i in plan.executable() if isinstance(i.fix, SetNotNullFix)]
-        assert null_fixes == []
-
-        blocked = [i for i in plan.blocked if isinstance(i.drift, NullabilityDrift)]
-        assert len(blocked) == 1
-        assert blocked[0].fix is None
-        assert blocked[0].guidance is not None
-        assert "NULL" in blocked[0].guidance
-
-    def test_blocks_sync(self, db):
-        """SetNotNullFix blocks sync (correctness convergence)."""
-        _execute('ALTER TABLE "examples_car" ALTER COLUMN "make" DROP NOT NULL')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable()
-
-        null_fixes = [i for i in items if isinstance(i.fix, SetNotNullFix)]
-        assert len(null_fixes) == 1
-        assert null_fixes[0].blocks_sync is True
-
-    def test_can_auto_fix_no_nulls(self):
-        """can_auto_fix returns True for NullabilityDrift with no null rows."""
-        drift = NullabilityDrift(
-            table="t", column="c", model_allows_null=False, has_null_rows=False
-        )
-        assert can_auto_fix(drift)
-
-    def test_can_auto_fix_with_nulls(self):
-        """can_auto_fix returns False for NullabilityDrift with null rows."""
-        drift = NullabilityDrift(
-            table="t", column="c", model_allows_null=False, has_null_rows=True
-        )
-        assert not can_auto_fix(drift)
-
-    def test_can_auto_fix_drop_not_null(self):
-        """can_auto_fix returns True for NullabilityDrift (model allows NULL)."""
-        drift = NullabilityDrift(table="t", column="c", model_allows_null=True)
-        assert can_auto_fix(drift)
-
-
-class TestNotNullFixes:
-    def test_apply_set_not_null(self, isolated_db):
-        """SetNotNullFix uses safe CHECK NOT VALID → VALIDATE → SET NOT NULL."""
-        _execute('ALTER TABLE "examples_car" ALTER COLUMN "make" DROP NOT NULL')
-        assert not _column_is_not_null("examples_car", "make")
-
-        fix = SetNotNullFix(table="examples_car", column="make")
-        sql = fix.apply()
-
-        # Verify the four-step safe pattern
-        assert "NOT VALID" in sql
-        assert "VALIDATE CONSTRAINT" in sql
-        assert "SET NOT NULL" in sql
-        assert _column_is_not_null("examples_car", "make")
-        # Temp check constraint is cleaned up
-        from plain.postgres.convergence.analysis import generate_notnull_check_name
-
-        assert not _constraint_exists(
-            "examples_car", generate_notnull_check_name("examples_car", "make")
-        )
-
-    def test_set_not_null_lifecycle(self, isolated_db):
-        """Full cycle: drop NOT NULL → detect → fix → converged."""
-        _execute('ALTER TABLE "examples_car" ALTER COLUMN "make" DROP NOT NULL')
-
-        conn = get_connection()
-
-        # First pass: detect drift, plan fix
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable()
-        null_fixes = [i for i in items if isinstance(i.fix, SetNotNullFix)]
-        assert len(null_fixes) == 1
-        fix = null_fixes[0].fix
-        assert isinstance(fix, SetNotNullFix)
-
-        fix.apply()
-        assert _column_is_not_null("examples_car", "make")
-
-        # Second pass: converged
-        with conn.cursor() as cursor:
-            plan = plan_model_convergence(conn, cursor, Car)
-        null_drifts = [i for i in plan.items if isinstance(i.drift, NullabilityDrift)]
-        assert null_drifts == []
-
-    def test_set_not_null_describe(self):
-        """SetNotNullFix.describe() is clear."""
-        fix = SetNotNullFix(table="examples_car", column="make")
-        assert fix.describe() == "examples_car: set NOT NULL on make"
-
-    def test_set_not_null_pass_order(self):
-        """SetNotNullFix runs at pass 2 (alongside constraint additions)."""
-        assert SetNotNullFix.pass_order == 2
-
-
-class TestDropNotNull:
-    def test_detects_too_strict_column(self, db):
-        """Nullable model field + NOT NULL DB column creates NullabilityDrift."""
-        # ChildSetNull.parent is allow_null=True; set the column to NOT NULL
-        _execute(
-            'ALTER TABLE "examples_childsetnull" ALTER COLUMN "parent_id" SET NOT NULL'
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            analysis = analyze_model(conn, cursor, ChildSetNull)
-
-        null_drifts = [d for d in analysis.drifts if isinstance(d, NullabilityDrift)]
-        assert len(null_drifts) == 1
-        assert null_drifts[0].model_allows_null is True
-
-    def test_plans_drop_not_null(self, db):
-        """Nullable model + NOT NULL DB → executable DropNotNullFix."""
-        _execute(
-            'ALTER TABLE "examples_childsetnull" ALTER COLUMN "parent_id" SET NOT NULL'
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            plan = plan_model_convergence(conn, cursor, ChildSetNull)
-
-        items = plan.executable()
-        drop_fixes = [i for i in items if isinstance(i.fix, DropNotNullFix)]
-        assert len(drop_fixes) == 1
-        fix = drop_fixes[0].fix
-        assert isinstance(fix, DropNotNullFix)
-        assert fix.column == "parent_id"
-        assert drop_fixes[0].blocks_sync is True
-
-    def test_apply_drop_not_null(self, isolated_db):
-        """DropNotNullFix applies DROP NOT NULL on the column."""
-        # parent_id starts nullable; force it NOT NULL then fix it
-        _execute(
-            'ALTER TABLE "examples_childsetnull" ALTER COLUMN "parent_id" SET NOT NULL'
-        )
-        assert _column_is_not_null("examples_childsetnull", "parent_id")
-
-        fix = DropNotNullFix(table="examples_childsetnull", column="parent_id")
-        sql = fix.apply()
-
-        assert "DROP NOT NULL" in sql
-        assert not _column_is_not_null("examples_childsetnull", "parent_id")
-
-    def test_drop_not_null_lifecycle(self, isolated_db):
-        """Full cycle: set NOT NULL → detect → fix → converged."""
-        _execute(
-            'ALTER TABLE "examples_childsetnull" ALTER COLUMN "parent_id" SET NOT NULL'
-        )
-
-        conn = get_connection()
-
-        # First pass: detect drift, plan fix
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, ChildSetNull).executable()
-        drop_fixes = [i for i in items if isinstance(i.fix, DropNotNullFix)]
-        assert len(drop_fixes) == 1
-        fix = drop_fixes[0].fix
-        assert isinstance(fix, DropNotNullFix)
-
-        fix.apply()
-        assert not _column_is_not_null("examples_childsetnull", "parent_id")
-
-        # Second pass: converged
-        with conn.cursor() as cursor:
-            plan = plan_model_convergence(conn, cursor, ChildSetNull)
-        null_drifts = [i for i in plan.items if isinstance(i.drift, NullabilityDrift)]
-        assert null_drifts == []
-
-    def test_drop_not_null_describe(self):
-        """DropNotNullFix.describe() is clear."""
-        fix = DropNotNullFix(table="examples_car", column="make")
-        assert fix.describe() == "examples_car: drop NOT NULL on make"
