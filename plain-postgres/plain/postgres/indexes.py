@@ -9,15 +9,13 @@ from plain.postgres.ddl import (
     compile_index_expressions_sql,
 )
 from plain.postgres.dialect import quote_name
-from plain.postgres.expressions import Col, ExpressionList, F, Func, OrderBy
+from plain.postgres.expressions import Col, F, Func, OrderBy
 from plain.postgres.query_utils import Q
-from plain.postgres.sql.query import Query
 from plain.utils.functional import partition
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.expressions import Expression
-    from plain.postgres.schema import DatabaseSchemaEditor, Statement
 
 __all__ = ["Index"]
 
@@ -85,17 +83,6 @@ class Index:
     def contains_expressions(self) -> bool:
         return bool(self.expressions)
 
-    def _get_condition_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor
-    ) -> str | None:
-        if self.condition is None:
-            return None
-        query = Query(model=model, alias_cols=False)
-        where = query.build_where(self.condition)
-        compiler = query.get_compiler()
-        sql, params = where.as_sql(compiler, schema_editor.connection)
-        return sql % tuple(schema_editor.quote_value(p) for p in params)
-
     def to_sql(self, model: type[Model]) -> str:
         """Generate CREATE INDEX CONCURRENTLY SQL as a plain string."""
         table = model.model_options.db_table
@@ -124,44 +111,6 @@ class Index:
         table = quote_name(table)
         condition_sql = f" WHERE {condition}" if condition else ""
         return f"CREATE INDEX CONCURRENTLY {name} ON {table} ({columns_sql}){include_sql}{condition_sql}"
-
-    def create_sql(
-        self, model: type[Model], schema_editor: DatabaseSchemaEditor, **kwargs: Any
-    ) -> Statement:
-        include = [
-            model._model_meta.get_forward_field(field_name).column
-            for field_name in self.include
-        ]
-        condition = self._get_condition_sql(model, schema_editor)
-        if self.expressions:
-            index_expressions = []
-            for expression in self.expressions:
-                index_expression = IndexExpression(expression)
-                index_expressions.append(index_expression)
-            expressions = ExpressionList(*index_expressions).resolve_expression(
-                Query(model, alias_cols=False),
-            )
-            fields = None
-            col_suffixes = ()
-        else:
-            fields = [
-                model._model_meta.get_forward_field(field_name)
-                for field_name, _ in self.fields_orders
-            ]
-            # Support index column ordering (ASC/DESC)
-            col_suffixes = tuple(order[1] for order in self.fields_orders)
-            expressions = None
-        return schema_editor._create_index_sql(
-            model,
-            fields=fields,
-            name=self.name,
-            col_suffixes=col_suffixes,
-            opclasses=self.opclasses,
-            condition=condition,
-            include=include,
-            expressions=expressions,
-            **kwargs,
-        )
 
     def deconstruct(self) -> tuple[str, tuple[Expression, ...], dict[str, Any]]:
         path = f"{self.__class__.__module__}.{self.__class__.__name__}"

@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Generator
-from copy import deepcopy
+from collections.abc import Generator
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
-
-from psycopg import sql as psycopg_sql
 
 if TYPE_CHECKING:
     from typing import Self
 
-    from plain.postgres.sql.compiler import SQLCompiler
 
 from plain.logs import get_framework_logger
-from plain.postgres.constraints import Deferrable
 from plain.postgres.dialect import quote_name
 from plain.postgres.fields import (
     BinaryField,
@@ -24,205 +19,15 @@ from plain.postgres.fields import (
 )
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
-from plain.postgres.sql import Query
 from plain.postgres.transaction import atomic
 from plain.utils import timezone
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
     from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.fields import Field
 
 logger = get_framework_logger()
-
-
-# ##### DDL Reference classes (for deferred DDL statement manipulation) #####
-
-
-class Table:
-    """Hold a reference to a table."""
-
-    def __init__(self, table: str) -> None:
-        self.table = table
-
-    def references_table(self, table: str) -> bool:
-        return self.table == table
-
-    def references_column(self, table: str, column: str) -> bool:
-        return False
-
-    def rename_table_references(self, old_table: str, new_table: str) -> None:
-        if self.table == old_table:
-            self.table = new_table
-
-    def rename_column_references(
-        self, table: str, old_column: str, new_column: str
-    ) -> None:
-        pass
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {str(self)!r}>"
-
-    def __str__(self) -> str:
-        return quote_name(self.table)
-
-
-class TableColumns(Table):
-    """Base class for references to multiple columns of a table."""
-
-    def __init__(self, table: str, columns: list[str]) -> None:
-        self.table = table
-        self.columns = columns
-
-    def references_column(self, table: str, column: str) -> bool:
-        return self.table == table and column in self.columns
-
-    def rename_column_references(
-        self, table: str, old_column: str, new_column: str
-    ) -> None:
-        if self.table == table:
-            for index, column in enumerate(self.columns):
-                if column == old_column:
-                    self.columns[index] = new_column
-
-
-class Columns(TableColumns):
-    """Hold a reference to one or many columns."""
-
-    def __init__(
-        self,
-        table: str,
-        columns: list[str],
-        col_suffixes: tuple[str, ...] = (),
-        opclasses: tuple[str, ...] = (),
-    ) -> None:
-        self.col_suffixes = col_suffixes
-        self.opclasses = opclasses
-        super().__init__(table, columns)
-
-    def __str__(self) -> str:
-        def col_str(column: str, idx: int) -> str:
-            col = quote_name(column)
-            # If opclasses are provided, include them
-            if self.opclasses:
-                col = f"{col} {self.opclasses[idx]}"
-            try:
-                suffix = self.col_suffixes[idx]
-                if suffix:
-                    col = f"{col} {suffix}"
-            except IndexError:
-                pass
-            return col
-
-        return ", ".join(
-            col_str(column, idx) for idx, column in enumerate(self.columns)
-        )
-
-
-class IndexName(TableColumns):
-    """Hold a reference to an index name."""
-
-    def __init__(
-        self,
-        table: str,
-        columns: list[str],
-        suffix: str,
-        create_index_name: Callable[[str, list[str], str], str],
-    ) -> None:
-        self.suffix = suffix
-        self.create_index_name = create_index_name
-        super().__init__(table, columns)
-
-    def __str__(self) -> str:
-        return self.create_index_name(self.table, self.columns, self.suffix)
-
-
-class Statement:
-    """
-    Statement template and formatting parameters container.
-
-    Allows keeping a reference to a statement without interpolating identifiers
-    that might have to be adjusted if they're referencing a table or column
-    that is removed
-    """
-
-    def __init__(self, template: str, **parts: Any) -> None:
-        self.template = template
-        self.parts = parts
-
-    def references_table(self, table: str) -> bool:
-        return any(
-            hasattr(part, "references_table") and part.references_table(table)
-            for part in self.parts.values()
-        )
-
-    def references_column(self, table: str, column: str) -> bool:
-        return any(
-            hasattr(part, "references_column") and part.references_column(table, column)
-            for part in self.parts.values()
-        )
-
-    def rename_table_references(self, old_table: str, new_table: str) -> None:
-        for part in self.parts.values():
-            if hasattr(part, "rename_table_references"):
-                part.rename_table_references(old_table, new_table)
-
-    def rename_column_references(
-        self, table: str, old_column: str, new_column: str
-    ) -> None:
-        for part in self.parts.values():
-            if hasattr(part, "rename_column_references"):
-                part.rename_column_references(table, old_column, new_column)
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {str(self)!r}>"
-
-    def __str__(self) -> str:
-        return self.template % self.parts
-
-
-class Expressions(TableColumns):
-    def __init__(
-        self,
-        table: str,
-        expressions: Any,
-        compiler: SQLCompiler,
-        quote_value: Callable[[Any], str],
-    ) -> None:
-        self.compiler = compiler
-        self.expressions = expressions
-        self.quote_value = quote_value
-        columns = [
-            col.target.column
-            for col in self.compiler.query._gen_cols(iter([self.expressions]))
-        ]
-        super().__init__(table, columns)
-
-    def rename_table_references(self, old_table: str, new_table: str) -> None:
-        if self.table != old_table:
-            return
-        self.expressions = self.expressions.relabeled_clone({old_table: new_table})
-        super().rename_table_references(old_table, new_table)
-
-    def rename_column_references(
-        self, table: str, old_column: str, new_column: str
-    ) -> None:
-        if self.table != table:
-            return
-        expressions = deepcopy(self.expressions)
-        self.columns = []
-        for col in self.compiler.query._gen_cols(iter([expressions])):
-            if col.target.column == old_column:
-                col.target.column = new_column
-            self.columns.append(col.target.column)
-        self.expressions = expressions
-
-    def __str__(self) -> str:
-        sql, params = self.compiler.compile(self.expressions)
-        params = map(self.quote_value, params)
-        return sql % tuple(params)
 
 
 class DatabaseSchemaEditor:
@@ -252,35 +57,6 @@ class DatabaseSchemaEditor:
         "; SET CONSTRAINTS ALL IMMEDIATE"
     )
 
-    sql_delete_constraint = "ALTER TABLE %(table)s DROP CONSTRAINT %(name)s"
-    sql_create_check = "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s CHECK (%(check)s)"
-    sql_delete_check = sql_delete_constraint
-
-    sql_create_unique = (
-        "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s "
-        "UNIQUE (%(columns)s)%(deferrable)s"
-    )
-    sql_delete_unique = sql_delete_constraint
-
-    sql_create_index = (
-        "CREATE INDEX %(name)s ON %(table)s%(using)s "
-        "(%(columns)s)%(include)s%(extra)s%(condition)s"
-    )
-    sql_create_index_concurrently = (
-        "CREATE INDEX CONCURRENTLY %(name)s ON %(table)s%(using)s "
-        "(%(columns)s)%(include)s%(extra)s%(condition)s"
-    )
-    sql_create_unique_index = (
-        "CREATE UNIQUE INDEX %(name)s ON %(table)s "
-        "(%(columns)s)%(include)s%(condition)s"
-    )
-    sql_create_unique_index_concurrently = (
-        "CREATE UNIQUE INDEX CONCURRENTLY %(name)s ON %(table)s "
-        "(%(columns)s)%(include)s%(condition)s"
-    )
-    sql_delete_index = "DROP INDEX IF EXISTS %(name)s"
-    sql_delete_index_concurrently = "DROP INDEX CONCURRENTLY IF EXISTS %(name)s"
-
     def __init__(
         self,
         connection: DatabaseConnection,
@@ -294,7 +70,6 @@ class DatabaseSchemaEditor:
     # State-managing methods
 
     def __enter__(self) -> Self:
-        self.deferred_sql: list[Any] = []
         self.executed_sql: list[str] = []
         if self.atomic_migration:
             self.atomic = atomic()
@@ -302,21 +77,16 @@ class DatabaseSchemaEditor:
         return self
 
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
-        if exc_type is None:
-            for sql in self.deferred_sql:
-                self.execute(sql)
         if self.atomic_migration:
             self.atomic.__exit__(exc_type, exc_value, traceback)
-        self.deferred_sql.clear()
 
     # Core utility functions
 
     def execute(
-        self, sql: str | Statement, params: tuple[Any, ...] | list[Any] | None = ()
+        self, sql: str, params: tuple[Any, ...] | list[Any] | None = ()
     ) -> None:
         """Execute the given SQL statement, with optional parameters."""
-        # Account for non-string statement objects.
-        sql_str = str(sql)
+        sql_str = sql
 
         # Merge the query client-side, as PostgreSQL won't do it server-side.
         if params is not None:
@@ -335,20 +105,8 @@ class DatabaseSchemaEditor:
         with self.connection.cursor() as cursor:
             cursor.execute(sql_str, params)
 
-    def quote_value(self, value: Any) -> str:
-        """
-        Return a quoted version of the value so it's safe to use in an SQL
-        string. This is not safe against injection from user code; it is
-        intended only for use in making SQL scripts or preparing default values
-        (which are not user-defined, so this is safe).
-        """
-        if isinstance(value, str):
-            value = value.replace("%", "%%")
-        return psycopg_sql.quote(value, self.connection.connection)
-
     def table_sql(self, model: type[Model]) -> tuple[str, list[Any]]:
         """Take a model and return its table definition."""
-        # Create column SQL, add FK deferreds if needed.
         column_sqls = []
         params = []
         for field in model._model_meta.local_fields:
@@ -459,34 +217,20 @@ class DatabaseSchemaEditor:
     # Actions
 
     def create_model(self, model: type[Model]) -> None:
-        """
-        Create a table and any accompanying indexes or unique constraints for
-        the given `model`.
-        """
+        """Create a table for the given model."""
         sql, params = self.table_sql(model)
         # Prevent using [] as params, in the case a literal '%' is used in the
         # definition.
         self.execute(sql, params or None)
 
-        # Add any field indexes.
-        self.deferred_sql.extend(self._model_indexes_sql(model))
-
     def delete_model(self, model: type[Model]) -> None:
         """Delete a model from the database."""
-
-        # Delete the table
         self.execute(
             self.sql_delete_table
             % {
                 "table": quote_name(model.model_options.db_table),
             }
         )
-        # Remove all deferred statements referencing the deleted table.
-        for sql in list(self.deferred_sql):
-            if isinstance(sql, Statement) and sql.references_table(
-                model.model_options.db_table
-            ):
-                self.deferred_sql.remove(sql)
 
     def alter_db_table(
         self, model: type[Model], old_db_table: str, new_db_table: str
@@ -501,10 +245,6 @@ class DatabaseSchemaEditor:
                 "new_table": quote_name(new_db_table),
             }
         )
-        # Rename all references to the old table name.
-        for sql in self.deferred_sql:
-            if isinstance(sql, Statement):
-                sql.rename_table_references(old_db_table, new_db_table)
 
     def add_field(self, model: type[Model], field: Field) -> None:
         """
@@ -553,12 +293,6 @@ class DatabaseSchemaEditor:
             "column": quote_name(field.column),
         }
         self.execute(sql)
-        # Remove all deferred statements referencing the deleted column.
-        for sql in list(self.deferred_sql):
-            if isinstance(sql, Statement) and sql.references_column(
-                model.model_options.db_table, field.column
-            ):
-                self.deferred_sql.remove(sql)
 
     def alter_field(
         self,
@@ -632,12 +366,6 @@ class DatabaseSchemaEditor:
                     model.model_options.db_table, old_field, new_field, new_type
                 )
             )
-            # Rename all references to the renamed column.
-            for sql in self.deferred_sql:
-                if isinstance(sql, Statement):
-                    sql.rename_column_references(
-                        model.model_options.db_table, old_field.column, new_field.column
-                    )
         # Next, start accumulating actions to do
         actions = []
         null_actions = []
@@ -811,121 +539,6 @@ class DatabaseSchemaEditor:
             [],
         )
 
-    def _create_index_name(
-        self, table_name: str, column_names: list[str], suffix: str = ""
-    ) -> str:
-        """Generate a unique name for an index/unique constraint."""
-        from plain.postgres.utils import generate_identifier_name
-
-        return generate_identifier_name(table_name, column_names, suffix)
-
-    def _index_include_sql(
-        self, model: type[Model], columns: list[str] | None
-    ) -> str | Statement:
-        if not columns:
-            return ""
-        return Statement(
-            " INCLUDE (%(columns)s)",
-            columns=Columns(model.model_options.db_table, columns),
-        )
-
-    def _create_index_sql(
-        self,
-        model: type[Model],
-        *,
-        fields: list[Field] | None = None,
-        name: str | None = None,
-        suffix: str = "",
-        using: str = "",
-        col_suffixes: tuple[str, ...] = (),
-        sql: str | None = None,
-        opclasses: tuple[str, ...] = (),
-        condition: str | None = None,
-        concurrently: bool = False,
-        include: list[str] | None = None,
-        expressions: Any = None,
-    ) -> Statement:
-        """
-        Return the SQL statement to create the index for one or several fields
-        or expressions. `sql` can be specified if the syntax differs from the
-        standard (GIS indexes, ...).
-        """
-        fields = fields or []
-        expressions = expressions or []
-        compiler = Query(model, alias_cols=False).get_compiler()
-        columns = [field.column for field in fields]
-        if sql is None:
-            sql = (
-                self.sql_create_index
-                if not concurrently
-                else self.sql_create_index_concurrently
-            )
-        table = model.model_options.db_table
-
-        def create_index_name(*args: Any, **kwargs: Any) -> str:
-            nonlocal name
-            if name is None:
-                name = self._create_index_name(*args, **kwargs)
-            return quote_name(name)
-
-        return Statement(
-            sql,
-            table=Table(table),
-            name=IndexName(table, columns, suffix, create_index_name),
-            using=using,
-            columns=(
-                self._index_columns(table, columns, col_suffixes, opclasses)
-                if columns
-                else Expressions(table, expressions, compiler, self.quote_value)
-            ),
-            extra="",
-            condition=(" WHERE " + condition if condition else ""),
-            include=self._index_include_sql(model, include),
-        )
-
-    def _delete_index_sql(
-        self,
-        model: type[Model],
-        name: str,
-        sql: str | None = None,
-        concurrently: bool = False,
-    ) -> Statement:
-        if sql is None:
-            sql = (
-                self.sql_delete_index_concurrently
-                if concurrently
-                else self.sql_delete_index
-            )
-        return Statement(
-            sql,
-            table=Table(model.model_options.db_table),
-            name=quote_name(name),
-        )
-
-    def _index_columns(
-        self,
-        table: str,
-        columns: list[str],
-        col_suffixes: tuple[str, ...],
-        opclasses: tuple[str, ...],
-    ) -> Columns:
-        return Columns(
-            table,
-            columns,
-            col_suffixes=col_suffixes,
-            opclasses=opclasses,
-        )
-
-    def _model_indexes_sql(self, model: type[Model]) -> list[Statement | None]:
-        """
-        Return a list of all index SQL statements (Meta.indexes) for the specified model.
-        """
-        output: list[Statement | None] = []
-        for index in model.model_options.indexes:
-            if not index.contains_expressions:
-                output.append(index.create_sql(model, self))
-        return output
-
     def _field_should_be_altered(
         self, old_field: Field, new_field: Field, ignore: set[str] | None = None
     ) -> bool:
@@ -955,136 +568,3 @@ class DatabaseSchemaEditor:
             "new_column": quote_name(new_field.column),
             "type": new_type,
         }
-
-    def _deferrable_constraint_sql(self, deferrable: Deferrable | None) -> str:
-        if deferrable is None:
-            return ""
-        if deferrable == Deferrable.DEFERRED:
-            return " DEFERRABLE INITIALLY DEFERRED"
-        if deferrable == Deferrable.IMMEDIATE:
-            return " DEFERRABLE INITIALLY IMMEDIATE"
-        return ""
-
-    def _create_unique_sql(
-        self,
-        model: type[Model],
-        fields: Iterable[Field],
-        name: str | None = None,
-        condition: str | None = None,
-        deferrable: Deferrable | None = None,
-        include: list[str] | None = None,
-        opclasses: tuple[str, ...] | None = None,
-        expressions: Any = None,
-        concurrently: bool = False,
-    ) -> Statement | None:
-        compiler = Query(model, alias_cols=False).get_compiler()
-        table = model.model_options.db_table
-        columns = [field.column for field in fields]
-        constraint_name: IndexName | str
-        if name is None:
-            constraint_name = self._unique_constraint_name(table, columns, quote=True)
-        else:
-            constraint_name = quote_name(name)
-        if concurrently:
-            sql = self.sql_create_unique_index_concurrently
-        elif condition or include or opclasses or expressions:
-            sql = self.sql_create_unique_index
-        else:
-            sql = self.sql_create_unique
-        if columns:
-            columns_obj: Columns | Expressions = self._index_columns(
-                table, columns, col_suffixes=(), opclasses=opclasses or ()
-            )
-        else:
-            columns_obj = Expressions(table, expressions, compiler, self.quote_value)
-        return Statement(
-            sql,
-            table=Table(table),
-            name=constraint_name,
-            columns=columns_obj,
-            condition=(" WHERE " + condition if condition else ""),
-            deferrable=self._deferrable_constraint_sql(deferrable),
-            include=self._index_include_sql(model, include),
-        )
-
-    def _unique_constraint_name(
-        self, table: str, columns: list[str], quote: bool = True
-    ) -> IndexName | str:
-        if quote:
-
-            def create_unique_name(*args: Any, **kwargs: Any) -> str:
-                return quote_name(self._create_index_name(*args, **kwargs))
-
-        else:
-            create_unique_name = self._create_index_name
-
-        return IndexName(table, columns, "_uniq", create_unique_name)
-
-    def _delete_unique_sql(
-        self,
-        model: type[Model],
-        name: str,
-        condition: str | None = None,
-        deferrable: Deferrable | None = None,
-        include: list[str] | None = None,
-        opclasses: tuple[str, ...] | None = None,
-        expressions: Any = None,
-    ) -> Statement:
-        if condition or include or opclasses or expressions:
-            sql = self.sql_delete_index
-        else:
-            sql = self.sql_delete_unique
-        return self._delete_constraint_sql(sql, model, name)
-
-    def _create_check_sql(self, model: type[Model], name: str, check: str) -> Statement:
-        return Statement(
-            self.sql_create_check,
-            table=Table(model.model_options.db_table),
-            name=quote_name(name),
-            check=check,
-        )
-
-    def _delete_constraint_sql(
-        self, template: str, model: type[Model], name: str
-    ) -> Statement:
-        return Statement(
-            template,
-            table=Table(model.model_options.db_table),
-            name=quote_name(name),
-        )
-
-    def _constraint_names(
-        self,
-        model: type[Model],
-        column_names: list[str] | None = None,
-        unique: bool | None = None,
-        primary_key: bool | None = None,
-        index: bool | None = None,
-        foreign_key: bool | None = None,
-        check: bool | None = None,
-        type_: str | None = None,
-        exclude: set[str] | None = None,
-    ) -> list[str]:
-        """Return all constraint names matching the columns and conditions."""
-        with self.connection.cursor() as cursor:
-            constraints = self.connection.get_constraints(
-                cursor, model.model_options.db_table
-            )
-        result: list[str] = []
-        for name, infodict in constraints.items():
-            if column_names is None or column_names == infodict["columns"]:
-                if unique is not None and infodict["unique"] != unique:
-                    continue
-                if primary_key is not None and infodict["primary_key"] != primary_key:
-                    continue
-                if index is not None and infodict["index"] != index:
-                    continue
-                if check is not None and infodict["check"] != check:
-                    continue
-                if foreign_key is not None and not infodict["foreign_key"]:
-                    continue
-                if type_ is not None and infodict["type"] != type_:
-                    continue
-                if not exclude or name not in exclude:
-                    result.append(name)
-        return result
