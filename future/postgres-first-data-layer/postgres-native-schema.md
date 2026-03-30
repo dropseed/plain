@@ -247,13 +247,52 @@ With these schema features in place:
 
 ## Implementation priority
 
-| Priority | Feature               | Effort | Unlocks                                            |
-| -------- | --------------------- | ------ | -------------------------------------------------- |
-| 1        | GIN/GiST index types  | Small  | JSONB indexing, FTS indexing, array indexing       |
-| 2        | Generated columns     | Medium | FTS vectors, derived data, COALESCE patterns       |
-| 3        | Array fields          | Medium | Tags without join tables, GIN-indexed containment  |
-| 4        | Range fields          | Medium | Temporal data, pairing with exclusion constraints  |
-| 5        | Exclusion constraints | Medium | Non-overlapping ranges, scheduling integrity       |
-| 6        | Hash indexes          | Small  | Niche optimization for large equality-only lookups |
+The priority is driven by dependency chains. Items 1–3 form a chain that culminates in full-text search being declarable entirely through model code — the showcase feature for the postgres-first thesis.
 
-GIN/GiST indexes are the highest leverage — they're small to implement and immediately unlock proper indexing for an existing field type (JSONField) while unblocking the other features on this list.
+| Priority | Feature               | Effort | Unlocks                                           | Depends on              |
+| -------- | --------------------- | ------ | ------------------------------------------------- | ----------------------- |
+| 1        | GIN/GiST index types  | Small  | JSONB indexing, FTS indexing, array indexing      | —                       |
+| 2        | Generated columns     | Medium | FTS vectors, derived data, COALESCE patterns      | —                       |
+| 3        | Exclusion constraints | Medium | Non-overlapping ranges, scheduling integrity      | GiST (1)                |
+| 4        | Array fields          | Medium | Tags without join tables, GIN-indexed containment | GIN (1)                 |
+| 5        | Range fields          | Medium | Temporal data, pairing with exclusion constraints | GiST (1), exclusion (3) |
+| 6        | Fillfactor            | Small  | HOT update optimization for write-heavy tables    | —                       |
+
+GIN/GiST indexes are the highest leverage — they're small to implement and immediately unlock proper indexing for an existing field type (JSONField) while unblocking most other features on this list. Generated columns are independent but together with GIN they enable FTS (`postgres-full-text-search`).
+
+### Convergence integration
+
+Each feature added here expands the set of **managed types** in convergence (see `schema-convergence.md` "Ownership" section). Today, convergence only manages B-tree indexes and unique/check/FK constraints. When GIN support ships, GIN becomes a managed index type — convergence creates, tracks, and can drop GIN indexes declared on models. Until then, GIN indexes in the database are shown as **unmanaged** in `postgres schema` and are invisible to convergence operations.
+
+## What we won't build
+
+Not every Postgres feature needs a model-level declaration. The goal is covering features where dropping to `RunSQL` forces users out of the migration autodetector entirely. Features where the escape hatch composes cleanly with the managed layer don't need wrapping.
+
+### Not planned
+
+| Feature                           | Why not                                                                                                                                                                                                                                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Hash indexes**                  | B-tree covers nearly all equality cases. The marginal benefit (constant-size for very long keys) doesn't justify the surface area. Trivial to add later as `type="hash"` if demand emerges.                                                                                    |
+| **BRIN indexes**                  | Niche — useful for large naturally-ordered tables (time-series). Create via `RunSQL`; convergence won't touch them (unmanaged type).                                                                                                                                           |
+| **SP-GiST indexes**               | Very niche (partitioned search trees). Same story as BRIN.                                                                                                                                                                                                                     |
+| **Table partitioning**            | Large effort, complex lifecycle (partition creation, detachment, pruning). Better handled by `pg_partman` or manual DDL. The key question — should Plain manage partition lifecycle or delegate — doesn't have a clear answer without a concrete use case driving it.          |
+| **Triggers**                      | Convergence manages declarative state, not procedural logic. A trigger is behavior, not schema. `RunSQL` or explicit migration is the right tool. Exception: if `on_update=Now()` lands (see `fields-db-defaults.md`), convergence could manage that specific trigger pattern. |
+| **Views / materialized views**    | Out of scope for the model layer. Views are queries, not tables.                                                                                                                                                                                                               |
+| **Row-level security policies**   | Niche and deeply tied to Postgres roles/permissions, which Plain doesn't manage.                                                                                                                                                                                               |
+| **Custom types / domains**        | Low demand. Users needing these are already comfortable with raw DDL.                                                                                                                                                                                                          |
+| **`db_collation` / `db_comment`** | Nice-to-have metadata. Not load-bearing for any other feature. Can be added incrementally if demand warrants.                                                                                                                                                                  |
+
+### How the escape hatches compose
+
+For features we don't wrap, users have two paths:
+
+1. **`RunSQL` in migrations** — for one-time DDL (creating a partition scheme, adding a BRIN index, installing an extension). The object exists in the database alongside model-managed objects.
+
+2. **`sql()` in queries** — for query-side features that don't have ORM wrappers (window functions, CTEs, LATERAL joins). Returns typed model instances.
+
+Both compose cleanly with the managed layer:
+
+- Objects created via `RunSQL` on model-managed tables are visible in `postgres schema` as **unmanaged** (labeled with their type), not flagged as issues. They coexist safely with convergence.
+- `sql()` queries can reference model fields and return model instances, so dropping to SQL for a query doesn't mean abandoning the ORM for everything else.
+
+The boundary is: if you're defining something convergence can declare, use a model declaration. If convergence can't declare it, use `RunSQL` / `sql()` and convergence will leave it alone.

@@ -1012,6 +1012,7 @@ class DatabaseConnection:
                 "unique": kind in ["p", "u"],
                 "foreign_key": tuple(used_cols.split(".", 1)) if kind == "f" else None,
                 "check": kind == "c",
+                "contype": kind,
                 "index": False,
                 "definition": constraintdef,
                 "options": options,

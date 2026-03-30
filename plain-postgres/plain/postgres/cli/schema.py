@@ -8,7 +8,7 @@ import click
 from ..convergence.analysis import ModelAnalysis, analyze_model
 from ..convergence.planning import can_auto_fix
 from ..db import get_connection
-from ..introspection import get_unknown_tables
+from ..introspection import MANAGED_CONSTRAINT_TYPES, get_unknown_tables
 from ..registry import models_registry
 
 
@@ -22,6 +22,10 @@ def _err(msg: str) -> None:
 
 def _fixable(msg: str) -> None:
     click.secho(f"  ~ {msg} (auto-fix)", fg="yellow")
+
+
+def _unmanaged(type_label: str) -> None:
+    click.secho(f"  unmanaged ({type_label})", dim=True)
 
 
 def _render_model(analysis: ModelAnalysis) -> None:
@@ -68,7 +72,9 @@ def _render_model(analysis: ModelAnalysis) -> None:
         fields_str = ", ".join(idx.fields) if idx.fields else "expressions"
         click.echo(f"    {idx.name}  ({fields_str})", nl=False)
 
-        if idx.issue and idx.drift and can_auto_fix(idx.drift):
+        if idx.access_method:
+            _unmanaged(idx.access_method)
+        elif idx.issue and idx.drift and can_auto_fix(idx.drift):
             _fixable(idx.issue)
         elif idx.issue:
             _err(idx.issue)
@@ -81,15 +87,17 @@ def _render_model(analysis: ModelAnalysis) -> None:
         click.secho("  Constraints:", dim=True)
 
     for con in analysis.constraints:
-        con_type = con.type.upper()
+        con_label = con.constraint_type.label.upper()
         if con.fields:
             click.echo(
-                f"    {con.name}  {con_type} ({', '.join(con.fields)})", nl=False
+                f"    {con.name}  {con_label} ({', '.join(con.fields)})", nl=False
             )
         else:
-            click.echo(f"    {con.name}  {con_type}", nl=False)
+            click.echo(f"    {con.name}  {con_label}", nl=False)
 
-        if con.issue and con.drift and can_auto_fix(con.drift):
+        if con.constraint_type not in MANAGED_CONSTRAINT_TYPES:
+            _unmanaged(con.constraint_type.label)
+        elif con.issue and con.drift and can_auto_fix(con.drift):
             _fixable(con.issue)
         elif con.issue:
             _err(con.issue)

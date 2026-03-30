@@ -2,56 +2,104 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 import sqlparse
 
 from ..db import get_connection
+from ..indexes import Index
 
 if TYPE_CHECKING:
     from ..connection import DatabaseConnection
     from ..utils import CursorWrapper
 
+DEFAULT_INDEX_ACCESS_METHOD = "btree"
+
+# Index access methods that convergence can create and manage.
+# Expand when support for new index types ships (e.g. "gin", "gist").
+MANAGED_INDEX_ACCESS_METHODS: frozenset[str] = frozenset({DEFAULT_INDEX_ACCESS_METHOD})
+
+
+class ConType(StrEnum):
+    """Postgres pg_constraint.contype values."""
+
+    PRIMARY = "p"
+    UNIQUE = "u"
+    CHECK = "c"
+    FOREIGN_KEY = "f"
+    EXCLUSION = "x"
+
+    @property
+    def label(self) -> str:
+        return _CONTYPE_LABELS[self]
+
+
+_CONTYPE_LABELS: dict[ConType, str] = {
+    ConType.PRIMARY: "primary key",
+    ConType.UNIQUE: "unique",
+    ConType.CHECK: "check",
+    ConType.FOREIGN_KEY: "foreign key",
+    ConType.EXCLUSION: "exclusion",
+}
+
+# Constraint types that convergence can create and manage.
+# Expand when support for new constraint types ships.
+MANAGED_CONSTRAINT_TYPES: frozenset[ConType] = frozenset(
+    {ConType.UNIQUE, ConType.CHECK, ConType.FOREIGN_KEY}
+)
+
 
 @dataclass
 class ColumnState:
+    """A column from pg_attribute."""
+
     type: str
     not_null: bool
 
 
 @dataclass
 class IndexState:
+    """An index from pg_index + pg_am."""
+
     columns: list[str]
-    valid: bool
+    access_method: str = DEFAULT_INDEX_ACCESS_METHOD
+    is_unique: bool = False
+    is_valid: bool = True
     definition: str | None = None
 
 
 @dataclass
 class ConstraintState:
+    """A constraint from pg_constraint.
+
+    All constraint types use this single class, matching Postgres's
+    pg_constraint catalog. FK-specific fields (target_table, target_column)
+    are only populated for foreign key constraints.
+    """
+
+    constraint_type: ConType
     columns: list[str]
-    validated: bool
-    definition: str | None = None
-    from_index: bool = False
-
-
-@dataclass
-class ForeignKeyState:
-    column: str
-    target_table: str
-    target_column: str
     validated: bool = True
+    definition: str | None = None
+    target_table: str | None = None  # FK only
+    target_column: str | None = None  # FK only
 
 
 @dataclass
 class TableState:
-    """Raw database state for a single table — no model comparison."""
+    """Raw database state for a single table.
+
+    Mirrors Postgres's catalog structure:
+    - columns from pg_attribute
+    - indexes from pg_index + pg_am
+    - constraints from pg_constraint (all types in one dict)
+    """
 
     exists: bool = True
     columns: dict[str, ColumnState] = field(default_factory=dict)
     indexes: dict[str, IndexState] = field(default_factory=dict)
-    check_constraints: dict[str, ConstraintState] = field(default_factory=dict)
-    unique_constraints: dict[str, ConstraintState] = field(default_factory=dict)
-    foreign_keys: dict[str, ForeignKeyState] = field(default_factory=dict)
+    constraints: dict[str, ConstraintState] = field(default_factory=dict)
 
 
 def introspect_table(
@@ -65,41 +113,55 @@ def introspect_table(
     raw = conn.get_constraints(cursor, table_name)
 
     indexes: dict[str, IndexState] = {}
-    check_constraints: dict[str, ConstraintState] = {}
-    unique_constraints: dict[str, ConstraintState] = {}
-    foreign_keys: dict[str, ForeignKeyState] = {}
+    constraints: dict[str, ConstraintState] = {}
 
     for name, info in raw.items():
-        if info.get("primary_key"):
-            continue
+        raw_contype = info.get("contype")
 
-        if info.get("unique"):
-            unique_constraints[name] = ConstraintState(
+        # Map raw contype to ConType enum if it's a known constraint type
+        contype: ConType | None = None
+        if raw_contype:
+            try:
+                contype = ConType(raw_contype)
+            except ValueError:
+                pass
+
+        if contype in (
+            ConType.PRIMARY,
+            ConType.UNIQUE,
+            ConType.CHECK,
+            ConType.EXCLUSION,
+        ):
+            constraints[name] = ConstraintState(
+                constraint_type=contype,
                 columns=list(info.get("columns") or []),
                 validated=info.get("validated", True),
                 definition=info.get("definition"),
-                from_index=info.get("index", False),
             )
-        elif info.get("check"):
-            check_constraints[name] = ConstraintState(
-                columns=list(info.get("columns") or []),
-                validated=info.get("validated", True),
-                definition=info.get("definition"),
-            )
-        elif info.get("foreign_key"):
+        elif contype == ConType.FOREIGN_KEY:
             fk_target = info.get("foreign_key", ())
             fk_cols = info.get("columns", [])
             if len(fk_cols) == 1 and len(fk_target) == 2:
-                foreign_keys[name] = ForeignKeyState(
-                    column=fk_cols[0],
+                constraints[name] = ConstraintState(
+                    constraint_type=ConType.FOREIGN_KEY,
+                    columns=fk_cols,
+                    validated=info.get("validated", True),
+                    definition=info.get("definition"),
                     target_table=fk_target[0],
                     target_column=fk_target[1],
-                    validated=info.get("validated", True),
                 )
         elif info.get("index"):
+            # get_constraints() encodes basic btree indexes as Index.suffix ("idx")
+            # and non-btree indexes as their raw pg_am.amname. Reverse that here.
+            raw_type = info.get("type", DEFAULT_INDEX_ACCESS_METHOD)
+            access_method = (
+                DEFAULT_INDEX_ACCESS_METHOD if raw_type == Index.suffix else raw_type
+            )
             indexes[name] = IndexState(
                 columns=list(info.get("columns") or []),
-                valid=info.get("valid", True),
+                access_method=access_method,
+                is_unique=info.get("unique", False),
+                is_valid=info.get("valid", True),
                 definition=info.get("definition"),
             )
 
@@ -107,9 +169,7 @@ def introspect_table(
         exists=True,
         columns=actual_columns,
         indexes=indexes,
-        check_constraints=check_constraints,
-        unique_constraints=unique_constraints,
-        foreign_keys=foreign_keys,
+        constraints=constraints,
     )
 
 

@@ -20,6 +20,101 @@ from plain.postgres.convergence.analysis import DriftKind, IndexDrift, analyze_m
 from plain.postgres.functions.text import Upper
 
 
+def _create_hash_index(name: str = "examples_car_make_hash_idx") -> None:
+    execute(f'CREATE INDEX "{name}" ON "examples_car" USING hash ("make")')
+
+
+class TestUnmanagedIndexTypes:
+    def test_hash_index_not_flagged_as_undeclared(self, db):
+        """A hash index is unmanaged — no drift, shown as informational."""
+        _create_hash_index()
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Car)
+
+        # No drift for the hash index
+        assert not any(
+            isinstance(d, IndexDrift)
+            and getattr(d, "name", None) == "examples_car_make_hash_idx"
+            for d in analysis.drifts
+        )
+
+        # Appears in indexes with access_method set (informational)
+        hash_idx = next(
+            idx for idx in analysis.indexes if idx.name == "examples_car_make_hash_idx"
+        )
+        assert hash_idx.access_method == "hash"
+        assert hash_idx.issue is None
+        assert hash_idx.drift is None
+
+    def test_unmanaged_index_not_dropped_by_drop_undeclared(self, db):
+        """--drop-undeclared does not propose dropping unmanaged index types."""
+        _create_hash_index()
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            items = plan_model_convergence(conn, cursor, Car).executable(
+                drop_undeclared=True
+            )
+
+        assert not any(
+            isinstance(item.fix, DropIndexFix)
+            and item.fix.name == "examples_car_make_hash_idx"
+            for item in items
+        )
+
+    def test_btree_extra_index_still_undeclared(self, db):
+        """A btree index not in the model is still flagged as undeclared."""
+        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Car)
+
+        assert any(
+            isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+            for d in analysis.drifts
+        )
+
+    def test_unmanaged_index_not_counted_as_issue(self, db):
+        """Unmanaged indexes don't count toward the issue total."""
+        _create_hash_index()
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Car)
+
+        assert analysis.issue_count == 0
+
+    def test_name_conflict_with_unmanaged_index(self, db):
+        """A declared index whose name collides with a hash index is an error."""
+        _create_hash_index("examples_car_make_idx")
+
+        original_indexes = list(Car.model_options.indexes)
+        Car.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["make"], name="examples_car_make_idx"),
+        ]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, Car)
+
+            conflict = next(
+                idx
+                for idx in analysis.indexes
+                if idx.name == "examples_car_make_idx" and idx.issue
+            )
+            assert conflict.issue is not None
+            assert "name conflict" in conflict.issue
+            assert "hash" in conflict.issue
+            assert conflict.drift is None  # no auto-fix
+        finally:
+            Car.model_options.indexes = original_indexes
+
+
 class TestDetectIndexFixes:
     def test_detects_missing_index(self, db):
         """Add an index to the model, detect it as missing."""

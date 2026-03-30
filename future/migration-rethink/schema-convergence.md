@@ -93,19 +93,84 @@ $ plain postgres converge
 
 ## Ownership: what convergence manages vs ignores
 
-Convergence only manages objects that match a declaration on a model. The **name** is the ownership key.
+Convergence has two layers of filtering that determine what it touches:
+
+### Layer 1: Managed types
+
+Convergence only manages **types** of database objects it knows how to create. This is defined at the system level, not per-model. If convergence can't express an object type in a model declaration, it doesn't introspect, report, or act on objects of that type.
+
+**Managed index types:**
+
+| Index type | Managed? | Notes                                     |
+| ---------- | -------- | ----------------------------------------- |
+| B-tree     | **Yes**  | The only type `Index()` currently creates |
+| GIN        | No       | Planned — see `postgres-native-schema.md` |
+| GiST       | No       | Planned — see `postgres-native-schema.md` |
+| Hash       | No       | Low priority                              |
+| BRIN       | No       | Niche                                     |
+| SP-GiST    | No       | Niche                                     |
+
+**Managed constraint types:**
+
+| Constraint type | Managed? | Notes                                                    |
+| --------------- | -------- | -------------------------------------------------------- |
+| UNIQUE          | **Yes**  | Via `UniqueConstraint`                                   |
+| CHECK           | **Yes**  | Via `CheckConstraint`                                    |
+| FOREIGN KEY     | **Yes**  | Via `ForeignKeyField(db_constraint=True)`                |
+| EXCLUSION       | No       | Planned — requires GiST, see `postgres-native-schema.md` |
+
+**Other object types convergence does not manage:** triggers, views, materialized views, sequences, extensions, partitions, roles, policies. These are completely invisible to convergence — it doesn't query for them, doesn't report them, and can't affect them.
+
+As support for new types is added (e.g. GIN indexes), they move from unmanaged to managed. Objects of that type on existing tables would then be subject to Layer 2 below.
+
+### Layer 2: Declared names
+
+Within managed types, convergence only owns objects that match a declaration on a model. The **name** is the ownership key.
 
 - `Index(fields=["email"], name="users_email_idx")` → convergence owns `users_email_idx`
 - `UniqueConstraint(fields=["email"], name="users_email_unique")` → convergence owns `users_email_unique`
 - `ForeignKeyField(User)` with `db_constraint=True` → convergence owns the FK constraint (name derived from field)
-- An index someone created via psql or RunSQL with a different name → convergence ignores it
-- An old auto-generated index from Django/Plain's FK auto-indexing → convergence ignores it (it has no matching model declaration)
+- A B-tree index someone created via psql or RunSQL with a different name → reported as **undeclared** (a managed type that exists in DB but not in the model)
+- An old auto-generated index from Django/Plain's FK auto-indexing → reported as **undeclared**
 
 All indexes and constraints require explicit names (`Index.name` and `UniqueConstraint.name` are required, not auto-generated). There is no `db_index=True` field shorthand and no `unique=True` field option — all indexes use `model_options.indexes`, all unique constraints use `model_options.constraints`. FK constraints are the exception: they're implied by `ForeignKeyField(db_constraint=True)` (the default).
 
 **Note:** `PositiveIntegerField` was removed — users declare explicit `CheckConstraint` objects in `model_options.constraints` instead. These are already managed by convergence.
 
-This means: convergence never touches things it didn't create (or that aren't declared). No surprises from manual DB work, extensions, or legacy objects. The tradeoff is that duplicate indexes can exist (one convergence-managed, one legacy) — `postgres schema` should report these as informational.
+### How unmanaged vs undeclared interact
+
+These are different concepts with different behavior:
+
+|                              | **Unmanaged**                                         | **Undeclared**                                                      |
+| ---------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------- |
+| Meaning                      | Convergence can't manage this type of object          | Convergence can manage this type, but the model doesn't declare it  |
+| Example                      | A GIN index on a JSONB column                         | A B-tree index created via RunSQL                                   |
+| Shown in `postgres schema`?  | Yes, labeled as unmanaged with the type (e.g. "gin")  | Yes, flagged as an issue                                            |
+| Acted on by `postgres sync`? | Never                                                 | Only dropped with `--drop-undeclared`                               |
+| Counts as an issue?          | No                                                    | Yes                                                                 |
+| What to do                   | Nothing — or declare it once the type becomes managed | Either declare it on the model, or drop it with `--drop-undeclared` |
+
+The distinction matters for `--drop-undeclared`: it should only propose dropping objects of managed types that aren't declared. It should never propose dropping a GIN index just because convergence doesn't know how to create GIN indexes. When GIN support ships and GIN becomes a managed type, then an undeclared GIN index is a legitimate `--drop-undeclared` candidate.
+
+### `postgres schema` rendering
+
+`postgres schema` shows the full truth of what's on a table. Managed objects get the standard treatment (green check, red error, yellow auto-fix). Unmanaged objects are shown but clearly labeled:
+
+```
+Orders  →  app_orders
+  id                              bigint PK  ✓
+  total                           numeric    ✓
+
+  Indexes:
+    app_orders_created_at_idx  (created_at)  ✓
+    app_orders_data_gin_idx    (data)  unmanaged (gin)
+
+  Constraints:
+    app_orders_total_positive  CHECK  ✓
+    app_orders_no_overlap      EXCLUSION  unmanaged (gist)
+```
+
+This gives operators a complete picture without creating false alarms. The type label in parentheses tells you _why_ it's unmanaged — and implicitly, what feature would need to land for convergence to manage it.
 
 ## Convergence ordering
 

@@ -26,6 +26,65 @@ from plain.postgres.convergence import (
     plan_model_convergence,
 )
 from plain.postgres.functions.text import Upper
+from plain.postgres.introspection import ConType
+
+
+def _create_exclusion_constraint(name: str = "examples_car_make_excl") -> None:
+    execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
+    execute(
+        f'ALTER TABLE "examples_car" ADD CONSTRAINT "{name}"'
+        ' EXCLUDE USING gist ("make" WITH =)'
+    )
+
+
+class TestUnmanagedConstraintTypes:
+    def test_exclusion_constraint_shown_as_unmanaged(self, db):
+        """An exclusion constraint appears in constraints with no drift."""
+        _create_exclusion_constraint()
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Car)
+
+        # No drift
+        assert not any(
+            getattr(d, "name", None) == "examples_car_make_excl"
+            for d in analysis.drifts
+        )
+
+        # Appears in constraints with the right type
+        excl = next(
+            con for con in analysis.constraints if con.name == "examples_car_make_excl"
+        )
+        assert excl.constraint_type == ConType.EXCLUSION
+        assert excl.issue is None
+        assert excl.drift is None
+
+    def test_exclusion_constraint_not_dropped_by_drop_undeclared(self, db):
+        """--drop-undeclared does not propose dropping unmanaged constraint types."""
+        _create_exclusion_constraint()
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            items = plan_model_convergence(conn, cursor, Car).executable(
+                drop_undeclared=True
+            )
+
+        assert not any(
+            isinstance(item.fix, DropConstraintFix)
+            and item.fix.name == "examples_car_make_excl"
+            for item in items
+        )
+
+    def test_exclusion_constraint_not_counted_as_issue(self, db):
+        """Unmanaged constraints don't count toward the issue total."""
+        _create_exclusion_constraint()
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Car)
+
+        assert analysis.issue_count == 0
 
 
 class TestDetectConstraintFixes:

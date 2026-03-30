@@ -11,8 +11,10 @@ from ..dialect import quote_name
 from ..fields.related import ForeignKeyField
 from ..indexes import Index
 from ..introspection import (
+    MANAGED_CONSTRAINT_TYPES,
+    MANAGED_INDEX_ACCESS_METHODS,
     ConstraintState,
-    ForeignKeyState,
+    ConType,
     TableState,
     introspect_table,
     normalize_check_definition,
@@ -159,12 +161,13 @@ class IndexStatus:
     fields: list[str] = field(default_factory=list)
     issue: str | None = None
     drift: IndexDrift | None = None
+    access_method: str | None = None  # set for unmanaged indexes (display only)
 
 
 @dataclass
 class ConstraintStatus:
     name: str
-    type: str
+    constraint_type: ConType
     fields: list[str] = field(default_factory=list)
     issue: str | None = None
     drift: ConstraintDrift | ForeignKeyDrift | IndexDrift | None = None
@@ -226,6 +229,7 @@ class ModelAnalysis:
                 {
                     "name": idx.name,
                     "fields": idx.fields,
+                    "access_method": idx.access_method,
                     "issue": idx.issue,
                     "drift": idx.drift.describe() if idx.drift else None,
                 }
@@ -234,7 +238,8 @@ class ModelAnalysis:
             "constraints": [
                 {
                     "name": con.name,
-                    "type": con.type,
+                    "constraint_type": con.constraint_type,
+                    "type_label": con.constraint_type.label,
                     "fields": con.fields,
                     "issue": con.issue,
                     "drift": con.drift.describe() if con.drift else None,
@@ -369,15 +374,36 @@ def _compare_indexes(
     statuses: list[IndexStatus] = []
     missing: list[Index] = []
     model_index_names = {idx.name for idx in model.model_options.indexes}
+    # Unique indexes are handled by _compare_unique_constraints, not here.
+    # Also exclude indexes that back unique constraints in pg_constraint.
+    unique_constraint_names = {
+        k for k, v in db.constraints.items() if v.constraint_type == ConType.UNIQUE
+    }
+    non_unique_indexes = {
+        k: v
+        for k, v in db.indexes.items()
+        if not v.is_unique and k not in unique_constraint_names
+    }
 
     for index in model.model_options.indexes:
-        if index.name not in db.indexes:
+        if index.name not in non_unique_indexes:
             missing.append(index)
             continue
 
-        db_idx = db.indexes[index.name]
+        db_idx = non_unique_indexes[index.name]
 
-        if not db_idx.valid:
+        # Name collision: DB has an unmanaged index type with this name
+        if db_idx.access_method not in MANAGED_INDEX_ACCESS_METHODS:
+            statuses.append(
+                IndexStatus(
+                    name=index.name,
+                    fields=list(index.fields) if index.fields else [],
+                    issue=f"name conflict with {db_idx.access_method} index — rename one to resolve",
+                )
+            )
+            continue
+
+        if not db_idx.is_valid:
             statuses.append(
                 IndexStatus(
                     name=index.name,
@@ -434,7 +460,14 @@ def _compare_indexes(
         )
 
     # Extra indexes (in DB but not in model)
-    extra_names = sorted(db.indexes.keys() - model_index_names)
+    extra_names = sorted(non_unique_indexes.keys() - model_index_names)
+
+    # Only managed index types participate in rename detection
+    managed_extra = [
+        n
+        for n in extra_names
+        if non_unique_indexes[n].access_method in MANAGED_INDEX_ACCESS_METHODS
+    ]
 
     # Detect renames: match missing and extra by normalized definition
     renamed_missing: set[str] = set()
@@ -446,8 +479,8 @@ def _compare_indexes(
         missing_by_def.setdefault(norm, []).append(index)
 
     extra_by_def: dict[str, list[str]] = {}
-    for name in extra_names:
-        defn = db.indexes[name].definition
+    for name in managed_extra:
+        defn = non_unique_indexes[name].definition
         if defn:
             norm = normalize_index_definition(defn)
             extra_by_def.setdefault(norm, []).append(name)
@@ -490,19 +523,31 @@ def _compare_indexes(
                 )
             )
 
-    # Remaining unmatched extra
-    for name in extra_names:
+    # Extra managed indexes are undeclared
+    for name in managed_extra:
         if name not in renamed_extra:
             statuses.append(
                 IndexStatus(
                     name=name,
-                    fields=db.indexes[name].columns,
+                    fields=non_unique_indexes[name].columns,
                     issue="not in model",
                     drift=IndexDrift(
                         kind=DriftKind.UNDECLARED,
                         table=table,
                         name=name,
                     ),
+                )
+            )
+
+    # Extra unmanaged indexes — informational only, no drift
+    for name in extra_names:
+        idx = non_unique_indexes[name]
+        if idx.access_method not in MANAGED_INDEX_ACCESS_METHODS:
+            statuses.append(
+                IndexStatus(
+                    name=name,
+                    fields=idx.columns,
+                    access_method=idx.access_method,
                 )
             )
 
@@ -519,6 +564,22 @@ def _compare_constraints(
     statuses.extend(_compare_unique_constraints(model, db, table))
     statuses.extend(_compare_check_constraints(model, db, table))
     statuses.extend(_compare_foreign_keys(model, db, table))
+
+    # Unmanaged constraint types — informational only, no drift.
+    # Primary keys are also unmanaged but not shown.
+    for name, cs in db.constraints.items():
+        if (
+            cs.constraint_type not in MANAGED_CONSTRAINT_TYPES
+            and cs.constraint_type != ConType.PRIMARY
+        ):
+            statuses.append(
+                ConstraintStatus(
+                    name=name,
+                    constraint_type=cs.constraint_type,
+                    fields=cs.columns,
+                )
+            )
+
     return statuses
 
 
@@ -526,7 +587,23 @@ def _compare_unique_constraints(
     model: type[Model], db: TableState, table: str
 ) -> list[ConstraintStatus]:
     statuses: list[ConstraintStatus] = []
-    actual = db.unique_constraints
+    # Unique constraints from pg_constraint (contype='u')
+    actual_constraints = {
+        k: v for k, v in db.constraints.items() if v.constraint_type == ConType.UNIQUE
+    }
+    # Unique indexes from pg_index that don't have a backing pg_constraint
+    # (e.g. partial/expression unique indexes created with CREATE UNIQUE INDEX)
+    actual_indexes = {
+        k: ConstraintState(
+            constraint_type=ConType.UNIQUE,
+            columns=v.columns,
+            validated=True,
+            definition=v.definition,
+        )
+        for k, v in db.indexes.items()
+        if v.is_unique and k not in actual_constraints
+    }
+    actual = {**actual_constraints, **actual_indexes}
     model_constraints = [
         c for c in model.model_options.constraints if isinstance(c, UniqueConstraint)
     ]
@@ -569,7 +646,7 @@ def _compare_unique_constraints(
         statuses.append(
             ConstraintStatus(
                 name=constraint.name,
-                type="unique",
+                constraint_type=ConType.UNIQUE,
                 fields=list(constraint.fields),
                 issue=issue,
                 drift=drift,
@@ -587,7 +664,7 @@ def _compare_unique_constraints(
             statuses.append(
                 ConstraintStatus(
                     name=constraint.name,
-                    type="unique",
+                    constraint_type=ConType.UNIQUE,
                     fields=list(constraint.fields),
                     issue="missing from database",
                     drift=ConstraintDrift(
@@ -604,7 +681,7 @@ def _compare_unique_constraints(
             # Index-only entries (from pg_index, not pg_constraint) need
             # IndexDrift so the planner uses DROP INDEX, not DROP CONSTRAINT.
             undeclared_drift: Drift
-            if actual[name].from_index:
+            if name in actual_indexes:
                 undeclared_drift = IndexDrift(
                     kind=DriftKind.UNDECLARED, table=table, name=name
                 )
@@ -615,7 +692,7 @@ def _compare_unique_constraints(
             statuses.append(
                 ConstraintStatus(
                     name=name,
-                    type="unique",
+                    constraint_type=ConType.UNIQUE,
                     fields=actual[name].columns,
                     issue="not in model",
                     drift=undeclared_drift,
@@ -629,7 +706,9 @@ def _compare_check_constraints(
     model: type[Model], db: TableState, table: str
 ) -> list[ConstraintStatus]:
     statuses: list[ConstraintStatus] = []
-    actual = db.check_constraints
+    actual = {
+        k: v for k, v in db.constraints.items() if v.constraint_type == ConType.CHECK
+    }
     model_constraints = [
         c for c in model.model_options.constraints if isinstance(c, CheckConstraint)
     ]
@@ -668,7 +747,7 @@ def _compare_check_constraints(
         statuses.append(
             ConstraintStatus(
                 name=constraint.name,
-                type="check",
+                constraint_type=ConType.CHECK,
                 fields=[],
                 issue=issue,
                 drift=drift,
@@ -686,7 +765,7 @@ def _compare_check_constraints(
             statuses.append(
                 ConstraintStatus(
                     name=constraint.name,
-                    type="check",
+                    constraint_type=ConType.CHECK,
                     fields=[],
                     issue="missing from database",
                     drift=ConstraintDrift(
@@ -712,7 +791,7 @@ def _compare_check_constraints(
             statuses.append(
                 ConstraintStatus(
                     name=name,
-                    type="check",
+                    constraint_type=ConType.CHECK,
                     fields=actual[name].columns,
                     issue="not in model",
                     drift=ConstraintDrift(
@@ -730,6 +809,11 @@ def _compare_foreign_keys(
     model: type[Model], db: TableState, table: str
 ) -> list[ConstraintStatus]:
     statuses: list[ConstraintStatus] = []
+    actual = {
+        k: v
+        for k, v in db.constraints.items()
+        if v.constraint_type == ConType.FOREIGN_KEY
+    }
 
     # Build expected FKs from model fields: shape → (field_name, constraint_name)
     expected_fks: dict[tuple[str, str, str], tuple[str, str]] = {}
@@ -743,21 +827,25 @@ def _compare_foreign_keys(
             )
             expected_fks[(f.column, to_table, to_column)] = (f.name, constraint_name)
 
-    # Build actual FKs from DB: shape → (constraint_name, ForeignKeyState)
-    actual_fk_by_shape: dict[tuple[str, str, str], tuple[str, ForeignKeyState]] = {}
-    for name, fk in db.foreign_keys.items():
-        actual_fk_by_shape[(fk.column, fk.target_table, fk.target_column)] = (name, fk)
+    # Build actual FKs from DB: shape → (constraint_name, ConstraintState)
+    actual_fk_by_shape: dict[tuple[str, str, str], tuple[str, ConstraintState]] = {}
+    for name, cs in actual.items():
+        if cs.target_table and cs.target_column and cs.columns:
+            actual_fk_by_shape[(cs.columns[0], cs.target_table, cs.target_column)] = (
+                name,
+                cs,
+            )
 
     matched_fk_names: set[str] = set()
     for key, (field_name, constraint_name) in expected_fks.items():
         if match := actual_fk_by_shape.get(key):
-            actual_name, fk_state = match
+            actual_name, cs = match
             matched_fk_names.add(actual_name)
 
             # Check validation state
             issue: str | None = None
             drift: ForeignKeyDrift | None = None
-            if not fk_state.validated:
+            if not cs.validated:
                 issue = "NOT VALID — needs validation"
                 drift = ForeignKeyDrift(
                     kind=DriftKind.UNVALIDATED,
@@ -768,7 +856,7 @@ def _compare_foreign_keys(
             statuses.append(
                 ConstraintStatus(
                     name=actual_name,
-                    type="fk",
+                    constraint_type=ConType.FOREIGN_KEY,
                     fields=[key[0]],
                     issue=issue,
                     drift=drift,
@@ -779,7 +867,7 @@ def _compare_foreign_keys(
             statuses.append(
                 ConstraintStatus(
                     name=f"{field_name} → {to_table}.{to_column}",
-                    type="fk",
+                    constraint_type=ConType.FOREIGN_KEY,
                     fields=[col],
                     issue="missing from database",
                     drift=ForeignKeyDrift(
@@ -793,14 +881,14 @@ def _compare_foreign_keys(
                 )
             )
 
-    for name in sorted(db.foreign_keys.keys() - matched_fk_names):
-        fk = db.foreign_keys[name]
+    for name in sorted(actual.keys() - matched_fk_names):
+        cs = actual[name]
         statuses.append(
             ConstraintStatus(
                 name=name,
-                type="fk",
-                fields=[fk.column],
-                issue=f"not in model (→ {fk.target_table}.{fk.target_column})",
+                constraint_type=ConType.FOREIGN_KEY,
+                fields=cs.columns,
+                issue=f"not in model (→ {cs.target_table}.{cs.target_column})",
                 drift=ForeignKeyDrift(
                     kind=DriftKind.UNDECLARED,
                     table=table,
@@ -893,7 +981,7 @@ def _detect_unique_renames(
             statuses.append(
                 ConstraintStatus(
                     name=constraint.name,
-                    type="unique",
+                    constraint_type=ConType.UNIQUE,
                     fields=list(constraint.fields),
                     issue=f"rename from {old_name}",
                     drift=DriftType(
@@ -934,7 +1022,7 @@ def _detect_unique_renames(
             statuses.append(
                 ConstraintStatus(
                     name=constraint.name,
-                    type="unique",
+                    constraint_type=ConType.UNIQUE,
                     fields=list(constraint.fields),
                     issue=f"rename from {old_name}",
                     drift=IndexDrift(
@@ -983,7 +1071,7 @@ def _detect_check_renames(
             statuses.append(
                 ConstraintStatus(
                     name=constraint.name,
-                    type="check",
+                    constraint_type=ConType.CHECK,
                     fields=[],
                     issue=f"rename from {old_name}",
                     drift=ConstraintDrift(
