@@ -214,6 +214,94 @@ class AddForeignKeyFix(Fix):
 
 
 @dataclass
+class SetNotNullFix(Fix):
+    """Enforce NOT NULL via CHECK NOT VALID → VALIDATE → SET NOT NULL.
+
+    A bare SET NOT NULL acquires ACCESS EXCLUSIVE and scans the whole table
+    while holding it.  With a validated IS NOT NULL check constraint already
+    in place, Postgres (12+) skips the scan and the lock is brief.
+
+    Transaction boundaries are chosen to keep lock windows narrow:
+
+      1. ADD CHECK (col IS NOT NULL) NOT VALID  — catalog-only, brief lock
+      2. VALIDATE CONSTRAINT                    — SHARE UPDATE EXCLUSIVE scan
+      3. SET NOT NULL + DROP temp check          — atomic, instant catalog ops
+
+    Steps 3+4 share a single commit so no orphaned temp check can remain
+    after the column becomes NOT NULL.  If earlier steps fail, the leftover
+    temp check is cleaned up at the start of the next run (analysis also
+    ignores framework-owned temp checks so they never block sync).
+    """
+
+    pass_order = 2
+
+    table: str
+    column: str
+
+    def describe(self) -> str:
+        return f"{self.table}: set NOT NULL on {self.column}"
+
+    def apply(self) -> str:
+        from .analysis import generate_notnull_check_name
+
+        t = quote_name(self.table)
+        c = quote_name(self.column)
+        check = quote_name(generate_notnull_check_name(self.table, self.column))
+
+        # Clean up any leftover temp constraint from a previous failed run
+        _execute_and_commit(f"ALTER TABLE {t} DROP CONSTRAINT IF EXISTS {check}")
+
+        # Step 1: Add NOT VALID check (no scan, brief lock)
+        add_sql = (
+            f"ALTER TABLE {t} ADD CONSTRAINT {check} CHECK ({c} IS NOT NULL) NOT VALID"
+        )
+        _execute_and_commit(add_sql)
+
+        # Step 2: Validate (SHARE UPDATE EXCLUSIVE — non-blocking scan)
+        validate_sql = f"ALTER TABLE {t} VALIDATE CONSTRAINT {check}"
+        _execute_and_commit(validate_sql)
+
+        # Step 3: SET NOT NULL + drop temp check in one commit.
+        # Both are instant catalog operations (SET NOT NULL skips the scan
+        # thanks to the validated check).  Combining them ensures no orphaned
+        # temp check if SET NOT NULL succeeds.
+        set_sql = f"ALTER TABLE {t} ALTER COLUMN {c} SET NOT NULL"
+        drop_sql = f"ALTER TABLE {t} DROP CONSTRAINT {check}"
+        conn = get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(set_sql)
+                cursor.execute(drop_sql)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+        return f"{add_sql}; {validate_sql}; {set_sql}; {drop_sql}"
+
+
+@dataclass
+class DropNotNullFix(Fix):
+    """Remove NOT NULL from a column (model now allows NULL).
+
+    DROP NOT NULL is a catalog-only change — no data scan, instant.
+    """
+
+    pass_order = 2
+
+    table: str
+    column: str
+
+    def describe(self) -> str:
+        return f"{self.table}: drop NOT NULL on {self.column}"
+
+    def apply(self) -> str:
+        sql = f"ALTER TABLE {quote_name(self.table)} ALTER COLUMN {quote_name(self.column)} DROP NOT NULL"
+        _execute_and_commit(sql)
+        return sql
+
+
+@dataclass
 class RenameConstraintFix(Fix):
     """Rename a constraint (catalog-only, instant).
 

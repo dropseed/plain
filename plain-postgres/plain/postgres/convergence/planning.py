@@ -12,6 +12,7 @@ from .analysis import (
     DriftKind,
     ForeignKeyDrift,
     IndexDrift,
+    NullabilityDrift,
     analyze_model,
 )
 from .fixes import (
@@ -20,10 +21,12 @@ from .fixes import (
     CreateIndexFix,
     DropConstraintFix,
     DropIndexFix,
+    DropNotNullFix,
     Fix,
     RebuildIndexFix,
     RenameConstraintFix,
     RenameIndexFix,
+    SetNotNullFix,
     ValidateConstraintFix,
 )
 
@@ -99,6 +102,18 @@ def _plan_drift(drift: Drift) -> PlanItem:
             return PlanItem(drift, ValidateConstraintFix(t, n))
         case ForeignKeyDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
             return PlanItem(drift, DropConstraintFix(t, n), drop_undeclared=True)
+        case NullabilityDrift(
+            table=t, column=col, model_allows_null=False, has_null_rows=False
+        ):
+            return PlanItem(drift, SetNotNullFix(t, col))
+        case NullabilityDrift(model_allows_null=False, has_null_rows=True):
+            return PlanItem(
+                drift,
+                fix=None,
+                guidance="Backfill existing NULL rows, then rerun sync.",
+            )
+        case NullabilityDrift(table=t, column=col, model_allows_null=True):
+            return PlanItem(drift, DropNotNullFix(t, col))
         case _:
             raise ValueError(f"Unhandled drift: {drift}")
 

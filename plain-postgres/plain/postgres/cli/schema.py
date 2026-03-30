@@ -52,7 +52,9 @@ def _render_model(analysis: ModelAnalysis) -> None:
 
         click.echo(f"  {col_display:30s}  {' '.join(type_parts)}", nl=False)
 
-        if col.issue:
+        if col.issue and col.drift and can_auto_fix(col.drift):
+            _fixable(col.issue)
+        elif col.issue:
             _err(col.issue)
         else:
             _ok()

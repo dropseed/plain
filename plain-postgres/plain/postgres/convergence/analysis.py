@@ -6,6 +6,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from ..constraints import CheckConstraint, UniqueConstraint
+from ..dialect import quote_name
 from ..fields.related import ForeignKeyField
 from ..indexes import Index
 from ..introspection import (
@@ -113,7 +114,26 @@ class ForeignKeyDrift:
                 return f"{self.table}: FK {self.name} not declared"
 
 
-type Drift = IndexDrift | ConstraintDrift | ForeignKeyDrift
+@dataclass
+class NullabilityDrift:
+    """Mismatch between model and DB column nullability."""
+
+    table: str
+    column: str
+    model_allows_null: bool
+    has_null_rows: bool = False  # Only checked when model_allows_null is False
+
+    def describe(self) -> str:
+        if not self.model_allows_null:
+            if self.has_null_rows:
+                return (
+                    f"{self.table}: column {self.column} allows NULL (NULL rows exist)"
+                )
+            return f"{self.table}: column {self.column} allows NULL"
+        return f"{self.table}: column {self.column} is NOT NULL, model allows NULL"
+
+
+type Drift = IndexDrift | ConstraintDrift | ForeignKeyDrift | NullabilityDrift
 
 
 # Status objects — analysis results with optional drift
@@ -128,6 +148,7 @@ class ColumnStatus:
     primary_key: bool
     pk_suffix: str
     issue: str | None = None
+    drift: NullabilityDrift | None = None
 
 
 @dataclass
@@ -160,6 +181,9 @@ class ModelAnalysis:
     def drifts(self) -> list[Drift]:
         """All detected schema drifts."""
         result: list[Drift] = []
+        for col in self.columns:
+            if col.drift:
+                result.append(col.drift)
         for idx in self.indexes:
             if idx.drift:
                 result.append(idx.drift)
@@ -192,6 +216,7 @@ class ModelAnalysis:
                     "primary_key": col.primary_key,
                     "pk_suffix": col.pk_suffix,
                     "issue": col.issue,
+                    "drift": col.drift.describe() if col.drift else None,
                 }
                 for col in self.columns
             ],
@@ -239,7 +264,7 @@ def analyze_model(
     return ModelAnalysis(
         label=model.model_options.label,
         table=table_name,
-        columns=_compare_columns(model, db),
+        columns=_compare_columns(model, db, table_name, cursor),
         indexes=_compare_indexes(model, db, table_name),
         constraints=_compare_constraints(model, db, table_name),
     )
@@ -248,7 +273,17 @@ def analyze_model(
 # Column comparison
 
 
-def _compare_columns(model: type[Model], db: TableState) -> list[ColumnStatus]:
+def _column_has_nulls(cursor: CursorWrapper, table: str, column: str) -> bool:
+    """Check whether any NULL values exist in a column."""
+    cursor.execute(
+        f"SELECT 1 FROM {quote_name(table)} WHERE {quote_name(column)} IS NULL LIMIT 1"
+    )
+    return cursor.fetchone() is not None
+
+
+def _compare_columns(
+    model: type[Model], db: TableState, table: str, cursor: CursorWrapper
+) -> list[ColumnStatus]:
     statuses: list[ColumnStatus] = []
     expected_col_names: set[str] = set()
 
@@ -259,6 +294,7 @@ def _compare_columns(model: type[Model], db: TableState) -> list[ColumnStatus]:
 
         expected_col_names.add(f.column)
         issue: str | None = None
+        drift: NullabilityDrift | None = None
 
         if f.column not in db.columns:
             issue = "missing from database"
@@ -266,10 +302,26 @@ def _compare_columns(model: type[Model], db: TableState) -> list[ColumnStatus]:
             actual = db.columns[f.column]
             if db_type != actual.type:
                 issue = f"expected {db_type}, actual {actual.type}"
-            elif (not f.allow_null) != actual.not_null:
-                exp = "NOT NULL" if not f.allow_null else "NULL"
-                act = "NOT NULL" if actual.not_null else "NULL"
-                issue = f"expected {exp}, actual {act}"
+            elif not f.allow_null and not actual.not_null:
+                # Model says NOT NULL, DB allows NULL — semantic drift
+                has_nulls = _column_has_nulls(cursor, table, f.column)
+                if has_nulls:
+                    issue = "expected NOT NULL, actual NULL (NULL rows exist)"
+                else:
+                    issue = "expected NOT NULL, actual NULL"
+                drift = NullabilityDrift(
+                    table=table,
+                    column=f.column,
+                    model_allows_null=False,
+                    has_null_rows=has_nulls,
+                )
+            elif f.allow_null and actual.not_null:
+                issue = "expected NULL, actual NOT NULL"
+                drift = NullabilityDrift(
+                    table=table,
+                    column=f.column,
+                    model_allows_null=True,
+                )
 
         pk_suffix = ""
         if f.primary_key:
@@ -285,6 +337,7 @@ def _compare_columns(model: type[Model], db: TableState) -> list[ColumnStatus]:
                 primary_key=f.primary_key,
                 pk_suffix=pk_suffix,
                 issue=issue,
+                drift=drift,
             )
         )
 
@@ -654,8 +707,17 @@ def _compare_check_constraints(
                 )
             )
 
+    # Build set of framework-owned temp NOT NULL check names so leftover
+    # artifacts from a partially-completed SetNotNullFix are silently
+    # ignored rather than surfaced as undeclared user constraints.
+    internal_checks = {
+        generate_notnull_check_name(table, f.column)
+        for f in model._model_meta.local_fields
+        if f.db_type() is not None
+    }
+
     for name in extra_names:
-        if name not in renamed_extra:
+        if name not in renamed_extra and name not in internal_checks:
             statuses.append(
                 ConstraintStatus(
                     name=name,
@@ -757,6 +819,17 @@ def _compare_foreign_keys(
         )
 
     return statuses
+
+
+def generate_notnull_check_name(table: str, column: str) -> str:
+    """Generate a hashed name for the temporary NOT NULL check constraint.
+
+    Used by SetNotNullFix for the CHECK NOT VALID → VALIDATE → SET NOT NULL
+    pattern, and by analysis to recognize (and ignore) leftover temp checks.
+    """
+    from ..utils import generate_identifier_name
+
+    return generate_identifier_name(table, [column], "_notnull")
 
 
 def generate_fk_constraint_name(
