@@ -18,7 +18,7 @@ from plain.test import Client
 )
 @click.option(
     "--data",
-    help="Request data (JSON string for POST/PUT/PATCH)",
+    help="Request body for POST/PUT/PATCH (form-encoded by default, e.g. 'key=val&key2=val2')",
 )
 @click.option(
     "--user",
@@ -127,10 +127,17 @@ def request(
                 key, value = header.split(":", 1)
                 header_dict[key.strip()] = value.strip()
 
-        # Prepare request data
+        # Auto-detect content type if not specified
+        if data and not content_type:
+            stripped = data.strip()
+            if stripped.startswith(("{", "[")):
+                content_type = "application/json"
+            else:
+                content_type = "application/x-www-form-urlencoded"
+
+        # Validate JSON data
         if data and content_type and "json" in content_type.lower():
             try:
-                # Validate JSON
                 json.loads(data)
             except json.JSONDecodeError as e:
                 click.secho(f"Invalid JSON data: {e}", fg="red", err=True)
