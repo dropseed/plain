@@ -76,7 +76,12 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 - `uv run plain run script.py` — run a script with Plain configured
 - `uv run plain request /path` — test HTTP request against dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`)
 
-## After making code changes
+## Debugging and verifying changes
 
-- Run `uv run plain check` to verify changes — this runs linting, preflight, migration, and test checks. Add `--skip-test` for faster iteration during development.
-- Use `uv run plain request /path` to smoke-test changed GET views — errors and stacktraces surface immediately, making for fast iteration. Supports `--user`, `--status`, `--contains`, `--not-contains`.
+Don't guess at errors — reproduce them first, read the traceback, then fix what it actually says.
+
+- `uv run plain check` — lint, preflight, migration, and test checks in one shot (add `--skip-test` for faster iteration)
+- `uv run plain request /path` — hit a view and see the full error/stacktrace (`--user`, `--status`, `--contains`, `--not-contains`)
+- `uv run plain shell -c "..."` — run a quick snippet to test behavior in isolation
+- `uv run plain test -x -k test_name` — run a specific failing test, stop on first failure
+- `print()` statements — add them, run the code, read the output, then remove before committing
