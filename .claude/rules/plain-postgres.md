@@ -55,9 +55,10 @@ Run `uv run plain docs postgres --section querying` for full patterns with code 
 
 ## Schema Design
 
+- Always index FK columns — Postgres doesn't auto-create these. Use an `Index`, or a constraint with the FK as the first field.
 - Index fields used in `.filter()` and `.order_by()`
-- `Index` requires a `name` argument — use `{table}_{column(s)}_idx` (e.g., `plainjobs_jobrequest_priority_idx`, `plainobserver_log_trace_id_timestamp_idx`)
-- Use `UniqueConstraint` in constraints, not `unique=True` on fields
+- Indexes: `{table}_{column(s)}_idx`
+- Constraints: `{table}_{column(s)}_{type}` (e.g., `_unique`, `_check`)
 - Choose `on_delete` deliberately: CASCADE for children, PROTECT for referenced data
 - No `allow_null` on string fields — use `default=""`
 
@@ -74,6 +75,5 @@ Run `uv run plain docs postgres --section diagnostics` for check details, thresh
 - Use `Model.query` not `Model.objects`
 - Import fields from `plain.postgres.types` not `plain.postgres.fields` — and don't import field classes directly from `plain.postgres`
 - Use `model_options = postgres.Options(...)` not `class Meta`
-- Fields don't accept `unique=True` — use `UniqueConstraint` in constraints
 - Never format raw SQL strings — always use parameterized queries
 - Migrations are forward-only — no reverse migrations. `RunPython` takes a single callable (no `reverse_code` or `noop`). The callable signature is `fn(models, schema_editor)`, not `fn(apps, schema_editor)`
