@@ -46,24 +46,19 @@
             <header class="px-4 lg:px-8 inset-x-0 pt-6 pb-4">
                 {% block header %}
                 {# Breadcrumbs - small, above title #}
-                {% if parent_view_classes or view_class.nav_section %}
+                {% if parent_view_classes %}
                 <nav class="flex items-center space-x-1.5 mb-1 text-xs text-black/50" aria-label="Breadcrumb">
                     {% for parent_view in parent_view_classes|reverse %}
-                        {% if loop.first and parent_view.nav_section %}
-                            <span class="text-black/40">{{ parent_view.nav_section }}</span>
-                            <span class="text-black/30">/</span>
-                        {% elif not loop.first %}
+                        {% if not loop.first %}
                             <span class="text-black/30">/</span>
                         {% endif %}
                         <a href="{{ parent_view.get_view_url(object if object is defined else None) }}" class="hover:text-black/70 hover:underline">
                             {{ parent_view.get_nav_title() }}
                         </a>
                     {% endfor %}
-                    {% if object is defined and parent_view_classes %}
+                    {% if object is defined %}
                         <span class="text-black/30">/</span>
                         <span class="text-black/60 truncate max-w-48">{{ object.__repr__() }}</span>
-                    {% elif view_class.nav_section and not parent_view_classes %}
-                        <span class="text-black/40">{{ view_class.nav_section }}</span>
                     {% endif %}
                 </nav>
                 {% endif %}
