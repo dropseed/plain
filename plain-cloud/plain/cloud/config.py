@@ -21,7 +21,7 @@ class Config(PackageConfig):
     package_label = "plaincloud"
 
     def ready(self) -> None:
-        if not settings.CLOUD_EXPORT_TOKEN:
+        if not settings.CLOUD_EXPORT_ENABLED or not settings.CLOUD_EXPORT_TOKEN:
             return
 
         resource = Resource.create(
