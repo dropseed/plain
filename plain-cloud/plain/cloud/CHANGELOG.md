@@ -1,5 +1,15 @@
 # plain-cloud changelog
 
+## [0.1.4](https://github.com/dropseed/plain/releases/plain-cloud@0.1.4) (2026-04-02)
+
+### What's changed
+
+- Switched metrics export to delta temporality for Counter, Histogram, and UpDownCounter. Each export now contains only the increment since the last collection, making server-side aggregation in ClickHouse straightforward. ([ab431cb5ffe6](https://github.com/dropseed/plain/commit/ab431cb5ffe6))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.3](https://github.com/dropseed/plain/releases/plain-cloud@0.1.3) (2026-04-01)
 
 ### What's changed
