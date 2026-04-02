@@ -5,8 +5,11 @@ import atexit
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics import Counter, Histogram, MeterProvider, UpDownCounter
+from opentelemetry.sdk.metrics.export import (
+    AggregationTemporality,
+    PeriodicExportingMetricReader,
+)
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider, sampling
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -53,10 +56,17 @@ class Config(PackageConfig):
         tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
         trace.set_tracer_provider(tracer_provider)
 
-        # Metrics
+        # Metrics — use delta temporality so each export contains only the
+        # increment since the last export, not a running total.  This makes
+        # server-side aggregation (sum/avg in ClickHouse) straightforward.
         metric_exporter = OTLPMetricExporter(
             endpoint=f"{export_url}/v1/metrics",
             headers=headers,
+            preferred_temporality={
+                Counter: AggregationTemporality.DELTA,
+                Histogram: AggregationTemporality.DELTA,
+                UpDownCounter: AggregationTemporality.DELTA,
+            },
         )
         reader = PeriodicExportingMetricReader(metric_exporter)
         meter_provider = MeterProvider(metric_readers=[reader], resource=resource)
