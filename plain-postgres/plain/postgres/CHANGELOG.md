@@ -1,5 +1,19 @@
 # plain-postgres changelog
 
+## [0.93.1](https://github.com/dropseed/plain/releases/plain-postgres@0.93.1) (2026-04-02)
+
+### What's changed
+
+- **Fixed `F.deconstruct()` failing with "Could not find object F in plain.postgres".** `F`, `Value`, `Func`, and other expression classes had `@deconstructible` paths pointing to `plain.postgres` but weren't exported from it, breaking migration serialization. `F` is now exported from `plain.postgres` (alongside `Q`), and the other classes use their actual module paths. ([5fdcb040](https://github.com/dropseed/plain/commit/5fdcb040))
+
+- **Fixed false-positive convergence mismatches for expression-based unique constraints.** PostgreSQL's `pg_get_indexdef` adds type casts (e.g. `lower((slug)::text)`) and the ORM wraps each expression in parentheses — `normalize_expression()` now strips both, preventing spurious "definition changed" errors during `postgres sync`. ([b734205268](https://github.com/dropseed/plain/commit/b734205268))
+
+- **Removed constraints and indexes from migration options.** These were serialized into migration files but never used during execution — convergence reads from the live model class. Removing them eliminates unnecessary serialization of complex expressions like `Lower()` and reduces migration file noise. ([82e5a880](https://github.com/dropseed/plain/commit/82e5a880))
+
+### Upgrade instructions
+
+- No changes required. Existing migrations with constraints/indexes in their options will continue to load fine.
+
 ## [0.93.0](https://github.com/dropseed/plain/releases/plain-postgres@0.93.0) (2026-04-01)
 
 ### What's changed
