@@ -1,6 +1,6 @@
 [project]
 name = "plain.cloud"
-version = "0.1.0"
+version = "0.1.1"
 description = "Production observability via OTLP export to Plain Cloud."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
