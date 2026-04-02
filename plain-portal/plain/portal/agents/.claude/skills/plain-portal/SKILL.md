@@ -65,7 +65,7 @@ Kill the `connect` process to end the session. This also frees the remote proces
 
 ## Important
 
-- Sessions are **read-only** by default. Database writes will fail unless the remote was started with `--writable`.
+- Sessions are **read-only** by default. Database writes will fail unless the remote was started with `--writable --yes`.
 - Each `exec` gets a **fresh namespace**. Variables don't carry between commands. Put setup and queries in one code block if they depend on each other.
 - Use `plain portal exec` for quick queries. For heavy data export, write to `/tmp/` on the remote and `pull` the file.
 - If the session drops, the remote side must be restarted and a new code used to reconnect.
