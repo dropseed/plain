@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.34.0](https://github.com/dropseed/plain/releases/plain-observer@0.34.0) (2026-04-01)
+
+### What's changed
+
+- **Added "Record this page" button to the observer toolbar.** When in summary mode, a record dot appears next to the observer pill. Clicking it enables `persist_once` mode — the next page load is fully traced and saved to the database, then the mode reverts to summary automatically. ([6f30760fe40c](https://github.com/dropseed/plain/commit/6f30760fe40c))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.33.1](https://github.com/dropseed/plain/releases/plain-observer@0.33.1) (2026-03-29)
 
 ### What's changed
