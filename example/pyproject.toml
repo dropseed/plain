@@ -9,6 +9,7 @@ dependencies = [
   "plain-api",
   "plain-auth",
   "plain-cache",
+  "plain-cloud",
   "plain-code",
   "plain-dev",
   "plain-elements",

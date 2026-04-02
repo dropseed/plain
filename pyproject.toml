@@ -10,6 +10,7 @@ dev = [
   "plain-api",
   "plain-auth",
   "plain-cache",
+  "plain-cloud",
   "plain-code",
   "plain-dev",
   "plain-elements",
@@ -46,6 +47,7 @@ dev = [
 "plain-api" = { workspace = true }
 "plain-auth" = { workspace = true }
 "plain-cache" = { workspace = true }
+"plain-cloud" = { workspace = true }
 "plain-code" = { workspace = true }
 "plain-dev" = { workspace = true }
 "plain-elements" = { workspace = true }
