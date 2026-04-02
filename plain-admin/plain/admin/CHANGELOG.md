@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.77.3](https://github.com/dropseed/plain/releases/plain-admin@0.77.3) (2026-04-01)
+
+### What's changed
+
+- Moved the `PasswordField` admin display template to plain-passwords, where the field itself is defined. ([811ce65f4cda](https://github.com/dropseed/plain/commit/811ce65f4cda))
+
+### Upgrade instructions
+
+- Requires `plain-passwords>=0.25.1` if you use `PasswordField` in the admin.
+
 ## [0.77.2](https://github.com/dropseed/plain/releases/plain-admin@0.77.2) (2026-04-01)
 
 ### What's changed
