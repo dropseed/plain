@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.130.2](https://github.com/dropseed/plain/releases/plain@0.130.2) (2026-04-01)
+
+### What's changed
+
+- **`plain request --data` now auto-detects content type.** If `--content-type` is not specified, JSON data (starting with `{` or `[`) is sent as `application/json`, otherwise as `application/x-www-form-urlencoded`. ([0af889455ffa](https://github.com/dropseed/plain/commit/0af889455ffa))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.130.1](https://github.com/dropseed/plain/releases/plain@0.130.1) (2026-03-29)
 
 ### What's changed
