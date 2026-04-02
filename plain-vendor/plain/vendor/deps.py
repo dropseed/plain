@@ -82,7 +82,7 @@ class Dependency:
     def install(self) -> Path:
         if self.installed:
             version, response = self.download(self.installed)
-            if version != self.installed:
+            if version and version != self.installed:
                 raise VersionMismatchError(
                     f"Version mismatch for {self.name}: {self.installed} != {version}"
                 )
