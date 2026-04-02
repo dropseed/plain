@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.12.4](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.4) (2026-04-01)
+
+### What's changed
+
+- Clicking the active tab button now collapses the panel instead of being a no-op. ([704780b5b749](https://github.com/dropseed/plain/commit/704780b5b749))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.3](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.3) (2026-03-19)
 
 ### What's changed
