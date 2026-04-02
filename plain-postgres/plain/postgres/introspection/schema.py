@@ -220,8 +220,15 @@ def _strip_type_casts(s: str) -> str:
     PostgreSQL adds explicit casts to stored definitions (pg_get_indexdef,
     pg_get_constraintdef) but the ORM compiler omits them.  Only used for
     expression/condition comparison where the two generators diverge.
+
+    Also strips the grouping parens PG adds around cast operands, e.g.
+    (slug)::text → slug, so that lower((slug)::text) normalizes to lower(slug).
     """
-    return re.sub(r"::\w+", "", s)
+    # First strip (identifier)::type → identifier (PG wraps cast operands in parens)
+    s = re.sub(r"\((\w+)\)::\w+", r"\1", s)
+    # Then strip any remaining bare ::type casts
+    s = re.sub(r"::\w+", "", s)
+    return s
 
 
 def normalize_check_definition(s: str) -> str:
@@ -258,11 +265,40 @@ def normalize_unique_definition(s: str) -> str:
 def normalize_expression(s: str) -> str:
     """Normalize an index expression for comparison.
 
-    Lowercases, strips quotes, collapses whitespace, and strips redundant
-    outer parentheses.  Used for comparing the expression portion of index
-    definitions (e.g. 'LOWER("col")' vs 'lower(col)').
+    Lowercases, strips quotes, collapses whitespace, strips PG type casts,
+    and strips redundant outer parentheses from each comma-separated term.
+
+    Used for comparing the expression portion of index definitions
+    (e.g. 'LOWER("col")' vs 'lower(col)').
+
+    Type casts are stripped because pg_get_indexdef adds explicit casts
+    (e.g. lower((slug)::text)) that the ORM compiler omits.  Per-term
+    paren stripping is needed because the ORM wraps each IndexExpression
+    in parentheses (e.g. '(LOWER("slug")), "team_id"') while PostgreSQL
+    does not.
     """
-    return _strip_balanced_parens(_normalize_sql(s))
+    s = _normalize_sql(s)
+    s = _strip_type_casts(s)
+    # Split on top-level commas and normalize each term independently
+    terms = _split_expression_terms(s)
+    return ", ".join(_strip_balanced_parens(t.strip()) for t in terms)
+
+
+def _split_expression_terms(s: str) -> list[str]:
+    """Split an expression list on top-level commas, respecting parentheses."""
+    terms = []
+    depth = 0
+    start = 0
+    for i, ch in enumerate(s):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            terms.append(s[start:i])
+            start = i + 1
+    terms.append(s[start:])
+    return terms
 
 
 def normalize_index_definition(s: str) -> str:

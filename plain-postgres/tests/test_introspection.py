@@ -8,6 +8,7 @@ from plain.postgres.introspection import (
     IndexState,
     introspect_table,
     normalize_check_definition,
+    normalize_expression,
     normalize_index_definition,
 )
 
@@ -240,6 +241,44 @@ class TestNormalizeCheckDefinition:
             normalize_check_definition("CHECK (username <> ''::text)")
             == "username <> ''"
         )
+
+
+class TestNormalizeExpression:
+    """Unit tests for normalize_expression — used by convergence to compare
+    index expressions between pg_get_indexdef output and ORM-compiled SQL."""
+
+    def test_simple_lower(self):
+        assert normalize_expression('LOWER("slug")') == "lower(slug)"
+
+    def test_strips_type_cast(self):
+        """PG adds explicit casts: lower((slug)::text) for varchar columns."""
+        assert normalize_expression("lower((slug)::text)") == "lower(slug)"
+
+    def test_strips_type_cast_in_multi_expression(self):
+        assert (
+            normalize_expression("lower((slug)::text), team_id")
+            == "lower(slug), team_id"
+        )
+
+    def test_orm_paren_wrapping_matches_pg(self):
+        """ORM wraps each IndexExpression in parens; PG doesn't.
+        These must normalize to the same string."""
+        pg = "lower((slug)::text), team_id"
+        orm = '(LOWER("slug")), "team_id"'
+        assert normalize_expression(pg) == normalize_expression(orm)
+
+    def test_single_expression_paren_wrapping(self):
+        pg = "lower((slug)::text)"
+        orm = '(LOWER("slug"))'
+        assert normalize_expression(pg) == normalize_expression(orm)
+
+    def test_plain_columns(self):
+        assert normalize_expression("slug, team_id") == "slug, team_id"
+
+    def test_multiple_function_expressions(self):
+        pg = "lower((name)::text), upper((email)::text), team_id"
+        orm = '(LOWER("name")), (UPPER("email")), "team_id"'
+        assert normalize_expression(pg) == normalize_expression(orm)
 
 
 class TestNormalizeIndexDefinition:
