@@ -5,13 +5,19 @@ import concurrent.futures
 import contextlib
 import dataclasses
 import inspect
+import time
 from typing import TYPE_CHECKING, Any
 
-from opentelemetry import baggage, context, trace
+from opentelemetry import baggage, context, metrics, trace
 from opentelemetry.semconv._incubating.attributes.http_attributes import (
     HTTP_RESPONSE_BODY_SIZE,
 )
-from opentelemetry.semconv.attributes import http_attributes, url_attributes
+from opentelemetry.semconv.attributes import (
+    error_attributes,
+    http_attributes,
+    url_attributes,
+)
+from opentelemetry.semconv.metrics.http_metrics import HTTP_SERVER_REQUEST_DURATION
 
 from plain import signals
 from plain.http import Response
@@ -45,6 +51,13 @@ BUILTIN_AFTER_MIDDLEWARE = [
 
 
 tracer = trace.get_tracer("plain")
+
+meter = metrics.get_meter("plain")
+request_duration_histogram = meter.create_histogram(
+    name=HTTP_SERVER_REQUEST_DURATION,
+    unit="s",
+    description="Duration of HTTP server requests.",
+)
 
 
 @dataclasses.dataclass
@@ -175,6 +188,8 @@ class BaseHandler:
         )
 
         with self._start_request_span(request) as span:
+            start = time.perf_counter()
+
             result = await self._run_in_executor(
                 executor, self._run_sync_pipeline, request
             )
@@ -200,6 +215,21 @@ class BaseHandler:
 
             response._resource_closers.append(request.close)
             self._finalize_span(span, response)
+
+            duration_s = time.perf_counter() - start
+            duration_attrs: dict[str, str | int] = {
+                http_attributes.HTTP_REQUEST_METHOD: request.method or "",
+                http_attributes.HTTP_RESPONSE_STATUS_CODE: response.status_code,
+                url_attributes.URL_SCHEME: request.scheme,
+            }
+            if request.resolver_match and request.resolver_match.route:
+                duration_attrs[http_attributes.HTTP_ROUTE] = (
+                    f"/{request.resolver_match.route}"
+                )
+            if response.status_code >= 400:
+                duration_attrs[error_attributes.ERROR_TYPE] = str(response.status_code)
+            request_duration_histogram.record(duration_s, duration_attrs)
+
             return response
 
     def _run_sync_pipeline(self, request: Request) -> ResponseBase | _AsyncViewPending:
