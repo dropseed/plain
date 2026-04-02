@@ -905,7 +905,7 @@ class OuterRef(F):
         return self
 
 
-@deconstructible(path="plain.postgres.Func")
+@deconstructible(path="plain.postgres.expressions.Func")
 class Func(Expression):
     """An SQL function call."""
 
@@ -1011,7 +1011,7 @@ class Func(Expression):
         return clone
 
 
-@deconstructible(path="plain.postgres.Value")
+@deconstructible(path="plain.postgres.expressions.Value")
 class Value(Expression):
     """Represent a wrapped value as a node within an expression."""
 
@@ -1263,7 +1263,7 @@ class OrderByList(Func):
         return group_by_cols
 
 
-@deconstructible(path="plain.postgres.ExpressionWrapper")
+@deconstructible(path="plain.postgres.expressions.ExpressionWrapper")
 class ExpressionWrapper(Expression):
     """
     An expression that can wrap another expression so that it can provide
@@ -1338,7 +1338,7 @@ class NegatedExpression(ExpressionWrapper):
         return sql, params
 
 
-@deconstructible(path="plain.postgres.When")
+@deconstructible(path="plain.postgres.expressions.When")
 class When(Expression):
     template = "WHEN %(condition)s THEN %(result)s"
     # This isn't a complete conditional expression, must be used in Case().
@@ -1433,7 +1433,7 @@ class When(Expression):
         return cols
 
 
-@deconstructible(path="plain.postgres.Case")
+@deconstructible(path="plain.postgres.expressions.Case")
 class Case(Expression):
     """
     An SQL searched CASE expression:
@@ -1633,7 +1633,7 @@ class Exists(Subquery):
         return sql, params
 
 
-@deconstructible(path="plain.postgres.OrderBy")
+@deconstructible(path="plain.postgres.expressions.OrderBy")
 class OrderBy(Expression):
     template = "%(expression)s %(ordering)s"
     conditional = False

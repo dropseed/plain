@@ -8,6 +8,7 @@ from .base import Model
 from .constraints import CheckConstraint, UniqueConstraint
 from .db import get_connection
 from .deletion import CASCADE, DO_NOTHING, PROTECT, RESTRICT, SET, SET_DEFAULT, SET_NULL
+from .expressions import F
 from .enums import IntegerChoices, TextChoices
 from .fields import (
     BigIntegerField,
@@ -93,6 +94,8 @@ __all__ = [
     "QuerySet",
     # From query_utils
     "Q",
+    # From expressions
+    "F",
     # From base
     "Model",
     # From fields.related
