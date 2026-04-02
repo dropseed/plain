@@ -650,8 +650,6 @@ class ModelState:
         self.name = name
         self.fields: dict[str, Field] = dict(fields)
         self.options = options or {}
-        self.options.setdefault("indexes", [])
-        self.options.setdefault("constraints", [])
         self.bases = bases or (postgres.Model,)
         for name, field in self.fields.items():
             # Sanity-check that fields are NOT already bound to a model.
@@ -675,13 +673,6 @@ class ModelState:
                 raise ValueError(
                     f'ModelState.fields cannot refer to a model class - "{name}.through" '
                     "does. Use a string reference instead."
-                )
-        # Sanity-check that indexes have their name set.
-        for index in self.options["indexes"]:
-            if not index.name:
-                raise ValueError(
-                    "Indexes passed to ModelState require a name attribute. "
-                    f"{index!r} doesn't have one."
                 )
 
     @cached_property
@@ -766,9 +757,6 @@ class ModelState:
             package_label=self.package_label,
             name=self.name,
             fields=list(self.fields.items()),
-            # Since options are shallow-copied here, operations such as
-            # AddIndex must replace their option (e.g 'indexes') rather
-            # than mutating it.
             options=dict(self.options),
             bases=self.bases,
         )

@@ -164,17 +164,16 @@ class Options:
         return new_objs
 
     def export_for_migrations(self) -> dict[str, Any]:
-        """Export user-provided options for migrations."""
+        """Export user-provided options for migrations.
+
+        Indexes and constraints are excluded — they're managed entirely by
+        convergence (``plain postgres sync``), not migrations.
+        """
         options = {}
         for name in self._provided_options:
-            if name == "indexes":
-                options["indexes"] = [idx.clone() for idx in self.indexes]
-            elif name == "constraints":
-                # Clone constraints
-                options["constraints"] = [con.clone() for con in self.constraints]
-            else:
-                # Use current attribute value
-                options[name] = getattr(self, name)
+            if name in ("indexes", "constraints"):
+                continue
+            options[name] = getattr(self, name)
         return options
 
     @property

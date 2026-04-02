@@ -181,9 +181,6 @@ class MigrationAutodetector:
         self.generate_altered_options()
 
         # Create the renamed fields and store them in self.renamed_fields.
-        # They are used by create_altered_indexes(), generate_altered_fields(),
-        # generate_removed_altered_index(), and
-        # generate_altered_index().
         self.create_renamed_fields()
         # Generate field renaming operations.
         self.generate_renamed_fields()
