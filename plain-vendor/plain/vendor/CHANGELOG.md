@@ -1,5 +1,16 @@
 # plain-vendor changelog
 
+## [0.11.3](https://github.com/dropseed/plain/releases/plain-vendor@0.11.3) (2026-04-02)
+
+### What's changed
+
+- Fixed `vendor sync` crashing when a dependency fails to install — success output was referencing an unbound variable after a `DependencyError` ([c177db2](https://github.com/dropseed/plain/commit/c177db2))
+- Fixed false `VersionMismatchError` when the download response doesn't include version information ([c177db2](https://github.com/dropseed/plain/commit/c177db2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.11.2](https://github.com/dropseed/plain/releases/plain-vendor@0.11.2) (2026-03-10)
 
 ### What's changed
