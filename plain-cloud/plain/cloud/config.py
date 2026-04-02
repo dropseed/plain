@@ -35,6 +35,15 @@ class Config(PackageConfig):
         headers = {"Authorization": f"Bearer {settings.CLOUD_EXPORT_TOKEN}"}
 
         # Traces
+        current_provider = trace.get_tracer_provider()
+        if current_provider and not isinstance(
+            current_provider, trace.ProxyTracerProvider
+        ):
+            raise RuntimeError(
+                "A tracer provider already exists."
+                " plain.cloud must be listed before plain.observer in INSTALLED_PACKAGES."
+            )
+
         span_exporter = OTLPSpanExporter(
             endpoint=f"{export_url}/v1/traces",
             headers=headers,
