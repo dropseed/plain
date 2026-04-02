@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.131.0](https://github.com/dropseed/plain/releases/plain@0.131.0) (2026-04-01)
+
+### What's changed
+
+- **Added `http.server.request.duration` OTel histogram to the request handler.** Records request duration in seconds with standard HTTP semantic convention attributes (`http.request.method`, `http.response.status_code`, `url.scheme`, `http.route`, `error.type`). ([c40bfd42bdd8](https://github.com/dropseed/plain/commit/c40bfd42bdd8))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.130.2](https://github.com/dropseed/plain/releases/plain@0.130.2) (2026-04-01)
 
 ### What's changed
