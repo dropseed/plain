@@ -129,7 +129,11 @@ window.addEventListener("load", () => {
 
   for (const tab of toolbar.querySelectorAll("button[data-toolbar-tab]")) {
     tab.addEventListener("click", () => {
-      window.plainToolbar.showTab(tab.dataset.toolbarTab);
+      if (window.plainToolbar.expanded && tab.hasAttribute("data-active")) {
+        window.plainToolbar.collapse();
+      } else {
+        window.plainToolbar.showTab(tab.dataset.toolbarTab);
+      }
     });
   }
 
