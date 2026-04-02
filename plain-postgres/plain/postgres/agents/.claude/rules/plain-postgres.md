@@ -31,12 +31,18 @@ In your plan, present:
 
 Get approval before writing any model code or generating migrations.
 
-## Migrations
+## Migrations vs Convergence
 
-- `uv run plain postgres sync` — creates migrations (in DEBUG), applies them, and converges
-- For custom data migrations, use `uv run plain migrations create --empty --name <name>` to scaffold the file
+`uv run plain postgres sync` runs three steps: create migrations → apply migrations → converge schema.
 
-Run `uv run plain docs postgres --section migrations` for individual migration commands and full workflow details.
+- **Migrations** handle tables and columns (CreateModel, AddField, AlterField, etc.)
+- **Convergence** handles indexes, constraints, and FK constraints — declared on the model but NOT serialized into migration files. (FK _columns_ like `team_id bigint` are created by migrations; the actual `FOREIGN KEY` constraint is added by convergence.)
+
+This means: when you add an `Index` or `UniqueConstraint` to a model, no migration is generated. The converge step reads the live model class and syncs the database directly. Don't worry about serializing constraint expressions (like `Lower()`) for migrations — they never go there.
+
+For custom data migrations, use `uv run plain migrations create --empty --name <name>` to scaffold the file.
+
+Run `uv run plain docs postgres --section migrations` for full workflow details.
 
 ## Querying
 
