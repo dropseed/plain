@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import re
+import time
 import traceback
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import context as otel_context
-from opentelemetry import trace
+from opentelemetry import metrics, trace
+from opentelemetry.semconv.metrics.db_metrics import DB_CLIENT_OPERATION_DURATION
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Span
@@ -47,6 +49,12 @@ _SUPPRESS_KEY = "plain.postgres.suppress_db_tracing"
 
 tracer = trace.get_tracer("plain.postgres")
 
+meter = metrics.get_meter("plain.postgres")
+query_duration_histogram = meter.create_histogram(
+    name=DB_CLIENT_OPERATION_DURATION,
+    unit="s",
+    description="Duration of database client operations.",
+)
 
 DB_SYSTEM = DbSystemValues.POSTGRESQL.value
 
@@ -174,7 +182,18 @@ def db_span(
     with tracer.start_as_current_span(
         span_name, kind=SpanKind.CLIENT, attributes=attrs
     ) as span:
+        start = time.perf_counter()
         yield span
+        duration_s = time.perf_counter() - start
+
+        metric_attrs: dict[str, str] = {
+            DB_SYSTEM_NAME: DB_SYSTEM,
+            DB_OPERATION_NAME: operation,
+        }
+        if collection_name:
+            metric_attrs[DB_COLLECTION_NAME] = collection_name
+        query_duration_histogram.record(duration_s, metric_attrs)
+
         span.set_status(trace.StatusCode.OK)
 
 
