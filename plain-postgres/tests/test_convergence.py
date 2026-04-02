@@ -54,7 +54,7 @@ class TestPassOrdering:
         )
 
         try:
-            items = plan_convergence().executable(drop_undeclared=True)
+            items = plan_convergence().executable()
             fix_types = [type(item.fix) for item in items]
 
             # All six fix types should be present
@@ -92,17 +92,6 @@ class TestPassOrdering:
             assert add_con_max < validate_min
             assert validate_max < drop_con_min
             assert drop_con_max < drop_idx
-
-            # Without drop_undeclared, drop items should be excluded
-            default_items = plan_convergence().executable()
-            default_types = [type(item.fix) for item in default_items]
-            assert DropConstraintFix not in default_types
-            assert DropIndexFix not in default_types
-            # Non-drop items should still be present
-            assert RebuildIndexFix in default_types
-            assert CreateIndexFix in default_types
-            assert AddConstraintFix in default_types
-            assert ValidateConstraintFix in default_types
         finally:
             Car.model_options.indexes = original_indexes
             Car.model_options.constraints = original_constraints
@@ -494,37 +483,27 @@ class TestDriftPolicy:
         finally:
             Car.model_options.indexes = original_indexes
 
-    def test_undeclared_constraint_is_blocking_cleanup(self, db):
-        """Undeclared constraints are drop_undeclared + blocks_sync."""
+    def test_undeclared_constraint_included_in_plan(self, db):
+        """Undeclared constraints are auto-dropped."""
         execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
         )
 
         plan = plan_convergence()
-        undeclared = [
-            item
-            for item in plan.items
-            if isinstance(item.drift, ConstraintDrift)
-            and item.drift.kind == DriftKind.UNDECLARED
-        ]
-        assert len(undeclared) == 1
-        assert undeclared[0].drop_undeclared is True
-        assert undeclared[0].blocks_sync is True
+        items = plan.executable()
+        drops = [item for item in items if isinstance(item.fix, DropConstraintFix)]
+        assert len(drops) == 1
+        assert drops[0].blocks_sync is True
 
-    def test_undeclared_index_is_optional_cleanup(self, db):
-        """Undeclared indexes are drop_undeclared + not blocks_sync."""
+    def test_undeclared_index_included_in_plan(self, db):
+        """Undeclared indexes are auto-dropped."""
         execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         plan = plan_convergence()
-        undeclared = [
-            item
-            for item in plan.items
-            if isinstance(item.drift, IndexDrift)
-            and item.drift.kind == DriftKind.UNDECLARED
-        ]
-        assert len(undeclared) == 1
-        assert undeclared[0].drop_undeclared is True
-        assert undeclared[0].blocks_sync is False
+        items = plan.executable()
+        drops = [item for item in items if isinstance(item.fix, DropIndexFix)]
+        assert len(drops) == 1
+        assert drops[0].blocks_sync is False
 
     def test_can_auto_fix_for_missing(self, db):
         """can_auto_fix returns True for missing indexes and constraints."""
@@ -538,33 +517,24 @@ class TestDriftPolicy:
 
 
 class TestConvergencePlan:
-    def test_executable_excludes_cleanup_by_default(self, db):
-        """Default mode excludes cleanup items."""
+    def test_executable_includes_undeclared_drops(self, db):
+        """Undeclared objects are included in executable items."""
         execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         plan = plan_convergence()
-        default = plan.executable()
-        with_drop = plan.executable(drop_undeclared=True)
+        items = plan.executable()
+        drops = [item for item in items if isinstance(item.fix, DropIndexFix)]
+        assert len(drops) == 1
 
-        drop_in_default = [
-            item for item in default if isinstance(item.fix, DropIndexFix)
-        ]
-        drop_in_drop = [
-            item for item in with_drop if isinstance(item.fix, DropIndexFix)
-        ]
-        assert drop_in_default == []
-        assert len(drop_in_drop) == 1
-
-    def test_has_work_ignores_cleanup_by_default(self, db):
-        """has_work() only counts cleanup items when drop_undeclared=True."""
+    def test_has_work_includes_undeclared(self, db):
+        """has_work() counts undeclared drops."""
         execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         plan = plan_convergence()
-        assert not plan.has_work()
-        assert plan.has_work(drop_undeclared=True)
+        assert plan.has_work()
 
     def test_has_work_counts_forward_fixes(self, db):
-        """has_work() sees forward fixes regardless of drop_undeclared."""
+        """has_work() sees forward fixes."""
         original_indexes = list(Car.model_options.indexes)
         Car.model_options.indexes = [
             *original_indexes,
@@ -574,52 +544,8 @@ class TestConvergencePlan:
         try:
             plan = plan_convergence()
             assert plan.has_work()
-            assert plan.has_work(drop_undeclared=True)
         finally:
             Car.model_options.indexes = original_indexes
-
-    def test_blocking_cleanup_for_extra_constraint(self, db):
-        """Extra constraint is blocking cleanup."""
-        execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
-        )
-
-        plan = plan_convergence()
-        assert len(plan.blocking_cleanup) == 1
-        assert (
-            plan.blocking_cleanup[0].describe()
-            == "examples_car: drop constraint examples_car_test_check"
-        )
-        assert plan.optional_cleanup == []
-
-    def test_optional_cleanup_for_extra_index(self, db):
-        """Extra index is optional cleanup."""
-        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
-
-        plan = plan_convergence()
-        assert plan.blocking_cleanup == []
-        assert len(plan.optional_cleanup) == 1
-        assert (
-            plan.optional_cleanup[0].describe()
-            == "examples_car: drop index examples_car_extra_idx"
-        )
-
-    def test_blocking_and_optional_together(self, db):
-        """Both blocking and optional cleanup can coexist."""
-        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
-        execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
-        )
-
-        plan = plan_convergence()
-        assert len(plan.blocking_cleanup) == 1
-        assert len(plan.optional_cleanup) == 1
-
-    def test_no_cleanup_when_converged(self, db):
-        """Fully converged schema has no cleanup."""
-        plan = plan_convergence()
-        assert plan.blocking_cleanup == []
-        assert plan.optional_cleanup == []
 
     def test_blocked_for_changed_constraint(self, db):
         """Changed constraint definition appears in plan.blocked."""
@@ -657,7 +583,7 @@ class TestExecutePlan:
             table="examples_car",
             name="examples_car_temp_idx",
         )
-        item = PlanItem(drift=drift, fix=fix, blocks_sync=False, drop_undeclared=True)
+        item = PlanItem(drift=drift, fix=fix, blocks_sync=False)
 
         result = execute_plan([item])
 
@@ -674,7 +600,7 @@ class TestExecutePlan:
         drift = ConstraintDrift(
             kind=DriftKind.UNDECLARED, table="examples_car", name="nonexistent"
         )
-        item = PlanItem(drift=drift, fix=fix, drop_undeclared=True)
+        item = PlanItem(drift=drift, fix=fix)
 
         result = execute_plan([item])
 
@@ -695,7 +621,6 @@ class TestExecutePlan:
                     kind=DriftKind.UNDECLARED, table="examples_car", name="nonexistent"
                 ),
                 fix=DropConstraintFix(table="examples_car", name="nonexistent"),
-                drop_undeclared=True,
             ),
             PlanItem(
                 drift=ConstraintDrift(
@@ -706,7 +631,6 @@ class TestExecutePlan:
                 fix=DropConstraintFix(
                     table="examples_car", name="examples_car_real_check"
                 ),
-                drop_undeclared=True,
             ),
         ]
 
@@ -728,7 +652,6 @@ class TestExecutePlan:
                     kind=DriftKind.UNDECLARED, table="examples_car", name="nonexistent"
                 ),
                 fix=DropConstraintFix(table="examples_car", name="nonexistent"),
-                drop_undeclared=True,
             ),
             PlanItem(
                 drift=ConstraintDrift(
@@ -739,7 +662,6 @@ class TestExecutePlan:
                 fix=DropConstraintFix(
                     table="examples_car", name="examples_car_real_check"
                 ),
-                drop_undeclared=True,
             ),
         ]
 
@@ -756,7 +678,7 @@ class TestExecutePlan:
             table="examples_car",
             name="examples_car_temp_idx",
         )
-        item = PlanItem(drift=drift, fix=fix, blocks_sync=False, drop_undeclared=True)
+        item = PlanItem(drift=drift, fix=fix, blocks_sync=False)
 
         result = execute_plan([item])
 
@@ -772,7 +694,7 @@ class TestSyncPolicy:
         drift = ConstraintDrift(
             kind=DriftKind.UNDECLARED, table="examples_car", name="nonexistent"
         )
-        item = PlanItem(drift=drift, fix=fix, blocks_sync=True, drop_undeclared=True)
+        item = PlanItem(drift=drift, fix=fix, blocks_sync=True)
 
         result = execute_plan([item])
 
@@ -824,7 +746,6 @@ class TestSyncPolicy:
                 ),
                 fix=DropConstraintFix(table="examples_car", name="nonexistent"),
                 blocks_sync=True,
-                drop_undeclared=True,
             ),
         ]
 
@@ -844,7 +765,7 @@ class TestSyncPolicy:
         drift = ConstraintDrift(
             kind=DriftKind.UNDECLARED, table="examples_car", name="examples_car_temp"
         )
-        item = PlanItem(drift=drift, fix=fix, drop_undeclared=True)
+        item = PlanItem(drift=drift, fix=fix)
 
         result = execute_plan([item])
 

@@ -14,31 +14,20 @@ from ..convergence import execute_plan, plan_convergence
     is_flag=True,
     help="Skip confirmation prompt.",
 )
-@click.option(
-    "--drop-undeclared",
-    is_flag=True,
-    help="Drop indexes and constraints not declared on any model.",
-)
-def converge(yes: bool, drop_undeclared: bool) -> None:
+def converge(yes: bool) -> None:
     """Fix schema mismatches between models and the database.
 
     Detects and fixes:
     - Missing indexes (using CONCURRENTLY)
     - Missing constraints (check, unique)
     - NOT VALID constraints needing validation
-
-    With --drop-undeclared, also drops indexes and constraints that exist in the
-    database but are not declared on any model.
-
-    Without --drop-undeclared, exits non-zero if undeclared constraints remain
-    (constraints affect database behavior). Undeclared indexes are reported but
-    do not block success.
+    - Undeclared indexes and constraints (dropped automatically)
 
     Each fix is applied and committed independently so partial
     failures don't block subsequent fixes.
     """
     plan = plan_convergence()
-    items = plan.executable(drop_undeclared=drop_undeclared)
+    items = plan.executable()
     success = True
 
     if items:
@@ -78,20 +67,6 @@ def converge(yes: bool, drop_undeclared: bool) -> None:
             if item.guidance:
                 click.secho(f"      {item.guidance}", fg="red", dim=True)
         success = False
-
-    if not drop_undeclared and plan.blocking_cleanup:
-        click.echo()
-        click.secho("  Undeclared constraints still in database:", fg="red", bold=True)
-        for item in plan.blocking_cleanup:
-            click.secho(f"    {item.describe()}", fg="red")
-        click.secho("  Rerun with --drop-undeclared to remove them.", fg="red")
-        success = False
-
-    if not drop_undeclared and plan.optional_cleanup:
-        click.echo()
-        for item in plan.optional_cleanup:
-            click.echo(f"    {item.describe()}")
-        click.echo("  Run with --drop-undeclared to remove undeclared indexes.")
 
     if not success:
         sys.exit(1)

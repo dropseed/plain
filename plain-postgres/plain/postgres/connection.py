@@ -1141,8 +1141,8 @@ class DatabaseConnection:
             )
         # Shouldn't happen — a fresh DB from migrations has no undeclared objects
         # or changed definitions. Safety net so test setup follows sync policy.
-        if plan.blocked or plan.blocking_cleanup:
-            problem = plan.blocked[0] if plan.blocked else plan.blocking_cleanup[0]
+        if plan.blocked:
+            problem = plan.blocked[0]
             raise RuntimeError(
                 f"Convergence blocked during test DB setup: {problem.describe()}"
             )

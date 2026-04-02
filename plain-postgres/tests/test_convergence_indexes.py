@@ -48,15 +48,13 @@ class TestUnmanagedIndexTypes:
         assert hash_idx.issue is None
         assert hash_idx.drift is None
 
-    def test_unmanaged_index_not_dropped_by_drop_undeclared(self, db):
-        """--drop-undeclared does not propose dropping unmanaged index types."""
+    def test_unmanaged_index_not_auto_dropped(self, db):
+        """Convergence does not propose dropping unmanaged index types."""
         _create_hash_index()
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable(
-                drop_undeclared=True
-            )
+            items = plan_model_convergence(conn, cursor, Car).executable()
 
         assert not any(
             isinstance(item.fix, DropIndexFix)
@@ -138,31 +136,19 @@ class TestDetectIndexFixes:
         finally:
             Car.model_options.indexes = original_indexes
 
-    def test_detects_extra_index_with_prune(self, db):
-        """An index in the DB not declared on the model is extra (requires prune)."""
-        execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable(
-                drop_undeclared=True
-            )
-
-        index_items = [item for item in items if isinstance(item.fix, DropIndexFix)]
-        assert len(index_items) == 1
-        fix = index_items[0].fix
-        assert isinstance(fix, DropIndexFix)
-        assert fix.name == "examples_car_extra_idx"
-
-    def test_extra_index_excluded_by_default(self, db):
-        """An extra index produces no item by default."""
+    def test_detects_extra_index(self, db):
+        """An index in the DB not declared on the model is auto-dropped."""
         execute('CREATE INDEX "examples_car_extra_idx" ON "examples_car" ("make")')
 
         conn = get_connection()
         with conn.cursor() as cursor:
             items = plan_model_convergence(conn, cursor, Car).executable()
 
-        assert items == []
+        index_items = [item for item in items if isinstance(item.fix, DropIndexFix)]
+        assert len(index_items) == 1
+        fix = index_items[0].fix
+        assert isinstance(fix, DropIndexFix)
+        assert fix.name == "examples_car_extra_idx"
 
     def test_detects_invalid_index(self, isolated_db):
         """An INVALID index matching a model index produces a RebuildIndexFix."""

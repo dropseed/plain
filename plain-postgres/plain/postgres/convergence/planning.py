@@ -46,7 +46,6 @@ class PlanItem:
     drift: Drift
     fix: Fix | None = None
     blocks_sync: bool = True
-    drop_undeclared: bool = False
     guidance: str | None = None
 
     def describe(self) -> str:
@@ -67,9 +66,7 @@ def _plan_drift(drift: Drift) -> PlanItem:
         case IndexDrift(kind=DriftKind.RENAMED, table=t, old_name=old, new_name=new):
             return PlanItem(drift, RenameIndexFix(t, old, new), blocks_sync=False)
         case IndexDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
-            return PlanItem(
-                drift, DropIndexFix(t, n), blocks_sync=False, drop_undeclared=True
-            )
+            return PlanItem(drift, DropIndexFix(t, n), blocks_sync=False)
         case ConstraintDrift(kind=DriftKind.MISSING, table=t, constraint=c, model=m):
             return PlanItem(drift, AddConstraintFix(t, c, m))
         case ConstraintDrift(kind=DriftKind.UNVALIDATED, table=t, name=n):
@@ -80,7 +77,7 @@ def _plan_drift(drift: Drift) -> PlanItem:
                 fix=None,
                 guidance=(
                     "Declare a new constraint under a new name, run sync to add it,"
-                    " then remove the old one with --drop-undeclared."
+                    " then remove the old one."
                 ),
             )
         case ConstraintDrift(
@@ -88,7 +85,7 @@ def _plan_drift(drift: Drift) -> PlanItem:
         ):
             return PlanItem(drift, RenameConstraintFix(t, old, new), blocks_sync=False)
         case ConstraintDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
-            return PlanItem(drift, DropConstraintFix(t, n), drop_undeclared=True)
+            return PlanItem(drift, DropConstraintFix(t, n))
         case ForeignKeyDrift(
             kind=DriftKind.MISSING,
             table=t,
@@ -101,7 +98,7 @@ def _plan_drift(drift: Drift) -> PlanItem:
         case ForeignKeyDrift(kind=DriftKind.UNVALIDATED, table=t, name=n):
             return PlanItem(drift, ValidateConstraintFix(t, n))
         case ForeignKeyDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
-            return PlanItem(drift, DropConstraintFix(t, n), drop_undeclared=True)
+            return PlanItem(drift, DropConstraintFix(t, n))
         case NullabilityDrift(
             table=t, column=col, model_allows_null=False, has_null_rows=False
         ):
@@ -152,36 +149,18 @@ class ConvergencePlan:
 
     items: list[PlanItem]
 
-    def executable(self, *, drop_undeclared: bool = False) -> list[PlanItem]:
-        """Items eligible for execution in this mode, sorted by pass_order."""
-        return [
-            item
-            for item in self.items
-            if item.fix is not None and (drop_undeclared or not item.drop_undeclared)
-        ]
+    def executable(self) -> list[PlanItem]:
+        """Items eligible for execution, sorted by pass_order."""
+        return [item for item in self.items if item.fix is not None]
 
-    def has_work(self, *, drop_undeclared: bool = False) -> bool:
-        """Would this mode produce any items to execute?"""
-        return bool(self.executable(drop_undeclared=drop_undeclared))
+    def has_work(self) -> bool:
+        """Would execution produce any items?"""
+        return bool(self.executable())
 
     @property
     def blocked(self) -> list[PlanItem]:
         """Items that cannot be auto-resolved (require staged rollout)."""
         return [item for item in self.items if item.fix is None]
-
-    @property
-    def blocking_cleanup(self) -> list[PlanItem]:
-        """Undeclared-object drops that block sync success."""
-        return [
-            item for item in self.items if item.drop_undeclared and item.blocks_sync
-        ]
-
-    @property
-    def optional_cleanup(self) -> list[PlanItem]:
-        """Undeclared-object drops safe to defer."""
-        return [
-            item for item in self.items if item.drop_undeclared and not item.blocks_sync
-        ]
 
 
 # Convergence result

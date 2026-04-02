@@ -60,15 +60,13 @@ class TestUnmanagedConstraintTypes:
         assert excl.issue is None
         assert excl.drift is None
 
-    def test_exclusion_constraint_not_dropped_by_drop_undeclared(self, db):
-        """--drop-undeclared does not propose dropping unmanaged constraint types."""
+    def test_exclusion_constraint_not_auto_dropped(self, db):
+        """Convergence does not propose dropping unmanaged constraint types."""
         _create_exclusion_constraint()
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable(
-                drop_undeclared=True
-            )
+            items = plan_model_convergence(conn, cursor, Car).executable()
 
         assert not any(
             isinstance(item.fix, DropConstraintFix)
@@ -94,57 +92,31 @@ class TestDetectConstraintFixes:
             items = plan_model_convergence(conn, cursor, Car).executable()
         assert items == []
 
-    def test_detects_extra_check_constraint_with_prune(self, db):
+    def test_detects_extra_check_constraint(self, db):
         execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
         )
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable(
-                drop_undeclared=True
-            )
+            items = plan_model_convergence(conn, cursor, Car).executable()
 
         assert len(items) == 1
         assert isinstance(items[0].fix, DropConstraintFix)
         assert items[0].fix.name == "examples_car_test_check"
 
-    def test_extra_check_constraint_excluded_by_default(self, db):
-        execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_test_check" CHECK ("id" >= 0)'
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable()
-
-        assert items == []
-
-    def test_detects_extra_unique_constraint_with_prune(self, db):
+    def test_detects_extra_unique_constraint(self, db):
         execute(
             'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_unique" UNIQUE ("make")'
         )
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable(
-                drop_undeclared=True
-            )
+            items = plan_model_convergence(conn, cursor, Car).executable()
 
         assert len(items) == 1
         assert isinstance(items[0].fix, DropConstraintFix)
         assert items[0].fix.name == "examples_car_extra_unique"
-
-    def test_extra_unique_constraint_excluded_by_default(self, db):
-        execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "examples_car_extra_unique" UNIQUE ("make")'
-        )
-
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            items = plan_model_convergence(conn, cursor, Car).executable()
-
-        assert items == []
 
     def test_detects_missing_check_constraint(self, db):
         original_constraints = list(Car.model_options.constraints)

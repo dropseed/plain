@@ -472,14 +472,13 @@ plain postgres sync
 
 In development (`DEBUG=True`), sync auto-generates migrations before applying them. In production, it only applies existing migrations and converges.
 
-| Command                                 | Purpose                                                               |
-| --------------------------------------- | --------------------------------------------------------------------- |
-| `plain postgres sync`                   | Create + apply migrations + converge (the one command for everything) |
-| `plain postgres sync --check`           | Exit non-zero if anything would change (for CI)                       |
-| `plain postgres sync --drop-undeclared` | Also remove indexes/constraints not declared on any model             |
-| `plain postgres schema`                 | Show schema state with drift detection                                |
-| `plain postgres schema --json`          | Machine-readable schema output                                        |
-| `plain postgres converge`               | Run convergence alone (advanced)                                      |
+| Command                        | Purpose                                                               |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `plain postgres sync`          | Create + apply migrations + converge (the one command for everything) |
+| `plain postgres sync --check`  | Exit non-zero if anything would change (for CI)                       |
+| `plain postgres schema`        | Show schema state with drift detection                                |
+| `plain postgres schema --json` | Machine-readable schema output                                        |
+| `plain postgres converge`      | Run convergence alone (advanced)                                      |
 
 ### Migrations
 
@@ -609,13 +608,7 @@ Some changes can't be applied automatically. For example, if you add `NOT NULL` 
 
 **Cleanup:**
 
-When you remove an index or constraint from a model, the database object still exists. By default, `postgres sync` reports undeclared objects but doesn't drop them. Use `--drop-undeclared` to remove them:
-
-```bash
-plain postgres sync --drop-undeclared
-```
-
-Undeclared constraints block sync (they affect query behavior), while undeclared indexes are just reported as warnings.
+When you remove an index or constraint from a model, convergence automatically drops the undeclared database object on the next `postgres sync`. Models are the source of truth — if it's not declared, it gets removed.
 
 ## Fields
 

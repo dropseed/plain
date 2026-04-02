@@ -15,36 +15,27 @@ from ..convergence import execute_plan, plan_convergence
     is_flag=True,
     help="Exit with non-zero status if sync would make any database changes.",
 )
-@click.option(
-    "--drop-undeclared",
-    is_flag=True,
-    help="Drop indexes and constraints not declared on any model.",
-)
-def sync(check: bool, drop_undeclared: bool) -> None:
+def sync(check: bool) -> None:
     """Sync the database schema with models.
 
     In DEBUG mode: generates migrations, applies them, then converges constraints.
     In production: applies migrations, then converges constraints.
 
-    With --drop-undeclared, also drops indexes and constraints that exist in the
-    database but are not declared on any model.
-
-    Without --drop-undeclared, exits non-zero if undeclared constraints remain
-    (constraints affect database behavior). Undeclared indexes are reported but
-    do not block success.
+    Undeclared indexes and constraints are automatically dropped — models are
+    the source of truth.
     """
     if check:
-        _check(drop_undeclared=drop_undeclared)
+        _check()
         return
 
     if settings.DEBUG:
         _create_migrations()
 
     _migrate()
-    _converge(drop_undeclared=drop_undeclared)
+    _converge()
 
 
-def _check(*, drop_undeclared: bool) -> None:
+def _check() -> None:
     """Exit non-zero if sync would make any database changes."""
     from .migrations import apply, create
 
@@ -82,9 +73,7 @@ def _check(*, drop_undeclared: bool) -> None:
 
     # Check for convergence
     plan = plan_convergence()
-    if plan.has_work(drop_undeclared=drop_undeclared):
-        has_changes = True
-    if not drop_undeclared and plan.blocking_cleanup:
+    if plan.has_work():
         has_changes = True
     if plan.blocked:
         has_changes = True
@@ -129,11 +118,11 @@ def _migrate() -> None:
     click.echo(f"  Applied {len(migration_plan)} migration(s).")
 
 
-def _converge(*, drop_undeclared: bool) -> None:
+def _converge() -> None:
     click.secho("Converging schema...", bold=True)
 
     plan = plan_convergence()
-    items = plan.executable(drop_undeclared=drop_undeclared)
+    items = plan.executable()
     success = True
 
     if items:
@@ -157,20 +146,6 @@ def _converge(*, drop_undeclared: bool) -> None:
             if item.guidance:
                 click.secho(f"      {item.guidance}", fg="red", dim=True)
         success = False
-
-    if not drop_undeclared and plan.blocking_cleanup:
-        click.echo()
-        click.secho("  Undeclared constraints still in database:", fg="red", bold=True)
-        for item in plan.blocking_cleanup:
-            click.secho(f"    {item.describe()}", fg="red")
-        click.secho("  Rerun with --drop-undeclared to remove them.", fg="red")
-        success = False
-
-    if not drop_undeclared and plan.optional_cleanup:
-        click.echo()
-        for item in plan.optional_cleanup:
-            click.echo(f"    {item.describe()}")
-        click.echo("  Run with --drop-undeclared to remove undeclared indexes.")
 
     if not success:
         sys.exit(1)
