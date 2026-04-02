@@ -1,5 +1,16 @@
 # plain-cloud changelog
 
+## [0.1.3](https://github.com/dropseed/plain/releases/plain-cloud@0.1.3) (2026-04-01)
+
+### What's changed
+
+- Added `CLOUD_EXPORT_ENABLED` setting (defaults to `True`) to allow disabling all OTEL reporting without removing the token. Set `PLAIN_CLOUD_EXPORT_ENABLED=false` to turn it off. ([e9c4d140b227](https://github.com/dropseed/plain/commit/e9c4d140b227))
+- Raises `RuntimeError` if another tracer provider is already configured when plain.cloud initializes — ensures `plain.cloud` is listed before `plain.observer` in `INSTALLED_PACKAGES`. ([40252d96ce7d](https://github.com/dropseed/plain/commit/40252d96ce7d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.2](https://github.com/dropseed/plain/releases/plain-cloud@0.1.2) (2026-04-01)
 
 ### What's changed
