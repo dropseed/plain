@@ -1,5 +1,15 @@
 # plain-portal changelog
 
+## [0.2.3](https://github.com/dropseed/plain/releases/plain-portal@0.2.3) (2026-04-02)
+
+### What's changed
+
+- Updated agent skill to include `--yes` flag alongside `--writable` in documentation, matching the confirmation-skip behavior added in 0.2.1 ([86b0257](https://github.com/dropseed/plain/commit/86b0257))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.2](https://github.com/dropseed/plain/releases/plain-portal@0.2.2) (2026-03-30)
 
 ### What's changed
