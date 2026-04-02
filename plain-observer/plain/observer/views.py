@@ -74,6 +74,11 @@ class ObserverTracesView(AuthView, HTMXView, ListView):
             response = Response(status_code=204)
             observer.enable_summary_mode(response)
             return response
+        elif action == "persist_once":
+            observer = Observer.from_request(self.request)
+            response = Response(status_code=204)
+            observer.enable_persist_once_mode(response)
+            return response
         return Response("Invalid action", status_code=400)
 
 

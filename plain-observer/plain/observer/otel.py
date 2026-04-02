@@ -25,7 +25,7 @@ from plain.logs import app_logger
 from plain.postgres.otel import suppress_db_tracing
 from plain.runtime import settings
 
-from .core import Observer, ObserverMode
+from .core import PERSISTING_MODES, RECORDING_MODES, Observer, ObserverMode
 
 if TYPE_CHECKING:
     from plain.observer.models import Span as ObserverSpanModel
@@ -108,9 +108,7 @@ class ObserverSampler(sampling.Sampler):
             mode = Observer.from_otel_context(parent_context).mode()
 
             # Set decision based on mode
-            if mode in (ObserverMode.PERSIST.value, ObserverMode.SUMMARY.value):
-                # Always use RECORD_AND_SAMPLE so ParentBased works correctly
-                # The processor will check the mode to decide whether to export
+            if mode in RECORDING_MODES:
                 decision = sampling.Decision.RECORD_AND_SAMPLE
             elif mode == ObserverMode.DISABLED.value:
                 # Explicitly disabled - never sample even with remote parent
@@ -233,8 +231,7 @@ class ObserverSpanProcessor(SpanProcessor):
 
             span_id = f"0x{format_span_id(span.get_span_context().span_id)}"
 
-            # Enable DEBUG logging only for PERSIST mode (when logs are captured)
-            if trace_info["mode"] == ObserverMode.PERSIST.value:
+            if trace_info["mode"] in PERSISTING_MODES:
                 app_logger.debug_mode.start()
 
             # Store span (we know mode is truthy if we get here)
@@ -256,8 +253,7 @@ class ObserverSpanProcessor(SpanProcessor):
 
             trace_info = self._traces[trace_id]
 
-            # Disable DEBUG logging only for PERSIST mode spans
-            if trace_info["mode"] == ObserverMode.PERSIST.value:
+            if trace_info["mode"] in PERSISTING_MODES:
                 app_logger.debug_mode.end()
 
             # Move span from active to completed
@@ -276,8 +272,7 @@ class ObserverSpanProcessor(SpanProcessor):
                     for s in all_spans
                 ]
 
-                # Export if in persist mode
-                if trace_info["mode"] == ObserverMode.PERSIST.value:
+                if trace_info["mode"] in PERSISTING_MODES:
                     # Get and remove logs for this trace
                     from .logging import observer_log_handler
 
@@ -432,7 +427,7 @@ class ObserverSpanProcessor(SpanProcessor):
         mode = Observer.from_otel_context(context).mode()
 
         # Only return valid recording modes (summary/persist), not disabled
-        if mode in (ObserverMode.SUMMARY.value, ObserverMode.PERSIST.value):
+        if mode in RECORDING_MODES:
             return mode
 
         return None

@@ -8,7 +8,7 @@ from typing import TypedDict
 from opentelemetry import trace
 from opentelemetry.trace import format_span_id, format_trace_id
 
-from .core import ObserverMode
+from .core import PERSISTING_MODES
 from .otel import get_observer_span_processor
 
 
@@ -50,8 +50,7 @@ class ObserverLogHandler(logging.Handler):
                     return
 
                 trace_info = processor._traces[trace_id]
-                # Only capture logs in PERSIST mode
-                if trace_info["mode"] != ObserverMode.PERSIST.value:
+                if trace_info["mode"] not in PERSISTING_MODES:
                     return
 
             # Store the formatted message with span context

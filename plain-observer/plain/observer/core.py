@@ -14,7 +14,7 @@ from plain.runtime import settings
 if TYPE_CHECKING:
     from plain.http import Request
 
-__all__ = ["Observer", "ObserverMode"]
+__all__ = ["Observer", "ObserverMode", "PERSISTING_MODES", "RECORDING_MODES"]
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ class ObserverMode(Enum):
 
     SUMMARY = "summary"  # Real-time monitoring only, no DB export
     PERSIST = "persist"  # Real-time monitoring + DB export
+    PERSIST_ONCE = "persist_once"  # Persist one trace then revert to summary
     DISABLED = "disabled"  # Observer explicitly disabled
 
     @classmethod
@@ -42,7 +43,12 @@ class ObserverMode(Enum):
         if mode is None:
             return None
 
-        valid_modes = (cls.SUMMARY.value, cls.PERSIST.value, cls.DISABLED.value)
+        valid_modes = (
+            cls.SUMMARY.value,
+            cls.PERSIST.value,
+            cls.PERSIST_ONCE.value,
+            cls.DISABLED.value,
+        )
 
         if mode not in valid_modes:
             if settings.DEBUG:
@@ -60,6 +66,12 @@ class ObserverMode(Enum):
                 return None
 
         return mode
+
+
+# Modes that trigger DB export and log capture
+PERSISTING_MODES = (ObserverMode.PERSIST.value, ObserverMode.PERSIST_ONCE.value)
+# All modes that record traces (summary + persisting)
+RECORDING_MODES = (*PERSISTING_MODES, ObserverMode.SUMMARY.value)
 
 
 class Observer:
@@ -131,11 +143,19 @@ class Observer:
 
     def is_enabled(self) -> bool:
         """Check if observer is enabled (either summary or persist mode)."""
-        return self.mode() in (ObserverMode.SUMMARY.value, ObserverMode.PERSIST.value)
+        return self.mode() in RECORDING_MODES
 
     def is_persisting(self) -> bool:
         """Check if full persisting (with DB export) is enabled."""
+        return self.mode() in PERSISTING_MODES
+
+    def is_recording_session(self) -> bool:
+        """Check if in continuous recording mode (not persist-once)."""
         return self.mode() == ObserverMode.PERSIST.value
+
+    def is_persist_once(self) -> bool:
+        """Check if persist-once mode is enabled (single trace recording)."""
+        return self.mode() == ObserverMode.PERSIST_ONCE.value
 
     def is_summarizing(self) -> bool:
         """Check if summary mode is enabled."""
@@ -158,6 +178,14 @@ class Observer:
         response.set_signed_cookie(
             self.COOKIE_NAME,
             ObserverMode.PERSIST.value,
+            max_age=self.PERSIST_COOKIE_DURATION,
+        )
+
+    def enable_persist_once_mode(self, response: Response) -> None:
+        """Enable persist-once mode (persist one trace then revert to summary)."""
+        response.set_signed_cookie(
+            self.COOKIE_NAME,
+            ObserverMode.PERSIST_ONCE.value,
             max_age=self.PERSIST_COOKIE_DURATION,
         )
 

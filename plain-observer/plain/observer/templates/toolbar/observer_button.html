@@ -1,10 +1,27 @@
+{# Observer pill + record dot, visually semi-attached #}
+<div class="inline-flex items-center gap-px">
+
+{# Record dot — separate clickable circle, tight against the pill #}
+{% if observer.is_summarizing() or observer.is_persist_once() %}
+<button
+    type="button"
+    class="inline-flex items-center justify-center cursor-pointer rounded-full px-1.5 py-px bg-white/8 text-white/30 hover:text-red-400 hover:bg-white/12 transition-colors self-stretch"
+    data-observer-record-page
+    title="Record this page"
+>
+    <svg class="size-1.5" viewBox="0 0 16 16" fill="currentColor">
+        <circle cx="8" cy="8" r="8"/>
+    </svg>
+</button>
+{% endif %}
+
 {# Request pill — observer state + request stats, clickable to open Observer panel #}
 <button
     type="button"
     class="inline-flex items-center cursor-pointer text-xs rounded-full px-1 py-px bg-white/8 text-white/80 hover:bg-white/12 overflow-hidden divide-x divide-white/10 [&>span]:px-1.5"
     data-toolbar-tab="Observer"
 >
-    {% if observer.is_persisting() %}
+    {% if observer.is_recording_session() %}
     <span class="inline-flex items-center">
         <span class="relative inline-flex size-1.5 mr-1.5 flex-shrink-0">
             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
@@ -76,6 +93,8 @@
 </span>
 {% endif %}
 
+</div>
+
 <script nonce="{{ request.csp_nonce }}">
 (function() {
     function formatBytes(bytes) {
@@ -97,5 +116,44 @@
             el.classList.remove("hidden");
         }
     });
+
+    const recordBtn = document.querySelector("[data-observer-record-page]");
+
+    {% if observer.is_persist_once() %}
+    // Revert persist_once cookie back to summary, then re-enable record button
+    const revertForm = new FormData();
+    revertForm.append("observe_action", "summary");
+    if (recordBtn) recordBtn.disabled = true;
+    fetch("{{ url('observer:traces') }}", {
+        method: "POST",
+        body: revertForm,
+        credentials: "same-origin"
+    }).then(function() {
+        if (recordBtn) recordBtn.disabled = false;
+    });
+
+    window.addEventListener("load", function() {
+        if (window.plainToolbar) {
+            window.plainToolbar.showTab("Observer");
+        }
+    });
+    {% endif %}
+
+    if (recordBtn) {
+        recordBtn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            recordBtn.style.color = "#f87171";
+            recordBtn.disabled = true;
+            const form = new FormData();
+            form.append("observe_action", "persist_once");
+            fetch("{{ url('observer:traces') }}", {
+                method: "POST",
+                body: form,
+                credentials: "same-origin"
+            }).then(function() {
+                window.location.reload();
+            });
+        });
+    }
 })();
 </script>
