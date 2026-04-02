@@ -804,7 +804,7 @@ dev = [
 
 [[package]]
 name = "plain-htmx"
-version = "0.18.0"
+version = "0.18.1"
 source = { editable = "plain-htmx" }
 dependencies = [
     { name = "plain" },

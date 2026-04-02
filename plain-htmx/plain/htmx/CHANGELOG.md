@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.18.1](https://github.com/dropseed/plain/releases/plain-htmx@0.18.1) (2026-04-01)
+
+### What's changed
+
+- Added Claude agent rule with HTMX view dispatching patterns and `plain request` testing examples. ([c80596b71cf9](https://github.com/dropseed/plain/commit/c80596b71cf9))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-htmx@0.18.0) (2026-03-20)
 
 ### What's changed
