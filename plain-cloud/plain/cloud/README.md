@@ -17,7 +17,7 @@ You can use plain.cloud to export traces and metrics from your Plain app to Plai
 Set two environment variables and your app starts pushing telemetry:
 
 ```
-PLAIN_CLOUD_EXPORT_URL=https://ingest.plaincloud.com
+PLAIN_CLOUD_EXPORT_URL=https://plainframework.com/otel
 PLAIN_CLOUD_EXPORT_TOKEN=your-token
 ```
 
@@ -25,11 +25,11 @@ If `CLOUD_EXPORT_URL` is not set, the package is a no-op — safe to install wit
 
 ## Settings
 
-| Setting                   | Default | Description                                                 |
-| ------------------------- | ------- | ----------------------------------------------------------- |
-| `CLOUD_EXPORT_URL`        | `""`    | OTLP ingest endpoint (e.g. `https://ingest.plaincloud.com`) |
-| `CLOUD_EXPORT_TOKEN`      | `""`    | Auth token for the export endpoint                          |
-| `CLOUD_TRACE_SAMPLE_RATE` | `1.0`   | Probability of exporting a trace (0.0–1.0)                  |
+| Setting                   | Default | Description                                                   |
+| ------------------------- | ------- | ------------------------------------------------------------- |
+| `CLOUD_EXPORT_URL`        | `""`    | OTLP ingest endpoint (e.g. `https://plainframework.com/otel`) |
+| `CLOUD_EXPORT_TOKEN`      | `""`    | Auth token for the export endpoint                            |
+| `CLOUD_TRACE_SAMPLE_RATE` | `1.0`   | Probability of exporting a trace (0.0–1.0)                    |
 
 All settings can be set via `PLAIN_`-prefixed environment variables or in `app/settings.py`.
 
