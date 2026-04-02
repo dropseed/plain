@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.93.0](https://github.com/dropseed/plain/releases/plain-postgres@0.93.0) (2026-04-01)
+
+### What's changed
+
+- **Added `db.client.operation.duration` OTel histogram for database query timing.** Every query executed through `db_span()` now records its duration as an OpenTelemetry histogram metric, following the [semantic conventions](https://opentelemetry.io/docs/specs/semconv/db/database-metrics/) for database client metrics. Attributes include `db.system.name`, `db.operation.name`, and `db.collection.name`. Without a configured `MeterProvider`, this is a no-op with zero overhead. ([56c2f993b88c](https://github.com/dropseed/plain/commit/56c2f993b88c))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.92.1](https://github.com/dropseed/plain/releases/plain-postgres@0.92.1) (2026-03-30)
 
 ### What's changed
