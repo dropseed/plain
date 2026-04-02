@@ -1,5 +1,18 @@
 # plain-admin changelog
 
+## [0.77.2](https://github.com/dropseed/plain/releases/plain-admin@0.77.2) (2026-04-01)
+
+### What's changed
+
+- **Added custom admin display for `PasswordField`.** Shows the hash algorithm and iteration count instead of the raw hash string. ([db85bc4726f0](https://github.com/dropseed/plain/commit/db85bc4726f0))
+- **Cleaned up breadcrumbs.** Removed `nav_section` from the breadcrumb trail and hid redundant breadcrumbs on top-level views. ([1412efe712b5](https://github.com/dropseed/plain/commit/1412efe712b5))
+- Fixed vertical padding on boolean True/False labels in detail views. ([82e5da63cd9f](https://github.com/dropseed/plain/commit/82e5da63cd9f))
+- Fixed encrypted field display crashing when the value is empty. ([7ce1b3c32da7](https://github.com/dropseed/plain/commit/7ce1b3c32da7))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.77.1](https://github.com/dropseed/plain/releases/plain-admin@0.77.1) (2026-03-29)
 
 ### What's changed
