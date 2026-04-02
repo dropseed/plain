@@ -1,5 +1,16 @@
 # plain-cloud changelog
 
+## [0.1.2](https://github.com/dropseed/plain/releases/plain-cloud@0.1.2) (2026-04-01)
+
+### What's changed
+
+- `CLOUD_EXPORT_URL` now defaults to `https://plainframework.com/otel` — no need to set it manually. Export is gated on `CLOUD_EXPORT_TOKEN` instead, so only one env var is needed to start pushing telemetry. ([fa711758acda](https://github.com/dropseed/plain/commit/fa711758acda))
+
+### Upgrade instructions
+
+- If you had `PLAIN_CLOUD_EXPORT_URL` set to `https://plainframework.com/otel`, you can remove it — that's now the default.
+- If you relied on leaving `CLOUD_EXPORT_URL` empty to disable export, set `CLOUD_EXPORT_TOKEN` to empty instead (or just don't set it).
+
 ## [0.1.1](https://github.com/dropseed/plain/releases/plain-cloud@0.1.1) (2026-04-01)
 
 ### What's changed
