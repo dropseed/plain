@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.94.0](https://github.com/dropseed/plain/releases/plain-postgres@0.94.0) (2026-04-02)
+
+### What's changed
+
+- **Undeclared indexes and constraints are now automatically dropped by `postgres sync` and `postgres converge`.** Models are the source of truth — if an index or constraint exists in the database but isn't declared on any model, convergence removes it. The `--drop-undeclared` flag has been removed from both commands. ([a74b6ab30c14](https://github.com/dropseed/plain/commit/a74b6ab30c14))
+
+### Upgrade instructions
+
+- Remove `--drop-undeclared` from any scripts or Procfiles that use `plain postgres sync` or `plain postgres converge`. Undeclared objects are now dropped automatically.
+
 ## [0.93.1](https://github.com/dropseed/plain/releases/plain-postgres@0.93.1) (2026-04-02)
 
 ### What's changed
