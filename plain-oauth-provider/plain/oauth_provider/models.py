@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import binascii
 import hashlib
-import os
 import secrets
 from datetime import datetime
 
@@ -13,22 +12,22 @@ from plain.runtime import SettingsReference
 
 def generate_client_id() -> str:
     """Generate a random client ID (32 hex chars)."""
-    return binascii.hexlify(os.urandom(16)).decode()
+    return secrets.token_hex(16)
 
 
 def generate_client_secret() -> str:
     """Generate a random client secret (64 hex chars)."""
-    return binascii.hexlify(os.urandom(32)).decode()
+    return secrets.token_hex(32)
 
 
 def generate_token() -> str:
     """Generate a random token (40 hex chars)."""
-    return binascii.hexlify(os.urandom(20)).decode()
+    return secrets.token_hex(20)
 
 
 def generate_code() -> str:
     """Generate a random authorization code (32 hex chars)."""
-    return binascii.hexlify(os.urandom(16)).decode()
+    return secrets.token_hex(16)
 
 
 @postgres.register_model

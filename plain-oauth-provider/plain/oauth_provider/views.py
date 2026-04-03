@@ -11,9 +11,11 @@ from __future__ import annotations
 
 from datetime import timedelta
 from typing import Any
+from urllib.parse import urlencode, urlparse, urlunparse
 
 from plain.auth.views import AuthView
-from plain.http import JsonResponse, RedirectResponse, Response, ResponseBase
+from plain.http import JsonResponse, RedirectResponse, Request, Response, ResponseBase
+from plain.postgres import transaction
 from plain.runtime import settings
 from plain.templates import Template
 from plain.urls import reverse
@@ -30,7 +32,6 @@ class AuthorizationServerMetadataView(View):
     """
 
     def get(self) -> JsonResponse:
-        # Build the issuer URL from the request
         scheme = self.request.server_scheme
         host = self.request.host
         issuer = f"{scheme}://{host}"
@@ -78,18 +79,14 @@ class AuthorizeView(AuthView):
 
     def get(self) -> ResponseBase:
         context: dict[str, Any] = {}
-        errors = self._validate_request()
+        application, errors = self._validate_request()
         if errors:
             context["error"] = errors[0]
             return self._render(context)
 
-        application = OAuthApplication.query.get(
-            client_id=self.request.query_params.get("client_id")
-        )
         context["application"] = application
         context["scope"] = self.request.query_params.get("scope", "")
         context["redirect_uri"] = self.request.query_params.get("redirect_uri", "")
-        # Pass through all params for the POST form
         context["params"] = {
             "response_type": self.request.query_params.get("response_type"),
             "client_id": self.request.query_params.get("client_id"),
@@ -104,7 +101,7 @@ class AuthorizeView(AuthView):
         return self._render(context)
 
     def post(self) -> ResponseBase:
-        errors = self._validate_request()
+        application, errors = self._validate_request()
         if errors:
             return JsonResponse(
                 {"error": "invalid_request", "error_description": errors[0]},
@@ -116,18 +113,17 @@ class AuthorizeView(AuthView):
 
         # User denied
         if self.request.form_data.get("action") != "approve":
-            return _redirect_with_error(redirect_uri, "access_denied", state)
+            return _redirect_with_params(
+                redirect_uri, {"error": "access_denied", "state": state}
+            )
 
-        client_id = self.request.form_data.get("client_id", "")
         scope = self.request.form_data.get("scope", "")
         code_challenge = self.request.form_data.get("code_challenge", "")
         code_challenge_method = self.request.form_data.get(
             "code_challenge_method", "S256"
         )
 
-        try:
-            application = OAuthApplication.query.get(client_id=client_id)
-        except OAuthApplication.DoesNotExist:
+        if not application:
             return JsonResponse(
                 {"error": "invalid_client", "error_description": "Unknown client"},
                 status_code=400,
@@ -157,16 +153,17 @@ class AuthorizeView(AuthView):
         )
         auth_code.save()
 
-        # Redirect back to client with the code
-        separator = "&" if "?" in redirect_uri else "?"
-        url = f"{redirect_uri}{separator}code={auth_code.code}"
+        params = {"code": auth_code.code}
         if state:
-            url += f"&state={state}"
+            params["state"] = state
 
-        return RedirectResponse(url, allow_external=True)
+        return _redirect_with_params(redirect_uri, params)
 
-    def _validate_request(self) -> list[str]:
-        """Validate the authorization request parameters. Returns list of errors."""
+    def _validate_request(self) -> tuple[OAuthApplication | None, list[str]]:
+        """Validate the authorization request parameters.
+
+        Returns (application, errors). Application is None if validation fails.
+        """
         errors: list[str] = []
         params = (
             self.request.query_params
@@ -180,12 +177,13 @@ class AuthorizeView(AuthView):
                 f"Unsupported response_type: {response_type!r}. Must be 'code'."
             )
 
+        application = None
         client_id = params.get("client_id", "")
         if not client_id:
             errors.append("Missing client_id")
         else:
             try:
-                OAuthApplication.query.get(client_id=client_id)
+                application = OAuthApplication.query.get(client_id=client_id)
             except OAuthApplication.DoesNotExist:
                 errors.append(f"Unknown client_id: {client_id}")
 
@@ -198,7 +196,7 @@ class AuthorizeView(AuthView):
                 f"Unsupported code_challenge_method: {code_challenge_method!r}. Must be 'S256'."
             )
 
-        return errors
+        return application, errors
 
 
 class TokenView(View):
@@ -210,7 +208,6 @@ class TokenView(View):
     """
 
     def post(self) -> JsonResponse:
-        # Token endpoint uses form-encoded POST per RFC 6749 §4.1.3
         grant_type = self.request.form_data.get("grant_type", "")
 
         match grant_type:
@@ -227,42 +224,9 @@ class TokenView(View):
                     status_code=400,
                 )
 
-    def _authenticate_client(self) -> OAuthApplication | JsonResponse:
-        """Authenticate the client via client_secret_post."""
-        client_id = self.request.form_data.get("client_id", "")
-        client_secret = self.request.form_data.get("client_secret", "")
-
-        if not client_id or not client_secret:
-            return JsonResponse(
-                {
-                    "error": "invalid_client",
-                    "error_description": "Missing client_id or client_secret",
-                },
-                status_code=401,
-            )
-
-        try:
-            application = OAuthApplication.query.get(client_id=client_id)
-        except OAuthApplication.DoesNotExist:
-            return JsonResponse(
-                {"error": "invalid_client", "error_description": "Unknown client"},
-                status_code=401,
-            )
-
-        if not application.verify_client_secret(client_secret):
-            return JsonResponse(
-                {
-                    "error": "invalid_client",
-                    "error_description": "Invalid client_secret",
-                },
-                status_code=401,
-            )
-
-        return application
-
     def _handle_authorization_code(self) -> JsonResponse:
         """Exchange an authorization code for tokens."""
-        auth_result = self._authenticate_client()
+        auth_result = _authenticate_client(self.request)
         if isinstance(auth_result, JsonResponse):
             return auth_result
         application = auth_result
@@ -285,7 +249,6 @@ class TokenView(View):
         except AuthorizationCode.DoesNotExist:
             return _token_error("invalid_grant", "Invalid authorization code")
 
-        # Validate the authorization code
         if auth_code.used:
             return _token_error("invalid_grant", "Authorization code already used")
 
@@ -295,7 +258,6 @@ class TokenView(View):
         if auth_code.redirect_uri != redirect_uri:
             return _token_error("invalid_grant", "redirect_uri mismatch")
 
-        # PKCE verification
         if not auth_code.verify_code_challenge(code_verifier):
             return _token_error("invalid_grant", "PKCE verification failed")
 
@@ -303,12 +265,11 @@ class TokenView(View):
         auth_code.used = True
         auth_code.save(update_fields=["used"])
 
-        # Issue tokens
-        return self._issue_tokens(application, auth_code.user, auth_code.scope)
+        return _issue_tokens(application, auth_code.user, auth_code.scope)
 
     def _handle_refresh_token(self) -> JsonResponse:
         """Exchange a refresh token for new tokens."""
-        auth_result = self._authenticate_client()
+        auth_result = _authenticate_client(self.request)
         if isinstance(auth_result, JsonResponse):
             return auth_result
         application = auth_result
@@ -333,19 +294,92 @@ class TokenView(View):
         refresh_token.access_token.revoked = True
         refresh_token.access_token.save(update_fields=["revoked"])
 
-        # Issue new tokens
-        return self._issue_tokens(
+        return _issue_tokens(
             application, refresh_token.user, refresh_token.access_token.scope
         )
 
-    def _issue_tokens(
-        self, application: OAuthApplication, user: object, scope: str
-    ) -> JsonResponse:
-        """Create a new access token and refresh token pair."""
-        expires_at = timezone.now() + timedelta(
-            seconds=settings.OAUTH_PROVIDER_ACCESS_TOKEN_EXPIRY
+
+class RevocationView(View):
+    """RFC 7009: Token Revocation.
+
+    Revokes an access token or refresh token.
+    """
+
+    def post(self) -> Response:
+        auth_result = _authenticate_client(self.request)
+        if isinstance(auth_result, JsonResponse):
+            return auth_result
+        application = auth_result
+
+        token_value = self.request.form_data.get("token", "")
+        if not token_value:
+            # RFC 7009: server responds with 200 even if token is missing
+            return Response(status_code=200)
+
+        # Try access token first, then refresh token
+        revoked = AccessToken.query.filter(
+            token=token_value, application=application
+        ).update(revoked=True)
+        if revoked:
+            return Response(status_code=200)
+
+        refresh_tokens = RefreshToken.query.select_related("access_token").filter(
+            token=token_value, application=application
+        )
+        for rt in refresh_tokens:
+            rt.revoked = True
+            rt.save(update_fields=["revoked"])
+            rt.access_token.revoked = True
+            rt.access_token.save(update_fields=["revoked"])
+            return Response(status_code=200)
+
+        # RFC 7009: respond 200 even if token not found
+        return Response(status_code=200)
+
+
+def _authenticate_client(request: Request) -> OAuthApplication | JsonResponse:
+    """Authenticate the client via client_secret_post."""
+    client_id = request.form_data.get("client_id", "")
+    client_secret = request.form_data.get("client_secret", "")
+
+    if not client_id or not client_secret:
+        return JsonResponse(
+            {
+                "error": "invalid_client",
+                "error_description": "Missing client_id or client_secret",
+            },
+            status_code=401,
         )
 
+    try:
+        application = OAuthApplication.query.get(client_id=client_id)
+    except OAuthApplication.DoesNotExist:
+        return JsonResponse(
+            {"error": "invalid_client", "error_description": "Unknown client"},
+            status_code=401,
+        )
+
+    if not application.verify_client_secret(client_secret):
+        return JsonResponse(
+            {
+                "error": "invalid_client",
+                "error_description": "Invalid client_secret",
+            },
+            status_code=401,
+        )
+
+    return application
+
+
+def _issue_tokens(
+    application: OAuthApplication, user: object, scope: str
+) -> JsonResponse:
+    """Create a new access token and refresh token pair."""
+    expires_at = timezone.now() + timedelta(
+        seconds=settings.OAUTH_PROVIDER_ACCESS_TOKEN_EXPIRY
+    )
+
+    with transaction.atomic():
         access_token = AccessToken(
             application=application,
             user=user,
@@ -361,85 +395,28 @@ class TokenView(View):
         )
         refresh_token.save()
 
-        return JsonResponse(
-            {
-                "access_token": access_token.token,
-                "token_type": "Bearer",
-                "expires_in": settings.OAUTH_PROVIDER_ACCESS_TOKEN_EXPIRY,
-                "refresh_token": refresh_token.token,
-                "scope": scope,
-            },
-            headers={"Cache-Control": "no-store"},
-        )
+    return JsonResponse(
+        {
+            "access_token": access_token.token,
+            "token_type": "Bearer",
+            "expires_in": settings.OAUTH_PROVIDER_ACCESS_TOKEN_EXPIRY,
+            "refresh_token": refresh_token.token,
+            "scope": scope,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 
-class RevocationView(View):
-    """RFC 7009: Token Revocation.
-
-    Revokes an access token or refresh token.
-    """
-
-    def post(self) -> Response:
-        client_id = self.request.form_data.get("client_id", "")
-        client_secret = self.request.form_data.get("client_secret", "")
-
-        if not client_id or not client_secret:
-            return JsonResponse(
-                {"error": "invalid_client", "error_description": "Missing credentials"},
-                status_code=401,
-            )
-
-        try:
-            application = OAuthApplication.query.get(client_id=client_id)
-        except OAuthApplication.DoesNotExist:
-            return JsonResponse(
-                {"error": "invalid_client", "error_description": "Unknown client"},
-                status_code=401,
-            )
-
-        if not application.verify_client_secret(client_secret):
-            return JsonResponse(
-                {
-                    "error": "invalid_client",
-                    "error_description": "Invalid client_secret",
-                },
-                status_code=401,
-            )
-
-        token_value = self.request.form_data.get("token", "")
-        if not token_value:
-            # RFC 7009: server responds with 200 even if token is missing
-            return Response(status_code=200)
-
-        # Try access token first, then refresh token
-        access_tokens = AccessToken.query.filter(
-            token=token_value, application=application
-        )
-        for at in access_tokens:
-            at.revoked = True
-            at.save(update_fields=["revoked"])
-            return Response(status_code=200)
-
-        refresh_tokens = RefreshToken.query.filter(
-            token=token_value, application=application
-        )
-        for rt in refresh_tokens:
-            rt.revoked = True
-            rt.save(update_fields=["revoked"])
-            # Also revoke the associated access token
-            rt.access_token.revoked = True
-            rt.access_token.save(update_fields=["revoked"])
-            return Response(status_code=200)
-
-        # RFC 7009: respond 200 even if token not found
-        return Response(status_code=200)
-
-
-def _redirect_with_error(redirect_uri: str, error: str, state: str) -> RedirectResponse:
-    separator = "&" if "?" in redirect_uri else "?"
-    url = f"{redirect_uri}{separator}error={error}"
-    if state:
-        url += f"&state={state}"
+def _redirect_with_params(
+    redirect_uri: str, params: dict[str, str]
+) -> RedirectResponse:
+    """Append query parameters to a redirect URI."""
+    # Filter out empty values
+    params = {k: v for k, v in params.items() if v}
+    parsed = urlparse(redirect_uri)
+    separator = "&" if parsed.query else ""
+    new_query = parsed.query + separator + urlencode(params)
+    url = urlunparse(parsed._replace(query=new_query))
     return RedirectResponse(url, allow_external=True)
 
 

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import traceback
-import uuid
 from typing import Any
 
 from plain.logs import get_framework_logger
@@ -37,6 +36,14 @@ class MCPServer:
 
     def __init__(self, registry: MCPRegistry) -> None:
         self.registry = registry
+        self._handlers: dict[str, Any] = {
+            "initialize": self._handle_initialize,
+            "ping": self._handle_ping,
+            "tools/list": self._handle_tools_list,
+            "tools/call": self._handle_tools_call,
+            "resources/list": self._handle_resources_list,
+            "resources/read": self._handle_resources_read,
+        }
 
     def handle_message(self, raw: bytes | str) -> dict[str, Any] | None:
         """Process a single JSON-RPC message and return a response.
@@ -82,15 +89,7 @@ class MCPServer:
             return _error_response(msg_id, INTERNAL_ERROR, f"Internal error: {e}")
 
     def _get_handler(self, method: str) -> Any | None:
-        handlers: dict[str, Any] = {
-            "initialize": self._handle_initialize,
-            "ping": self._handle_ping,
-            "tools/list": self._handle_tools_list,
-            "tools/call": self._handle_tools_call,
-            "resources/list": self._handle_resources_list,
-            "resources/read": self._handle_resources_read,
-        }
-        return handlers.get(method)
+        return self._handlers.get(method)
 
     def _handle_notification(self, method: str, params: dict[str, Any]) -> None:
         # Accept notifications silently (e.g. notifications/initialized)
@@ -226,7 +225,3 @@ def _error_response(msg_id: Any, code: int, message: str) -> dict[str, Any]:
             "message": message,
         },
     }
-
-
-def generate_session_id() -> str:
-    return str(uuid.uuid4())

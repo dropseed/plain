@@ -19,22 +19,23 @@ from plain.http import (
     Response,
     ResponseBase,
 )
-from plain.logs import get_framework_logger
-from plain.packages import packages_registry
 from plain.runtime import settings
 from plain.views.base import View
 
-from .protocol import MCPServer, generate_session_id
+from .protocol import MCPServer
 from .registry import mcp_registry
 
-logger = get_framework_logger("plain.mcp")
+_server = MCPServer(mcp_registry)
 
 
-def _ensure_discovered() -> None:
-    """Auto-discover mcp modules from installed packages (runs once)."""
-    if not getattr(_ensure_discovered, "_done", False):
-        packages_registry.autodiscover_modules("mcp", include_app=True)
-        _ensure_discovered._done = True  # type: ignore[attr-defined]
+def _has_oauth_provider() -> bool:
+    """Check once whether plain.oauth_provider is installed."""
+    try:
+        from plain.oauth_provider.models import AccessToken  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
 
 
 def _check_auth(request: Request) -> ResponseBase | None:
@@ -60,29 +61,19 @@ def _check_auth(request: Request) -> ResponseBase | None:
         return None
 
     # 2. OAuth access token check (if plain-oauth-provider is installed)
-    if bearer_token:
+    if _has_oauth_provider():
+        from plain.oauth_provider.models import AccessToken
+
+        if not bearer_token:
+            return _auth_error("Missing or invalid Authorization header")
+
         try:
-            from plain.oauth_provider.models import AccessToken
-
-            try:
-                access_token = AccessToken.query.get(token=bearer_token)
-                if access_token.is_valid():
-                    return None
-                return _auth_error("Access token expired or revoked")
-            except AccessToken.DoesNotExist:
-                return _auth_error("Invalid access token")
-        except ImportError:
-            # plain-oauth-provider not installed — token is not recognized
-            return _auth_error("Invalid auth token")
-
-    # 3. Check if OAuth provider is installed (require auth if so)
-    try:
-        from plain.oauth_provider.models import AccessToken  # noqa: F811
-
-        # Provider is installed but no token was provided
-        return _auth_error("Missing or invalid Authorization header")
-    except ImportError:
-        pass
+            access_token = AccessToken.query.get(token=bearer_token)
+            if access_token.is_valid():
+                return None
+            return _auth_error("Access token expired or revoked")
+        except AccessToken.DoesNotExist:
+            return _auth_error("Invalid access token")
 
     # No auth configured — allow all (development mode)
     return None
@@ -114,14 +105,8 @@ class ProtectedResourceMetadataView(View):
 
         metadata: dict[str, Any] = {
             "resource": base,
+            "authorization_servers": [f"{base}/.well-known/oauth-authorization-server"],
         }
-
-        try:
-            metadata["authorization_servers"] = [
-                f"{base}/.well-known/oauth-authorization-server"
-            ]
-        except Exception:
-            pass
 
         return JsonResponse(metadata)
 
@@ -133,8 +118,6 @@ class MCPView(View):
     """
 
     def get_response(self) -> ResponseBase:
-        _ensure_discovered()
-
         auth_error = _check_auth(self.request)
         if auth_error:
             return auth_error
@@ -143,33 +126,22 @@ class MCPView(View):
 
     def post(self) -> ResponseBase:
         """Handle a JSON-RPC request from the MCP client."""
-        server = MCPServer(mcp_registry)
-
         body = self.request.body
-        response = server.handle_message(body)
+        response = _server.handle_message(body)
 
         if response is None:
-            # Notification — accepted, no content
             return Response(status_code=204)
 
-        session_id = generate_session_id()
-        json_response = JsonResponse(response)
-        json_response.headers["Mcp-Session-Id"] = session_id
-        return json_response
+        return JsonResponse(response)
 
     def get(self) -> ResponseBase:
-        """Open an SSE stream for server-initiated notifications.
-
-        For now, this keeps the connection alive with periodic keepalives.
-        Server push notifications can be added later.
-        """
+        """Open an SSE stream for server-initiated notifications."""
         return AsyncStreamingResponse(
             streaming_content=self._keepalive_stream(),
             content_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
                 "X-Accel-Buffering": "no",
-                "Mcp-Session-Id": generate_session_id(),
             },
         )
 
@@ -181,7 +153,6 @@ class MCPView(View):
         """Yield SSE keepalive comments to keep the connection open."""
         import asyncio
 
-        # Send an initial endpoint event so clients know we're alive
         yield _sse_event(
             {"jsonrpc": "2.0", "method": "notifications/ready", "params": {}}
         )
