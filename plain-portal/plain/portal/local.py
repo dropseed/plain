@@ -8,12 +8,13 @@ commands (exec, pull, push) talk to the connect process over the socket.
 from __future__ import annotations
 
 import asyncio
+import fcntl
+import functools
 import json
 import os
 import signal
 import struct
 import sys
-import tempfile
 
 import websockets.exceptions
 from websockets.asyncio.client import connect as ws_connect
@@ -26,7 +27,26 @@ from .protocol import (
     make_relay_url,
 )
 
-SOCKET_PATH = os.path.join(tempfile.gettempdir(), "plain-portal.sock")
+
+@functools.lru_cache
+def _portal_dir() -> str:
+    """Return .plain/portal/ in the project root, creating it if needed."""
+    from plain.runtime import PLAIN_TEMP_PATH
+
+    d = os.path.join(PLAIN_TEMP_PATH, "portal")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _socket_path() -> str:
+    return os.path.join(_portal_dir(), "portal.sock")
+
+
+def _lock_path() -> str:
+    return os.path.join(_portal_dir(), "portal.lock")
+
+
+_lock_fd = None
 
 
 async def _send_framed(writer: asyncio.StreamWriter, data: bytes) -> None:
@@ -60,19 +80,21 @@ async def connect(
         print(f"Invalid portal code: {code}", file=sys.stderr)
         sys.exit(1)
 
-    if os.path.exists(SOCKET_PATH):
-        # Socket may be stale after SIGKILL — verify something is listening.
-        try:
-            _, w = await asyncio.open_unix_connection(SOCKET_PATH)
-            w.close()
-            await w.wait_closed()
-            print(
-                "A portal session is already active.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        except (ConnectionError, FileNotFoundError):
-            _cleanup()
+    # Acquire an exclusive file lock before anything else.  Holds for the
+    # lifetime of the process — released automatically on exit/crash.
+    # Stored at module level to prevent GC from closing the fd.
+    global _lock_fd
+    _lock_fd = open(_lock_path(), "w")
+    try:
+        fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        _lock_fd.close()
+        _lock_fd = None
+        print("A portal session is already active.", file=sys.stderr)
+        sys.exit(1)
+
+    # Clean up any stale socket from a previous crash.
+    _cleanup()
 
     cid = channel_id(code)
     relay_url = make_relay_url(relay_host, cid, "connect")
@@ -217,7 +239,9 @@ async def connect(
     # Set restrictive umask so the socket is created owner-only (no TOCTOU window)
     old_umask = os.umask(0o177)
     try:
-        server = await asyncio.start_unix_server(handle_local_client, path=SOCKET_PATH)
+        server = await asyncio.start_unix_server(
+            handle_local_client, path=_socket_path()
+        )
     finally:
         os.umask(old_umask)
 
@@ -247,9 +271,11 @@ async def connect(
 
 
 def _cleanup() -> None:
-    """Remove the socket file."""
+    """Remove the socket file.  The lock file is left in place — the flock
+    is on the inode, so unlinking it would let a new process acquire a
+    lock on a different inode."""
     try:
-        os.unlink(SOCKET_PATH)
+        os.unlink(_socket_path())
     except FileNotFoundError:
         pass
 
@@ -260,7 +286,7 @@ async def send_command(request: dict) -> dict:
     Returns a single response. For streaming exec, use send_exec_streaming instead.
     """
     try:
-        reader, writer = await asyncio.open_unix_connection(SOCKET_PATH)
+        reader, writer = await asyncio.open_unix_connection(_socket_path())
     except (FileNotFoundError, ConnectionRefusedError):
         print(
             "No active portal session. Run 'plain portal connect <code>' first.",
@@ -287,7 +313,7 @@ async def send_exec_streaming(
     Returns the final exec_result response.
     """
     try:
-        reader, writer = await asyncio.open_unix_connection(SOCKET_PATH)
+        reader, writer = await asyncio.open_unix_connection(_socket_path())
     except (FileNotFoundError, ConnectionRefusedError):
         print(
             "No active portal session. Run 'plain portal connect <code>' first.",
