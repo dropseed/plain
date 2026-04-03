@@ -26,6 +26,7 @@ INSTALLED_PACKAGES = [
     "plain.toolbar",
     "plain.redirection",
     "plain.observer",
+    "plain.mcp",
     "app.users",
 ]
 
