@@ -68,7 +68,6 @@ class MCPServer:
 
         # Notifications (no id) — we accept but don't respond
         if msg_id is None:
-            self._handle_notification(method, message.get("params", {}))
             return None
 
         params = message.get("params", {})
@@ -87,10 +86,6 @@ class MCPServer:
         except Exception as e:
             logger.exception("MCP method error", extra={"context": {"method": method}})
             return _error_response(msg_id, INTERNAL_ERROR, f"Internal error: {e}")
-
-    def _handle_notification(self, method: str, params: dict[str, Any]) -> None:
-        # Accept notifications silently (e.g. notifications/initialized)
-        pass
 
     def _handle_initialize(self, params: dict[str, Any]) -> dict[str, Any]:
         capabilities: dict[str, Any] = {}
@@ -113,16 +108,16 @@ class MCPServer:
         return {}
 
     def _handle_tools_list(self, params: dict[str, Any]) -> dict[str, Any]:
-        tools = []
-        for tool in self.registry.tools.values():
-            tools.append(
+        return {
+            "tools": [
                 {
                     "name": tool.name,
                     "description": tool.description,
                     "inputSchema": tool.input_schema,
                 }
-            )
-        return {"tools": tools}
+                for tool in self.registry.tools.values()
+            ]
+        }
 
     def _handle_tools_call(self, params: dict[str, Any]) -> dict[str, Any]:
         tool_name = params.get("name")
@@ -157,17 +152,17 @@ class MCPServer:
         }
 
     def _handle_resources_list(self, params: dict[str, Any]) -> dict[str, Any]:
-        resources = []
-        for resource in self.registry.resources.values():
-            resources.append(
+        return {
+            "resources": [
                 {
                     "uri": resource.uri,
                     "name": resource.name,
                     "description": resource.description,
                     "mimeType": resource.mime_type,
                 }
-            )
-        return {"resources": resources}
+                for resource in self.registry.resources.values()
+            ]
+        }
 
     def _handle_resources_read(self, params: dict[str, Any]) -> dict[str, Any]:
         uri = params.get("uri")

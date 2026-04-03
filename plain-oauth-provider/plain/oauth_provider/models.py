@@ -4,30 +4,16 @@ import base64
 import hashlib
 import secrets
 from datetime import datetime
+from functools import partial
 
 from plain import postgres
 from plain.postgres import types
 from plain.runtime import SettingsReference
 
-
-def generate_client_id() -> str:
-    """Generate a random client ID (32 hex chars)."""
-    return secrets.token_hex(16)
-
-
-def generate_client_secret() -> str:
-    """Generate a random client secret (64 hex chars)."""
-    return secrets.token_hex(32)
-
-
-def generate_token() -> str:
-    """Generate a random token (40 hex chars)."""
-    return secrets.token_hex(20)
-
-
-def generate_code() -> str:
-    """Generate a random authorization code (32 hex chars)."""
-    return secrets.token_hex(16)
+generate_client_id = partial(secrets.token_hex, 16)
+generate_client_secret = partial(secrets.token_hex, 32)
+generate_token = partial(secrets.token_hex, 20)
+generate_code = partial(secrets.token_hex, 16)
 
 
 @postgres.register_model
