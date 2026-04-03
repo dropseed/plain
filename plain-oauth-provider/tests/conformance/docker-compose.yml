@@ -1,0 +1,22 @@
+# OpenID Foundation Conformance Suite
+# Docs: https://gitlab.com/openid/conformance-suite/
+#
+# Usage: docker compose up -d
+# UI: http://localhost:9999
+
+services:
+  conformance-suite:
+    image: gitlab-registry.lfx.linuxfoundation.org/openid/conformance-suite/httpd:latest
+    ports:
+      - "9999:9999"
+    depends_on:
+      - conformance-server
+    volumes:
+      - ./conformance-config:/config
+
+  conformance-server:
+    image: gitlab-registry.lfx.linuxfoundation.org/openid/conformance-suite/server:latest
+    ports:
+      - "9998:9998"
+    environment:
+      - CONFORMANCE_DEV_MODE=true

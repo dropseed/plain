@@ -24,6 +24,7 @@ dev = [
   "plain-portal",
   "plain-postgres",
   "plain-oauth",
+  "plain-oauth-provider",
   "plain-observer",
   "plain-pages",
   "plain-pageviews",
@@ -62,6 +63,7 @@ dev = [
 "plain-portal" = { workspace = true }
 "plain-postgres" = { workspace = true }
 "plain-oauth" = { workspace = true }
+"plain-oauth-provider" = { workspace = true }
 "plain-observer" = { workspace = true }
 "plain-pages" = { workspace = true }
 "plain-pageviews" = { workspace = true }

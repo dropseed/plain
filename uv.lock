@@ -22,6 +22,7 @@ members = [
     "plain-loginlink",
     "plain-mcp",
     "plain-oauth",
+    "plain-oauth-provider",
     "plain-observer",
     "plain-pages",
     "plain-pageviews",
@@ -913,6 +914,31 @@ requires-dist = [
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
+name = "plain-oauth-provider"
+version = "0.1.0"
+source = { editable = "plain-oauth-provider" }
+dependencies = [
+    { name = "plain" },
+    { name = "plain-auth" },
+    { name = "plain-postgres" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-auth", editable = "plain-auth" },
+    { name = "plain-postgres", editable = "plain-postgres" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+
+[[package]]
 name = "plain-observer"
 version = "0.34.0"
 source = { editable = "plain-observer" }
@@ -1230,6 +1256,7 @@ dev = [
     { name = "plain-loginlink" },
     { name = "plain-mcp" },
     { name = "plain-oauth" },
+    { name = "plain-oauth-provider" },
     { name = "plain-observer" },
     { name = "plain-pages" },
     { name = "plain-pageviews" },
@@ -1270,6 +1297,7 @@ dev = [
     { name = "plain-loginlink", editable = "plain-loginlink" },
     { name = "plain-mcp", editable = "plain-mcp" },
     { name = "plain-oauth", editable = "plain-oauth" },
+    { name = "plain-oauth-provider", editable = "plain-oauth-provider" },
     { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
     { name = "plain-pageviews", editable = "plain-pageviews" },

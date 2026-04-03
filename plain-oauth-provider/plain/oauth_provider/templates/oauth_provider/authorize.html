@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Authorize {{ application.name if application is defined and application else "Application" }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f5f5f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 2rem; max-width: 400px; width: 100%; }
+        h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+        .app-name { font-weight: 600; color: #111; }
+        .scope { background: #f0f0f0; border-radius: 4px; padding: 0.5rem 0.75rem; margin: 1rem 0; font-size: 0.875rem; color: #555; }
+        .actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+        button { flex: 1; padding: 0.75rem; border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 500; cursor: pointer; }
+        .approve { background: #111; color: white; }
+        .approve:hover { background: #333; }
+        .deny { background: #e5e5e5; color: #333; }
+        .deny:hover { background: #d5d5d5; }
+        .error { color: #c00; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        {% if error is defined and error %}
+            <p class="error">{{ error }}</p>
+        {% elif application is defined and application %}
+            <h1><span class="app-name">{{ application.name }}</span> wants to access your account</h1>
+
+            {% if scope is defined and scope %}
+                <div class="scope">Requested scope: {{ scope }}</div>
+            {% endif %}
+
+            <form method="post">
+                <input type="hidden" name="response_type" value="{{ params.response_type }}">
+                <input type="hidden" name="client_id" value="{{ params.client_id }}">
+                <input type="hidden" name="redirect_uri" value="{{ params.redirect_uri }}">
+                <input type="hidden" name="scope" value="{{ params.scope }}">
+                <input type="hidden" name="state" value="{{ params.state }}">
+                <input type="hidden" name="code_challenge" value="{{ params.code_challenge }}">
+                <input type="hidden" name="code_challenge_method" value="{{ params.code_challenge_method }}">
+
+                <div class="actions">
+                    <button type="submit" name="action" value="deny" class="deny">Deny</button>
+                    <button type="submit" name="action" value="approve" class="approve">Approve</button>
+                </div>
+            </form>
+        {% endif %}
+    </div>
+</body>
+</html>

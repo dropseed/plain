@@ -38,38 +38,92 @@ def _ensure_discovered() -> None:
 
 
 def _check_auth(request: Request) -> ResponseBase | None:
-    """Return an error response if auth fails, or None if OK."""
-    token = settings.MCP_AUTH_TOKEN
-    if not token:
-        # No token configured — allow all (development mode)
+    """Return an error response if auth fails, or None if OK.
+
+    Checks in order:
+    1. If MCP_AUTH_TOKEN is set, validate against that (simple shared token).
+    2. If plain.oauth_provider is installed, validate as an OAuth access token.
+    3. If neither is configured, allow all requests (development mode).
+    """
+    auth_header = request.headers.get("Authorization", "")
+    bearer_token = ""
+    if auth_header.startswith("Bearer "):
+        bearer_token = auth_header[7:]
+
+    # 1. Simple shared token check
+    static_token = settings.MCP_AUTH_TOKEN
+    if static_token:
+        if not bearer_token:
+            return _auth_error("Missing or invalid Authorization header")
+        if bearer_token != static_token:
+            return _auth_error("Invalid auth token")
         return None
 
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        return JsonResponse(
-            {
-                "jsonrpc": "2.0",
-                "id": None,
-                "error": {
-                    "code": -32001,
-                    "message": "Missing or invalid Authorization header",
-                },
-            },
-            status_code=401,
-        )
+    # 2. OAuth access token check (if plain-oauth-provider is installed)
+    if bearer_token:
+        try:
+            from plain.oauth_provider.models import AccessToken
 
-    provided_token = auth_header[7:]  # len("Bearer ") == 7
-    if provided_token != token:
-        return JsonResponse(
-            {
-                "jsonrpc": "2.0",
-                "id": None,
-                "error": {"code": -32001, "message": "Invalid auth token"},
-            },
-            status_code=401,
-        )
+            try:
+                access_token = AccessToken.query.get(token=bearer_token)
+                if access_token.is_valid():
+                    return None
+                return _auth_error("Access token expired or revoked")
+            except AccessToken.DoesNotExist:
+                return _auth_error("Invalid access token")
+        except ImportError:
+            # plain-oauth-provider not installed — token is not recognized
+            return _auth_error("Invalid auth token")
 
+    # 3. Check if OAuth provider is installed (require auth if so)
+    try:
+        from plain.oauth_provider.models import AccessToken  # noqa: F811
+
+        # Provider is installed but no token was provided
+        return _auth_error("Missing or invalid Authorization header")
+    except ImportError:
+        pass
+
+    # No auth configured — allow all (development mode)
     return None
+
+
+def _auth_error(message: str) -> JsonResponse:
+    return JsonResponse(
+        {
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {"code": -32001, "message": message},
+        },
+        status_code=401,
+    )
+
+
+class ProtectedResourceMetadataView(View):
+    """RFC 9728: OAuth 2.0 Protected Resource Metadata.
+
+    Served at /.well-known/oauth-protected-resource to tell MCP clients
+    where to obtain authorization. Only useful when plain-oauth-provider
+    is installed.
+    """
+
+    def get(self) -> ResponseBase:
+        scheme = self.request.server_scheme
+        host = self.request.host
+        base = f"{scheme}://{host}"
+
+        metadata: dict[str, Any] = {
+            "resource": base,
+        }
+
+        try:
+            metadata["authorization_servers"] = [
+                f"{base}/.well-known/oauth-authorization-server"
+            ]
+        except Exception:
+            pass
+
+        return JsonResponse(metadata)
 
 
 class MCPView(View):

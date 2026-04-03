@@ -1,0 +1,23 @@
+[project]
+name = "plain.oauth-provider"
+version = "0.1.0"
+description = "OAuth 2.1 authorization server for Plain apps."
+authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.13"
+dependencies = [
+  "plain>=0.129.0,<1.0.0",
+  "plain-auth>=0.18.0,<1.0.0",
+  "plain-postgres>=0.90.0,<1.0.0",
+]
+
+[dependency-groups]
+dev = ["plain.pytest<1.0.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["plain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
