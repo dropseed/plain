@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.131.1](https://github.com/dropseed/plain/releases/plain@0.131.1) (2026-04-02)
+
+### What's changed
+
+- **`ServerSentEventsView.get()` is now sync.** The `get()` method was unnecessarily `async` — it only constructs an `AsyncStreamingResponse` without awaiting anything. Making it sync fixes compatibility with `AuthView` and other view mixins that override `get_response()`, which previously received a coroutine instead of a response object. ([890d0d6ddb5a](https://github.com/dropseed/plain/commit/890d0d6ddb5a))
+
+### Upgrade instructions
+
+- If you override `get()` on a `ServerSentEventsView` subclass with `async def get(self)`, change it to `def get(self)`. The `stream()` method remains async — no changes needed there.
+
 ## [0.131.0](https://github.com/dropseed/plain/releases/plain@0.131.0) (2026-04-01)
 
 ### What's changed
