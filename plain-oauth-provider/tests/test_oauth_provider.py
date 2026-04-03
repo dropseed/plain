@@ -616,7 +616,7 @@ class TestEndToEndFlow:
         # Verify access token is valid in DB
         at = AccessToken.query.get(token=access_token)
         assert at.is_valid()
-        assert at.user_id == user.id
+        assert at.user.id == user.id
 
         # Step 3: Refresh the token
         response = token_client.post(

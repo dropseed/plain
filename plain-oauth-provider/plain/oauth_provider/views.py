@@ -338,7 +338,9 @@ class TokenView(View):
             application, refresh_token.user, refresh_token.access_token.scope
         )
 
-    def _issue_tokens(self, application, user, scope) -> JsonResponse:
+    def _issue_tokens(
+        self, application: OAuthApplication, user: object, scope: str
+    ) -> JsonResponse:
         """Create a new access token and refresh token pair."""
         expires_at = timezone.now() + timedelta(
             seconds=settings.OAUTH_PROVIDER_ACCESS_TOKEN_EXPIRY

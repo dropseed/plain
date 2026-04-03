@@ -65,8 +65,8 @@ class MCPRegistry:
         name: str | None = None,
         description: str | None = None,
     ) -> None:
-        tool_name = name or fn.__name__
-        tool_description = description or fn.__doc__ or ""
+        tool_name = name or getattr(fn, "__name__", "unknown")
+        tool_description = description or getattr(fn, "__doc__", None) or ""
         input_schema = _build_input_schema(fn)
         self.tools[tool_name] = Tool(
             name=tool_name,
@@ -84,8 +84,8 @@ class MCPRegistry:
         description: str | None = None,
         mime_type: str = "application/json",
     ) -> None:
-        resource_name = name or fn.__name__
-        resource_description = description or fn.__doc__ or ""
+        resource_name = name or getattr(fn, "__name__", "unknown")
+        resource_description = description or getattr(fn, "__doc__", None) or ""
         self.resources[uri] = Resource(
             uri=uri,
             name=resource_name,
