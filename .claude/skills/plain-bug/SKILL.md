@@ -1,7 +1,6 @@
 ---
 name: plain-bug
 description: Submit a bug report for the Plain framework. Use when the user wants to report a bug, error, or unexpected behavior. Collects context and creates a GitHub issue.
-disable-model-invocation: true
 ---
 
 # Submit a Plain Bug Report
