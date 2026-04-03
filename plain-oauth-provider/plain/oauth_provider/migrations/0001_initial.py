@@ -4,13 +4,14 @@ import plain.oauth_provider.models
 import plain.postgres.deletion
 from plain import postgres
 from plain.postgres import migrations
+from plain.runtime import settings
 
 
 class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("users", "0002_alter_user_email"),
+        migrations.settings_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
@@ -57,7 +58,8 @@ class Migration(migrations.Migration):
                 (
                     "user",
                     postgres.ForeignKeyField(
-                        on_delete=plain.postgres.deletion.CASCADE, to="users.user"
+                        on_delete=plain.postgres.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
                     ),
                 ),
                 (
@@ -94,7 +96,8 @@ class Migration(migrations.Migration):
                 (
                     "user",
                     postgres.ForeignKeyField(
-                        on_delete=plain.postgres.deletion.CASCADE, to="users.user"
+                        on_delete=plain.postgres.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
                     ),
                 ),
             ],
@@ -114,7 +117,8 @@ class Migration(migrations.Migration):
                 (
                     "user",
                     postgres.ForeignKeyField(
-                        on_delete=plain.postgres.deletion.CASCADE, to="users.user"
+                        on_delete=plain.postgres.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
                     ),
                 ),
                 (

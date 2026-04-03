@@ -6,7 +6,6 @@
 - [Endpoints](#endpoints)
 - [Authorization flow](#authorization-flow)
 - [Registering applications](#registering-applications)
-- [Using with plain-mcp](#using-with-plain-mcp)
 - [Consent template](#consent-template)
 - [Models](#models)
 - [Settings](#settings)
@@ -18,7 +17,7 @@
 You can add OAuth 2.1 authorization to any Plain app. This is useful for letting third-party clients (like AI assistants, CLI tools, or other apps) access your API on behalf of your users.
 
 ```python
-from plain.oauth_provider import OAuthProviderRouter, OAuthWellKnownRouter
+from plain.oauth_provider.urls import OAuthProviderRouter, OAuthWellKnownRouter
 from plain.urls import Router, include
 
 
@@ -77,33 +76,6 @@ app = OAuthApplication(
     redirect_uris="http://localhost:3000/callback https://myapp.com/callback",
 )
 ```
-
-## Using with plain-mcp
-
-When both `plain-mcp` and `plain-oauth-provider` are installed, the MCP endpoint automatically validates OAuth access tokens. Add both sets of well-known endpoints for full MCP OAuth discovery:
-
-```python
-from plain.mcp import MCPRouter, MCPWellKnownRouter
-from plain.oauth_provider import OAuthProviderRouter, OAuthWellKnownRouter
-from plain.urls import Router, include
-
-
-class AppRouter(Router):
-    namespace = ""
-    urls = [
-        include("mcp/", MCPRouter),
-        include("oauth/", OAuthProviderRouter),
-        include(".well-known/", OAuthWellKnownRouter),
-        include(".well-known/", MCPWellKnownRouter),
-    ]
-```
-
-MCP clients will automatically:
-
-1. Discover `/.well-known/oauth-protected-resource` to find the authorization server
-2. Fetch `/.well-known/oauth-authorization-server` to get endpoint URLs
-3. Run the OAuth flow to get an access token
-4. Use the token for MCP requests
 
 ## Consent template
 

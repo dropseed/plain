@@ -131,7 +131,7 @@ When [`plain.oauth_provider`](../../plain-oauth-provider/plain/oauth_provider/RE
 
 ```python
 from plain.mcp import MCPRouter, MCPWellKnownRouter
-from plain.oauth_provider import OAuthProviderRouter, OAuthWellKnownRouter
+from plain.oauth_provider.urls import OAuthProviderRouter, OAuthWellKnownRouter
 from plain.urls import Router, include
 
 
