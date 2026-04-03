@@ -132,7 +132,7 @@ class BaseHandler:
             span.set_attribute(HTTP_RESPONSE_BODY_SIZE, len(response.content))
         span.set_status(
             trace.StatusCode.OK
-            if response.status_code < 400
+            if response.status_code < 500
             else trace.StatusCode.ERROR
         )
         if response.exception:
@@ -226,7 +226,7 @@ class BaseHandler:
                 duration_attrs[http_attributes.HTTP_ROUTE] = (
                     f"/{request.resolver_match.route}"
                 )
-            if response.status_code >= 400:
+            if response.status_code >= 500:
                 duration_attrs[error_attributes.ERROR_TYPE] = str(response.status_code)
             request_duration_histogram.record(duration_s, duration_attrs)
 
