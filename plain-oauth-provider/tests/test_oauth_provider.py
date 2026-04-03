@@ -10,9 +10,9 @@ Tests cover:
 
 from __future__ import annotations
 
-import binascii
+import base64
 import hashlib
-import os
+import secrets
 from datetime import timedelta
 
 import pytest
@@ -32,15 +32,9 @@ from plain.utils import timezone
 
 def generate_pkce_pair() -> tuple[str, str]:
     """Generate a PKCE code_verifier and code_challenge (S256)."""
-    code_verifier = binascii.hexlify(os.urandom(32)).decode()
+    code_verifier = secrets.token_hex(32)
     digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
-    code_challenge = (
-        binascii.b2a_base64(digest, newline=False)
-        .decode("ascii")
-        .rstrip("=")
-        .replace("+", "-")
-        .replace("/", "_")
-    )
+    code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
     return code_verifier, code_challenge
 
 

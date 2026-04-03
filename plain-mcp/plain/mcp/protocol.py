@@ -75,7 +75,7 @@ class MCPServer:
         if not isinstance(params, dict):
             params = {}
 
-        handler = self._get_handler(method)
+        handler = self._handlers.get(method)
         if handler is None:
             return _error_response(
                 msg_id, METHOD_NOT_FOUND, f"Unknown method: {method}"
@@ -87,9 +87,6 @@ class MCPServer:
         except Exception as e:
             logger.exception("MCP method error", extra={"context": {"method": method}})
             return _error_response(msg_id, INTERNAL_ERROR, f"Internal error: {e}")
-
-    def _get_handler(self, method: str) -> Any | None:
-        return self._handlers.get(method)
 
     def _handle_notification(self, method: str, params: dict[str, Any]) -> None:
         # Accept notifications silently (e.g. notifications/initialized)

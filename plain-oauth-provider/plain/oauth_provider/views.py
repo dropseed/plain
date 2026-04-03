@@ -123,11 +123,7 @@ class AuthorizeView(AuthView):
             "code_challenge_method", "S256"
         )
 
-        if not application:
-            return JsonResponse(
-                {"error": "invalid_client", "error_description": "Unknown client"},
-                status_code=400,
-            )
+        assert application is not None  # guaranteed: no errors means valid client_id
 
         if not application.is_valid_redirect_uri(redirect_uri):
             return JsonResponse(
@@ -323,17 +319,18 @@ class RevocationView(View):
         if revoked:
             return Response(status_code=200)
 
-        refresh_tokens = RefreshToken.query.select_related("access_token").filter(
-            token=token_value, application=application
-        )
-        for rt in refresh_tokens:
-            rt.revoked = True
-            rt.save(update_fields=["revoked"])
-            rt.access_token.revoked = True
-            rt.access_token.save(update_fields=["revoked"])
+        try:
+            rt = RefreshToken.query.select_related("access_token").get(
+                token=token_value, application=application
+            )
+        except RefreshToken.DoesNotExist:
+            # RFC 7009: respond 200 even if token not found
             return Response(status_code=200)
 
-        # RFC 7009: respond 200 even if token not found
+        rt.revoked = True
+        rt.save(update_fields=["revoked"])
+        AccessToken.query.filter(id=rt.access_token.id).update(revoked=True)
+
         return Response(status_code=200)
 
 

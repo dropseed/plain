@@ -8,6 +8,7 @@ Implements the MCP Streamable HTTP transport (2025-03-26 spec):
 
 from __future__ import annotations
 
+import functools
 import json
 from collections.abc import AsyncIterator
 from typing import Any
@@ -28,8 +29,9 @@ from .registry import mcp_registry
 _server = MCPServer(mcp_registry)
 
 
+@functools.cache
 def _has_oauth_provider() -> bool:
-    """Check once whether plain.oauth_provider is installed."""
+    """Check whether plain.oauth_provider is installed (cached after first call)."""
     try:
         from plain.oauth_provider.models import AccessToken  # noqa: F401
 
@@ -162,10 +164,6 @@ class MCPView(View):
             yield ": keepalive\n\n"
 
 
-def _sse_event(data: dict[str, Any], *, event: str | None = None) -> str:
+def _sse_event(data: dict[str, Any]) -> str:
     """Format a dict as a single SSE event."""
-    lines: list[str] = []
-    if event:
-        lines.append(f"event: {event}")
-    lines.append(f"data: {json.dumps(data)}")
-    return "\n".join(lines) + "\n\n"
+    return f"data: {json.dumps(data)}\n\n"

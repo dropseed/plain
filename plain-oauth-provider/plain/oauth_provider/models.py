@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import binascii
+import base64
 import hashlib
 import secrets
 from datetime import datetime
@@ -114,14 +114,7 @@ class AuthorizationCode(postgres.Model):
 
         # S256: BASE64URL(SHA256(code_verifier)) == code_challenge
         digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
-        # Base64url encode without padding
-        computed = (
-            binascii.b2a_base64(digest, newline=False)
-            .decode("ascii")
-            .rstrip("=")
-            .replace("+", "-")
-            .replace("/", "_")
-        )
+        computed = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
         return secrets.compare_digest(computed, self.code_challenge)
 
 
