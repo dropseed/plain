@@ -21,7 +21,7 @@ class ServerSentEventsView(View):
                     await asyncio.sleep(1)
     """
 
-    async def get(self) -> AsyncStreamingResponse:
+    def get(self) -> AsyncStreamingResponse:
         return AsyncStreamingResponse(
             streaming_content=self._format_events(),
             content_type="text/event-stream",

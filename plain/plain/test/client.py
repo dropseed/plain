@@ -8,7 +8,8 @@ from io import BytesIO, IOBase
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse, urlsplit
 
-from plain.http import QueryDict, Request
+from plain.http import AsyncStreamingResponse, QueryDict, Request
+from plain.http import Response as HttpResponse
 from plain.internal.handlers.base import BaseHandler
 from plain.json import PlainJSONEncoder
 from plain.urls import get_resolver
@@ -204,6 +205,10 @@ class ClientHandler(BaseHandler):
             else:
                 response = result
 
+            # Collect async streaming content so tests can use response.content.
+            if isinstance(response, AsyncStreamingResponse):
+                response = self._collect_async_streaming(response)
+
             self._finalize_span(span, response)
 
         response._resource_closers.append(request.close)
@@ -220,10 +225,35 @@ class ClientHandler(BaseHandler):
 
         return response
 
+    def _collect_async_streaming(
+        self, response: AsyncStreamingResponse
+    ) -> ResponseBase:
+        """Collect async streaming content into a regular Response for tests."""
+
+        async def _collect(resp: AsyncStreamingResponse) -> HttpResponse:
+            chunks = []
+            async for chunk in resp:
+                chunks.append(chunk)
+            collected = b"".join(chunks)
+
+            sync_response = HttpResponse(
+                collected,
+                status_code=resp.status_code,
+                content_type=resp.headers.get("Content-Type"),
+            )
+            for key, value in resp.headers.items():
+                if key != "Content-Type":
+                    sync_response.headers[key] = value
+            sync_response.cookies = resp.cookies
+            sync_response._resource_closers = resp._resource_closers
+            resp._resource_closers = []
+            await resp.aclose()
+            return sync_response
+
+        return asyncio.run(_collect(response))
+
     def _handle_async_view(self, request: Request, pending: Any) -> ResponseBase:
         """Await an async view coroutine and run after-middleware."""
-        from plain.http import AsyncStreamingResponse
-        from plain.http import Response as HttpResponse
         from plain.internal.handlers.exception import response_for_exception
 
         async def _run() -> ResponseBase:
@@ -232,27 +262,6 @@ class ClientHandler(BaseHandler):
                 self._check_response(resp, pending.view_class)
             except Exception as exc:
                 resp = response_for_exception(request, exc)
-
-            # Collect async streaming content so tests can inspect it.
-            if isinstance(resp, AsyncStreamingResponse):
-                chunks = []
-                async for chunk in resp:
-                    chunks.append(chunk)
-                collected = b"".join(chunks)
-
-                sync_response = HttpResponse(
-                    collected,
-                    status_code=resp.status_code,
-                    content_type=resp.headers.get("Content-Type"),
-                )
-                for key, value in resp.headers.items():
-                    if key != "Content-Type":
-                        sync_response.headers[key] = value
-                sync_response.cookies = resp.cookies
-                sync_response._resource_closers = resp._resource_closers
-                resp._resource_closers = []
-                await resp.aclose()
-                return sync_response
 
             return resp
 
