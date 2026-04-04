@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.131.2](https://github.com/dropseed/plain/releases/plain@0.131.2) (2026-04-03)
+
+### What's changed
+
+- **OTel span status and `error.type` metric now only flag 5xx responses as errors.** Previously, 4xx responses were marked as `StatusCode.ERROR` on server spans and included `error.type` in request duration metrics. Per the OpenTelemetry HTTP semantic conventions, only 5xx responses should be treated as server errors — 4xx is expected behavior from the server's perspective. ([1f058a6119ce](https://github.com/dropseed/plain/commit/1f058a6119ce))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.131.1](https://github.com/dropseed/plain/releases/plain@0.131.1) (2026-04-02)
 
 ### What's changed
