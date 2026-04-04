@@ -1,5 +1,16 @@
 # plain-portal changelog
 
+## [0.2.4](https://github.com/dropseed/plain/releases/plain-portal@0.2.4) (2026-04-03)
+
+### What's changed
+
+- **Replaced socket-probe guard with `flock`-based locking.** The previous approach tried to connect to the existing socket to detect a running session, but this was racy and could fail under certain timing conditions. Now uses an exclusive file lock (`fcntl.flock`) that is held for the process lifetime and released automatically on exit or crash. ([a6866332a7cb](https://github.com/dropseed/plain/commit/a6866332a7cb))
+- **Portal socket is now project-scoped.** The socket and lock files are placed under `.plain/tmp/portal/` instead of the system temp directory, so multiple projects can run portal sessions simultaneously without conflicts. ([a6866332a7cb](https://github.com/dropseed/plain/commit/a6866332a7cb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.3](https://github.com/dropseed/plain/releases/plain-portal@0.2.3) (2026-04-02)
 
 ### What's changed
