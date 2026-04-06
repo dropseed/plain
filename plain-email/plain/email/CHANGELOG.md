@@ -1,5 +1,15 @@
 # plain-email changelog
 
+## [0.18.1](https://github.com/dropseed/plain/releases/plain-email@0.18.1) (2026-04-05)
+
+### What's changed
+
+- **Added OTel tracing to the SMTP email backend.** Each `_send()` call now creates an `email.send` CLIENT span with `email.system`, `email.recipients.count`, `email.has_attachments`, `server.address`, and `server.port` attributes. SMTP errors set `error.type` on the span. No PII (addresses, subjects) is recorded. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.18.0](https://github.com/dropseed/plain/releases/plain-email@0.18.0) (2026-03-20)
 
 ### What's changed
