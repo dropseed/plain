@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.34.1](https://github.com/dropseed/plain/releases/plain-observer@0.34.1) (2026-04-05)
+
+### What's changed
+
+- **Fixed cookie/header reading from OTel context.** Switched from `baggage.get_baggage()` to `context.get_value()` to match the producer side, which now uses process-local context values instead of baggage. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.34.0](https://github.com/dropseed/plain/releases/plain-observer@0.34.0) (2026-04-01)
 
 ### What's changed
