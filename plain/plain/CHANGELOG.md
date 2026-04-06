@@ -1,5 +1,25 @@
 # plain changelog
 
+## [0.131.3](https://github.com/dropseed/plain/releases/plain@0.131.3) (2026-04-05)
+
+### What's changed
+
+- **Fixed OTel baggage data leak.** Request cookies and headers were passed to the observer sampler via OTel baggage, which propagates to downstream services. Any instrumented outbound HTTP client would have serialized cookies and auth tokens into the `baggage:` header. Now uses process-local context values instead. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **HTTP server span name no longer includes raw URL path.** Span names start as just the HTTP method (e.g. `GET`) and are updated to `GET /users/<id>/` after URL resolution. Previously, the raw path was used from the start, causing high-cardinality span names for 404s and middleware failures. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Removed `url.full` from HTTP server spans.** The HTTP semconv doesn't define `url.full` for server spans — `url.path` and `url.query` are already set separately. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Added recommended HTTP server span attributes.** `server.address`, `server.port`, `client.address`, and `user_agent.original` are now set on HTTP server spans. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Unknown HTTP methods normalized to `_OTHER`.** Per the HTTP semconv, unrecognized methods are now set to `_OTHER` with the original value in `http.request.method_original`. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Added `error.type` to HTTP server spans.** Set to the exception class name on 5xx with an exception, or the status code string for 5xx without one. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Added `network.protocol.name` to `http.server.request.duration` metric.** ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Removed `set_status(OK)` from HTTP server span.** Per the OTel spec, instrumentation libraries should leave span status as Unset on success. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Template tracer renamed from `plain` to `plain.templates`.** ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Template `code.namespace` replaced with fully-qualified `code.function.name`.** Uses the stable semconv attribute. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Added `plain.utils.otel` module** with `format_exception_type()` helper shared across packages. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.131.2](https://github.com/dropseed/plain/releases/plain@0.131.2) (2026-04-03)
 
 ### What's changed
