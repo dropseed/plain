@@ -8,7 +8,16 @@ import threading
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
+from opentelemetry import trace
+from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
+from opentelemetry.semconv.attributes.server_attributes import (
+    SERVER_ADDRESS,
+    SERVER_PORT,
+)
+from opentelemetry.trace import SpanKind
+
 from plain.runtime import settings
+from plain.utils.otel import format_exception_type
 
 from ..backends.base import BaseEmailBackend
 from ..message import _sanitize_address
@@ -16,6 +25,8 @@ from ..utils import _DNS_NAME
 
 if TYPE_CHECKING:
     from ..message import EmailMessage
+
+tracer = trace.get_tracer("plain.email")
 
 
 class EmailBackend(BaseEmailBackend):
@@ -136,14 +147,39 @@ class EmailBackend(BaseEmailBackend):
         """A helper method that does the actual sending."""
         if not email_message.recipients():
             return False
-        encoding = email_message.encoding or "utf-8"
-        from_email = _sanitize_address(email_message.from_email, encoding)
-        recipients = [
-            _sanitize_address(addr, encoding) for addr in email_message.recipients()
-        ]
-        message = email_message.message()
-        assert self.connection is not None, "connection should be open before sending"
-        self.connection.sendmail(
-            from_email, recipients, message.as_bytes(linesep="\r\n")
-        )
-        return True
+
+        attrs: dict[str, Any] = {
+            "email.system": "smtp",
+            "email.recipients.count": len(email_message.recipients()),
+            "email.has_attachments": bool(email_message.attachments),
+        }
+        if self.host:
+            attrs[SERVER_ADDRESS] = self.host
+        if self.port:
+            attrs[SERVER_PORT] = self.port
+
+        with tracer.start_as_current_span(
+            "email.send",
+            kind=SpanKind.CLIENT,
+            attributes=attrs,
+        ) as span:
+            encoding = email_message.encoding or "utf-8"
+            from_email = _sanitize_address(email_message.from_email, encoding)
+            recipients = [
+                _sanitize_address(addr, encoding) for addr in email_message.recipients()
+            ]
+            message = email_message.message()
+            assert self.connection is not None, (
+                "connection should be open before sending"
+            )
+            try:
+                self.connection.sendmail(
+                    from_email, recipients, message.as_bytes(linesep="\r\n")
+                )
+            except Exception as exc:
+                # record_exception + set_status(ERROR) handled by the
+                # context manager when the exception propagates out.
+                # We only need to set error.type (SDK doesn't do this).
+                span.set_attribute(ERROR_TYPE, format_exception_type(exc))
+                raise
+            return True

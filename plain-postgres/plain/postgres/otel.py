@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_QUERY_PARAMETER_TEMPLATE,
-    DB_USER,
 )
 from opentelemetry.semconv.attributes.code_attributes import (
     CODE_COLUMN_NUMBER,
@@ -34,15 +33,17 @@ from opentelemetry.semconv.attributes.db_attributes import (
     DB_QUERY_SUMMARY,
     DB_QUERY_TEXT,
     DB_SYSTEM_NAME,
+    DbSystemNameValues,
 )
+from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.semconv.attributes.network_attributes import (
     NETWORK_PEER_ADDRESS,
     NETWORK_PEER_PORT,
 )
-from opentelemetry.semconv.trace import DbSystemValues
 from opentelemetry.trace import SpanKind
 
 from plain.runtime import settings
+from plain.utils.otel import format_exception_type
 
 # Use a stable string key so OpenTelemetry context APIs receive the expected type.
 _SUPPRESS_KEY = "plain.postgres.suppress_db_tracing"
@@ -56,7 +57,7 @@ query_duration_histogram = meter.create_histogram(
     description="Duration of database client operations.",
 )
 
-DB_SYSTEM = DbSystemValues.POSTGRESQL.value
+DB_SYSTEM = DbSystemNameValues.POSTGRESQL.value
 
 
 def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]:
@@ -150,10 +151,6 @@ def db_span(
     if collection_name:
         attrs[DB_COLLECTION_NAME] = collection_name
 
-    # Add user attribute
-    if user := db.settings_dict.get("USER"):
-        attrs[DB_USER] = user
-
     # Network attributes
     if host := db.settings_dict.get("HOST"):
         attrs[NETWORK_PEER_ADDRESS] = host
@@ -183,7 +180,13 @@ def db_span(
         span_name, kind=SpanKind.CLIENT, attributes=attrs
     ) as span:
         start = time.perf_counter()
-        yield span
+        try:
+            yield span
+        except Exception as exc:
+            # record_exception + set_status(ERROR) handled by
+            # start_as_current_span when the exception propagates out.
+            span.set_attribute(ERROR_TYPE, format_exception_type(exc))
+            raise
         duration_s = time.perf_counter() - start
 
         metric_attrs: dict[str, str] = {
@@ -193,8 +196,6 @@ def db_span(
         if collection_name:
             metric_attrs[DB_COLLECTION_NAME] = collection_name
         query_duration_histogram.record(duration_s, metric_attrs)
-
-        span.set_status(trace.StatusCode.OK)
 
 
 @contextmanager

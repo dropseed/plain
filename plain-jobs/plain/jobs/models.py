@@ -6,9 +6,6 @@ from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID, uuid4
 
 from opentelemetry import trace
-from opentelemetry.semconv._incubating.attributes.code_attributes import (
-    CODE_NAMESPACE,
-)
 from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MESSAGING_CONSUMER_GROUP_NAME,
     MESSAGING_DESTINATION_NAME,
@@ -18,8 +15,11 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MESSAGING_SYSTEM,
     MessagingOperationTypeValues,
 )
+from opentelemetry.semconv.attributes.code_attributes import (
+    CODE_FUNCTION_NAME,
+)
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
-from opentelemetry.trace import Link, SpanContext, SpanKind
+from opentelemetry.trace import Link, SpanContext, SpanKind, TraceFlags
 
 from plain import postgres
 from plain.logs import get_framework_logger
@@ -27,6 +27,7 @@ from plain.postgres import transaction, types
 from plain.postgres.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
+from plain.utils.otel import format_exception_type
 
 from .exceptions import DeferError, DeferJob
 from .registry import jobs_registry
@@ -260,6 +261,7 @@ class JobProcess(postgres.Model):
                             trace_id=int(self.trace_id, 16),
                             span_id=int(self.span_id, 16),
                             is_remote=True,
+                            trace_flags=TraceFlags(TraceFlags.SAMPLED),
                         )
                     )
                 )
@@ -269,22 +271,20 @@ class JobProcess(postgres.Model):
                     extra={"job_uuid": self.uuid},
                 )
 
-        with (
-            tracer.start_as_current_span(
-                f"run {self.job_class}",
-                kind=SpanKind.CONSUMER,
-                attributes={
-                    MESSAGING_SYSTEM: "plain.jobs",
-                    MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.PROCESS.value,
-                    MESSAGING_OPERATION_NAME: "run",
-                    MESSAGING_MESSAGE_ID: str(self.uuid),
-                    MESSAGING_DESTINATION_NAME: self.queue,
-                    MESSAGING_CONSUMER_GROUP_NAME: self.queue,  # Workers consume from specific queues
-                    CODE_NAMESPACE: self.job_class,
-                },
-                links=links,
-            ) as span
-        ):
+        with tracer.start_as_current_span(
+            f"process {self.queue}",
+            kind=SpanKind.CONSUMER,
+            attributes={
+                MESSAGING_SYSTEM: "plain.jobs",
+                MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.PROCESS.value,
+                MESSAGING_OPERATION_NAME: "process",
+                MESSAGING_MESSAGE_ID: str(self.uuid),
+                MESSAGING_DESTINATION_NAME: self.queue,
+                MESSAGING_CONSUMER_GROUP_NAME: self.queue,
+                CODE_FUNCTION_NAME: f"{self.job_class}.run",
+            },
+            links=links,
+        ) as span:
             # This is how we know it has been picked up
             self.started_at = timezone.now()
             self.save(update_fields=["started_at"])
@@ -306,12 +306,8 @@ class JobProcess(postgres.Model):
                             "job_process_uuid": self.uuid,
                         },
                     )
-                    span.set_attribute(ERROR_TYPE, "DeferJob")
-                    span.set_status(trace.StatusCode.OK)  # Not an error
                     return self.defer(job=job, defer_exception=e)
 
-                # Success case (only reached if no DeferJob was raised)
-                span.set_status(trace.StatusCode.OK)
                 return self.convert_to_result(status=JobResultStatuses.SUCCESSFUL)
 
             except DeferError as e:
@@ -323,8 +319,8 @@ class JobProcess(postgres.Model):
                     extra={"job_class": self.job_class, "error": str(e)},
                 )
                 span.record_exception(e)
-                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                span.set_attribute(ERROR_TYPE, type(e).__name__)
+                span.set_status(trace.StatusCode.ERROR)
+                span.set_attribute(ERROR_TYPE, format_exception_type(e))
                 return self.convert_to_result(
                     status=JobResultStatuses.ERRORED,
                     error=str(e),
@@ -333,8 +329,8 @@ class JobProcess(postgres.Model):
             except Exception as e:
                 logger.exception(e)
                 span.record_exception(e)
-                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                span.set_attribute(ERROR_TYPE, type(e).__name__)
+                span.set_status(trace.StatusCode.ERROR)
+                span.set_attribute(ERROR_TYPE, format_exception_type(e))
                 return self.convert_to_result(
                     status=JobResultStatuses.ERRORED,
                     error="".join(traceback.format_tb(e.__traceback__)),

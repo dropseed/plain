@@ -7,10 +7,6 @@ from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
-from opentelemetry.semconv._incubating.attributes.code_attributes import (
-    CODE_FILEPATH,
-    CODE_LINENO,
-)
 from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MESSAGING_DESTINATION_NAME,
     MESSAGING_MESSAGE_ID,
@@ -19,7 +15,11 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MESSAGING_SYSTEM,
     MessagingOperationTypeValues,
 )
-from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
+from opentelemetry.semconv.attributes.code_attributes import (
+    CODE_FILE_PATH,
+    CODE_FUNCTION_NAME,
+    CODE_LINE_NUMBER,
+)
 from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
 
 from plain import postgres
@@ -81,13 +81,14 @@ class Job(metaclass=JobType):
             queue = self.default_queue()
 
         with tracer.start_as_current_span(
-            f"run_in_worker {job_class_name}",
+            f"send {queue}",
             kind=SpanKind.PRODUCER,
             attributes={
                 MESSAGING_SYSTEM: "plain.jobs",
                 MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.SEND.value,
-                MESSAGING_OPERATION_NAME: "run_in_worker",
+                MESSAGING_OPERATION_NAME: "send",
                 MESSAGING_DESTINATION_NAME: queue,
+                CODE_FUNCTION_NAME: f"{job_class_name}.run_in_worker",
             },
         ) as span:
             try:
@@ -96,8 +97,8 @@ class Job(metaclass=JobType):
                 source = f"{caller.filename}:{caller.lineno}"
                 span.set_attributes(
                     {
-                        CODE_FILEPATH: caller.filename,
-                        CODE_LINENO: caller.lineno,
+                        CODE_FILE_PATH: caller.filename,
+                        CODE_LINE_NUMBER: caller.lineno,
                     }
                 )
             except (IndexError, AttributeError):
@@ -144,7 +145,7 @@ class Job(metaclass=JobType):
                 with self.get_enqueue_lock(concurrency_key) or nullcontext():
                     # Check with lock held (if using locks)
                     if not self.should_enqueue(concurrency_key):
-                        span.set_attribute(ERROR_TYPE, "ShouldNotEnqueue")
+                        span.set_attribute("job.enqueue.skipped", True)
                         return None
 
                     # Create job with lock held
@@ -167,10 +168,6 @@ class Job(metaclass=JobType):
                         MESSAGING_MESSAGE_ID,
                         str(job_request.uuid),
                     )
-
-                    # Add job UUID to current span for bidirectional linking
-                    span.set_attribute("job.uuid", str(job_request.uuid))
-                    span.set_status(trace.StatusCode.OK)
 
                     return job_request
 

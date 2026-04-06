@@ -5,7 +5,7 @@ from collections.abc import Mapping, MutableMapping
 from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
 
-from opentelemetry import baggage
+from opentelemetry import context as otel_context
 
 from plain.http import Response
 from plain.http.cookie import unsign_cookie_value
@@ -97,18 +97,19 @@ class Observer:
     def from_otel_context(cls, context: Any) -> Observer:
         """Create an Observer instance from an OpenTelemetry context.
 
-        This method extracts cookies and headers from the OTEL baggage.
+        Reads cookies and headers from process-local context values
+        (set by BaseHandler._start_request_span via context.set_value).
         """
         cookies = cast(
             MutableMapping[str, str] | None,
-            baggage.get_baggage("http.request.cookies", context),
+            otel_context.get_value("plain.request.cookies", context),
         )
         if not cookies:
             cookies = {}
 
         headers = cast(
             MutableMapping[str, str] | None,
-            baggage.get_baggage("http.request.headers", context),
+            otel_context.get_value("plain.request.headers", context),
         )
         if not headers:
             headers = {}

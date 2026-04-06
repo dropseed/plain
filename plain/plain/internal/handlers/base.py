@@ -8,14 +8,18 @@ import inspect
 import time
 from typing import TYPE_CHECKING, Any
 
-from opentelemetry import baggage, context, metrics, trace
+from opentelemetry import context, metrics, trace
 from opentelemetry.semconv._incubating.attributes.http_attributes import (
     HTTP_RESPONSE_BODY_SIZE,
 )
 from opentelemetry.semconv.attributes import (
+    client_attributes,
     error_attributes,
     http_attributes,
+    network_attributes,
+    server_attributes,
     url_attributes,
+    user_agent_attributes,
 )
 from opentelemetry.semconv.metrics.http_metrics import HTTP_SERVER_REQUEST_DURATION
 
@@ -24,6 +28,7 @@ from plain.http import Response
 from plain.runtime import settings
 from plain.urls import get_resolver
 from plain.utils.module_loading import import_string
+from plain.utils.otel import format_exception_type
 
 from .exception import response_for_exception
 
@@ -49,6 +54,20 @@ BUILTIN_AFTER_MIDDLEWARE = [
     "plain.internal.middleware.slash.RedirectSlashMiddleware",
 ]
 
+
+# RFC 9110 standard methods + PATCH (RFC 5789).
+# Unknown methods get normalized to _OTHER per OTel HTTP semconv.
+_KNOWN_HTTP_METHODS = frozenset(
+    {"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"}
+)
+
+# Context keys for passing request data to the observer sampler.
+# Uses context.set_value (process-local) — NOT baggage, which propagates
+# across process boundaries and would leak cookies/auth-tokens downstream.
+# Uses plain strings (like plain-postgres's _SUPPRESS_KEY) so the observer
+# can look them up by the same string without needing to import these.
+_REQUEST_COOKIES_KEY = "plain.request.cookies"
+_REQUEST_HEADERS_KEY = "plain.request.headers"
 
 tracer = trace.get_tracer("plain")
 
@@ -96,28 +115,55 @@ class BaseHandler:
         self, request: Request
     ) -> contextlib.AbstractContextManager[trace.Span]:
         """Start an OpenTelemetry span for a request and set it as current."""
-        span_attributes: dict[str, str] = {
+        method = request.method or ""
+        if method not in _KNOWN_HTTP_METHODS:
+            span_method = "_OTHER"
+        else:
+            span_method = method
+
+        span_attributes: dict[str, Any] = {
             "plain.request.id": request.unique_id,
-            http_attributes.HTTP_REQUEST_METHOD: request.method or "",
+            http_attributes.HTTP_REQUEST_METHOD: span_method,
             url_attributes.URL_PATH: request.path_info,
             url_attributes.URL_SCHEME: request.scheme,
         }
 
-        try:
-            span_attributes[url_attributes.URL_FULL] = request.build_absolute_uri()
-        except (KeyError, AttributeError):
-            pass
+        if span_method == "_OTHER" and method:
+            span_attributes[http_attributes.HTTP_REQUEST_METHOD_ORIGINAL] = method
 
         if request.query_string:
             span_attributes[url_attributes.URL_QUERY] = request.query_string
 
-        span_context = baggage.set_baggage("http.request.cookies", request.cookies)
-        span_context = baggage.set_baggage(
-            "http.request.headers", request.headers, span_context
+        if request.server_name:
+            span_attributes[server_attributes.SERVER_ADDRESS] = request.server_name
+        if request.server_port:
+            try:
+                span_attributes[server_attributes.SERVER_PORT] = int(
+                    request.server_port
+                )
+            except (TypeError, ValueError):
+                pass
+
+        if client_ip := request.client_ip:
+            span_attributes[client_attributes.CLIENT_ADDRESS] = client_ip
+
+        if user_agent := request.headers.get("User-Agent"):
+            span_attributes[user_agent_attributes.USER_AGENT_ORIGINAL] = user_agent
+
+        # Pass request data to observer sampler via process-local context
+        # (not baggage, which would propagate to downstream services).
+        span_context = context.set_value(_REQUEST_COOKIES_KEY, request.cookies)
+        span_context = context.set_value(
+            _REQUEST_HEADERS_KEY, request.headers, span_context
         )
 
+        # Start with just the method; updated to "{method} {route}" after
+        # URL resolution in _resolve_request. Avoids high-cardinality span
+        # names from raw paths when resolution fails (404, middleware errors).
+        span_name = "HTTP" if span_method == "_OTHER" else span_method
+
         return tracer.start_as_current_span(
-            f"{request.method} {request.path_info}",
+            span_name,
             context=span_context,
             attributes=span_attributes,
             kind=trace.SpanKind.SERVER,
@@ -130,13 +176,18 @@ class BaseHandler:
         )
         if isinstance(response, Response):
             span.set_attribute(HTTP_RESPONSE_BODY_SIZE, len(response.content))
-        span.set_status(
-            trace.StatusCode.OK
-            if response.status_code < 500
-            else trace.StatusCode.ERROR
-        )
-        if response.exception:
-            span.record_exception(response.exception)
+        if response.status_code >= 500:
+            span.set_status(trace.StatusCode.ERROR)
+            if response.exception:
+                span.record_exception(response.exception)
+                span.set_attribute(
+                    error_attributes.ERROR_TYPE,
+                    format_exception_type(response.exception),
+                )
+            else:
+                span.set_attribute(
+                    error_attributes.ERROR_TYPE, str(response.status_code)
+                )
 
     async def _run_in_executor(
         self,
@@ -217,10 +268,14 @@ class BaseHandler:
             self._finalize_span(span, response)
 
             duration_s = time.perf_counter() - start
+            method = request.method or ""
+            if method not in _KNOWN_HTTP_METHODS:
+                method = "_OTHER"
             duration_attrs: dict[str, str | int] = {
-                http_attributes.HTTP_REQUEST_METHOD: request.method or "",
+                http_attributes.HTTP_REQUEST_METHOD: method,
                 http_attributes.HTTP_RESPONSE_STATUS_CODE: response.status_code,
                 url_attributes.URL_SCHEME: request.scheme,
+                network_attributes.NETWORK_PROTOCOL_NAME: "http",
             }
             if request.resolver_match and request.resolver_match.route:
                 duration_attrs[http_attributes.HTTP_ROUTE] = (
@@ -313,7 +368,9 @@ class BaseHandler:
         if resolver_match.route:
             route_with_slash = f"/{resolver_match.route}"
             span.set_attribute(http_attributes.HTTP_ROUTE, route_with_slash)
-            span.update_name(f"{request.method} {route_with_slash}")
+            method = request.method or ""
+            span_method = method if method in _KNOWN_HTTP_METHODS else "HTTP"
+            span.update_name(f"{span_method} {route_with_slash}")
 
         return resolver_match
 
