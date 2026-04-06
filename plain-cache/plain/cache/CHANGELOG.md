@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.27.2](https://github.com/dropseed/plain/releases/plain-cache@0.27.2) (2026-04-05)
+
+### What's changed
+
+- **Removed OTel span instrumentation from cache operations.** Cache operations (`get`, `set`, `delete`, `exists`) no longer create their own OTel spans. The underlying postgres queries already produce `db.*` spans automatically, making the cache-level spans redundant noise. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.1](https://github.com/dropseed/plain/releases/plain-cache@0.27.1) (2026-03-29)
 
 ### What's changed
