@@ -1,5 +1,20 @@
 # plain-jobs changelog
 
+## [0.47.2](https://github.com/dropseed/plain/releases/plain-jobs@0.47.2) (2026-04-05)
+
+### What's changed
+
+- **Job span names now follow OTel messaging semconv.** Producer spans are named `send {queue}` (was `run_in_worker {job_class}`), consumer spans are named `process {queue}` (was `run {job_class}`). The job class name is now in `code.function.name` instead of the span name. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Swapped deprecated code attribute constants.** `code.filepath` → `code.file.path`, `code.lineno` → `code.line.number`, `code.namespace` → fully-qualified `code.function.name`. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Added `TraceFlags(SAMPLED)` to job trace links.** Links from consumer spans back to the producing trace now correctly set the sampled flag. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Changed `ShouldNotEnqueue` from `error.type` to `job.enqueue.skipped` boolean.** Skipping an enqueue due to concurrency control is normal flow, not an error. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Removed `set_status(OK)` from job spans.** Per the OTel spec, instrumentation libraries should leave span status as Unset on success. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **`error.type` now uses fully-qualified exception class names.** Uses `format_exception_type()` for consistent naming across packages. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.47.1](https://github.com/dropseed/plain/releases/plain-jobs@0.47.1) (2026-03-29)
 
 ### What's changed
