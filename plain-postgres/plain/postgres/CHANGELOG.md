@@ -1,5 +1,18 @@
 # plain-postgres changelog
 
+## [0.94.1](https://github.com/dropseed/plain/releases/plain-postgres@0.94.1) (2026-04-05)
+
+### What's changed
+
+- **Removed deprecated `db.user` attribute from query spans.** The attribute was removed from the OTel semconv with no replacement. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Switched `DbSystemValues` to stable `DbSystemNameValues`.** Migrated from the deprecated `opentelemetry.semconv.trace` module to the stable `opentelemetry.semconv.attributes.db_attributes`. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Added `error.type` attribute to query spans on exceptions.** Set to the fully-qualified exception class name (e.g. `psycopg.errors.UniqueViolation`) for queryable error grouping. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+- **Removed `set_status(OK)` from query spans.** Per the OTel spec, instrumentation libraries should leave span status as Unset on success. ([b56a9edc9c7d](https://github.com/dropseed/plain/commit/b56a9edc9c7d))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.94.0](https://github.com/dropseed/plain/releases/plain-postgres@0.94.0) (2026-04-02)
 
 ### What's changed
