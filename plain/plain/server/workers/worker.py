@@ -211,7 +211,8 @@ class Worker:
         )
 
         # Start servers (one per listener socket)
-        servers: list[asyncio.Server] = []
+        self._servers: list[asyncio.Server] = []
+        servers = self._servers
         for listener in self.sockets:
             assert listener.sock is not None, "Listener socket is closed"
             listener.sock.setblocking(False)
@@ -337,6 +338,10 @@ class Worker:
 
     def _signal_exit(self) -> None:
         self.alive = False
+        # Immediately stop accepting new connections so requests
+        # don't land on a worker that's about to exit (H13 prevention).
+        for server in getattr(self, "_servers", ()):
+            server.close()
 
     def _signal_quit(self) -> None:
         # Hard stop — the arbiter uses SIGQUIT for immediate termination.
