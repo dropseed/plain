@@ -1,6 +1,7 @@
 ---
 name: plain-postgres-doctor
 description: Check overall database health — schema correctness and operational health. Use when asked to check the database, validate schema, optimize indexes, or diagnose Postgres problems.
+context: fork
 ---
 
 # Database Doctor

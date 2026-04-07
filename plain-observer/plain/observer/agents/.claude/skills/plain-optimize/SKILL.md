@@ -1,6 +1,7 @@
 ---
 name: plain-optimize
 description: Captures and analyzes performance traces to identify slow queries and N+1 problems. Use when a page is slow, there are too many queries, or the user asks about performance.
+context: fork
 ---
 
 # Performance Optimization Workflow
