@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}New note{% endblock %}
+
+{% block content %}
+<div class="p-8 max-w-2xl mx-auto">
+    <div class="mb-4">
+        <a href="{{ url('notes:list') }}" class="text-sm text-blue-500 hover:underline">
+            ← Back to notes
+        </a>
+    </div>
+
+    <h1 class="text-2xl font-bold mb-4">New note</h1>
+
+    <form method="post" class="flex flex-col">
+        {% for error in form.non_field_errors %}
+        <div class="text-red-500 border-red-500 border rounded-md p-2 mb-4">{{ error }}</div>
+        {% endfor %}
+
+        <label class="text-sm mb-1" for="{{ form.title.html_id }}">Title</label>
+        <input
+            class="border border-gray-300 rounded-md px-3 py-2 mb-1"
+            type="text"
+            name="{{ form.title.html_name }}"
+            id="{{ form.title.html_id }}"
+            value="{{ form.title.value() or '' }}"
+            autofocus
+            required
+        >
+        {% for error in form.title.errors %}
+        <div class="text-red-500 text-sm mb-2">{{ error }}</div>
+        {% endfor %}
+
+        <label class="text-sm mb-1 mt-3" for="{{ form.body.html_id }}">Body</label>
+        <textarea
+            class="border border-gray-300 rounded-md px-3 py-2 mb-1 min-h-[200px]"
+            name="{{ form.body.html_name }}"
+            id="{{ form.body.html_id }}"
+        >{{ form.body.value() or '' }}</textarea>
+        {% for error in form.body.errors %}
+        <div class="text-red-500 text-sm mb-2">{{ error }}</div>
+        {% endfor %}
+
+        <button
+            type="submit"
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4 self-start"
+        >
+            Create
+        </button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}{{ note.title }}{% endblock %}
+
+{% block content %}
+<div class="p-8 max-w-2xl mx-auto">
+    <div class="mb-4">
+        <a href="{{ url('notes:list') }}" class="text-sm text-blue-500 hover:underline">
+            ← Back to notes
+        </a>
+    </div>
+
+    <h1 class="text-2xl font-bold mb-2">{{ note.title }}</h1>
+    <div class="text-sm text-gray-500 mb-4">
+        Created {{ note.created_at.strftime("%Y-%m-%d %H:%M") }}
+        {% if note.updated_at != note.created_at %}
+        · Updated {{ note.updated_at.strftime("%Y-%m-%d %H:%M") }}
+        {% endif %}
+    </div>
+
+    {% if note.body %}
+    <div class="prose whitespace-pre-wrap mb-8">{{ note.body }}</div>
+    {% else %}
+    <p class="text-gray-500 italic mb-8">No body.</p>
+    {% endif %}
+
+    <div class="flex gap-2">
+        <a
+            href="{{ url('notes:update', id=note.id) }}"
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+            Edit
+        </a>
+        <a
+            href="{{ url('notes:delete', id=note.id) }}"
+            class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+        >
+            Delete
+        </a>
+    </div>
+</div>
+{% endblock %}

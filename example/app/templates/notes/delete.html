@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Delete {{ note.title }}{% endblock %}
+
+{% block content %}
+<div class="p-8 max-w-2xl mx-auto">
+    <div class="mb-4">
+        <a
+            href="{{ url('notes:detail', id=note.id) }}"
+            class="text-sm text-blue-500 hover:underline"
+        >
+            ← Back to note
+        </a>
+    </div>
+
+    <h1 class="text-2xl font-bold mb-4">Delete note</h1>
+    <p class="mb-4">
+        Are you sure you want to delete
+        <span class="font-semibold">{{ note.title }}</span>?
+        This can't be undone.
+    </p>
+
+    <form method="post" class="flex gap-2">
+        <button
+            type="submit"
+            class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+        >
+            Delete
+        </button>
+        <a
+            href="{{ url('notes:detail', id=note.id) }}"
+            class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded"
+        >
+            Cancel
+        </a>
+    </form>
+</div>
+{% endblock %}

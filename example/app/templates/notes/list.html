@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Notes{% endblock %}
+
+{% block content %}
+<div class="p-8 max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold">Notes</h1>
+        <a
+            href="{{ url('notes:create') }}"
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+            New note
+        </a>
+    </div>
+
+    {% if notes %}
+    <ul class="divide-y divide-gray-200 border border-gray-200 rounded">
+        {% for note in notes %}
+        <li class="p-4 hover:bg-gray-50">
+            <a href="{{ url('notes:detail', id=note.id) }}" class="block">
+                <div class="font-medium">{{ note.title }}</div>
+                <div class="text-sm text-gray-500">
+                    {{ note.updated_at.strftime("%Y-%m-%d %H:%M") }}
+                </div>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-gray-500">No notes yet. Create your first one.</p>
+    {% endif %}
+</div>
+{% endblock %}

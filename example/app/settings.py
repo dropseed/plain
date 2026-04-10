@@ -27,6 +27,7 @@ INSTALLED_PACKAGES = [
     "plain.redirection",
     "plain.observer",
     "app.users",
+    "app.notes",
 ]
 
 
