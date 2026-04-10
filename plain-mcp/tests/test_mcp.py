@@ -110,7 +110,7 @@ class TestMCPProtocol:
         assert response is not None
         result = response["result"]
         assert result["isError"] is True
-        assert "RuntimeError" in result["content"][0]["text"]
+        assert result["content"][0]["text"] == "something broke"
 
     def test_resources_list_empty(self) -> None:
         response = self.server.handle_message(_make_request("resources/list"))

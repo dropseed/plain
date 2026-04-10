@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# Run the MCP Conformance Test Framework against a live plain-mcp server.
+#
+# Usage: plain-mcp/tests/conformance/run
+#
+# Starts `plain server` on a local port, waits for it to become ready, runs
+# `npx @modelcontextprotocol/conformance server`, then stops the server.
+# Exits with the conformance CLI's exit code.
+#
+# Gracefully skips (exit 0) if `npx` is not available on PATH.
+
+set -e
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PORT="${MCP_CONFORMANCE_PORT:-18765}"
+URL="http://127.0.0.1:${PORT}/mcp/"
+BASELINE="${HERE}/expected-failures.yml"
+
+bold() { printf '\033[1m%s\033[0m\n' "$1"; }
+
+if ! command -v npx >/dev/null 2>&1; then
+    bold "Skipping MCP conformance (npx not available — install Node.js to run)"
+    exit 0
+fi
+
+bold "Starting plain-mcp server on ${URL}"
+
+cd "${HERE}"
+PLAIN_SETTINGS_MODULE=app.settings \
+PYTHONPATH="${HERE}" \
+    uv run plain server \
+        -b "127.0.0.1:${PORT}" \
+        --workers 1 \
+        --no-access-log \
+    >/tmp/plain-mcp-conformance.log 2>&1 &
+SERVER_PID=$!
+
+cleanup() {
+    if kill -0 "${SERVER_PID}" 2>/dev/null; then
+        kill "${SERVER_PID}" 2>/dev/null || true
+        wait "${SERVER_PID}" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT INT TERM
+
+# Wait for the server to respond to an MCP initialize request.
+for i in $(seq 1 40); do
+    if curl -sf -X POST "${URL}" \
+        -H 'Content-Type: application/json' \
+        -H 'Accept: application/json, text/event-stream' \
+        -d '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}' \
+        >/dev/null 2>&1; then
+        break
+    fi
+    if ! kill -0 "${SERVER_PID}" 2>/dev/null; then
+        bold "Server died before becoming ready. Last 40 log lines:"
+        tail -n 40 /tmp/plain-mcp-conformance.log || true
+        exit 1
+    fi
+    sleep 0.25
+done
+
+bold "Running MCP conformance suite"
+
+set +e
+npx --yes @modelcontextprotocol/conformance server \
+    --url "${URL}" \
+    --expected-failures "${BASELINE}"
+STATUS=$?
+set -e
+
+exit "${STATUS}"

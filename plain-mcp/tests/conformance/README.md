@@ -1,75 +1,56 @@
 # MCP Conformance Testing
 
-This directory contains instructions for running the [MCP Conformance Test Framework](https://github.com/modelcontextprotocol/conformance) against a plain-mcp server.
+Runs the [MCP Conformance Test Framework](https://github.com/modelcontextprotocol/conformance) against a live plain-mcp server as part of `./scripts/test plain-mcp`.
 
-Unlike the OAuth conformance suite, the MCP conformance framework is distributed as an npm package, so no Docker or long-running containers are required — just `npx`.
+## Layout
 
-## Quick start
+- `app/settings.py`, `app/urls.py` — a minimal Plain server that mounts `MCPRouter` on `/mcp/`
+- `app/mcp.py` — the tools and resources the conformance suite expects (`test_simple_text`, `test_error_handling`, `test://static-text`)
+- `run` — starts the Plain server on `127.0.0.1:18765`, runs the conformance CLI against it, then shuts the server down
+- `expected-failures.yml` — baseline of scenarios that plain-mcp does not yet pass
 
-### 1. Start a Plain server with plain-mcp installed
+## How it runs
 
-Use the `example/` app at the repo root (or any Plain app with `plain.mcp` installed and `MCPRouter` mounted):
+`scripts/test plain-mcp` invokes `tests/conformance/run` after the pytest suite. The runner:
 
-```bash
-cd example
-uv run plain dev
-```
+1. Starts `plain server` with `app.settings` in a background process
+2. Waits for `ping` to succeed
+3. Invokes `npx --yes @modelcontextprotocol/conformance server --url … --expected-failures …`
+4. Kills the server regardless of the outcome
+5. Exits with the conformance CLI's exit code
 
-The server will be available at `https://<project>.localhost:8443`, with the MCP endpoint at `/mcp/`.
+If `npx` isn't on `PATH` the runner prints a skip notice and exits 0, so devs without Node can still run the rest of the suite.
 
-Make sure `app/mcp.py` registers at least one `@mcp_tool` and one `@mcp_resource` so the conformance suite has something to exercise:
-
-```python
-# app/mcp.py
-from plain.mcp import mcp_tool, mcp_resource
-
-
-@mcp_tool
-def echo(text: str) -> str:
-    """Return the input text unchanged."""
-    return text
-
-
-@mcp_resource("example://hello", description="A greeting")
-def hello() -> str:
-    return "Hello from plain-mcp"
-```
-
-### 2. Disable auth for the conformance run
-
-The MCP conformance tool does not send bearer tokens or OAuth credentials, so leave `MCP_AUTH_TOKEN` unset and do **not** install `plain.oauth_provider` in this server. With no token configured, plain-mcp allows all requests — which is what the conformance framework expects.
-
-### 3. Run the conformance suite
-
-In a separate terminal:
+## Running it directly
 
 ```bash
-npx @modelcontextprotocol/conformance server --url https://<project>.localhost:8443/mcp/
+plain-mcp/tests/conformance/run
 ```
 
-To see which scenarios are available:
+Override the port with `MCP_CONFORMANCE_PORT=<port>`.
 
-```bash
-npx @modelcontextprotocol/conformance list --server
-```
+## Updating the baseline
 
-To run a single scenario:
+The conformance CLI has four exit-code outcomes when `--expected-failures` is set:
 
-```bash
-npx @modelcontextprotocol/conformance server \
-    --url https://<project>.localhost:8443/mcp/ \
-    --scenario server-initialize
-```
+| Run result | In baseline | Exit                                 |
+| ---------- | ----------- | ------------------------------------ |
+| Fails      | Yes         | 0 — expected failure                 |
+| Fails      | No          | 1 — unexpected regression            |
+| Passes     | Yes         | 1 — stale baseline, remove the entry |
+| Passes     | No          | 0 — normal pass                      |
 
-Add `--verbose` for full request/response output. Results are written to `results/server-<scenario>-<timestamp>/checks.json`.
+So when you ship a new MCP feature (e.g. prompts), the runner will fail with "stale baseline" until you remove the now-passing scenarios from `expected-failures.yml`. That forces the baseline to track reality.
 
-## What's tested
+## Currently passing scenarios
 
-The MCP conformance framework verifies:
+- `server-initialize`
+- `ping`
+- `tools-list`
+- `tools-call-simple-text`
+- `tools-call-error`
+- `resources-list`
+- `resources-read-text`
+- `dns-rebinding-protection`
 
-- `initialize` handshake and capability negotiation
-- `tools/list` and `tools/call` behavior
-- `resources/list` and `resources/read` behavior
-- JSON-RPC 2.0 framing (request/response/notification)
-- Error codes and response shapes
-- Streamable HTTP transport semantics (the `2025-03-26` spec)
+Everything else is listed in `expected-failures.yml` with a short note about what feature it needs.

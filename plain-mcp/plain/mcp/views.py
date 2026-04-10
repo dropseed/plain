@@ -20,6 +20,7 @@ from plain.http import (
     Response,
     ResponseBase,
 )
+from plain.packages import packages_registry
 from plain.runtime import settings
 from plain.views.base import View
 
@@ -31,13 +32,12 @@ _server = MCPServer(mcp_registry)
 
 @functools.cache
 def _has_oauth_provider() -> bool:
-    """Check whether plain.oauth_provider is installed (cached after first call)."""
+    """Check whether plain.oauth_provider is in INSTALLED_PACKAGES (cached)."""
     try:
-        from plain.oauth_provider.models import AccessToken  # noqa: F401
-
-        return True
-    except ImportError:
+        packages_registry.get_package_config("plainoauthprovider")
+    except LookupError:
         return False
+    return True
 
 
 def _check_auth(request: Request) -> ResponseBase | None:

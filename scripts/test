@@ -21,12 +21,14 @@ plain-jobs
 plain-flags
 plain-admin
 plain-oauth
+plain-oauth-provider
 plain-auth
 plain-api
 plain-elements
 plain-htmx
 plain-email
 plain-pages
+plain-mcp
 EOF
 )"
 
@@ -83,6 +85,14 @@ for package in $packages; do
   set +x
 
   cd ../..
+
+  # MCP conformance suite (external, Node.js-based) — runs after plain-mcp
+  # unit tests. Gracefully skips if `npx` isn't available.
+  if [ "$package" = "plain-mcp" ]; then
+    echo
+    bold "Running MCP conformance suite for plain-mcp"
+    plain-mcp/tests/conformance/run
+  fi
 done
 
 # Example project (smoke-tests only)

@@ -10,7 +10,6 @@ Implements the Model Context Protocol (2025-03-26 spec) server-side:
 from __future__ import annotations
 
 import json
-import traceback
 from typing import Any
 
 from plain.logs import get_framework_logger
@@ -132,10 +131,10 @@ class MCPServer:
 
         try:
             result = tool.call(arguments)
-        except Exception:
-            error_text = traceback.format_exc()
+        except Exception as e:
+            logger.exception("MCP tool error", extra={"context": {"tool": tool_name}})
             return {
-                "content": [{"type": "text", "text": error_text}],
+                "content": [{"type": "text", "text": str(e)}],
                 "isError": True,
             }
 
@@ -173,20 +172,7 @@ class MCPServer:
         if not resource:
             raise ValueError(f"Unknown resource: {uri}")
 
-        try:
-            text = resource.read()
-        except Exception:
-            error_text = traceback.format_exc()
-            return {
-                "contents": [
-                    {
-                        "uri": uri,
-                        "mimeType": "text/plain",
-                        "text": error_text,
-                    }
-                ],
-            }
-
+        text = resource.read()
         return {
             "contents": [
                 {
