@@ -35,26 +35,26 @@ class ChoicesMeta(enum.EnumMeta):
             # Use dict.__setitem__() to suppress defenses against double
             # assignment in enum's classdict.
             dict.__setitem__(classdict, key, value)
-        cls = super().__new__(metacls, classname, bases, classdict, **kwds)  # type: ignore[misc]
+        cls = super().__new__(metacls, classname, bases, classdict, **kwds)  # type: ignore
         for member, label in zip(cls.__members__.values(), labels):
             member._label_ = label
         return enum.unique(cls)
 
-    def __contains__(cls, member: object) -> bool:  # type: ignore[override]
+    def __contains__(cls, member: object) -> bool:  # type: ignore
         if not isinstance(member, enum.Enum):
             # Allow non-enums to match against member values.
-            return any(x.value == member for x in cls)  # type: ignore[attr-defined]
+            return any(x.value == member for x in cls)  # type: ignore
         return super().__contains__(member)
 
     @property
     def names(cls) -> list[str]:
         empty = ["__empty__"] if hasattr(cls, "__empty__") else []
-        return empty + [member.name for member in cls]  # type: ignore[attr-defined]
+        return empty + [member.name for member in cls]  # type: ignore
 
     @property
     def choices(cls) -> list[tuple[Any, str]]:
         empty = [(None, cls.__empty__)] if hasattr(cls, "__empty__") else []
-        return empty + [(member.value, member.label) for member in cls]  # type: ignore[attr-defined]
+        return empty + [(member.value, member.label) for member in cls]  # type: ignore
 
     @property
     def labels(cls) -> list[str]:

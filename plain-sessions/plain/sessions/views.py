@@ -23,6 +23,6 @@ class SessionView(View):
 
     def get_template_context(self) -> dict:
         """Add session to template context."""
-        context = super().get_template_context()  # type: ignore[misc]
+        context = super().get_template_context()  # type: ignore
         context["session"] = self.session
         return context

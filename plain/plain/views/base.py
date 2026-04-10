@@ -70,7 +70,7 @@ class View:
             return NotAllowedResponse(self._allowed_methods())
 
         if inspect.iscoroutinefunction(handler):
-            return self._dispatch_handler_async(handler)  # type: ignore[return-value]
+            return self._dispatch_handler_async(handler)  # type: ignore
 
         try:
             result: Any = handler()

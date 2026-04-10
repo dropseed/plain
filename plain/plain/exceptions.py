@@ -84,7 +84,7 @@ class ValidationError(Exception):
     @property
     def messages(self) -> list[str]:
         if hasattr(self, "error_dict"):
-            return sum(dict(self).values(), [])  # type: ignore[arg-type]
+            return sum(dict(self).values(), [])  # type: ignore
         return list(self)
 
     def update_error_dict(
@@ -100,7 +100,7 @@ class ValidationError(Exception):
     def __iter__(self) -> Iterator[tuple[str, list[str]] | str]:
         if hasattr(self, "error_dict"):
             for field, errors in self.error_dict.items():
-                yield field, list(ValidationError(errors))
+                yield field, list(ValidationError(errors))  # ty: ignore[invalid-yield]
         else:
             for error in self.error_list:
                 message = error.message
@@ -110,7 +110,7 @@ class ValidationError(Exception):
 
     def __str__(self) -> str:
         if hasattr(self, "error_dict"):
-            return repr(dict(self))  # type: ignore[arg-type]
+            return repr(dict(self))  # type: ignore
         return repr(list(self))
 
     def __repr__(self) -> str:

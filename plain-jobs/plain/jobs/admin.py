@@ -229,7 +229,7 @@ class JobResultViewset(AdminViewset):
         ]
 
         def get_initial_queryset(self) -> JobResultQuerySet:
-            queryset: JobResultQuerySet = super().get_initial_queryset()  # type: ignore[assignment]
+            queryset: JobResultQuerySet = super().get_initial_queryset()  # type: ignore
             return queryset.annotate(
                 retried=Case(
                     When(retry_job_request_uuid__isnull=False, then=True),

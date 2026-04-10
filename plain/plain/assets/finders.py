@@ -53,4 +53,4 @@ def _iter_asset_dirs() -> Iterator[str]:
 
     # The app/assets take priority over everything
     if _APP_ASSETS_DIR.exists():
-        yield _APP_ASSETS_DIR
+        yield str(_APP_ASSETS_DIR)

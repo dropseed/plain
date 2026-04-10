@@ -118,7 +118,7 @@ class AdminModelListView(AdminListView):
         if search := self.request.query_params.get("search"):
             filters = Q()
             for field in self.search_fields:
-                filters |= Q(**{f"{field}__icontains": search})  # type: ignore[invalid-argument-type]
+                filters |= Q(**{f"{field}__icontains": search})  # type: ignore
             return queryset.filter(filters)
         return queryset
 

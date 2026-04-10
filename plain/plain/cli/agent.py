@@ -45,7 +45,7 @@ def _get_agent_dirs() -> list[Path]:
 
     # Search plainx.* packages
     try:
-        import plainx  # type: ignore[import-not-found]
+        import plainx  # type: ignore
 
         # Check plainx.* subpackages
         if hasattr(plainx, "__path__"):

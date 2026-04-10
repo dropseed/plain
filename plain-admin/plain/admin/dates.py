@@ -181,7 +181,7 @@ class DatetimeRange:
                 year=start.year, month=start.month, day=start.day
             )
         else:
-            self.start = start  # type: ignore[assignment]
+            self.start = start  # type: ignore
 
         if isinstance(end, str) and end:
             self.end = datetime.datetime.fromisoformat(end)
@@ -190,7 +190,7 @@ class DatetimeRange:
                 year=end.year, month=end.month, day=end.day
             )
         else:
-            self.end = end  # type: ignore[assignment]
+            self.end = end  # type: ignore
 
     def as_tuple(self) -> tuple[datetime.datetime, datetime.datetime]:
         return (self.start, self.end)

@@ -373,7 +373,7 @@ def select_related_descend(
     if (
         restricted
         and select_mask
-        and field.name in requested  # type: ignore[operator]
+        and field.name in requested  # type: ignore
         and field not in select_mask
     ):
         raise FieldError(

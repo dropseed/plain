@@ -144,7 +144,7 @@ class Field:
         try:
             data = self.to_python(data)
             if hasattr(self, "_coerce"):
-                return self._coerce(data) != self._coerce(initial)  # type: ignore[misc]
+                return self._coerce(data) != self._coerce(initial)  # type: ignore
         except ValidationError:
             return True
         # For purposes of seeing whether something has changed, None is
@@ -677,7 +677,7 @@ class FileField(Field):
 
         return value
 
-    def clean(self, data: Any, initial: Any = None) -> Any:  # type: ignore[override]
+    def clean(self, data: Any, initial: Any = None) -> Any:  # type: ignore
         # If the widget got contradictory inputs, we raise a validation error
         if data is _FILE_INPUT_CONTRADICTION:
             raise ValidationError(
@@ -726,7 +726,7 @@ class ImageField(FileField):
         if f is None:
             return None
 
-        from PIL import Image  # type: ignore[import-not-found]
+        from PIL import Image  # type: ignore
 
         # We need to get a file object for Pillow. We might have a path or we might
         # have to read the data into memory.
@@ -882,7 +882,7 @@ class NullBooleanField(BooleanField):
     to None.
     """
 
-    def to_python(self, value: Any) -> bool | None:  # type: ignore[override]
+    def to_python(self, value: Any) -> bool | None:  # type: ignore
         """
         Explicitly check for the string 'True' and 'False', which is what a
         hidden field will submit for True and False, for 'true' and 'false',
@@ -1039,7 +1039,7 @@ class MultipleChoiceField(ChoiceField):
         "invalid_list": "Enter a list of values.",
     }
 
-    def to_python(self, value: Any) -> list[str]:  # type: ignore[override]
+    def to_python(self, value: Any) -> list[str]:  # type: ignore
         if not value:
             return []
         elif not isinstance(value, list | tuple):
@@ -1086,7 +1086,7 @@ class UUIDField(TextField):
             return str(value)
         return value
 
-    def to_python(self, value: Any) -> uuid.UUID | None:  # type: ignore[override]
+    def to_python(self, value: Any) -> uuid.UUID | None:  # type: ignore
         value = super().to_python(value)
         if value in self.empty_values:
             return None

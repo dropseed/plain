@@ -390,7 +390,7 @@ class ObserverSpanProcessor(SpanProcessor):
                         )
                         delete_ids = Trace.query.order_by("start_time")[
                             :excess_count
-                        ].values_list(  # type: ignore[union-attr]
+                        ].values_list(  # type: ignore
                             "id", flat=True
                         )
                         Trace.query.filter(id__in=delete_ids).delete()

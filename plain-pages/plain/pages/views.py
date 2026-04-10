@@ -23,7 +23,7 @@ __all__ = ["PageView"]
 class PageViewMixin:
     @cached_property
     def page(self) -> Page:
-        url_name = self.request.resolver_match.url_name  # type: ignore[attr-defined]
+        url_name = self.request.resolver_match.url_name  # type: ignore
 
         try:
             return pages_registry.get_page_from_name(url_name)
@@ -31,7 +31,7 @@ class PageViewMixin:
             raise NotFoundError404()
 
     def get_template_context(self) -> dict[str, Any]:
-        context = super().get_template_context()  # type: ignore[misc]
+        context = super().get_template_context()  # type: ignore
         context["page"] = self.page
         self.page.set_template_context(context)  # Pass the standard context through
         return context

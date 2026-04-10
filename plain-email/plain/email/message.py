@@ -8,7 +8,7 @@ from email.errors import HeaderParseError
 from email.header import Header
 from email.headerregistry import Address
 from email.headerregistry import (
-    parser as headerregistry_parser,  # type: ignore[attr-defined]
+    parser as headerregistry_parser,  # type: ignore
 )
 from email.message import Message
 from email.mime.base import MIMEBase
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 # Don't BASE64-encode UTF-8 messages so that we avoid unwanted attention from
 # some spam filters.
 _utf8_charset = Charset.Charset("utf-8")
-_utf8_charset.body_encoding = None  # type: ignore[assignment]  # Python defaults to BASE64
+_utf8_charset.body_encoding = None  # type: ignore  # Python defaults to BASE64
 _utf8_charset_qp = Charset.Charset("utf-8")
 _utf8_charset_qp.body_encoding = Charset.QP
 
@@ -181,7 +181,7 @@ class SafeMIMEText(MIMEMixin, MIMEText):
         name, val = _forbid_multi_line_headers(name, val, self.encoding)
         MIMEText.__setitem__(self, name, val)
 
-    def set_payload(  # type: ignore[override]
+    def set_payload(  # type: ignore
         self, payload: str, charset: str | Charset.Charset | None = None
     ) -> None:
         if charset == "utf-8" and not isinstance(charset, Charset.Charset):

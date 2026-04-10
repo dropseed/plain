@@ -221,7 +221,7 @@ def new_method_proxy(func: Callable[..., Any]) -> Callable[..., Any]:
             _wrapped = self._wrapped
         return func(_wrapped, *args)
 
-    inner._mask_wrapped = False  # type: ignore[attr-defined]
+    inner._mask_wrapped = False  # type: ignore
     return inner
 
 

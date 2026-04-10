@@ -483,7 +483,7 @@ def _make_execute_code(*, writable: bool = False):
 
             last_expr: ast.Expr | None = None
             if tree.body and isinstance(tree.body[-1], ast.Expr):
-                last_expr = tree.body.pop()  # type: ignore[assignment]
+                last_expr = tree.body.pop()  # type: ignore
 
             ctx = contextlib.ExitStack()
             ctx.enter_context(redirect_stdout(stdout_capture))

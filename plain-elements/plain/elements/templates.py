@@ -41,7 +41,7 @@ class ElementsExtension(Extension):
     def __init__(self, env: Environment):
         super().__init__(env)
         # Make the Element function available in connection with this extension
-        env.globals["Element"] = Element  # type: ignore[invalid-assignment]
+        env.globals["Element"] = Element  # type: ignore
 
         self._CAP_TAG = r"(?:[a-z_]+\.)?[A-Z][A-Za-z0-9_]*"
 

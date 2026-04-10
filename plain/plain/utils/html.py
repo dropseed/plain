@@ -70,7 +70,7 @@ def conditional_escape(text: Any) -> SafeString | str:
     if isinstance(text, Promise):
         text = str(text)
     if hasattr(text, "__html__"):
-        return text.__html__()  # type: ignore[union-attr]
+        return text.__html__()  # type: ignore
     else:
         return escape(text)
 

@@ -146,22 +146,22 @@ class Dependency:
         # Force [tool.plain.vendor.dependencies.{name}] to be an inline table
         # name = { url = "https://example.com", installed = "1.0.0" }
         dependencies[self.name] = tomlkit.inline_table()
-        dependencies[self.name]["url"] = self.url  # type: ignore[index]
-        dependencies[self.name]["installed"] = self.installed  # type: ignore[index]
+        dependencies[self.name]["url"] = self.url  # type: ignore
+        dependencies[self.name]["installed"] = self.installed  # type: ignore
         if self.filename:
-            dependencies[self.name]["filename"] = self.filename  # type: ignore[index]
+            dependencies[self.name]["filename"] = self.filename  # type: ignore
         if self.sourcemap:
-            dependencies[self.name]["sourcemap"] = self.sourcemap  # type: ignore[index]
+            dependencies[self.name]["sourcemap"] = self.sourcemap  # type: ignore
 
         # Have to give it the right structure in case they don't exist
         if "tool" not in pyproject:
             pyproject["tool"] = tomlkit.table()
-        if "plain" not in pyproject["tool"]:  # type: ignore[operator]
-            pyproject["tool"]["plain"] = tomlkit.table()  # type: ignore[index]
-        if "vendor" not in pyproject["tool"]["plain"]:  # type: ignore[operator, index]
-            pyproject["tool"]["plain"]["vendor"] = tomlkit.table()  # type: ignore[index]
+        if "plain" not in pyproject["tool"]:  # type: ignore
+            pyproject["tool"]["plain"] = tomlkit.table()  # type: ignore
+        if "vendor" not in pyproject["tool"]["plain"]:  # type: ignore
+            pyproject["tool"]["plain"]["vendor"] = tomlkit.table()  # type: ignore
 
-        pyproject["tool"]["plain"]["vendor"]["dependencies"] = dependencies  # type: ignore[index]
+        pyproject["tool"]["plain"]["vendor"]["dependencies"] = dependencies  # type: ignore
 
         with open("pyproject.toml", "w") as f:
             f.write(tomlkit.dumps(pyproject))

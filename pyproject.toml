@@ -37,7 +37,7 @@ dev = [
   "plain-tunnel",
   "plain-vendor",
   # Type checking and better dev experience
-  "ty>=0.0.21",
+  "ty>=0.0.29",
   "psycopg[binary]>=3.2.12",
 ]
 

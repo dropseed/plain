@@ -18,7 +18,7 @@ from .schemas import ErrorSchema
 try:
     from .models import APIKey
 except ImportError:
-    APIKey = None  # type: ignore[misc, assignment]
+    APIKey = None  # type: ignore
 
 __all__ = [
     "APIKeyView",

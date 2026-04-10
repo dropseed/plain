@@ -51,7 +51,7 @@ class Node:
         """
         obj = Node(children, connector or cls.default, negated)
         obj.__class__ = cls
-        return obj  # type: ignore[return-value]
+        return obj  # type: ignore
 
     def __str__(self) -> str:
         template = "(NOT (%s: %s))" if self.negated else "(%s: %s)"

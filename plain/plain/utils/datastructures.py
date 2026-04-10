@@ -183,13 +183,13 @@ class MultiValueDict(dict[str, list[Any]]):
             self.setlist(key, default_list)
             # Do not return default_list here because setlist() may store
             # another value -- QueryDict.setlist() does. Look it up.
-        return self._getlist(key)  # type: ignore[return-value]
+        return self._getlist(key)  # type: ignore
 
     def appendlist(self, key: str, value: Any) -> None:
         """Append an item to the internal list associated with key."""
         self.setlistdefault(key).append(value)
 
-    def items(self) -> Iterator[tuple[str, Any]]:  # type: ignore[override]
+    def items(self) -> Iterator[tuple[str, Any]]:  # type: ignore
         """
         Yield (key, value) pairs, where value is the last item in the list
         associated with the key.
@@ -201,7 +201,7 @@ class MultiValueDict(dict[str, list[Any]]):
         """Yield (key, list) pairs."""
         return iter(super().items())
 
-    def values(self) -> Iterator[Any]:  # type: ignore[override]
+    def values(self) -> Iterator[Any]:  # type: ignore
         """Yield the last value on every key list."""
         for key in self:
             yield self[key]
@@ -360,10 +360,10 @@ class CaseInsensitiveMapping(Mapping[str, Any]):
         # avoiding abc's __instancecheck__ and _abc_instancecheck for the
         # general Mapping case.
         if isinstance(data, dict):
-            yield from data.items()
+            yield from data.items()  # ty: ignore[invalid-yield]
             return
         if isinstance(data, Mapping):
-            yield from data.items()
+            yield from data.items()  # ty: ignore[invalid-yield]
             return
         for i, elem in enumerate(data):
             if len(elem) != 2:

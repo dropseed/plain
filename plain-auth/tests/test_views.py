@@ -27,7 +27,7 @@ def test_admin_required(db):
     # not admin -> 404
     assert client.get("/admin/").status_code == 404
 
-    user.is_admin = True  # type: ignore[unresolved-attribute]
+    user.is_admin = True  # type: ignore
     user.save()
     # now admin -> success
     resp = client.get("/admin/")

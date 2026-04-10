@@ -1235,7 +1235,7 @@ class QuerySet[T: "Model"]:
         if fields == (None,):
             obj.sql_query.select_related = False
         elif fields:
-            obj.sql_query.add_select_related(list(fields))  # type: ignore[arg-type]
+            obj.sql_query.add_select_related(list(fields))  # type: ignore
         else:
             obj.sql_query.select_related = True
         return obj
@@ -1401,7 +1401,7 @@ class QuerySet[T: "Model"]:
         if fields == (None,):
             clone.sql_query.clear_deferred_loading()
         else:
-            clone.sql_query.add_deferred_loading(frozenset(fields))
+            clone.sql_query.add_deferred_loading(frozenset(fields))  # ty: ignore[invalid-argument-type]
         return clone
 
     def only(self, *fields: str) -> QuerySet[T]:
@@ -1441,7 +1441,7 @@ class QuerySet[T: "Model"]:
         elif (
             self.sql_query.default_ordering
             and self.sql_query.model
-            and self.sql_query.model._model_meta.ordering  # type: ignore[arg-type]
+            and self.sql_query.model._model_meta.ordering  # type: ignore
             and
             # A default ordering doesn't affect GROUP BY queries.
             not self.sql_query.group_by
@@ -1497,7 +1497,7 @@ class QuerySet[T: "Model"]:
         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
             if on_conflict is None:
                 inserted_rows.extend(
-                    self._insert(  # type: ignore[arg-type]
+                    self._insert(  # type: ignore
                         item,
                         fields=fields,
                         returning_fields=self.model._model_meta.db_returning_fields,
@@ -1715,7 +1715,7 @@ class RawQuerySet:
         return iter(self._result_cache)
 
     def iterator(self) -> Iterator[Model]:
-        yield from RawModelIterable(self)  # type: ignore[arg-type]
+        yield from RawModelIterable(self)  # type: ignore
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.sql_query}>"
@@ -1851,7 +1851,7 @@ def prefetch_related_objects(
     auto_lookups = set()  # we add to this as we go through.
     followed_descriptors = set()  # recursion protection
 
-    all_lookups = normalize_prefetch_lookups(reversed(related_lookups))  # type: ignore[arg-type]
+    all_lookups = normalize_prefetch_lookups(reversed(related_lookups))  # type: ignore
     while all_lookups:
         lookup = all_lookups.pop()
         if lookup.prefetch_to in done_queries:
@@ -1947,7 +1947,7 @@ def prefetch_related_objects(
                 ):
                     done_queries[prefetch_to] = obj_list
                     new_lookups = normalize_prefetch_lookups(
-                        reversed(additional_lookups),  # type: ignore[arg-type]
+                        reversed(additional_lookups),  # type: ignore
                         prefetch_to,
                     )
                     auto_lookups.update(new_lookups)
@@ -1966,7 +1966,7 @@ def prefetch_related_objects(
                     if through_attr in getattr(obj, "_prefetched_objects_cache", ()):
                         # If related objects have been prefetched, use the
                         # cache rather than the object's through_attr.
-                        new_obj = list(obj._prefetched_objects_cache.get(through_attr))  # type: ignore[arg-type]
+                        new_obj = list(obj._prefetched_objects_cache.get(through_attr))  # type: ignore
                     else:
                         try:
                             new_obj = getattr(obj, through_attr)
@@ -2135,7 +2135,7 @@ def prefetch_one_level(
                 # No to_attr has been given for this prefetch operation and the
                 # cache_name does not point to a descriptor. Store the value of
                 # the field in the object's field cache.
-                obj._state.fields_cache[cache_name] = val  # type: ignore[index]
+                obj._state.fields_cache[cache_name] = val  # type: ignore
         else:
             if as_attr:
                 setattr(obj, to_attr, vals)

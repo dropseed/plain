@@ -61,14 +61,14 @@ async def _start_healthcheck_server(
         reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         conn = Connection(
-            worker.app,  # type: ignore[arg-type]
+            worker.app,  # type: ignore
             reader,
             writer,
             client=("127.0.0.1", 0),
             server=("127.0.0.1", 0),
         )
         try:
-            await handle_connection(worker, conn)  # type: ignore[arg-type]
+            await handle_connection(worker, conn)  # type: ignore
         finally:
             conn.close()
             await asyncio.sleep(0)  # let the writer flush

@@ -559,7 +559,7 @@ class QueryDict(MultiValueDict):
         self._mutable = mutable
 
     @classmethod
-    def fromkeys(  # type: ignore[override]
+    def fromkeys(  # type: ignore
         cls,
         iterable: Any,
         value: str = "",
@@ -601,7 +601,7 @@ class QueryDict(MultiValueDict):
         self._assert_mutable()
         super().__delitem__(key)
 
-    def __getitem__(self, key: str) -> str:  # type: ignore[override]
+    def __getitem__(self, key: str) -> str:  # type: ignore
         """
         Return the last data value for this key as a string.
         QueryDict values are always strings.
@@ -655,7 +655,7 @@ class QueryDict(MultiValueDict):
     @overload
     def get(self, key: str, default: _T) -> str | _T: ...
 
-    def get(self, key: str, default: Any = None) -> str | Any:  # type: ignore[override]
+    def get(self, key: str, default: Any = None) -> str | Any:  # type: ignore
         """
         Return the last data value for the passed key. If key doesn't exist
         or value is an empty list, return `default`.
@@ -679,7 +679,7 @@ class QueryDict(MultiValueDict):
     @overload
     def pop(self, key: str, default: _T) -> str | _T: ...
 
-    def pop(self, key: str, *args: Any) -> str | Any:  # type: ignore[override]
+    def pop(self, key: str, *args: Any) -> str | Any:  # type: ignore
         """
         Remove and return a value for the key.
 

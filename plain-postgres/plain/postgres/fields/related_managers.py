@@ -367,7 +367,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         for lh_field, rh_field in self.source_field.related_fields:
             core_filter_key = f"{self.query_field_name}__{rh_field.name}"
             self.core_filters[core_filter_key] = getattr(instance, rh_field.attname)
-            self.id_field_names[lh_field.name] = rh_field.name  # type: ignore[assignment]
+            self.id_field_names[lh_field.name] = rh_field.name  # type: ignore
 
         self.related_val = self.source_field.get_foreign_related_value(instance)
         if None in self.related_val:

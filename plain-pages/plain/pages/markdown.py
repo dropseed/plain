@@ -93,7 +93,7 @@ def render_markdown(content: str, current_page_path: str) -> str:
     markdown = mistune.create_markdown(
         renderer=renderer, plugins=["strikethrough", "table"]
     )
-    return markdown(content)  # type: ignore[return-value]
+    return markdown(content)  # type: ignore
 
 
 class InnerTextParser(HTMLParser):

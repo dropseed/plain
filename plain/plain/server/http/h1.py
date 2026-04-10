@@ -415,7 +415,7 @@ async def async_handle_error(
         elif isinstance(exc, InvalidHeaderName | InvalidHeader):
             mesg = str(exc)
             if not req and hasattr(exc, "req"):
-                req = exc.req  # type: ignore[assignment]  # for access log
+                req = exc.req  # type: ignore  # for access log
         elif isinstance(exc, LimitRequestLine):
             mesg = str(exc)
         elif isinstance(exc, LimitRequestHeaders):
@@ -708,7 +708,7 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
         # connection closes cleanly via Connection: close header.
         if use_bridge and content_length > 0:
             remaining = (
-                content_length - len(body_start) - unreader.socket_bytes_read  # type: ignore[union-attr]
+                content_length - len(body_start) - unreader.socket_bytes_read  # type: ignore
             )
             while remaining > 0:
                 try:

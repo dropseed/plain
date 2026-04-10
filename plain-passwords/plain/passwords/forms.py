@@ -49,7 +49,7 @@ class PasswordResetForm(forms.Form):
         resetting their password.
         """
         active_users = get_user_model().query.filter(email__iexact=email)
-        return (u for u in active_users if unicode_ci_compare(email, u.email))  # type: ignore[unresolved-attribute]
+        return (u for u in active_users if unicode_ci_compare(email, u.email))  # type: ignore
 
     def save(
         self,
@@ -75,7 +75,7 @@ class PasswordResetForm(forms.Form):
                 template_name=email_template_name,
                 context=context,
                 from_email=from_email,
-                to_email=user.email,  # type: ignore[attr-defined]
+                to_email=user.email,  # type: ignore
             )
 
 
@@ -105,13 +105,13 @@ class PasswordSetForm(forms.Form):
         assert isinstance(password2, str), "new_password2 must be a string"
 
         # Clean it as if it were being put into the model directly
-        self.user._model_meta.get_field("password").clean(password2, self.user)  # type: ignore[union-attr]
+        self.user._model_meta.get_field("password").clean(password2, self.user)  # type: ignore
 
         return password2
 
     def save(self, commit: bool = True) -> Model:
         # User model has password attribute
-        self.user.password = self.cleaned_data["new_password1"]  # type: ignore[assignment]
+        self.user.password = self.cleaned_data["new_password1"]  # type: ignore
         if commit:
             self.user.save()
         return self.user

@@ -85,7 +85,7 @@ class AuthView(SessionView):
                         )
                     return
 
-            if not self.user.is_admin:  # type: ignore[union-attr]
+            if not self.user.is_admin:  # type: ignore
                 # Show a 404 so we don't expose admin urls to non-admin users
                 raise NotFoundError404()
 

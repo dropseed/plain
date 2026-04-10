@@ -33,7 +33,7 @@ class MigrationRecorder:
 
     _migration_class: type[postgres.Model] | None = None
 
-    @classproperty  # type: ignore[invalid-argument-type]
+    @classproperty  # type: ignore
     def Migration(cls) -> type[postgres.Model]:
         """
         Lazy load to avoid PackageRegistryNotReady if installed packages import

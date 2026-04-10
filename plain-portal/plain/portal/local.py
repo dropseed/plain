@@ -305,7 +305,7 @@ async def send_command(request: dict) -> dict:
 
 async def send_exec_streaming(
     request: dict,
-    on_stdout: callable,  # type: ignore[type-arg]
+    on_stdout: callable,  # type: ignore
 ) -> dict:
     """Send an exec request and stream stdout chunks as they arrive.
 
