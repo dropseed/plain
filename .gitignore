@@ -18,6 +18,7 @@ plain*/tests/.plain
 
 .vscode
 /.claude/settings.local.json
+/.claude/skills/announcements/
 /CLAUDE.local.md
 /.benchmarks
 .claude/worktrees
