@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from html.parser import HTMLParser
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlparse, urlunparse
 
 import mistune
@@ -93,7 +93,7 @@ def render_markdown(content: str, current_page_path: str) -> str:
     markdown = mistune.create_markdown(
         renderer=renderer, plugins=["strikethrough", "table"]
     )
-    return markdown(content)  # type: ignore[return-value]
+    return cast(str, markdown(content))
 
 
 class InnerTextParser(HTMLParser):

@@ -393,7 +393,7 @@ class SQLCompiler:
         selected_exprs = {}
         if select := self.select:
             for ordinal, (expr, _, alias) in enumerate(select, start=1):
-                pos_expr = PositionRef(ordinal, alias, expr)
+                pos_expr = PositionRef(ordinal, alias, expr)  # ty: ignore[invalid-argument-type]
                 if alias:
                     selected_exprs[alias] = pos_expr
                 selected_exprs[expr] = pos_expr
@@ -1523,7 +1523,7 @@ class SQLInsertCompiler(SQLCompiler):
 
     def assemble_as_sql(
         self, fields: list[Any], value_rows: list[list[Any]]
-    ) -> tuple[list[list[str]], list[list]]:
+    ) -> tuple[Any, list[list[Any]]]:
         """
         Take a sequence of N fields and a sequence of M rows of values, and
         generate placeholder SQL and parameters for each field and value.
@@ -1558,7 +1558,7 @@ class SQLInsertCompiler(SQLCompiler):
 
         return placeholder_rows, param_rows
 
-    def as_sql(  # type: ignore[override]  # Returns list for internal iteration in execute_sql
+    def as_sql(  # ty: ignore[invalid-method-override]  # Returns list for internal iteration in execute_sql
         self, with_limits: bool = True, with_col_aliases: bool = False
     ) -> list[SqlWithParams]:
         # We don't need quote_name_unless_alias() here, since these are all
@@ -1590,7 +1590,7 @@ class SQLInsertCompiler(SQLCompiler):
         placeholder_rows, param_rows = self.assemble_as_sql(fields, value_rows)
 
         conflict_suffix_sql = on_conflict_suffix_sql(
-            fields,  # type: ignore[arg-type]
+            fields,  # ty: ignore[invalid-argument-type]
             self.query.on_conflict,
             (f.column for f in self.query.update_fields),
             (f.column for f in self.query.unique_fields),
@@ -1598,7 +1598,7 @@ class SQLInsertCompiler(SQLCompiler):
         if self.returning_fields:
             # Use RETURNING clause to get inserted values
             result.append(
-                bulk_insert_sql(fields, placeholder_rows)  # type: ignore[arg-type]
+                bulk_insert_sql(fields, placeholder_rows)  # ty: ignore[invalid-argument-type]
             )
             params = param_rows
             if conflict_suffix_sql:
@@ -1613,12 +1613,12 @@ class SQLInsertCompiler(SQLCompiler):
             return [(" ".join(result), tuple(chain.from_iterable(params)))]
 
         # Bulk insert without returning fields
-        result.append(bulk_insert_sql(fields, placeholder_rows))  # type: ignore[arg-type]
+        result.append(bulk_insert_sql(fields, placeholder_rows))  # ty: ignore[invalid-argument-type]
         if conflict_suffix_sql:
             result.append(conflict_suffix_sql)
         return [(" ".join(result), tuple(p for ps in param_rows for p in ps))]
 
-    def execute_sql(  # type: ignore[override]
+    def execute_sql(  # ty: ignore[invalid-method-override]
         self, returning_fields: list | None = None
     ) -> list:
         assert self.query.model is not None, "INSERT execution requires a model"
@@ -1669,7 +1669,7 @@ class SQLDeleteCompiler(SQLCompiler):
         )
 
     def _as_sql(self, query: Query) -> SqlWithParams:
-        delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"  # type: ignore[invalid-argument-type]
+        delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"  # ty: ignore[invalid-argument-type]
         try:
             where, params = self.compile(query.where)
         except FullResultSet:
@@ -1752,7 +1752,7 @@ class SQLUpdateCompiler(SQLCompiler):
                 values.append(f"{qn(name)} = NULL")
         table = self.query.base_table
         result = [
-            f"UPDATE {qn(table)} SET",  # type: ignore[invalid-argument-type]
+            f"UPDATE {qn(table)} SET",  # ty: ignore[invalid-argument-type]
             ", ".join(values),
         ]
         try:
@@ -1763,7 +1763,7 @@ class SQLUpdateCompiler(SQLCompiler):
             result.append(f"WHERE {where}")
         return " ".join(result), tuple(update_params + list(params))
 
-    def execute_sql(self, result_type: str) -> int:  # type: ignore[override]
+    def execute_sql(self, result_type: str) -> int:  # ty: ignore[invalid-method-override]
         """
         Execute the specified update. Return the number of rows affected by
         the primary update query. The "primary update query" is the first
@@ -1833,7 +1833,7 @@ class SQLUpdateCompiler(SQLCompiler):
                 for parent, index in related_ids_index:
                     related_ids[parent].append(row[index])
             self.query.add_filter("id__in", idents)
-            self.query.related_ids = related_ids  # type: ignore[assignment]
+            self.query.related_ids = related_ids  # ty: ignore[invalid-assignment]
         else:
             # The fast path. Filters and updates in one query using a subquery.
             self.query.add_filter("id__in", query)

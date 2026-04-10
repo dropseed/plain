@@ -37,7 +37,7 @@ class AdminViewRegistry:
         self, view: type[T] | None = None
     ) -> type[T] | Callable[[type[T]], type[T]]:
         def inner(view: type[T]) -> type[T]:
-            self.registered_views.add(view)  # type: ignore[arg-type]
+            self.registered_views.add(view)  # ty: ignore[invalid-argument-type]
             # Invalidate lookup caches
             self.__dict__.pop("slug_to_view", None)
             self.__dict__.pop("path_to_view", None)

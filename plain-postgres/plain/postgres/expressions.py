@@ -432,7 +432,7 @@ class BaseExpression:
         return self.output_field.get_lookup(lookup)
 
     def get_transform(self, name: str) -> type[Transform] | None:
-        return self.output_field.get_transform(name)  # type: ignore[return-type]
+        return self.output_field.get_transform(name)  # ty: ignore[invalid-return-type]
 
     def relabeled_clone(self, change_map: dict[str, str]) -> Self:
         clone = self.copy()
@@ -1045,7 +1045,7 @@ class Value(Expression):
             else:
                 val = output_field.get_db_prep_value(val, connection=connection)
             if hasattr(output_field, "get_placeholder"):
-                return output_field.get_placeholder(val, compiler, connection), [val]  # type: ignore[call-non-callable]
+                return output_field.get_placeholder(val, compiler, connection), [val]  # ty: ignore[call-non-callable]
         if val is None:
             return "NULL", []
         return "%s", [val]
@@ -1366,7 +1366,7 @@ class When(Expression):
         if isinstance(condition, Q) and not condition:
             raise ValueError("An empty Q() can't be used as a When() condition.")
         super().__init__(output_field=None)
-        self.condition = condition  # type: ignore[assignment]
+        self.condition = condition  # ty: ignore[invalid-assignment]
         self.result = self._parse_expressions(then)[0]
 
     def __str__(self) -> str:
@@ -1703,10 +1703,10 @@ class OrderBy(Expression):
             self.nulls_last = None
         return self
 
-    def asc(self) -> None:  # type: ignore[override]
+    def asc(self) -> None:  # ty: ignore[invalid-method-override]
         self.descending = False
 
-    def desc(self) -> None:  # type: ignore[override]
+    def desc(self) -> None:  # ty: ignore[invalid-method-override]
         self.descending = True
 
 

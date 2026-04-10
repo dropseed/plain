@@ -12,13 +12,13 @@ class PlainHelpFormatter(click.HelpFormatter):
         styled_heading = click.style(heading, dim=True)
         self.write(f"{'':>{self.current_indent}}{styled_heading}\n")
 
-    def write_usage(  # type: ignore[override]
+    def write_usage(  # ty: ignore[invalid-method-override]
         self, prog: str, args: str = "", prefix: str = "Usage: "
     ) -> None:
         prefix_styled = click.style(prefix, dim=True)
         super().write_usage(prog, args, prefix=prefix_styled)
 
-    def write_dl(  # type: ignore[override]
+    def write_dl(  # ty: ignore[invalid-method-override]
         self,
         rows: list[tuple[str, str]],
         col_max: int = 20,

@@ -75,7 +75,7 @@ class Aggregate(Func):
         self.filter = self.filter and exprs_list.pop()
         super().set_source_expressions(exprs_list)
 
-    def resolve_expression(  # type: ignore[override]
+    def resolve_expression(  # ty: ignore[invalid-method-override]
         self,
         query: Any = None,
         allow_joins: bool = True,
@@ -140,7 +140,7 @@ class Aggregate(Func):
         if self.filter is not None:
             # Use FILTER clause for aggregates when filter is specified
             try:
-                filter_sql, filter_params = self.filter.as_sql(compiler, connection)  # type: ignore[union-attr]
+                filter_sql, filter_params = self.filter.as_sql(compiler, connection)  # ty: ignore[unresolved-attribute]
             except FullResultSet:
                 pass
             else:

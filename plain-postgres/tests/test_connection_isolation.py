@@ -39,7 +39,7 @@ def _reset_db_conn():
 def _store_fake() -> FakeConn:
     """Store a FakeConn in the ContextVar."""
     conn = FakeConn()
-    _db_conn.set(conn)  # type: ignore[arg-type]
+    _db_conn.set(conn)  # ty: ignore[invalid-argument-type]
     return conn
 
 
@@ -215,7 +215,7 @@ def test_executor_connection_persists_across_calls_on_same_thread():
 
         def request_1() -> tuple[int, int]:
             conn = FakeConn()
-            _db_conn.set(conn)  # type: ignore[arg-type]
+            _db_conn.set(conn)  # ty: ignore[invalid-argument-type]
             return threading.get_ident(), id(conn)
 
         def request_2() -> tuple[int, int]:

@@ -53,11 +53,11 @@ def test_base_exceptions_from_plain_exceptions():
     except ObjectDoesNotExist:
         pass  # Should work due to inheritance
     except Exception:
-        pytest.fail("Should have caught with base ObjectDoesNotExist")  # type: ignore[invalid-argument-type]
+        pytest.fail("Should have caught with base ObjectDoesNotExist")  # ty: ignore[invalid-argument-type]
 
     try:
         raise Car.MultipleObjectsReturned("model-specific exception")
     except MultipleObjectsReturned:
         pass  # Should work due to inheritance
     except Exception:
-        pytest.fail("Should have caught with base MultipleObjectsReturned")  # type: ignore[invalid-argument-type]
+        pytest.fail("Should have caught with base MultipleObjectsReturned")  # ty: ignore[invalid-argument-type]

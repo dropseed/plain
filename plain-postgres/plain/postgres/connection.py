@@ -354,7 +354,7 @@ class DatabaseConnection:
             return False
         if new_role := self.settings_dict.get("OPTIONS", {}).get("assume_role"):
             sql_str = self.compose_sql("SET ROLE %s", [new_role])
-            self.connection.execute(sql_str)  # type: ignore[arg-type]
+            self.connection.execute(sql_str)  # ty: ignore[invalid-argument-type]
             return True
         return False
 
@@ -373,7 +373,7 @@ class DatabaseConnection:
 
         # Register the cursor timezone only if the connection disagrees, to avoid copying the adapter map.
         tzloader = self.connection.adapters.get_loader(TIMESTAMPTZ_OID, Format.TEXT)
-        if self.timezone != tzloader.timezone:  # type: ignore[union-attr]
+        if self.timezone != tzloader.timezone:  # ty: ignore[unresolved-attribute]
             register_tzloader(self.timezone, cursor)
         return cursor
 
@@ -1309,7 +1309,7 @@ class CursorMixin:
 
         qparts.append(psycopg_sql.SQL(")"))
         stmt = psycopg_sql.Composed(qparts)
-        self.execute(stmt)  # type: ignore[attr-defined]
+        self.execute(stmt)  # ty: ignore[unresolved-attribute]
         return args
 
 

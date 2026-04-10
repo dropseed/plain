@@ -240,7 +240,7 @@ def pluralize_lazy(singular: str, plural: str, number: int | str) -> Any:
 
                 def _get_number_value(self, values: dict[str, Any]) -> Any:
                     try:
-                        return values[number]  # type: ignore[index]
+                        return values[number]  # ty: ignore[invalid-argument-type]
                     except KeyError:
                         raise KeyError(
                             f"Your dictionary lacks key '{number}'. Please provide "

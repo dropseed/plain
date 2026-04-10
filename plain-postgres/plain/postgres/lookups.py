@@ -441,7 +441,7 @@ class IntegerFieldOverflow:
                 raise self.underflow_exception
             if max_value is not None and rhs > max_value:
                 raise self.overflow_exception
-        return super().process_rhs(compiler, connection)  # type: ignore[misc]
+        return super().process_rhs(compiler, connection)  # ty: ignore[unresolved-attribute]
 
 
 class IntegerFieldFloatRounding:
@@ -455,7 +455,7 @@ class IntegerFieldFloatRounding:
     def get_prep_lookup(self) -> Any:
         if isinstance(self.rhs, float):
             self.rhs = math.ceil(self.rhs)
-        return super().get_prep_lookup()  # type: ignore[misc]
+        return super().get_prep_lookup()  # ty: ignore[unresolved-attribute]
 
 
 @IntegerField.register_lookup

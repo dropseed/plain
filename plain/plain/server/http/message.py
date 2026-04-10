@@ -360,5 +360,5 @@ class Request(Message):
 
     def set_body_reader(self) -> None:
         super().set_body_reader()
-        if isinstance(self.body.reader, EOFReader):  # type: ignore[union-attr]
+        if isinstance(self.body.reader, EOFReader):  # ty: ignore[unresolved-attribute]
             self.body = Body(LengthReader(self.unreader, 0))

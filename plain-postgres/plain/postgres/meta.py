@@ -367,7 +367,7 @@ class Meta:
             )
 
         try:
-            return self.fields_map[field_name]  # type: ignore[return-type]
+            return self.fields_map[field_name]  # ty: ignore[invalid-return-type]
         except KeyError:
             raise FieldDoesNotExist(
                 f"{self.model} has no reverse relation named '{field_name}'"

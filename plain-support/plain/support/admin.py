@@ -36,7 +36,7 @@ class UserSupportFormEntriesCard(Card):
 
         # self.view has an object attribute when used in DetailView context
         context["entries"] = SupportFormEntry.query.filter(
-            user=self.view.object  # type: ignore[attr-defined]
+            user=self.view.object  # ty: ignore[unresolved-attribute]
         )
 
         return context

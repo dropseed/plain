@@ -38,7 +38,7 @@ class File(FileProxyMixin):
     @cached_property
     def size(self) -> int:
         if hasattr(self.file, "size"):
-            return self.file.size  # type: ignore[return-value]
+            return self.file.size  # ty: ignore[invalid-return-type]
         if hasattr(self.file, "name"):
             try:
                 return os.path.getsize(self.file.name)

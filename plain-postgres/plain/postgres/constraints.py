@@ -372,7 +372,7 @@ class UniqueConstraint(BaseConstraint):
             if exclude:
                 for expression in self.expressions:
                     if hasattr(expression, "flatten"):
-                        for expr in expression.flatten():  # type: ignore[operator]
+                        for expr in expression.flatten():  # ty: ignore[call-non-callable]
                             if isinstance(expr, F) and expr.name in exclude:
                                 return
                     elif isinstance(expression, F) and expression.name in exclude:

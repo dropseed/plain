@@ -357,7 +357,7 @@ class MigrationGraph:
         plan = self._generate_plan(nodes, at_end)
         project_state = ProjectState(real_packages=real_packages)
         for node in plan:
-            project_state = self.nodes[node].mutate_state(project_state, preserve=False)  # type: ignore[attr-defined]
+            project_state = self.nodes[node].mutate_state(project_state, preserve=False)  # ty: ignore[unresolved-attribute]
         return project_state
 
     def __contains__(self, node: tuple[str, str]) -> bool:

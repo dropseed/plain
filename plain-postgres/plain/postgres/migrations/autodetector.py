@@ -230,7 +230,7 @@ class MigrationAutodetector:
                     field.remote_field, "through", None
                 ):
                     through_key = resolve_relation(
-                        field.remote_field.through,  # type: ignore[unresolved-attribute]
+                        field.remote_field.through,  # ty: ignore[unresolved-attribute]
                         package_label,
                         model_name,
                     )
@@ -894,19 +894,19 @@ class MigrationAutodetector:
                 new_field.remote_field, "model", None
             ):
                 rename_key = resolve_relation(
-                    new_field.remote_field.model,  # type: ignore[unresolved-attribute]
+                    new_field.remote_field.model,  # ty: ignore[unresolved-attribute]
                     package_label,
                     model_name,
                 )
                 if rename_key in self.renamed_models:
-                    new_field.remote_field.model = old_field.remote_field.model  # type: ignore[unresolved-attribute]
+                    new_field.remote_field.model = old_field.remote_field.model  # ty: ignore[unresolved-attribute]
                 # Handle ForeignKeyField which can only have a single to_field.
                 remote_field_name = getattr(new_field.remote_field, "field_name", None)
                 if remote_field_name:
                     to_field_rename_key = rename_key + (remote_field_name,)
                     if to_field_rename_key in self.renamed_fields:
                         # Repoint model name only
-                        new_field.remote_field.model = old_field.remote_field.model  # type: ignore[unresolved-attribute]
+                        new_field.remote_field.model = old_field.remote_field.model  # ty: ignore[unresolved-attribute]
                 dependencies.extend(
                     self._get_dependencies_for_foreign_key(
                         package_label,
@@ -919,12 +919,12 @@ class MigrationAutodetector:
                 new_field.remote_field, "through", None
             ):
                 rename_key = resolve_relation(
-                    new_field.remote_field.through,  # type: ignore[unresolved-attribute]
+                    new_field.remote_field.through,  # ty: ignore[unresolved-attribute]
                     package_label,
                     model_name,
                 )
                 if rename_key in self.renamed_models:
-                    new_field.remote_field.through = old_field.remote_field.through  # type: ignore[unresolved-attribute]
+                    new_field.remote_field.through = old_field.remote_field.through  # ty: ignore[unresolved-attribute]
             old_field_dec = self.deep_deconstruct(old_field)
             new_field_dec = self.deep_deconstruct(new_field)
             if old_field_dec != new_field_dec and old_field_name == field_name:

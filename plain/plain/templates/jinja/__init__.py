@@ -63,7 +63,7 @@ def register_template_filter(
     func: Callable[..., Any], name: str | None = None
 ) -> Callable[..., Any]:
     """Adds a filter to the Jinja environment."""
-    filter_name = name if name is not None else func.__name__  # type: ignore[attr-defined]
+    filter_name = name if name is not None else func.__name__  # ty: ignore[unresolved-attribute]
     environment.filters[filter_name] = func
     return func
 

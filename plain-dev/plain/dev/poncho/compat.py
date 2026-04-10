@@ -21,9 +21,9 @@ class ProcessManager:
         def terminate(self, pid: int) -> None:
             # The first argument to OpenProcess represents the desired access
             # to the process. 1 represents the PROCESS_TERMINATE access right.
-            handle = ctypes.windll.kernel32.OpenProcess(1, False, pid)  # type: ignore[attr-defined]
-            ctypes.windll.kernel32.TerminateProcess(handle, -1)  # type: ignore[attr-defined]
-            ctypes.windll.kernel32.CloseHandle(handle)  # type: ignore[attr-defined]
+            handle = ctypes.windll.kernel32.OpenProcess(1, False, pid)  # ty: ignore[unresolved-attribute]
+            ctypes.windll.kernel32.TerminateProcess(handle, -1)  # ty: ignore[unresolved-attribute]
+            ctypes.windll.kernel32.CloseHandle(handle)  # ty: ignore[unresolved-attribute]
     else:
 
         def terminate(self, pid: int) -> None:

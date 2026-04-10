@@ -59,7 +59,7 @@ def worker_main(
         for raw_sock, addr, family, is_ssl in listener_data:
             sock_class = sock_class_map[family]
             fd = raw_sock.detach()
-            listener = sock_class(addr, is_ssl=is_ssl, fd=fd)  # type: ignore[arg-type]
+            listener = sock_class(addr, is_ssl=is_ssl, fd=fd)  # ty: ignore[invalid-argument-type]
             listeners.append(listener)
 
         # Setup Plain runtime (settings, packages, logging)

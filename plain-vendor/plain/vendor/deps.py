@@ -146,22 +146,22 @@ class Dependency:
         # Force [tool.plain.vendor.dependencies.{name}] to be an inline table
         # name = { url = "https://example.com", installed = "1.0.0" }
         dependencies[self.name] = tomlkit.inline_table()
-        dependencies[self.name]["url"] = self.url  # type: ignore[index]
-        dependencies[self.name]["installed"] = self.installed  # type: ignore[index]
+        dependencies[self.name]["url"] = self.url  # ty: ignore[invalid-assignment]
+        dependencies[self.name]["installed"] = self.installed  # ty: ignore[invalid-assignment]
         if self.filename:
-            dependencies[self.name]["filename"] = self.filename  # type: ignore[index]
+            dependencies[self.name]["filename"] = self.filename  # ty: ignore[invalid-assignment]
         if self.sourcemap:
-            dependencies[self.name]["sourcemap"] = self.sourcemap  # type: ignore[index]
+            dependencies[self.name]["sourcemap"] = self.sourcemap  # ty: ignore[invalid-assignment]
 
         # Have to give it the right structure in case they don't exist
         if "tool" not in pyproject:
             pyproject["tool"] = tomlkit.table()
-        if "plain" not in pyproject["tool"]:  # type: ignore[operator]
-            pyproject["tool"]["plain"] = tomlkit.table()  # type: ignore[index]
-        if "vendor" not in pyproject["tool"]["plain"]:  # type: ignore[operator, index]
-            pyproject["tool"]["plain"]["vendor"] = tomlkit.table()  # type: ignore[index]
+        if "plain" not in pyproject["tool"]:  # ty: ignore[unsupported-operator]
+            pyproject["tool"]["plain"] = tomlkit.table()  # ty: ignore[invalid-assignment]
+        if "vendor" not in pyproject["tool"]["plain"]:  # ty: ignore[unsupported-operator, not-subscriptable]
+            pyproject["tool"]["plain"]["vendor"] = tomlkit.table()  # ty: ignore[not-subscriptable, invalid-assignment]
 
-        pyproject["tool"]["plain"]["vendor"]["dependencies"] = dependencies  # type: ignore[index]
+        pyproject["tool"]["plain"]["vendor"]["dependencies"] = dependencies  # ty: ignore[not-subscriptable, invalid-assignment]
 
         with open("pyproject.toml", "w") as f:
             f.write(tomlkit.dumps(pyproject))

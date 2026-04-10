@@ -349,7 +349,7 @@ class Serializer:
             raise ValueError(
                 f"'{serializer.__name__}' must inherit from 'BaseSerializer'."
             )
-        cls._registry[type_] = serializer  # type: ignore[assignment]
+        cls._registry[type_] = serializer  # ty: ignore[invalid-assignment]
 
 
 def serializer_factory(value: Any) -> BaseSerializer:

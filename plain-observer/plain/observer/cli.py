@@ -111,7 +111,7 @@ def observer_request(
         raise SystemExit(1)
 
     # Analyze spans
-    spans = trace.spans.query.all().annotate_spans()  # type: ignore[attr-defined]
+    spans = trace.spans.query.all().annotate_spans()  # ty: ignore[unresolved-attribute]
 
     # Group queries by SQL text
     queries_by_sql: dict[str, dict[str, Any]] = {}
@@ -640,7 +640,7 @@ def format_trace_output(trace: Trace) -> str:
     output_lines.append(click.style("Spans:", fg="bright_blue", bold=True))
 
     # Get annotated spans with nesting levels
-    spans = trace.spans.query.all().annotate_spans()  # type: ignore[attr-defined]
+    spans = trace.spans.query.all().annotate_spans()  # ty: ignore[unresolved-attribute]
 
     # Build parent-child relationships
     span_dict = {span.span_id: span for span in spans}

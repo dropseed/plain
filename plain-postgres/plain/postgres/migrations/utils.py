@@ -137,7 +137,7 @@ def get_references(
                 *field_tuple,
             )
             if reference:
-                yield model_state, name, field, reference
+                yield model_state, name, field, reference  # ty: ignore[invalid-yield]
 
 
 def field_is_referenced(

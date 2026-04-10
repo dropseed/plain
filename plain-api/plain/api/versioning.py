@@ -136,11 +136,11 @@ class VersionedAPIView(View):
             return
 
         # Get the original response JSON
-        response_data = json.loads(response.content)  # type: ignore[attr-defined]
+        response_data = json.loads(response.content)  # ty: ignore[unresolved-attribute]
 
         for change in reversed(response_changes):
             # Transform the response data for this version
             change().transform_response_backward(response, response_data)
 
         # Update the response body with the transformed data
-        response.content = json.dumps(response_data).encode("utf-8")  # type: ignore[attr-defined]
+        response.content = json.dumps(response_data).encode("utf-8")  # ty: ignore[unresolved-attribute]

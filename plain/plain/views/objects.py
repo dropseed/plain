@@ -7,7 +7,7 @@ from plain.exceptions import ImproperlyConfigured
 try:
     from plain.postgres.exceptions import ObjectDoesNotExist
 except ImportError:
-    ObjectDoesNotExist = None  # type: ignore[misc, assignment]
+    ObjectDoesNotExist = None  # ty: ignore[invalid-assignment]
 
 from plain.forms import BaseForm, Form
 from plain.http import NotFoundError404
@@ -38,7 +38,7 @@ class CreateView(FormView):
 
     def form_valid(self, form: BaseForm) -> Any:
         """If the form is valid, save the associated model."""
-        self.object = form.save()  # type: ignore[attr-defined]
+        self.object = form.save()  # ty: ignore[unresolved-attribute]
         return super().form_valid(form)
 
 
@@ -102,7 +102,7 @@ class UpdateView(DetailView, FormView):
 
     def form_valid(self, form: BaseForm) -> Any:
         """If the form is valid, save the associated model."""
-        form.save()  # type: ignore[attr-defined]
+        form.save()  # ty: ignore[unresolved-attribute]
         return super().form_valid(form)
 
     def get_form_kwargs(self) -> dict[str, Any]:
@@ -136,7 +136,7 @@ class DeleteView(DetailView, FormView):
 
     def form_valid(self, form: BaseForm) -> Any:
         """If the form is valid, save the associated model."""
-        form.save()  # type: ignore[attr-defined]
+        form.save()  # ty: ignore[unresolved-attribute]
         return super().form_valid(form)
 
 

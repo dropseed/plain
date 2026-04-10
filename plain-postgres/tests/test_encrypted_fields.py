@@ -141,7 +141,7 @@ class TestLookupBlocking:
 
     def test_transform_blocked(self, db):
         field = SecretStore._model_meta.get_field("api_key")
-        assert field.get_transform("lower") is None  # type: ignore[union-attr]
+        assert field.get_transform("lower") is None  # ty: ignore[unresolved-attribute]
 
 
 class TestKeyRotation:

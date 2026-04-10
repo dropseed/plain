@@ -115,7 +115,7 @@ class RelatedField(FieldCacheMixin, Field):
         obj = super().__deepcopy__(memodict)
         obj.remote_field = copy.copy(self.remote_field)
         if hasattr(self.remote_field, "field") and self.remote_field.field is self:
-            obj.remote_field.field = obj  # type: ignore[misc]
+            obj.remote_field.field = obj  # ty: ignore[invalid-assignment]
         return obj
 
     @cached_property
@@ -288,7 +288,7 @@ class RelatedField(FieldCacheMixin, Field):
         returned.
         """
         if callable(self.remote_field.limit_choices_to):
-            return self.remote_field.limit_choices_to()  # type: ignore[call-top-callable]
+            return self.remote_field.limit_choices_to()  # ty: ignore[call-top-callable]
         return self.remote_field.limit_choices_to
 
     def related_query_name(self) -> str:
@@ -1130,7 +1130,7 @@ class ManyToManyField(RelatedField):
         )
 
         # Add the descriptor for the m2m relation.
-        setattr(cls, self.name, ForwardManyToManyDescriptor(self.remote_field))  # type: ignore[arg-type]
+        setattr(cls, self.name, ForwardManyToManyDescriptor(self.remote_field))  # ty: ignore[invalid-argument-type]
 
         # Set up the accessor for the m2m table name for the relation.
         self.m2m_db_table = self._get_m2m_db_table

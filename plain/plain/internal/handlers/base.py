@@ -408,7 +408,7 @@ class BaseHandler:
         """Run after_response in reverse through middleware that ran before_request."""
         for mw in reversed(ran_before):
             try:
-                response = mw.after_response(request, response)  # type: ignore[arg-type]
+                response = mw.after_response(request, response)  # ty: ignore[invalid-argument-type]
             except Exception as exc:
                 response = response_for_exception(request, exc)
 

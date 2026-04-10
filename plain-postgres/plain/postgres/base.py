@@ -744,7 +744,7 @@ class Model(metaclass=ModelBase):
 
         if len(unique_check) == 1:
             field = meta.get_forward_field(unique_check[0])
-            params["field_label"] = field.name  # type: ignore[assignment]
+            params["field_label"] = field.name  # ty: ignore[invalid-assignment]
             return ValidationError(
                 message=field.error_messages["unique"],
                 code="unique",
@@ -1215,7 +1215,7 @@ class Model(metaclass=ModelBase):
             fld = None
             for part in field.split(LOOKUP_SEP):
                 try:
-                    fld = _cls._model_meta.get_field(part)  # type: ignore[unresolved-attribute]
+                    fld = _cls._model_meta.get_field(part)  # ty: ignore[unresolved-attribute]
                     if isinstance(fld, RelatedField):
                         _cls = fld.path_infos[-1].to_meta.model
                     else:
@@ -1413,4 +1413,4 @@ def model_unpickle(model_id: tuple[str, str] | type[Model]) -> Model:
 
 
 # Pickle protocol marker - functions don't normally have this attribute
-model_unpickle.__safe_for_unpickle__ = True  # type: ignore[attr-defined]
+model_unpickle.__safe_for_unpickle__ = True  # ty: ignore[unresolved-attribute]

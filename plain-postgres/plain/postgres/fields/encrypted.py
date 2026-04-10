@@ -10,11 +10,11 @@ try:
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 except ImportError:
-    Fernet = None  # type: ignore[assignment,misc]
-    InvalidToken = None  # type: ignore[assignment,misc]
-    MultiFernet = None  # type: ignore[assignment,misc]
-    hashes = None  # type: ignore[assignment]
-    PBKDF2HMAC = None  # type: ignore[assignment]
+    Fernet = None  # ty: ignore[invalid-assignment]
+    InvalidToken = None  # ty: ignore[invalid-assignment]
+    MultiFernet = None  # ty: ignore[invalid-assignment]
+    hashes = None  # ty: ignore[invalid-assignment]
+    PBKDF2HMAC = None  # ty: ignore[invalid-assignment]
 
 from plain import exceptions, preflight
 from plain.runtime import settings

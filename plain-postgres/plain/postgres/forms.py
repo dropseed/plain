@@ -578,7 +578,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
     def __init__(self, queryset: Any, **kwargs: Any) -> None:
         super().__init__(queryset, empty_label=None, **kwargs)
 
-    def to_python(self, value: Any) -> list[Any]:  # type: ignore[override]
+    def to_python(self, value: Any) -> list[Any]:  # ty: ignore[invalid-method-override]
         if not value:
             return []
         return list(self._check_values(value))

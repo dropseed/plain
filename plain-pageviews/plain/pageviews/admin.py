@@ -43,7 +43,7 @@ class UserPageviewsCard(Card):
 
         # self.view has an object attribute when used in DetailView context
         context["pageviews"] = Pageview.query.filter(
-            user_id=self.view.object.id  # type: ignore[attr-defined]
+            user_id=self.view.object.id  # ty: ignore[unresolved-attribute]
         ).order_by("-timestamp")[:50]
 
         return context

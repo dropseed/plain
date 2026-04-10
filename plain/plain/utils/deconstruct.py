@@ -18,7 +18,7 @@ def deconstructible[T](
     def decorator(klass: type[T]) -> type[T]:
         def __new__(cls: type[T], *args: Any, **kwargs: Any) -> T:
             # We capture the arguments to make returning them trivial
-            obj = super(klass, cls).__new__(cls)  # type: ignore[misc]
+            obj = super(klass, cls).__new__(cls)  # ty: ignore[unresolved-attribute]
             obj._constructor_args = (args, kwargs)
             return obj
 

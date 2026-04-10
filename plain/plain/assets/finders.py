@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from pathlib import Path
 
 from plain.packages import packages_registry
 from plain.runtime import APP_PATH
@@ -26,7 +27,7 @@ def _iter_assets() -> Iterator[Asset]:
     packages and the app itself.
     """
 
-    def __iter_assets_dir(path: str) -> Iterator[tuple[str, str]]:
+    def __iter_assets_dir(path: str | Path) -> Iterator[tuple[str, str]]:
         for root, _, files in os.walk(path):
             for f in files:
                 if f in _SKIP_ASSETS:
@@ -40,7 +41,7 @@ def _iter_assets() -> Iterator[Asset]:
             yield Asset(url_path=url_path, absolute_path=abs_path)
 
 
-def _iter_asset_dirs() -> Iterator[str]:
+def _iter_asset_dirs() -> Iterator[str | Path]:
     """
     Iterate all directories containing assets, from installed
     packages and from app/assets.

@@ -15,6 +15,7 @@ import os
 import signal
 import struct
 import sys
+from collections.abc import Callable
 
 import websockets.exceptions
 from websockets.asyncio.client import connect as ws_connect
@@ -305,7 +306,7 @@ async def send_command(request: dict) -> dict:
 
 async def send_exec_streaming(
     request: dict,
-    on_stdout: callable,  # type: ignore[type-arg]
+    on_stdout: Callable[[str], None],
 ) -> dict:
     """Send an exec request and stream stdout chunks as they arrive.
 

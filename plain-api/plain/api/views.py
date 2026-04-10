@@ -18,7 +18,7 @@ from .schemas import ErrorSchema
 try:
     from .models import APIKey
 except ImportError:
-    APIKey = None  # type: ignore[misc, assignment]
+    APIKey: Any = None
 
 __all__ = [
     "APIKeyView",
@@ -87,8 +87,8 @@ class APIKeyView(View):
                 )
 
             try:
-                api_key = APIKey.query.get(token=header_token)
-            except APIKey.DoesNotExist:
+                api_key = APIKey.query.get(token=header_token)  # ty: ignore[unresolved-attribute]
+            except APIKey.DoesNotExist:  # ty: ignore[unresolved-attribute]
                 raise ResponseException(
                     JsonResponse(
                         ErrorSchema(

@@ -41,7 +41,7 @@ def shell(interface: str | None, command: str | None) -> None:
 
         def get_default_interface() -> list[str]:
             try:
-                import IPython  # noqa: F401  # type: ignore[import-not-found]
+                import IPython  # noqa: F401  # ty: ignore[unresolved-import]
 
                 return ["python", "-m", "IPython"]
             except ImportError:

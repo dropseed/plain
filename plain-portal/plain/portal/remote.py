@@ -146,7 +146,9 @@ async def run_remote(
 
             last_expr: ast.Expr | None = None
             if tree.body and isinstance(tree.body[-1], ast.Expr):
-                last_expr = tree.body.pop()  # type: ignore[assignment]
+                popped = tree.body.pop()
+                assert isinstance(popped, ast.Expr)
+                last_expr = popped
 
             # Process-global redirect — safe because _log() uses _real_stdout
             ctx = contextlib.ExitStack()

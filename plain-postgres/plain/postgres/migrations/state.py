@@ -170,12 +170,12 @@ class ProjectState:
             if reference.to:
                 changed_field = field.clone()
                 assert changed_field.remote_field is not None
-                changed_field.remote_field.model = new_remote_model  # type: ignore[assignment]
+                changed_field.remote_field.model = new_remote_model  # ty: ignore[invalid-assignment]
             if reference.through:
                 if changed_field is None:
                     changed_field = field.clone()
                 assert changed_field.remote_field is not None
-                changed_field.remote_field.through = new_remote_model  # type: ignore[attr-defined]
+                changed_field.remote_field.through = new_remote_model  # ty: ignore[unresolved-attribute]
             if changed_field:
                 model_state.fields[name] = changed_field
                 to_reload.add((model_state.package_label, model_state.name_lower))

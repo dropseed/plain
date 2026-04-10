@@ -401,7 +401,7 @@ class Query(BaseExpression):
             obj.used_aliases = set()
         obj.filter_is_sticky = False
         if hasattr(obj, "_setup_query"):
-            obj._setup_query()  # type: ignore[operator]
+            obj._setup_query()  # ty: ignore[call-non-callable]
         return obj
 
     def relabeled_clone(self, change_map: dict[str, str]) -> Self:
@@ -1031,10 +1031,10 @@ class Query(BaseExpression):
         """
         if self.alias_map:
             alias = self.base_table
-            self.ref_alias(alias)  # type: ignore[invalid-argument-type]
+            self.ref_alias(alias)  # ty: ignore[invalid-argument-type]
         elif self.model:
             alias = self.join(
-                self.base_table_class(self.model.model_options.db_table, None)  # type: ignore[invalid-argument-type]
+                self.base_table_class(self.model.model_options.db_table, None)  # ty: ignore[invalid-argument-type]
             )
         else:
             alias = None
@@ -1884,7 +1884,7 @@ class Query(BaseExpression):
             connection = self.join_class(
                 meta.model.model_options.db_table,
                 alias,
-                table_alias,  # type: ignore[invalid-argument-type]
+                table_alias,  # ty: ignore[invalid-argument-type]
                 INNER,
                 join.join_field,
                 nullable,
@@ -1899,7 +1899,7 @@ class Query(BaseExpression):
             joins.append(alias)
             if filtered_relation:
                 filtered_relation.path = joins[:]
-        return JoinInfo(final_field, targets, meta, joins, path, final_transformer)  # type: ignore[invalid-argument-type]
+        return JoinInfo(final_field, targets, meta, joins, path, final_transformer)  # ty: ignore[invalid-argument-type]
 
     def trim_joins(
         self, targets: tuple[Field, ...], joins: list[str], path: list[Any]
@@ -1959,7 +1959,7 @@ class Query(BaseExpression):
                 )
 
     @classmethod
-    def _gen_col_aliases(cls, exprs: Iterable[Any]) -> TypingIterator[str]:
+    def _gen_col_aliases(cls, exprs: Iterable[Any]) -> TypingIterator[str | None]:
         yield from (expr.alias for expr in cls._gen_cols(exprs))
 
     def resolve_ref(

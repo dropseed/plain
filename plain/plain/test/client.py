@@ -168,14 +168,14 @@ def _conditional_content_removal(
     """
     if 100 <= response.status_code < 200 or response.status_code in (204, 304):
         if hasattr(response, "streaming") and response.streaming:
-            response.streaming_content = []  # type: ignore[attr-defined]
+            response.streaming_content = []  # ty: ignore[invalid-assignment]
         elif hasattr(response, "content"):
-            response.content = b""  # type: ignore[attr-defined]
+            response.content = b""  # ty: ignore[invalid-assignment]
     if request.method == "HEAD":
         if hasattr(response, "streaming") and response.streaming:
-            response.streaming_content = []  # type: ignore[attr-defined]
+            response.streaming_content = []  # ty: ignore[invalid-assignment]
         elif hasattr(response, "content"):
-            response.content = b""  # type: ignore[attr-defined]
+            response.content = b""  # ty: ignore[invalid-assignment]
     return response
 
 
@@ -351,7 +351,7 @@ class RequestFactory:
 
     def _encode_data(self, data: dict[str, Any] | str, content_type: str) -> bytes:
         if content_type is _MULTIPART_CONTENT:
-            return encode_multipart(_BOUNDARY, data)  # type: ignore[arg-type]
+            return encode_multipart(_BOUNDARY, data)  # ty: ignore[invalid-argument-type]
         else:
             # Encode the content so that the byte representation is correct.
             match = _CONTENT_TYPE_RE.match(content_type)

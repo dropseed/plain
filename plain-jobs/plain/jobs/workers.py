@@ -89,7 +89,7 @@ class Worker:
         # How often to log the stats (in seconds)
         self.stats_every = stats_every
 
-        self.max_processes = self.executor._max_workers  # type: ignore[attr-defined]
+        self.max_processes = self.executor._max_workers  # ty: ignore[unresolved-attribute]
         self.max_jobs_per_process = max_jobs_per_process
         self.max_pending_per_process = max_pending_per_process
 
@@ -354,7 +354,9 @@ def process_job(job_process_uuid: str) -> None:
 
         job_result = middleware_chain(job_process)
 
-        duration = job_result.ended_at - job_result.started_at  # type: ignore[operator]
+        assert job_result.ended_at is not None
+        assert job_result.started_at is not None
+        duration = job_result.ended_at - job_result.started_at
         duration = duration.total_seconds()
 
         logger.info(

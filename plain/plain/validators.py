@@ -339,7 +339,7 @@ def int_list_validator(
             sep=re.escape(sep),
         )
     )
-    return RegexValidator(regexp, message=message, code=code)  # type: ignore[arg-type]
+    return RegexValidator(regexp, message=message, code=code)  # ty: ignore[invalid-argument-type]
 
 
 validate_comma_separated_integer_list = int_list_validator(
@@ -581,7 +581,7 @@ class FileExtensionValidator:
 
 def get_available_image_extensions() -> list[str]:
     try:
-        from PIL import Image  # type: ignore[import-not-found]
+        from PIL import Image  # ty: ignore[unresolved-import]
     except ImportError:
         return []
     else:
