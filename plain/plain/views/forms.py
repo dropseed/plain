@@ -10,13 +10,18 @@ if TYPE_CHECKING:
     from plain.forms import BaseForm
 
 
-class FormView(TemplateView):
-    """A view for displaying a form and rendering a template response."""
+class FormView[F: "BaseForm"](TemplateView):
+    """A view for displaying a form and rendering a template response.
 
-    form_class: type["BaseForm"] | None = None
+    Generic over the form type. Subclasses that want type-safe access to
+    their specific form should parameterize: `FormView[MyForm]`. The
+    `form_class` attribute must still be set separately at runtime.
+    """
+
+    form_class: type[F] | None = None
     success_url: Callable | str | None = None
 
-    def get_form(self) -> "BaseForm":
+    def get_form(self) -> F:
         """Return an instance of the form to be used in this view."""
         if not self.form_class:
             raise ImproperlyConfigured(
@@ -32,17 +37,17 @@ class FormView(TemplateView):
             "request": self.request,
         }
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self, form: F) -> str:
         """Return the URL to redirect to after processing a valid form."""
         if not self.success_url:
             raise ImproperlyConfigured("No URL to redirect to. Provide a success_url.")
         return str(self.success_url)  # success_url may be lazy
 
-    def form_valid(self, form: "BaseForm") -> Response:
+    def form_valid(self, form: F) -> Response:
         """If the form is valid, redirect to the supplied URL."""
         return RedirectResponse(self.get_success_url(form))
 
-    def form_invalid(self, form: "BaseForm") -> Response:
+    def form_invalid(self, form: F) -> Response:
         """If the form is invalid, render the invalid form."""
         context = {
             **self.get_template_context(),

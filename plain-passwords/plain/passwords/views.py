@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from plain.postgres import Model
 
 
-class PasswordForgotView(FormView):
+class PasswordForgotView(FormView[PasswordResetForm]):
     form_class = PasswordResetForm
     reset_confirm_url_name: str
 
@@ -52,14 +52,14 @@ class PasswordForgotView(FormView):
         url = reverse(self.reset_confirm_url_name) + f"?token={token}"
         return self.request.build_absolute_uri(url)
 
-    def form_valid(self, form: PasswordResetForm) -> Response:  # ty: ignore[invalid-method-override]
+    def form_valid(self, form: PasswordResetForm) -> Response:
         form.save(
             generate_reset_url=self.generate_password_reset_url,
         )
         return super().form_valid(form)
 
 
-class PasswordResetView(AuthView, FormView):
+class PasswordResetView(AuthView, FormView[PasswordSetForm]):
     form_class = PasswordSetForm
     reset_token_max_age = 60 * 60  # 1 hour
     _reset_token_session_key = "_password_reset_token"
@@ -135,7 +135,7 @@ class PasswordResetView(AuthView, FormView):
         kwargs["user"] = self.get_user()
         return kwargs
 
-    def form_valid(self, form: PasswordSetForm) -> Response:  # ty: ignore[invalid-method-override]
+    def form_valid(self, form: PasswordSetForm) -> Response:
         form.save()
         del self.session[self._reset_token_session_key]
         # If you wanted, you could log in the user here so they don't have to
@@ -143,7 +143,7 @@ class PasswordResetView(AuthView, FormView):
         return super().form_valid(form)
 
 
-class PasswordChangeView(AuthView, FormView):
+class PasswordChangeView(AuthView, FormView[PasswordChangeForm]):
     # Change to PasswordSetForm if you want to set new passwords
     # without confirming the old one.
     form_class = PasswordChangeForm
@@ -153,7 +153,7 @@ class PasswordChangeView(AuthView, FormView):
         kwargs["user"] = self.user
         return kwargs
 
-    def form_valid(self, form: PasswordChangeForm) -> Response:  # ty: ignore[invalid-method-override]
+    def form_valid(self, form: PasswordChangeForm) -> Response:
         form.save()
         # Updating the password logs out all other sessions for the user
         # except the current one.
@@ -161,7 +161,7 @@ class PasswordChangeView(AuthView, FormView):
         return super().form_valid(form)
 
 
-class PasswordLoginView(AuthView, FormView):
+class PasswordLoginView(AuthView, FormView[PasswordLoginForm]):
     form_class = PasswordLoginForm
     success_url = "/"
 
@@ -172,7 +172,7 @@ class PasswordLoginView(AuthView, FormView):
 
         return super().get()
 
-    def form_valid(self, form: PasswordLoginForm) -> Response:  # ty: ignore[invalid-method-override]
+    def form_valid(self, form: PasswordLoginForm) -> Response:
         # Log the user in and redirect
         auth_login(self.request, form.get_user())
 
