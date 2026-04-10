@@ -89,7 +89,7 @@ class Worker:
         # How often to log the stats (in seconds)
         self.stats_every = stats_every
 
-        self.max_processes = self.executor._max_workers  # type: ignore
+        self.max_processes = max_processes
         self.max_jobs_per_process = max_jobs_per_process
         self.max_pending_per_process = max_pending_per_process
 
