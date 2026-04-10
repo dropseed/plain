@@ -12,19 +12,20 @@ docker compose -f tests/conformance/docker-compose.yml up -d
 
 The conformance suite UI will be available at `http://localhost:9999`.
 
-### 2. Start the Plain test server
+### 2. Start a Plain server with plain-oauth-provider installed
+
+Use the `example/` app at the repo root (or any Plain app with `plain.oauth_provider` installed and the `OAuthProviderRouter` / `OAuthWellKnownRouter` mounted):
 
 ```bash
-cd tests/conformance/server
+cd example
 uv run plain dev
 ```
 
-This runs a minimal Plain app with oauth-provider configured, typically at `https://localhost:8443`.
+This typically runs at `https://<project>.localhost:8443`.
 
 ### 3. Create a test OAuth application
 
 ```bash
-cd tests/conformance/server
 uv run plain shell -c "
 from plain.oauth_provider.models import OAuthApplication
 app = OAuthApplication(
@@ -44,7 +45,7 @@ In the conformance suite UI:
 1. Create a new test plan
 2. Select "OAuth Authorization Server" test
 3. Configure:
-    - **Server metadata URL**: `https://localhost:8443/.well-known/oauth-authorization-server`
+    - **Server metadata URL**: `https://<project>.localhost:8443/.well-known/oauth-authorization-server`
     - **Client ID**: from step 3
     - **Client Secret**: from step 3
     - **Client authentication**: `client_secret_post`
