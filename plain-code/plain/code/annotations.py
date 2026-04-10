@@ -144,9 +144,9 @@ class TypeAnnotationAnalyzer(ast.NodeVisitor):
 
 
 def count_ignore_comments(content: str) -> int:
-    """Count type: ignore comments in the file."""
+    """Count type/ty ignore comments in the file."""
     count = 0
-    pattern = r"#\s*type:\s*ignore"
+    pattern = r"#\s*ty(?:pe)?:\s*ignore"
 
     for line in content.split("\n"):
         if re.search(pattern, line, re.IGNORECASE):
