@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.35.2](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.2) (2026-04-13)
+
+### What's changed
+
+- Migrated type suppression comments to `ty: ignore` for the new ty checker version. ([4ec631a7ef51](https://github.com/dropseed/plain/commit/4ec631a7ef51))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.35.1](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.1) (2026-03-29)
 
 ### What's changed
