@@ -1,14 +1,14 @@
 [project]
 name = "plain.oauth"
-version = "0.49.1"
+version = "0.49.2"
 description = "Let users log in with OAuth providers."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-  "plain>=0.123.0,<1.0.0",
-  "plain.auth<1.0.0",
+  "plain>=0.132.0,<1.0.0",
+  "plain.auth>=0.29.0,<1.0.0",
   "plain.postgres>=0.89.0,<1.0.0",
   "requests>=2.0.0",
 ]
