@@ -84,6 +84,7 @@ class ConstraintState:
     definition: str | None = None
     target_table: str | None = None  # FK only
     target_column: str | None = None  # FK only
+    on_delete_action: str | None = None  # FK only: pg_constraint.confdeltype char
 
 
 @dataclass
@@ -149,6 +150,7 @@ def introspect_table(
                     definition=info.get("definition"),
                     target_table=fk_target[0],
                     target_column=fk_target[1],
+                    on_delete_action=info.get("on_delete_action"),
                 )
         elif info.get("index"):
             # get_constraints() encodes basic btree indexes as Index.suffix ("idx")

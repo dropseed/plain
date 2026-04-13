@@ -97,6 +97,26 @@ def NO_ACTION(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     pass
 
 
+# Mapping from Python on_delete callable to Postgres SQL clause and pg_constraint
+# confdeltype code. PROTECT and SET(callable) have no DB-level equivalent — they
+# map to NO ACTION (the Python handler enforces them before DELETE is issued;
+# NO ACTION is the safe DB-level fallback if the handler is ever bypassed).
+_ON_DELETE_SQL: dict[Any, tuple[str, str]] = {
+    CASCADE: (" ON DELETE CASCADE", "c"),
+    SET_NULL: (" ON DELETE SET NULL", "n"),
+    RESTRICT: (" ON DELETE RESTRICT", "r"),
+}
+
+
+def sql_on_delete(on_delete: Any) -> tuple[str, str]:
+    """Return (sql_clause, pg_confdeltype_code) for a Python on_delete value.
+
+    Unknown values (PROTECT, SET(callable), NO_ACTION) map to NO ACTION — no
+    clause, code 'a' — which is Postgres's default behavior.
+    """
+    return _ON_DELETE_SQL.get(on_delete, ("", "a"))
+
+
 def get_candidate_relations_to_delete(
     meta: Meta,
 ) -> Generator[ForeignKeyRel]:

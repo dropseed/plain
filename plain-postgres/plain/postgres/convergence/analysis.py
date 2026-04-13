@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..constraints import CheckConstraint, UniqueConstraint
 from ..ddl import compile_expression_sql, compile_index_expressions_sql
+from ..deletion import sql_on_delete
 from ..dialect import quote_name
 from ..fields.related import ForeignKeyField
 from ..indexes import Index
@@ -111,6 +112,9 @@ class ForeignKeyDrift:
     column: str | None = None
     target_table: str | None = None
     target_column: str | None = None
+    on_delete_clause: str = ""  # SQL clause to emit, e.g. " ON DELETE CASCADE"
+    actual_action: str | None = None  # CHANGED only: current DB confdeltype
+    expected_action: str | None = None  # CHANGED only: expected confdeltype
 
     def describe(self) -> str:
         match self.kind:
@@ -118,6 +122,11 @@ class ForeignKeyDrift:
                 return f"{self.table}: FK {self.name} missing ({self.column} → {self.target_table}.{self.target_column})"
             case DriftKind.UNVALIDATED:
                 return f"{self.table}: FK {self.name} NOT VALID"
+            case DriftKind.CHANGED:
+                return (
+                    f"{self.table}: FK {self.name} on_delete changed "
+                    f"({self.actual_action!r} → {self.expected_action!r})"
+                )
             case _:
                 return f"{self.table}: FK {self.name} not declared"
 
@@ -823,8 +832,10 @@ def _compare_foreign_keys(
         if v.constraint_type == ConType.FOREIGN_KEY
     }
 
-    # Build expected FKs from model fields: shape → (field_name, constraint_name)
-    expected_fks: dict[tuple[str, str, str], tuple[str, str]] = {}
+    # Build expected FKs from model fields.
+    # Key: shape (column, target_table, target_column)
+    # Value: (field_name, constraint_name, expected_on_delete_clause, expected_confdeltype)
+    expected_fks: dict[tuple[str, str, str], tuple[str, str, str, str]] = {}
     for f in model._model_meta.local_fields:
         if isinstance(f, ForeignKeyField) and f.db_constraint:
             assert f.name is not None
@@ -833,7 +844,13 @@ def _compare_foreign_keys(
             constraint_name = generate_fk_constraint_name(
                 table, f.column, to_table, to_column
             )
-            expected_fks[(f.column, to_table, to_column)] = (f.name, constraint_name)
+            on_delete_clause, confdeltype = sql_on_delete(f.remote_field.on_delete)
+            expected_fks[(f.column, to_table, to_column)] = (
+                f.name,
+                constraint_name,
+                on_delete_clause,
+                confdeltype,
+            )
 
     # Build actual FKs from DB: shape → (constraint_name, ConstraintState)
     actual_fk_by_shape: dict[tuple[str, str, str], tuple[str, ConstraintState]] = {}
@@ -845,15 +862,41 @@ def _compare_foreign_keys(
             )
 
     matched_fk_names: set[str] = set()
-    for key, (field_name, constraint_name) in expected_fks.items():
+    for key, (
+        field_name,
+        constraint_name,
+        on_delete_clause,
+        expected_action,
+    ) in expected_fks.items():
         if match := actual_fk_by_shape.get(key):
             actual_name, cs = match
             matched_fk_names.add(actual_name)
 
-            # Check validation state
             issue: str | None = None
             drift: ForeignKeyDrift | None = None
-            if not cs.validated:
+
+            # on_delete action mismatch — drop + re-add with new clause
+            if (
+                cs.on_delete_action is not None
+                and cs.on_delete_action != expected_action
+            ):
+                issue = (
+                    f"on_delete action differs "
+                    f"({cs.on_delete_action!r} → {expected_action!r})"
+                )
+                col, to_table, to_column = key
+                drift = ForeignKeyDrift(
+                    kind=DriftKind.CHANGED,
+                    table=table,
+                    name=actual_name,
+                    column=col,
+                    target_table=to_table,
+                    target_column=to_column,
+                    on_delete_clause=on_delete_clause,
+                    actual_action=cs.on_delete_action,
+                    expected_action=expected_action,
+                )
+            elif not cs.validated:
                 issue = "NOT VALID — needs validation"
                 drift = ForeignKeyDrift(
                     kind=DriftKind.UNVALIDATED,
@@ -885,6 +928,7 @@ def _compare_foreign_keys(
                         column=col,
                         target_table=to_table,
                         target_column=to_column,
+                        on_delete_clause=on_delete_clause,
                     ),
                 )
             )

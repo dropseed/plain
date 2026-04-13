@@ -990,7 +990,8 @@ class DatabaseConnection:
                 WHERE fka.attrelid = c.confrelid AND fka.attnum = c.confkey[1]),
                 cl.reloptions,
                 c.convalidated,
-                pg_get_constraintdef(c.oid)
+                pg_get_constraintdef(c.oid),
+                c.confdeltype
             FROM pg_constraint AS c
             JOIN pg_class AS cl ON c.conrelid = cl.oid
             WHERE cl.relname = %s AND pg_catalog.pg_table_is_visible(cl.oid)
@@ -1005,6 +1006,7 @@ class DatabaseConnection:
             options,
             validated,
             constraintdef,
+            confdeltype,
         ) in cursor.fetchall():
             constraints[constraint] = {
                 "columns": columns,
@@ -1017,6 +1019,7 @@ class DatabaseConnection:
                 "definition": constraintdef,
                 "options": options,
                 "validated": validated,
+                "on_delete_action": confdeltype if kind == "f" else None,
             }
         # Now get indexes
         cursor.execute(

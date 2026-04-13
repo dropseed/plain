@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from app.examples.models import Car, CarFeature, TreeNode, UnconstrainedChild
+from app.examples.models import (
+    Car,
+    CarFeature,
+    ChildCascade,
+    ChildSetNull,
+    TreeNode,
+    UnconstrainedChild,
+)
 from conftest_convergence import (
     constraint_exists,
     constraint_is_deferrable,
     constraint_is_valid,
     execute,
+    fk_on_delete_action,
     get_fk_constraint_names,
 )
 
@@ -21,6 +29,7 @@ from plain.postgres.convergence import (
     plan_model_convergence,
 )
 from plain.postgres.convergence.analysis import generate_fk_constraint_name
+from plain.postgres.convergence.fixes import ReplaceForeignKeyFix
 
 
 class TestForeignKeyDetection:
@@ -349,6 +358,138 @@ class TestSelfReferentialFK:
         assert result.ok
         assert constraint_exists("examples_treenode", expected)
         assert constraint_is_valid("examples_treenode", expected)
+
+
+class TestForeignKeyOnDelete:
+    """Convergence must treat `on_delete` as part of the FK shape and
+    recreate the constraint when the model's action diverges from the DB."""
+
+    def test_fk_emits_on_delete_cascade(self, isolated_db):
+        """AddForeignKeyFix with ON DELETE CASCADE lands as confdeltype='c'."""
+        fk_name = generate_fk_constraint_name(
+            "examples_childcascade", "parent_id", "examples_deleteparent", "id"
+        )
+        fk_names = get_fk_constraint_names("examples_childcascade")
+        if fk_name in fk_names:
+            execute(f'ALTER TABLE "examples_childcascade" DROP CONSTRAINT "{fk_name}"')
+
+        fix = AddForeignKeyFix(
+            table="examples_childcascade",
+            constraint_name=fk_name,
+            column="parent_id",
+            target_table="examples_deleteparent",
+            target_column="id",
+            on_delete_clause=" ON DELETE CASCADE",
+        )
+        sql = fix.apply()
+
+        assert "ON DELETE CASCADE" in sql
+        assert fk_on_delete_action("examples_childcascade", fk_name) == "c"
+
+    def test_detects_on_delete_drift(self, isolated_db):
+        """A FK whose DB action differs from the model declaration is CHANGED drift."""
+        fk_name = generate_fk_constraint_name(
+            "examples_childcascade", "parent_id", "examples_deleteparent", "id"
+        )
+        fk_names = get_fk_constraint_names("examples_childcascade")
+        if fk_name in fk_names:
+            execute(f'ALTER TABLE "examples_childcascade" DROP CONSTRAINT "{fk_name}"')
+
+        # Recreate as NO ACTION (confdeltype='a') while model says CASCADE
+        execute(
+            f'ALTER TABLE "examples_childcascade" ADD CONSTRAINT "{fk_name}"'
+            f' FOREIGN KEY ("parent_id") REFERENCES "examples_deleteparent" ("id")'
+            f" DEFERRABLE INITIALLY DEFERRED"
+        )
+        assert fk_on_delete_action("examples_childcascade", fk_name) == "a"
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, ChildCascade)
+
+        changed = [
+            d
+            for d in analysis.drifts
+            if isinstance(d, ForeignKeyDrift) and d.kind == DriftKind.CHANGED
+        ]
+        assert len(changed) == 1
+        assert changed[0].actual_action == "a"
+        assert changed[0].expected_action == "c"
+        assert changed[0].on_delete_clause == " ON DELETE CASCADE"
+
+    def test_replace_fk_updates_action(self, isolated_db):
+        """ReplaceForeignKeyFix drops + re-adds in one statement, updating confdeltype."""
+        fk_name = generate_fk_constraint_name(
+            "examples_childcascade", "parent_id", "examples_deleteparent", "id"
+        )
+        fk_names = get_fk_constraint_names("examples_childcascade")
+        if fk_name in fk_names:
+            execute(f'ALTER TABLE "examples_childcascade" DROP CONSTRAINT "{fk_name}"')
+        execute(
+            f'ALTER TABLE "examples_childcascade" ADD CONSTRAINT "{fk_name}"'
+            f' FOREIGN KEY ("parent_id") REFERENCES "examples_deleteparent" ("id")'
+            f" DEFERRABLE INITIALLY DEFERRED"
+        )
+        assert fk_on_delete_action("examples_childcascade", fk_name) == "a"
+
+        fix = ReplaceForeignKeyFix(
+            table="examples_childcascade",
+            constraint_name=fk_name,
+            column="parent_id",
+            target_table="examples_deleteparent",
+            target_column="id",
+            on_delete_clause=" ON DELETE CASCADE",
+        )
+        fix.apply()
+
+        assert constraint_exists("examples_childcascade", fk_name)
+        assert constraint_is_valid("examples_childcascade", fk_name)
+        assert constraint_is_deferrable("examples_childcascade", fk_name)
+        assert fk_on_delete_action("examples_childcascade", fk_name) == "c"
+
+    def test_on_delete_drift_planned_and_executed(self, isolated_db):
+        """End-to-end: DB action 'a' + model CASCADE → CHANGED drift → ReplaceForeignKeyFix → 'c'."""
+        fk_name = generate_fk_constraint_name(
+            "examples_childcascade", "parent_id", "examples_deleteparent", "id"
+        )
+        fk_names = get_fk_constraint_names("examples_childcascade")
+        if fk_name in fk_names:
+            execute(f'ALTER TABLE "examples_childcascade" DROP CONSTRAINT "{fk_name}"')
+        execute(
+            f'ALTER TABLE "examples_childcascade" ADD CONSTRAINT "{fk_name}"'
+            f' FOREIGN KEY ("parent_id") REFERENCES "examples_deleteparent" ("id")'
+            f" DEFERRABLE INITIALLY DEFERRED"
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            items = plan_model_convergence(conn, cursor, ChildCascade).executable()
+
+        replace_items = [
+            item for item in items if isinstance(item.fix, ReplaceForeignKeyFix)
+        ]
+        assert len(replace_items) == 1
+
+        assert execute_plan(items).ok
+        assert fk_on_delete_action("examples_childcascade", fk_name) == "c"
+
+    def test_set_null_emits_set_null_clause(self, isolated_db):
+        """ChildSetNull has on_delete=SET_NULL — confdeltype should be 'n'."""
+        fk_name = generate_fk_constraint_name(
+            "examples_childsetnull", "parent_id", "examples_deleteparent", "id"
+        )
+        # Whatever exists in the test DB should already reflect the model, but
+        # after convergence this must be 'n' regardless.
+        fk_names = get_fk_constraint_names("examples_childsetnull")
+        if fk_name in fk_names:
+            execute(f'ALTER TABLE "examples_childsetnull" DROP CONSTRAINT "{fk_name}"')
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            items = plan_model_convergence(conn, cursor, ChildSetNull).executable()
+        assert execute_plan(items).ok
+
+        assert fk_on_delete_action("examples_childsetnull", fk_name) == "n"
 
 
 class TestDbConstraintFalse:

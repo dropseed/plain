@@ -26,6 +26,7 @@ from .fixes import (
     RebuildIndexFix,
     RenameConstraintFix,
     RenameIndexFix,
+    ReplaceForeignKeyFix,
     SetNotNullFix,
     ValidateConstraintFix,
 )
@@ -93,8 +94,23 @@ def _plan_drift(drift: Drift) -> PlanItem:
             column=col,
             target_table=tt,
             target_column=tc,
+            on_delete_clause=od,
         ):
-            return PlanItem(drift, AddForeignKeyFix(t, cn, col, tt, tc))
+            return PlanItem(drift, AddForeignKeyFix(t, cn, col, tt, tc, od))
+        case ForeignKeyDrift(
+            kind=DriftKind.CHANGED,
+            table=t,
+            name=cn,
+            column=col,
+            target_table=tt,
+            target_column=tc,
+            on_delete_clause=od,
+        ):
+            assert cn is not None
+            assert col is not None
+            assert tt is not None
+            assert tc is not None
+            return PlanItem(drift, ReplaceForeignKeyFix(t, cn, col, tt, tc, od))
         case ForeignKeyDrift(kind=DriftKind.UNVALIDATED, table=t, name=n):
             return PlanItem(drift, ValidateConstraintFix(t, n))
         case ForeignKeyDrift(kind=DriftKind.UNDECLARED, table=t, name=n):

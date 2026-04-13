@@ -194,6 +194,7 @@ class AddForeignKeyFix(Fix):
     column: str
     target_table: str
     target_column: str
+    on_delete_clause: str = ""  # e.g. " ON DELETE CASCADE" or "" for NO ACTION
 
     def describe(self) -> str:
         return f"{self.table}: add FK {self.constraint_name} ({self.column} → {self.target_table}.{self.target_column})"
@@ -204,6 +205,7 @@ class AddForeignKeyFix(Fix):
             f" ADD CONSTRAINT {quote_name(self.constraint_name)}"
             f" FOREIGN KEY ({quote_name(self.column)})"
             f" REFERENCES {quote_name(self.target_table)} ({quote_name(self.target_column)})"
+            f"{self.on_delete_clause}"
             f" DEFERRABLE INITIALLY DEFERRED"
             f" NOT VALID"
         )
@@ -216,6 +218,49 @@ class AddForeignKeyFix(Fix):
         _execute_and_commit(validate_sql)
 
         return f"{add_sql}; {validate_sql}"
+
+
+@dataclass
+class ReplaceForeignKeyFix(Fix):
+    """Drop + re-add a FK in one ALTER TABLE to update ON DELETE action.
+
+    Transactional, so no window without the constraint. Uses NOT VALID +
+    VALIDATE to minimize lock time — existing data is already valid for
+    the old FK, so validation is a fast catalog-only step.
+    """
+
+    pass_order = 2
+
+    table: str
+    constraint_name: str
+    column: str
+    target_table: str
+    target_column: str
+    on_delete_clause: str
+
+    def describe(self) -> str:
+        return f"{self.table}: update FK {self.constraint_name} on_delete"
+
+    def apply(self) -> str:
+        replace_sql = (
+            f"ALTER TABLE {quote_name(self.table)}"
+            f" DROP CONSTRAINT {quote_name(self.constraint_name)},"
+            f" ADD CONSTRAINT {quote_name(self.constraint_name)}"
+            f" FOREIGN KEY ({quote_name(self.column)})"
+            f" REFERENCES {quote_name(self.target_table)} ({quote_name(self.target_column)})"
+            f"{self.on_delete_clause}"
+            f" DEFERRABLE INITIALLY DEFERRED"
+            f" NOT VALID"
+        )
+        _execute_and_commit(replace_sql)
+
+        validate_sql = (
+            f"ALTER TABLE {quote_name(self.table)}"
+            f" VALIDATE CONSTRAINT {quote_name(self.constraint_name)}"
+        )
+        _execute_and_commit(validate_sql)
+
+        return f"{replace_sql}; {validate_sql}"
 
 
 @dataclass

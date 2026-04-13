@@ -102,6 +102,21 @@ def get_fk_constraint_names(table: str) -> list[str]:
         return [row[0] for row in cursor.fetchall()]
 
 
+def fk_on_delete_action(table: str, name: str) -> str | None:
+    """Return pg_constraint.confdeltype char code for a FK constraint."""
+    with get_connection().cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT c.confdeltype FROM pg_constraint c
+            JOIN pg_class cl ON c.conrelid = cl.oid
+            WHERE cl.relname = %s AND c.conname = %s AND c.contype = 'f'
+            """,
+            [table, name],
+        )
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+
 def column_is_not_null(table: str, column: str) -> bool:
     with get_connection().cursor() as cursor:
         cursor.execute(
