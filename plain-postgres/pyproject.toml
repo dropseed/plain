@@ -1,12 +1,12 @@
 [project]
 name = "plain.postgres"
-version = "0.94.1"
+version = "0.94.2"
 description = "Model your data and store it in a database."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
-dependencies = ["plain>=0.129.0,<1.0.0", "sqlparse>=0.3.1"]
+dependencies = ["plain>=0.132.0,<1.0.0", "sqlparse>=0.3.1"]
 
 [project.entry-points."plain.setup"]
 "postgres-setup" = "plain.postgres.entrypoints:setup"
