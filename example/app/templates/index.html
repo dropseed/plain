@@ -1,7 +1,375 @@
 {% extends "base.html" %}
 
+{% block title %}plain — example app{% endblock %}
+
 {% block content %}
-<div class="p-8">
-    Hey!
+<style nonce="{{ request.csp_nonce }}">
+    :root {
+        --plain-bg: #f7f7f4;
+        --plain-dark: #3a352f;
+        --plain-green: #4d7c4a;
+        --plain-yellow: #b8973a;
+        --plain-red: #9e5a42;
+        --plain-blue: #2b7a9e;
+    }
+
+    .page {
+        background: var(--plain-bg);
+        color: rgba(58, 53, 47, 0.9);
+        min-height: 100vh;
+        font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        letter-spacing: -0.005em;
+    }
+
+    .font-lexend { font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .font-mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+
+    /* Top announcement-style banner */
+    .banner {
+        background: rgba(184, 151, 58, 0.55);
+        color: rgba(58, 53, 47, 0.85);
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .header {
+        height: 48px;
+        display: flex;
+        align-items: flex-end;
+        background: rgba(247, 247, 244, 0.95);
+        border-bottom: 1px solid rgba(58, 53, 47, 0.06);
+    }
+
+    .header-inner {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 0 1.25rem 0.5rem;
+    }
+
+    .brand {
+        font-family: 'Lexend', sans-serif;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        color: rgba(28, 25, 23, 0.95);
+        text-decoration: none;
+        font-size: 14px;
+    }
+    .brand .muted { color: rgba(28, 25, 23, 0.35); font-weight: 400; }
+
+    .header-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 12px;
+        color: rgba(58, 53, 47, 0.55);
+    }
+
+    /* Hero */
+    .hero {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 3rem 1.25rem 1.5rem;
+    }
+    .hero h1 {
+        font-family: 'Lexend', sans-serif;
+        font-weight: 500;
+        font-size: 1.75rem;
+        line-height: 1.3;
+        letter-spacing: -0.02em;
+        color: rgba(28, 25, 23, 0.95);
+        max-width: 48rem;
+    }
+    @media (min-width: 640px) {
+        .hero h1 { font-size: 2rem; }
+    }
+    .hero p {
+        margin-top: 0.5rem;
+        font-size: 14px;
+        color: rgba(58, 53, 47, 0.55);
+        max-width: 36rem;
+        letter-spacing: 0.01em;
+    }
+    @media (min-width: 1024px) {
+        .hero p { font-size: 16px; }
+    }
+
+    /* Section headings */
+    .section {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 0;
+    }
+    .section h2 {
+        font-family: 'Lexend', sans-serif;
+        font-weight: 500;
+        font-size: 18px;
+        letter-spacing: -0.01em;
+        color: rgba(28, 25, 23, 0.95);
+        margin-bottom: 0.25rem;
+    }
+    .section-desc {
+        font-size: 13px;
+        color: rgba(58, 53, 47, 0.5);
+        margin-bottom: 1rem;
+    }
+
+    /* Route list (plain-public card style) */
+    .route-card {
+        border: 1px solid rgba(58, 53, 47, 0.12);
+        border-radius: 8px;
+        background: #ffffff;
+        overflow: hidden;
+        box-shadow: 0 1px 0 rgba(58, 53, 47, 0.02);
+    }
+
+    .route {
+        display: grid;
+        grid-template-columns: 180px 1fr auto;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem 1rem;
+        text-decoration: none;
+        color: inherit;
+        border-top: 1px solid rgba(58, 53, 47, 0.08);
+        transition: background 160ms ease;
+    }
+    .route:first-child { border-top: none; }
+    .route:hover {
+        background: rgba(58, 53, 47, 0.025);
+    }
+    .route:hover .route-arrow {
+        transform: translateX(3px);
+        color: rgba(28, 25, 23, 0.85);
+    }
+    @media (max-width: 640px) {
+        .route {
+            grid-template-columns: 1fr auto;
+            grid-template-areas:
+                "path arrow"
+                "desc arrow";
+            gap: 0.25rem 1rem;
+        }
+        .route-path { grid-area: path; }
+        .route-desc { grid-area: desc; font-size: 12px; }
+        .route-arrow { grid-area: arrow; }
+    }
+
+    .route-path {
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+        font-size: 13px;
+        font-weight: 500;
+        color: rgba(28, 25, 23, 0.9);
+        letter-spacing: -0.01em;
+    }
+    .route-path .slash { color: rgba(58, 53, 47, 0.35); font-weight: 400; }
+
+    .route-desc {
+        font-size: 13px;
+        color: rgba(58, 53, 47, 0.6);
+        letter-spacing: 0.005em;
+    }
+
+    .route-right {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .route-arrow {
+        color: rgba(58, 53, 47, 0.3);
+        transition: transform 160ms ease, color 160ms ease;
+        font-family: ui-monospace, monospace;
+    }
+
+    /* Tags */
+    .tag {
+        display: inline-flex;
+        align-items: center;
+        font-size: 10.5px;
+        font-weight: 500;
+        padding: 2px 8px;
+        border-radius: 999px;
+        letter-spacing: 0.01em;
+        line-height: 1.6;
+    }
+    .tag-method {
+        background: rgba(58, 53, 47, 0.06);
+        color: rgba(58, 53, 47, 0.7);
+        font-family: ui-monospace, 'SF Mono', monospace;
+    }
+    .tag-auth {
+        background: rgba(43, 122, 158, 0.1);
+        color: var(--plain-blue);
+    }
+    .tag-live {
+        background: rgba(77, 124, 74, 0.12);
+        color: var(--plain-green);
+    }
+    .tag-dev {
+        background: rgba(184, 151, 58, 0.15);
+        color: var(--plain-yellow);
+    }
+    .tag-danger {
+        background: rgba(158, 90, 66, 0.12);
+        color: var(--plain-red);
+    }
+
+    /* Footer */
+    .footer {
+        max-width: 72rem;
+        margin: 3rem auto 0;
+        padding: 1.5rem 1.25rem 2.5rem;
+        border-top: 1px solid rgba(58, 53, 47, 0.08);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        font-size: 12px;
+        color: rgba(58, 53, 47, 0.4);
+    }
+    .footer a {
+        color: rgba(58, 53, 47, 0.6);
+        text-decoration: underline;
+        text-decoration-color: rgba(58, 53, 47, 0.2);
+        text-underline-offset: 2px;
+    }
+    .footer a:hover { color: rgba(28, 25, 23, 0.9); }
+
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeInUp 0.5s ease-out both; }
+    .delay-1 { animation-delay: 0.08s; }
+    .delay-2 { animation-delay: 0.18s; }
+    .delay-3 { animation-delay: 0.28s; }
+    .delay-4 { animation-delay: 0.38s; }
+</style>
+
+<div class="page">
+    <!-- Announcement banner -->
+    <div class="banner">
+        you are exploring the plain example app — every url below is wired up and live
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <a href="/" class="brand">plain <span class="muted">· example</span></a>
+            <div class="header-right">
+                <span class="font-mono">localhost</span>
+                <span style="color: rgba(58,53,47,0.25);">·</span>
+                <span>dev</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <div class="hero fade-in">
+        <h1>a small tour of the example app.</h1>
+        <p>follow any route to see the piece of plain it exercises — pages, streaming, admin, tooling.</p>
+    </div>
+
+    <!-- Pages -->
+    <section class="section fade-in delay-1">
+        <h2>pages</h2>
+        <p class="section-desc">the hand-written views in <span class="font-mono" style="color: rgba(58,53,47,0.7);">app/urls.py</span>.</p>
+        <div class="route-card">
+            <a class="route" href="/">
+                <div class="route-path"><span class="slash">/</span></div>
+                <div class="route-desc">this index — the page you're on.</div>
+                <div class="route-right">
+                    <span class="tag tag-method">get</span>
+                    <span class="route-arrow">→</span>
+                </div>
+            </a>
+            <a class="route" href="/notes/">
+                <div class="route-path"><span class="slash">/</span>notes<span class="slash">/</span></div>
+                <div class="route-desc">a tiny crud app — create, edit, pin, delete.</div>
+                <div class="route-right">
+                    <span class="tag tag-auth">auth</span>
+                    <span class="route-arrow">→</span>
+                </div>
+            </a>
+            <a class="route" href="/sse/">
+                <div class="route-path"><span class="slash">/</span>sse<span class="slash">/</span></div>
+                <div class="route-desc">server-sent events streaming in real time.</div>
+                <div class="route-right">
+                    <span class="tag tag-live">live</span>
+                    <span class="route-arrow">→</span>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Dev tools -->
+    <section class="section fade-in delay-2">
+        <h2>dev tools</h2>
+        <p class="section-desc">packages that ship with plain, mounted locally.</p>
+        <div class="route-card">
+            <a class="route" href="/admin/">
+                <div class="route-path"><span class="slash">/</span>admin<span class="slash">/</span></div>
+                <div class="route-desc">browse models, run admin actions.</div>
+                <div class="route-right">
+                    <span class="tag tag-auth">auth</span>
+                    <span class="route-arrow">→</span>
+                </div>
+            </a>
+            <a class="route" href="/observer/">
+                <div class="route-path"><span class="slash">/</span>observer<span class="slash">/</span></div>
+                <div class="route-desc">traces, spans, and slow-query hunting.</div>
+                <div class="route-right">
+                    <span class="tag tag-dev">dev</span>
+                    <span class="route-arrow">→</span>
+                </div>
+            </a>
+            <a class="route" href="/error/">
+                <div class="route-path"><span class="slash">/</span>error<span class="slash">/</span></div>
+                <div class="route-desc">raises on purpose — see the toolbar catch it.</div>
+                <div class="route-right">
+                    <span class="tag tag-danger">500</span>
+                    <span class="route-arrow">→</span>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Auth -->
+    <section class="section fade-in delay-3">
+        <h2>auth</h2>
+        <p class="section-desc">sessions + password login, per <span class="font-mono" style="color: rgba(58,53,47,0.7);">plain.passwords</span>.</p>
+        <div class="route-card">
+            <a class="route" href="/login/">
+                <div class="route-path"><span class="slash">/</span>login<span class="slash">/</span></div>
+                <div class="route-desc">password login form.</div>
+                <div class="route-right">
+                    <span class="tag tag-method">get</span>
+                    <span class="route-arrow">→</span>
+                </div>
+            </a>
+            <a class="route" href="/logout/">
+                <div class="route-path"><span class="slash">/</span>logout<span class="slash">/</span></div>
+                <div class="route-desc">sign out and clear the session.</div>
+                <div class="route-right">
+                    <span class="tag tag-method">post</span>
+                    <span class="route-arrow">→</span>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer fade-in delay-4">
+        <div>urls sourced from <span class="font-mono" style="color: rgba(58,53,47,0.7);">app/urls.py</span>.</div>
+        <div><a href="https://plainframework.com/">plainframework.com</a></div>
+    </footer>
 </div>
 {% endblock %}
