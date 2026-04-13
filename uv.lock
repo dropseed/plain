@@ -665,7 +665,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-cloud"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "plain-cloud" }
 dependencies = [
     { name = "opentelemetry-exporter-otlp-proto-http" },

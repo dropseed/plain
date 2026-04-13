@@ -1,5 +1,15 @@
 # plain-cloud changelog
 
+## [0.1.5](https://github.com/dropseed/plain/releases/plain-cloud@0.1.5) (2026-04-13)
+
+### What's changed
+
+- Removed redundant `atexit` shutdown registrations that duplicated the shutdown hooks already registered elsewhere. ([dfb2ce53cd5c](https://github.com/dropseed/plain/commit/dfb2ce53cd5c))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.4](https://github.com/dropseed/plain/releases/plain-cloud@0.1.4) (2026-04-02)
 
 ### What's changed
