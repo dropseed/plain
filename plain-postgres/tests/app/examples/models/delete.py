@@ -67,21 +67,6 @@ class ChildSetNull(postgres.Model):
 
 
 @postgres.register_model
-class ChildSetDefault(postgres.Model):
-    def default_parent_id():
-        return DeleteParent.query.get(name="default").id
-
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent,
-        on_delete=postgres.SET_DEFAULT,
-        default=default_parent_id,
-    )
-    parent_id: int
-
-    query: postgres.QuerySet[ChildSetDefault] = postgres.QuerySet()
-
-
-@postgres.register_model
 class ChildNoAction(postgres.Model):
     parent: DeleteParent = types.ForeignKeyField(
         DeleteParent, on_delete=postgres.NO_ACTION

@@ -12,7 +12,7 @@ Sections:
     8. Query-count canary
     9. Collector-specific behavior — deleted wholesale when the DB-level
        ON DELETE rewrite lands (PROTECT, SET(callable), db_constraint=False
-       app-level cascade, SET_DEFAULT dangling-reference edge case). See
+       app-level cascade). See
        Futures/plain/postgres-native/models-db-level-on-delete.md.
 """
 
@@ -28,7 +28,6 @@ from app.examples.models import (
     ChildProtect,
     ChildRestrict,
     ChildSetCallable,
-    ChildSetDefault,
     ChildSetNull,
     CircA,
     CircB,
@@ -130,24 +129,6 @@ def test_set_null_bulk(db):
 
     nulls = ChildSetNull.query.filter(id__in=child_ids, parent_id__isnull=True).count()
     assert nulls == 100
-
-
-def test_set_default_instance(db):
-    default_parent, parent = _create_parents()
-    child = ChildSetDefault.query.create(parent=parent)
-    parent.delete()
-    child.refresh_from_db()
-    assert child.parent_id == default_parent.id
-
-
-def test_set_default_queryset(db):
-    default_parent, parent = _create_parents()
-    child = ChildSetDefault.query.create(parent=parent)
-
-    DeleteParent.query.filter(id=parent.id).delete()
-
-    child.refresh_from_db()
-    assert child.parent_id == default_parent.id
 
 
 def test_no_action_raises_at_commit(db):
@@ -628,23 +609,3 @@ def test_unconstrained_fk_still_cascades_via_collector(db):
     parent.delete()
 
     assert not UnconstrainedChild.query.filter(id=child_id).exists()
-
-
-def test_set_default_when_default_itself_is_deleted_fails(db):
-    """
-    Collector blindly resolves the default callable and reassigns children to
-    the about-to-be-deleted id, leaving dangling references until the deferred
-    FK fires at commit. Under DB-level SET DEFAULT this becomes an immediate
-    IntegrityError — a cleaner outcome, so the specific mechanics tested here
-    go away.
-    """
-    from plain.postgres.db import get_connection
-
-    default_parent, parent = _create_parents()
-    ChildSetDefault.query.create(parent=default_parent)
-
-    with pytest.raises(psycopg.IntegrityError):  # noqa: PT012
-        with transaction.atomic():
-            default_parent.delete()
-            with get_connection().cursor() as cur:
-                cur.execute("SET CONSTRAINTS ALL IMMEDIATE")

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Self, cast
 
 from plain import exceptions
 from plain.postgres.constants import LOOKUP_SEP
-from plain.postgres.deletion import SET_DEFAULT, SET_NULL
+from plain.postgres.deletion import SET_NULL
 from plain.postgres.exceptions import FieldDoesNotExist, FieldError
 from plain.postgres.query_utils import PathInfo, Q
 from plain.postgres.utils import make_model_tuple
@@ -524,19 +524,7 @@ class ForeignKeyField(RelatedField):
                     id="fields.foreign_key_null_constraint_violation",
                 )
             ]
-        elif on_delete == SET_DEFAULT and not self.has_default():
-            return [
-                PreflightResult(
-                    fix=(
-                        "Field specifies on_delete=SET_DEFAULT, but has no default value. "
-                        "Set a default value, or change the on_delete rule."
-                    ),
-                    obj=self,
-                    id="fields.foreign_key_set_default_no_default",
-                )
-            ]
-        else:
-            return []
+        return []
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()

@@ -93,13 +93,6 @@ def SET_NULL(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
 _LAZY_ON_DELETE.add(SET_NULL)
 
 
-def SET_DEFAULT(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
-    collector.add_field_update(field, field.get_default(), sub_objs)
-
-
-_LAZY_ON_DELETE.add(SET_DEFAULT)
-
-
 def NO_ACTION(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     pass
 

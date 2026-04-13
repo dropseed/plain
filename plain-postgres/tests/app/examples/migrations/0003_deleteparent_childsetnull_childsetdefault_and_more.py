@@ -33,20 +33,6 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name="ChildSetDefault",
-            fields=[
-                ("id", postgres.PrimaryKeyField()),
-                (
-                    "parent",
-                    postgres.ForeignKeyField(
-                        default=1,
-                        on_delete=plain.postgres.deletion.SET_DEFAULT,
-                        to="examples.deleteparent",
-                    ),
-                ),
-            ],
-        ),
-        migrations.CreateModel(
             name="ChildNoAction",
             fields=[
                 ("id", postgres.PrimaryKeyField()),

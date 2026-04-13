@@ -55,13 +55,4 @@ class Migration(migrations.Migration):
                 to="examples.deleteparent",
             ),
         ),
-        migrations.AlterField(
-            model_name="childsetdefault",
-            name="parent",
-            field=postgres.ForeignKeyField(
-                default=app.examples.models.ChildSetDefault.default_parent_id,
-                on_delete=plain.postgres.deletion.SET_DEFAULT,
-                to="examples.deleteparent",
-            ),
-        ),
     ]
