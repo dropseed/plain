@@ -1,5 +1,21 @@
 # plain changelog
 
+## [0.132.0](https://github.com/dropseed/plain/releases/plain@0.132.0) (2026-04-13)
+
+### What's changed
+
+- **Removed `AUTH_USER_MODEL` setting.** The User model is now fixed at `app.users.models.User` — a required convention, not a configurable setting. Code that used `SettingsReference("AUTH_USER_MODEL")` or imported from a user-configured location must be updated. ([0861c9915cb6](https://github.com/dropseed/plain/commit/0861c9915cb6))
+- **Removed `plain.runtime.SettingsReference`.** It was only used to defer resolution of `AUTH_USER_MODEL` in migrations, which no longer exists. ([0861c9915cb6](https://github.com/dropseed/plain/commit/0861c9915cb6))
+- **Made `FormView` generic over its form type.** `FormView[MyForm]` now types `self.form` and related methods with the concrete form class. ([8dbe9e413d30](https://github.com/dropseed/plain/commit/8dbe9e413d30))
+- **Server now closes listener sockets immediately on SIGTERM.** Prevents new connections from landing on a worker that's about to exit, which could cause H13 errors on Heroku and similar platforms. ([5fb7c2fb482f](https://github.com/dropseed/plain/commit/5fb7c2fb482f))
+- Updated `plain request --user` to resolve users via `app.users.models.User` instead of `get_user_model()`. ([0861c9915cb6](https://github.com/dropseed/plain/commit/0861c9915cb6))
+- Migrated type suppression comments to `ty: ignore` and upgraded the ty checker to 0.0.29. ([4ec631a7ef51](https://github.com/dropseed/plain/commit/4ec631a7ef51))
+
+### Upgrade instructions
+
+- Move your User model to `app/users/models.py` (package label `users`, class name `User`) if it isn't already there. Remove `AUTH_USER_MODEL` from `settings.py`.
+- If you referenced `plain.runtime.SettingsReference`, remove the usage — the class no longer exists.
+
 ## [0.131.3](https://github.com/dropseed/plain/releases/plain@0.131.3) (2026-04-05)
 
 ### What's changed
