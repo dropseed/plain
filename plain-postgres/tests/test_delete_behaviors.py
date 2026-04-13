@@ -24,7 +24,7 @@ from app.examples.models import (
     Car,
     CarFeature,
     ChildCascade,
-    ChildDoNothing,
+    ChildNoAction,
     ChildProtect,
     ChildRestrict,
     ChildSetCallable,
@@ -150,9 +150,9 @@ def test_set_default_queryset(db):
     assert child.parent_id == default_parent.id
 
 
-def test_do_nothing_raises_at_commit(db):
+def test_no_action_raises_at_commit(db):
     """
-    DO_NOTHING skips application-level FK handling; the DB's deferred
+    NO_ACTION skips application-level FK handling; the DB's deferred
     constraint check fires at commit. The pytest fixture wraps tests in a
     never-committed atomic, so force the check with SET CONSTRAINTS ALL
     IMMEDIATE inside a savepoint.
@@ -161,7 +161,7 @@ def test_do_nothing_raises_at_commit(db):
 
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
-    ChildDoNothing.query.create(parent=parent)
+    ChildNoAction.query.create(parent=parent)
 
     with pytest.raises(psycopg.IntegrityError):  # noqa: PT012
         with transaction.atomic():

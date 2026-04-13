@@ -7,7 +7,7 @@ from . import (
 from .base import Model
 from .constraints import CheckConstraint, UniqueConstraint
 from .db import get_connection
-from .deletion import CASCADE, DO_NOTHING, PROTECT, RESTRICT, SET, SET_DEFAULT, SET_NULL
+from .deletion import CASCADE, NO_ACTION, PROTECT, RESTRICT, SET, SET_DEFAULT, SET_NULL
 from .expressions import F
 from .enums import IntegerChoices, TextChoices
 from .fields import (
@@ -82,7 +82,7 @@ __all__ = [
     "Index",
     # From deletion
     "CASCADE",
-    "DO_NOTHING",
+    "NO_ACTION",
     "PROTECT",
     "RESTRICT",
     "SET",

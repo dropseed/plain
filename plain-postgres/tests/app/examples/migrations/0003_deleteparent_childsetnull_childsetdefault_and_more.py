@@ -47,13 +47,13 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name="ChildDoNothing",
+            name="ChildNoAction",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 (
                     "parent",
                     postgres.ForeignKeyField(
-                        on_delete=plain.postgres.deletion.DO_NOTHING,
+                        on_delete=plain.postgres.deletion.NO_ACTION,
                         to="examples.deleteparent",
                     ),
                 ),

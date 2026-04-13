@@ -82,12 +82,12 @@ class ChildSetDefault(postgres.Model):
 
 
 @postgres.register_model
-class ChildDoNothing(postgres.Model):
+class ChildNoAction(postgres.Model):
     parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.DO_NOTHING
+        DeleteParent, on_delete=postgres.NO_ACTION
     )
 
-    query: postgres.QuerySet[ChildDoNothing] = postgres.QuerySet()
+    query: postgres.QuerySet[ChildNoAction] = postgres.QuerySet()
 
 
 @postgres.register_model

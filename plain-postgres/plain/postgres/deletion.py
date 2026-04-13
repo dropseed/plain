@@ -100,7 +100,7 @@ def SET_DEFAULT(collector: Collector, field: RelatedField, sub_objs: Any) -> Non
 _LAZY_ON_DELETE.add(SET_DEFAULT)
 
 
-def DO_NOTHING(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
+def NO_ACTION(collector: Collector, field: RelatedField, sub_objs: Any) -> None:
     pass
 
 
@@ -246,7 +246,7 @@ class Collector:
         return (
             # Foreign keys pointing to this model.
             all(
-                related.field.remote_field.on_delete is DO_NOTHING
+                related.field.remote_field.on_delete is NO_ACTION
                 for related in get_candidate_relations_to_delete(meta)
             )
         )
@@ -300,7 +300,7 @@ class Collector:
         for related in get_candidate_relations_to_delete(model._model_meta):
             field = related.field
             on_delete = field.remote_field.on_delete
-            if on_delete == DO_NOTHING:
+            if on_delete == NO_ACTION:
                 continue
             related_model = related.related_model
             if self.can_fast_delete(related_model, from_field=field):
