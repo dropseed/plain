@@ -58,6 +58,7 @@ INSTALLED_PACKAGES = [
 
 MIDDLEWARE = [
     "plain.sessions.middleware.SessionMiddleware",
+    "plain.auth.middleware.AuthMiddleware",
 ]
 
 AUTH_LOGIN_URL = "login"
