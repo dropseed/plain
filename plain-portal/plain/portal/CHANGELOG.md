@@ -1,5 +1,15 @@
 # plain-portal changelog
 
+## [0.2.5](https://github.com/dropseed/plain/releases/plain-portal@0.2.5) (2026-04-13)
+
+### What's changed
+
+- Migrated type suppression comments to `ty: ignore` for the new ty checker version. ([4ec631a7ef51](https://github.com/dropseed/plain/commit/4ec631a7ef51))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.4](https://github.com/dropseed/plain/releases/plain-portal@0.2.4) (2026-04-03)
 
 ### What's changed
