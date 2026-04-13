@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.29.1](https://github.com/dropseed/plain/releases/plain-auth@0.29.1) (2026-04-13)
+
+### What's changed
+
+- Switched OTel user attribution from the deprecated `enduser.id` attribute to `user.id`, following the updated OpenTelemetry semantic conventions. ([e02ef5a46213](https://github.com/dropseed/plain/commit/e02ef5a46213))
+
+### Upgrade instructions
+
+- If your tracing/observability tooling queries spans by the `enduser.id` attribute, update it to `user.id`.
+
 ## [0.29.0](https://github.com/dropseed/plain/releases/plain-auth@0.29.0) (2026-04-13)
 
 ### What's changed
