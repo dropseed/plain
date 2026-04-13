@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import atexit
-
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -71,6 +69,3 @@ class Config(PackageConfig):
         reader = PeriodicExportingMetricReader(metric_exporter)
         meter_provider = MeterProvider(metric_readers=[reader], resource=resource)
         metrics.set_meter_provider(meter_provider)
-
-        atexit.register(tracer_provider.shutdown)
-        atexit.register(meter_provider.shutdown)
