@@ -1,5 +1,16 @@
 # plain-support changelog
 
+## [0.34.2](https://github.com/dropseed/plain/releases/plain-support@0.34.2) (2026-04-13)
+
+### What's changed
+
+- Updated internal references to use the fixed `app.users.models.User` convention. ([0861c9915cb6](https://github.com/dropseed/plain/commit/0861c9915cb6))
+- Migrated type suppression comments to `ty: ignore` for the new ty checker version. ([4ec631a7ef51](https://github.com/dropseed/plain/commit/4ec631a7ef51))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.34.1](https://github.com/dropseed/plain/releases/plain-support@0.34.1) (2026-03-29)
 
 ### What's changed
