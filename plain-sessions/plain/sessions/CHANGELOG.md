@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.45.2](https://github.com/dropseed/plain/releases/plain-sessions@0.45.2) (2026-04-13)
+
+### What's changed
+
+- Migrated type suppression comments to `ty: ignore` for the new ty checker version. ([4ec631a7ef51](https://github.com/dropseed/plain/commit/4ec631a7ef51))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.45.1](https://github.com/dropseed/plain/releases/plain-sessions@0.45.1) (2026-03-29)
 
 ### What's changed
