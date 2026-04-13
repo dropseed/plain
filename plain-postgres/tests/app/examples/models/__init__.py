@@ -5,6 +5,8 @@ from datetime import datetime
 from plain import postgres
 from plain.postgres import types
 
+from .delete import *  # noqa: F401,F403
+
 
 @postgres.register_model
 class Feature(postgres.Model):
@@ -51,81 +53,6 @@ class Car(postgres.Model):
 
 class UnregisteredModel(postgres.Model):
     pass
-
-
-@postgres.register_model
-class DeleteParent(postgres.Model):
-    name: str = types.TextField(max_length=100)
-
-    query: postgres.QuerySet[DeleteParent] = postgres.QuerySet()
-
-    # Explicit reverse relation - no more TYPE_CHECKING hacks!
-    childcascade_set: types.ReverseForeignKey[ChildCascade] = types.ReverseForeignKey(
-        to="ChildCascade", field="parent"
-    )
-
-
-@postgres.register_model
-class ChildCascade(postgres.Model):
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.CASCADE
-    )
-
-    query: postgres.QuerySet[ChildCascade] = postgres.QuerySet()
-
-
-@postgres.register_model
-class ChildProtect(postgres.Model):
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.PROTECT
-    )
-
-    query: postgres.QuerySet[ChildProtect] = postgres.QuerySet()
-
-
-@postgres.register_model
-class ChildRestrict(postgres.Model):
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.RESTRICT
-    )
-
-    query: postgres.QuerySet[ChildRestrict] = postgres.QuerySet()
-
-
-@postgres.register_model
-class ChildSetNull(postgres.Model):
-    parent: DeleteParent | None = types.ForeignKeyField(
-        DeleteParent,
-        on_delete=postgres.SET_NULL,
-        allow_null=True,
-    )
-    parent_id: int | None
-
-    query: postgres.QuerySet[ChildSetNull] = postgres.QuerySet()
-
-
-@postgres.register_model
-class ChildSetDefault(postgres.Model):
-    def default_parent_id():
-        return DeleteParent.query.get(name="default").id
-
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent,
-        on_delete=postgres.SET_DEFAULT,
-        default=default_parent_id,
-    )
-    parent_id: int
-
-    query: postgres.QuerySet[ChildSetDefault] = postgres.QuerySet()
-
-
-@postgres.register_model
-class ChildDoNothing(postgres.Model):
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.DO_NOTHING
-    )
-
-    query: postgres.QuerySet[ChildDoNothing] = postgres.QuerySet()
 
 
 # Models for testing QuerySet assignment behavior
@@ -198,17 +125,6 @@ class TreeNode(postgres.Model):
     parent_id: int | None
 
     query: postgres.QuerySet[TreeNode] = postgres.QuerySet()
-
-
-@postgres.register_model
-class UnconstrainedChild(postgres.Model):
-    """FK with db_constraint=False — no DB constraint, convergence should ignore."""
-
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.CASCADE, db_constraint=False
-    )
-
-    query: postgres.QuerySet[UnconstrainedChild] = postgres.QuerySet()
 
 
 @postgres.register_model
