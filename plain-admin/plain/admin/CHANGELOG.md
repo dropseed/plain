@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.77.4](https://github.com/dropseed/plain/releases/plain-admin@0.77.4) (2026-04-13)
+
+### What's changed
+
+- Updated internal references to use the fixed `app.users.models.User` convention. ([0861c9915cb6](https://github.com/dropseed/plain/commit/0861c9915cb6))
+- Migrated type suppression comments to `ty: ignore` for the new ty checker version. ([4ec631a7ef51](https://github.com/dropseed/plain/commit/4ec631a7ef51))
+
+### Upgrade instructions
+
+- No changes required — but see the `plain` 0.132.0 notes if you haven't moved your User model to `app/users/models.py`.
+
 ## [0.77.3](https://github.com/dropseed/plain/releases/plain-admin@0.77.3) (2026-04-01)
 
 ### What's changed
