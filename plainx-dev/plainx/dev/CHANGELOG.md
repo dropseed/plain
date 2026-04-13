@@ -1,5 +1,15 @@
 # plainx-dev changelog
 
+## [0.1.5](https://github.com/dropseed/plain/releases/plainx-dev@0.1.5) (2026-04-13)
+
+### What's changed
+
+- Updated internal references to use the fixed `app.users.models.User` convention. ([0861c9915cb6](https://github.com/dropseed/plain/commit/0861c9915cb6))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.1.4](https://github.com/dropseed/plain/releases/plainx-dev@0.1.4) (2026-03-29)
 
 ### What's changed
