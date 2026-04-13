@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from weakref import WeakKeyDictionary
 
 from opentelemetry import trace
-from opentelemetry.semconv._incubating.attributes import enduser_attributes
+from opentelemetry.semconv._incubating.attributes import user_attributes
 
 if TYPE_CHECKING:
     from app.users.models import User
@@ -19,7 +19,7 @@ def _stamp_span(user: User | None) -> None:
         return
     span = trace.get_current_span()
     if span.is_recording():
-        span.set_attribute(enduser_attributes.ENDUSER_ID, str(user.id))
+        span.set_attribute(user_attributes.USER_ID, str(user.id))
 
 
 def set_request_user(request: Request, user: User | None) -> None:
