@@ -1,5 +1,21 @@
 # plain-auth changelog
 
+## [0.29.0](https://github.com/dropseed/plain/releases/plain-auth@0.29.0) (2026-04-13)
+
+### What's changed
+
+- **Added `AuthMiddleware`** that eagerly resolves `request.user` on every request and stamps the `enduser.id` OTel attribute on the request span. This gives consistent user attribution in traces regardless of whether the view touches `request.user`. Opt-in via `MIDDLEWARE` (after `SessionMiddleware`). ([fe5e3cf8b74a](https://github.com/dropseed/plain/commit/fe5e3cf8b74a))
+- **Stamp `enduser.id` whenever a user is resolved or set** via `get_request_user()` / `set_request_user()` / `login()`. The attribute uses the OTel semantic convention (incubating) and only fires when there's a recording span. ([fe5e3cf8b74a](https://github.com/dropseed/plain/commit/fe5e3cf8b74a))
+- **Removed `AUTH_USER_MODEL` setting and `get_user_model()` function.** The User class is now fixed at `app.users.models.User` — a required convention, not a configurable setting. ([0861c9915cb6](https://github.com/dropseed/plain/commit/0861c9915cb6))
+- Updated type annotations throughout to reference the concrete `User` class instead of the generic `Model`. ([0861c9915cb6](https://github.com/dropseed/plain/commit/0861c9915cb6))
+- Migrated type suppression comments to `ty: ignore` and upgraded the ty checker to 0.0.29. ([4ec631a7ef51](https://github.com/dropseed/plain/commit/4ec631a7ef51))
+
+### Upgrade instructions
+
+- Remove `AUTH_USER_MODEL` from `settings.py`. Move your User model to `app/users/models.py` (package label `users`, class name `User`) if it isn't there.
+- Replace `from plain.auth import get_user_model; User = get_user_model()` with `from app.users.models import User`.
+- To get consistent `enduser.id` attribution on traces, add `"plain.auth.middleware.AuthMiddleware"` to `MIDDLEWARE` after `SessionMiddleware`.
+
 ## [0.28.0](https://github.com/dropseed/plain/releases/plain-auth@0.28.0) (2026-03-12)
 
 ### What's changed
