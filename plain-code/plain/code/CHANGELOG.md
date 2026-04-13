@@ -1,5 +1,16 @@
 # plain-code changelog
 
+## [0.21.6](https://github.com/dropseed/plain/releases/plain-code@0.21.6) (2026-04-13)
+
+### What's changed
+
+- The annotation coverage report now counts `ty: ignore` comments alongside `type: ignore`. ([9cb678ba4602](https://github.com/dropseed/plain/commit/9cb678ba4602))
+- Upgraded ty to 0.0.29 and migrated internal type suppression comments to `ty: ignore`. ([4ec631a7ef51](https://github.com/dropseed/plain/commit/4ec631a7ef51))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.5](https://github.com/dropseed/plain/releases/plain-code@0.21.5) (2026-03-19)
 
 ### What's changed
