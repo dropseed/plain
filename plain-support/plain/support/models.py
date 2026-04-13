@@ -4,7 +4,6 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
-from plain.runtime import SettingsReference
 
 __all__ = ["SupportFormEntry"]
 
@@ -12,7 +11,7 @@ __all__ = ["SupportFormEntry"]
 @postgres.register_model
 class SupportFormEntry(postgres.Model):
     user = types.ForeignKeyField(
-        SettingsReference("AUTH_USER_MODEL"),
+        "users.User",
         on_delete=postgres.SET_NULL,
         allow_null=True,
         required=False,

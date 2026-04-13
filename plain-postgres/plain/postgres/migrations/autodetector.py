@@ -15,7 +15,7 @@ from plain.postgres.fields import (
 from plain.postgres.fields.related import ManyToManyField, RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.migrations import operations
-from plain.postgres.migrations.migration import Migration, SettingsTuple
+from plain.postgres.migrations.migration import Migration
 from plain.postgres.migrations.operations.models import AlterModelOptions
 from plain.postgres.migrations.optimizer import MigrationOptimizer
 from plain.postgres.migrations.questioner import MigrationQuestioner
@@ -24,7 +24,6 @@ from plain.postgres.migrations.utils import (
     RegexObject,
     resolve_relation,
 )
-from plain.runtime import settings
 
 if TYPE_CHECKING:
     from plain.postgres.migrations.graph import MigrationGraph
@@ -240,23 +239,6 @@ class MigrationAutodetector:
                         field_name,
                     )
 
-    @staticmethod
-    def _resolve_dependency(
-        dependency: tuple[str, str, str | None, bool | str],
-    ) -> tuple[tuple[str, str, str | None, bool | str], bool]:
-        """
-        Return the resolved dependency and a boolean denoting whether or not
-        it was a settings dependency.
-        """
-        if not isinstance(dependency, SettingsTuple):
-            return dependency, False
-        resolved_package_label, resolved_object_name = getattr(
-            settings, dependency[1]
-        ).split(".")
-        return (resolved_package_label, resolved_object_name.lower()) + dependency[
-            2:
-        ], True
-
     def _build_migration_list(self, graph: MigrationGraph | None = None) -> None:
         """
         Chop the lists of operations up into migrations with dependencies on
@@ -285,12 +267,6 @@ class MigrationAutodetector:
                     deps_satisfied = True
                     operation_dependencies = set()
                     for dep in operation._auto_deps:
-                        # Temporarily resolve the settings dependency to
-                        # prevent circular references. While keeping the
-                        # dependency checks on the resolved model, add the
-                        # settings dependencies.
-                        original_dep = dep
-                        dep, is_settings_dep = self._resolve_dependency(dep)
                         if dep[0] != package_label:
                             # External app dependency. See if it's not yet
                             # satisfied.
@@ -303,11 +279,7 @@ class MigrationAutodetector:
                             if not deps_satisfied:
                                 break
                             else:
-                                if is_settings_dep:
-                                    operation_dependencies.add(
-                                        (original_dep[0], original_dep[1])
-                                    )
-                                elif dep[0] in self.migrations:
+                                if dep[0] in self.migrations:
                                     operation_dependencies.add(
                                         (dep[0], self.migrations[dep[0]][-1].name)
                                     )
@@ -381,9 +353,6 @@ class MigrationAutodetector:
             for op in ops:
                 ts.add(op)
                 for dep in op._auto_deps:
-                    # Resolve intra-app dependencies to handle circular
-                    # references involving a settings model.
-                    dep = self._resolve_dependency(dep)[0]
                     if dep[0] != package_label:
                         continue
                     ts.add(op, *(x for x in ops if self.check_dependency(x, dep)))

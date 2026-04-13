@@ -1,6 +1,3 @@
-from typing import Any
-
-from plain.auth import get_user_model
 from plain.auth.requests import get_request_user, set_request_user
 from plain.http import HttpMiddleware, Request, Response
 from plain.sessions import get_request_session
@@ -10,17 +7,10 @@ from .permissions import can_be_impersonator, can_impersonate_user
 from .requests import set_request_impersonator
 
 
-def get_user_by_id(id: int) -> Any | None:
-    UserModel = get_user_model()
-
-    try:
-        return UserModel.query.get(id=id)
-    except UserModel.DoesNotExist:
-        return None
-
-
 class ImpersonateMiddleware(HttpMiddleware):
     def before_request(self, request: Request) -> Response | None:
+        from app.users.models import User
+
         session = get_request_session(request)
         user = get_request_user(request)
 
@@ -30,7 +20,13 @@ class ImpersonateMiddleware(HttpMiddleware):
             and user
             and can_be_impersonator(user)
         ):
-            user_to_impersonate = get_user_by_id(session[_IMPERSONATE_SESSION_KEY])
+            try:
+                user_to_impersonate = User.query.get(
+                    id=session[_IMPERSONATE_SESSION_KEY]
+                )
+            except User.DoesNotExist:
+                user_to_impersonate = None
+
             if user_to_impersonate:
                 if not can_impersonate_user(user, user_to_impersonate):
                     # Can't impersonate this user, remove it and show an error

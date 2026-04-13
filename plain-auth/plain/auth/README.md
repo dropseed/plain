@@ -53,19 +53,21 @@ INSTALLED_PACKAGES = [
     "plain.auth",
     "plain.sessions",
     "plain.passwords",  # Or another auth method
+    "app.users",
 ]
 
 MIDDLEWARE = [
     "plain.sessions.middleware.SessionMiddleware",
 ]
 
-AUTH_USER_MODEL = "users.User"
 AUTH_LOGIN_URL = "login"
 ```
 
 ### Creating a user model
 
-You can create your own user model using `plain create users` or manually:
+`plain.auth` expects your project's User class at `app.users.models.User` — a fixed convention, not a configurable setting. The package label (`users`), module (`models.py`), and class name (`User`) are all required.
+
+You can create one with `plain create users` or manually:
 
 ```python
 # app/users/models.py
@@ -203,7 +205,6 @@ logout_client(client)
 
 | Setting                        | Default              | Env var                              |
 | ------------------------------ | -------------------- | ------------------------------------ |
-| `AUTH_USER_MODEL`              | Required             | `PLAIN_AUTH_USER_MODEL`              |
 | `AUTH_LOGIN_URL`               | Required             | `PLAIN_AUTH_LOGIN_URL`               |
 | `AUTH_USER_SESSION_HASH_FIELD` | `"password"` or `""` | `PLAIN_AUTH_USER_SESSION_HASH_FIELD` |
 
@@ -235,14 +236,12 @@ logout(request)
 
 By default, if you have [plain.passwords](../../plain-passwords/plain/passwords/README.md) installed, sessions are automatically invalidated when the `password` field changes. This is controlled by the `AUTH_USER_SESSION_HASH_FIELD` setting. You can change this to a different field name, or set it to an empty string to disable this feature.
 
-#### How do I get the user model class?
+#### How do I reference the User class?
 
-You can use the [`get_user_model()`](./sessions.py#get_user_model) function:
+Import it directly from `app.users.models` — the location is fixed:
 
 ```python
-from plain.auth.sessions import get_user_model
-
-User = get_user_model()
+from app.users.models import User
 ```
 
 ## Installation

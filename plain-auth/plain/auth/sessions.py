@@ -4,8 +4,6 @@ import hmac
 from collections.abc import Generator
 from typing import TYPE_CHECKING
 
-from plain.exceptions import ImproperlyConfigured
-from plain.postgres import models_registry
 from plain.runtime import settings
 from plain.sessions import get_request_session
 from plain.utils.crypto import salted_hmac
@@ -14,21 +12,22 @@ from plain.utils.encoding import force_bytes
 from .requests import get_request_user, set_request_user
 
 if TYPE_CHECKING:
+    from app.users.models import User
+
     from plain.http import Request
-    from plain.postgres import Model
 
 _USER_ID_SESSION_KEY = "_auth_user_id"
 _USER_HASH_SESSION_KEY = "_auth_user_hash"
 
 
-def get_session_auth_hash(user: Model) -> str:
+def get_session_auth_hash(user: User) -> str:
     """
     Return an HMAC of the password field.
     """
     return _get_session_auth_hash(user)
 
 
-def update_session_auth_hash(request: Request, user: Model) -> None:
+def update_session_auth_hash(request: Request, user: User) -> None:
     """
     Updating a user's password (for example) logs out all sessions for the user.
 
@@ -44,12 +43,12 @@ def update_session_auth_hash(request: Request, user: Model) -> None:
         session[_USER_HASH_SESSION_KEY] = get_session_auth_hash(user)
 
 
-def _get_session_auth_fallback_hash(user: Model) -> Generator[str]:
+def _get_session_auth_fallback_hash(user: User) -> Generator[str]:
     for fallback_secret in settings.SECRET_KEY_FALLBACKS:
         yield _get_session_auth_hash(user, secret=fallback_secret)
 
 
-def _get_session_auth_hash(user: Model, secret: str | None = None) -> str:
+def _get_session_auth_hash(user: User, secret: str | None = None) -> str:
     key_salt = "plain.auth.get_session_auth_hash"
     return salted_hmac(
         key_salt,
@@ -59,7 +58,7 @@ def _get_session_auth_hash(user: Model, secret: str | None = None) -> str:
     ).hexdigest()
 
 
-def login(request: Request, user: Model) -> None:
+def login(request: Request, user: User) -> None:
     """
     Persist a user id and a backend in the request. This way a user doesn't
     have to reauthenticate on every request. Note that data set during
@@ -107,36 +106,21 @@ def logout(request: Request) -> None:
     set_request_user(request, None)
 
 
-def get_user_model() -> type[Model]:
-    """
-    Return the User model that is active in this project.
-    """
-    try:
-        return models_registry.get_model(settings.AUTH_USER_MODEL, require_ready=False)
-    except ValueError:
-        raise ImproperlyConfigured(
-            "AUTH_USER_MODEL must be of the form 'package_label.model_name'"
-        )
-    except LookupError:
-        raise ImproperlyConfigured(
-            f"AUTH_USER_MODEL refers to model '{settings.AUTH_USER_MODEL}' that has not been installed"
-        )
-
-
-def get_user(request: Request) -> Model | None:
+def get_user(request: Request) -> User | None:
     """
     Return the user model instance associated with the given request session.
     If no user is retrieved, return None.
     """
+    from app.users.models import User
+
     session = get_request_session(request)
 
     if _USER_ID_SESSION_KEY not in session:
         return None
 
-    UserModel = get_user_model()
     try:
-        user = UserModel.query.get(id=session[_USER_ID_SESSION_KEY])
-    except UserModel.DoesNotExist:
+        user = User.query.get(id=session[_USER_ID_SESSION_KEY])
+    except User.DoesNotExist:
         return None
 
     # If the user models defines a specific field to also hash and compare

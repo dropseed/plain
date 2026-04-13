@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from app.users.models import User
+
 from plain import forms
-from plain.auth import get_user_model
 from plain.email import TemplateEmail
 
 from .links import generate_link_url
@@ -19,11 +20,10 @@ class LoginLinkForm(forms.Form):
     def maybe_send_link(
         self, request: Request, expires_in: int = 60 * 60
     ) -> int | None:
-        user_model = get_user_model()
         email = self.cleaned_data["email"]
         try:
-            user = user_model.query.get(email__iexact=email)
-        except user_model.DoesNotExist:
+            user = User.query.get(email__iexact=email)
+        except User.DoesNotExist:
             user = None
 
         if user:

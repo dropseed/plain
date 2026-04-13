@@ -1,5 +1,5 @@
 from ..schema import DatabaseSchemaEditor
-from .migration import Migration, settings_dependency
+from .migration import Migration
 from .operations import (
     AddField,
     AlterField,
@@ -19,7 +19,6 @@ from .state import StateModelsRegistry
 __all__ = [
     # Migration class
     "Migration",
-    "settings_dependency",
     # Model operations
     "CreateModel",
     "DeleteModel",

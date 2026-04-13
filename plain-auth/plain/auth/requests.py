@@ -4,18 +4,19 @@ from typing import TYPE_CHECKING
 from weakref import WeakKeyDictionary
 
 if TYPE_CHECKING:
+    from app.users.models import User
+
     from plain.http import Request
-    from plain.postgres import Model
 
-_request_users: WeakKeyDictionary[Request, Model | None] = WeakKeyDictionary()
+_request_users: WeakKeyDictionary[Request, User | None] = WeakKeyDictionary()
 
 
-def set_request_user(request: Request, user: Model | None) -> None:
+def set_request_user(request: Request, user: User | None) -> None:
     """Store the authenticated user for this request."""
     _request_users[request] = user
 
 
-def get_request_user(request: Request) -> Model | None:
+def get_request_user(request: Request) -> User | None:
     """
     Get the authenticated user for this request, if any.
 

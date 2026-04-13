@@ -4,12 +4,11 @@ import datetime
 from typing import TYPE_CHECKING, Any
 
 import psycopg
+from app.users.models import User
 
 from plain import postgres
-from plain.auth import get_user_model
 from plain.exceptions import ValidationError
 from plain.postgres import transaction, types
-from plain.runtime import SettingsReference
 from plain.utils import timezone
 
 from .exceptions import OAuthUserAlreadyExistsError
@@ -26,7 +25,7 @@ class OAuthConnection(postgres.Model):
     updated_at: datetime.datetime = types.DateTimeField(auto_now=True)
 
     user = types.ForeignKeyField(
-        SettingsReference("AUTH_USER_MODEL"),
+        "users.User",
         on_delete=postgres.CASCADE,
     )
 
@@ -121,7 +120,7 @@ class OAuthConnection(postgres.Model):
             with transaction.atomic():
                 try:
                     with transaction.atomic():
-                        user = get_user_model()(
+                        user = User(
                             **oauth_user.user_model_fields,
                         )
                         user.save()

@@ -4,7 +4,8 @@ import hmac
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from plain.auth import get_user_model
+from app.users.models import User
+
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView
@@ -29,7 +30,6 @@ from .forms import (
 
 if TYPE_CHECKING:
     from plain.http import Response
-    from plain.postgres import Model
 
 
 class PasswordForgotView(FormView[PasswordResetForm]):
@@ -64,7 +64,7 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
     reset_token_max_age = 60 * 60  # 1 hour
     _reset_token_session_key = "_password_reset_token"
 
-    def check_password_reset_token(self, token: str) -> Model | None:
+    def check_password_reset_token(self, token: str) -> User | None:
         max_age = self.reset_token_max_age
 
         try:
@@ -76,22 +76,21 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
         except BadSignature:
             return None
 
-        UserModel = get_user_model()
         try:
-            user = UserModel.query.get(id=data["id"])
-        except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
+            user = User.query.get(id=data["id"])
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             return None
 
         # If the password has changed since the token was generated, the token is invalid.
         # (These are the hashed passwords, not the raw passwords.)
         if not hmac.compare_digest(
-            force_bytes(user.password),  # ty: ignore[unresolved-attribute]
+            force_bytes(user.password),
             force_bytes(data["password"]),
         ):
             return None
 
         # If the email has changed since the token was generated, the token is invalid.
-        if not hmac.compare_digest(force_bytes(user.email), force_bytes(data["email"])):  # ty: ignore[unresolved-attribute]
+        if not hmac.compare_digest(force_bytes(user.email), force_bytes(data["email"])):
             return None
 
         return user
@@ -116,7 +115,7 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
 
         return super().get()
 
-    def get_user(self) -> Model:
+    def get_user(self) -> User:
         session_token = self.session.get(self._reset_token_session_key, "")
         if not session_token:
             # No token in the session, so we can't check the password reset token.

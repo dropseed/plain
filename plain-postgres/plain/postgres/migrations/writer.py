@@ -8,7 +8,6 @@ from typing import Any
 from plain.packages import packages_registry
 from plain.postgres import migrations
 from plain.postgres.migrations.loader import MigrationLoader
-from plain.postgres.migrations.migration import SettingsTuple
 from plain.postgres.migrations.serializer import serializer_factory
 from plain.runtime import __version__
 from plain.utils.inspect import get_func_args
@@ -144,16 +143,10 @@ class MigrationWriter:
             operations.append(operation_string)
         items["operations"] = "\n".join(operations) + "\n" if operations else ""
 
-        # Format dependencies and write out settings dependencies right
+        # Format dependencies
         dependencies = []
         for dependency in self.migration.dependencies:
-            if isinstance(dependency, SettingsTuple):
-                dependencies.append(
-                    f"        migrations.settings_dependency(settings.{dependency[1]}),"
-                )
-                imports.add("from plain.runtime import settings")
-            else:
-                dependencies.append(f"        {self.serialize(dependency)[0]},")
+            dependencies.append(f"        {self.serialize(dependency)[0]},")
         items["dependencies"] = "\n".join(dependencies) + "\n" if dependencies else ""
 
         # Format imports nicely, swapping imports of functions from migration files

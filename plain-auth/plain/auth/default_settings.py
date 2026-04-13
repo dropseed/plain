@@ -1,6 +1,5 @@
 from importlib.util import find_spec
 
-AUTH_USER_MODEL: str
 AUTH_LOGIN_URL: str
 
 if find_spec("plain.passwords"):

@@ -13,7 +13,6 @@ MIDDLEWARE = [
     "plain.sessions.middleware.SessionMiddleware",
 ]
 AUTH_LOGIN_URL = "login"
-AUTH_USER_MODEL = "users.User"
 
 # OAuth providers to use for a real, interactive test
 # (in a real config you'd probably do environ["key"] to raise a KeyError if an env var is forgotten)

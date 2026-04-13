@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Generator
-from typing import TYPE_CHECKING, Any
+from typing import Any
+
+from app.users.models import User
 
 from plain import forms
-from plain.auth import get_user_model
 from plain.exceptions import ValidationError
 from plain.postgres.forms import ModelForm
 
 from .core import check_user_password
 from .hashers import check_password
 from .utils import unicode_ci_compare
-
-if TYPE_CHECKING:
-    from plain.postgres import Model
 
 
 class PasswordResetForm(forms.Form):
@@ -41,20 +39,20 @@ class PasswordResetForm(forms.Form):
 
         email.send()
 
-    def get_users(self, email: str) -> Generator[Model]:
+    def get_users(self, email: str) -> Generator[User]:
         """Given an email, return matching user(s) who should receive a reset.
 
         This allows subclasses to more easily customize the default policies
         that prevent inactive users and users with unusable passwords from
         resetting their password.
         """
-        active_users = get_user_model().query.filter(email__iexact=email)
-        return (u for u in active_users if unicode_ci_compare(email, u.email))  # ty: ignore[unresolved-attribute]
+        active_users = User.query.filter(email__iexact=email)
+        return (u for u in active_users if unicode_ci_compare(email, u.email))
 
     def save(
         self,
         *,
-        generate_reset_url: Callable[[Model], str],
+        generate_reset_url: Callable[[User], str],
         email_template_name: str = "password_reset",
         from_email: str = "",
         extra_email_context: dict[str, Any] | None = None,
@@ -75,7 +73,7 @@ class PasswordResetForm(forms.Form):
                 template_name=email_template_name,
                 context=context,
                 from_email=from_email,
-                to_email=user.email,  # ty: ignore[unresolved-attribute]
+                to_email=user.email,
             )
 
 
@@ -88,7 +86,7 @@ class PasswordSetForm(forms.Form):
     new_password1 = forms.TextField(strip=False)
     new_password2 = forms.TextField(strip=False)
 
-    def __init__(self, user: Model, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, user: User, *args: Any, **kwargs: Any) -> None:
         self.user = user
         super().__init__(*args, **kwargs)
 
@@ -109,9 +107,8 @@ class PasswordSetForm(forms.Form):
 
         return password2
 
-    def save(self, commit: bool = True) -> Model:
-        # User model has password attribute
-        self.user.password = self.cleaned_data["new_password1"]  # ty: ignore[invalid-assignment]
+    def save(self, commit: bool = True) -> User:
+        self.user.password = self.cleaned_data["new_password1"]
         if commit:
             self.user.save()
         return self.user
@@ -143,8 +140,6 @@ class PasswordLoginForm(forms.Form):
     password = forms.TextField(strip=False)
 
     def clean(self) -> dict[str, Any]:
-        User = get_user_model()
-
         email = self.cleaned_data.get("email")
         password = self.cleaned_data.get("password")
 
@@ -172,7 +167,7 @@ class PasswordLoginForm(forms.Form):
 
         return self.cleaned_data
 
-    def get_user(self) -> Model:
+    def get_user(self) -> User:
         return self._user
 
 
@@ -180,7 +175,7 @@ class PasswordSignupForm(ModelForm):
     confirm_password = forms.TextField(strip=False)
 
     class Meta:
-        model = get_user_model()
+        model = User
         fields = ("email", "password")
 
     def clean(self) -> dict[str, Any]:

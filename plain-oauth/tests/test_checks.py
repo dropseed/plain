@@ -1,4 +1,5 @@
-from plain.auth import get_user_model
+from app.users.models import User
+
 from plain.oauth.models import OAuthConnection
 from plain.oauth.preflight import CheckOAuthProviderKeys
 
@@ -15,7 +16,7 @@ def test_oauth_provider_keys_check_pass(db, settings):
         },
     }
 
-    user = get_user_model().query.create(username="test_user", email="test@example.com")
+    user = User.query.create(username="test_user", email="test@example.com")
 
     OAuthConnection.query.create(
         user=user,
@@ -41,7 +42,7 @@ def test_oauth_provider_keys_check_fail(db, settings):
         },
     }
 
-    user = get_user_model().query.create(username="test_user", email="test@example.com")
+    user = User.query.create(username="test_user", email="test@example.com")
 
     OAuthConnection.query.create(
         user=user,

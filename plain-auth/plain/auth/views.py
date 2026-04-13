@@ -21,7 +21,7 @@ from .sessions import logout
 from .utils import resolve_url
 
 if TYPE_CHECKING:
-    from plain.postgres import Model
+    from app.users.models import User
 
 try:
     from plain.admin.impersonate import get_request_impersonator
@@ -48,7 +48,7 @@ class AuthView(SessionView):
     login_url = settings.AUTH_LOGIN_URL
 
     @cached_property
-    def user(self) -> Model | None:
+    def user(self) -> User | None:
         """Get the authenticated user for this request."""
         from .requests import get_request_user
 
@@ -85,7 +85,7 @@ class AuthView(SessionView):
                         )
                     return
 
-            if not self.user.is_admin:  # ty: ignore[unresolved-attribute]
+            if not self.user.is_admin:
                 # Show a 404 so we don't expose admin urls to non-admin users
                 raise NotFoundError404()
 

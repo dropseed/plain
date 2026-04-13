@@ -4,7 +4,6 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
-from plain.runtime import SettingsReference
 
 
 @postgres.register_model
@@ -12,7 +11,7 @@ class PinnedNavItem(postgres.Model):
     """A user's pinned navigation item in the admin."""
 
     user = types.ForeignKeyField(
-        SettingsReference("AUTH_USER_MODEL"),
+        "users.User",
         on_delete=postgres.CASCADE,
     )
     view_slug: str = types.TextField(max_length=255)

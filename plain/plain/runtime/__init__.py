@@ -2,7 +2,6 @@ import importlib.metadata
 import sys
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Self
 
 from plain.logs.configure import configure_logging
 from plain.packages import packages_registry
@@ -74,27 +73,12 @@ def setup() -> None:
     packages_registry.populate(settings.INSTALLED_PACKAGES)
 
 
-class SettingsReference(str):
-    """
-    String subclass which references a current settings value. It's treated as
-    the value in memory but serializes to a settings.NAME attribute reference.
-    """
-
-    def __new__(self, setting_name: str) -> Self:
-        value = getattr(settings, setting_name)
-        return str.__new__(self, value)
-
-    def __init__(self, setting_name: str):
-        self.setting_name = setting_name
-
-
 __all__ = [
     "APP_PATH",
     "AppPathNotFound",
     "PLAIN_TEMP_PATH",
     "Secret",
     "SetupError",
-    "SettingsReference",
     "__version__",
     "settings",
     "setup",

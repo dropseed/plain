@@ -16,7 +16,7 @@ from ..db import get_connection
 from ..migrations.autodetector import MigrationAutodetector
 from ..migrations.executor import MigrationExecutor
 from ..migrations.loader import AmbiguityError, MigrationLoader
-from ..migrations.migration import Migration, SettingsTuple
+from ..migrations.migration import Migration
 from ..migrations.optimizer import MigrationOptimizer
 from ..migrations.questioner import (
     InteractiveMigrationQuestioner,
@@ -971,9 +971,7 @@ def squash(
             )
         operations.extend(smigration.operations)
         for dependency in smigration.dependencies:
-            if isinstance(dependency, SettingsTuple):
-                dependencies.add(dependency)
-            elif dependency[0] != smigration.package_label or first_migration:
+            if dependency[0] != smigration.package_label or first_migration:
                 dependencies.add(dependency)
         first_migration = False
 

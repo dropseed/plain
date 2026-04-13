@@ -38,7 +38,6 @@ INSTALLED_PACKAGES = [
     "app.users",
 ]
 
-AUTH_USER_MODEL = "users.User"
 AUTH_LOGIN_URL = "login"
 
 MIDDLEWARE = [

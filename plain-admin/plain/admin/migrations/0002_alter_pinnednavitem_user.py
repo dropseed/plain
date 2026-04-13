@@ -3,12 +3,11 @@
 import plain.postgres.deletion
 from plain import postgres
 from plain.postgres import migrations
-from plain.runtime import settings
 
 
 class Migration(migrations.Migration):
     dependencies = [
-        migrations.settings_dependency(settings.AUTH_USER_MODEL),
+        ("users", "__first__"),
         ("plainadmin", "0001_initial"),
     ]
 
@@ -18,7 +17,7 @@ class Migration(migrations.Migration):
             name="user",
             field=postgres.ForeignKeyField(
                 on_delete=plain.postgres.deletion.CASCADE,
-                to=settings.AUTH_USER_MODEL,
+                to="users.User",
             ),
         ),
     ]

@@ -161,20 +161,3 @@ class Migration:
                 break
             name = new_name
         return name
-
-
-class SettingsTuple(tuple):
-    """
-    Subclass of tuple so Plain can tell this was originally a settings
-    dependency when it reads the migration file.
-    """
-
-    def __new__(cls, value: tuple[str, str], setting: str) -> SettingsTuple:
-        self = tuple.__new__(cls, value)
-        self.setting = setting
-        return self
-
-
-def settings_dependency(value: str) -> SettingsTuple:
-    """Turn a setting value into a dependency."""
-    return SettingsTuple((value.split(".", 1)[0], "__first__"), value)

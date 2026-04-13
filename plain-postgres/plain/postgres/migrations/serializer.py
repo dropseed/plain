@@ -19,7 +19,6 @@ from plain.postgres.enums import Choices
 from plain.postgres.fields import Field
 from plain.postgres.migrations.operations.base import Operation
 from plain.postgres.migrations.utils import COMPILED_REGEX_TYPE, RegexObject
-from plain.runtime import SettingsReference
 from plain.utils.functional import LazyObject, Promise
 
 
@@ -277,13 +276,6 @@ class SetSerializer(BaseSequenceSerializer):
         return "{%s}" if self.value else "set(%s)"
 
 
-class SettingsReferenceSerializer(BaseSerializer):
-    def serialize(self) -> tuple[str, set[str]]:
-        return f"settings.{self.value.setting_name}", {
-            "from plain.runtime import settings"
-        }
-
-
 class TupleSerializer(BaseSequenceSerializer):
     def _format(self) -> str:
         # When len(value)==0, the empty tuple should be serialized as "()",
@@ -326,7 +318,6 @@ class Serializer:
         enum.Enum: EnumSerializer,
         datetime.datetime: DatetimeDatetimeSerializer,
         (datetime.date, datetime.timedelta, datetime.time): DateTimeSerializer,
-        SettingsReference: SettingsReferenceSerializer,
         float: FloatSerializer,
         (bool, int, types.NoneType, bytes, str, range): BaseSimpleSerializer,
         decimal.Decimal: DecimalSerializer,

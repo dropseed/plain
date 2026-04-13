@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plain.auth import get_user_model
+from app.users.models import User
+
 from plain.signing import BadSignature, SignatureExpired
 from plain.urls import reverse
 
@@ -10,7 +11,6 @@ from .signing import ExpiringSigner
 
 if TYPE_CHECKING:
     from plain.http import Request
-    from plain.postgres import Model
 
 
 class LoginLinkExpired(Exception):
@@ -26,7 +26,7 @@ class LoginLinkChanged(Exception):
 
 
 def generate_link_url(
-    *, request: Request, user: Model, email: str, expires_in: int
+    *, request: Request, user: User, email: str, expires_in: int
 ) -> str:
     """
     Generate a login link using both the user's ID
@@ -39,7 +39,7 @@ def generate_link_url(
     return request.build_absolute_uri(reverse("loginlink:login", token=token))
 
 
-def get_link_token_user(token: str) -> Model:
+def get_link_token_user(token: str) -> User:
     """
     Validate a link token and get the user from it.
     """
@@ -50,11 +50,10 @@ def get_link_token_user(token: str) -> Model:
     except BadSignature:
         raise LoginLinkInvalid()
 
-    user_model = get_user_model()
     user_id = signed_data["user_id"]
     email = signed_data["email"]
 
     try:
-        return user_model.query.get(id=user_id, email__iexact=email)
-    except user_model.DoesNotExist:
+        return User.query.get(id=user_id, email__iexact=email)
+    except User.DoesNotExist:
         raise LoginLinkChanged()

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain.auth import get_user_model
+from app.users.models import User
+
 from plain.email import TemplateEmail
-from plain.postgres import Model
 from plain.postgres.forms import ModelForm
 from plain.runtime import settings
 
@@ -21,14 +21,14 @@ class SupportForm(ModelForm):
         model = SupportFormEntry
         fields = ["name", "email", "message"]
 
-    def __init__(self, user: Model | None, form_slug: str, *args: Any, **kwargs: Any):
+    def __init__(self, user: User | None, form_slug: str, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.user = user  # User provided directly by authed request
         self.form_slug = form_slug
         if self.user:
-            self.fields["email"].initial = self.user.email  # ty: ignore[unresolved-attribute]
+            self.fields["email"].initial = self.user.email
 
-    def find_user(self) -> Model | None:
+    def find_user(self) -> User | None:
         # If the user isn't logged in (typical in an iframe, depending on session cookie settings),
         # we can still try to look them up by email
         # to associate the entry with them.
@@ -39,10 +39,9 @@ class SupportForm(ModelForm):
         email = self.cleaned_data.get("email")
         if not email:
             return None
-        UserModel = get_user_model()
         try:
-            return UserModel.query.get(email=email)
-        except UserModel.DoesNotExist:
+            return User.query.get(email=email)
+        except User.DoesNotExist:
             return None
 
     def save(self, commit: bool = True) -> SupportFormEntry:

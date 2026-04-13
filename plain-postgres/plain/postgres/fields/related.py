@@ -11,7 +11,6 @@ from plain.postgres.exceptions import FieldDoesNotExist, FieldError
 from plain.postgres.query_utils import PathInfo, Q
 from plain.postgres.utils import make_model_tuple
 from plain.preflight import PreflightResult
-from plain.runtime import SettingsReference
 
 from ..registry import models_registry
 from . import Field
@@ -543,9 +542,7 @@ class ForeignKeyField(RelatedField):
         name, path, args, kwargs = super().deconstruct()
         kwargs["on_delete"] = self.remote_field.on_delete
 
-        if isinstance(self.remote_field.model, SettingsReference):
-            kwargs["to"] = self.remote_field.model
-        elif isinstance(self.remote_field.model, str):
+        if isinstance(self.remote_field.model, str):
             if "." in self.remote_field.model:
                 package_label, model_name = self.remote_field.model.split(".")
                 kwargs["to"] = f"{package_label}.{model_name.lower()}"

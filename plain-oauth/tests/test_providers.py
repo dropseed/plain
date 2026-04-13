@@ -1,6 +1,7 @@
 import datetime
 
-from plain.auth import get_user_model
+from app.users.models import User
+
 from plain.oauth.models import OAuthConnection
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.test import Client
@@ -60,7 +61,7 @@ def test_dummy_signup(db, settings):
 
     client = Client()
 
-    assert get_user_model().query.count() == 0
+    assert User.query.count() == 0
     assert OAuthConnection.query.count() == 0
 
     # Login required for this view
@@ -103,7 +104,7 @@ def test_dummy_signup(db, settings):
         2020, 1, 2, 0, 0, tzinfo=datetime.UTC
     )
 
-    assert get_user_model().query.count() == 1
+    assert User.query.count() == 1
     assert OAuthConnection.query.count() == 1
 
 
@@ -121,13 +122,11 @@ def test_dummy_login_connection(db, settings):
 
     client = Client()
 
-    assert get_user_model().query.count() == 0
+    assert User.query.count() == 0
     assert OAuthConnection.query.count() == 0
 
     # Create a user
-    user = get_user_model().query.create(
-        username="dummy_username", email="dummy@example.com"
-    )
+    user = User.query.create(username="dummy_username", email="dummy@example.com")
     OAuthConnection.query.create(
         user=user,
         provider_key="dummy",
@@ -142,7 +141,7 @@ def test_dummy_login_connection(db, settings):
         ),
     )
 
-    assert get_user_model().query.count() == 1
+    assert User.query.count() == 1
     assert OAuthConnection.query.count() == 1
 
     # Login required for this view
@@ -185,7 +184,7 @@ def test_dummy_login_connection(db, settings):
         2020, 1, 2, 0, 0, tzinfo=datetime.UTC
     )
 
-    assert get_user_model().query.count() == 1
+    assert User.query.count() == 1
     assert OAuthConnection.query.count() == 1
 
 
@@ -203,13 +202,13 @@ def test_dummy_login_without_connection(db, settings):
 
     client = Client()
 
-    assert get_user_model().query.count() == 0
+    assert User.query.count() == 0
     assert OAuthConnection.query.count() == 0
 
     # Create a user
-    get_user_model().query.create(username="dummy_username", email="dummy@example.com")
+    User.query.create(username="dummy_username", email="dummy@example.com")
 
-    assert get_user_model().query.count() == 1
+    assert User.query.count() == 1
     assert OAuthConnection.query.count() == 0
 
     # Login required for this view
@@ -245,15 +244,13 @@ def test_dummy_connect(db, settings):
 
     client = Client()
 
-    assert get_user_model().query.count() == 0
+    assert User.query.count() == 0
     assert OAuthConnection.query.count() == 0
 
     # Create a user
-    user = get_user_model().query.create(
-        username="dummy_username", email="dummy@example.com"
-    )
+    user = User.query.create(username="dummy_username", email="dummy@example.com")
 
-    assert get_user_model().query.count() == 1
+    assert User.query.count() == 1
     assert OAuthConnection.query.count() == 0
 
     client.force_login(user)
@@ -288,7 +285,7 @@ def test_dummy_connect(db, settings):
         2020, 1, 2, 0, 0, tzinfo=datetime.UTC
     )
 
-    assert get_user_model().query.count() == 1
+    assert User.query.count() == 1
     assert OAuthConnection.query.count() == 1
 
 
@@ -304,11 +301,11 @@ def test_dummy_connect(db, settings):
 #         }
 #     }
 
-#     assert get_user_model().query.count() == 0
+#     assert User.query.count() == 0
 #     assert OAuthConnection.query.count() == 0
 
 #     # Create a user
-#     user = get_user_model().query.create(
+#     user = User.query.create(
 #         username="dummy_username", email="dummy@example.com", password="dummy_password"
 #     )
 #     OAuthConnection.query.create(
@@ -325,7 +322,7 @@ def test_dummy_connect(db, settings):
 #         ),
 #     )
 
-#     assert get_user_model().query.count() == 1
+#     assert User.query.count() == 1
 #     assert OAuthConnection.query.count() == 1
 
 #     client.force_login(user)
@@ -337,7 +334,7 @@ def test_dummy_connect(db, settings):
 #     assert response.status_code == 302
 #     assert response.url == "/"
 
-#     assert get_user_model().query.count() == 1
+#     assert User.query.count() == 1
 #     assert OAuthConnection.query.count() == 0
 
 
@@ -353,11 +350,11 @@ def test_dummy_connect(db, settings):
 #         }
 #     }
 
-#     assert get_user_model().query.count() == 0
+#     assert User.query.count() == 0
 #     assert OAuthConnection.query.count() == 0
 
 #     # Create a user
-#     user = get_user_model().query.create(
+#     user = User.query.create(
 #         username="dummy_username", email="dummy@example.com"
 #     )
 #     OAuthConnection.query.create(
@@ -387,7 +384,7 @@ def test_dummy_connect(db, settings):
 #         ),
 #     )
 
-#     assert get_user_model().query.count() == 1
+#     assert User.query.count() == 1
 #     assert OAuthConnection.query.count() == 2
 
 #     client.force_login(user)
@@ -399,7 +396,7 @@ def test_dummy_connect(db, settings):
 #     assert response.status_code == 302
 #     assert response.url == "/"
 
-#     assert get_user_model().query.count() == 1
+#     assert User.query.count() == 1
 #     assert OAuthConnection.query.count() == 1
 
 
@@ -415,11 +412,11 @@ def test_dummy_connect(db, settings):
 #         }
 #     }
 
-#     assert get_user_model().query.count() == 0
+#     assert User.query.count() == 0
 #     assert OAuthConnection.query.count() == 0
 
 #     # Create a user
-#     user = get_user_model().query.create(
+#     user = User.query.create(
 #         username="dummy_username", email="dummy@example.com"
 #     )
 #     OAuthConnection.query.create(
@@ -436,7 +433,7 @@ def test_dummy_connect(db, settings):
 #         ),
 #     )
 
-#     assert get_user_model().query.count() == 1
+#     assert User.query.count() == 1
 #     assert OAuthConnection.query.count() == 1
 
 #     client.force_login(user)
@@ -448,7 +445,7 @@ def test_dummy_connect(db, settings):
 #     assert response.status_code == 400
 #     assert response.templates[0].name == "oauth/error.html"
 
-#     assert get_user_model().query.count() == 1
+#     assert User.query.count() == 1
 #     assert OAuthConnection.query.count() == 1
 
 
@@ -464,9 +461,7 @@ def test_dummy_refresh(db, settings, monkeypatch):
         }
     }
 
-    user = get_user_model().query.create(
-        username="dummy_username", email="dummy@example.com"
-    )
+    user = User.query.create(username="dummy_username", email="dummy@example.com")
     connection = OAuthConnection.query.create(
         user=user,
         provider_key="dummy",

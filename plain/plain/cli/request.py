@@ -96,11 +96,11 @@ def request(
 
         if user_id:
             try:
-                from plain.auth import get_user_model
+                from app.users.models import User
             except ImportError:
-                raise click.UsageError("plain-auth is required to use --user")
-
-            User = get_user_model()
+                raise click.UsageError(
+                    "app.users.models.User is required to use --user"
+                )
 
             user = None
             try:
