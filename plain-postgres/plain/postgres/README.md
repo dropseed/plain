@@ -456,14 +456,15 @@ Schema changes fall into three categories, each with a different author and appl
 
 Many convergence-managed changes produce DB-enforced behavior — cascading deletes (`ON DELETE`), validation (`CHECK`, `NOT NULL`), default generation. Whether a change is "behavioral" doesn't determine the category; whether the framework can guarantee a safe apply does.
 
-| Property         | Convergence                                                     | Migrations                              |
-| ---------------- | --------------------------------------------------------------- | --------------------------------------- |
-| Authored by      | Framework (derived from models)                                 | Framework (structural) or you (data)    |
-| When it runs     | Every `sync`, by diffing models vs database                     | Once, in recorded timestamp order       |
-| Drift correction | Yes — reverts undeclared DB changes on next sync                | No — manual DB changes persist          |
-| Reversible       | Implicit (roll back code, re-sync re-derives)                   | No — forward-only, fix-forward          |
-| Files on disk    | None — derived from models live                                 | `.py` files in `migrations/`            |
-| Safe DDL         | Framework-applied patterns (CONCURRENTLY, NOT VALID + VALIDATE) | Generated DDL; you review before deploy |
+| Property                 | Convergence                                                           | Migrations                                                  |
+| ------------------------ | --------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Authored by              | Framework (derived from models)                                       | Framework (structural) or you (data)                        |
+| When it runs             | Every `sync`, by diffing models vs database                           | Once, in recorded timestamp order                           |
+| Drift correction         | Yes — reverts undeclared DB changes on next sync                      | No — manual DB changes persist                              |
+| Reversible (intentional) | Implicit — roll back code, re-sync re-derives                         | No — forward-only, fix-forward                              |
+| Failure behavior         | Per-operation commits — partial progress on failure (re-run to retry) | Batch transaction — failure rolls back the entire migration |
+| Files on disk            | None — derived from models live                                       | `.py` files in `migrations/`                                |
+| Safe DDL                 | Framework-applied patterns (CONCURRENTLY, NOT VALID + VALIDATE)       | Generated DDL; you review before deploy                     |
 
 **Drift correction is a convergence-only behavior.** Convergence re-runs on every `sync` and compares models against the database. An index created manually outside a model declaration will be dropped on the next run because models are the source of truth. Migrations don't behave this way — once applied, they're recorded and never re-applied.
 
