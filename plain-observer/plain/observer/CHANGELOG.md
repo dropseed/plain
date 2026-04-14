@@ -1,5 +1,17 @@
 # plain-observer changelog
 
+## [0.34.3](https://github.com/dropseed/plain/releases/plain-observer@0.34.3) (2026-04-14)
+
+### What's changed
+
+- **Fixed observer panel main content scrolling.** Added `h-full` to `<html>`, `<body>`, and `#main-content` so the traces panel now scrolls correctly inside the viewport. ([163f6220191b](https://github.com/dropseed/plain/commit/163f6220191b))
+- Updated `observer clear` to the new `QuerySet.delete()` return type. The confirmation message now reads `✓ Cleared N traces (and cascaded spans/logs)` since the reported count is parents only — spans and logs are cascaded by Postgres. ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- Added explicit `plain.postgres>=0.95.0` dependency — the package has always imported `plain.postgres` APIs but previously relied on it being present transitively.
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.95.0`.
+
 ## [0.34.2](https://github.com/dropseed/plain/releases/plain-observer@0.34.2) (2026-04-13)
 
 ### What's changed

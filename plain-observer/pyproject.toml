@@ -1,12 +1,17 @@
 [project]
 name = "plain.observer"
-version = "0.34.2"
+version = "0.34.3"
 description = "On-page telemetry and observability tools for Plain."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["plain>=0.132.0,<1.0.0", "plain.admin<1.0.0", "opentelemetry-sdk>=1.34.1"]
+dependencies = [
+  "plain>=0.132.0,<1.0.0",
+  "plain.admin<1.0.0",
+  "plain.postgres>=0.95.0,<1.0.0",
+  "opentelemetry-sdk>=1.34.1",
+]
 
 [dependency-groups]
 dev = ["plain.pytest<1.0.0"]
