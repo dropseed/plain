@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Self, cast
 
 from plain import exceptions
 from plain.postgres.constants import LOOKUP_SEP
-from plain.postgres.deletion import SET_NULL
+from plain.postgres.deletion import NO_ACTION, SET_NULL, OnDelete
 from plain.postgres.exceptions import FieldDoesNotExist, FieldError
 from plain.postgres.query_utils import PathInfo, Q
 from plain.postgres.utils import make_model_tuple
@@ -319,6 +319,10 @@ class RelatedField(FieldCacheMixin, Field):
 
 
 class ForeignKeyField(RelatedField):
+    # Narrow the base class's `ForeignObjectRel` annotation — a FK's remote_field
+    # is always a ForeignKeyRel with a concrete on_delete action.
+    remote_field: ForeignKeyRel
+
     """
     Provide a many-to-one relation by adding a column to the local model
     to hold the remote value.
@@ -335,7 +339,7 @@ class ForeignKeyField(RelatedField):
     def __init__(
         self,
         to: type[Model] | str,
-        on_delete: Any,
+        on_delete: OnDelete,
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         db_constraint: bool = True,
@@ -349,15 +353,18 @@ class ForeignKeyField(RelatedField):
                     f"{self.__class__.__name__}({to!r}) is invalid. First parameter to ForeignKeyField must be "
                     f"either a model, a model name, or the string {RECURSIVE_RELATIONSHIP_CONSTANT!r}"
                 )
-        if not callable(on_delete):
-            raise TypeError("on_delete must be callable.")
+        if not isinstance(on_delete, OnDelete):
+            raise TypeError(
+                "on_delete must be one of plain.postgres.CASCADE, SET_NULL, "
+                f"RESTRICT, or NO_ACTION; got {on_delete!r}"
+            )
 
         self.remote_field = ForeignKeyRel(
-            self,
-            to,
+            field=self,
+            to=to,
+            on_delete=on_delete,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
-            on_delete=on_delete,
         )
 
         super().__init__(
@@ -513,8 +520,9 @@ class ForeignKeyField(RelatedField):
 
     def _check_on_delete(self) -> list[PreflightResult]:
         on_delete = getattr(self.remote_field, "on_delete", None)
-        if on_delete == SET_NULL and not self.allow_null:
-            return [
+        results: list[PreflightResult] = []
+        if on_delete is SET_NULL and not self.allow_null:
+            results.append(
                 PreflightResult(
                     fix=(
                         "Field specifies on_delete=SET_NULL, but cannot be null. "
@@ -523,8 +531,20 @@ class ForeignKeyField(RelatedField):
                     obj=self,
                     id="fields.foreign_key_null_constraint_violation",
                 )
-            ]
-        return []
+            )
+        if not self.db_constraint and on_delete is not NO_ACTION:
+            results.append(
+                PreflightResult(
+                    fix=(
+                        "db_constraint=False requires on_delete=NO_ACTION. "
+                        "Without a FOREIGN KEY constraint there is no place for "
+                        "Postgres to apply the delete behavior."
+                    ),
+                    obj=self,
+                    id="fields.foreign_key_unconstrained_requires_no_action",
+                )
+            )
+        return results
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
@@ -686,8 +706,8 @@ class ManyToManyField(RelatedField):
             raise ValueError("ManyToManyField must have a 'through' argument.")
 
         self.remote_field = ManyToManyRel(
-            self,
-            to,
+            field=self,
+            to=to,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
             symmetrical=symmetrical,

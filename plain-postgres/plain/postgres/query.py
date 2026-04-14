@@ -939,8 +939,13 @@ class QuerySet[T: "Model"]:
             return obj
         return None
 
-    def delete(self) -> tuple[int, dict[str, int]]:
-        """Delete the records in the current QuerySet."""
+    def delete(self) -> int:
+        """Delete the records in the current QuerySet.
+
+        Returns the number of parent rows deleted. Cascaded child rows are
+        handled by Postgres via the declared `on_delete` clauses and are not
+        included in the count.
+        """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot use 'limit' or 'offset' with delete().")
         if self.sql_query.distinct or self.sql_query.distinct_fields:
@@ -949,26 +954,20 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
         del_query = self._chain()
-
-        # The delete is actually 2 queries - one to find related objects,
-        # and one to delete. Make sure that the discovery of related
-        # objects is performed on the same database as the deletion.
         del_query._for_write = True
-
-        # Disable non-supported fields.
         del_query.sql_query.select_for_update = False
         del_query.sql_query.select_related = False
         del_query.sql_query.clear_ordering(force=True)
 
-        from plain.postgres.deletion import Collector
-
-        collector = Collector(origin=self)
-        collector.collect(del_query)
-        deleted, _rows_count = collector.delete()
+        # FK errors (RESTRICT / NO_ACTION) leave the DB transaction aborted.
+        # Mark the connection so outer atomic() blocks see the abort state
+        # even if the caller catches IntegrityError themselves.
+        with transaction.mark_for_rollback_on_error():
+            count = del_query._raw_delete()
 
         # Clear the result cache, in case this QuerySet gets reused.
         self._result_cache = None
-        return deleted, _rows_count
+        return count
 
     def _raw_delete(self) -> int:
         """

@@ -143,8 +143,8 @@ def clear() -> None:
         seconds=settings.JOBS_RESULTS_RETENTION
     )
     click.echo(f"Clearing job results created before {cutoff}")
-    results = JobResult.query.filter(created_at__lt=cutoff).delete()
-    click.echo(f"Deleted {results[0]} jobs")
+    count = JobResult.query.filter(created_at__lt=cutoff).delete()
+    click.echo(f"Deleted {count} jobs")
 
 
 @cli.command()
@@ -173,10 +173,10 @@ def purge(yes: bool) -> None:
     ):
         return
 
-    deleted = JobRequest.query.all().delete()[0]
+    deleted = JobRequest.query.all().delete()
     click.echo(f"Deleted {deleted} job requests")
 
-    deleted = JobProcess.query.all().delete()[0]
+    deleted = JobProcess.query.all().delete()
     click.echo(f"Deleted {deleted} jobs")
 
 

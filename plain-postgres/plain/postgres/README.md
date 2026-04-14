@@ -536,6 +536,30 @@ Use this when migrations have already been committed or deployed to other enviro
 | Migrations are committed but not deployed | Delete-and-recreate (if all developers reset) or squash |
 | Migrations are deployed to production     | Squash or full reset                                    |
 
+#### Data migrations and cascading deletes
+
+`Model.delete()` and `QuerySet.delete()` rely on Postgres `ON DELETE` clauses (`CASCADE`, `SET NULL`, `RESTRICT`) — Plain does not walk relationships in Python.
+
+Foreign key constraints are added by **convergence** (step 3 of `postgres sync`), not by migrations. So during a fresh `migrations apply` (before convergence has run), FK constraints don't exist yet. A `RunPython` migration that calls `.delete()` on a model with cascading children will:
+
+- Delete only the parent row — children become orphans
+- Cause convergence's later `VALIDATE CONSTRAINT` step to fail because of the orphans
+
+This only affects fresh applies. Existing databases keep their FK constraints across syncs, so incremental migrations are unaffected.
+
+**If your data migration needs to delete rows that have cascading children, handle the cascade explicitly:**
+
+```python
+def forwards(models, schema_editor):
+    Parent = models.get_model("myapp", "Parent")
+    Child = models.get_model("myapp", "Child")
+    # Delete children first, then parent — explicit, no constraint reliance
+    Child.query.filter(parent__name="old").delete()
+    Parent.query.filter(name="old").delete()
+```
+
+Or use `RunSQL` with explicit cascade if the relationship is large.
+
 #### Resetting migrations
 
 Over time a package can accumulate dozens of migrations. Once **every environment** (dev, staging, production) has applied all of them, you can replace the entire history with a single fresh `0001_initial`.

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.query_utils import Q
 
 # ---------------------------------------------------------------------------
 # Single-level: one parent, one child per on_delete option
@@ -34,15 +35,6 @@ class ChildCascade(postgres.Model):
     )
 
     query: postgres.QuerySet[ChildCascade] = postgres.QuerySet()
-
-
-@postgres.register_model
-class ChildProtect(postgres.Model):
-    parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.PROTECT
-    )
-
-    query: postgres.QuerySet[ChildProtect] = postgres.QuerySet()
 
 
 @postgres.register_model
@@ -80,10 +72,33 @@ class UnconstrainedChild(postgres.Model):
     """FK with db_constraint=False — no DB constraint, convergence should ignore."""
 
     parent: DeleteParent = types.ForeignKeyField(
-        DeleteParent, on_delete=postgres.CASCADE, db_constraint=False
+        DeleteParent, on_delete=postgres.NO_ACTION, db_constraint=False
     )
 
     query: postgres.QuerySet[UnconstrainedChild] = postgres.QuerySet()
+
+
+class _HideGhostsQuerySet(postgres.QuerySet):
+    """QuerySet with a default filter. Rows named "ghost" are hidden from
+    the public queryset — mirrors real-world patterns like soft-delete or
+    tenant scoping. Used to verify Model.delete() bypasses custom filters.
+
+    Filter is applied to the underlying SQL query directly to avoid the
+    recursion that would happen if we called .exclude() (which clones via
+    from_model)."""
+
+    @classmethod
+    def from_model(cls, model, query=None):
+        instance = super().from_model(model, query)
+        instance._query.add_q(~Q(name="ghost"))
+        return instance
+
+
+@postgres.register_model
+class HideableItem(postgres.Model):
+    name: str = types.TextField(max_length=100)
+
+    query = _HideGhostsQuerySet()
 
 
 # ---------------------------------------------------------------------------
@@ -143,33 +158,6 @@ class DiamondChild(postgres.Model):
     )
 
     query: postgres.QuerySet[DiamondChild] = postgres.QuerySet()
-
-
-# ---------------------------------------------------------------------------
-# SET(callable) — reassign to a sentinel row
-# ---------------------------------------------------------------------------
-
-
-@postgres.register_model
-class SetSentinelParent(postgres.Model):
-    name: str = types.TextField(max_length=100)
-
-    query: postgres.QuerySet[SetSentinelParent] = postgres.QuerySet()
-
-
-def _sentinel_parent():
-    return SetSentinelParent.query.get(name="sentinel")
-
-
-@postgres.register_model
-class ChildSetCallable(postgres.Model):
-    parent: SetSentinelParent = types.ForeignKeyField(
-        SetSentinelParent,
-        on_delete=postgres.SET(_sentinel_parent),
-    )
-    parent_id: int
-
-    query: postgres.QuerySet[ChildSetCallable] = postgres.QuerySet()
 
 
 # ---------------------------------------------------------------------------

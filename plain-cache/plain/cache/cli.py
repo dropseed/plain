@@ -15,8 +15,8 @@ def cli() -> None:
 def clear_expired() -> None:
     """Clear expired cache entries"""
     click.echo("Clearing expired cache items...")
-    result = CachedItem.query.expired().delete()
-    click.echo(f"Deleted {result[0]} expired cache items.")
+    count = CachedItem.query.expired().delete()
+    click.echo(f"Deleted {count} expired cache items.")
 
 
 @cli.command()
@@ -28,8 +28,8 @@ def clear_all(yes: bool) -> None:
     ):
         return
     click.echo("Clearing all cache items...")
-    result = CachedItem.query.all().delete()
-    click.echo(f"Deleted {result[0]} cache items.")
+    count = CachedItem.query.all().delete()
+    click.echo(f"Deleted {count} cache items.")
 
 
 @cli.command()

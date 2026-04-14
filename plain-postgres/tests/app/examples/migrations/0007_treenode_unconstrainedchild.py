@@ -38,7 +38,7 @@ class Migration(migrations.Migration):
                     "parent",
                     postgres.ForeignKeyField(
                         db_constraint=False,
-                        on_delete=plain.postgres.deletion.CASCADE,
+                        on_delete=plain.postgres.deletion.NO_ACTION,
                         to="examples.deleteparent",
                     ),
                 ),

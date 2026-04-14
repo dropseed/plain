@@ -18,7 +18,6 @@ from plain.postgres import models_registry, transaction, types
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.constraints import CheckConstraint, UniqueConstraint
 from plain.postgres.db import PLAIN_VERSION_PICKLE_KEY
-from plain.postgres.deletion import Collector
 from plain.postgres.dialect import MAX_NAME_LENGTH
 from plain.postgres.exceptions import (
     DoesNotExistDescriptor,
@@ -592,15 +591,30 @@ class Model(metaclass=ModelBase):
                 ):
                     field.delete_cached_value(self)
 
-    def delete(self) -> tuple[int, dict[str, int]]:
+    def delete(self) -> int:
+        """Delete this row. Returns the number of rows deleted (1 or 0).
+
+        Cascades are handled entirely by Postgres via the declared
+        `on_delete` clauses on related FKs — see
+        `uv run plain docs postgres --section deletion`.
+        """
         if self.id is None:
             raise ValueError(
                 f"{self.model_options.object_name} object can't be deleted because its id attribute is set "
                 "to None."
             )
-        collector = Collector(origin=self)
-        collector.collect([self])
-        return collector.delete()
+        # Use base_queryset to bypass any user-defined filters on the public
+        # query (e.g. soft-delete scopes). An instance we have a reference to
+        # should always be deletable — custom querysets shape reads, not
+        # internal row lifecycle operations.
+        #
+        # mark_for_rollback_on_error: FK errors (RESTRICT / NO_ACTION) leave
+        # the DB transaction aborted. Mark the connection so outer atomic()
+        # blocks see the abort state even if the caller catches IntegrityError.
+        with transaction.mark_for_rollback_on_error():
+            count = self._model_meta.base_queryset.filter(id=self.id)._raw_delete()
+        setattr(self, self._model_meta.get_forward_field("id").attname, None)
+        return count
 
     def get_field_display(self, field_name: str) -> str:
         """Get the display value for a field, especially useful for fields with choices."""

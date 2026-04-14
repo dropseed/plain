@@ -273,8 +273,10 @@ def clear(yes: bool) -> None:
         confirm_msg = f"Are you sure you want to clear {trace_count} trace(s)? This will delete all observer data."
         click.confirm(confirm_msg, abort=True)
 
-    deleted_count, _ = query.delete()
-    click.secho(f"✓ Cleared {deleted_count} traces and spans", fg="green")
+    deleted_count = query.delete()
+    click.secho(
+        f"✓ Cleared {deleted_count} traces (and cascaded spans/logs)", fg="green"
+    )
 
 
 @observer_cli.command("traces")

@@ -15,6 +15,7 @@ import uuid
 from typing import Any
 
 from plain.postgres.base import Model
+from plain.postgres.deletion import OnDelete
 from plain.postgres.enums import Choices
 from plain.postgres.fields import Field
 from plain.postgres.migrations.operations.base import Operation
@@ -306,6 +307,15 @@ class UUIDSerializer(BaseSerializer):
         return f"uuid.{repr(self.value)}", {"import uuid"}
 
 
+class OnDeleteSerializer(BaseSerializer):
+    """Serialize on_delete sentinels (CASCADE, SET_NULL, RESTRICT, NO_ACTION)
+    as bare references to their exported names, preserving singleton identity
+    across migration load/reload cycles."""
+
+    def serialize(self) -> tuple[str, set[str]]:
+        return f"postgres.{self.value.name}", {"from plain import postgres"}
+
+
 class Serializer:
     _registry = {
         # Some of these are order-dependent.
@@ -332,6 +342,7 @@ class Serializer:
         uuid.UUID: UUIDSerializer,
         pathlib.PurePath: PathSerializer,
         os.PathLike: PathLikeSerializer,
+        OnDelete: OnDeleteSerializer,
     }
 
     @classmethod

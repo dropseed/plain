@@ -1,19 +1,19 @@
 """
 Delete / on_delete behavior tests.
 
+Cascading is enforced entirely by Postgres. Model.delete() and
+QuerySet.delete() issue a single DELETE statement; child rows are handled
+via the declared `ON DELETE` clauses (CASCADE, SET_NULL, RESTRICT, NO_ACTION).
+
 Sections:
     1. on_delete options — instance + queryset paths for each action
     2. Graph shapes — multi-level, diamond, self-ref, M2M, mixed, circular
     3. Deferred FK / transaction semantics
-    4. Return value shape
+    4. Return value — delete() returns an int row count
     5. QuerySet operator rejections / leniency
     6. Related manager + M2M through-table mutation
     7. Idempotency
     8. Query-count canary
-    9. Collector-specific behavior — deleted wholesale when the DB-level
-       ON DELETE rewrite lands (PROTECT, SET(callable), db_constraint=False
-       app-level cascade). See
-       Futures/plain/postgres-native/models-db-level-on-delete.md.
 """
 
 from __future__ import annotations
@@ -25,9 +25,7 @@ from app.examples.models import (
     CarFeature,
     ChildCascade,
     ChildNoAction,
-    ChildProtect,
     ChildRestrict,
-    ChildSetCallable,
     ChildSetNull,
     CircA,
     CircB,
@@ -38,14 +36,13 @@ from app.examples.models import (
     Feature,
     Grandchild,
     Grandparent,
+    HideableItem,
     MidParent,
-    SetSentinelParent,
     TreeNode,
     UnconstrainedChild,
 )
 
 from plain.postgres import transaction
-from plain.postgres.deletion import ProtectedError, RestrictedError
 
 
 def _create_parents():
@@ -80,11 +77,16 @@ def test_cascade_queryset(db):
 
 
 def test_restrict_instance(db):
+    """RESTRICT is immediate — raises at the DELETE call site even inside
+    a transaction, regardless of DEFERRABLE INITIALLY DEFERRED."""
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
     ChildRestrict.query.create(parent=parent)
-    with pytest.raises(RestrictedError):
-        parent.delete()
+    # Inner atomic so the failed DELETE rolls back to a savepoint, leaving the
+    # outer pytest fixture transaction usable for follow-up assertions.
+    with pytest.raises(psycopg.errors.IntegrityError):  # noqa: PT012
+        with transaction.atomic():
+            parent.delete()
     assert DeleteParent.query.filter(id=parent.id).exists()
 
 
@@ -93,8 +95,9 @@ def test_restrict_queryset(db):
     parent = DeleteParent.query.get(name="parent")
     ChildRestrict.query.create(parent=parent)
 
-    with pytest.raises(RestrictedError):
-        DeleteParent.query.filter(id=parent.id).delete()
+    with pytest.raises(psycopg.errors.IntegrityError):  # noqa: PT012
+        with transaction.atomic():
+            DeleteParent.query.filter(id=parent.id).delete()
 
     assert DeleteParent.query.filter(id=parent.id).exists()
 
@@ -120,7 +123,7 @@ def test_set_null_queryset(db):
 
 
 def test_set_null_bulk(db):
-    """Parent with many children — all end up null in one shot."""
+    """Parent with many children — all end up null in one Postgres-driven pass."""
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
     child_ids = [ChildSetNull.query.create(parent=parent).id for _ in range(100)]
@@ -133,10 +136,9 @@ def test_set_null_bulk(db):
 
 def test_no_action_raises_at_commit(db):
     """
-    NO_ACTION skips application-level FK handling; the DB's deferred
-    constraint check fires at commit. The pytest fixture wraps tests in a
-    never-committed atomic, so force the check with SET CONSTRAINTS ALL
-    IMMEDIATE inside a savepoint.
+    NO_ACTION respects DEFERRABLE INITIALLY DEFERRED — orphan detection is
+    deferred to commit. Force the check inside a savepoint so the outer
+    transaction stays clean under pytest's never-committed atomic wrapper.
     """
     from plain.postgres.db import get_connection
 
@@ -230,16 +232,18 @@ def test_m2m_through_cascades_from_either_side(db):
 
 def test_mixed_on_delete_restrict_blocks_cascade(db):
     """
-    Parent has both CASCADE and RESTRICT children. RESTRICT must abort the
-    whole delete — the CASCADE child must NOT be deleted either.
+    Parent has both CASCADE and RESTRICT children. Postgres evaluates all
+    FK actions before applying the DELETE — RESTRICT raises and the would-be
+    CASCADE child is untouched.
     """
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
     cascade_child = ChildCascade.query.create(parent=parent)
     restrict_child = ChildRestrict.query.create(parent=parent)
 
-    with pytest.raises(RestrictedError):
-        parent.delete()
+    with pytest.raises(psycopg.errors.IntegrityError):  # noqa: PT012
+        with transaction.atomic():
+            parent.delete()
 
     assert DeleteParent.query.filter(id=parent.id).exists()
     assert ChildCascade.query.filter(id=cascade_child.id).exists()
@@ -250,8 +254,7 @@ def test_circular_fk_cascade_inside_atomic(db):
     """
     A.partner → B, B.partner → A, both CASCADE. Plain's FK constraints are
     DEFERRABLE INITIALLY DEFERRED, so deleting either side inside one atomic
-    should cascade to the other and commit cleanly. If the rewrite switches
-    constraints to IMMEDIATE, this test catches it.
+    should cascade to the other and commit cleanly.
     """
     with transaction.atomic():
         a = CircA.query.create(name="a")
@@ -318,41 +321,47 @@ def test_child_insert_before_parent_in_one_atomic(db):
 
 
 # ===========================================================================
-# 4. Return value shape — (count, {label: count})
+# 4. Return value — delete() returns an int
 # ===========================================================================
 
 
-def test_instance_delete_return_value(db):
+def test_instance_delete_returns_one(db):
+    """instance.delete() returns 1 for a successful delete.
+
+    Cascaded child rows are handled by Postgres and are not counted.
+    """
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
     ChildCascade.query.create(parent=parent)
     ChildCascade.query.create(parent=parent)
 
-    count, by_label = parent.delete()
-
-    assert count == 3  # 1 parent + 2 children
-    assert by_label == {
-        DeleteParent.model_options.label: 1,
-        ChildCascade.model_options.label: 2,
-    }
+    assert parent.delete() == 1
+    # But children were still cascaded at the DB level
+    assert ChildCascade.query.count() == 0
 
 
-def test_queryset_delete_return_value(db):
+def test_queryset_delete_returns_count(db):
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
     ChildCascade.query.create(parent=parent)
 
-    count, by_label = DeleteParent.query.filter(id=parent.id).delete()
+    count = DeleteParent.query.filter(id=parent.id).delete()
 
-    assert count == 2
-    assert by_label[DeleteParent.model_options.label] == 1
-    assert by_label[ChildCascade.model_options.label] == 1
+    assert count == 1  # one parent row; children cascaded by Postgres
+    assert ChildCascade.query.count() == 0
 
 
 def test_queryset_delete_empty_returns_zero(db):
-    count, by_label = DeleteParent.query.filter(name="nonexistent").delete()
+    count = DeleteParent.query.filter(name="nonexistent").delete()
     assert count == 0
-    assert by_label == {}
+
+
+def test_queryset_delete_multi_row(db):
+    DeleteParent.query.create(name="a")
+    DeleteParent.query.create(name="b")
+    DeleteParent.query.create(name="c")
+
+    assert DeleteParent.query.all().delete() == 3
 
 
 # ===========================================================================
@@ -385,7 +394,7 @@ def test_order_by_is_silently_stripped_not_rejected(db):
     result. Pin this so a stricter rewrite doesn't start rejecting it.
     """
     _create_parents()
-    count, _ = DeleteParent.query.order_by("name").delete()
+    count = DeleteParent.query.order_by("name").delete()
     assert count == 2
 
 
@@ -460,11 +469,8 @@ def test_m2m_set_reconciles_through_rows(db):
 
 
 def test_delete_already_deleted_instance_raises(db):
-    """
-    After `.delete()`, Plain sets `instance.id = None`. A second `.delete()`
-    raises ValueError. Pin this — users who expect a second delete to be a
-    no-op are in for a surprise today.
-    """
+    """After `.delete()`, Plain sets `instance.id = None`. A second `.delete()`
+    raises ValueError."""
     _create_parents()
     parent = DeleteParent.query.get(name="parent")
     parent.delete()
@@ -478,15 +484,9 @@ def test_delete_already_deleted_instance_raises(db):
 # ===========================================================================
 
 
-def test_cascade_query_count_canary(db):
-    """
-    Pins the number of queries issued for a single-level CASCADE delete.
-
-    Today's Collector issues multiple queries (SELECT children, DELETE
-    children, DELETE parent). Under DB-level ON DELETE CASCADE this should
-    drop to ~1-2. When this test fails post-rewrite, update the expected
-    count to lock in the gain.
-    """
+def test_cascade_delete_issues_one_query(db):
+    """Single-level CASCADE fires exactly one DELETE — Postgres handles the
+    cascade internally. This is the headline win of the DB-level rewrite."""
     from plain.postgres.db import get_connection
 
     _create_parents()
@@ -504,108 +504,60 @@ def test_cascade_query_count_canary(db):
     finally:
         conn.force_debug_cursor = prev_force
 
-    # Today: Collector issues multiple queries.
-    # Post-rewrite: should be 1 DELETE (Postgres handles the cascade).
-    assert query_count > 1, (
-        f"Collector should issue multiple queries today; got {query_count}"
+    assert query_count == 1, (
+        f"Expected one DELETE; got {query_count} queries — Collector may have "
+        f"crept back, or _raw_delete lost its single-statement property."
     )
 
 
 # ===========================================================================
-# 9. Collector-specific behavior — delete wholesale during the rewrite
+# 9. db_constraint=False requires on_delete=NO_ACTION (preflight)
 # ===========================================================================
 
 
-def test_protect_instance(db):
-    _create_parents()
-    parent = DeleteParent.query.get(name="parent")
-    ChildProtect.query.create(parent=parent)
-    with pytest.raises(ProtectedError):
-        parent.delete()
-    assert DeleteParent.query.filter(id=parent.id).exists()
+def test_unconstrained_with_cascade_is_rejected_at_preflight():
+    """db_constraint=False has no FK constraint to attach on_delete to, so
+    anything other than NO_ACTION is rejected at model-check."""
+    from plain import postgres
+    from plain.postgres.fields.related import ForeignKeyField
+
+    field = ForeignKeyField(
+        DeleteParent, on_delete=postgres.CASCADE, db_constraint=False
+    )
+    field.set_attributes_from_name("parent")
+    field.model = UnconstrainedChild
+    results = field._check_on_delete()
+
+    assert any(
+        r.id == "fields.foreign_key_unconstrained_requires_no_action" for r in results
+    )
 
 
-def test_protect_queryset(db):
-    _create_parents()
-    parent = DeleteParent.query.get(name="parent")
-    ChildProtect.query.create(parent=parent)
-
-    with pytest.raises(ProtectedError):
-        DeleteParent.query.filter(id=parent.id).delete()
-
-    assert DeleteParent.query.filter(id=parent.id).exists()
-
-
-def test_protect_fires_in_python_before_delete(db):
-    """PROTECT fires in-Python before DELETE is issued — not at commit."""
-    _create_parents()
-    parent = DeleteParent.query.get(name="parent")
-    ChildProtect.query.create(parent=parent)
-
-    with pytest.raises(ProtectedError):
-        with transaction.atomic():
-            parent.delete()
-
-
-def test_protect_error_carries_referenced_objects(db):
-    _create_parents()
-    parent = DeleteParent.query.get(name="parent")
-    child = ChildProtect.query.create(parent=parent)
-
-    with pytest.raises(ProtectedError) as excinfo:
-        parent.delete()
-
-    assert child in list(excinfo.value.protected_objects)
-
-
-def test_protect_error_message_mentions_model(db):
-    _create_parents()
-    parent = DeleteParent.query.get(name="parent")
-    ChildProtect.query.create(parent=parent)
-
-    with pytest.raises(ProtectedError) as excinfo:
-        parent.delete()
-
-    msg = str(excinfo.value)
-    assert "ChildProtect" in msg or "childprotect" in msg.lower()
-
-
-def test_restrict_error_carries_referenced_objects(db):
-    """`RestrictedError.restricted_objects` is populated by the Collector;
-    under DB-level RESTRICT this becomes a plain `IntegrityError`."""
-    _create_parents()
-    parent = DeleteParent.query.get(name="parent")
-    child = ChildRestrict.query.create(parent=parent)
-
-    with pytest.raises(RestrictedError) as excinfo:
-        parent.delete()
-
-    assert child in list(excinfo.value.restricted_objects)
-
-
-def test_set_callable_reassigns_to_sentinel(db):
-    """SET(callable) — Collector-only feature; no DB mapping."""
-    SetSentinelParent.query.create(name="sentinel")
-    doomed = SetSentinelParent.query.create(name="doomed")
-    sentinel = SetSentinelParent.query.get(name="sentinel")
-
-    child = ChildSetCallable.query.create(parent=doomed)
-    doomed.delete()
-
-    child.refresh_from_db()
-    assert child.parent_id == sentinel.id
-
-
-def test_unconstrained_fk_still_cascades_via_collector(db):
+def test_instance_delete_bypasses_custom_query_filters(db):
+    """An instance you hold a reference to must always be deletable, even if
+    the model's public `query` descriptor applies a default filter that would
+    exclude it (e.g. soft-delete scopes, tenant filtering). Model.delete()
+    uses `_model_meta.base_queryset` to route around custom filtering.
     """
-    FK with db_constraint=False has no DB-level constraint, but the Collector
-    still honors on_delete=CASCADE. Under DB-level, the rewrite must decide
-    whether this combo is rejected at model-check time or silently no-ops.
-    """
-    _create_parents()
-    parent = DeleteParent.query.get(name="parent")
-    child_id = UnconstrainedChild.query.create(parent=parent).id
+    ghost = HideableItem(name="ghost")
+    ghost.save()
+    visible = HideableItem(name="visible")
+    visible.save()
 
-    parent.delete()
+    # Public queryset filters out ghost rows by default
+    assert HideableItem.query.filter(id=ghost.id).count() == 0
+    assert HideableItem.query.filter(id=visible.id).count() == 1
 
-    assert not UnconstrainedChild.query.filter(id=child_id).exists()
+    # But instance.delete() bypasses the filter — ghost is deleted
+    assert ghost.delete() == 1
+
+    # Row is actually gone (verify via base_queryset which skips the filter)
+    assert not HideableItem._model_meta.base_queryset.filter(id=ghost.id).exists()
+
+
+def test_on_delete_must_be_sentinel():
+    """Passing a non-OnDelete value raises TypeError at FK construction."""
+    from plain.postgres.fields.related import ForeignKeyField
+
+    with pytest.raises(TypeError, match="on_delete must be one of"):
+        ForeignKeyField(DeleteParent, on_delete=lambda *a: None)  # ty: ignore[invalid-argument-type]

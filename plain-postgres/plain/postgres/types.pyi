@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo
 
 # Import manager types from runtime (will be Generic[T, QS] there)
 from plain.postgres.base import Model
+from plain.postgres.deletion import OnDelete
 from plain.postgres.fields.related_managers import (
     ManyToManyManager,
     ReverseForeignKeyManager,
@@ -536,7 +537,7 @@ def EncryptedJSONField(
 @overload
 def ForeignKeyField[T: Model](
     to: type[T] | str,
-    on_delete: Any,
+    on_delete: OnDelete,
     *,
     related_query_name: str | None = None,
     limit_choices_to: Any = None,
@@ -552,7 +553,7 @@ def ForeignKeyField[T: Model](
 @overload
 def ForeignKeyField[T: Model](
     to: type[T] | str,
-    on_delete: Any,
+    on_delete: OnDelete,
     *,
     related_query_name: str | None = None,
     limit_choices_to: Any = None,

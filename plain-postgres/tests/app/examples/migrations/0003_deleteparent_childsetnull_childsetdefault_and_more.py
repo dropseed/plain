@@ -71,17 +71,4 @@ class Migration(migrations.Migration):
                 ),
             ],
         ),
-        migrations.CreateModel(
-            name="ChildProtect",
-            fields=[
-                ("id", postgres.PrimaryKeyField()),
-                (
-                    "parent",
-                    postgres.ForeignKeyField(
-                        on_delete=plain.postgres.deletion.PROTECT,
-                        to="examples.deleteparent",
-                    ),
-                ),
-            ],
-        ),
     ]

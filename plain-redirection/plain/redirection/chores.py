@@ -14,10 +14,10 @@ class DeleteLogs(Chore):
     def run(self) -> str:
         cutoff = timezone.now() - settings.REDIRECTION_LOG_RETENTION_TIMEDELTA
 
-        result = RedirectLog.query.filter(created_at__lt=cutoff).delete()
-        output = f"{result[0]} redirect logs deleted"
+        redirects = RedirectLog.query.filter(created_at__lt=cutoff).delete()
+        output = f"{redirects} redirect logs deleted"
 
-        result = NotFoundLog.query.filter(created_at__lt=cutoff).delete()
-        output += f", {result[0]} not found logs deleted"
+        not_founds = NotFoundLog.query.filter(created_at__lt=cutoff).delete()
+        output += f", {not_founds} not found logs deleted"
 
         return output

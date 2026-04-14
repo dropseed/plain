@@ -21,10 +21,8 @@ from . import BLANK_CHOICE_DASH
 from .mixins import FieldCacheMixin
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from plain.postgres.base import Model
-    from plain.postgres.deletion import Collector
+    from plain.postgres.deletion import OnDelete
     from plain.postgres.fields import Field
     from plain.postgres.fields.related import (
         ForeignKeyField,
@@ -33,9 +31,6 @@ if TYPE_CHECKING:
     )
     from plain.postgres.lookups import Lookup
     from plain.postgres.query_utils import PathInfo, Q
-
-    # Type alias for on_delete callbacks
-    OnDeleteCallback = Callable[[Collector, Any, Any], None]
 
 
 class ForeignObjectRel(FieldCacheMixin):
@@ -58,16 +53,17 @@ class ForeignObjectRel(FieldCacheMixin):
     # Type annotations for instance attributes
     model: type[Model]
     field: RelatedField
-    on_delete: OnDeleteCallback | None
+    on_delete: OnDelete | None
     limit_choices_to: dict[str, Any] | Q
 
     def __init__(
         self,
+        *,
         field: RelatedField,
         to: str | type[Model],
         related_query_name: str | None = None,
         limit_choices_to: dict[str, Any] | Q | None = None,
-        on_delete: OnDeleteCallback | None = None,
+        on_delete: OnDelete | None = None,
     ):
         self.field = field  # ty: ignore[invalid-assignment]
         # Initially may be a string, gets resolved to type[Model] by lazy_related_operation
@@ -219,18 +215,20 @@ class ForeignKeyRel(ForeignObjectRel):
 
     # Type annotations for instance attributes
     field: ForeignKeyField
+    on_delete: OnDelete  # narrowed: FK rel always has a concrete action
 
     def __init__(
         self,
+        *,
         field: ForeignKeyField,
         to: str | type[Model],
+        on_delete: OnDelete,
         related_query_name: str | None = None,
         limit_choices_to: dict[str, Any] | Q | None = None,
-        on_delete: OnDeleteCallback | None = None,
     ):
         super().__init__(
-            field,
-            to,
+            field=field,
+            to=to,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
             on_delete=on_delete,
@@ -272,9 +270,9 @@ class ManyToManyRel(ForeignObjectRel):
 
     def __init__(
         self,
+        *,
         field: ManyToManyField,
         to: str | type[Model],
-        *,
         through: str | type[Model],
         through_fields: tuple[str, str] | None = None,
         related_query_name: str | None = None,
@@ -282,8 +280,8 @@ class ManyToManyRel(ForeignObjectRel):
         symmetrical: bool = True,
     ):
         super().__init__(
-            field,
-            to,
+            field=field,
+            to=to,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
         )
