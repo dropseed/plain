@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from ..db import get_connection
 from ..registry import models_registry
 from .analysis import (
+    ColumnDefaultDrift,
     ConstraintDrift,
     Drift,
     DriftKind,
@@ -19,6 +20,7 @@ from .fixes import (
     AddConstraintFix,
     AddForeignKeyFix,
     CreateIndexFix,
+    DropColumnDefaultFix,
     DropConstraintFix,
     DropIndexFix,
     DropNotNullFix,
@@ -27,6 +29,7 @@ from .fixes import (
     RenameConstraintFix,
     RenameIndexFix,
     ReplaceForeignKeyFix,
+    SetColumnDefaultFix,
     SetNotNullFix,
     ValidateConstraintFix,
 )
@@ -127,6 +130,16 @@ def _plan_drift(drift: Drift) -> PlanItem:
             )
         case NullabilityDrift(table=t, column=col, model_allows_null=True):
             return PlanItem(drift, DropNotNullFix(t, col))
+        case ColumnDefaultDrift(
+            kind=DriftKind.MISSING | DriftKind.CHANGED,
+            table=t,
+            column=col,
+            model_default_sql=default_sql,
+        ):
+            assert default_sql is not None  # MISSING/CHANGED always carry model SQL
+            return PlanItem(drift, SetColumnDefaultFix(t, col, default_sql))
+        case ColumnDefaultDrift(kind=DriftKind.UNDECLARED, table=t, column=col):
+            return PlanItem(drift, DropColumnDefaultFix(t, col))
         case _:
             raise ValueError(f"Unhandled drift: {drift}")
 

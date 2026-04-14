@@ -1,4 +1,6 @@
 from .analysis import (
+    ColumnDefaultDrift,
+    ColumnDrift,
     ColumnStatus,
     ConstraintDrift,
     ConstraintStatus,
@@ -15,6 +17,7 @@ from .fixes import (
     AddConstraintFix,
     AddForeignKeyFix,
     CreateIndexFix,
+    DropColumnDefaultFix,
     DropConstraintFix,
     DropIndexFix,
     DropNotNullFix,
@@ -22,6 +25,7 @@ from .fixes import (
     RebuildIndexFix,
     RenameConstraintFix,
     RenameIndexFix,
+    SetColumnDefaultFix,
     SetNotNullFix,
     ValidateConstraintFix,
 )
@@ -39,6 +43,8 @@ from .planning import (
 __all__ = [
     "AddConstraintFix",
     "AddForeignKeyFix",
+    "ColumnDefaultDrift",
+    "ColumnDrift",
     "ColumnStatus",
     "ConstraintDrift",
     "ConstraintStatus",
@@ -47,6 +53,7 @@ __all__ = [
     "CreateIndexFix",
     "Drift",
     "DriftKind",
+    "DropColumnDefaultFix",
     "DropConstraintFix",
     "DropIndexFix",
     "DropNotNullFix",
@@ -61,6 +68,7 @@ __all__ = [
     "RebuildIndexFix",
     "RenameConstraintFix",
     "RenameIndexFix",
+    "SetColumnDefaultFix",
     "SetNotNullFix",
     "ValidateConstraintFix",
     "analyze_model",

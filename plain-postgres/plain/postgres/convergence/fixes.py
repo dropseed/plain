@@ -364,6 +364,51 @@ class DropNotNullFix(Fix):
 
 
 @dataclass
+class SetColumnDefaultFix(Fix):
+    """Set (or replace) a column's DEFAULT (catalog-only, instant)."""
+
+    pass_order = 2
+
+    table: str
+    column: str
+    default_sql: str
+
+    def describe(self) -> str:
+        return f"{self.table}: set DEFAULT {self.default_sql} on {self.column}"
+
+    def apply(self) -> str:
+        sql = (
+            f"ALTER TABLE {quote_name(self.table)}"
+            f" ALTER COLUMN {quote_name(self.column)}"
+            f" SET DEFAULT {self.default_sql}"
+        )
+        _execute_and_commit(sql)
+        return sql
+
+
+@dataclass
+class DropColumnDefaultFix(Fix):
+    """Drop a column's DEFAULT (catalog-only, instant)."""
+
+    pass_order = 2
+
+    table: str
+    column: str
+
+    def describe(self) -> str:
+        return f"{self.table}: drop DEFAULT on {self.column}"
+
+    def apply(self) -> str:
+        sql = (
+            f"ALTER TABLE {quote_name(self.table)}"
+            f" ALTER COLUMN {quote_name(self.column)}"
+            f" DROP DEFAULT"
+        )
+        _execute_and_commit(sql)
+        return sql
+
+
+@dataclass
 class RenameConstraintFix(Fix):
     """Rename a constraint (catalog-only, instant).
 

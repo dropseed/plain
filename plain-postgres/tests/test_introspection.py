@@ -8,6 +8,7 @@ from plain.postgres.introspection import (
     IndexState,
     introspect_table,
     normalize_check_definition,
+    normalize_default_sql,
     normalize_expression,
     normalize_index_definition,
 )
@@ -324,3 +325,27 @@ class TestNormalizeIndexDefinition:
         )
         assert "where" in result
         assert "lower(username)" in result
+
+
+class TestNormalizeDefaultSql:
+    """Unit tests for normalize_default_sql — used to compare column DEFAULT
+    expressions between pg_get_expr output and ORM-compiled SQL."""
+
+    def test_lowercases_function_call(self):
+        assert normalize_default_sql("STATEMENT_TIMESTAMP()") == "statement_timestamp()"
+
+    def test_strips_type_cast_on_string_literal(self):
+        assert normalize_default_sql("'pending'::text") == "'pending'"
+
+    def test_strips_type_cast_on_int_literal(self):
+        assert normalize_default_sql("0::integer") == "0"
+
+    def test_function_call_parens_preserved(self):
+        """Balanced-paren stripping must not eat the argless () from a call."""
+        assert normalize_default_sql("gen_random_uuid()") == "gen_random_uuid()"
+
+    def test_matching_defaults(self):
+        """pg_get_expr output and ORM-compiled SQL normalize to the same string."""
+        pg = "statement_timestamp()"
+        orm = "STATEMENT_TIMESTAMP()"
+        assert normalize_default_sql(pg) == normalize_default_sql(orm)

@@ -60,6 +60,19 @@ def compile_expression_sql(model: type[Model], expression_q: Q) -> str:
     return sql % tuple(quote_value(p) for p in params)
 
 
+def compile_database_default_sql(expression: Any) -> str:
+    """Compile a DatabaseDefaultExpression to parameter-free DDL SQL."""
+    compiler = Query(None).get_compiler()
+    conn = get_connection()
+    sql, params = expression.as_sql(compiler, conn)
+    if params:
+        raise ValueError(
+            f"Expression defaults must compile to parameter-free SQL; "
+            f"got params={params!r} for {expression!r}."
+        )
+    return sql
+
+
 def compile_index_expressions_sql(
     model: type[Model], expressions: tuple[Any, ...]
 ) -> str:

@@ -56,6 +56,7 @@ class ColumnState:
 
     type: str
     not_null: bool
+    default_sql: str | None = None
 
 
 @dataclass
@@ -303,6 +304,21 @@ def _split_expression_terms(s: str) -> list[str]:
     return terms
 
 
+def normalize_default_sql(s: str) -> str:
+    """Normalize a column DEFAULT expression for comparison.
+
+    pg_get_expr returns the stored DEFAULT with canonical lowercase function
+    names (e.g. `gen_random_uuid()`, `statement_timestamp()`) and explicit
+    type casts (e.g. `'pending'::text`).  The ORM compiler produces the same
+    function names but without the casts, so we normalize both sides before
+    comparing.
+    """
+    s = _normalize_sql(s)
+    s = _strip_type_casts(s)
+    s = _strip_balanced_parens(s)
+    return s
+
+
 def normalize_index_definition(s: str) -> str:
     """Extract and normalize the expression part of a CREATE INDEX definition.
 
@@ -334,8 +350,13 @@ def _get_columns(cursor: CursorWrapper, table_name: str) -> dict[str, ColumnStat
     """Return {column_name: ColumnState} from the actual DB."""
     cursor.execute(
         """
-        SELECT a.attname, format_type(a.atttypid, a.atttypmod), a.attnotnull
+        SELECT a.attname,
+               format_type(a.atttypid, a.atttypmod),
+               a.attnotnull,
+               pg_get_expr(d.adbin, d.adrelid) AS column_default
         FROM pg_attribute a
+        LEFT JOIN pg_attrdef d
+               ON d.adrelid = a.attrelid AND d.adnum = a.attnum
         JOIN pg_class c ON a.attrelid = c.oid
         WHERE c.relname = %s AND pg_catalog.pg_table_is_visible(c.oid)
           AND a.attnum > 0 AND NOT a.attisdropped
@@ -344,6 +365,6 @@ def _get_columns(cursor: CursorWrapper, table_name: str) -> dict[str, ColumnStat
         [table_name],
     )
     return {
-        name: ColumnState(type=type_str, not_null=is_not_null)
-        for name, type_str, is_not_null in cursor.fetchall()
+        name: ColumnState(type=type_str, not_null=is_not_null, default_sql=default_sql)
+        for name, type_str, is_not_null, default_sql in cursor.fetchall()
     }

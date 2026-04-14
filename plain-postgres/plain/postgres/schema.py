@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 
 from plain.logs import get_framework_logger
+from plain.postgres.ddl import compile_database_default_sql
 from plain.postgres.dialect import quote_name
 from plain.postgres.expressions import DatabaseDefaultExpression
 from plain.postgres.fields import (
@@ -201,21 +202,8 @@ class DatabaseSchemaEditor:
         )
 
     def _compile_expression(self, expression: Any) -> str:
-        """Compile a DatabaseDefaultExpression to a parameter-free SQL fragment
-        suitable for inlining into DDL (e.g. `DEFAULT gen_random_uuid()`).
-
-        Typed as Any because DatabaseDefaultExpression is a marker mixin and
-        `as_sql` comes from the concrete expression class (e.g. Func)."""
-        from plain.postgres.sql.query import Query
-
-        compiler = Query(None).get_compiler()
-        sql, params = expression.as_sql(compiler, self.connection)
-        if params:
-            raise ValueError(
-                f"Expression defaults must compile to parameter-free SQL; "
-                f"got params={params!r} for {expression!r}."
-            )
-        return sql
+        """Compile a DatabaseDefaultExpression for inlining into DDL."""
+        return compile_database_default_sql(expression)
 
     @staticmethod
     def _effective_default(field: Field) -> Any:
@@ -570,38 +558,6 @@ class DatabaseSchemaEditor:
                 "changes": changes_sql,
             }
             self.execute(sql, params)
-        # Reconcile expression defaults (`default=Now()` etc.) — these PERSIST
-        # on the column, so an AlterField that adds, swaps, or removes one
-        # must emit a corresponding SET/DROP DEFAULT. ALTER COLUMN SET/DROP
-        # DEFAULT is catalog-only on Postgres — fast, safe, idempotent — so
-        # we issue it whenever an expression default appears on either side
-        # of the change. (Long-term, this reconciliation belongs in
-        # convergence; until then it lives here so user-authored AlterField
-        # migrations don't silently no-op.)
-        if isinstance(new_field.default, DatabaseDefaultExpression):
-            changes_sql, params = self._alter_column_default_sql(
-                model, old_field, new_field
-            )
-            self.execute(
-                self.sql_alter_column
-                % {
-                    "table": quote_name(model.model_options.db_table),
-                    "changes": changes_sql,
-                },
-                params,
-            )
-        elif isinstance(old_field.default, DatabaseDefaultExpression):
-            changes_sql, params = self._alter_column_default_sql(
-                model, old_field, new_field, drop=True
-            )
-            self.execute(
-                self.sql_alter_column
-                % {
-                    "table": quote_name(model.model_options.db_table),
-                    "changes": changes_sql,
-                },
-                params,
-            )
 
     def _alter_column_null_sql(
         self, model: type[Model], old_field: Field, new_field: Field

@@ -7,19 +7,26 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from ..constraints import CheckConstraint, UniqueConstraint
-from ..ddl import compile_expression_sql, compile_index_expressions_sql
+from ..ddl import (
+    compile_database_default_sql,
+    compile_expression_sql,
+    compile_index_expressions_sql,
+)
 from ..deletion import sql_on_delete
 from ..dialect import quote_name
+from ..expressions import DatabaseDefaultExpression
 from ..fields.related import ForeignKeyField
 from ..indexes import Index
 from ..introspection import (
     MANAGED_CONSTRAINT_TYPES,
     MANAGED_INDEX_ACCESS_METHODS,
+    ColumnState,
     ConstraintState,
     ConType,
     TableState,
     introspect_table,
     normalize_check_definition,
+    normalize_default_sql,
     normalize_expression,
     normalize_index_definition,
     normalize_unique_definition,
@@ -29,6 +36,7 @@ if TYPE_CHECKING:
     from ..base import Model
     from ..connection import DatabaseConnection
     from ..expressions import Expression, ReplaceableExpression
+    from ..fields import Field
     from ..query_utils import Q
     from ..utils import CursorWrapper
 
@@ -150,7 +158,38 @@ class NullabilityDrift:
         return f"{self.table}: column {self.column} is NOT NULL, model allows NULL"
 
 
-type Drift = IndexDrift | ConstraintDrift | ForeignKeyDrift | NullabilityDrift
+@dataclass
+class ColumnDefaultDrift:
+    """Mismatch between the model's declared default and the DB column DEFAULT."""
+
+    kind: DriftKind
+    table: str
+    column: str
+    db_default_sql: str | None
+    model_default_sql: str | None
+
+    def describe(self) -> str:
+        match self.kind:
+            case DriftKind.MISSING:
+                return (
+                    f"{self.table}: column {self.column} missing DEFAULT "
+                    f"(expected {self.model_default_sql})"
+                )
+            case DriftKind.CHANGED:
+                return (
+                    f"{self.table}: column {self.column} DEFAULT mismatch — "
+                    f"db has {self.db_default_sql}, model declares "
+                    f"{self.model_default_sql}"
+                )
+            case _:
+                return (
+                    f"{self.table}: column {self.column} has undeclared DEFAULT "
+                    f"{self.db_default_sql}"
+                )
+
+
+type ColumnDrift = NullabilityDrift | ColumnDefaultDrift
+type Drift = IndexDrift | ConstraintDrift | ForeignKeyDrift | ColumnDrift
 
 
 # Status objects — analysis results with optional drift
@@ -165,7 +204,7 @@ class ColumnStatus:
     primary_key: bool
     pk_suffix: str
     issue: str | None = None
-    drift: NullabilityDrift | None = None
+    drifts: list[ColumnDrift] = field(default_factory=list)
 
 
 @dataclass
@@ -200,8 +239,7 @@ class ModelAnalysis:
         """All detected schema drifts."""
         result: list[Drift] = []
         for col in self.columns:
-            if col.drift:
-                result.append(col.drift)
+            result.extend(col.drifts)
         for idx in self.indexes:
             if idx.drift:
                 result.append(idx.drift)
@@ -234,7 +272,7 @@ class ModelAnalysis:
                     "primary_key": col.primary_key,
                     "pk_suffix": col.pk_suffix,
                     "issue": col.issue,
-                    "drift": col.drift.describe() if col.drift else None,
+                    "drifts": [d.describe() for d in col.drifts],
                 }
                 for col in self.columns
             ],
@@ -314,7 +352,7 @@ def _compare_columns(
 
         expected_col_names.add(f.column)
         issue: str | None = None
-        drift: NullabilityDrift | None = None
+        drifts: list[ColumnDrift] = []
 
         if f.column not in db.columns:
             issue = "missing from database"
@@ -329,19 +367,28 @@ def _compare_columns(
                     issue = "expected NOT NULL, actual NULL (NULL rows exist)"
                 else:
                     issue = "expected NOT NULL, actual NULL"
-                drift = NullabilityDrift(
-                    table=table,
-                    column=f.column,
-                    model_allows_null=False,
-                    has_null_rows=has_nulls,
+                drifts.append(
+                    NullabilityDrift(
+                        table=table,
+                        column=f.column,
+                        model_allows_null=False,
+                        has_null_rows=has_nulls,
+                    )
                 )
             elif f.allow_null and actual.not_null:
                 issue = "expected NULL, actual NOT NULL"
-                drift = NullabilityDrift(
-                    table=table,
-                    column=f.column,
-                    model_allows_null=True,
+                drifts.append(
+                    NullabilityDrift(
+                        table=table,
+                        column=f.column,
+                        model_allows_null=True,
+                    )
                 )
+
+            if default_drift := _compare_column_default(f, actual, table):
+                drifts.append(default_drift)
+                if issue is None:
+                    issue = default_drift.describe()
 
         pk_suffix = ""
         if f.primary_key:
@@ -357,7 +404,7 @@ def _compare_columns(
                 primary_key=f.primary_key,
                 pk_suffix=pk_suffix,
                 issue=issue,
-                drift=drift,
+                drifts=drifts,
             )
         )
 
@@ -376,6 +423,46 @@ def _compare_columns(
         )
 
     return statuses
+
+
+def _compare_column_default(
+    field: Field, actual: ColumnState, table: str
+) -> ColumnDefaultDrift | None:
+    if isinstance(field.default, DatabaseDefaultExpression):
+        expected_sql = compile_database_default_sql(field.default)
+
+        if actual.default_sql is None:
+            return ColumnDefaultDrift(
+                kind=DriftKind.MISSING,
+                table=table,
+                column=field.column,
+                db_default_sql=None,
+                model_default_sql=expected_sql,
+            )
+
+        if normalize_default_sql(actual.default_sql) == normalize_default_sql(
+            expected_sql
+        ):
+            return None
+
+        return ColumnDefaultDrift(
+            kind=DriftKind.CHANGED,
+            table=table,
+            column=field.column,
+            db_default_sql=actual.default_sql,
+            model_default_sql=expected_sql,
+        )
+
+    if actual.default_sql is None:
+        return None
+
+    return ColumnDefaultDrift(
+        kind=DriftKind.UNDECLARED,
+        table=table,
+        column=field.column,
+        db_default_sql=actual.default_sql,
+        model_default_sql=None,
+    )
 
 
 # Index comparison with rename detection

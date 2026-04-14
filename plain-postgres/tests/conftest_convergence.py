@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from plain.postgres import get_connection
+from plain.postgres.introspection import introspect_table
 
 
 def execute(sql: str) -> None:
@@ -134,3 +135,11 @@ def column_is_not_null(table: str, column: str) -> bool:
         )
         row = cursor.fetchone()
         return row[0] if row else False
+
+
+def column_default_sql(table: str, column: str) -> str | None:
+    """Return the rendered DEFAULT clause for a column, or None if none."""
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        state = introspect_table(conn, cursor, table).columns.get(column)
+    return state.default_sql if state else None

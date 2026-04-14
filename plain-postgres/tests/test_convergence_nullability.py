@@ -79,8 +79,10 @@ class TestNotNullDetection:
 
         required_col = [c for c in analysis.columns if c.name == "required_text"]
         assert len(required_col) == 1
-        assert required_col[0].drift is not None
-        assert isinstance(required_col[0].drift, NullabilityDrift)
+        null_drifts = [
+            d for d in required_col[0].drifts if isinstance(d, NullabilityDrift)
+        ]
+        assert len(null_drifts) == 1
         assert required_col[0].issue == "expected NOT NULL, actual NULL"
 
     def test_issue_text_with_null_rows(self, db):

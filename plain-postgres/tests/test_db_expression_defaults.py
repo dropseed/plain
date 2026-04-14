@@ -196,18 +196,16 @@ def test_full_clean_skips_constraints_on_sentinel_fields(db):
     assert isinstance(inst.db_uuid, uuid.UUID)
 
 
-def test_alter_field_adds_expression_default_to_existing_column(db):
-    """AlterField that adds `default=GenRandomUUID()` to an existing column
-    must emit `ALTER COLUMN SET DEFAULT gen_random_uuid()`. Without this,
-    subsequent ORM saves would emit `INSERT (...) VALUES (DEFAULT)` against
-    a column that has no actual DEFAULT — Postgres would reject the row."""
+def test_alter_field_is_no_op_for_default_only_expression_change(db):
+    """AlterField that only changes an expression default must be a no-op in
+    the schema editor — convergence reconciles the column DEFAULT afterward.
+    This keeps the schema editor focused on table/column structure and lets
+    the convergence engine own drift correction for persistent DEFAULTs."""
     from plain.postgres import fields as plain_fields
 
     connection = get_connection()
 
-    # Build an "old" field without an expression default and a "new" field
-    # with one. set_attributes_from_name + contribute_to_class would normally
-    # bind these to a model; for this test we just need a column name.
+    # Adding an expression default: schema editor emits nothing.
     old_field = plain_fields.UUIDField()
     old_field.set_attributes_from_name("token")
     new_field = plain_fields.UUIDField(default=GenRandomUUID())
@@ -223,16 +221,31 @@ def test_alter_field_adds_expression_default_to_existing_column(db):
         )
 
     joined = " ".join(editor.executed_sql).lower()
-    assert "set default gen_random_uuid()" in joined
+    assert "set default" not in joined
+    assert "drop default" not in joined
 
+    # Swapping one expression default for another: same story.
+    old_field = plain_fields.DateTimeField(default=Now())
+    old_field.set_attributes_from_name("touched_at")
+    new_field = plain_fields.DateTimeField(default=GenRandomUUID())
+    new_field.set_attributes_from_name("touched_at")
 
-def test_alter_field_drops_expression_default(db):
-    """Removing an expression default on an existing column should emit
-    `ALTER COLUMN DROP DEFAULT`."""
-    from plain.postgres import fields as plain_fields
+    with connection.schema_editor(atomic=False, collect_sql=True) as editor:
+        editor._alter_field(
+            DBDefaultsExample,
+            old_field,
+            new_field,
+            old_type=_db_type(old_field),
+            new_type=_db_type(new_field),
+        )
 
-    connection = get_connection()
+    joined = " ".join(editor.executed_sql).lower()
+    assert "set default" not in joined
+    assert "drop default" not in joined
 
+    # Removing an expression default: also no-op (user must take a data
+    # migration to DROP DEFAULT; convergence treats unmanaged DB DEFAULTs as
+    # out of scope).
     old_field = plain_fields.UUIDField(default=GenRandomUUID())
     old_field.set_attributes_from_name("token")
     new_field = plain_fields.UUIDField()
@@ -248,36 +261,7 @@ def test_alter_field_drops_expression_default(db):
         )
 
     joined = " ".join(editor.executed_sql).lower()
-    assert "drop default" in joined
-
-
-def test_alter_field_swaps_one_expression_default_for_another(db):
-    """Swapping `default=GenRandomUUID()` for a different expression should
-    emit a SET DEFAULT with the new expression's SQL — not a no-op, and not
-    a DROP."""
-    from plain.postgres import fields as plain_fields
-
-    connection = get_connection()
-
-    # Same field type, different expression default.
-    old_field = plain_fields.DateTimeField(default=Now())
-    old_field.set_attributes_from_name("touched_at")
-    new_field = plain_fields.DateTimeField(
-        default=GenRandomUUID()
-    )  # contrived but valid
-    new_field.set_attributes_from_name("touched_at")
-
-    with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DBDefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
-
-    joined = " ".join(editor.executed_sql).lower()
-    assert "set default gen_random_uuid()" in joined
+    assert "set default" not in joined
     assert "drop default" not in joined
 
 
@@ -423,7 +407,8 @@ def test_alter_field_sets_new_default_before_null_backfill(db):
 def test_alter_field_drops_old_expression_default_before_type_change(db):
     """ALTER COLUMN TYPE with an incompatible expression DEFAULT in place
     will fail — Postgres can't cast e.g. STATEMENT_TIMESTAMP() to uuid.
-    The schema editor must drop the old DEFAULT before the type alter."""
+    The schema editor must drop the old DEFAULT before the type alter.
+    (SET DEFAULT for the NEW expression is reconciled by convergence.)"""
     from plain.postgres import fields as plain_fields
 
     connection = get_connection()
@@ -445,14 +430,9 @@ def test_alter_field_drops_old_expression_default_before_type_change(db):
     statements = [s.lower() for s in editor.executed_sql]
     drop_idx = next((i for i, s in enumerate(statements) if "drop default" in s), -1)
     type_idx = next((i for i, s in enumerate(statements) if "type uuid" in s), -1)
-    set_idx = next(
-        (i for i, s in enumerate(statements) if "set default gen_random_uuid()" in s),
-        -1,
-    )
 
     assert drop_idx >= 0, "expected DROP DEFAULT before type change"
     assert type_idx > drop_idx, "type change must come after DROP DEFAULT"
-    assert set_idx > type_idx, "new SET DEFAULT must come after type change"
 
 
 def test_modelfield_to_formfield_excludes_expression_defaults():

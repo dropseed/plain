@@ -446,6 +446,7 @@ Schema changes fall into three categories, each with a different author and appl
 | Add / drop unique or check constraint | Convergence          | `ADD CONSTRAINT NOT VALID` + `VALIDATE`         |
 | Add / remove NOT NULL                 | Convergence          | `CHECK NOT VALID` + `VALIDATE` + `SET NOT NULL` |
 | Change FK `on_delete` action          | Convergence          | drop + re-add with `NOT VALID` + `VALIDATE`     |
+| Set / change / drop column `DEFAULT`  | Convergence          | catalog-only `ALTER COLUMN SET/DROP DEFAULT`    |
 | Create / drop table                   | Structural migration | framework-generated, you review                 |
 | Add / drop / rename column            | Structural migration | framework-generated, you review                 |
 | Column type change                    | Structural migration | may rewrite the table                           |
