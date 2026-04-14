@@ -7,7 +7,8 @@
 - [Querying](#querying)
 - [Schema management](#schema-management)
     - [Syncing](#syncing)
-    - [Migrations](#migrations)
+    - [Structural migrations](#structural-migrations)
+    - [Data migrations](#data-migrations)
     - [Convergence](#convergence)
 - [Fields](#fields)
 - [Relationships](#relationships)
@@ -433,20 +434,42 @@ Read-only mode must be set outside a transaction — calling it inside `atomic()
 
 ## Schema management
 
-Your database schema is managed by two complementary systems: **migrations** and **convergence**. Migrations handle structural changes — creating tables, adding columns, renaming things. Convergence handles everything declarative — indexes, constraints, foreign keys, and NOT NULL enforcement. You declare these on your models and convergence makes the database match.
+Schema changes fall into three categories, each with a different author and apply model:
 
-```
-Migrations                      Convergence
-(imperative, ordered)           (declarative, idempotent)
-─────────────────────────────   ─────────────────────────────
-Create / drop tables            Indexes
-Add / remove / rename columns   Check constraints
-Change column types             Unique constraints
-Data migrations (RunPython)     Foreign key constraints
-Custom SQL (RunSQL)             NOT NULL enforcement
-```
+- **Convergence** — declarative properties like indexes, constraints, NOT NULL, and FK `on_delete`. Derived from model definitions and applied automatically using online-safe DDL (`CREATE INDEX CONCURRENTLY`, `NOT VALID` + `VALIDATE`, etc.). The framework owns the safe apply pattern.
+- **Structural migrations** — tables, columns, renames, column type changes. Framework-generated from the model diff, but you review them and decide when to deploy (a column type change can rewrite the table; a column drop is destructive).
+- **Data migrations** — backfills, transformations, one-time cleanup. Authored by you via `RunPython` or `RunSQL`. The framework only sequences them.
 
-This split exists because structural changes (adding a column) must happen in a specific order and can't be retried, while declarative objects (indexes, constraints) can be compared against model definitions and fixed automatically — even if a previous attempt failed.
+| Change                                | Category             | Safe apply pattern                              |
+| ------------------------------------- | -------------------- | ----------------------------------------------- |
+| Add / drop index                      | Convergence          | `CREATE INDEX CONCURRENTLY`                     |
+| Add / drop unique or check constraint | Convergence          | `ADD CONSTRAINT NOT VALID` + `VALIDATE`         |
+| Add / remove NOT NULL                 | Convergence          | `CHECK NOT VALID` + `VALIDATE` + `SET NOT NULL` |
+| Change FK `on_delete` action          | Convergence          | drop + re-add with `NOT VALID` + `VALIDATE`     |
+| Create / drop table                   | Structural migration | framework-generated, you review                 |
+| Add / drop / rename column            | Structural migration | framework-generated, you review                 |
+| Column type change                    | Structural migration | may rewrite the table                           |
+| Data backfill or transformation       | Data migration       | you author (`RunPython` / `RunSQL`)             |
+| One-time cleanup, seeding             | Data migration       | you author                                      |
+
+**The principle: who authors the change, and can the framework guarantee safety?** If the framework can derive both the change and a universally-safe apply pattern from model definitions, it belongs to convergence. If the framework can generate the DDL but safety depends on context (table size, deploy timing, destructiveness), it's a structural migration — you review it before deploying. If only you know what to do, it's a data migration.
+
+Many convergence-managed changes produce DB-enforced behavior — cascading deletes (`ON DELETE`), validation (`CHECK`, `NOT NULL`), default generation. Whether a change is "behavioral" doesn't determine the category; whether the framework can guarantee a safe apply does.
+
+| Property         | Convergence                                                     | Migrations                              |
+| ---------------- | --------------------------------------------------------------- | --------------------------------------- |
+| Authored by      | Framework (derived from models)                                 | Framework (structural) or you (data)    |
+| When it runs     | Every `sync`, by diffing models vs database                     | Once, in recorded timestamp order       |
+| Drift correction | Yes — reverts undeclared DB changes on next sync                | No — manual DB changes persist          |
+| Reversible       | Implicit (roll back code, re-sync re-derives)                   | No — forward-only, fix-forward          |
+| Files on disk    | None — derived from models live                                 | `.py` files in `migrations/`            |
+| Safe DDL         | Framework-applied patterns (CONCURRENTLY, NOT VALID + VALIDATE) | Generated DDL; you review before deploy |
+
+**Drift correction is a convergence-only behavior.** Convergence re-runs on every `sync` and compares models against the database. An index created manually outside a model declaration will be dropped on the next run because models are the source of truth. Migrations don't behave this way — once applied, they're recorded and never re-applied.
+
+**Caveats.** The safety promise isn't absolute. Structural migrations aren't lint-checked yet: adding a column with a volatile default (`gen_random_uuid()`, `now()`) on a large table will rewrite it without warning. Review structural migrations before deploying to production.
+
+**Out of scope for convergence.** Triggers, views, stored procedures, and other non-standard DDL stay outside convergence — it won't create them from models, and it won't drop them if they exist. Manage them with `RunSQL` data migrations.
 
 ### Syncing
 
@@ -480,9 +503,9 @@ In development (`DEBUG=True`), sync auto-generates migrations before applying th
 | `plain postgres schema --json` | Machine-readable schema output                                        |
 | `plain postgres converge`      | Run convergence alone (advanced)                                      |
 
-### Migrations
+### Structural migrations
 
-Migrations track structural changes to your models. They are Python files stored in your app's `migrations/` directory.
+Structural migrations are framework-generated from model changes — tables, columns, renames, column type changes. They are Python files stored in your app's `migrations/` directory. You don't author them by hand; you edit models and run `plain migrations create`.
 
 ```bash
 plain migrations create
@@ -492,12 +515,9 @@ Key flags:
 
 - `--dry-run` — Show what migrations would be created (with operations and SQL) without writing files
 - `--check` — Exit non-zero if migrations are needed (for CI)
-- `--empty <package>` — Create an empty migration for custom data migrations
 - `--name <name>` — Set the migration filename
 
-Only write migrations by hand if they are custom data migrations.
-
-Other migration commands:
+Shared commands (apply equally to structural and data migrations):
 
 | Command                                     | Purpose                                              |
 | ------------------------------------------- | ---------------------------------------------------- |
@@ -536,30 +556,6 @@ Use this when migrations have already been committed or deployed to other enviro
 | Migrations are committed but not deployed | Delete-and-recreate (if all developers reset) or squash |
 | Migrations are deployed to production     | Squash or full reset                                    |
 
-#### Data migrations and cascading deletes
-
-`Model.delete()` and `QuerySet.delete()` rely on Postgres `ON DELETE` clauses (`CASCADE`, `SET NULL`, `RESTRICT`) — Plain does not walk relationships in Python.
-
-Foreign key constraints are added by **convergence** (step 3 of `postgres sync`), not by migrations. So during a fresh `migrations apply` (before convergence has run), FK constraints don't exist yet. A `RunPython` migration that calls `.delete()` on a model with cascading children will:
-
-- Delete only the parent row — children become orphans
-- Cause convergence's later `VALIDATE CONSTRAINT` step to fail because of the orphans
-
-This only affects fresh applies. Existing databases keep their FK constraints across syncs, so incremental migrations are unaffected.
-
-**If your data migration needs to delete rows that have cascading children, handle the cascade explicitly:**
-
-```python
-def forwards(models, schema_editor):
-    Parent = models.get_model("myapp", "Parent")
-    Child = models.get_model("myapp", "Child")
-    # Delete children first, then parent — explicit, no constraint reliance
-    Child.query.filter(parent__name="old").delete()
-    Parent.query.filter(name="old").delete()
-```
-
-Or use `RunSQL` with explicit cascade if the relationship is large.
-
 #### Resetting migrations
 
 Over time a package can accumulate dozens of migrations. Once **every environment** (dev, staging, production) has applied all of them, you can replace the entire history with a single fresh `0001_initial`.
@@ -583,6 +579,53 @@ Over time a package can accumulate dozens of migrations. Once **every environmen
 - If resetting multiple packages, process depended-on packages first — the new `0001_initial` may have cross-package FK dependencies.
 - Data migrations (`RunPython`) in the deleted history are gone, which is fine since they've already run everywhere.
 - If CI runs `migrations create --check` or `migrations apply --check`, the reset PR must be merged and deployed before those checks pass in other branches.
+
+### Data migrations
+
+Data migrations are user-authored operations — backfills, transformations, seeding, cleanup. The framework has no way to derive these from models; you write the logic and it gets sequenced in timestamp order alongside structural migrations.
+
+Create an empty migration to author one:
+
+```bash
+plain migrations create --empty <package>
+```
+
+Add a `RunPython` or `RunSQL` operation inside:
+
+```python
+def forwards(models, schema_editor):
+    User = models.get_model("users", "User")
+    # Use .update() for batch SQL — a row-by-row save loop can lock a large table.
+    User.query.filter(full_name="").update(full_name="pending")
+```
+
+For large tables, chunk the work (e.g. by ID range) and commit between batches so no single transaction holds locks for too long.
+
+See [Structural migrations](#structural-migrations) for shared commands (`apply`, `list`, `squash`, `prune`).
+
+#### Cascading deletes inside data migrations
+
+`Model.delete()` and `QuerySet.delete()` rely on Postgres `ON DELETE` clauses (`CASCADE`, `SET NULL`, `RESTRICT`) — Plain does not walk relationships in Python.
+
+Foreign key constraints are added by **convergence** (step 3 of `postgres sync`), not by migrations. During a fresh `migrations apply` (before convergence has run), FK constraints don't exist yet. A `RunPython` data migration that calls `.delete()` on a model with cascading children will:
+
+- Delete only the parent row — children become orphans
+- Cause convergence's later `VALIDATE CONSTRAINT` step to fail because of the orphans
+
+This only affects fresh applies. Existing databases keep their FK constraints across syncs, so incremental data migrations are unaffected.
+
+**If your data migration needs to delete rows that have cascading children, handle the cascade explicitly:**
+
+```python
+def forwards(models, schema_editor):
+    Parent = models.get_model("myapp", "Parent")
+    Child = models.get_model("myapp", "Child")
+    # Delete children first, then parent — explicit, no constraint reliance
+    Child.query.filter(parent__name="old").delete()
+    Parent.query.filter(name="old").delete()
+```
+
+Or use `RunSQL` with explicit cascade if the relationship is large.
 
 ### Convergence
 
