@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.47.4](https://github.com/dropseed/plain/releases/plain-jobs@0.47.4) (2026-04-14)
+
+### What's changed
+
+- Updated `jobs clear` and `jobs purge` CLI commands and the `ClearCompleted` chore to use the new `QuerySet.delete()` return type (an `int` directly instead of a `(count, by_label)` tuple) from plain-postgres 0.95.0. ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- Raised `plain.postgres` floor to `>=0.95.0`.
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.95.0`.
+
 ## [0.47.3](https://github.com/dropseed/plain/releases/plain-jobs@0.47.3) (2026-04-13)
 
 ### What's changed
