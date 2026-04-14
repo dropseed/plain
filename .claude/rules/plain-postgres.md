@@ -65,7 +65,7 @@ Run `uv run plain docs postgres --section querying` for full patterns with code 
 - Index fields used in `.filter()` and `.order_by()`
 - Indexes: `{table}_{column(s)}_idx`
 - Constraints: `{table}_{column(s)}_{type}` (e.g., `_unique`, `_check`)
-- Choose `on_delete` deliberately: CASCADE for children, PROTECT for referenced data
+- Choose `on_delete` deliberately: CASCADE for owned children, RESTRICT for referenced data, SET_NULL for optional references
 - No `allow_null` on string fields — use `default=""`
 
 Run `uv run plain docs postgres --section constraints` for full patterns with code examples.

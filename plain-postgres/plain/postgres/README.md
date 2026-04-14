@@ -951,14 +951,14 @@ model_options = postgres.Options(
 
 #### Choose `on_delete` deliberately
 
-CASCADE for owned children, PROTECT for referenced data, SET_NULL for optional references.
+CASCADE for owned children, RESTRICT for referenced data, SET_NULL for optional references.
 
 ```python
 # Bad — blindly using CASCADE everywhere
 company: Company = types.ForeignKeyField("Company", on_delete=postgres.CASCADE)  # deleting company deletes invoices!
 
-# Good — protect referenced data
-company: Company = types.ForeignKeyField("Company", on_delete=postgres.PROTECT)
+# Good — block the delete while invoices reference the company
+company: Company = types.ForeignKeyField("Company", on_delete=postgres.RESTRICT)
 ```
 
 #### No `allow_null` on string fields

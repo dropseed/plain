@@ -594,9 +594,8 @@ class Model(metaclass=ModelBase):
     def delete(self) -> int:
         """Delete this row. Returns the number of rows deleted (1 or 0).
 
-        Cascades are handled entirely by Postgres via the declared
-        `on_delete` clauses on related FKs — see
-        `uv run plain docs postgres --section deletion`.
+        Cascades are handled entirely by Postgres via the `on_delete`
+        clauses declared on related foreign keys.
         """
         if self.id is None:
             raise ValueError(

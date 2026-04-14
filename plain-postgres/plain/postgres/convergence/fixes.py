@@ -222,11 +222,23 @@ class AddForeignKeyFix(Fix):
 
 @dataclass
 class ReplaceForeignKeyFix(Fix):
-    """Drop + re-add a FK in one ALTER TABLE to update ON DELETE action.
+    """Swap a FK's ON DELETE action, then validate.
 
-    Transactional, so no window without the constraint. Uses NOT VALID +
-    VALIDATE to minimize lock time — existing data is already valid for
-    the old FK, so validation is a fast catalog-only step.
+    Step 1: ALTER TABLE DROP CONSTRAINT + ADD CONSTRAINT ... NOT VALID
+            (ACCESS EXCLUSIVE on the referenced table's DROP, but the
+            statement is catalog-only — no table scan)
+    Step 2: VALIDATE CONSTRAINT (SHARE UPDATE EXCLUSIVE, scans data)
+
+    Between steps the constraint exists as NOT VALID, which still enforces
+    on new inserts/updates — so there is no window of unsafe writes. The
+    DROP and ADD share a single ALTER TABLE statement so the old
+    constraint is never absent in the catalog.
+
+    VALIDATE still scans the table, but under a weaker lock than a naive
+    DROP + ADD would take for the validation scan. Existing rows were
+    already valid under the previous constraint (on_delete action doesn't
+    affect what is validated — only what happens at delete time), so
+    the scan will pass unless the data was corrupted out-of-band.
     """
 
     pass_order = 2
