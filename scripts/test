@@ -4,6 +4,11 @@
 #
 #  • Installs psycopg database driver wheel on-demand.
 
+# Disable cloud OTLP export during tests. plain-dev's `plain.setup` entrypoint
+# loads .env on every `plain` command, which pulls example/.env's real
+# CLOUD_EXPORT_TOKEN into the test process and produces noisy retry output.
+export PLAIN_CLOUD_EXPORT_ENABLED=false
+
 # ---------------------------------------------------------------------------
 # CLI option parsing
 # ---------------------------------------------------------------------------
