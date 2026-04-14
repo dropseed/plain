@@ -1,12 +1,12 @@
 [project]
 name = "plain.sessions"
-version = "0.45.2"
+version = "0.45.3"
 description = "Database-backed sessions for managing user state across requests."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
-dependencies = ["plain>=0.116.0,<1.0.0"]
+dependencies = ["plain>=0.116.0,<1.0.0", "plain.postgres>=0.95.0,<1.0.0"]
 
 [dependency-groups]
 dev = ["plain.postgres<1.0.0", "plain.pytest<1.0.0"]

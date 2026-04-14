@@ -1,5 +1,16 @@
 # plain-sessions changelog
 
+## [0.45.3](https://github.com/dropseed/plain/releases/plain-sessions@0.45.3) (2026-04-14)
+
+### What's changed
+
+- Updated the `ClearExpired` chore to the new `QuerySet.delete()` return type (an `int` directly instead of a `(count, by_label)` tuple) from plain-postgres 0.95.0. ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- Added explicit `plain.postgres>=0.95.0` dependency — the package has always imported `plain.postgres` APIs but previously relied on it being present transitively.
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.95.0`.
+
 ## [0.45.2](https://github.com/dropseed/plain/releases/plain-sessions@0.45.2) (2026-04-13)
 
 ### What's changed
