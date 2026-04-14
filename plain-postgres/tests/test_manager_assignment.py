@@ -1,4 +1,4 @@
-from app.examples.models import (
+from app.examples.models.querysets import (
     CustomQuerySet,
     CustomQuerySetModel,
     CustomSpecialQuerySetModel,

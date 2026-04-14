@@ -22,24 +22,24 @@ class TestIntrospectTable:
     """Boundary tests: introspect_table() against a real Postgres database."""
 
     def test_existing_table(self, db):
-        """Car table returns a populated TableState with columns and constraints."""
+        """Widget table returns a populated TableState with columns and constraints."""
         conn = get_connection()
         with conn.cursor() as cursor:
-            state = introspect_table(conn, cursor, "examples_car")
+            state = introspect_table(conn, cursor, "examples_widget")
 
         assert state.exists
 
-        # Columns include id, make, model
+        # Columns include id, name, size
         assert "id" in state.columns
-        assert "make" in state.columns
-        assert "model" in state.columns
+        assert "name" in state.columns
+        assert "size" in state.columns
         assert isinstance(state.columns["id"], ColumnState)
         assert state.columns["id"].not_null is True
-        assert state.columns["make"].not_null is True
+        assert state.columns["name"].not_null is True
 
         # Has the unique constraint from the model
-        assert "unique_make_model" in state.constraints
-        uc = state.constraints["unique_make_model"]
+        assert "unique_widget_name_size" in state.constraints
+        uc = state.constraints["unique_widget_name_size"]
         assert isinstance(uc, ConstraintState)
         assert uc.constraint_type == ConType.UNIQUE
         assert uc.validated is True
@@ -56,50 +56,52 @@ class TestIntrospectTable:
 
     def test_indexes_separated_from_constraints(self, db):
         """Indexes go to state.indexes, constraints go to state.constraints."""
-        _execute('CREATE INDEX "examples_car_make_idx" ON "examples_car" ("make")')
+        _execute(
+            'CREATE INDEX "examples_widget_name_idx" ON "examples_widget" ("name")'
+        )
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            state = introspect_table(conn, cursor, "examples_car")
+            state = introspect_table(conn, cursor, "examples_widget")
 
-        assert "examples_car_make_idx" in state.indexes
-        idx = state.indexes["examples_car_make_idx"]
+        assert "examples_widget_name_idx" in state.indexes
+        idx = state.indexes["examples_widget_name_idx"]
         assert isinstance(idx, IndexState)
-        assert idx.columns == ["make"]
+        assert idx.columns == ["name"]
         assert idx.is_valid is True
 
         # The unique constraint should be in constraints, not indexes
-        assert "unique_make_model" not in state.indexes
-        assert "unique_make_model" in state.constraints
+        assert "unique_widget_name_size" not in state.indexes
+        assert "unique_widget_name_size" in state.constraints
 
     def test_invalid_index(self, db):
         """An index marked INVALID in pg_catalog is reported as is_valid=False."""
-        _execute('CREATE INDEX "examples_car_bad_idx" ON "examples_car" ("make")')
+        _execute('CREATE INDEX "examples_widget_bad_idx" ON "examples_widget" ("name")')
         _execute(
             """
             UPDATE pg_index SET indisvalid = false
-            WHERE indexrelid = (SELECT oid FROM pg_class WHERE relname = 'examples_car_bad_idx')
+            WHERE indexrelid = (SELECT oid FROM pg_class WHERE relname = 'examples_widget_bad_idx')
             """
         )
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            state = introspect_table(conn, cursor, "examples_car")
+            state = introspect_table(conn, cursor, "examples_widget")
 
-        assert state.indexes["examples_car_bad_idx"].is_valid is False
+        assert state.indexes["examples_widget_bad_idx"].is_valid is False
 
     def test_check_constraint(self, db):
         """Check constraints land in state.constraints with contype 'c'."""
         _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "car_id_positive" CHECK ("id" > 0)'
+            'ALTER TABLE "examples_widget" ADD CONSTRAINT "widget_id_positive" CHECK ("id" > 0)'
         )
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            state = introspect_table(conn, cursor, "examples_car")
+            state = introspect_table(conn, cursor, "examples_widget")
 
-        assert "car_id_positive" in state.constraints
-        cc = state.constraints["car_id_positive"]
+        assert "widget_id_positive" in state.constraints
+        cc = state.constraints["widget_id_positive"]
         assert isinstance(cc, ConstraintState)
         assert cc.constraint_type == ConType.CHECK
         assert cc.validated is True
@@ -109,23 +111,23 @@ class TestIntrospectTable:
     def test_not_valid_constraint(self, db):
         """A NOT VALID constraint is reported as validated=False."""
         _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "car_id_positive"'
+            'ALTER TABLE "examples_widget" ADD CONSTRAINT "widget_id_positive"'
             ' CHECK ("id" > 0) NOT VALID'
         )
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            state = introspect_table(conn, cursor, "examples_car")
+            state = introspect_table(conn, cursor, "examples_widget")
 
-        assert state.constraints["car_id_positive"].validated is False
+        assert state.constraints["widget_id_positive"].validated is False
 
     def test_foreign_keys(self, db):
         """Foreign keys are in state.constraints with contype 'f' and target info."""
         conn = get_connection()
         with conn.cursor() as cursor:
-            state = introspect_table(conn, cursor, "examples_carfeature")
+            state = introspect_table(conn, cursor, "examples_widgettag")
 
-        # CarFeature has FKs to Car and Feature
+        # WidgetTag has FKs to Widget and Tag
         fk_constraints = {
             k: v
             for k, v in state.constraints.items()
@@ -134,8 +136,8 @@ class TestIntrospectTable:
         fk_targets = {
             (v.target_table, v.target_column) for v in fk_constraints.values()
         }
-        assert ("examples_car", "id") in fk_targets
-        assert ("examples_feature", "id") in fk_targets
+        assert ("examples_widget", "id") in fk_targets
+        assert ("examples_tag", "id") in fk_targets
 
         # Verify FK structure
         for cs in fk_constraints.values():
@@ -148,7 +150,7 @@ class TestIntrospectTable:
         """Primary key appears in constraints with contype 'p'."""
         conn = get_connection()
         with conn.cursor() as cursor:
-            state = introspect_table(conn, cursor, "examples_car")
+            state = introspect_table(conn, cursor, "examples_widget")
 
         pk_constraints = {
             k: v
@@ -163,16 +165,16 @@ class TestIntrospectTable:
         """Exclusion constraints land in constraints with contype 'x'."""
         _execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
         _execute(
-            'ALTER TABLE "examples_car" ADD CONSTRAINT "car_make_excl"'
-            ' EXCLUDE USING gist ("make" WITH =)'
+            'ALTER TABLE "examples_widget" ADD CONSTRAINT "widget_name_excl"'
+            ' EXCLUDE USING gist ("name" WITH =)'
         )
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            state = introspect_table(conn, cursor, "examples_car")
+            state = introspect_table(conn, cursor, "examples_widget")
 
-        assert "car_make_excl" in state.constraints
-        xc = state.constraints["car_make_excl"]
+        assert "widget_name_excl" in state.constraints
+        xc = state.constraints["widget_name_excl"]
         assert xc.constraint_type == ConType.EXCLUSION
         assert xc.validated is True
         assert xc.definition is not None
@@ -180,15 +182,15 @@ class TestIntrospectTable:
     def test_hash_index(self, db):
         """Non-btree indexes are stored with their access method."""
         _execute(
-            'CREATE INDEX "examples_car_make_hash" ON "examples_car" USING hash ("make")'
+            'CREATE INDEX "examples_widget_name_hash" ON "examples_widget" USING hash ("name")'
         )
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            state = introspect_table(conn, cursor, "examples_car")
+            state = introspect_table(conn, cursor, "examples_widget")
 
-        assert "examples_car_make_hash" in state.indexes
-        idx = state.indexes["examples_car_make_hash"]
+        assert "examples_widget_name_hash" in state.indexes
+        idx = state.indexes["examples_widget_name_hash"]
         assert idx.access_method == "hash"
         assert idx.is_unique is False
         assert idx.is_valid is True
@@ -196,16 +198,16 @@ class TestIntrospectTable:
     def test_unique_index_without_constraint(self, db):
         """A CREATE UNIQUE INDEX (no backing constraint) has is_unique=True."""
         _execute(
-            'CREATE UNIQUE INDEX "examples_car_make_uniq_idx"'
-            ' ON "examples_car" ("make")'
+            'CREATE UNIQUE INDEX "examples_widget_name_uniq_idx"'
+            ' ON "examples_widget" ("name")'
         )
 
         conn = get_connection()
         with conn.cursor() as cursor:
-            state = introspect_table(conn, cursor, "examples_car")
+            state = introspect_table(conn, cursor, "examples_widget")
 
-        assert "examples_car_make_uniq_idx" in state.indexes
-        idx = state.indexes["examples_car_make_uniq_idx"]
+        assert "examples_widget_name_uniq_idx" in state.indexes
+        idx = state.indexes["examples_widget_name_uniq_idx"]
         assert idx.is_unique is True
 
 

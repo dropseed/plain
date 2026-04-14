@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import psycopg.errors
 import pytest
-from app.examples.models import Car
+from app.examples.models.iteration import IterationExample
 
 from plain.postgres import transaction
 from plain.postgres.connections import read_only
@@ -25,32 +25,32 @@ class TestReadOnlyContextManager:
     def test_blocks_writes(self, isolated_db):
         with read_only():
             with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
-                Car.query.create(make="Toyota", model="Tundra")
+                IterationExample.query.create(name="Toyota", tag="Tundra")
 
     def test_allows_reads(self, isolated_db):
-        Car.query.create(make="Toyota", model="Tundra")
+        IterationExample.query.create(name="Toyota", tag="Tundra")
         with read_only():
-            assert Car.query.count() == 1
-            assert Car.query.filter(make="Toyota").exists()
+            assert IterationExample.query.count() == 1
+            assert IterationExample.query.filter(name="Toyota").exists()
 
     def test_writable_after_exit(self, isolated_db):
         with read_only():
-            assert Car.query.count() == 0
+            assert IterationExample.query.count() == 0
 
-        Car.query.create(make="Toyota", model="Tundra")
-        assert Car.query.count() == 1
+        IterationExample.query.create(name="Toyota", tag="Tundra")
+        assert IterationExample.query.count() == 1
 
     def test_with_atomic(self, isolated_db):
-        Car.query.create(make="Toyota", model="Tundra")
+        IterationExample.query.create(name="Toyota", tag="Tundra")
         with read_only():
             with transaction.atomic():
-                assert Car.query.count() == 1
+                assert IterationExample.query.count() == 1
 
     def test_blocks_in_atomic(self, isolated_db):
         with read_only():
             with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
                 with transaction.atomic():
-                    Car.query.create(make="Toyota", model="Tundra")
+                    IterationExample.query.create(name="Toyota", tag="Tundra")
 
     def test_inside_atomic_raises(self, isolated_db):
         with transaction.atomic():
@@ -86,16 +86,16 @@ class TestSetReadOnly:
         conn.set_read_only(True)
         try:
             with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
-                Car.query.create(make="Toyota", model="Tundra")
+                IterationExample.query.create(name="Toyota", tag="Tundra")
         finally:
             conn.set_read_only(False)
 
     def test_allows_reads(self, isolated_db):
-        Car.query.create(make="Toyota", model="Tundra")
+        IterationExample.query.create(name="Toyota", tag="Tundra")
         conn = get_connection()
         conn.set_read_only(True)
         try:
-            assert Car.query.count() == 1
+            assert IterationExample.query.count() == 1
         finally:
             conn.set_read_only(False)
 
@@ -103,8 +103,8 @@ class TestSetReadOnly:
         conn = get_connection()
         conn.set_read_only(True)
         conn.set_read_only(False)
-        Car.query.create(make="Toyota", model="Tundra")
-        assert Car.query.count() == 1
+        IterationExample.query.create(name="Toyota", tag="Tundra")
+        assert IterationExample.query.count() == 1
 
     def test_inside_atomic_raises(self, isolated_db):
         conn = get_connection()

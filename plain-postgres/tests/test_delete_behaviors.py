@@ -20,9 +20,7 @@ from __future__ import annotations
 
 import psycopg
 import pytest
-from app.examples.models import (
-    Car,
-    CarFeature,
+from app.examples.models.delete import (
     ChildCascade,
     ChildNoAction,
     ChildRestrict,
@@ -33,14 +31,14 @@ from app.examples.models import (
     DiamondChild,
     DiamondParentA,
     DiamondParentB,
-    Feature,
     Grandchild,
     Grandparent,
     HideableItem,
     MidParent,
-    TreeNode,
     UnconstrainedChild,
 )
+from app.examples.models.relationships import Tag, Widget, WidgetTag
+from app.examples.models.trees import TreeNode
 
 from plain.postgres import transaction
 
@@ -210,24 +208,24 @@ def test_self_referential_tree_cascade(db):
 
 def test_m2m_through_cascades_from_either_side(db):
     """
-    `car.delete()` or `feat.delete()` both cascade the through-row, leaving
+    `widget.delete()` or `tag.delete()` both cascade the through-row, leaving
     the other side intact.
     """
-    car = Car.query.create(make="Ford", model="F150")
-    feat = Feature.query.create(name="4wd")
-    CarFeature.query.create(car=car, feature=feat)
+    widget = Widget.query.create(name="Ford", size="F150")
+    tag = Tag.query.create(name="4wd")
+    WidgetTag.query.create(widget=widget, tag=tag)
 
-    car.delete()
-    assert CarFeature.query.count() == 0
-    assert Feature.query.filter(id=feat.id).exists()
+    widget.delete()
+    assert WidgetTag.query.count() == 0
+    assert Tag.query.filter(id=tag.id).exists()
 
     # Symmetric: delete from the other side
-    car2 = Car.query.create(make="Ford", model="F250")
-    CarFeature.query.create(car=car2, feature=feat)
+    widget2 = Widget.query.create(name="Ford", size="F250")
+    WidgetTag.query.create(widget=widget2, tag=tag)
 
-    feat.delete()
-    assert CarFeature.query.count() == 0
-    assert Car.query.filter(id=car2.id).exists()
+    tag.delete()
+    assert WidgetTag.query.count() == 0
+    assert Widget.query.filter(id=widget2.id).exists()
 
 
 def test_mixed_on_delete_restrict_blocks_cascade(db):
@@ -424,43 +422,43 @@ def test_related_manager_delete(db):
 
 
 def test_m2m_remove_deletes_through_row(db):
-    car = Car.query.create(make="Ford", model="F150")
-    feat_a = Feature.query.create(name="4wd")
-    feat_b = Feature.query.create(name="towing")
-    car.features.add(feat_a, feat_b)
+    widget = Widget.query.create(name="Ford", size="F150")
+    tag_a = Tag.query.create(name="4wd")
+    tag_b = Tag.query.create(name="towing")
+    widget.tags.add(tag_a, tag_b)
 
-    car.features.remove(feat_a)
+    widget.tags.remove(tag_a)
 
-    assert CarFeature.query.filter(car=car).count() == 1
-    assert CarFeature.query.filter(car=car, feature=feat_b).exists()
-    assert Feature.query.filter(id=feat_a.id).exists()
+    assert WidgetTag.query.filter(widget=widget).count() == 1
+    assert WidgetTag.query.filter(widget=widget, tag=tag_b).exists()
+    assert Tag.query.filter(id=tag_a.id).exists()
 
 
 def test_m2m_clear_deletes_all_through_rows(db):
-    car = Car.query.create(make="Ford", model="F150")
-    feat_a = Feature.query.create(name="4wd")
-    feat_b = Feature.query.create(name="towing")
-    car.features.add(feat_a, feat_b)
+    widget = Widget.query.create(name="Ford", size="F150")
+    tag_a = Tag.query.create(name="4wd")
+    tag_b = Tag.query.create(name="towing")
+    widget.tags.add(tag_a, tag_b)
 
-    car.features.clear()
+    widget.tags.clear()
 
-    assert CarFeature.query.filter(car=car).count() == 0
-    assert Feature.query.count() == 2
+    assert WidgetTag.query.filter(widget=widget).count() == 0
+    assert Tag.query.count() == 2
 
 
 def test_m2m_set_reconciles_through_rows(db):
-    car = Car.query.create(make="Ford", model="F150")
-    a = Feature.query.create(name="a")
-    b = Feature.query.create(name="b")
-    c = Feature.query.create(name="c")
-    car.features.add(a, b)
+    widget = Widget.query.create(name="Ford", size="F150")
+    a = Tag.query.create(name="a")
+    b = Tag.query.create(name="b")
+    c = Tag.query.create(name="c")
+    widget.tags.add(a, b)
 
-    car.features.set([b, c])
+    widget.tags.set([b, c])
 
-    feat_ids = set(
-        CarFeature.query.filter(car=car).values_list("feature_id", flat=True)
+    tag_ids = set(
+        WidgetTag.query.filter(widget=widget).values_list("tag_id", flat=True)
     )
-    assert feat_ids == {b.id, c.id}
+    assert tag_ids == {b.id, c.id}
 
 
 # ===========================================================================

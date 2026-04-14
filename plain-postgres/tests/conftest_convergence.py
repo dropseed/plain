@@ -51,9 +51,13 @@ def constraint_is_deferrable(table: str, name: str) -> bool:
         return row[0] if row else False
 
 
-def create_invalid_index(name: str) -> None:
+def create_invalid_index(
+    name: str,
+    table: str = "examples_widget",
+    column: str = "name",
+) -> None:
     """Create a normal index then mark it INVALID via pg_catalog."""
-    execute(f'CREATE INDEX "{name}" ON "examples_car" ("make")')
+    execute(f'CREATE INDEX "{name}" ON "{table}" ("{column}")')
     execute(
         f"""
         UPDATE pg_index SET indisvalid = false

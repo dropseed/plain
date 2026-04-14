@@ -1,10 +1,4 @@
-"""
-Test fixtures for delete / on_delete behavior.
-
-Kept in one place so the main models module isn't cluttered with a dozen
-parent/child variants. Imported with `from .delete import *` in the package
-__init__ so `@postgres.register_model` fires at import time.
-"""
+"""Test fixtures for delete / on_delete behavior."""
 
 from __future__ import annotations
 

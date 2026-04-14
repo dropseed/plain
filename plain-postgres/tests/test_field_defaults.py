@@ -13,7 +13,7 @@ import uuid
 
 import psycopg
 import pytest
-from app.examples.models import DefaultsExample
+from app.examples.models.defaults import DefaultsExample
 
 from plain.postgres import get_connection
 
