@@ -1,5 +1,16 @@
 # plain-pageviews changelog
 
+## [0.35.3](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.3) (2026-04-14)
+
+### What's changed
+
+- Updated the `ClearOldPageviews` chore to the new `QuerySet.delete()` return type (an `int` directly instead of a `(count, by_label)` tuple) from plain-postgres 0.95.0. ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- Raised `plain.postgres` floor to `>=0.95.0`.
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.95.0`.
+
 ## [0.35.2](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.2) (2026-04-13)
 
 ### What's changed
