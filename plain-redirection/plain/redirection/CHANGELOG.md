@@ -1,5 +1,16 @@
 # plain-redirection changelog
 
+## [0.35.2](https://github.com/dropseed/plain/releases/plain-redirection@0.35.2) (2026-04-14)
+
+### What's changed
+
+- Updated the `DeleteLogs` chore to the new `QuerySet.delete()` return type (an `int` directly instead of a `(count, by_label)` tuple) from plain-postgres 0.95.0. ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- Raised `plain.postgres` floor to `>=0.95.0`.
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.95.0`.
+
 ## [0.35.1](https://github.com/dropseed/plain/releases/plain-redirection@0.35.1) (2026-03-29)
 
 ### What's changed
