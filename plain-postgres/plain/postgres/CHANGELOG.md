@@ -1,5 +1,33 @@
 # plain-postgres changelog
 
+## [0.95.0](https://github.com/dropseed/plain/releases/plain-postgres@0.95.0) (2026-04-14)
+
+### What's changed
+
+- **Deletes now run as a single DELETE statement and cascade through Postgres `ON DELETE` clauses.** The Python `Collector` (which walked relationships in Python to fire per-table DELETEs) has been removed. `Model.delete()` and `QuerySet.delete()` issue one statement and let Postgres do the cascading via the FK actions installed by convergence. The old Collector path required N queries per cascade; the new path requires exactly one. ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- **`Model.delete()` and `QuerySet.delete()` now return `int`** (the directly-deleted row count). They previously returned a `(count, {label: count})` tuple — Postgres does not report cascaded counts, and the per-label dict was Collector-only bookkeeping. ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- **`on_delete` constants are now `OnDelete` instances, not bare functions.** `ForeignKeyField` rejects any non-`OnDelete` value at construction, and the declared action is emitted as the FK's Postgres `ON DELETE` clause. ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- **Removed `PROTECT`, `SET()`, `SET_DEFAULT`, `ProtectedError`, and `RestrictedError`.** `PROTECT` and `SET(callable)` had no Postgres equivalent (prefer `RESTRICT`). `SET_DEFAULT` was removed because Plain does not currently persist Python model defaults as DB-level column defaults — emitting `ON DELETE SET DEFAULT` would set children to `NULL` on bypass-the-ORM deletes, contradicting the model's intent. `SET_DEFAULT` will return once DB-level defaults are supported. `RESTRICT` now surfaces as `psycopg.errors.IntegrityError` directly. ([670dab428ad2](https://github.com/dropseed/plain/commit/670dab428ad2), [29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- **Renamed `DO_NOTHING` to `NO_ACTION`** to match Postgres's SQL term. No behavior change. ([5fcf8aa9ced3](https://github.com/dropseed/plain/commit/5fcf8aa9ced3))
+- **Convergence now owns FK `on_delete` drift.** `plain postgres sync` introspects `pg_constraint.confdeltype`, compares it to the declared `on_delete`, and replaces the constraint when they drift. Replacement uses `ADD CONSTRAINT … NOT VALID` + `VALIDATE` to minimize lock time. Existing databases auto-upgrade on their next sync. ([211840197e1e](https://github.com/dropseed/plain/commit/211840197e1e))
+- **Preflight rejects `db_constraint=False` with a non-`NO_ACTION` `on_delete`.** Without a constraint there is no place to attach a deletion action. ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- **Tightened types.** `on_delete` is now typed as `OnDelete` everywhere (was `Any`). `ForeignKeyField.remote_field` narrows to `ForeignKeyRel` so `remote_field.on_delete` is non-optional. `ForeignObjectRel`, `ForeignKeyRel`, and `ManyToManyRel` `__init__` are kwarg-only. ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- **Known limitation: data migrations + cascading deletes.** On a fresh `migrations apply`, FK constraints don't exist yet (they're added by convergence in step 3 of `postgres sync`). A `RunPython` data migration that calls `.delete()` on a parent with cascading children will orphan the children, and the subsequent convergence `VALIDATE` will fail. Existing databases are unaffected. Documented with a workaround in the Postgres README (delete children explicitly first, or use `RunSQL`). ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+- **Rewrote the Schema management docs** to distinguish convergence, structural migrations, and data migrations by who authors the change and whether the framework can guarantee a safe apply. Added a per-change-type table covering safe apply patterns (`CREATE INDEX CONCURRENTLY`, `NOT VALID` + `VALIDATE`, etc.) and split the Migrations section into “Structural migrations” and “Data migrations.” ([8ae39e2cef78](https://github.com/dropseed/plain/commit/8ae39e2cef78), [49d2b2452dea](https://github.com/dropseed/plain/commit/49d2b2452dea))
+
+### Upgrade instructions
+
+- **Adapt callers of `.delete()`.** `.delete()` now returns an `int`, not a `(count, by_label)` tuple.
+    - Before: `count, _ = qs.delete()` or `count = qs.delete()[0]`
+    - After: `count = qs.delete()`
+- **Rename `DO_NOTHING` to `NO_ACTION`** at all import and usage sites. Regenerate or hand-edit migration files that reference `DO_NOTHING`.
+- **Replace `PROTECT` with `RESTRICT`.** Catch `psycopg.errors.IntegrityError` instead of `ProtectedError` / `RestrictedError`.
+- **Replace `SET(callable)` usages.** There is no one-line equivalent — the Python-callable path doesn't exist in Postgres. Either switch to a supported action (`SET_NULL`, `RESTRICT`, `CASCADE`, `NO_ACTION`) or handle the affected rows explicitly before deletion.
+- **Replace `SET_DEFAULT` usages.** Pick a different `on_delete`, or set the default explicitly in application code before deletion. `SET_DEFAULT` will return once Plain persists column defaults.
+- **Run `plain postgres sync`** after upgrading. Convergence will install the correct `ON DELETE` clauses on existing FKs — no migration file, no manual step.
+- **If you set `db_constraint=False` on a FK with a non-`NO_ACTION` `on_delete`**, change the action to `NO_ACTION` — preflight will now fail otherwise.
+- **Review `RunPython` migrations that call `.delete()` on parents with cascading children.** On a fresh `migrations apply` before convergence runs, children become orphans and break the subsequent `VALIDATE`. Delete children explicitly first, or use `RunSQL`.
+
 ## [0.94.2](https://github.com/dropseed/plain/releases/plain-postgres@0.94.2) (2026-04-13)
 
 ### What's changed

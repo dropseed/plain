@@ -915,6 +915,7 @@ requires-dist = [
     { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
+    { name = "plain-postgres", editable = "plain-postgres" },
 ]
 
 [package.metadata.requires-dev]
@@ -994,7 +995,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-postgres"
-version = "0.94.2"
+version = "0.95.0"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },
@@ -1074,10 +1075,11 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-sessions"
-version = "0.45.2"
+version = "0.45.3"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-postgres" },
 ]
 
 [package.dev-dependencies]
@@ -1087,7 +1089,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-postgres", editable = "plain-postgres" },
+]
 
 [package.metadata.requires-dev]
 dev = [
