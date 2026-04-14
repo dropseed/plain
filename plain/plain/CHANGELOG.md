@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.132.1](https://github.com/dropseed/plain/releases/plain@0.132.1) (2026-04-14)
+
+### What's changed
+
+- Updated the `chores` README example to reflect the new `QuerySet.delete()` return type (`int` instead of a `(count, by_label)` tuple). ([29e10dba51d9](https://github.com/dropseed/plain/commit/29e10dba51d9))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.132.0](https://github.com/dropseed/plain/releases/plain@0.132.0) (2026-04-13)
 
 ### What's changed
