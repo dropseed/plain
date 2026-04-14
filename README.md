@@ -1,6 +1,8 @@
 # Plain
 
-**The full-stack Python framework designed for humans and agents.**
+**The Python web framework for building apps.**
+
+A familiar foundation, reimagined for humans and agents.
 
 ## Get started
 
