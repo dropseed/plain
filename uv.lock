@@ -654,14 +654,18 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-cache"
-version = "0.27.2"
+version = "0.27.3"
 source = { editable = "plain-cache" }
 dependencies = [
     { name = "plain" },
+    { name = "plain-postgres" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "plain", editable = "plain" }]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "plain-postgres", editable = "plain-postgres" },
+]
 
 [[package]]
 name = "plain-cloud"
