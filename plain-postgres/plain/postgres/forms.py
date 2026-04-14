@@ -17,6 +17,7 @@ from plain.forms import fields
 from plain.forms.fields import ChoiceField, Field
 from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
 from plain.postgres.exceptions import FieldError
+from plain.postgres.expressions import DatabaseDefaultExpression
 
 if TYPE_CHECKING:
     from plain.postgres.fields import Field as ModelField
@@ -64,6 +65,16 @@ def construct_instance(
         ):
             continue
 
+        # DB-expression defaults: preserve the DATABASE_DEFAULT sentinel that
+        # Model.__init__ already placed on the instance when the submitted
+        # value is empty. Otherwise save_form_data would overwrite it with
+        # None, and INSERT would pass NULL instead of DEFAULT.
+        if (
+            isinstance(f.default, DatabaseDefaultExpression)
+            and cleaned_data.get(f.name) in form[f.name].field.empty_values
+        ):
+            continue
+
         f.save_form_data(instance, cleaned_data[f.name])
 
     for f in file_field_list:
@@ -85,12 +96,20 @@ def model_to_dict(
     ``fields`` is an optional list of field names. If provided, return only the
     named.
     """
+    from plain.postgres.fields import DATABASE_DEFAULT
+
     meta = instance._model_meta
     data = {}
     for f in chain(meta.concrete_fields, meta.many_to_many):
         if fields is not None and f.name not in fields:
             continue
-        data[f.name] = f.value_from_object(instance)
+        value = f.value_from_object(instance)
+        if value is DATABASE_DEFAULT:
+            # Field hasn't been populated yet — the DB will produce it on
+            # INSERT. Omit so it doesn't override the form field's own
+            # initial=None when used as form.initial.
+            continue
+        data[f.name] = value
     return data
 
 
@@ -667,11 +686,17 @@ def modelfield_to_formfield(
     choices_form_class: type[Field] | None = None,
     **kwargs: Any,
 ) -> Field | None:
+    # DB-expression defaults (`default=Now()`, `default=GenRandomUUID()`)
+    # produce a value on the INSERT — there is no meaningful Python initial
+    # to show in a form, and the form field must allow the user to omit the
+    # value so it reaches the INSERT as the DATABASE_DEFAULT sentinel.
+    has_db_default = isinstance(modelfield.default, DatabaseDefaultExpression)
+
     defaults: dict[str, Any] = {
-        "required": modelfield.required,
+        "required": modelfield.required and not has_db_default,
     }
 
-    if modelfield.has_default():
+    if modelfield.has_default() and not has_db_default:
         defaults["initial"] = modelfield.get_default()
 
     if modelfield.choices is not None:

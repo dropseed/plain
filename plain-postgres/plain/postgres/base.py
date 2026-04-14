@@ -24,8 +24,8 @@ from plain.postgres.exceptions import (
     FieldDoesNotExist,
     MultipleObjectsReturnedDescriptor,
 )
-from plain.postgres.expressions import RawSQL, Value
-from plain.postgres.fields import NOT_PROVIDED, Field
+from plain.postgres.expressions import DatabaseDefaultExpression, RawSQL, Value
+from plain.postgres.fields import DATABASE_DEFAULT, NOT_PROVIDED, Field
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ForeignObjectRel
 from plain.postgres.meta import Meta
@@ -105,6 +105,7 @@ class Model(metaclass=ModelBase):
         meta = cls._model_meta
         _setattr = setattr
         _DEFERRED = DEFERRED
+        _DATABASE_DEFAULT = DATABASE_DEFAULT
 
         # Set up the storage for instance state
         self._state = ModelState()
@@ -138,7 +139,13 @@ class Model(metaclass=ModelBase):
                     # default argument on pop because we don't want
                     # get_default() to be evaluated, and then not used.
                     # Refs #12057.
-                    val = field.get_default()
+                    if isinstance(field.default, DatabaseDefaultExpression):
+                        # DB-expression default: let Postgres evaluate it
+                        # on INSERT. The compiler emits DEFAULT in the
+                        # VALUES clause when it sees this sentinel.
+                        val = _DATABASE_DEFAULT
+                    else:
+                        val = field.get_default()
 
             if is_related_object:
                 # If we are passed a related instance, set it using the
@@ -489,6 +496,16 @@ class Model(metaclass=ModelBase):
                 )
                 for f in non_pks
             ]
+            # DATABASE_DEFAULT fields represent "let the DB produce this on
+            # INSERT" — they have no meaningful UPDATE semantic, so skip them
+            # on the UPDATE path. If the row doesn't exist the INSERT fallback
+            # below handles them correctly. If the UPDATE *does* succeed, we
+            # need to refresh those fields from the DB so the in-memory
+            # instance doesn't keep the sentinel.
+            db_default_attnames = [
+                v[0].attname for v in values if v[2] is DATABASE_DEFAULT
+            ]
+            values = [v for v in values if v[2] is not DATABASE_DEFAULT]
             forced_update = bool(update_fields or force_update)
             updated = self._do_update(
                 base_qs, id_val, values, update_fields, forced_update
@@ -499,6 +516,8 @@ class Model(metaclass=ModelBase):
                 raise psycopg.DatabaseError(
                     "Save with update_fields did not affect any rows."
                 )
+            if updated and db_default_attnames:
+                self.refresh_from_db(fields=db_default_attnames)
         if not updated:
             fields = meta.local_concrete_fields
             if not id_set:
@@ -827,6 +846,17 @@ class Model(metaclass=ModelBase):
             exclude = set()
         else:
             exclude = set(exclude)
+
+        # Fields holding the DATABASE_DEFAULT sentinel will be produced by
+        # the database on INSERT — there's no Python value to clean,
+        # uniqueness-check, or feed into a constraint lookup. Exclude them
+        # from every validation step until the value is populated. Read via
+        # __dict__ to avoid triggering refresh_from_db on deferred fields.
+        for f in self._model_meta.fields:
+            if f.name in exclude:
+                continue
+            if self.__dict__.get(f.attname) is DATABASE_DEFAULT:
+                exclude.add(f.name)
 
         try:
             self.clean_fields(exclude=exclude)

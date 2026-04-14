@@ -87,6 +87,32 @@ class NOT_PROVIDED:
     pass
 
 
+class DatabaseDefault:
+    """Sentinel assigned to a field attribute when the column's persistent
+    DEFAULT (e.g. `default=Now()`) should produce the value on the next
+    INSERT. The INSERT compiler recognizes the sentinel and emits `DEFAULT`
+    in the VALUES clause; RETURNING then populates the real value back onto
+    the instance."""
+
+    def __repr__(self) -> str:
+        return "<DatabaseDefault>"
+
+    def __str__(self) -> str:
+        return "<DatabaseDefault>"
+
+    def __reduce__(self) -> tuple[Any, tuple]:
+        # Pickling/unpickling must round-trip to the same singleton instance;
+        # downstream code uses `value is DATABASE_DEFAULT` identity checks.
+        return (_get_database_default_singleton, ())
+
+
+DATABASE_DEFAULT = DatabaseDefault()
+
+
+def _get_database_default_singleton() -> DatabaseDefault:
+    return DATABASE_DEFAULT
+
+
 # The values to use for "blank" in SelectFields. Will be appended to the start
 # of most "choices" lists.
 BLANK_CHOICE_DASH = [("", "---------")]
@@ -659,7 +685,11 @@ class Field[T](RegisterLookupMixin):
         Private API intended only to be used by Plain itself. Currently only
         the PostgreSQL backend supports returning multiple fields on a model.
         """
-        return False
+        # Local import: expressions.py imports fields at module load, so a
+        # top-level import here would be circular.
+        from plain.postgres.expressions import DatabaseDefaultExpression
+
+        return isinstance(self.default, DatabaseDefaultExpression)
 
     def set_attributes_from_name(self, name: str) -> None:
         self.name = self.name or name
@@ -733,8 +763,9 @@ class Field[T](RegisterLookupMixin):
                 f"This usually means the field is being used before it was added to a model class."
             )
 
-        # Convert/validate the value
-        if value is not None:
+        # Convert/validate the value. The DATABASE_DEFAULT sentinel is stored
+        # as-is so the INSERT compiler can emit `DEFAULT` in the VALUES clause.
+        if value is not None and value is not DATABASE_DEFAULT:
             value = self.to_python(value)
 
         # Store in instance dict

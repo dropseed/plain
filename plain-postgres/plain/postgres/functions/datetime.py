@@ -13,7 +13,7 @@ from plain.postgres.dialect import (
     time_extract_sql,
     time_trunc_sql,
 )
-from plain.postgres.expressions import Func
+from plain.postgres.expressions import DatabaseDefaultExpression, Func
 from plain.postgres.fields import (
     DateField,
     DateTimeField,
@@ -234,7 +234,7 @@ ExtractIsoYear.register_lookup(YearLt)
 ExtractIsoYear.register_lookup(YearLte)
 
 
-class Now(Func):
+class Now(DatabaseDefaultExpression, Func):
     # STATEMENT_TIMESTAMP() returns the time at the start of the current statement,
     # as opposed to CURRENT_TIMESTAMP which returns the time at the start of the
     # transaction.

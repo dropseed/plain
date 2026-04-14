@@ -29,6 +29,7 @@ from plain.postgres.expressions import (
     ResolvableExpression,
     Value,
 )
+from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.functions import Cast, Random
 from plain.postgres.lookups import Lookup
@@ -1467,7 +1468,12 @@ class SQLInsertCompiler(SQLCompiler):
         When field is None, consider the value raw and use it as the
         placeholder, with no corresponding parameters returned.
         """
-        if field is None:
+        if val is DATABASE_DEFAULT:
+            # Emit the literal DEFAULT keyword so Postgres uses the column's
+            # persistent DEFAULT (e.g. `gen_random_uuid()`). RETURNING then
+            # populates the real value back onto the instance.
+            sql, params = "DEFAULT", []
+        elif field is None:
             # A field value of None means the value is raw.
             sql, params = val, []
         elif hasattr(val, "as_sql"):
@@ -1489,6 +1495,10 @@ class SQLInsertCompiler(SQLCompiler):
         Prepare a value to be used in a query by resolving it if it is an
         expression and otherwise calling the field's get_db_prep_save().
         """
+        if value is DATABASE_DEFAULT:
+            # Carry the sentinel through untouched — field_as_sql will emit
+            # the literal DEFAULT keyword.
+            return value
         if isinstance(value, ResolvableExpression):
             value = value.resolve_expression(
                 self.query, allow_joins=False, for_save=True

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.functions import GenRandomUUID, Now
 
 
 @postgres.register_model
@@ -23,3 +25,26 @@ class DefaultsExample(postgres.Model):
     )
 
     query: postgres.QuerySet[DefaultsExample] = postgres.QuerySet()
+
+
+@postgres.register_model
+class DBDefaultsExample(postgres.Model):
+    """Model exercising DB-expression defaults (fields-db-defaults Phase 1)."""
+
+    name: str = types.TextField(max_length=100)
+    # Expression default — rendered as `DEFAULT gen_random_uuid()` in DDL
+    db_uuid: uuid.UUID = types.UUIDField(default=GenRandomUUID())
+    # Expression default — rendered as `DEFAULT STATEMENT_TIMESTAMP()` in DDL
+    created_at: datetime = types.DateTimeField(default=Now())
+
+    query: postgres.QuerySet[DBDefaultsExample] = postgres.QuerySet()
+
+    model_options = postgres.Options(
+        constraints=[
+            # Constraint over an expression-default field — exercises the
+            # "validate_constraints must skip DATABASE_DEFAULT" path.
+            postgres.UniqueConstraint(
+                fields=["db_uuid"], name="dbdefaultsexample_db_uuid_unique"
+            ),
+        ],
+    )
