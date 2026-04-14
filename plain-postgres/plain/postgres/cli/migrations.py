@@ -263,6 +263,16 @@ def create(
         )
     else:
         if check_changes:
+            for package_label, package_migrations in changes.items():
+                log(
+                    click.style(
+                        f"Migrations for '{package_label}':", fg="cyan", bold=True
+                    ),
+                    level=1,
+                )
+                for migration in package_migrations:
+                    for operation in migration.operations:
+                        log(f"  - {operation.describe()}", level=1)
             sys.exit(1)
 
         write_migration_files(changes)
@@ -474,7 +484,7 @@ def apply(
                             click.secho("    " + message, fg="yellow")
                         else:
                             click.echo("    " + message)
-        if check_unapplied:
+        if check_unapplied and migration_plan:
             sys.exit(1)
         return
 

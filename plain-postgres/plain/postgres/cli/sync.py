@@ -36,12 +36,11 @@ def sync(check: bool) -> None:
 
 
 def _check() -> None:
-    """Exit non-zero if sync would make any database changes."""
+    """Print pending work and exit non-zero if sync would make any changes."""
     from .migrations import apply, create
 
     has_changes = False
 
-    # Check if migrations would be created (DEBUG only)
     if settings.DEBUG:
         try:
             create.callback(
@@ -51,35 +50,44 @@ def _check() -> None:
                 no_input=True,
                 name=None,
                 check=True,
-                verbosity=0,
+                verbosity=1,
             )
         except SystemExit:
             has_changes = True
 
-    # Check for unapplied migrations
     try:
         apply.callback(
             package_label=None,
             migration_name=None,
             fake=False,
-            plan=False,
+            plan=True,
             check_unapplied=True,
             no_input=True,
             atomic_batch=None,
-            quiet=True,
+            quiet=False,
         )
     except SystemExit:
         has_changes = True
 
-    # Check for convergence
     plan = plan_convergence()
-    if plan.has_work():
+    if plan.executable():
         has_changes = True
+        click.secho("Convergence items to apply:", bold=True)
+        for item in plan.executable():
+            click.echo(f"  {item.drift.describe()}")
     if plan.blocked:
         has_changes = True
+        click.secho("Blocked (requires staged rollout):", fg="red", bold=True)
+        for item in plan.blocked:
+            click.secho(f"  {item.drift.describe()}", fg="red")
+            if item.guidance:
+                click.secho(f"    {item.guidance}", fg="red", dim=True)
 
-    if has_changes:
-        sys.exit(1)
+    if not has_changes:
+        click.echo("Schema is in sync.")
+        return
+
+    sys.exit(1)
 
 
 def _create_migrations() -> None:
