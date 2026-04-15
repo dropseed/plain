@@ -17,7 +17,7 @@ from plain.postgres.lookups import (
     Transform,
 )
 
-from . import Field
+from .base import DefaultableField
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 __all__ = ["JSONField"]
 
 
-class JSONField(Field):
+class JSONField(DefaultableField):
     db_type_sql = "jsonb"
     empty_strings_allowed = False
     description = "A JSON object"

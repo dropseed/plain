@@ -20,7 +20,7 @@ from plain import exceptions, preflight
 from plain.runtime import settings
 from plain.utils.encoding import force_bytes
 
-from . import Field
+from .base import ColumnField
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -178,7 +178,7 @@ class EncryptedFieldMixin:
         return errors
 
 
-class EncryptedTextField(EncryptedFieldMixin, Field[str]):
+class EncryptedTextField(EncryptedFieldMixin, ColumnField[str]):
     """A text field that encrypts its value before storing in the database.
 
     Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key
@@ -265,7 +265,7 @@ class EncryptedTextField(EncryptedFieldMixin, Field[str]):
         return errors
 
 
-class EncryptedJSONField(EncryptedFieldMixin, Field):
+class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
     """A JSONField that encrypts its serialized value before storing in the database.
 
     The JSON value is serialized to a string, encrypted, and stored as text.

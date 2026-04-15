@@ -16,7 +16,7 @@ from plain.preflight import PreflightResult
 
 from ..registry import models_registry
 from . import BLANK_CHOICE_DASH, Field
-from .base import NOT_PROVIDED
+from .base import ColumnField
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForwardForeignKeyDescriptor,
@@ -102,27 +102,17 @@ class RelatedField(FieldCacheMixin, Field):
     remote_field: ForeignObjectRel
     # path_infos is implemented as @cached_property in subclasses (ForeignKey, ManyToManyField)
     path_infos: list[PathInfo]
+    # Set by ForeignKeyField / ManyToManyField in their __init__; declared
+    # here so RelatedField methods (deconstruct, related_query_name) can
+    # reference them without isinstance-narrowing.
+    _related_query_name: str | None
+    _limit_choices_to: Any
 
-    def __init__(
-        self,
-        *,
-        related_query_name: str | None = None,
-        limit_choices_to: Any = None,
-        required: bool = True,
-        allow_null: bool = False,
-        default: Any = NOT_PROVIDED,
-        validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
-    ):
-        self._related_query_name = related_query_name
-        self._limit_choices_to = limit_choices_to
-        super().__init__(
-            required=required,
-            allow_null=allow_null,
-            default=default,
-            validators=validators,
-            error_messages=error_messages,
-        )
+    # No __init__: ForeignKeyField and ManyToManyField each set
+    # _related_query_name, _limit_choices_to, and remote_field themselves
+    # (and call super().__init__ for error_messages). This keeps the MI
+    # super() chain in ForeignKeyField simple — ColumnField.__init__ doesn't
+    # have to know how to forward relational kwargs.
 
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         # Handle remote_field deepcopy for RelatedFields
@@ -360,7 +350,7 @@ class RelatedField(FieldCacheMixin, Field):
         return self.name
 
 
-class ForeignKeyField(RelatedField):
+class ForeignKeyField(ColumnField, RelatedField):
     # Narrow the base class's `ForeignObjectRel` annotation — a FK's remote_field
     # is always a ForeignKeyRel with a concrete on_delete action.
     remote_field: ForeignKeyRel
@@ -372,7 +362,7 @@ class ForeignKeyField(RelatedField):
     ForeignKeyField targets the primary key (id) of the remote model.
     """
 
-    non_db_attrs = (*RelatedField.non_db_attrs, "on_delete")
+    non_db_attrs = (*RelatedField.non_db_attrs, *ColumnField.non_db_attrs, "on_delete")
 
     empty_strings_allowed = False
     default_error_messages = {
@@ -411,21 +401,20 @@ class ForeignKeyField(RelatedField):
                 f"RESTRICT, or NO_ACTION; got {on_delete!r}"
             )
 
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            validators=validators,
+            error_messages=error_messages,
+        )
+        self._related_query_name = related_query_name
+        self._limit_choices_to = limit_choices_to
         self.remote_field = ForeignKeyRel(
             field=self,
             to=to,
             on_delete=on_delete,
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
-        )
-
-        super().__init__(
-            related_query_name=related_query_name,
-            limit_choices_to=limit_choices_to,
-            required=required,
-            allow_null=allow_null,
-            validators=validators,
-            error_messages=error_messages,
         )
         self.db_constraint = db_constraint
 
@@ -670,13 +659,6 @@ class ForeignKeyField(RelatedField):
     def get_attname(self) -> str:
         return f"{self.name}_id"
 
-    def get_default(self) -> Any:
-        """Return the to_field if the default value is an object."""
-        field_default = super().get_default()
-        if isinstance(field_default, self.remote_field.model):
-            return getattr(field_default, self.target_field.attname)
-        return field_default
-
     def get_db_prep_save(self, value: Any, connection: DatabaseConnection) -> Any:
         if value is None or (
             value == "" and not self.target_field.empty_strings_allowed
@@ -774,11 +756,9 @@ class ManyToManyField(RelatedField):
             through_fields=through_fields,
         )
 
-        super().__init__(
-            related_query_name=related_query_name,
-            limit_choices_to=limit_choices_to,
-            error_messages=error_messages,
-        )
+        super().__init__(error_messages=error_messages)
+        self._related_query_name = related_query_name
+        self._limit_choices_to = limit_choices_to
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [

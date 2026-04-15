@@ -47,6 +47,7 @@ from plain.postgres.expressions import (
     Value,
 )
 from plain.postgres.fields import Field
+from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.related_lookups import MultiColSource
 from plain.postgres.lookups import Lookup
 from plain.postgres.query_utils import (
@@ -2633,6 +2634,8 @@ class Query(BaseExpression):
         # QuerySet does not have knowledge of which connection is going to be
         # used. For the single-database setup we always reference the default
         # connection here.
+        if not isinstance(field, ColumnField):
+            return False
         return field.allow_null
 
 

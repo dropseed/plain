@@ -10,7 +10,7 @@ from plain.preflight import PreflightResult
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
 
-from .base import NOT_PROVIDED, Field
+from .base import NOT_PROVIDED, DefaultableField
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -27,7 +27,7 @@ def _get_naive_now() -> datetime.datetime:
     return _to_naive(timezone.now())
 
 
-class DateTimeCheckMixin(Field):
+class DateTimeCheckMixin(DefaultableField):
     auto_now: bool
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
@@ -102,7 +102,7 @@ class DateTimeCheckMixin(Field):
         return []
 
 
-class DateField(DateTimeCheckMixin, Field[datetime.date]):
+class DateField(DateTimeCheckMixin, DefaultableField[datetime.date]):
     db_type_sql = "date"
     empty_strings_allowed = False
     default_error_messages = {
@@ -338,7 +338,7 @@ class DateTimeField(DateField):
         return "" if val is None else val.isoformat()
 
 
-class TimeField(DateTimeCheckMixin, Field[datetime.time]):
+class TimeField(DateTimeCheckMixin, DefaultableField[datetime.time]):
     db_type_sql = "time without time zone"
     empty_strings_allowed = False
     default_error_messages = {

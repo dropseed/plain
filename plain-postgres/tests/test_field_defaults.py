@@ -163,6 +163,18 @@ def test_refresh_from_db_reads_persisted_value_not_default(db):
     assert row.token_uuid == original_uuid
 
 
+def test_omitted_required_field_uses_python_empty_at_construction(db):
+    """A required column field omitted at `Model()` construction takes the
+    type's Python-side empty value (e.g. "" for text), not None. full_clean
+    surfaces required-but-empty separately; this contract keeps non-validated
+    save paths from sending NULL to a NOT NULL column for empty-string types.
+    """
+    row = DefaultsExample()
+    # name is TextField(required=True) with no `default=` — empty string
+    # fallback at construction.
+    assert row.name == ""
+
+
 def test_raw_insert_omitting_defaulted_column_fails_without_column_default(db):
     """Sanity check that backs up the previous tests: a pure-SQL INSERT that
     skips `status` errors out — the column has no DEFAULT and is NOT NULL, so

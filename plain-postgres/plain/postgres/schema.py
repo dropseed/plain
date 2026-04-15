@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 from plain.logs import get_framework_logger
 from plain.postgres.ddl import compile_database_default_sql
 from plain.postgres.dialect import quote_name
-from plain.postgres.expressions import DatabaseDefaultExpression
 from plain.postgres.fields import Field
+from plain.postgres.fields.base import ColumnField, DefaultableField
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.transaction import atomic
@@ -110,7 +110,7 @@ class DatabaseSchemaEditor:
         for field in model._model_meta.local_fields:
             # SQL. Expression defaults (`default=Now()`, `default=GenRandomUUID()`)
             # persist on the column and therefore must be inlined during CREATE TABLE.
-            include_default = isinstance(field.default, DatabaseDefaultExpression)
+            include_default = field.db_returning
             definition, extra_params = self.column_sql(
                 model, field, include_default=include_default
             )
@@ -139,15 +139,15 @@ class DatabaseSchemaEditor:
         column_db_type: str,
         params: list[Any],
         model: type[Model],
-        field: Field,
+        field: ColumnField,
         include_default: bool,
     ) -> Generator[str]:
         yield column_db_type
-        # Work out nullability.
         null = field.allow_null
         # Include a default value, if requested.
         if include_default:
-            if isinstance(field.default, DatabaseDefaultExpression):
+            if field.has_db_default():
+                assert isinstance(field, DefaultableField)
                 # Expression defaults are inlined into the DDL — they render
                 # as parameter-free SQL and become the column's persistent
                 # DEFAULT.
@@ -178,6 +178,7 @@ class DatabaseSchemaEditor:
         # Check for fields that aren't actually columns (e.g. M2M).
         if column_db_type is None:
             return None, None
+        assert isinstance(field, ColumnField)
         params: list[Any] = []
         return (
             " ".join(
@@ -256,10 +257,7 @@ class DatabaseSchemaEditor:
         # Drop the default if we need to
         # (Plain usually does not use in-database defaults — except for
         # DatabaseDefaultExpression defaults, which PERSIST on the column.)
-        if (
-            not isinstance(field.default, DatabaseDefaultExpression)
-            and self.effective_default(field) is not None
-        ):
+        if not field.db_returning and self.effective_default(field) is not None:
             changes_sql, params = self._alter_column_default_sql(
                 model, None, field, drop=True
             )
@@ -325,6 +323,8 @@ class DatabaseSchemaEditor:
                 "through= on M2M fields)"
             )
 
+        assert isinstance(old_field, ColumnField)
+        assert isinstance(new_field, ColumnField)
         self._alter_field(
             model,
             old_field,
@@ -336,8 +336,8 @@ class DatabaseSchemaEditor:
     def _alter_field(
         self,
         model: type[Model],
-        old_field: Field,
-        new_field: Field,
+        old_field: ColumnField,
+        new_field: ColumnField,
         old_type: str,
         new_type: str,
     ) -> None:
@@ -355,8 +355,9 @@ class DatabaseSchemaEditor:
         if (
             old_field.allow_null
             and not new_field.allow_null
-            and isinstance(new_field.default, DatabaseDefaultExpression)
-            and not isinstance(old_field.default, DatabaseDefaultExpression)
+            and isinstance(new_field, DefaultableField)
+            and new_field.db_returning
+            and not old_field.db_returning
         ):
             raise NotImplementedError(
                 f"Cannot alter {model.__name__}.{new_field.name} to NOT NULL "
@@ -379,10 +380,7 @@ class DatabaseSchemaEditor:
         # consistent with the live schema. The end-of-_alter_field
         # reconciliation below will re-issue SET DEFAULT for the new field
         # if it still has an expression default.
-        if (
-            isinstance(old_field.default, DatabaseDefaultExpression)
-            and old_field.db_type() != new_field.db_type()
-        ):
+        if old_field.db_returning and old_field.db_type() != new_field.db_type():
             drop_sql, _ = self._alter_column_default_sql(
                 model, old_field, new_field, drop=True
             )
@@ -452,7 +450,7 @@ class DatabaseSchemaEditor:
                     params,
                 )
             if four_way_default_alteration:
-                if isinstance(new_field.default, DatabaseDefaultExpression):
+                if new_field.db_returning:
                     # Ensure the column's DEFAULT reflects the NEW expression
                     # before backfilling — otherwise UPDATE col = DEFAULT
                     # would use whatever the column currently has (the old
@@ -516,7 +514,10 @@ class DatabaseSchemaEditor:
             self.execute(sql, params)
 
     def _alter_column_null_sql(
-        self, model: type[Model], old_field: Field, new_field: Field
+        self,
+        model: type[Model],
+        old_field: ColumnField,
+        new_field: ColumnField,
     ) -> tuple[str, list[Any]]:
         """
         Return a (sql, params) fragment to set a column to null or non-null
@@ -557,7 +558,8 @@ class DatabaseSchemaEditor:
                 [],
             )
 
-        if isinstance(new_field.default, DatabaseDefaultExpression):
+        if new_field.has_db_default():
+            assert isinstance(new_field, DefaultableField)
             # Inline the compiled expression into the DDL; no params.
             default_sql = self._compile_expression(new_field.default)
             return (

@@ -4,10 +4,10 @@ from typing import Any
 
 from plain import exceptions
 
-from .base import Field
+from .base import DefaultableField
 
 
-class BooleanField(Field[bool]):
+class BooleanField(DefaultableField[bool]):
     db_type_sql = "boolean"
     empty_strings_allowed = False
     default_error_messages = {

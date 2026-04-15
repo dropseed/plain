@@ -9,13 +9,13 @@ from plain.preflight import PreflightResult
 from plain.utils.ipv6 import clean_ipv6_address
 from plain.validators import ip_address_validators
 
-from .base import NOT_PROVIDED, Field
+from .base import NOT_PROVIDED, DefaultableField
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
 
 
-class GenericIPAddressField(Field[str]):
+class GenericIPAddressField(DefaultableField[str]):
     db_type_sql = "inet"
     empty_strings_allowed = False
     description = "IP address"

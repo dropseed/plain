@@ -8,14 +8,14 @@ from plain import exceptions
 from plain.utils.dateparse import parse_duration
 from plain.utils.duration import duration_string
 
-from .base import Field
+from .base import DefaultableField
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
 
 
-class DurationField(Field[datetime.timedelta]):
+class DurationField(DefaultableField[datetime.timedelta]):
     """Store timedelta objects using PostgreSQL's interval type."""
 
     db_type_sql = "interval"

@@ -99,10 +99,6 @@ def _empty(of_cls: type) -> Empty:
     return new
 
 
-def return_None() -> None:
-    return None
-
-
 class Field[T](RegisterLookupMixin):
     """Base class for all field types"""
 
@@ -140,11 +136,7 @@ class Field[T](RegisterLookupMixin):
     # Kwargs that don't affect the column definition; the schema editor
     # ignores these when deciding whether an ALTER is needed. Subclasses
     # that introduce additional non-db kwargs extend this tuple.
-    non_db_attrs: tuple[str, ...] = (
-        "required",
-        "error_messages",
-        "validators",
-    )
+    non_db_attrs: tuple[str, ...] = ("error_messages",)
 
     # Generic field type description, usually overridden by subclasses
     def _description(self) -> str:
@@ -155,21 +147,11 @@ class Field[T](RegisterLookupMixin):
     def __init__(
         self,
         *,
-        required: bool = True,
-        allow_null: bool = False,
-        default: Any = NOT_PROVIDED,
-        validators: Sequence[Callable[..., Any]] = (),
         error_messages: dict[str, str] | None = None,
     ):
         self.name = None  # Set by set_attributes_from_name
-        self.required, self.allow_null = required, allow_null
-        self.default = default
-
         self.primary_key = False
         self.auto_created = False
-
-        self._validators = list(validators)  # Store for deconstruction later
-
         self._error_messages = error_messages  # Store for deconstruction later
 
     def __str__(self) -> str:
@@ -191,11 +173,7 @@ class Field[T](RegisterLookupMixin):
         return f"<{path}>"
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        return [
-            *self._check_field_name(),
-            *self._check_null_allowed_for_primary_keys(),
-            *self._check_validators(),
-        ]
+        return [*self._check_field_name()]
 
     def _check_field_name(self) -> list[PreflightResult]:
         """
@@ -229,37 +207,6 @@ class Field[T](RegisterLookupMixin):
             ]
         else:
             return []
-
-    def _check_null_allowed_for_primary_keys(self) -> list[PreflightResult]:
-        if self.primary_key and self.allow_null:
-            return [
-                PreflightResult(
-                    fix="Primary keys must not have allow_null=True. "
-                    "Set allow_null=False on the field, or "
-                    "remove primary_key=True argument.",
-                    obj=self,
-                    id="fields.primary_key_allows_null",
-                )
-            ]
-        else:
-            return []
-
-    def _check_validators(self) -> list[PreflightResult]:
-        errors = []
-        for i, validator in enumerate(self.validators):
-            if not callable(validator):
-                errors.append(
-                    PreflightResult(
-                        fix=(
-                            "All 'validators' must be callable. "
-                            f"validators[{i}] ({repr(validator)}) isn't a function or "
-                            "instance of a validator class."
-                        ),
-                        obj=self,
-                        id="fields.invalid_validator",
-                    )
-                )
-        return errors
 
     def get_col(self, alias: str | None, output_field: Field | None = None) -> Col:
         if alias == self.model.model_options.db_table and (
@@ -316,29 +263,9 @@ class Field[T](RegisterLookupMixin):
         arguments over positional ones, and omit parameters with their default
         values.
         """
-        # Short-form way of fetching all the default parameters
-        keywords = {}
-        possibles = {
-            "required": True,
-            "allow_null": False,
-            "default": NOT_PROVIDED,
-            "validators": [],
-            "error_messages": None,
-        }
-        attr_overrides = {
-            "error_messages": "_error_messages",
-            "validators": "_validators",
-        }
-        equals_comparison = {"validators"}
-        for name, default in possibles.items():
-            value = getattr(self, attr_overrides.get(name, name))
-            # Do correct kind of comparison
-            if name in equals_comparison:
-                if value != default:
-                    keywords[name] = value
-            else:
-                if value is not default:
-                    keywords[name] = value
+        keywords: dict[str, Any] = {}
+        if self._error_messages is not None:
+            keywords["error_messages"] = self._error_messages
         # Work out path - we shorten it for known Plain core fields
         path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
         if path.startswith("plain.postgres.fields.related"):
@@ -397,9 +324,6 @@ class Field[T](RegisterLookupMixin):
             # class self.__class__, then update its dict with self.__dict__
             # values - so, this is very close to normal pickle.
             state = self.__dict__.copy()
-            # The _get_default cached_property can't be pickled due to lambda
-            # usage.
-            state.pop("_get_default", None)
             return _empty, (self.__class__,), state
         assert self.name is not None
         options = model.model_options
@@ -408,17 +332,6 @@ class Field[T](RegisterLookupMixin):
             options.object_name,
             self.name,
         )
-
-    def get_id_value_on_save(self, instance: Model) -> T | None:
-        """
-        Hook to generate new primary key values on save. This method is called when
-        saving instances with no primary key value set. If this method returns
-        something else than None, then the returned value is used when saving
-        the new instance.
-        """
-        if self.default:
-            return self.get_default()
-        return None
 
     def to_python(self, value: Any) -> T | None:
         """
@@ -435,57 +348,6 @@ class Field[T](RegisterLookupMixin):
             messages.update(getattr(c, "default_error_messages", {}))
         messages.update(self._error_messages or {})
         return messages
-
-    @cached_property
-    def validators(self) -> list[Callable[..., Any]]:
-        """
-        Some validators can't be created at field initialization time.
-        This method provides a way to delay their creation until required.
-        """
-        return [*self.default_validators, *self._validators]
-
-    def run_validators(self, value: Any) -> None:
-        if value in self.empty_values:
-            return
-
-        errors = []
-        for v in self.validators:
-            try:
-                v(value)
-            except exceptions.ValidationError as e:
-                if hasattr(e, "code") and e.code in self.error_messages:
-                    e.message = self.error_messages[e.code]
-                errors.extend(e.error_list)
-
-        if errors:
-            raise exceptions.ValidationError(errors)
-
-    def validate(self, value: Any, model_instance: Model) -> None:
-        """
-        Validate value and raise ValidationError if necessary. Subclasses
-        should override this to provide validation logic.
-        """
-
-        if value is None and not self.allow_null:
-            raise exceptions.ValidationError(
-                self.error_messages["allow_null"], code="allow_null"
-            )
-
-        if self.required and value in self.empty_values:
-            raise exceptions.ValidationError(
-                self.error_messages["required"], code="required"
-            )
-
-    def clean(self, value: Any, model_instance: Model) -> T | None:
-        """
-        Convert the value's type and run validation. Validation errors
-        from to_python() and validate() are propagated. Return the correct
-        value if no error is raised.
-        """
-        value = self.to_python(value)
-        self.validate(value, model_instance)
-        self.run_validators(value)
-        return value
 
     def db_type_parameters(self) -> DictWrapper:
         return DictWrapper(self.__dict__, quote_name, "qn_")
@@ -526,17 +388,7 @@ class Field[T](RegisterLookupMixin):
             return [from_db_value]
         return []
 
-    @property
-    def db_returning(self) -> bool:
-        """
-        Private API intended only to be used by Plain itself. Currently only
-        the PostgreSQL backend supports returning multiple fields on a model.
-        """
-        # Local import: expressions.py imports fields at module load, so a
-        # top-level import here would be circular.
-        from plain.postgres.expressions import DatabaseDefaultExpression
-
-        return isinstance(self.default, DatabaseDefaultExpression)
+    db_returning: bool = False
 
     def set_attributes_from_name(self, name: str) -> None:
         self.name = self.name or name
@@ -663,50 +515,24 @@ class Field[T](RegisterLookupMixin):
             return value
         return self.get_db_prep_value(value, connection=connection, prepared=False)
 
-    def has_default(self) -> bool:
-        """Return a boolean of whether this field has a default value."""
-        return self.default is not NOT_PROVIDED
-
-    def get_default(self) -> T | None:
-        """Return the default value for this field."""
-        return self._get_default()
-
-    # Column value emitted as the `DEFAULT` during CREATE TABLE / ADD COLUMN
-    # when the field has no user-provided default but still needs a fill
-    # (e.g. not-null + not-required + empty_strings_allowed).
+    # Empty-value fallback used by ColumnField.get_effective_default when
+    # not-null + not-required + empty_strings_allowed. BinaryField overrides
+    # with b"".
     _default_empty_value: Any = ""
 
     def get_effective_default(self) -> Any:
-        """
-        Return the column's effective default for schema operations — the
-        value the schema editor parameterizes into the DEFAULT clause (or
-        backfills onto existing rows). Returns None when no DEFAULT should
-        be emitted.
-        """
-        # Local import: expressions.py imports fields at module load, so a
-        # top-level import here would be circular.
-        from plain.postgres.expressions import DatabaseDefaultExpression
-
-        if self.has_default():
-            default = self.get_default()
-            if isinstance(default, DatabaseDefaultExpression):
-                # Expression defaults are inlined via DDL, not parameterized.
-                return None
-            return default
-        if not self.allow_null and not self.required and self.empty_strings_allowed:
-            return self._default_empty_value
         return None
 
-    @cached_property
-    def _get_default(self) -> Callable[[], Any]:
-        if self.has_default():
-            if callable(self.default):
-                return self.default
-            return lambda: self.default
+    def has_default(self) -> bool:
+        return False
 
-        if not self.empty_strings_allowed or self.allow_null:
-            return return_None
-        return str  # return empty string
+    def has_db_default(self) -> bool:
+        # True when the field's default is a DatabaseDefaultExpression that
+        # Postgres evaluates on INSERT (e.g. Now(), GenRandomUUID()).
+        return False
+
+    def get_id_value_on_save(self, instance: Model) -> Any:
+        return None
 
     def get_limit_choices_to(self) -> Any:
         """
@@ -733,10 +559,190 @@ class Field[T](RegisterLookupMixin):
         return getattr(obj, self.attname)
 
 
-class ChoicesField[T](Field[T]):
+class ColumnField[T](Field[T]):
+    """Base for fields backed by a column value (required/allow_null/validators)."""
+
+    non_db_attrs = (*Field.non_db_attrs, "required", "validators")
+
+    def __init__(
+        self,
+        *,
+        required: bool = True,
+        allow_null: bool = False,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
+    ):
+        self.required = required
+        self.allow_null = allow_null
+        self._validators = list(validators)
+        super().__init__(error_messages=error_messages)
+
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
+        return [
+            *super().preflight(**kwargs),
+            *self._check_null_allowed_for_primary_keys(),
+            *self._check_validators(),
+        ]
+
+    def _check_null_allowed_for_primary_keys(self) -> list[PreflightResult]:
+        if self.primary_key and self.allow_null:
+            return [
+                PreflightResult(
+                    fix="Primary keys must not have allow_null=True. "
+                    "Set allow_null=False on the field, or "
+                    "remove primary_key=True argument.",
+                    obj=self,
+                    id="fields.primary_key_allows_null",
+                )
+            ]
+        return []
+
+    def _check_validators(self) -> list[PreflightResult]:
+        errors = []
+        for i, validator in enumerate(self.validators):
+            if not callable(validator):
+                errors.append(
+                    PreflightResult(
+                        fix=(
+                            "All 'validators' must be callable. "
+                            f"validators[{i}] ({repr(validator)}) isn't a function or "
+                            "instance of a validator class."
+                        ),
+                        obj=self,
+                        id="fields.invalid_validator",
+                    )
+                )
+        return errors
+
+    @cached_property
+    def validators(self) -> list[Callable[..., Any]]:
+        # Some validators can't be created at field initialization time;
+        # subclasses (e.g. IntegerField) override to add range validators.
+        return [*self.default_validators, *self._validators]
+
+    def run_validators(self, value: Any) -> None:
+        if value in self.empty_values:
+            return
+        errors = []
+        for v in self.validators:
+            try:
+                v(value)
+            except exceptions.ValidationError as e:
+                if hasattr(e, "code") and e.code in self.error_messages:
+                    e.message = self.error_messages[e.code]
+                errors.extend(e.error_list)
+        if errors:
+            raise exceptions.ValidationError(errors)
+
+    def validate(self, value: Any, model_instance: Model) -> None:
+        if value is None and not self.allow_null:
+            raise exceptions.ValidationError(
+                self.error_messages["allow_null"], code="allow_null"
+            )
+        if self.required and value in self.empty_values:
+            raise exceptions.ValidationError(
+                self.error_messages["required"], code="required"
+            )
+
+    def clean(self, value: Any, model_instance: Model) -> T | None:
+        value = self.to_python(value)
+        self.validate(value, model_instance)
+        self.run_validators(value)
+        return value
+
+    def get_default(self) -> Any:
+        # Python-side default used when constructing model instances without
+        # an explicit value. Independent of `required` (validate() catches
+        # required-but-empty separately). DefaultableField overrides to
+        # honor a user-provided default.
+        if not self.empty_strings_allowed or self.allow_null:
+            return None
+        return self._default_empty_value
+
+    def get_effective_default(self) -> Any:
+        if not self.allow_null and not self.required and self.empty_strings_allowed:
+            return self._default_empty_value
+        return super().get_effective_default()
+
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+        name, path, args, kwargs = super().deconstruct()
+        if self.required is not True:
+            kwargs["required"] = self.required
+        if self.allow_null is not False:
+            kwargs["allow_null"] = self.allow_null
+        if list(self._validators):
+            kwargs["validators"] = list(self._validators)
+        return name, path, args, kwargs
+
+
+class DefaultableField[T](ColumnField[T]):
+    """Base for column-backed fields that accept a user-provided ``default``."""
+
+    non_db_attrs = (*ColumnField.non_db_attrs, "default")
+
+    def __init__(
+        self,
+        *,
+        default: Any = NOT_PROVIDED,
+        required: bool = True,
+        allow_null: bool = False,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
+    ):
+        self.default = default
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            validators=validators,
+            error_messages=error_messages,
+        )
+
+    def has_default(self) -> bool:
+        return self.default is not NOT_PROVIDED
+
+    def has_db_default(self) -> bool:
+        from plain.postgres.expressions import DatabaseDefaultExpression
+
+        return isinstance(self.default, DatabaseDefaultExpression)
+
+    def get_default(self) -> Any:
+        if not self.has_default():
+            return super().get_default()
+        if callable(self.default):
+            return self.default()
+        return self.default
+
+    def get_id_value_on_save(self, instance: Model) -> T | None:
+        if self.has_default():
+            return self.get_default()
+        return None
+
+    @property
+    def db_returning(self) -> bool:  # type: ignore[override]
+        return self.has_db_default()
+
+    def get_effective_default(self) -> Any:
+        from plain.postgres.expressions import DatabaseDefaultExpression
+
+        if self.has_default():
+            default = self.get_default()
+            if isinstance(default, DatabaseDefaultExpression):
+                # Expression defaults are inlined via DDL, not parameterized.
+                return None
+            return default
+        return super().get_effective_default()
+
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+        name, path, args, kwargs = super().deconstruct()
+        if self.default is not NOT_PROVIDED:
+            kwargs["default"] = self.default
+        return name, path, args, kwargs
+
+
+class ChoicesField[T](DefaultableField[T]):
     """Base for fields that accept a ``choices=`` parameter."""
 
-    non_db_attrs = (*Field.non_db_attrs, "choices")
+    non_db_attrs = (*DefaultableField.non_db_attrs, "choices")
 
     default_error_messages = {
         "invalid_choice": "Value %(value)r is not a valid choice.",

@@ -11,6 +11,7 @@ from plain.postgres.fields import (
     Field,
     TimeField,
 )
+from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.related import ManyToManyField, RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.migrations import operations
@@ -791,10 +792,15 @@ class MigrationAutodetector:
         # generating a migration that would fail at apply time.
         time_fields = (DateField, DateTimeField, TimeField)
         can_add_without_backfill = (
-            field.allow_null
+            isinstance(field, ManyToManyField)
             or field.has_default()
-            or isinstance(field, ManyToManyField)
-            or (not field.required and field.empty_strings_allowed)
+            or (
+                isinstance(field, ColumnField)
+                and (
+                    field.allow_null
+                    or (not field.required and field.empty_strings_allowed)
+                )
+            )
             or (isinstance(field, time_fields) and field.auto_now)
         )
         if not can_add_without_backfill:
@@ -909,10 +915,11 @@ class MigrationAutodetector:
                 if both_m2m or neither_m2m:
                     # Either both fields are m2m or neither is
                     if (
-                        old_field.allow_null
+                        isinstance(old_field, ColumnField)
+                        and isinstance(new_field, ColumnField)
+                        and old_field.allow_null
                         and not new_field.allow_null
                         and not new_field.has_default()
-                        and not isinstance(new_field, ManyToManyField)
                     ):
                         raise MigrationSchemaError(
                             f"Cannot alter field '{model_name}.{field_name}' "

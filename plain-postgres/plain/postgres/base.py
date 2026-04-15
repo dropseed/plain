@@ -24,8 +24,9 @@ from plain.postgres.exceptions import (
     FieldDoesNotExist,
     MultipleObjectsReturnedDescriptor,
 )
-from plain.postgres.expressions import DatabaseDefaultExpression, RawSQL, Value
+from plain.postgres.expressions import RawSQL, Value
 from plain.postgres.fields import DATABASE_DEFAULT, NOT_PROVIDED, Field
+from plain.postgres.fields.base import ColumnField, DefaultableField
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ForeignObjectRel
 from plain.postgres.meta import Meta
@@ -114,6 +115,10 @@ class Model(metaclass=ModelBase):
         for field in meta.fields:
             from plain.postgres.fields.related import RelatedField
 
+            # meta.fields excludes ManyToManyField, so every iterated field
+            # is column-backed and exposes the ColumnField surface.
+            assert isinstance(field, ColumnField)
+
             is_related_object = False
             # Virtual field
             if field.attname not in kwargs and field.column is None:
@@ -139,7 +144,7 @@ class Model(metaclass=ModelBase):
                     # default argument on pop because we don't want
                     # get_default() to be evaluated, and then not used.
                     # Refs #12057.
-                    if isinstance(field.default, DatabaseDefaultExpression):
+                    if field.has_db_default():
                         # DB-expression default: let Postgres evaluate it
                         # on INSERT. The compiler emits DEFAULT in the
                         # VALUES clause when it sees this sentinel.
@@ -467,9 +472,9 @@ class Model(metaclass=ModelBase):
                 if f.name in update_fields or f.attname in update_fields
             ]
 
+        id_field = meta.get_forward_field("id")
         id_val = self.id
         if id_val is None:
-            id_field = meta.get_forward_field("id")
             id_val = id_field.get_id_value_on_save(self)
             setattr(self, id_field.attname, id_val)
         id_set = id_val is not None
@@ -481,8 +486,9 @@ class Model(metaclass=ModelBase):
             not raw
             and not force_insert
             and self._state.adding
-            and meta.get_forward_field("id").default
-            and meta.get_forward_field("id").default is not NOT_PROVIDED
+            and isinstance(id_field, DefaultableField)
+            and id_field.default
+            and id_field.default is not NOT_PROVIDED
         ):
             force_insert = True
         # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.

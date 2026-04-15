@@ -573,5 +573,5 @@ class Meta:
         return [
             field
             for field in self._get_fields(forward=True, reverse=False)
-            if getattr(field, "db_returning", False)
+            if field.db_returning
         ]

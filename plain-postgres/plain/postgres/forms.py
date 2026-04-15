@@ -17,8 +17,8 @@ from plain.forms import fields
 from plain.forms.fields import ChoiceField, Field
 from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
 from plain.postgres.exceptions import FieldError
-from plain.postgres.expressions import DatabaseDefaultExpression
 from plain.postgres.fields import ChoicesField
+from plain.postgres.fields.base import ColumnField, DefaultableField
 
 if TYPE_CHECKING:
     from plain.postgres.fields import Field as ModelField
@@ -71,7 +71,7 @@ def construct_instance(
         # value is empty. Otherwise save_form_data would overwrite it with
         # None, and INSERT would pass NULL instead of DEFAULT.
         if (
-            isinstance(f.default, DatabaseDefaultExpression)
+            f.has_db_default()
             and cleaned_data.get(f.name) in form[f.name].field.empty_values
         ):
             continue
@@ -687,17 +687,25 @@ def modelfield_to_formfield(
     choices_form_class: type[Field] | None = None,
     **kwargs: Any,
 ) -> Field | None:
+    # M2M and other non-column-backed fields don't render as form inputs.
+    if not isinstance(modelfield, ColumnField):
+        return None
+
     # DB-expression defaults (`default=Now()`, `default=GenRandomUUID()`)
     # produce a value on the INSERT — there is no meaningful Python initial
     # to show in a form, and the form field must allow the user to omit the
     # value so it reaches the INSERT as the DATABASE_DEFAULT sentinel.
-    has_db_default = isinstance(modelfield.default, DatabaseDefaultExpression)
+    has_db_default = modelfield.db_returning
 
     defaults: dict[str, Any] = {
         "required": modelfield.required and not has_db_default,
     }
 
-    if modelfield.has_default() and not has_db_default:
+    if (
+        isinstance(modelfield, DefaultableField)
+        and modelfield.has_default()
+        and not has_db_default
+    ):
         defaults["initial"] = modelfield.get_default()
 
     if isinstance(modelfield, ChoicesField) and modelfield.choices is not None:

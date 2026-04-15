@@ -10,14 +10,14 @@ from psycopg.types import numeric
 from plain import exceptions, validators
 from plain.preflight import PreflightResult
 
-from .base import NOT_PROVIDED, Field
+from .base import NOT_PROVIDED, DefaultableField
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
 
 
-class FloatField(Field[float]):
+class FloatField(DefaultableField[float]):
     db_type_sql = "double precision"
     empty_strings_allowed = False
     default_error_messages = {
@@ -49,7 +49,7 @@ class FloatField(Field[float]):
             )
 
 
-class IntegerField(Field[int]):
+class IntegerField(DefaultableField[int]):
     db_type_sql = "integer"
     integer_range: tuple[int, int] = (-2147483648, 2147483647)
     psycopg_type: type = numeric.Int4
@@ -141,7 +141,7 @@ class SmallIntegerField(IntegerField):
     description = "Small integer"
 
 
-class DecimalField(Field[decimal.Decimal]):
+class DecimalField(DefaultableField[decimal.Decimal]):
     db_type_sql = "numeric(%(max_digits)s,%(decimal_places)s)"
     empty_strings_allowed = False
     default_error_messages = {

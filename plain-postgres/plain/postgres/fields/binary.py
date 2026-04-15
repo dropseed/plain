@@ -8,7 +8,7 @@ import psycopg
 
 from plain.validators import MaxLengthValidator
 
-from .base import Field
+from .base import ColumnField
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from plain.postgres.sql.compiler import SQLCompiler
 
 
-class BinaryField(Field[bytes | memoryview]):
+class BinaryField(ColumnField[bytes | memoryview]):
     db_type_sql = "bytea"
     description = "Raw binary data"
     empty_values = [None, b""]

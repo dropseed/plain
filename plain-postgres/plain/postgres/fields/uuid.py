@@ -5,13 +5,13 @@ from uuid import UUID
 
 from plain import exceptions
 
-from .base import Field
+from .base import DefaultableField
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
 
 
-class UUIDField(Field[UUID]):
+class UUIDField(DefaultableField[UUID]):
     db_type_sql = "uuid"
     default_error_messages = {
         "invalid": '"%(value)s" is not a valid UUID.',
