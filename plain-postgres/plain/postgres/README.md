@@ -1178,7 +1178,12 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 #### How do I add a field to an existing model?
 
-Add the field to your model class, then run `plain migrations create` to create a migration. If the field is required (no default value and not nullable), you'll be prompted to provide a default value for existing rows.
+Add the field to your model class, then run `plain migrations create` to create a migration.
+
+If the field is required (no `default=` and not `allow_null=True`), the autodetector refuses to generate the migration, since there's no value to seed existing rows with. You have two options:
+
+1. Declare a `default=` on the field so the new column has a value for existing rows.
+2. Add the field as nullable first, scaffold a data migration with `plain migrations create --empty --name backfill_<field>` to populate existing rows, then alter the field to NOT NULL in a third migration.
 
 #### How do I create a unique constraint on multiple fields?
 
