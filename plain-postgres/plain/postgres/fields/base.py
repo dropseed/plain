@@ -668,6 +668,32 @@ class Field[T](RegisterLookupMixin):
         """Return the default value for this field."""
         return self._get_default()
 
+    # Column value emitted as the `DEFAULT` during CREATE TABLE / ADD COLUMN
+    # when the field has no user-provided default but still needs a fill
+    # (e.g. not-null + not-required + empty_strings_allowed).
+    _default_empty_value: Any = ""
+
+    def get_effective_default(self) -> Any:
+        """
+        Return the column's effective default for schema operations — the
+        value the schema editor parameterizes into the DEFAULT clause (or
+        backfills onto existing rows). Returns None when no DEFAULT should
+        be emitted.
+        """
+        # Local import: expressions.py imports fields at module load, so a
+        # top-level import here would be circular.
+        from plain.postgres.expressions import DatabaseDefaultExpression
+
+        if self.has_default():
+            default = self.get_default()
+            if isinstance(default, DatabaseDefaultExpression):
+                # Expression defaults are inlined via DDL, not parameterized.
+                return None
+            return default
+        if not self.allow_null and not self.required and self.empty_strings_allowed:
+            return self._default_empty_value
+        return None
+
     @cached_property
     def _get_default(self) -> Callable[[], Any]:
         if self.has_default():

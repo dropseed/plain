@@ -20,6 +20,7 @@ class BinaryField(Field[bytes | memoryview]):
     db_type_sql = "bytea"
     description = "Raw binary data"
     empty_values = [None, b""]
+    _default_empty_value = b""
 
     def __init__(
         self,

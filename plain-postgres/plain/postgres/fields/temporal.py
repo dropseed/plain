@@ -207,6 +207,11 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
             value = self.get_prep_value(value)
         return value
 
+    def get_effective_default(self) -> Any:
+        if not self.has_default() and self.auto_now:
+            return datetime.datetime.now().date()
+        return super().get_effective_default()
+
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
@@ -323,6 +328,11 @@ class DateTimeField(DateField):
             value = self.get_prep_value(value)
         return value
 
+    def get_effective_default(self) -> Any:
+        if not self.has_default() and self.auto_now:
+            return timezone.now()
+        return super().get_effective_default()
+
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)
         return "" if val is None else val.isoformat()
@@ -432,6 +442,11 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
         if not prepared:
             value = self.get_prep_value(value)
         return value
+
+    def get_effective_default(self) -> Any:
+        if not self.has_default() and self.auto_now:
+            return datetime.datetime.now().time()
+        return super().get_effective_default()
 
     def value_to_string(self, obj: Model) -> str:
         val = self.value_from_object(obj)

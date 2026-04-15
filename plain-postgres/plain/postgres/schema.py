@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -12,17 +11,10 @@ from plain.logs import get_framework_logger
 from plain.postgres.ddl import compile_database_default_sql
 from plain.postgres.dialect import quote_name
 from plain.postgres.expressions import DatabaseDefaultExpression
-from plain.postgres.fields import (
-    BinaryField,
-    DateField,
-    DateTimeField,
-    Field,
-    TimeField,
-)
+from plain.postgres.fields import Field
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.transaction import atomic
-from plain.utils import timezone
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -205,38 +197,9 @@ class DatabaseSchemaEditor:
         """Compile a DatabaseDefaultExpression for inlining into DDL."""
         return compile_database_default_sql(expression)
 
-    @staticmethod
-    def _effective_default(field: Field) -> Any:
-        # This method allows testing its logic without a connection.
-        if field.has_default():
-            default = field.get_default()
-            if isinstance(default, DatabaseDefaultExpression):
-                # Expression defaults are handled via DDL inlining, not as a
-                # Python-side parameterized value.
-                return None
-        elif (
-            not field.allow_null and not field.required and field.empty_strings_allowed
-        ):
-            if isinstance(field, BinaryField):
-                default = b""
-            else:
-                default = ""
-        elif getattr(field, "auto_now", False):
-            if isinstance(field, DateTimeField):
-                default = timezone.now()
-            else:
-                default = datetime.now()
-                if isinstance(field, DateField):
-                    default = default.date()
-                elif isinstance(field, TimeField):
-                    default = default.time()
-        else:
-            default = None
-        return default
-
     def effective_default(self, field: Field) -> Any:
         """Return a field's effective database default value."""
-        return field.get_db_prep_save(self._effective_default(field), self.connection)
+        return field.get_db_prep_save(field.get_effective_default(), self.connection)
 
     # Actions
 
