@@ -198,7 +198,6 @@ class EncryptedTextField(EncryptedFieldMixin, Field[str]):
         max_length: int | None = None,
         required: bool = True,
         allow_null: bool = False,
-        choices: Any = None,
         validators: Sequence[Callable[..., Any]] = (),
         error_messages: dict[str, str] | None = None,
     ):
@@ -208,7 +207,6 @@ class EncryptedTextField(EncryptedFieldMixin, Field[str]):
         super().__init__(
             required=required,
             allow_null=allow_null,
-            choices=choices,
             validators=validators,
             error_messages=error_messages,
         )
@@ -288,7 +286,6 @@ class EncryptedJSONField(EncryptedFieldMixin, Field):
         decoder: type[json.JSONDecoder] | None = None,
         required: bool = True,
         allow_null: bool = False,
-        choices: Any = None,
         validators: Sequence[Callable[..., Any]] = (),
         error_messages: dict[str, str] | None = None,
     ):
@@ -303,7 +300,6 @@ class EncryptedJSONField(EncryptedFieldMixin, Field):
         super().__init__(
             required=required,
             allow_null=allow_null,
-            choices=choices,
             validators=validators,
             error_messages=error_messages,
         )

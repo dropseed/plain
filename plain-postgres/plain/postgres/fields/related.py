@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import operator
 from collections.abc import Callable, Sequence
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any, Self, cast
@@ -14,7 +15,7 @@ from plain.postgres.utils import make_model_tuple
 from plain.preflight import PreflightResult
 
 from ..registry import models_registry
-from . import Field
+from . import BLANK_CHOICE_DASH, Field
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForwardForeignKeyDescriptor,
@@ -291,6 +292,30 @@ class RelatedField(FieldCacheMixin, Field):
             return self.remote_field.limit_choices_to()  # ty: ignore[call-top-callable]
         return self.remote_field.limit_choices_to
 
+    def get_choices(
+        self,
+        include_blank: bool = True,
+        blank_choice: list[tuple[str, str]] = BLANK_CHOICE_DASH,
+        limit_choices_to: Any = None,
+        ordering: tuple[str, ...] = (),
+    ) -> list[tuple[Any, str]]:
+        """Return choices from the related model, for use as <select> options."""
+        rel_model = self.remote_field.model
+        if rel_model is None:
+            return blank_choice if include_blank else []
+        limit_choices_to = limit_choices_to or self.get_limit_choices_to()
+        get_related_field = getattr(self.remote_field, "get_related_field", None)
+        related_field_name = (
+            get_related_field().attname if get_related_field is not None else "id"
+        )
+        choice_func = operator.attrgetter(related_field_name)
+        qs = rel_model.query.complex_filter(limit_choices_to)
+        if ordering:
+            qs = qs.order_by(*ordering)
+        return (blank_choice if include_blank else []) + [
+            (choice_func(x), str(x)) for x in qs
+        ]
+
     def related_query_name(self) -> str:
         """
         Define the name that can be used to identify this related object in a
@@ -347,13 +372,13 @@ class ForeignKeyField(RelatedField):
         *,
         required: bool = True,
         allow_null: bool = False,
-        choices: Any = None,
         validators: Sequence[Callable[..., Any]] = (),
         error_messages: dict[str, str] | None = None,
     ):
-        # `default` is intentionally not accepted: a hardcoded FK id default is
-        # a portability/existence footgun. Use a callable via pre_save or set
-        # the value explicitly in code.
+        # `default` and `choices` are intentionally not accepted: a hardcoded
+        # FK id default is a portability/existence footgun, and the related
+        # model itself already defines the valid set. Use `limit_choices_to`
+        # to constrain the target rows.
         if not isinstance(to, str):
             try:
                 to.model_options.model_name
@@ -381,7 +406,6 @@ class ForeignKeyField(RelatedField):
             limit_choices_to=limit_choices_to,
             required=required,
             allow_null=allow_null,
-            choices=choices,
             validators=validators,
             error_messages=error_messages,
         )
@@ -701,12 +725,11 @@ class ManyToManyField(RelatedField):
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         symmetrical: bool | None = None,
-        choices: Any = None,
         error_messages: dict[str, str] | None = None,
     ):
         # M2M has no database column, so `required`, `allow_null`, `default`,
-        # and `validators` are intentionally not accepted. Membership is
-        # managed through the related manager; filter target rows with
+        # `validators`, and `choices` are intentionally not accepted. Membership
+        # is managed through the related manager; filter target rows with
         # `limit_choices_to`.
         if not isinstance(to, str):
             try:
@@ -736,7 +759,6 @@ class ManyToManyField(RelatedField):
         super().__init__(
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
-            choices=choices,
             error_messages=error_messages,
         )
 

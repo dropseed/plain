@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain import exceptions
 
-from . import Field
+from . import ChoicesField
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -45,7 +45,7 @@ def _get_canonical_timezones() -> frozenset[str]:
     )
 
 
-class TimeZoneField(Field[zoneinfo.ZoneInfo]):
+class TimeZoneField(ChoicesField[zoneinfo.ZoneInfo]):
     """
     A model field that stores timezone names as strings but provides ZoneInfo objects.
 

@@ -18,6 +18,7 @@ from plain.forms.fields import ChoiceField, Field
 from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
 from plain.postgres.exceptions import FieldError
 from plain.postgres.expressions import DatabaseDefaultExpression
+from plain.postgres.fields import ChoicesField
 
 if TYPE_CHECKING:
     from plain.postgres.fields import Field as ModelField
@@ -699,7 +700,7 @@ def modelfield_to_formfield(
     if modelfield.has_default() and not has_db_default:
         defaults["initial"] = modelfield.get_default()
 
-    if modelfield.choices is not None:
+    if isinstance(modelfield, ChoicesField) and modelfield.choices is not None:
         # Fields with choices get special treatment.
         include_blank = not modelfield.required or not (
             modelfield.has_default() or "initial" in kwargs

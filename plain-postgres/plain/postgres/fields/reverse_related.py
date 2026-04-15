@@ -161,8 +161,8 @@ class ForeignObjectRel(FieldCacheMixin):
         Return choices with a default blank choices included, for use
         as <select> choices for this field.
 
-        Analog of plain.postgres.fields.Field.get_choices(), provided
-        initially for utilization by RelatedFieldListFilter.
+        Analog of RelatedField.get_choices(), provided initially for
+        utilization by RelatedFieldListFilter.
         """
         limit_choices_to = limit_choices_to or self.limit_choices_to
         qs = self.related_model.query.complex_filter(limit_choices_to)

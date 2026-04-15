@@ -5,7 +5,6 @@ import copy
 import datetime
 import decimal
 import enum
-import operator
 import uuid
 import warnings
 from base64 import b64decode, b64encode
@@ -179,7 +178,6 @@ class Field[T](RegisterLookupMixin):
 
     default_validators = []  # Default set of validators
     default_error_messages = {
-        "invalid_choice": "Value %(value)r is not a valid choice.",
         "allow_null": "This field cannot be null.",
         "required": "This field is be required.",
         "unique": "A %(model_name)s with this %(field_label)s already exists.",
@@ -210,20 +208,12 @@ class Field[T](RegisterLookupMixin):
         required: bool = True,
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
-        choices: Any = None,
         validators: Sequence[Callable[..., Any]] = (),
         error_messages: dict[str, str] | None = None,
     ):
         self.name = None  # Set by set_attributes_from_name
         self.required, self.allow_null = required, allow_null
         self.default = default
-        if isinstance(choices, ChoicesMeta):
-            choices = choices.choices
-        elif isinstance(choices, enum.EnumMeta):
-            choices = [(member.value, member.name) for member in choices]
-        if isinstance(choices, collections.abc.Iterator):
-            choices = list(choices)
-        self.choices = choices
 
         self.primary_key = False
         self.auto_created = False
@@ -253,7 +243,6 @@ class Field[T](RegisterLookupMixin):
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *self._check_field_name(),
-            *self._check_choices(),
             *self._check_null_allowed_for_primary_keys(),
             *self._check_validators(),
         ]
@@ -290,83 +279,6 @@ class Field[T](RegisterLookupMixin):
             ]
         else:
             return []
-
-    @classmethod
-    def _choices_is_value(cls, value: Any) -> bool:
-        return isinstance(value, str | Promise) or not is_iterable(value)
-
-    def _check_choices(self) -> list[PreflightResult]:
-        if not self.choices:
-            return []
-
-        if not is_iterable(self.choices) or isinstance(self.choices, str):
-            return [
-                PreflightResult(
-                    fix="'choices' must be an iterable (e.g., a list or tuple).",
-                    obj=self,
-                    id="fields.choices_not_iterable",
-                )
-            ]
-
-        max_length = getattr(self, "max_length", None)
-        choice_max_length = 0
-        # Expect [group_name, [value, display]]
-        for choices_group in self.choices:
-            try:
-                group_name, group_choices = choices_group
-            except (TypeError, ValueError):
-                # Containing non-pairs
-                break
-            try:
-                if not all(
-                    self._choices_is_value(value) and self._choices_is_value(human_name)
-                    for value, human_name in group_choices
-                ):
-                    break
-                if max_length is not None and group_choices:
-                    choice_max_length = max(
-                        [
-                            choice_max_length,
-                            *(
-                                len(value)
-                                for value, _ in group_choices
-                                if isinstance(value, str)
-                            ),
-                        ]
-                    )
-            except (TypeError, ValueError):
-                # No groups, choices in the form [value, display]
-                value, human_name = group_name, group_choices
-                if not self._choices_is_value(value) or not self._choices_is_value(
-                    human_name
-                ):
-                    break
-                if max_length is not None and isinstance(value, str):
-                    choice_max_length = max(choice_max_length, len(value))
-
-            # Special case: choices=['ab']
-            if isinstance(choices_group, str):
-                break
-        else:
-            if max_length is not None and choice_max_length > max_length:
-                return [
-                    PreflightResult(
-                        fix="'max_length' is too small to fit the longest value "  # noqa: UP031
-                        "in 'choices' (%d characters)." % choice_max_length,
-                        obj=self,
-                        id="fields.max_length_too_small_for_choices",
-                    ),
-                ]
-            return []
-
-        return [
-            PreflightResult(
-                fix="'choices' must be an iterable containing "
-                "(actual value, human readable name) tuples.",
-                obj=self,
-                id="fields.choices_invalid_format",
-            )
-        ]
 
     def _check_null_allowed_for_primary_keys(self) -> list[PreflightResult]:
         if self.primary_key and self.allow_null:
@@ -460,7 +372,6 @@ class Field[T](RegisterLookupMixin):
             "required": True,
             "allow_null": False,
             "default": NOT_PROVIDED,
-            "choices": None,
             "validators": [],
             "error_messages": None,
         }
@@ -468,12 +379,9 @@ class Field[T](RegisterLookupMixin):
             "error_messages": "_error_messages",
             "validators": "_validators",
         }
-        equals_comparison = {"choices", "validators"}
+        equals_comparison = {"validators"}
         for name, default in possibles.items():
             value = getattr(self, attr_overrides.get(name, name))
-            # Unroll anything iterable for choices into a concrete list
-            if name == "choices" and isinstance(value, collections.abc.Iterable):
-                value = list(value)
             # Do correct kind of comparison
             if name in equals_comparison:
                 if value != default:
@@ -607,22 +515,6 @@ class Field[T](RegisterLookupMixin):
         Validate value and raise ValidationError if necessary. Subclasses
         should override this to provide validation logic.
         """
-
-        if self.choices is not None and value not in self.empty_values:
-            for option_key, option_value in self.choices:
-                if isinstance(option_value, list | tuple):
-                    # This is an optgroup, so look inside the group for
-                    # options.
-                    for optgroup_key, optgroup_value in option_value:
-                        if value == optgroup_key:
-                            return
-                elif value == option_key:
-                    return
-            raise exceptions.ValidationError(
-                self.error_messages["invalid_choice"],
-                code="invalid_choice",
-                params={"value": value},
-            )
 
         if value is None and not self.allow_null:
             raise exceptions.ValidationError(
@@ -842,44 +734,6 @@ class Field[T](RegisterLookupMixin):
             "get_limit_choices_to() should only be called on related fields"
         )
 
-    def get_choices(
-        self,
-        include_blank: bool = True,
-        blank_choice: list[tuple[str, str]] = BLANK_CHOICE_DASH,
-        limit_choices_to: Any = None,
-        ordering: tuple[str, ...] = (),
-    ) -> list[tuple[Any, str]]:
-        """
-        Return choices with a default blank choices included, for use
-        as <select> choices for this field.
-        """
-        if self.choices is not None:
-            choices = list(self.choices)
-            if include_blank:
-                blank_defined = any(
-                    choice in ("", None) for choice, _ in self.flatchoices
-                )
-                if not blank_defined:
-                    choices = blank_choice + choices
-            return choices
-        remote_field = getattr(self, "remote_field", None)
-        if remote_field is None or getattr(remote_field, "model", None) is None:
-            return blank_choice if include_blank else []
-        rel_model = remote_field.model
-        limit_choices_to = limit_choices_to or self.get_limit_choices_to()
-        related_field_name = (
-            remote_field.get_related_field().attname
-            if hasattr(remote_field, "get_related_field")
-            else "id"
-        )
-        choice_func = operator.attrgetter(related_field_name)
-        qs = rel_model.query.complex_filter(limit_choices_to)
-        if ordering:
-            qs = qs.order_by(*ordering)
-        return (blank_choice if include_blank else []) + [
-            (choice_func(x), str(x)) for x in qs
-        ]
-
     def value_to_string(self, obj: Model) -> str:
         """
         Return a string value of this field from the passed obj.
@@ -887,8 +741,170 @@ class Field[T](RegisterLookupMixin):
         """
         return str(self.value_from_object(obj))
 
-    def _get_flatchoices(self) -> list[tuple[Any, Any]]:
-        """Flattened version of choices tuple."""
+    def save_form_data(self, instance: Model, data: Any) -> None:
+        assert self.name is not None
+        setattr(instance, self.name, data)
+
+    def value_from_object(self, obj: Model) -> T | None:
+        """Return the value of this field in the given model instance."""
+        return getattr(obj, self.attname)
+
+
+class ChoicesField[T](Field[T]):
+    """Base for fields that accept a ``choices=`` parameter."""
+
+    default_error_messages = {
+        "invalid_choice": "Value %(value)r is not a valid choice.",
+    }
+
+    def __init__(
+        self,
+        *,
+        choices: Any = None,
+        required: bool = True,
+        allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
+    ):
+        if isinstance(choices, ChoicesMeta):
+            choices = choices.choices
+        elif isinstance(choices, enum.EnumMeta):
+            choices = [(member.value, member.name) for member in choices]
+        if isinstance(choices, collections.abc.Iterator):
+            choices = list(choices)
+        self.choices = choices
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            default=default,
+            validators=validators,
+            error_messages=error_messages,
+        )
+
+    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
+        return [*super().preflight(**kwargs), *self._check_choices()]
+
+    @classmethod
+    def _choices_is_value(cls, value: Any) -> bool:
+        return isinstance(value, str | Promise) or not is_iterable(value)
+
+    def _check_choices(self) -> list[PreflightResult]:
+        if not self.choices:
+            return []
+
+        if not is_iterable(self.choices) or isinstance(self.choices, str):
+            return [
+                PreflightResult(
+                    fix="'choices' must be an iterable (e.g., a list or tuple).",
+                    obj=self,
+                    id="fields.choices_not_iterable",
+                )
+            ]
+
+        max_length = getattr(self, "max_length", None)
+        choice_max_length = 0
+        # Expect [group_name, [value, display]]
+        for choices_group in self.choices:
+            try:
+                group_name, group_choices = choices_group
+            except (TypeError, ValueError):
+                # Containing non-pairs
+                break
+            try:
+                if not all(
+                    self._choices_is_value(value) and self._choices_is_value(human_name)
+                    for value, human_name in group_choices
+                ):
+                    break
+                if max_length is not None and group_choices:
+                    choice_max_length = max(
+                        [
+                            choice_max_length,
+                            *(
+                                len(value)
+                                for value, _ in group_choices
+                                if isinstance(value, str)
+                            ),
+                        ]
+                    )
+            except (TypeError, ValueError):
+                # No groups, choices in the form [value, display]
+                value, human_name = group_name, group_choices
+                if not self._choices_is_value(value) or not self._choices_is_value(
+                    human_name
+                ):
+                    break
+                if max_length is not None and isinstance(value, str):
+                    choice_max_length = max(choice_max_length, len(value))
+
+            # Special case: choices=['ab']
+            if isinstance(choices_group, str):
+                break
+        else:
+            if max_length is not None and choice_max_length > max_length:
+                return [
+                    PreflightResult(
+                        fix="'max_length' is too small to fit the longest value "  # noqa: UP031
+                        "in 'choices' (%d characters)." % choice_max_length,
+                        obj=self,
+                        id="fields.max_length_too_small_for_choices",
+                    ),
+                ]
+            return []
+
+        return [
+            PreflightResult(
+                fix="'choices' must be an iterable containing "
+                "(actual value, human readable name) tuples.",
+                obj=self,
+                id="fields.choices_invalid_format",
+            )
+        ]
+
+    def validate(self, value: Any, model_instance: Model) -> None:
+        if self.choices is not None and value not in self.empty_values:
+            for option_key, option_value in self.choices:
+                if isinstance(option_value, list | tuple):
+                    # This is an optgroup, so look inside the group for
+                    # options.
+                    for optgroup_key, optgroup_value in option_value:
+                        if value == optgroup_key:
+                            return
+                elif value == option_key:
+                    return
+            raise exceptions.ValidationError(
+                self.error_messages["invalid_choice"],
+                code="invalid_choice",
+                params={"value": value},
+            )
+        super().validate(value, model_instance)
+
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+        name, path, args, kwargs = super().deconstruct()
+        if self.choices is not None:
+            choices = self.choices
+            if isinstance(choices, collections.abc.Iterable):
+                choices = list(choices)
+            kwargs["choices"] = choices
+        return name, path, args, kwargs
+
+    def get_choices(
+        self,
+        include_blank: bool = True,
+        blank_choice: list[tuple[str, str]] = BLANK_CHOICE_DASH,
+    ) -> list[tuple[Any, str]]:
+        """Return choices with an optional blank choice included."""
+        choices = list(self.choices) if self.choices is not None else []
+        if include_blank:
+            blank_defined = any(choice in ("", None) for choice, _ in self.flatchoices)
+            if not blank_defined:
+                choices = blank_choice + choices
+        return choices
+
+    @cached_property
+    def flatchoices(self) -> list[tuple[Any, Any]]:
+        """Flattened version of choices tuple (choices are fixed at init)."""
         if self.choices is None:
             return []
         flat = []
@@ -898,16 +914,6 @@ class Field[T](RegisterLookupMixin):
             else:
                 flat.append((choice, value))
         return flat
-
-    flatchoices = property(_get_flatchoices)
-
-    def save_form_data(self, instance: Model, data: Any) -> None:
-        assert self.name is not None
-        setattr(instance, self.name, data)
-
-    def value_from_object(self, obj: Model) -> T | None:
-        """Return the value of this field in the given model instance."""
-        return getattr(obj, self.attname)
 
 
 class BooleanField(Field[bool]):
@@ -942,14 +948,31 @@ class BooleanField(Field[bool]):
         return self.to_python(value)
 
 
-class TextField(Field[str]):
+class TextField(ChoicesField[str]):
     db_type_sql = "text"
 
-    def __init__(self, *, max_length: int | None = None, **kwargs: Any):
+    def __init__(
+        self,
+        *,
+        max_length: int | None = None,
+        choices: Any = None,
+        required: bool = True,
+        allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
+    ):
         self.max_length = max_length
-        super().__init__(**kwargs)
+        super().__init__(
+            choices=choices,
+            required=required,
+            allow_null=allow_null,
+            default=default,
+            validators=validators,
+            error_messages=error_messages,
+        )
         if self.max_length is not None:
-            self.validators.append(validators.MaxLengthValidator(self.max_length))
+            self.validators.append(MaxLengthValidator(self.max_length))
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
@@ -1805,17 +1828,15 @@ class BinaryField(Field[bytes | memoryview]):
         max_length: int | None = None,
         required: bool = True,
         allow_null: bool = False,
-        choices: Any = None,
         validators: Sequence[Callable[..., Any]] = (),
         error_messages: dict[str, str] | None = None,
     ):
         # `default` is intentionally not accepted: a str default on a bytes
-        # field is a type mismatch, and callers should set bytes values explicitly.
+        # field is a type mismatch.
         self.max_length = max_length
         super().__init__(
             required=required,
             allow_null=allow_null,
-            choices=choices,
             validators=validators,
             error_messages=error_messages,
         )
