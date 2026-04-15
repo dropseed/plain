@@ -137,16 +137,12 @@ class Field[T](RegisterLookupMixin):
         "unique": "A %(model_name)s with this %(field_label)s already exists.",
     }
 
-    # Attributes that don't affect a column definition.
-    # These attributes are ignored when altering the field.
-    non_db_attrs = (
+    # Kwargs that don't affect the column definition; the schema editor
+    # ignores these when deciding whether an ALTER is needed. Subclasses
+    # that introduce additional non-db kwargs extend this tuple.
+    non_db_attrs: tuple[str, ...] = (
         "required",
-        "choices",
         "error_messages",
-        "limit_choices_to",
-        # Database-level options are not supported, see #21961.
-        "on_delete",
-        "related_query_name",
         "validators",
     )
 
@@ -732,6 +728,8 @@ class Field[T](RegisterLookupMixin):
 
 class ChoicesField[T](Field[T]):
     """Base for fields that accept a ``choices=`` parameter."""
+
+    non_db_attrs = (*Field.non_db_attrs, "choices")
 
     default_error_messages = {
         "invalid_choice": "Value %(value)r is not a valid choice.",

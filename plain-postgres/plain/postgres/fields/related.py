@@ -96,6 +96,8 @@ def lazy_related_operation(
 class RelatedField(FieldCacheMixin, Field):
     """Base class that all relational fields inherit from."""
 
+    non_db_attrs = (*Field.non_db_attrs, "limit_choices_to", "related_query_name")
+
     # RelatedField always has a remote_field (never None)
     remote_field: ForeignObjectRel
     # path_infos is implemented as @cached_property in subclasses (ForeignKey, ManyToManyField)
@@ -366,6 +368,8 @@ class ForeignKeyField(RelatedField):
 
     ForeignKeyField targets the primary key (id) of the remote model.
     """
+
+    non_db_attrs = (*RelatedField.non_db_attrs, "on_delete")
 
     empty_strings_allowed = False
     default_error_messages = {
