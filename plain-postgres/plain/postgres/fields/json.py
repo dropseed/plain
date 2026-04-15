@@ -144,9 +144,6 @@ class JSONField(DefaultableField):
                 params={"value": value},
             )
 
-    def value_to_string(self, obj: Any) -> Any:
-        return self.value_from_object(obj)
-
 
 class DataContains(FieldGetDbPrepValueMixin, OperatorLookup):
     lookup_name = "contains"

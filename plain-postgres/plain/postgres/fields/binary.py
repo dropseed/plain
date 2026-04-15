@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from base64 import b64decode, b64encode
+from base64 import b64decode
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -11,7 +11,6 @@ from plain.validators import MaxLengthValidator
 from .base import ColumnField
 
 if TYPE_CHECKING:
-    from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.sql.compiler import SQLCompiler
 
@@ -58,13 +57,6 @@ class BinaryField(ColumnField[bytes | memoryview]):
         if value is not None:
             return psycopg.Binary(value)
         return value
-
-    def value_to_string(self, obj: Model) -> str:
-        """Binary data is serialized as base64"""
-        val = self.value_from_object(obj)
-        if val is None:
-            return ""
-        return b64encode(val).decode("ascii")
 
     def to_python(self, value: Any) -> bytes | memoryview | None:
         # If it's a string, it should be base64-encoded data

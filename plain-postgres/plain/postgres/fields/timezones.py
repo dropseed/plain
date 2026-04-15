@@ -150,12 +150,6 @@ class TimeZoneField(ChoicesField[zoneinfo.ZoneInfo]):
         # Normalize legacy timezone names before saving
         return self.LEGACY_TO_CANONICAL.get(value, value)
 
-    def value_to_string(self, obj: Model) -> str:
-        """Serialize value for fixtures/migrations."""
-        value = self.value_from_object(obj)
-        prep_value = self.get_prep_value(value)
-        return prep_value if prep_value is not None else ""
-
     def validate(self, value: Any, model_instance: Model) -> None:
         """Validate value against choices using string comparison."""
         # Convert ZoneInfo to string for choice validation since choices are strings

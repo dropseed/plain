@@ -518,13 +518,6 @@ class Field[T](RegisterLookupMixin):
             "get_limit_choices_to() should only be called on related fields"
         )
 
-    def value_to_string(self, obj: Model) -> str:
-        """
-        Return a string value of this field from the passed obj.
-        This is used by the serialization framework.
-        """
-        return str(self.value_from_object(obj))
-
     def save_form_data(self, instance: Model, data: Any) -> None:
         assert self.name is not None
         setattr(instance, self.name, data)

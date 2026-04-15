@@ -210,10 +210,6 @@ class DateField(DateTimeCheckMixin, DefaultableField[datetime.date]):
             return datetime.datetime.now().date()
         return super().get_effective_default()
 
-    def value_to_string(self, obj: Model) -> str:
-        val = self.value_from_object(obj)
-        return "" if val is None else val.isoformat()
-
 
 class DateTimeField(DateField):
     db_type_sql = "timestamp with time zone"
@@ -325,10 +321,6 @@ class DateTimeField(DateField):
             return timezone.now()
         return super().get_effective_default()
 
-    def value_to_string(self, obj: Model) -> str:
-        val = self.value_from_object(obj)
-        return "" if val is None else val.isoformat()
-
 
 class TimeField(DateTimeCheckMixin, DefaultableField[datetime.time]):
     db_type_sql = "time without time zone"
@@ -432,7 +424,3 @@ class TimeField(DateTimeCheckMixin, DefaultableField[datetime.time]):
         if not self.has_default() and self.auto_now:
             return datetime.datetime.now().time()
         return super().get_effective_default()
-
-    def value_to_string(self, obj: Model) -> str:
-        val = self.value_from_object(obj)
-        return "" if val is None else val.isoformat()

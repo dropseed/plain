@@ -6,12 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from plain import exceptions
 from plain.utils.dateparse import parse_duration
-from plain.utils.duration import duration_string
 
 from .base import DefaultableField
 
 if TYPE_CHECKING:
-    from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
 
 
@@ -51,7 +49,3 @@ class DurationField(DefaultableField[datetime.timedelta]):
     ) -> list[Callable[..., Any]]:
         # PostgreSQL has native duration field, no converters needed
         return super().get_db_converters(connection)
-
-    def value_to_string(self, obj: Model) -> str:
-        val = self.value_from_object(obj)
-        return "" if val is None else duration_string(val)
