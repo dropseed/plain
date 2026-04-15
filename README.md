@@ -2,15 +2,23 @@
 
 **The Python web framework for building apps.**
 
-A familiar foundation, reimagined for humans and agents.
+Originally a fork of Django, reshaped over years of real use. Ready for the era of agents.
 
 ## Get started
+
+Start with an agent (Claude, Codex, Amp, OpenCode, or your agent of choice):
 
 ```
 mkdir my-app && cd my-app && claude "$(curl -sSf https://plainframework.com/start.md)"
 ```
 
-Also works with Codex, Amp, OpenCode, or your agent of choice.
+Or start with uv directly:
+
+```
+uvx plain-start my-app
+```
+
+Full walkthrough: https://plainframework.com/start/
 
 ## Why Plain?
 
