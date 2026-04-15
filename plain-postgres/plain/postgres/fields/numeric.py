@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import decimal
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
 
@@ -10,7 +10,7 @@ from psycopg.types import numeric
 from plain import exceptions, validators
 from plain.preflight import PreflightResult
 
-from .base import Field
+from .base import NOT_PROVIDED, Field
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -154,10 +154,20 @@ class DecimalField(Field[decimal.Decimal]):
         *,
         max_digits: int | None = None,
         decimal_places: int | None = None,
-        **kwargs: Any,
+        required: bool = True,
+        allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
     ):
         self.max_digits, self.decimal_places = max_digits, decimal_places
-        super().__init__(**kwargs)
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            default=default,
+            validators=validators,
+            error_messages=error_messages,
+        )
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         errors = super().preflight(**kwargs)

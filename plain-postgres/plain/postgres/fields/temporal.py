@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import warnings
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from plain import exceptions
@@ -9,7 +10,7 @@ from plain.preflight import PreflightResult
 from plain.utils import timezone
 from plain.utils.dateparse import parse_date, parse_datetime, parse_time
 
-from .base import Field
+from .base import NOT_PROVIDED, Field
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -110,11 +111,26 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
     }
     description = "Date (without time)"
 
-    def __init__(self, *, auto_now: bool = False, **kwargs: Any):
+    def __init__(
+        self,
+        *,
+        auto_now: bool = False,
+        required: bool = True,
+        allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
+    ):
         self.auto_now = auto_now
         if auto_now:
-            kwargs["required"] = False
-        super().__init__(**kwargs)
+            required = False
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            default=default,
+            validators=validators,
+            error_messages=error_messages,
+        )
 
     def _check_fix_default_value(self) -> list[PreflightResult]:
         """
@@ -321,11 +337,26 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
     }
     description = "Time"
 
-    def __init__(self, *, auto_now: bool = False, **kwargs: Any):
+    def __init__(
+        self,
+        *,
+        auto_now: bool = False,
+        required: bool = True,
+        allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
+    ):
         self.auto_now = auto_now
         if auto_now:
-            kwargs["required"] = False
-        super().__init__(**kwargs)
+            required = False
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            default=default,
+            validators=validators,
+            error_messages=error_messages,
+        )
 
     def _check_fix_default_value(self) -> list[PreflightResult]:
         """

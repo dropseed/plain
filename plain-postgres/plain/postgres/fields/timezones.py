@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import zoneinfo
+from collections.abc import Callable, Sequence
 from functools import cache
 from typing import TYPE_CHECKING, Any
 
 from plain import exceptions
 
 from . import ChoicesField
+from .base import NOT_PROVIDED
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -77,11 +79,25 @@ class TimeZoneField(ChoicesField[zoneinfo.ZoneInfo]):
     # Legacy varchar(100) column — pending migration to text.
     max_length = 100
 
-    def __init__(self, **kwargs: Any):
-        if "choices" in kwargs:
-            raise TypeError("TimeZoneField does not accept custom choices.")
-        kwargs["choices"] = self._get_timezone_choices()
-        super().__init__(**kwargs)
+    def __init__(
+        self,
+        *,
+        required: bool = True,
+        allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
+    ):
+        # `choices` is intentionally not accepted: the canonical timezone list
+        # is populated internally from the system tzdata.
+        super().__init__(
+            choices=self._get_timezone_choices(),
+            required=required,
+            allow_null=allow_null,
+            default=default,
+            validators=validators,
+            error_messages=error_messages,
+        )
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()

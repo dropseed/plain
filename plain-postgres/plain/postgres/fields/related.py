@@ -16,6 +16,7 @@ from plain.preflight import PreflightResult
 
 from ..registry import models_registry
 from . import BLANK_CHOICE_DASH, Field
+from .base import NOT_PROVIDED
 from .mixins import FieldCacheMixin
 from .related_descriptors import (
     ForwardForeignKeyDescriptor,
@@ -105,11 +106,21 @@ class RelatedField(FieldCacheMixin, Field):
         *,
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
-        **kwargs: Any,
+        required: bool = True,
+        allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
     ):
         self._related_query_name = related_query_name
         self._limit_choices_to = limit_choices_to
-        super().__init__(**kwargs)
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            default=default,
+            validators=validators,
+            error_messages=error_messages,
+        )
 
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         # Handle remote_field deepcopy for RelatedFields

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-from plain import exceptions, validators
+from plain import exceptions
 from plain.postgres.dialect import adapt_ipaddressfield_value
 from plain.preflight import PreflightResult
 from plain.utils.ipv6 import clean_ipv6_address
+from plain.validators import ip_address_validators
 
-from .base import Field
+from .base import NOT_PROVIDED, Field
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
@@ -24,16 +26,26 @@ class GenericIPAddressField(Field[str]):
         *,
         protocol: str = "both",
         unpack_ipv4: bool = False,
-        **kwargs: Any,
+        required: bool = True,
+        allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
     ):
         self.unpack_ipv4 = unpack_ipv4
         self.protocol = protocol
         (
             self.default_validators,
             invalid_error_message,
-        ) = validators.ip_address_validators(protocol, unpack_ipv4)
+        ) = ip_address_validators(protocol, unpack_ipv4)
         self.default_error_messages["invalid"] = invalid_error_message
-        super().__init__(**kwargs)
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            default=default,
+            validators=validators,
+            error_messages=error_messages,
+        )
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
