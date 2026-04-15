@@ -73,6 +73,9 @@ class TextField(ChoicesField[str]):
         else:
             return []
 
+    def _max_length_for_choices_check(self) -> int | None:
+        return self.max_length
+
     def to_python(self, value: Any) -> str | None:
         if isinstance(value, str) or value is None:
             return value

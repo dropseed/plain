@@ -333,13 +333,6 @@ class DatabaseSchemaEditor:
             new_type,
         )
 
-    def _field_data_type(self, field: Field) -> str | None:
-        if isinstance(field, RelatedField):
-            return field.rel_db_type()
-        if field.db_type_sql is not None:
-            return field.db_type_sql
-        return field.db_type()
-
     def _alter_field(
         self,
         model: type[Model],
@@ -602,7 +595,7 @@ class DatabaseSchemaEditor:
         """
         self.sql_alter_column_type = "ALTER COLUMN %(column)s TYPE %(type)s"
         # Cast when data type changed.
-        if self._field_data_type(old_field) != self._field_data_type(new_field):
+        if old_field.unqualified_db_type() != new_field.unqualified_db_type():
             self.sql_alter_column_type += " USING %(column)s::%(type)s"
         return (
             (

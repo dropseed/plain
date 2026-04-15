@@ -116,6 +116,9 @@ class TimeZoneField(ChoicesField[zoneinfo.ZoneInfo]):
             return "character varying"
         return f"character varying({self.max_length})"
 
+    def _max_length_for_choices_check(self) -> int | None:
+        return self.max_length
+
     def to_python(self, value: Any) -> zoneinfo.ZoneInfo | None:
         """Convert input to ZoneInfo object."""
         if value is None or value == "":

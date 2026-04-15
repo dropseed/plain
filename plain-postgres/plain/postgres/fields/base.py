@@ -496,6 +496,13 @@ class Field[T](RegisterLookupMixin):
             return None
         return self.db_type_sql % self.db_type_parameters()
 
+    def unqualified_db_type(self) -> str | None:
+        # Uninterpolated so that parameter-only changes (e.g. `max_length`)
+        # aren't flagged as data type changes by ALTER FIELD.
+        if self.db_type_sql is not None:
+            return self.db_type_sql
+        return self.db_type()
+
     def rel_db_type(self) -> str | None:
         """
         Return the data type that a related field pointing to this field should
@@ -767,6 +774,9 @@ class ChoicesField[T](Field[T]):
     def _choices_is_value(cls, value: Any) -> bool:
         return isinstance(value, str | Promise) or not is_iterable(value)
 
+    def _max_length_for_choices_check(self) -> int | None:
+        return None
+
     def _check_choices(self) -> list[PreflightResult]:
         if not self.choices:
             return []
@@ -780,7 +790,7 @@ class ChoicesField[T](Field[T]):
                 )
             ]
 
-        max_length = getattr(self, "max_length", None)
+        max_length = self._max_length_for_choices_check()
         choice_max_length = 0
         # Expect [group_name, [value, display]]
         for choices_group in self.choices:

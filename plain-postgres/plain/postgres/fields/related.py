@@ -252,6 +252,9 @@ class RelatedField(FieldCacheMixin, Field):
         # columns from another table.
         return None
 
+    def unqualified_db_type(self) -> str | None:
+        return self.rel_db_type()
+
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
         super().contribute_to_class(cls, name)
 
