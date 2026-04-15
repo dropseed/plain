@@ -6,6 +6,7 @@ from . import (  # noqa: F401
     defaults,
     delete,
     encrypted,
+    forms,
     indexes,
     iteration,
     mixins,
