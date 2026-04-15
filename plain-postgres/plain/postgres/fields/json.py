@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from plain import exceptions, preflight
@@ -9,6 +9,7 @@ from plain.postgres import expressions, lookups
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import adapt_json_value
 from plain.postgres.fields import TextField
+from plain.postgres.fields.base import NOT_PROVIDED
 from plain.postgres.lookups import (
     FieldGetDbPrepValueMixin,
     Lookup,
@@ -40,7 +41,11 @@ class JSONField(Field):
         *,
         encoder: type[json.JSONEncoder] | None = None,
         decoder: type[json.JSONDecoder] | None = None,
-        **kwargs: Any,
+        required: bool = True,
+        allow_null: bool = False,
+        default: Any = NOT_PROVIDED,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
     ):
         if encoder and not callable(encoder):
             raise ValueError("The encoder parameter must be a callable object.")
@@ -48,7 +53,13 @@ class JSONField(Field):
             raise ValueError("The decoder parameter must be a callable object.")
         self.encoder = encoder
         self.decoder = decoder
-        super().__init__(**kwargs)
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            default=default,
+            validators=validators,
+            error_messages=error_messages,
+        )
 
     def _check_default(self) -> list[PreflightResult]:
         if (
