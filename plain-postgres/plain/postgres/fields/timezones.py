@@ -57,7 +57,6 @@ class TimeZoneField(ChoicesField[zoneinfo.ZoneInfo]):
     """
 
     db_type_sql = "character varying"
-    description = "A timezone (stored as string, accessed as ZoneInfo)"
 
     # Mapping of legacy timezone names to canonical IANA names
     # Based on IANA timezone database backward compatibility file

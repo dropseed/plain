@@ -23,7 +23,6 @@ class DurationField(DefaultableField[datetime.timedelta]):
     default_error_messages = {
         "invalid": '"%(value)s" value has an invalid format. It must be in [DD] [[HH:]MM:]ss[.uuuuuu] format.',
     }
-    description = "Duration"
 
     def to_python(self, value: Any) -> datetime.timedelta | None:
         if value is None:

@@ -138,12 +138,6 @@ class Field[T](RegisterLookupMixin):
     # that introduce additional non-db kwargs extend this tuple.
     non_db_attrs: tuple[str, ...] = ("error_messages",)
 
-    # Generic field type description, usually overridden by subclasses
-    def _description(self) -> str:
-        return f"Field of type: {self.__class__.__name__}"
-
-    description = property(_description)
-
     def __init__(
         self,
         *,

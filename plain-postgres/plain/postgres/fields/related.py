@@ -368,7 +368,6 @@ class ForeignKeyField(ColumnField, RelatedField):
     default_error_messages = {
         "invalid": "%(model)s instance with %(field)s %(value)r does not exist."
     }
-    description = "Foreign Key (type determined by related field)"
 
     def __init__(
         self,
@@ -713,8 +712,6 @@ class ManyToManyField(RelatedField):
 
     # ManyToManyField uses ManyToManyRel which has through/through_fields
     remote_field: ManyToManyRel
-
-    description = "Many-to-many relationship"
 
     def __init__(
         self,

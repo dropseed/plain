@@ -16,7 +16,6 @@ class UUIDField(DefaultableField[UUID]):
     default_error_messages = {
         "invalid": '"%(value)s" is not a valid UUID.',
     }
-    description = "Universally unique identifier"
     empty_strings_allowed = False
 
     def get_prep_value(self, value: Any) -> Any:

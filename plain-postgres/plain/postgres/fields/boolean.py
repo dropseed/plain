@@ -14,7 +14,6 @@ class BooleanField(DefaultableField[bool]):
         "invalid": '"%(value)s" value must be either True or False.',
         "invalid_nullable": '"%(value)s" value must be either True, False, or None.',
     }
-    description = "Boolean (Either True or False)"
 
     def to_python(self, value: Any) -> bool | None:
         if self.allow_null and value in self.empty_values:

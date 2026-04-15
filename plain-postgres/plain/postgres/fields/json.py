@@ -30,7 +30,6 @@ __all__ = ["JSONField"]
 class JSONField(DefaultableField):
     db_type_sql = "jsonb"
     empty_strings_allowed = False
-    description = "A JSON object"
     default_error_messages = {
         "invalid": "Value must be valid JSON.",
     }

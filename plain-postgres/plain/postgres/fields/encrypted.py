@@ -190,7 +190,6 @@ class EncryptedTextField(EncryptedFieldMixin, ColumnField[str]):
     """
 
     db_type_sql = "text"
-    description = "Encrypted text"
 
     def __init__(
         self,
@@ -274,7 +273,6 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
 
     db_type_sql = "text"
     empty_strings_allowed = False
-    description = "Encrypted JSON"
     default_error_messages = {
         "invalid": "Value must be valid JSON.",
     }

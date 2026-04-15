@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 class GenericIPAddressField(DefaultableField[str]):
     db_type_sql = "inet"
     empty_strings_allowed = False
-    description = "IP address"
     default_error_messages = {}
 
     def __init__(

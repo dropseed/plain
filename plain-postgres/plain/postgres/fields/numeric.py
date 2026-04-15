@@ -23,7 +23,6 @@ class FloatField(DefaultableField[float]):
     default_error_messages = {
         "invalid": '"%(value)s" value must be a float.',
     }
-    description = "Floating point number"
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
@@ -57,7 +56,6 @@ class IntegerField(DefaultableField[int]):
     default_error_messages = {
         "invalid": '"%(value)s" value must be an integer.',
     }
-    description = "Integer"
 
     @cached_property
     def validators(self) -> list[Callable[..., Any]]:
@@ -131,14 +129,12 @@ class BigIntegerField(IntegerField):
     db_type_sql = "bigint"
     integer_range = (-9223372036854775808, 9223372036854775807)
     psycopg_type = numeric.Int8
-    description = "Big (8 byte) integer"
 
 
 class SmallIntegerField(IntegerField):
     db_type_sql = "smallint"
     integer_range = (-32768, 32767)
     psycopg_type = numeric.Int2
-    description = "Small integer"
 
 
 class DecimalField(DefaultableField[decimal.Decimal]):
@@ -147,7 +143,6 @@ class DecimalField(DefaultableField[decimal.Decimal]):
     default_error_messages = {
         "invalid": '"%(value)s" value must be a decimal number.',
     }
-    description = "Decimal number"
 
     def __init__(
         self,

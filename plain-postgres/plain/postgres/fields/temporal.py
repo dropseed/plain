@@ -109,7 +109,6 @@ class DateField(DateTimeCheckMixin, DefaultableField[datetime.date]):
         "invalid": '"%(value)s" value has an invalid date format. It must be in YYYY-MM-DD format.',
         "invalid_date": '"%(value)s" value has the correct format (YYYY-MM-DD) but it is an invalid date.',
     }
-    description = "Date (without time)"
 
     def __init__(
         self,
@@ -225,7 +224,6 @@ class DateTimeField(DateField):
         "invalid_date": '"%(value)s" value has the correct format (YYYY-MM-DD) but it is an invalid date.',
         "invalid_datetime": '"%(value)s" value has the correct format (YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]) but it is an invalid date/time.',
     }
-    description = "Date (with time)"
 
     # __init__ is inherited from DateField
 
@@ -345,7 +343,6 @@ class TimeField(DateTimeCheckMixin, DefaultableField[datetime.time]):
         "invalid": '"%(value)s" value has an invalid format. It must be in HH:MM[:ss[.uuuuuu]] format.',
         "invalid_time": '"%(value)s" value has the correct format (HH:MM[:ss[.uuuuuu]]) but it is an invalid time.',
     }
-    description = "Time"
 
     def __init__(
         self,

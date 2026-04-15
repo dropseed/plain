@@ -88,9 +88,7 @@ class TextField(ChoicesField[str]):
 
 class EmailField(TextField):
     default_validators = [validators.validate_email]
-    description = "Email address"
 
 
 class URLField(TextField):
     default_validators = [validators.URLValidator()]
-    description = "URL"
