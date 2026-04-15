@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable, Sequence
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any, Self, cast
 
@@ -343,8 +344,16 @@ class ForeignKeyField(RelatedField):
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         db_constraint: bool = True,
-        **kwargs: Any,
+        *,
+        required: bool = True,
+        allow_null: bool = False,
+        choices: Any = None,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
     ):
+        # `default` is intentionally not accepted: a hardcoded FK id default is
+        # a portability/existence footgun. Use a callable via pre_save or set
+        # the value explicitly in code.
         if not isinstance(to, str):
             try:
                 to.model_options.model_name
@@ -370,7 +379,11 @@ class ForeignKeyField(RelatedField):
         super().__init__(
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
-            **kwargs,
+            required=required,
+            allow_null=allow_null,
+            choices=choices,
+            validators=validators,
+            error_messages=error_messages,
         )
         self.db_constraint = db_constraint
 
@@ -690,6 +703,12 @@ class ManyToManyField(RelatedField):
         symmetrical: bool | None = None,
         **kwargs: Any,
     ):
+        if "default" in kwargs:
+            raise TypeError(
+                "ManyToManyField does not accept a default. M2M relationships "
+                "have no column to default; manage membership through the "
+                "related manager."
+            )
         if not isinstance(to, str):
             try:
                 to._model_meta

@@ -43,6 +43,7 @@ from plain.utils.duration import duration_string
 from plain.utils.functional import Promise
 from plain.utils.ipv6 import clean_ipv6_address
 from plain.utils.itercompat import is_iterable
+from plain.validators import MaxLengthValidator
 
 from ..registry import models_registry
 
@@ -1798,11 +1799,28 @@ class BinaryField(Field[bytes | memoryview]):
     description = "Raw binary data"
     empty_values = [None, b""]
 
-    def __init__(self, *, max_length: int | None = None, **kwargs: Any):
+    def __init__(
+        self,
+        *,
+        max_length: int | None = None,
+        required: bool = True,
+        allow_null: bool = False,
+        choices: Any = None,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
+    ):
+        # `default` is intentionally not accepted: a str default on a bytes
+        # field is a type mismatch, and callers should set bytes values explicitly.
         self.max_length = max_length
-        super().__init__(**kwargs)
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            choices=choices,
+            validators=validators,
+            error_messages=error_messages,
+        )
         if self.max_length is not None:
-            self.validators.append(validators.MaxLengthValidator(self.max_length))
+            self.validators.append(MaxLengthValidator(self.max_length))
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
@@ -1810,33 +1828,10 @@ class BinaryField(Field[bytes | memoryview]):
             kwargs["max_length"] = self.max_length
         return name, path, args, kwargs
 
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        return [*super().preflight(**kwargs), *self._check_str_default_value()]
-
-    def _check_str_default_value(self) -> list[PreflightResult]:
-        if self.has_default() and isinstance(self.default, str):
-            return [
-                PreflightResult(
-                    fix="BinaryField's default cannot be a string. Use bytes "
-                    "content instead.",
-                    obj=self,
-                    id="fields.filefield_upload_to_not_callable",
-                )
-            ]
-        return []
-
     def get_placeholder(
         self, value: Any, compiler: SQLCompiler, connection: DatabaseConnection
     ) -> Any:
         return "%s"
-
-    def get_default(self) -> bytes | memoryview | None:
-        if self.has_default() and not callable(self.default):
-            return self.default
-        default = super().get_default()
-        if default == "":
-            return b""
-        return default
 
     def get_db_prep_value(
         self, value: Any, connection: DatabaseConnection, prepared: bool = False
