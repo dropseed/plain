@@ -23,7 +23,7 @@ from plain.utils.encoding import force_bytes
 from . import Field
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.lookups import Lookup, Transform
@@ -192,9 +192,26 @@ class EncryptedTextField(EncryptedFieldMixin, Field[str]):
     db_type_sql = "text"
     description = "Encrypted text"
 
-    def __init__(self, *, max_length: int | None = None, **kwargs: Any):
+    def __init__(
+        self,
+        *,
+        max_length: int | None = None,
+        required: bool = True,
+        allow_null: bool = False,
+        choices: Any = None,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
+    ):
+        # `default` is intentionally not accepted: Fernet encryption is
+        # non-deterministic, so a literal column DEFAULT cannot be expressed.
         self.max_length = max_length
-        super().__init__(**kwargs)
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            choices=choices,
+            validators=validators,
+            error_messages=error_messages,
+        )
 
     def to_python(self, value: Any) -> str | None:
         if isinstance(value, str) or value is None:
@@ -263,22 +280,33 @@ class EncryptedJSONField(EncryptedFieldMixin, Field):
     default_error_messages = {
         "invalid": "Value must be valid JSON.",
     }
-    _default_fix = ("dict", "{}")
 
     def __init__(
         self,
         *,
         encoder: type[json.JSONEncoder] | None = None,
         decoder: type[json.JSONDecoder] | None = None,
-        **kwargs: Any,
+        required: bool = True,
+        allow_null: bool = False,
+        choices: Any = None,
+        validators: Sequence[Callable[..., Any]] = (),
+        error_messages: dict[str, str] | None = None,
     ):
+        # `default` is intentionally not accepted: Fernet encryption is
+        # non-deterministic, so a literal column DEFAULT cannot be expressed.
         if encoder and not callable(encoder):
             raise ValueError("The encoder parameter must be a callable object.")
         if decoder and not callable(decoder):
             raise ValueError("The decoder parameter must be a callable object.")
         self.encoder = encoder
         self.decoder = decoder
-        super().__init__(**kwargs)
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            choices=choices,
+            validators=validators,
+            error_messages=error_messages,
+        )
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
@@ -325,30 +353,7 @@ class EncryptedJSONField(EncryptedFieldMixin, Field):
                 "The stored value may be corrupt."
             )
 
-    def _check_default(self) -> list[PreflightResult]:
-        if (
-            self.has_default()
-            and self.default is not None
-            and not callable(self.default)
-        ):
-            return [
-                preflight.PreflightResult(
-                    fix=(
-                        f"{self.__class__.__name__} default should be a callable instead of an instance "
-                        "so that it's not shared between all field instances. "
-                        "Use a callable instead, e.g., use `{}` instead of "
-                        "`{}`.".format(*self._default_fix)
-                    ),
-                    obj=self,
-                    id="fields.encrypted_mutable_default",
-                    warning=True,
-                )
-            ]
-        else:
-            return []
-
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         errors = super().preflight(**kwargs)
-        errors.extend(self._check_default())
         errors.extend(self._check_encrypted_constraints())
         return errors
