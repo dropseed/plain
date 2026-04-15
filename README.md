@@ -2,7 +2,8 @@
 
 **The Python web framework for building apps.**
 
-Originally a fork of Django, reshaped over years of real use. Ready for the era of agents.
+Originally a fork of Django, reshaped over years of real use.
+Ready for the era of agents.
 
 ## Get started
 
@@ -20,11 +21,11 @@ uvx plain-start my-app
 
 Full walkthrough: https://plainframework.com/start/
 
-## Why Plain?
+## What Plain code looks like
 
-Explicit, typed, and predictable. What's good for humans is good for agents.
+Explicit, typed, and predictable. What's good for humans is good for AI.
 
-Here's what Plain code looks like:
+Models are Postgres-only:
 
 ```python
 # app/users/models.py
@@ -50,20 +51,6 @@ class User(postgres.Model):
     )
 ```
 
-Views are class-based:
-
-```python
-# app/users/views.py
-from plain.views import DetailView
-from .models import User
-
-class UserDetail(DetailView):
-    template_name = "users/detail.html"
-
-    def get_object(self):
-        return User.query.get(pk=self.url_kwargs["pk"])
-```
-
 URLs use a `Router` class:
 
 ```python
@@ -78,9 +65,53 @@ class UsersRouter(Router):
     ]
 ```
 
-## Agent tooling
+Views are class-based:
 
-Plain projects include built-in tooling that agents use automatically.
+```python
+# app/users/views.py
+from plain.views import DetailView
+from .models import User
+
+class UserDetail(DetailView):
+    template_name = "users/detail.html"
+
+    def get_object(self):
+        return User.query.get(pk=self.url_kwargs["pk"])
+```
+
+Templates are Jinja:
+
+```html
+{# app/users/templates/users/detail.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ user.display_name }}</h1>
+<p>Joined {{ user.created_at.strftime("%B %Y") }}</p>
+{% endblock %}
+```
+
+## An opinionated stack
+
+Python where you want it, JS where you need it.
+
+- **Python:** 3.13+
+- **Database:** Postgres
+- **Templates:** Jinja2
+- **Frontend:** htmx, Tailwind CSS
+- **Python tooling:** uv (packages), ruff (lint/format), ty (type checking)
+- **JavaScript tooling:** oxc (lint/format), esbuild (bundling)
+- **Testing:** pytest
+
+Models declare fields as annotated attributes, and that typing carries through views, forms, and URLs. `plain check` runs `ty` on every pass — what your IDE shows, CI enforces, and agents read from the same signatures.
+
+## Observability at the core
+
+OpenTelemetry traces, a built-in request observer, and slow-query detection ship in the box. The first time an N+1 matters, you already have the tools to see it.
+
+## Agents at the forefront
+
+Predictable APIs, typed signatures, and on-demand docs happen to be what both people and coding agents need. Plain projects also ship tooling that agents use automatically.
 
 **Rules** — Always-on guardrails stored in project rules files (e.g. `.claude/rules/` for Claude Code). Short files (~50 lines) that prevent the most common mistakes.
 
@@ -100,31 +131,9 @@ plain docs --search "queryset"         # search across all packages
 - `/plain-optimize` — capture performance traces, identify slow queries and N+1 problems, apply fixes
 - `/plain-bug` — collect context and submit a bug report as a GitHub issue
 
-## CLI
+## First-party ecosystem
 
-All commands run with `uv run` (e.g. `uv run plain dev`).
-
-- `plain dev` — start dev server with auto-reload and HTTPS
-- `plain fix` — format and lint Python, CSS, and JS in one command
-- `plain check` — linting, preflight, migration, and test validation
-- `plain test` — run tests (pytest)
-- `plain docs --api` — public API surface, formatted for LLMs
-
-## Stack
-
-Plain is opinionated. These are the technologies it's built on:
-
-- **Python:** 3.13+
-- **Database:** Postgres
-- **Templates:** Jinja2
-- **Frontend:** htmx, Tailwind CSS
-- **Python tooling:** uv (packages), ruff (lint/format), ty (type checking) — all from Astral
-- **JavaScript tooling:** oxc (lint/format), esbuild (bundling)
-- **Testing:** pytest
-
-## Packages
-
-30 first-party packages, one framework. All with built-in docs.
+30 packages, one framework. All with built-in docs. Decisions that usually take a sprint are already made.
 
 **Foundation:**
 
@@ -177,7 +186,7 @@ Plain is opinionated. These are the technologies it's built on:
 
 ## About
 
-Plain is a fork of [Django](https://www.djangoproject.com/), driven by ongoing development at [PullApprove](https://www.pullapprove.com/) — with the freedom to reimagine it for the agentic era.
+Plain is a fork of [Django](https://www.djangoproject.com/), started in the stone age of 2023 and driven by real use at [PullApprove](https://www.pullapprove.com/).
 
 - Docs: https://plainframework.com/docs/
 - Source: https://github.com/dropseed/plain
