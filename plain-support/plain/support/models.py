@@ -4,6 +4,7 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.functions import Now
 
 __all__ = ["SupportFormEntry"]
 
@@ -19,7 +20,7 @@ class SupportFormEntry(postgres.Model):
     name: str = types.TextField(max_length=255)
     email: str = types.EmailField()
     message: str = types.TextField()
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.DateTimeField(default=Now())
     form_slug: str = types.TextField(max_length=255)
     # referrer? source? session?
     # extra_data

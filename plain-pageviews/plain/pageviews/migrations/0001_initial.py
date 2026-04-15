@@ -4,6 +4,7 @@ import uuid
 
 from plain import postgres
 from plain.postgres import migrations
+from plain.postgres.functions import Now
 
 
 class Migration(migrations.Migration):
@@ -18,7 +19,7 @@ class Migration(migrations.Migration):
                 ("id", postgres.PrimaryKeyField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
                 ("url", postgres.URLField(max_length=768)),
-                ("timestamp", postgres.DateTimeField(auto_now_add=True)),
+                ("timestamp", postgres.DateTimeField(default=Now())),
                 ("title", postgres.TextField(max_length=512, required=False)),
                 ("referrer", postgres.TextField(max_length=1024, required=False)),
                 ("user_id", postgres.TextField(max_length=255, required=False)),

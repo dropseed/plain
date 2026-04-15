@@ -3,6 +3,7 @@
 import plain.postgres.deletion
 from plain import postgres
 from plain.postgres import migrations
+from plain.postgres.functions import Now
 
 
 class Migration(migrations.Migration):
@@ -18,7 +19,7 @@ class Migration(migrations.Migration):
                 ("from_pattern", postgres.TextField(max_length=255)),
                 ("to_pattern", postgres.TextField(max_length=255)),
                 ("http_status", postgres.SmallIntegerField(default=301)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.DateTimeField(default=Now())),
                 ("updated_at", postgres.DateTimeField(auto_now=True)),
                 ("order", postgres.SmallIntegerField(default=0)),
                 ("enabled", postgres.BooleanField(default=True)),
@@ -38,7 +39,7 @@ class Migration(migrations.Migration):
                 ("ip_address", postgres.GenericIPAddressField()),
                 ("user_agent", postgres.TextField(max_length=512, required=False)),
                 ("referrer", postgres.TextField(max_length=512, required=False)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.DateTimeField(default=Now())),
             ],
             options={
                 "ordering": ["-created_at"],
@@ -52,7 +53,7 @@ class Migration(migrations.Migration):
                 ("ip_address", postgres.GenericIPAddressField()),
                 ("user_agent", postgres.TextField(max_length=512, required=False)),
                 ("referrer", postgres.TextField(max_length=512, required=False)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.DateTimeField(default=Now())),
             ],
             options={
                 "ordering": ["-created_at"],

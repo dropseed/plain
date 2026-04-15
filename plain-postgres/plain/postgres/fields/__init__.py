@@ -1005,7 +1005,6 @@ def _get_naive_now() -> datetime.datetime:
 
 class DateTimeCheckMixin(Field):
     auto_now: bool
-    auto_now_add: bool
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
@@ -1015,11 +1014,9 @@ class DateTimeCheckMixin(Field):
         ]
 
     def _check_mutually_exclusive_options(self) -> list[PreflightResult]:
-        # auto_now, auto_now_add, and default are mutually exclusive
-        # options. The use of more than one of these options together
-        # will trigger an Error
+        # auto_now and default are mutually exclusive options. The use of
+        # both options together will trigger an Error.
         mutually_exclusive_options = [
-            self.auto_now_add,
             self.auto_now,
             self.has_default(),
         ]
@@ -1029,9 +1026,8 @@ class DateTimeCheckMixin(Field):
         if enabled_options > 1:
             return [
                 PreflightResult(
-                    fix="The options auto_now, auto_now_add, and default "
-                    "are mutually exclusive. Only one of these options "
-                    "may be present.",
+                    fix="The options auto_now and default are mutually "
+                    "exclusive. Only one of these options may be present.",
                     obj=self,
                     id="fields.datetime_auto_options_mutually_exclusive",
                 )
@@ -1091,11 +1087,9 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
     }
     description = "Date (without time)"
 
-    def __init__(
-        self, *, auto_now: bool = False, auto_now_add: bool = False, **kwargs: Any
-    ):
-        self.auto_now, self.auto_now_add = auto_now, auto_now_add
-        if auto_now or auto_now_add:
+    def __init__(self, *, auto_now: bool = False, **kwargs: Any):
+        self.auto_now = auto_now
+        if auto_now:
             kwargs["required"] = False
         super().__init__(**kwargs)
 
@@ -1122,9 +1116,6 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
         name, path, args, kwargs = super().deconstruct()
         if self.auto_now:
             kwargs["auto_now"] = True
-        if self.auto_now_add:
-            kwargs["auto_now_add"] = True
-        if self.auto_now or self.auto_now_add:
             del kwargs["required"]
         return name, path, args, kwargs
 
@@ -1159,7 +1150,7 @@ class DateField(DateTimeCheckMixin, Field[datetime.date]):
         )
 
     def pre_save(self, model_instance: Model, add: bool) -> datetime.date | None:
-        if self.auto_now or (self.auto_now_add and add):
+        if self.auto_now:
             value = datetime.date.today()
             setattr(model_instance, self.attname, value)
             return value
@@ -1259,7 +1250,7 @@ class DateTimeField(DateField):
         )
 
     def pre_save(self, model_instance: Model, add: bool) -> datetime.datetime | None:
-        if self.auto_now or (self.auto_now_add and add):
+        if self.auto_now:
             value = timezone.now()
             setattr(model_instance, self.attname, value)
             return value
@@ -1728,11 +1719,9 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
     }
     description = "Time"
 
-    def __init__(
-        self, *, auto_now: bool = False, auto_now_add: bool = False, **kwargs: Any
-    ):
-        self.auto_now, self.auto_now_add = auto_now, auto_now_add
-        if auto_now or auto_now_add:
+    def __init__(self, *, auto_now: bool = False, **kwargs: Any):
+        self.auto_now = auto_now
+        if auto_now:
             kwargs["required"] = False
         super().__init__(**kwargs)
 
@@ -1762,9 +1751,6 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
         name, path, args, kwargs = super().deconstruct()
         if self.auto_now is not False:
             kwargs["auto_now"] = self.auto_now
-        if self.auto_now_add is not False:
-            kwargs["auto_now_add"] = self.auto_now_add
-        if self.auto_now or self.auto_now_add:
             del kwargs["required"]
         return name, path, args, kwargs
 
@@ -1796,7 +1782,7 @@ class TimeField(DateTimeCheckMixin, Field[datetime.time]):
         )
 
     def pre_save(self, model_instance: Model, add: bool) -> datetime.time | None:
-        if self.auto_now or (self.auto_now_add and add):
+        if self.auto_now:
             value = datetime.datetime.now().time()
             setattr(model_instance, self.attname, value)
             return value

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.functions import Now
 
 if TYPE_CHECKING:
     from plain.http import Request
@@ -20,7 +21,7 @@ class Redirect(postgres.Model):
     http_status: int = types.SmallIntegerField(
         default=301
     )  # Default to permanent - could be choices?
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.DateTimeField(default=Now())
     updated_at: datetime = types.DateTimeField(auto_now=True)
     order: int = types.SmallIntegerField(default=0)
     enabled: bool = types.BooleanField(default=True)
@@ -106,7 +107,7 @@ class RedirectLog(postgres.Model):
     user_agent: str = types.TextField(required=False, max_length=512)
     referrer: str = types.TextField(required=False, max_length=512)
 
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.DateTimeField(default=Now())
 
     query: postgres.QuerySet[RedirectLog] = postgres.QuerySet()
 
@@ -161,7 +162,7 @@ class NotFoundLog(postgres.Model):
     user_agent: str = types.TextField(required=False, max_length=512)
     referrer: str = types.TextField(required=False, max_length=512)
 
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.DateTimeField(default=Now())
 
     query: postgres.QuerySet[NotFoundLog] = postgres.QuerySet()
 

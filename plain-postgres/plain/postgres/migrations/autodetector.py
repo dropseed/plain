@@ -798,14 +798,9 @@ class MigrationAutodetector:
         )
         if not preserve_default:
             field = field.clone()
-            if isinstance(field, time_fields) and field.auto_now_add:
-                field.default = self.questioner.ask_auto_now_add_addition(
-                    field_name, model_name
-                )
-            else:
-                field.default = self.questioner.ask_not_null_addition(
-                    field_name, model_name
-                )
+            field.default = self.questioner.ask_not_null_addition(
+                field_name, model_name
+            )
         self.add_operation(
             package_label,
             operations.AddField(

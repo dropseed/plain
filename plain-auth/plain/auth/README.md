@@ -76,6 +76,7 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.functions import Now
 from plain.passwords.models import PasswordField
 
 
@@ -84,7 +85,7 @@ class User(postgres.Model):
     email: str = types.EmailField()
     password = PasswordField()
     is_admin: bool = types.BooleanField(default=False)
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.DateTimeField(default=Now())
 
     def __str__(self):
         return self.email

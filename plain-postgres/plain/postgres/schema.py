@@ -221,7 +221,7 @@ class DatabaseSchemaEditor:
                 default = b""
             else:
                 default = ""
-        elif getattr(field, "auto_now", False) or getattr(field, "auto_now_add", False):
+        elif getattr(field, "auto_now", False):
             if isinstance(field, DateTimeField):
                 default = timezone.now()
             else:

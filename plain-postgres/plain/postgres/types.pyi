@@ -266,7 +266,6 @@ def BooleanField(
 def DateField(
     *,
     auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
@@ -279,7 +278,6 @@ def DateField(
 def DateField(
     *,
     auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
@@ -292,7 +290,6 @@ def DateField(
 def DateTimeField(
     *,
     auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
@@ -305,7 +302,6 @@ def DateTimeField(
 def DateTimeField(
     *,
     auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
@@ -318,7 +314,6 @@ def DateTimeField(
 def TimeField(
     *,
     auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
@@ -331,7 +326,6 @@ def TimeField(
 def TimeField(
     *,
     auto_now: bool = False,
-    auto_now_add: bool = False,
     max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,

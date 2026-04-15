@@ -28,6 +28,7 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.functions import Now
 from plain.passwords.models import PasswordField
 
 
@@ -36,7 +37,7 @@ class User(postgres.Model):
     email: str = types.EmailField()
     password = PasswordField()
     is_admin: bool = types.BooleanField(default=False)
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.DateTimeField(default=Now())
 
     def __str__(self) -> str:
         return self.email
@@ -689,6 +690,7 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.functions import Now
 
 class Product(postgres.Model):
     # Text fields
@@ -703,7 +705,7 @@ class Product(postgres.Model):
     is_active: bool = types.BooleanField(default=True)
 
     # Date and time fields
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.DateTimeField(default=Now())
     updated_at: datetime = types.DateTimeField(auto_now=True)
 ```
 
@@ -761,11 +763,12 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.functions import Now
 
 
 # Regular Python class for shared fields
 class TimestampedMixin:
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.DateTimeField(default=Now())
     updated_at: datetime = types.DateTimeField(auto_now=True)
 
 

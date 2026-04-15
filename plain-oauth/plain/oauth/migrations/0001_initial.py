@@ -3,6 +3,7 @@
 import plain.postgres.deletion
 from plain import postgres
 from plain.postgres import migrations
+from plain.postgres.functions import Now
 
 
 class Migration(migrations.Migration):
@@ -17,7 +18,7 @@ class Migration(migrations.Migration):
             name="OAuthConnection",
             fields=[
                 ("id", postgres.PrimaryKeyField()),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.DateTimeField(default=Now())),
                 ("updated_at", postgres.DateTimeField(auto_now=True)),
                 ("provider_key", postgres.TextField(max_length=100)),
                 ("provider_user_id", postgres.TextField(max_length=100)),

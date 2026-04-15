@@ -9,6 +9,7 @@ from app.users.models import User
 from plain import postgres
 from plain.exceptions import ValidationError
 from plain.postgres import transaction, types
+from plain.postgres.functions import Now
 from plain.utils import timezone
 
 from .exceptions import OAuthUserAlreadyExistsError
@@ -21,7 +22,7 @@ __all__ = ["OAuthConnection"]
 
 @postgres.register_model
 class OAuthConnection(postgres.Model):
-    created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime.datetime = types.DateTimeField(default=Now())
     updated_at: datetime.datetime = types.DateTimeField(auto_now=True)
 
     user = types.ForeignKeyField(

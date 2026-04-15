@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.functions import Now
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -34,7 +35,7 @@ __all__ = ["Pageview"]
 @postgres.register_model
 class Pageview(postgres.Model):
     url: str = types.URLField(max_length=2048)
-    timestamp: datetime = types.DateTimeField(auto_now_add=True)
+    timestamp: datetime = types.DateTimeField(default=Now())
 
     title: str = types.TextField(max_length=512, required=False)
     # Referrers may not always be valid URLs (e.g. `android-app://...`).

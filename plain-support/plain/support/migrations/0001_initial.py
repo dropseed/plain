@@ -5,6 +5,7 @@ import uuid
 import plain.postgres.deletion
 from plain import postgres
 from plain.postgres import migrations
+from plain.postgres.functions import Now
 
 
 class Migration(migrations.Migration):
@@ -23,7 +24,7 @@ class Migration(migrations.Migration):
                 ("name", postgres.TextField(max_length=255)),
                 ("email", postgres.EmailField()),
                 ("message", postgres.TextField()),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.DateTimeField(default=Now())),
                 ("form_slug", postgres.TextField(max_length=255)),
                 (
                     "user",

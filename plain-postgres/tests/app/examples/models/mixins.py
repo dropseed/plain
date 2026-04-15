@@ -4,12 +4,13 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.functions import Now
 
 
 class TimestampMixin:
     """Mixin that provides timestamp fields."""
 
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.DateTimeField(default=Now())
     updated_at: datetime = types.DateTimeField(auto_now=True)
 
 

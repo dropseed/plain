@@ -2,6 +2,7 @@
 
 from plain import postgres
 from plain.postgres import migrations
+from plain.postgres.functions import Now
 
 
 class Migration(migrations.Migration):
@@ -16,7 +17,7 @@ class Migration(migrations.Migration):
                 ("id", postgres.PrimaryKeyField()),
                 ("session_key", postgres.TextField(max_length=40)),
                 ("session_data", postgres.JSONField(default=dict, required=False)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.DateTimeField(default=Now())),
                 ("expires_at", postgres.DateTimeField(allow_null=True)),
             ],
         ),

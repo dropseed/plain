@@ -6,6 +6,7 @@ import plain.flags.models
 import plain.postgres.deletion
 from plain import postgres
 from plain.postgres import migrations
+from plain.postgres.functions import Now
 
 
 class Migration(migrations.Migration):
@@ -19,7 +20,7 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.DateTimeField(default=Now())),
                 ("updated_at", postgres.DateTimeField(auto_now=True)),
                 (
                     "name",
@@ -38,7 +39,7 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("uuid", postgres.UUIDField(default=uuid.uuid4)),
-                ("created_at", postgres.DateTimeField(auto_now_add=True)),
+                ("created_at", postgres.DateTimeField(default=Now())),
                 ("updated_at", postgres.DateTimeField(auto_now=True)),
                 ("key", postgres.TextField(max_length=255)),
                 ("value", postgres.JSONField()),

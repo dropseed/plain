@@ -4,6 +4,7 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
+from plain.postgres.functions import Now
 
 
 @postgres.register_model
@@ -16,7 +17,7 @@ class PinnedNavItem(postgres.Model):
     )
     view_slug: str = types.TextField(max_length=255)
     order: int = types.SmallIntegerField(default=0)
-    created_at: datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime = types.DateTimeField(default=Now())
 
     query: postgres.QuerySet[PinnedNavItem] = postgres.QuerySet()
 

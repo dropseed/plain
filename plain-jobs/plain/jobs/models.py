@@ -25,6 +25,7 @@ from plain import postgres
 from plain.logs import get_framework_logger
 from plain.postgres import transaction, types
 from plain.postgres.expressions import F
+from plain.postgres.functions import Now
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.otel import format_exception_type
@@ -47,7 +48,7 @@ class JobRequest(postgres.Model):
     Keep all pending job requests in a single table.
     """
 
-    created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime.datetime = types.DateTimeField(default=Now())
     uuid: UUID = types.UUIDField(default=uuid4)
 
     job_class: str = types.TextField(max_length=255)
@@ -171,7 +172,7 @@ class JobProcess(postgres.Model):
     """
 
     uuid: UUID = types.UUIDField(default=uuid4)
-    created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime.datetime = types.DateTimeField(default=Now())
     started_at: datetime.datetime | None = types.DateTimeField(
         required=False, allow_null=True
     )
@@ -526,7 +527,7 @@ class JobResult(postgres.Model):
     """
 
     uuid: UUID = types.UUIDField(default=uuid4)
-    created_at: datetime.datetime = types.DateTimeField(auto_now_add=True)
+    created_at: datetime.datetime = types.DateTimeField(default=Now())
 
     # From the Job
     job_process_uuid: UUID = types.UUIDField()
