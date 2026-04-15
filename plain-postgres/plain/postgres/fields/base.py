@@ -509,15 +509,6 @@ class Field[T](RegisterLookupMixin):
     def get_id_value_on_save(self, instance: Model) -> Any:
         return None
 
-    def get_limit_choices_to(self) -> Any:
-        """
-        Return ``limit_choices_to`` for this model field.
-        Overridden by related fields (ForeignKey, etc.).
-        """
-        raise NotImplementedError(
-            "get_limit_choices_to() should only be called on related fields"
-        )
-
     def save_form_data(self, instance: Model, data: Any) -> None:
         assert self.name is not None
         setattr(instance, self.name, data)
