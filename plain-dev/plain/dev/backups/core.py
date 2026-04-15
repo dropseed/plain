@@ -69,7 +69,9 @@ class DatabaseBackups:
         try:
             self.prune()
         except Exception:
-            pass
+            import logging
+
+            logging.getLogger(__name__).exception("Failed to prune backups")
         return backup_dir
 
     def prune(self) -> list[str]:

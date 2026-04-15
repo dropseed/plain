@@ -1220,6 +1220,7 @@ class DatabaseConnection:
                 self._execute_create_test_db(cursor, test_db_params)
             except Exception as e:
                 self._log(f"Got an error creating the test database: {e}")
+                confirm = ""
                 if not autoclobber:
                     confirm = input(
                         "Type 'yes' if you would like to try deleting the test "

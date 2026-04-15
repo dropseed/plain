@@ -67,6 +67,7 @@ class Request:
         path_info: str = "",
     ):
         self.unique_id = str(uuid.uuid4())
+        self._read_started = False
         self.resolver_match: ResolverMatch | None = None
 
         self.method = method

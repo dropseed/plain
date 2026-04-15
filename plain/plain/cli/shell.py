@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import sys
 
@@ -67,7 +68,7 @@ def shell(interface: str | None, command: str | None) -> None:
 def run(script: str) -> None:
     """Execute Python scripts with app context"""
     before_script = "import plain.runtime; plain.runtime.setup()"
-    command = f"{before_script}; exec(open('{script}').read())"
+    command = f"{before_script}; exec(open({shlex.quote(script)}).read())"
     result = subprocess.run(["python", "-c", command])
     if result.returncode:
         sys.exit(result.returncode)

@@ -53,8 +53,8 @@ def json_script(
     json_str = json.dumps(value, cls=encoder or PlainJSONEncoder).translate(
         _json_script_escapes
     )
-    id_attr = f' id="{element_id}"' if element_id else ""
-    nonce_attr = f' nonce="{nonce}"' if nonce else ""
+    id_attr = f' id="{escape(element_id)}"' if element_id else ""
+    nonce_attr = f' nonce="{escape(nonce)}"' if nonce else ""
     return mark_safe(
         f'<script{id_attr}{nonce_attr} type="application/json">{json_str}</script>'
     )
