@@ -6,11 +6,15 @@ from typing import Any
 
 from plain.utils.functional import Promise
 
-__all__ = ["Choices", "IntegerChoices", "TextChoices"]
+__all__ = ["TextChoices"]
 
 
 class ChoicesMeta(enum.EnumMeta):
-    """A metaclass for creating a enum choices."""
+    """Metaclass for TextChoices.
+
+    Unpacks ``(value, label)`` tuples in member definitions, and exposes
+    ``.choices`` / ``.names`` / ``.labels`` / ``.values`` on the class.
+    """
 
     def __new__(
         metacls: type,
@@ -65,8 +69,8 @@ class ChoicesMeta(enum.EnumMeta):
         return [value for value, _ in cls.choices]
 
 
-class Choices(enum.Enum, metaclass=ChoicesMeta):
-    """Class for creating enumerated choices."""
+class TextChoices(str, enum.Enum, metaclass=ChoicesMeta):
+    """Class for creating enumerated string choices."""
 
     # Dynamically set by metaclass
     _label_: str
@@ -77,7 +81,7 @@ class Choices(enum.Enum, metaclass=ChoicesMeta):
 
     def __str__(self) -> str:
         """
-        Use value when cast to str, so that Choices set as model instance
+        Use value when cast to str, so that choices set as model instance
         attributes are rendered as expected in templates and similar contexts.
         """
         return str(self.value)
@@ -85,16 +89,6 @@ class Choices(enum.Enum, metaclass=ChoicesMeta):
     # A similar format was proposed for Python 3.10.
     def __repr__(self) -> str:
         return f"{self.__class__.__qualname__}.{self._name_}"
-
-
-class IntegerChoices(int, Choices):
-    """Class for creating enumerated integer choices."""
-
-    pass
-
-
-class TextChoices(str, Choices):
-    """Class for creating enumerated string choices."""
 
     @staticmethod
     def _generate_next_value_(

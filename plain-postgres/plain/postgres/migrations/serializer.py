@@ -16,7 +16,7 @@ from typing import Any
 
 from plain.postgres.base import Model
 from plain.postgres.deletion import OnDelete
-from plain.postgres.enums import Choices
+from plain.postgres.enums import TextChoices
 from plain.postgres.fields import Field
 from plain.postgres.migrations.operations.base import Operation
 from plain.postgres.migrations.utils import COMPILED_REGEX_TYPE, RegexObject
@@ -324,7 +324,7 @@ class Serializer:
         set: SetSerializer,
         tuple: TupleSerializer,
         dict: DictionarySerializer,
-        Choices: ChoicesSerializer,
+        TextChoices: ChoicesSerializer,
         enum.Enum: EnumSerializer,
         datetime.datetime: DatetimeDatetimeSerializer,
         (datetime.date, datetime.timedelta, datetime.time): DateTimeSerializer,

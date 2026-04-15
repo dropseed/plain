@@ -9,7 +9,7 @@ from .constraints import CheckConstraint, UniqueConstraint
 from .db import get_connection
 from .deletion import CASCADE, NO_ACTION, RESTRICT, SET_NULL
 from .expressions import F
-from .enums import IntegerChoices, TextChoices
+from .enums import TextChoices
 from .fields import (
     BigIntegerField,
     BinaryField,
@@ -54,7 +54,6 @@ __all__ = [
     "CheckConstraint",
     "UniqueConstraint",
     # From enums
-    "IntegerChoices",
     "TextChoices",
     # From fields
     "BigIntegerField",
