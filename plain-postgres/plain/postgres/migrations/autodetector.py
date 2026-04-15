@@ -6,7 +6,6 @@ from graphlib import TopologicalSorter
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.fields import (
-    NOT_PROVIDED,
     DateField,
     DateTimeField,
     Field,
@@ -15,6 +14,7 @@ from plain.postgres.fields import (
 from plain.postgres.fields.related import ManyToManyField, RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.migrations import operations
+from plain.postgres.migrations.exceptions import MigrationSchemaError
 from plain.postgres.migrations.migration import Migration
 from plain.postgres.migrations.operations.models import AlterModelOptions
 from plain.postgres.migrations.optimizer import MigrationOptimizer
@@ -786,20 +786,29 @@ class MigrationAutodetector:
                     self.to_state,
                 )
             )
-        # You can't just add NOT NULL fields with no default or fields
-        # which don't allow empty strings as default.
+        # NOT NULL fields without a default can't be added to an existing
+        # table — existing rows have no value. Refuse here rather than
+        # generating a migration that would fail at apply time.
         time_fields = (DateField, DateTimeField, TimeField)
-        preserve_default = (
+        can_add_without_backfill = (
             field.allow_null
             or field.has_default()
             or isinstance(field, ManyToManyField)
             or (not field.required and field.empty_strings_allowed)
             or (isinstance(field, time_fields) and field.auto_now)
         )
-        if not preserve_default:
-            field = field.clone()
-            field.default = self.questioner.ask_not_null_addition(
-                field_name, model_name
+        if not can_add_without_backfill:
+            raise MigrationSchemaError(
+                f"Cannot add non-nullable field '{model_name}.{field_name}' "
+                f"without a default. Existing rows have no value for this "
+                f"column.\n\n"
+                f"Choose one:\n"
+                f"  1. Declare a default on the field in models.py, e.g.\n"
+                f'       {field_name}: str = types.TextField(default="...")\n'
+                f"  2. Split into two migrations: add the field as nullable, "
+                f"write a data migration to populate existing rows, then alter "
+                f"to NOT NULL:\n"
+                f"       uv run plain migrations create --empty --name backfill_{field_name}"
             )
         self.add_operation(
             package_label,
@@ -807,7 +816,6 @@ class MigrationAutodetector:
                 model_name=model_name,
                 name=field_name,
                 field=field,
-                preserve_default=preserve_default,
             ),
             dependencies=dependencies,
         )
@@ -900,29 +908,31 @@ class MigrationAutodetector:
                 ) and not isinstance(new_field, ManyToManyField)
                 if both_m2m or neither_m2m:
                     # Either both fields are m2m or neither is
-                    preserve_default = True
                     if (
                         old_field.allow_null
                         and not new_field.allow_null
                         and not new_field.has_default()
                         and not isinstance(new_field, ManyToManyField)
                     ):
-                        field = new_field.clone()
-                        new_default = self.questioner.ask_not_null_alteration(
-                            field_name, model_name
+                        raise MigrationSchemaError(
+                            f"Cannot alter field '{model_name}.{field_name}' "
+                            f"from nullable to NOT NULL without a default. "
+                            f"Existing NULL rows have no value to fall back "
+                            f"on.\n\n"
+                            f"Choose one:\n"
+                            f"  1. Declare a default on the field in models.py, e.g.\n"
+                            f'       {field_name}: str = types.TextField(default="...")\n'
+                            f"  2. Split into two migrations: write a data "
+                            f"migration to populate the NULL rows first, then "
+                            f"alter to NOT NULL:\n"
+                            f"       uv run plain migrations create --empty --name backfill_{field_name}"
                         )
-                        if new_default is not NOT_PROVIDED:
-                            field.default = new_default
-                            preserve_default = False
-                    else:
-                        field = new_field
                     self.add_operation(
                         package_label,
                         operations.AlterField(
                             model_name=model_name,
                             name=field_name,
-                            field=field,
-                            preserve_default=preserve_default,
+                            field=new_field,
                         ),
                         dependencies=dependencies,
                     )

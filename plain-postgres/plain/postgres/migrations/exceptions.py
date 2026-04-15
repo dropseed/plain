@@ -52,3 +52,12 @@ class NodeNotFoundError(LookupError):
 
 class MigrationSchemaMissing(psycopg.DatabaseError):
     pass
+
+
+class MigrationSchemaError(Exception):
+    """The model graph contains a schema change that cannot be safely
+    translated to a single migration — e.g. adding a NOT NULL field to
+    an existing table without a default, which would leave existing rows
+    with no value."""
+
+    pass

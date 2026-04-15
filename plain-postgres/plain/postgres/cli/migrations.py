@@ -14,13 +14,14 @@ from plain.utils.text import Truncator
 from .. import migrations
 from ..db import get_connection
 from ..migrations.autodetector import MigrationAutodetector
+from ..migrations.exceptions import MigrationSchemaError
 from ..migrations.executor import MigrationExecutor
 from ..migrations.loader import AmbiguityError, MigrationLoader
 from ..migrations.migration import Migration
 from ..migrations.optimizer import MigrationOptimizer
 from ..migrations.questioner import (
     InteractiveMigrationQuestioner,
-    NonInteractiveMigrationQuestioner,
+    MigrationQuestioner,
 )
 from ..migrations.recorder import MigrationRecorder
 from ..migrations.state import ModelState, ProjectState
@@ -215,10 +216,9 @@ def create(
             dry_run=dry_run,
         )
     else:
-        questioner = NonInteractiveMigrationQuestioner(
+        questioner = MigrationQuestioner(
             specified_packages=package_labels_set,
             dry_run=dry_run,
-            verbosity=verbosity,
         )
 
     # Set up autodetector
@@ -246,12 +246,15 @@ def create(
         return
 
     # Detect changes
-    changes = autodetector.changes(
-        graph=loader.graph,
-        trim_to_packages=package_labels_set or None,
-        convert_packages=package_labels_set or None,
-        migration_name=migration_name,
-    )
+    try:
+        changes = autodetector.changes(
+            graph=loader.graph,
+            trim_to_packages=package_labels_set or None,
+            convert_packages=package_labels_set or None,
+            migration_name=migration_name,
+        )
+    except MigrationSchemaError as e:
+        raise click.ClickException(str(e)) from e
 
     if not changes:
         log(
@@ -597,15 +600,27 @@ def apply(
                 executor.loader.project_state(),
                 ProjectState.from_models_registry(models_registry),
             )
-            changes = autodetector.changes(graph=executor.loader.graph)
-            if changes:
-                packages = ", ".join(sorted(changes))
+            try:
+                changes = autodetector.changes(graph=executor.loader.graph)
+            except MigrationSchemaError:
+                # A pending change can't be generated (e.g. NOT NULL without
+                # default). Surface it through `migrations create` rather than
+                # here.
                 click.echo(
-                    f"Your models have changes that are not yet reflected in migrations ({packages})."
+                    "Your models have schema changes that are not yet reflected in migrations."
                 )
                 click.echo(
                     "Run 'plain migrations create' to create migrations for these changes."
                 )
+            else:
+                if changes:
+                    packages = ", ".join(sorted(changes))
+                    click.echo(
+                        f"Your models have changes that are not yet reflected in migrations ({packages})."
+                    )
+                    click.echo(
+                        "Run 'plain migrations create' to create migrations for these changes."
+                    )
 
 
 @cli.command("list")

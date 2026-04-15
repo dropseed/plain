@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, cast
 from plain import postgres
 from plain.packages import packages_registry
 from plain.postgres.exceptions import FieldDoesNotExist
-from plain.postgres.fields import NOT_PROVIDED
 from plain.postgres.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT, RelatedField
 from plain.postgres.meta import Meta
 from plain.postgres.migrations.utils import field_is_referenced, get_references
@@ -229,14 +228,7 @@ class ProjectState:
         model_name: str,
         name: str,
         field: Field,
-        preserve_default: bool,
     ) -> None:
-        # If preserve default is off, don't use the default for future state.
-        if not preserve_default:
-            field = field.clone()
-            field.default = NOT_PROVIDED
-        else:
-            field = field
         model_key = package_label, model_name
         self.models[model_key].fields[name] = field
         if self._relations is not None:
@@ -261,13 +253,7 @@ class ProjectState:
         model_name: str,
         name: str,
         field: Field,
-        preserve_default: bool,
     ) -> None:
-        if not preserve_default:
-            field = field.clone()
-            field.default = NOT_PROVIDED
-        else:
-            field = field
         model_key = package_label, model_name
         fields = self.models[model_key].fields
         if self._relations is not None:

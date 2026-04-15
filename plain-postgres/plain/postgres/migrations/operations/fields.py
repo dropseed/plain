@@ -3,7 +3,6 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from plain.postgres.fields import NOT_PROVIDED
 from plain.postgres.migrations.utils import field_references
 
 from .base import Operation
@@ -80,10 +79,7 @@ class FieldOperation(Operation):
 class AddField(FieldOperation):
     """Add a field to a model."""
 
-    def __init__(
-        self, model_name: str, name: str, field: Field, preserve_default: bool = True
-    ) -> None:
-        self.preserve_default = preserve_default
+    def __init__(self, model_name: str, name: str, field: Field) -> None:
         super().__init__(model_name, name, field)
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
@@ -92,8 +88,6 @@ class AddField(FieldOperation):
             "name": self.name,
             "field": self.field,
         }
-        if self.preserve_default is not True:
-            kwargs["preserve_default"] = self.preserve_default
         return (self.__class__.__name__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: Any) -> None:
@@ -102,7 +96,6 @@ class AddField(FieldOperation):
             self.model_name_lower,
             self.name,
             self.field,
-            self.preserve_default,
         )
 
     def database_forwards(
@@ -118,14 +111,10 @@ class AddField(FieldOperation):
         )
         field = to_model._model_meta.get_forward_field(self.name)
         assert self.field is not None
-        if not self.preserve_default:
-            field.default = self.field.default
         schema_editor.add_field(
             from_model,
             field,
         )
-        if not self.preserve_default:
-            field.default = NOT_PROVIDED
 
     def describe(self) -> str:
         return f"Add field {self.name} to {self.model_name}"
@@ -217,10 +206,7 @@ class AlterField(FieldOperation):
     new field.
     """
 
-    def __init__(
-        self, model_name: str, name: str, field: Field, preserve_default: bool = True
-    ) -> None:
-        self.preserve_default = preserve_default
+    def __init__(self, model_name: str, name: str, field: Field) -> None:
         super().__init__(model_name, name, field)
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
@@ -229,8 +215,6 @@ class AlterField(FieldOperation):
             "name": self.name,
             "field": self.field,
         }
-        if self.preserve_default is not True:
-            kwargs["preserve_default"] = self.preserve_default
         return (self.__class__.__name__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: Any) -> None:
@@ -239,7 +223,6 @@ class AlterField(FieldOperation):
             self.model_name_lower,
             self.name,
             self.field,
-            self.preserve_default,
         )
 
     def database_forwards(
@@ -256,11 +239,7 @@ class AlterField(FieldOperation):
         from_field = from_model._model_meta.get_forward_field(self.name)
         to_field = to_model._model_meta.get_forward_field(self.name)
         assert self.field is not None
-        if not self.preserve_default:
-            to_field.default = self.field.default
         schema_editor.alter_field(from_model, from_field, to_field)
-        if not self.preserve_default:
-            to_field.default = NOT_PROVIDED
 
     def describe(self) -> str:
         return f"Alter field {self.name} on {self.model_name}"

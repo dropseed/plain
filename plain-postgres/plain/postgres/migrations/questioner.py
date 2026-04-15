@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-import datetime
 import importlib
 import os
-import sys
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import click
 
 from plain.packages import packages_registry
-from plain.postgres.fields import NOT_PROVIDED
-from plain.utils import timezone
 
 from .loader import MigrationLoader
 
@@ -68,16 +63,6 @@ class MigrationQuestioner:
                 filenames = os.listdir(list(migrations_module.__path__)[0])
             return not any(x.endswith(".py") for x in filenames if x != "__init__.py")
 
-    def ask_not_null_addition(self, field_name: str, model_name: str) -> Any:
-        """Adding a NOT NULL field to a model."""
-        # None means quit
-        return None
-
-    def ask_not_null_alteration(self, field_name: str, model_name: str) -> Any:
-        """Changing a NULL field to NOT NULL."""
-        # None means quit
-        return None
-
     def ask_rename(
         self, model_name: str, old_name: str, new_name: str, field_instance: Field
     ) -> bool:
@@ -90,102 +75,8 @@ class MigrationQuestioner:
 
 
 class InteractiveMigrationQuestioner(MigrationQuestioner):
-    def __init__(
-        self,
-        defaults: dict[str, Any] | None = None,
-        specified_packages: set[str] | None = None,
-        dry_run: bool | None = None,
-    ) -> None:
-        super().__init__(
-            defaults=defaults, specified_packages=specified_packages, dry_run=dry_run
-        )
-
     def _boolean_input(self, question: str, default: bool | None = None) -> bool:
         return click.confirm(question, default=default)
-
-    def _choice_input(self, question: str, choices: list[str]) -> int:
-        choice_map = {str(i + 1): choice for i, choice in enumerate(choices)}
-        choice_map_str = "\n".join(
-            [f"{i}) {choice}" for i, choice in choice_map.items()]
-        )
-        choice = click.prompt(
-            f"{question}\n{choice_map_str}\nSelect an option",
-            type=click.Choice(choice_map.keys()),
-        )
-        return int(choice)
-
-    def _ask_default(self) -> Any:
-        """Prompt for a default value."""
-        click.echo("Please enter the default value as valid Python.")
-        click.echo(
-            "The datetime and plain.utils.timezone modules are available, so "
-            "it is possible to provide e.g. timezone.now as a value."
-        )
-        click.echo("Type 'exit' to exit this prompt")
-        while True:
-            code = click.prompt(">>> ", default="", show_default=False)
-            if not code:
-                click.echo(
-                    "Please enter some code, or 'exit' (without quotes) to exit."
-                )
-            elif code == "exit":
-                sys.exit(1)
-            else:
-                try:
-                    return eval(code, {}, {"datetime": datetime, "timezone": timezone})
-                except (SyntaxError, NameError) as e:
-                    click.echo(f"Invalid input: {e}")
-
-    def ask_not_null_addition(self, field_name: str, model_name: str) -> Any:
-        """Adding a NOT NULL field to a model."""
-        if not self.dry_run:
-            choice = self._choice_input(
-                f"It is impossible to add a non-nullable field '{field_name}' "
-                f"to {model_name} without specifying a default. This is "
-                f"because the database needs something to populate existing "
-                f"rows.\n"
-                f"Please select a fix:",
-                [
-                    (
-                        "Provide a one-off default now (will be set on all existing "
-                        "rows with a null value for this column)"
-                    ),
-                    "Quit and manually define a default value in models.py.",
-                ],
-            )
-            if choice == 2:
-                sys.exit(3)
-            else:
-                return self._ask_default()
-        return None
-
-    def ask_not_null_alteration(self, field_name: str, model_name: str) -> Any:
-        """Changing a NULL field to NOT NULL."""
-        if not self.dry_run:
-            choice = self._choice_input(
-                f"It is impossible to change a nullable field '{field_name}' "
-                f"on {model_name} to non-nullable without providing a "
-                f"default. This is because the database needs something to "
-                f"populate existing rows.\n"
-                f"Please select a fix:",
-                [
-                    (
-                        "Provide a one-off default now (will be set on all existing "
-                        "rows with a null value for this column)"
-                    ),
-                    "Ignore for now. Existing rows that contain NULL values "
-                    "will have to be handled manually, for example with a "
-                    "RunPython or RunSQL operation.",
-                    "Quit and manually define a default value in models.py.",
-                ],
-            )
-            if choice == 2:
-                return NOT_PROVIDED
-            elif choice == 3:
-                sys.exit(3)
-            else:
-                return self._ask_default()
-        return None
 
     def ask_rename(
         self, model_name: str, old_name: str, new_name: str, field_instance: Field
@@ -216,47 +107,3 @@ class InteractiveMigrationQuestioner(MigrationQuestioner):
             ),
             default=False,
         )
-
-
-class NonInteractiveMigrationQuestioner(MigrationQuestioner):
-    def __init__(
-        self,
-        defaults: dict[str, Any] | None = None,
-        specified_packages: set[str] | None = None,
-        dry_run: bool | None = None,
-        verbosity: int = 1,
-        log: Callable[[str], Any] | None = None,
-    ) -> None:
-        self.verbosity = verbosity
-        self.log = log
-        super().__init__(
-            defaults=defaults,
-            specified_packages=specified_packages,
-            dry_run=dry_run,
-        )
-
-    def log_lack_of_migration(
-        self, field_name: str, model_name: str, reason: str
-    ) -> None:
-        if self.verbosity > 0 and self.log:
-            self.log(
-                f"Field '{field_name}' on model '{model_name}' not migrated: {reason}."
-            )
-
-    def ask_not_null_addition(self, field_name: str, model_name: str) -> Any:
-        # We can't ask the user, so act like the user aborted.
-        self.log_lack_of_migration(
-            field_name,
-            model_name,
-            "it is impossible to add a non-nullable field without specifying a default",
-        )
-        sys.exit(3)
-
-    def ask_not_null_alteration(self, field_name: str, model_name: str) -> Any:
-        # We can't ask the user, so set as not provided.
-        if self.log:
-            self.log(
-                f"Field '{field_name}' on model '{model_name}' given a default of "
-                f"NOT PROVIDED and must be corrected."
-            )
-        return NOT_PROVIDED
