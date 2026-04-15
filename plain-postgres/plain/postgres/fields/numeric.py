@@ -20,9 +20,6 @@ if TYPE_CHECKING:
 class FloatField(DefaultableField[float]):
     db_type_sql = "double precision"
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": '"%(value)s" value must be a float.',
-    }
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)
@@ -42,7 +39,7 @@ class FloatField(DefaultableField[float]):
             return float(value)
         except (TypeError, ValueError):
             raise exceptions.ValidationError(
-                self.error_messages["invalid"],
+                '"%(value)s" value must be a float.',
                 code="invalid",
                 params={"value": value},
             )
@@ -53,9 +50,6 @@ class IntegerField(DefaultableField[int]):
     integer_range: tuple[int, int] = (-2147483648, 2147483647)
     psycopg_type: type = numeric.Int4
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": '"%(value)s" value must be an integer.',
-    }
 
     @cached_property
     def validators(self) -> list[Callable[..., Any]]:
@@ -119,7 +113,7 @@ class IntegerField(DefaultableField[int]):
             return int(value)
         except (TypeError, ValueError):
             raise exceptions.ValidationError(
-                self.error_messages["invalid"],
+                '"%(value)s" value must be an integer.',
                 code="invalid",
                 params={"value": value},
             )
@@ -140,9 +134,6 @@ class SmallIntegerField(IntegerField):
 class DecimalField(DefaultableField[decimal.Decimal]):
     db_type_sql = "numeric(%(max_digits)s,%(decimal_places)s)"
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": '"%(value)s" value must be a decimal number.',
-    }
 
     def __init__(
         self,
@@ -153,7 +144,6 @@ class DecimalField(DefaultableField[decimal.Decimal]):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         self.max_digits, self.decimal_places = max_digits, decimal_places
         super().__init__(
@@ -161,7 +151,6 @@ class DecimalField(DefaultableField[decimal.Decimal]):
             allow_null=allow_null,
             default=default,
             validators=validators,
-            error_messages=error_messages,
         )
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
@@ -266,13 +255,13 @@ class DecimalField(DefaultableField[decimal.Decimal]):
                 decimal_value = decimal.Decimal(value)
         except (decimal.InvalidOperation, TypeError, ValueError):
             raise exceptions.ValidationError(
-                self.error_messages["invalid"],
+                '"%(value)s" value must be a decimal number.',
                 code="invalid",
                 params={"value": value},
             )
         if not decimal_value.is_finite():
             raise exceptions.ValidationError(
-                self.error_messages["invalid"],
+                '"%(value)s" value must be a decimal number.',
                 code="invalid",
                 params={"value": value},
             )

@@ -784,7 +784,7 @@ class Model(metaclass=ModelBase):
             field = meta.get_forward_field(unique_check[0])
             params["field_label"] = field.name  # ty: ignore[invalid-assignment]
             return ValidationError(
-                message=field.error_messages["unique"],
+                message=field.unique_error_message,
                 code="unique",
                 params=params,
             )
@@ -802,7 +802,7 @@ class Model(metaclass=ModelBase):
                 params["field_label"] = " ".join(cast(list[str], field_names))
 
             # Use the first field as the message format...
-            message = meta.get_forward_field(unique_check[0]).error_messages["unique"]
+            message = meta.get_forward_field(unique_check[0]).unique_error_message
 
             return ValidationError(
                 message=message,

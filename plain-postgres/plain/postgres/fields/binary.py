@@ -28,7 +28,6 @@ class BinaryField(ColumnField[bytes | memoryview]):
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         # `default` is intentionally not accepted: a str default on a bytes
         # field is a type mismatch.
@@ -37,7 +36,6 @@ class BinaryField(ColumnField[bytes | memoryview]):
             required=required,
             allow_null=allow_null,
             validators=validators,
-            error_messages=error_messages,
         )
         if self.max_length is not None:
             self.validators.append(MaxLengthValidator(self.max_length))

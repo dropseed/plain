@@ -198,7 +198,6 @@ class EncryptedTextField(EncryptedFieldMixin, ColumnField[str]):
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         # `default` is intentionally not accepted: Fernet encryption is
         # non-deterministic, so a literal column DEFAULT cannot be expressed.
@@ -207,7 +206,6 @@ class EncryptedTextField(EncryptedFieldMixin, ColumnField[str]):
             required=required,
             allow_null=allow_null,
             validators=validators,
-            error_messages=error_messages,
         )
 
     def to_python(self, value: Any) -> str | None:
@@ -273,9 +271,6 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
 
     db_type_sql = "text"
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": "Value must be valid JSON.",
-    }
 
     def __init__(
         self,
@@ -285,7 +280,6 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         # `default` is intentionally not accepted: Fernet encryption is
         # non-deterministic, so a literal column DEFAULT cannot be expressed.
@@ -299,7 +293,6 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
             required=required,
             allow_null=allow_null,
             validators=validators,
-            error_messages=error_messages,
         )
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
@@ -319,7 +312,7 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
             json.dumps(value, cls=self.encoder)
         except TypeError:
             raise exceptions.ValidationError(
-                self.error_messages["invalid"],
+                "Value must be valid JSON.",
                 code="invalid",
                 params={"value": value},
             )

@@ -13,9 +13,6 @@ if TYPE_CHECKING:
 
 class UUIDField(DefaultableField[UUID]):
     db_type_sql = "uuid"
-    default_error_messages = {
-        "invalid": '"%(value)s" is not a valid UUID.',
-    }
     empty_strings_allowed = False
 
     def get_prep_value(self, value: Any) -> Any:
@@ -39,7 +36,7 @@ class UUIDField(DefaultableField[UUID]):
                 return UUID(**{input_form: value})
             except (AttributeError, ValueError):
                 raise exceptions.ValidationError(
-                    self.error_messages["invalid"],
+                    '"%(value)s" is not a valid UUID.',
                     code="invalid",
                     params={"value": value},
                 )

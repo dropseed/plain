@@ -27,6 +27,11 @@ def _get_naive_now() -> datetime.datetime:
     return _to_naive(timezone.now())
 
 
+_INVALID_DATE_MESSAGE = (
+    '"%(value)s" value has the correct format (YYYY-MM-DD) but it is an invalid date.'
+)
+
+
 class DateTimeCheckMixin(DefaultableField):
     auto_now: bool
 
@@ -105,10 +110,6 @@ class DateTimeCheckMixin(DefaultableField):
 class DateField(DateTimeCheckMixin, DefaultableField[datetime.date]):
     db_type_sql = "date"
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": '"%(value)s" value has an invalid date format. It must be in YYYY-MM-DD format.',
-        "invalid_date": '"%(value)s" value has the correct format (YYYY-MM-DD) but it is an invalid date.',
-    }
 
     def __init__(
         self,
@@ -118,7 +119,6 @@ class DateField(DateTimeCheckMixin, DefaultableField[datetime.date]):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         self.auto_now = auto_now
         if auto_now:
@@ -128,7 +128,6 @@ class DateField(DateTimeCheckMixin, DefaultableField[datetime.date]):
             allow_null=allow_null,
             default=default,
             validators=validators,
-            error_messages=error_messages,
         )
 
     def _check_fix_default_value(self) -> list[PreflightResult]:
@@ -176,13 +175,13 @@ class DateField(DateTimeCheckMixin, DefaultableField[datetime.date]):
                 return parsed
         except ValueError:
             raise exceptions.ValidationError(
-                self.error_messages["invalid_date"],
+                _INVALID_DATE_MESSAGE,
                 code="invalid_date",
                 params={"value": value},
             )
 
         raise exceptions.ValidationError(
-            self.error_messages["invalid"],
+            '"%(value)s" value has an invalid date format. It must be in YYYY-MM-DD format.',
             code="invalid",
             params={"value": value},
         )
@@ -219,11 +218,6 @@ class DateField(DateTimeCheckMixin, DefaultableField[datetime.date]):
 class DateTimeField(DateField):
     db_type_sql = "timestamp with time zone"
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": '"%(value)s" value has an invalid format. It must be in YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ] format.',
-        "invalid_date": '"%(value)s" value has the correct format (YYYY-MM-DD) but it is an invalid date.',
-        "invalid_datetime": '"%(value)s" value has the correct format (YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]) but it is an invalid date/time.',
-    }
 
     # __init__ is inherited from DateField
 
@@ -269,7 +263,7 @@ class DateTimeField(DateField):
                 return parsed
         except ValueError:
             raise exceptions.ValidationError(
-                self.error_messages["invalid_datetime"],
+                '"%(value)s" value has the correct format (YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]) but it is an invalid date/time.',
                 code="invalid_datetime",
                 params={"value": value},
             )
@@ -280,13 +274,13 @@ class DateTimeField(DateField):
                 return datetime.datetime(parsed.year, parsed.month, parsed.day)
         except ValueError:
             raise exceptions.ValidationError(
-                self.error_messages["invalid_date"],
+                _INVALID_DATE_MESSAGE,
                 code="invalid_date",
                 params={"value": value},
             )
 
         raise exceptions.ValidationError(
-            self.error_messages["invalid"],
+            '"%(value)s" value has an invalid format. It must be in YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ] format.',
             code="invalid",
             params={"value": value},
         )
@@ -339,10 +333,6 @@ class DateTimeField(DateField):
 class TimeField(DateTimeCheckMixin, DefaultableField[datetime.time]):
     db_type_sql = "time without time zone"
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": '"%(value)s" value has an invalid format. It must be in HH:MM[:ss[.uuuuuu]] format.',
-        "invalid_time": '"%(value)s" value has the correct format (HH:MM[:ss[.uuuuuu]]) but it is an invalid time.',
-    }
 
     def __init__(
         self,
@@ -352,7 +342,6 @@ class TimeField(DateTimeCheckMixin, DefaultableField[datetime.time]):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         self.auto_now = auto_now
         if auto_now:
@@ -362,7 +351,6 @@ class TimeField(DateTimeCheckMixin, DefaultableField[datetime.time]):
             allow_null=allow_null,
             default=default,
             validators=validators,
-            error_messages=error_messages,
         )
 
     def _check_fix_default_value(self) -> list[PreflightResult]:
@@ -410,13 +398,13 @@ class TimeField(DateTimeCheckMixin, DefaultableField[datetime.time]):
                 return parsed
         except ValueError:
             raise exceptions.ValidationError(
-                self.error_messages["invalid_time"],
+                '"%(value)s" value has the correct format (HH:MM[:ss[.uuuuuu]]) but it is an invalid time.',
                 code="invalid_time",
                 params={"value": value},
             )
 
         raise exceptions.ValidationError(
-            self.error_messages["invalid"],
+            '"%(value)s" value has an invalid format. It must be in HH:MM[:ss[.uuuuuu]] format.',
             code="invalid",
             params={"value": value},
         )

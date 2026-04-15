@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 class GenericIPAddressField(DefaultableField[str]):
     db_type_sql = "inet"
     empty_strings_allowed = False
-    default_error_messages = {}
 
     def __init__(
         self,
@@ -29,21 +28,18 @@ class GenericIPAddressField(DefaultableField[str]):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         self.unpack_ipv4 = unpack_ipv4
         self.protocol = protocol
         (
             self.default_validators,
-            invalid_error_message,
+            self.invalid_error_message,
         ) = ip_address_validators(protocol, unpack_ipv4)
-        self.default_error_messages["invalid"] = invalid_error_message
         super().__init__(
             required=required,
             allow_null=allow_null,
             default=default,
             validators=validators,
-            error_messages=error_messages,
         )
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
@@ -82,7 +78,7 @@ class GenericIPAddressField(DefaultableField[str]):
         value = value.strip()
         if ":" in value:
             return clean_ipv6_address(
-                value, self.unpack_ipv4, self.error_messages["invalid"]
+                value, self.unpack_ipv4, self.invalid_error_message
             )
         return value
 

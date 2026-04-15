@@ -39,7 +39,6 @@ def TextField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> str | None: ...
 @overload
 def TextField(
@@ -50,7 +49,6 @@ def TextField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> str: ...
 @overload
 def EmailField(
@@ -61,7 +59,6 @@ def EmailField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> str | None: ...
 @overload
 def EmailField(
@@ -72,7 +69,6 @@ def EmailField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> str: ...
 @overload
 def URLField(
@@ -83,7 +79,6 @@ def URLField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> str | None: ...
 @overload
 def URLField(
@@ -94,7 +89,6 @@ def URLField(
     default: Any = ...,
     choices: Any = None,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> str: ...
 
 # Integer fields
@@ -105,7 +99,6 @@ def IntegerField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> int | None: ...
 @overload
 def IntegerField(
@@ -114,7 +107,6 @@ def IntegerField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> int: ...
 @overload
 def BigIntegerField(
@@ -123,7 +115,6 @@ def BigIntegerField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> int | None: ...
 @overload
 def BigIntegerField(
@@ -132,7 +123,6 @@ def BigIntegerField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> int: ...
 @overload
 def SmallIntegerField(
@@ -141,7 +131,6 @@ def SmallIntegerField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> int | None: ...
 @overload
 def SmallIntegerField(
@@ -150,7 +139,6 @@ def SmallIntegerField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> int: ...
 @overload
 def PrimaryKeyField(
@@ -159,7 +147,6 @@ def PrimaryKeyField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> int | None: ...
 @overload
 def PrimaryKeyField(
@@ -168,7 +155,6 @@ def PrimaryKeyField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> int: ...
 
 # Numeric fields
@@ -179,7 +165,6 @@ def FloatField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> float | None: ...
 @overload
 def FloatField(
@@ -188,7 +173,6 @@ def FloatField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> float: ...
 @overload
 def DecimalField(
@@ -199,7 +183,6 @@ def DecimalField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> Decimal | None: ...
 @overload
 def DecimalField(
@@ -210,7 +193,6 @@ def DecimalField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> Decimal: ...
 
 # Boolean field
@@ -221,7 +203,6 @@ def BooleanField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> bool | None: ...
 @overload
 def BooleanField(
@@ -230,7 +211,6 @@ def BooleanField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> bool: ...
 
 # Date/time fields
@@ -242,7 +222,6 @@ def DateField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> date | None: ...
 @overload
 def DateField(
@@ -252,7 +231,6 @@ def DateField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> date: ...
 @overload
 def DateTimeField(
@@ -262,7 +240,6 @@ def DateTimeField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> datetime | None: ...
 @overload
 def DateTimeField(
@@ -272,7 +249,6 @@ def DateTimeField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> datetime: ...
 @overload
 def TimeField(
@@ -282,7 +258,6 @@ def TimeField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> time | None: ...
 @overload
 def TimeField(
@@ -292,7 +267,6 @@ def TimeField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> time: ...
 @overload
 def DurationField(
@@ -301,7 +275,6 @@ def DurationField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> timedelta | None: ...
 @overload
 def DurationField(
@@ -310,7 +283,6 @@ def DurationField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> timedelta: ...
 @overload
 def TimeZoneField(
@@ -319,7 +291,6 @@ def TimeZoneField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> ZoneInfo | None: ...
 @overload
 def TimeZoneField(
@@ -328,7 +299,6 @@ def TimeZoneField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> ZoneInfo: ...
 
 # Other fields
@@ -339,7 +309,6 @@ def UUIDField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> UUID | None: ...
 @overload
 def UUIDField(
@@ -348,7 +317,6 @@ def UUIDField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> UUID: ...
 @overload
 def BinaryField(
@@ -357,7 +325,6 @@ def BinaryField(
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> bytes | None: ...
 @overload
 def BinaryField(
@@ -366,7 +333,6 @@ def BinaryField(
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> bytes: ...
 @overload
 def GenericIPAddressField(
@@ -377,7 +343,6 @@ def GenericIPAddressField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> str | None: ...
 @overload
 def GenericIPAddressField(
@@ -388,7 +353,6 @@ def GenericIPAddressField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> str: ...
 @overload
 def JSONField(
@@ -399,7 +363,6 @@ def JSONField(
     allow_null: Literal[True],
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> Any: ...
 @overload
 def JSONField(
@@ -410,7 +373,6 @@ def JSONField(
     allow_null: Literal[False] = False,
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> Any: ...
 
 # Encrypted fields
@@ -421,7 +383,6 @@ def EncryptedTextField(
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> str | None: ...
 @overload
 def EncryptedTextField(
@@ -430,7 +391,6 @@ def EncryptedTextField(
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> str: ...
 @overload
 def EncryptedJSONField(
@@ -440,7 +400,6 @@ def EncryptedJSONField(
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> Any: ...
 @overload
 def EncryptedJSONField(
@@ -450,7 +409,6 @@ def EncryptedJSONField(
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> Any: ...
 
 # Related fields
@@ -465,7 +423,6 @@ def ForeignKeyField[T: Model](
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> T | None: ...
 @overload
 def ForeignKeyField[T: Model](
@@ -478,7 +435,6 @@ def ForeignKeyField[T: Model](
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),
-    error_messages: dict[str, str] | None = None,
 ) -> T: ...
 def ManyToManyField[T: Model](
     to: type[T] | str,
@@ -488,7 +444,6 @@ def ManyToManyField[T: Model](
     related_query_name: str | None = None,
     limit_choices_to: Any = None,
     symmetrical: bool | None = None,
-    error_messages: dict[str, str] | None = None,
 ) -> ManyToManyManager[T]: ...
 
 # Reverse relation descriptors

@@ -22,7 +22,6 @@ class TextField(ChoicesField[str]):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         self.max_length = max_length
         super().__init__(
@@ -31,7 +30,6 @@ class TextField(ChoicesField[str]):
             allow_null=allow_null,
             default=default,
             validators=validators,
-            error_messages=error_messages,
         )
         if self.max_length is not None:
             self.validators.append(MaxLengthValidator(self.max_length))

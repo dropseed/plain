@@ -85,7 +85,6 @@ class TimeZoneField(ChoicesField[zoneinfo.ZoneInfo]):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         # `choices` is intentionally not accepted: the canonical timezone list
         # is populated internally from the system tzdata.
@@ -95,7 +94,6 @@ class TimeZoneField(ChoicesField[zoneinfo.ZoneInfo]):
             allow_null=allow_null,
             default=default,
             validators=validators,
-            error_messages=error_messages,
         )
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:

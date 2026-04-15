@@ -127,26 +127,17 @@ class Field[T](RegisterLookupMixin):
     empty_values = list(validators.EMPTY_VALUES)
 
     default_validators = []  # Default set of validators
-    default_error_messages = {
-        "allow_null": "This field cannot be null.",
-        "required": "This field is be required.",
-        "unique": "A %(model_name)s with this %(field_label)s already exists.",
-    }
+    unique_error_message = "A %(model_name)s with this %(field_label)s already exists."
 
     # Kwargs that don't affect the column definition; the schema editor
     # ignores these when deciding whether an ALTER is needed. Subclasses
     # that introduce additional non-db kwargs extend this tuple.
-    non_db_attrs: tuple[str, ...] = ("error_messages",)
+    non_db_attrs: tuple[str, ...] = ()
 
-    def __init__(
-        self,
-        *,
-        error_messages: dict[str, str] | None = None,
-    ):
+    def __init__(self) -> None:
         self.name = None  # Set by set_attributes_from_name
         self.primary_key = False
         self.auto_created = False
-        self._error_messages = error_messages  # Store for deconstruction later
 
     def __str__(self) -> str:
         """
@@ -258,8 +249,6 @@ class Field[T](RegisterLookupMixin):
         values.
         """
         keywords: dict[str, Any] = {}
-        if self._error_messages is not None:
-            keywords["error_messages"] = self._error_messages
         # Work out path - we shorten it for known Plain core fields
         path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
         if path.startswith("plain.postgres.fields.related"):
@@ -334,14 +323,6 @@ class Field[T](RegisterLookupMixin):
         Return the converted value. Subclasses should override this.
         """
         return value
-
-    @cached_property
-    def error_messages(self) -> dict[str, str]:
-        messages = {}
-        for c in reversed(self.__class__.__mro__):
-            messages.update(getattr(c, "default_error_messages", {}))
-        messages.update(self._error_messages or {})
-        return messages
 
     def db_type_parameters(self) -> DictWrapper:
         return DictWrapper(self.__dict__, quote_name, "qn_")
@@ -564,12 +545,11 @@ class ColumnField[T](Field[T]):
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         self.required = required
         self.allow_null = allow_null
         self._validators = list(validators)
-        super().__init__(error_messages=error_messages)
+        super().__init__()
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
@@ -622,8 +602,6 @@ class ColumnField[T](Field[T]):
             try:
                 v(value)
             except exceptions.ValidationError as e:
-                if hasattr(e, "code") and e.code in self.error_messages:
-                    e.message = self.error_messages[e.code]
                 errors.extend(e.error_list)
         if errors:
             raise exceptions.ValidationError(errors)
@@ -631,12 +609,10 @@ class ColumnField[T](Field[T]):
     def validate(self, value: Any, model_instance: Model) -> None:
         if value is None and not self.allow_null:
             raise exceptions.ValidationError(
-                self.error_messages["allow_null"], code="allow_null"
+                "This field cannot be null.", code="allow_null"
             )
         if self.required and value in self.empty_values:
-            raise exceptions.ValidationError(
-                self.error_messages["required"], code="required"
-            )
+            raise exceptions.ValidationError("This field is required.", code="required")
 
     def clean(self, value: Any, model_instance: Model) -> T | None:
         value = self.to_python(value)
@@ -681,14 +657,12 @@ class DefaultableField[T](ColumnField[T]):
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         self.default = default
         super().__init__(
             required=required,
             allow_null=allow_null,
             validators=validators,
-            error_messages=error_messages,
         )
 
     def has_default(self) -> bool:
@@ -738,10 +712,6 @@ class ChoicesField[T](DefaultableField[T]):
 
     non_db_attrs = (*DefaultableField.non_db_attrs, "choices")
 
-    default_error_messages = {
-        "invalid_choice": "Value %(value)r is not a valid choice.",
-    }
-
     def __init__(
         self,
         *,
@@ -750,7 +720,6 @@ class ChoicesField[T](DefaultableField[T]):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         if isinstance(choices, ChoicesMeta):
             choices = choices.choices
@@ -764,7 +733,6 @@ class ChoicesField[T](DefaultableField[T]):
             allow_null=allow_null,
             default=default,
             validators=validators,
-            error_messages=error_messages,
         )
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
@@ -862,7 +830,7 @@ class ChoicesField[T](DefaultableField[T]):
                 elif value == option_key:
                     return
             raise exceptions.ValidationError(
-                self.error_messages["invalid_choice"],
+                "Value %(value)r is not a valid choice.",
                 code="invalid_choice",
                 params={"value": value},
             )

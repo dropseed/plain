@@ -10,10 +10,6 @@ from .base import DefaultableField
 class BooleanField(DefaultableField[bool]):
     db_type_sql = "boolean"
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": '"%(value)s" value must be either True or False.',
-        "invalid_nullable": '"%(value)s" value must be either True, False, or None.',
-    }
 
     def to_python(self, value: Any) -> bool | None:
         if self.allow_null and value in self.empty_values:
@@ -25,8 +21,12 @@ class BooleanField(DefaultableField[bool]):
             return True
         if value in ("f", "False", "0"):
             return False
+        if self.allow_null:
+            message = '"%(value)s" value must be either True, False, or None.'
+        else:
+            message = '"%(value)s" value must be either True or False.'
         raise exceptions.ValidationError(
-            self.error_messages["invalid_nullable" if self.allow_null else "invalid"],
+            message,
             code="invalid",
             params={"value": value},
         )

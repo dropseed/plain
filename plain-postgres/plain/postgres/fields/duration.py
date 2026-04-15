@@ -20,9 +20,6 @@ class DurationField(DefaultableField[datetime.timedelta]):
 
     db_type_sql = "interval"
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": '"%(value)s" value has an invalid format. It must be in [DD] [[HH:]MM:]ss[.uuuuuu] format.',
-    }
 
     def to_python(self, value: Any) -> datetime.timedelta | None:
         if value is None:
@@ -38,7 +35,7 @@ class DurationField(DefaultableField[datetime.timedelta]):
                 return parsed
 
         raise exceptions.ValidationError(
-            self.error_messages["invalid"],
+            '"%(value)s" value has an invalid format. It must be in [DD] [[HH:]MM:]ss[.uuuuuu] format.',
             code="invalid",
             params={"value": value},
         )

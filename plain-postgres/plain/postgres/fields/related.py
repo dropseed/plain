@@ -109,10 +109,7 @@ class RelatedField(FieldCacheMixin, Field):
     _limit_choices_to: Any
 
     # No __init__: ForeignKeyField and ManyToManyField each set
-    # _related_query_name, _limit_choices_to, and remote_field themselves
-    # (and call super().__init__ for error_messages). This keeps the MI
-    # super() chain in ForeignKeyField simple — ColumnField.__init__ doesn't
-    # have to know how to forward relational kwargs.
+    # _related_query_name, _limit_choices_to, and remote_field themselves.
 
     def __deepcopy__(self, memodict: dict[int, Any]) -> Self:
         # Handle remote_field deepcopy for RelatedFields
@@ -365,9 +362,6 @@ class ForeignKeyField(ColumnField, RelatedField):
     non_db_attrs = (*RelatedField.non_db_attrs, *ColumnField.non_db_attrs, "on_delete")
 
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": "%(model)s instance with %(field)s %(value)r does not exist."
-    }
 
     def __init__(
         self,
@@ -380,7 +374,6 @@ class ForeignKeyField(ColumnField, RelatedField):
         required: bool = True,
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         # `default` and `choices` are intentionally not accepted: a hardcoded
         # FK id default is a portability/existence footgun, and the related
@@ -404,7 +397,6 @@ class ForeignKeyField(ColumnField, RelatedField):
             required=required,
             allow_null=allow_null,
             validators=validators,
-            error_messages=error_messages,
         )
         self._related_query_name = related_query_name
         self._limit_choices_to = limit_choices_to
@@ -628,7 +620,7 @@ class ForeignKeyField(ColumnField, RelatedField):
         qs = qs.complex_filter(self.get_limit_choices_to())
         if not qs.exists():
             raise exceptions.ValidationError(
-                self.error_messages["invalid"],
+                "%(model)s instance with %(field)s %(value)r does not exist.",
                 code="invalid",
                 params={
                     "model": self.remote_field.model.model_options.model_name,
@@ -722,7 +714,6 @@ class ManyToManyField(RelatedField):
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         symmetrical: bool | None = None,
-        error_messages: dict[str, str] | None = None,
     ):
         # M2M has no database column, so `required`, `allow_null`, `default`,
         # `validators`, and `choices` are intentionally not accepted. Membership
@@ -753,7 +744,7 @@ class ManyToManyField(RelatedField):
             through_fields=through_fields,
         )
 
-        super().__init__(error_messages=error_messages)
+        super().__init__()
         self._related_query_name = related_query_name
         self._limit_choices_to = limit_choices_to
 

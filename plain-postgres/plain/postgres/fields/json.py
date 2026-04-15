@@ -30,9 +30,6 @@ __all__ = ["JSONField"]
 class JSONField(DefaultableField):
     db_type_sql = "jsonb"
     empty_strings_allowed = False
-    default_error_messages = {
-        "invalid": "Value must be valid JSON.",
-    }
     _default_fix = ("dict", "{}")
 
     def __init__(
@@ -44,7 +41,6 @@ class JSONField(DefaultableField):
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
         validators: Sequence[Callable[..., Any]] = (),
-        error_messages: dict[str, str] | None = None,
     ):
         if encoder and not callable(encoder):
             raise ValueError("The encoder parameter must be a callable object.")
@@ -57,7 +53,6 @@ class JSONField(DefaultableField):
             allow_null=allow_null,
             default=default,
             validators=validators,
-            error_messages=error_messages,
         )
 
     def _check_default(self) -> list[PreflightResult]:
@@ -144,7 +139,7 @@ class JSONField(DefaultableField):
             json.dumps(value, cls=self.encoder)
         except TypeError:
             raise exceptions.ValidationError(
-                self.error_messages["invalid"],
+                "Value must be valid JSON.",
                 code="invalid",
                 params={"value": value},
             )
