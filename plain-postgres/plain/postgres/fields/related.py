@@ -701,14 +701,13 @@ class ManyToManyField(RelatedField):
         related_query_name: str | None = None,
         limit_choices_to: Any = None,
         symmetrical: bool | None = None,
-        **kwargs: Any,
+        choices: Any = None,
+        error_messages: dict[str, str] | None = None,
     ):
-        if "default" in kwargs:
-            raise TypeError(
-                "ManyToManyField does not accept a default. M2M relationships "
-                "have no column to default; manage membership through the "
-                "related manager."
-            )
+        # M2M has no database column, so `required`, `allow_null`, `default`,
+        # and `validators` are intentionally not accepted. Membership is
+        # managed through the related manager; filter target rows with
+        # `limit_choices_to`.
         if not isinstance(to, str):
             try:
                 to._model_meta
@@ -733,46 +732,20 @@ class ManyToManyField(RelatedField):
             through=through,
             through_fields=through_fields,
         )
-        self.has_null_arg = "allow_null" in kwargs
 
         super().__init__(
             related_query_name=related_query_name,
             limit_choices_to=limit_choices_to,
-            **kwargs,
+            choices=choices,
+            error_messages=error_messages,
         )
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *super().preflight(**kwargs),
             *self._check_relationship_model(**kwargs),
-            *self._check_ignored_options(**kwargs),
             *self._check_table_uniqueness(**kwargs),
         ]
-
-    def _check_ignored_options(self, **kwargs: Any) -> list[PreflightResult]:
-        warnings: list[PreflightResult] = []
-
-        if self.has_null_arg:
-            warnings.append(
-                PreflightResult(
-                    fix="The 'null' option has no effect on ManyToManyField. Remove the 'null' argument.",
-                    obj=self,
-                    id="fields.m2m_null_has_no_effect",
-                    warning=True,
-                )
-            )
-
-        if self._validators:
-            warnings.append(
-                PreflightResult(
-                    fix="ManyToManyField does not support validators. Remove validators from this field.",
-                    obj=self,
-                    id="fields.m2m_validators_not_supported",
-                    warning=True,
-                )
-            )
-
-        return warnings
 
     def _check_relationship_model(
         self, from_model: type[Model] | None = None, **kwargs: Any

@@ -526,10 +526,7 @@ def ManyToManyField[T: Model](
     related_query_name: str | None = None,
     limit_choices_to: Any = None,
     symmetrical: bool | None = None,
-    required: bool = True,
-    allow_null: bool = False,
     choices: Any = None,
-    validators: Sequence[Callable[..., Any]] = (),
     error_messages: dict[str, str] | None = None,
 ) -> ManyToManyManager[T]: ...
 
