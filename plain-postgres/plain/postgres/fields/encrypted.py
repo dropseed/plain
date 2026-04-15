@@ -192,6 +192,10 @@ class EncryptedTextField(EncryptedFieldMixin, Field[str]):
     db_type_sql = "text"
     description = "Encrypted text"
 
+    def __init__(self, *, max_length: int | None = None, **kwargs: Any):
+        self.max_length = max_length
+        super().__init__(**kwargs)
+
     def to_python(self, value: Any) -> str | None:
         if isinstance(value, str) or value is None:
             return value
@@ -236,6 +240,8 @@ class EncryptedTextField(EncryptedFieldMixin, Field[str]):
         # shorten "plain.postgres.fields.encrypted" to "plain.postgres.encrypted"
         # (a module that doesn't exist).
         path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
+        if self.max_length is not None:
+            kwargs["max_length"] = self.max_length
         return name, path, args, kwargs
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:

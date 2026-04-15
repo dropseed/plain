@@ -101,7 +101,6 @@ def URLField(
 @overload
 def IntegerField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -112,7 +111,6 @@ def IntegerField(
 @overload
 def IntegerField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -123,7 +121,6 @@ def IntegerField(
 @overload
 def BigIntegerField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -134,7 +131,6 @@ def BigIntegerField(
 @overload
 def BigIntegerField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -145,7 +141,6 @@ def BigIntegerField(
 @overload
 def SmallIntegerField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -156,7 +151,6 @@ def SmallIntegerField(
 @overload
 def SmallIntegerField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -167,7 +161,6 @@ def SmallIntegerField(
 @overload
 def PrimaryKeyField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -178,7 +171,6 @@ def PrimaryKeyField(
 @overload
 def PrimaryKeyField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -191,7 +183,6 @@ def PrimaryKeyField(
 @overload
 def FloatField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -202,7 +193,6 @@ def FloatField(
 @overload
 def FloatField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -215,7 +205,6 @@ def DecimalField(
     *,
     max_digits: int | None = None,
     decimal_places: int | None = None,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -228,7 +217,6 @@ def DecimalField(
     *,
     max_digits: int | None = None,
     decimal_places: int | None = None,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -241,7 +229,6 @@ def DecimalField(
 @overload
 def BooleanField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -252,7 +239,6 @@ def BooleanField(
 @overload
 def BooleanField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -266,7 +252,6 @@ def BooleanField(
 def DateField(
     *,
     auto_now: bool = False,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -278,7 +263,6 @@ def DateField(
 def DateField(
     *,
     auto_now: bool = False,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -290,7 +274,6 @@ def DateField(
 def DateTimeField(
     *,
     auto_now: bool = False,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -302,7 +285,6 @@ def DateTimeField(
 def DateTimeField(
     *,
     auto_now: bool = False,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -314,7 +296,6 @@ def DateTimeField(
 def TimeField(
     *,
     auto_now: bool = False,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -326,7 +307,6 @@ def TimeField(
 def TimeField(
     *,
     auto_now: bool = False,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -337,7 +317,6 @@ def TimeField(
 @overload
 def DurationField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -348,7 +327,6 @@ def DurationField(
 @overload
 def DurationField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -359,7 +337,6 @@ def DurationField(
 @overload
 def TimeZoneField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -370,7 +347,6 @@ def TimeZoneField(
 @overload
 def TimeZoneField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -383,7 +359,6 @@ def TimeZoneField(
 @overload
 def UUIDField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -394,7 +369,6 @@ def UUIDField(
 @overload
 def UUIDField(
     *,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -429,7 +403,6 @@ def GenericIPAddressField(
     *,
     protocol: str = "both",
     unpack_ipv4: bool = False,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -442,7 +415,6 @@ def GenericIPAddressField(
     *,
     protocol: str = "both",
     unpack_ipv4: bool = False,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -455,7 +427,6 @@ def JSONField(
     *,
     encoder: type[JSONEncoder] | None = None,
     decoder: type[JSONDecoder] | None = None,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -468,7 +439,6 @@ def JSONField(
     *,
     encoder: type[JSONEncoder] | None = None,
     decoder: type[JSONDecoder] | None = None,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -505,7 +475,6 @@ def EncryptedJSONField(
     *,
     encoder: type[JSONEncoder] | None = None,
     decoder: type[JSONDecoder] | None = None,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -518,7 +487,6 @@ def EncryptedJSONField(
     *,
     encoder: type[JSONEncoder] | None = None,
     decoder: type[JSONDecoder] | None = None,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -536,7 +504,6 @@ def ForeignKeyField[T: Model](
     related_query_name: str | None = None,
     limit_choices_to: Any = None,
     db_constraint: bool = True,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -552,7 +519,6 @@ def ForeignKeyField[T: Model](
     related_query_name: str | None = None,
     limit_choices_to: Any = None,
     db_constraint: bool = True,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -568,7 +534,6 @@ def ManyToManyField[T: Model](
     related_query_name: str | None = None,
     limit_choices_to: Any = None,
     symmetrical: bool | None = None,
-    max_length: int | None = None,
     required: bool = True,
     allow_null: bool = False,
     default: Any = ...,

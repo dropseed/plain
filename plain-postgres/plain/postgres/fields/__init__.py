@@ -164,7 +164,6 @@ class Field[T](RegisterLookupMixin):
     # Instance attributes set during field lifecycle
     # Set by __init__
     name: str | None
-    max_length: int | None
     # Set by set_attributes_from_name (called by contribute_to_class)
     attname: str
     column: str
@@ -207,7 +206,6 @@ class Field[T](RegisterLookupMixin):
     def __init__(
         self,
         *,
-        max_length: int | None = None,
         required: bool = True,
         allow_null: bool = False,
         default: Any = NOT_PROVIDED,
@@ -216,7 +214,6 @@ class Field[T](RegisterLookupMixin):
         error_messages: dict[str, str] | None = None,
     ):
         self.name = None  # Set by set_attributes_from_name
-        self.max_length = max_length
         self.required, self.allow_null = required, allow_null
         self.default = default
         if isinstance(choices, ChoicesMeta):
@@ -310,6 +307,7 @@ class Field[T](RegisterLookupMixin):
                 )
             ]
 
+        max_length = getattr(self, "max_length", None)
         choice_max_length = 0
         # Expect [group_name, [value, display]]
         for choices_group in self.choices:
@@ -324,7 +322,7 @@ class Field[T](RegisterLookupMixin):
                     for value, human_name in group_choices
                 ):
                     break
-                if self.max_length is not None and group_choices:
+                if max_length is not None and group_choices:
                     choice_max_length = max(
                         [
                             choice_max_length,
@@ -342,14 +340,14 @@ class Field[T](RegisterLookupMixin):
                     human_name
                 ):
                     break
-                if self.max_length is not None and isinstance(value, str):
+                if max_length is not None and isinstance(value, str):
                     choice_max_length = max(choice_max_length, len(value))
 
             # Special case: choices=['ab']
             if isinstance(choices_group, str):
                 break
         else:
-            if self.max_length is not None and choice_max_length > self.max_length:
+            if max_length is not None and choice_max_length > max_length:
                 return [
                     PreflightResult(
                         fix="'max_length' is too small to fit the longest value "  # noqa: UP031
@@ -458,7 +456,6 @@ class Field[T](RegisterLookupMixin):
         # Short-form way of fetching all the default parameters
         keywords = {}
         possibles = {
-            "max_length": None,
             "required": True,
             "allow_null": False,
             "default": NOT_PROVIDED,
@@ -947,10 +944,17 @@ class BooleanField(Field[bool]):
 class TextField(Field[str]):
     db_type_sql = "text"
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, *, max_length: int | None = None, **kwargs: Any):
+        self.max_length = max_length
         super().__init__(**kwargs)
         if self.max_length is not None:
             self.validators.append(validators.MaxLengthValidator(self.max_length))
+
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+        name, path, args, kwargs = super().deconstruct()
+        if self.max_length is not None:
+            kwargs["max_length"] = self.max_length
+        return name, path, args, kwargs
 
     @property
     def description(self) -> str:
@@ -1526,24 +1530,6 @@ class IntegerField(Field[int]):
     }
     description = "Integer"
 
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        return [
-            *super().preflight(**kwargs),
-            *self._check_max_length_warning(),
-        ]
-
-    def _check_max_length_warning(self) -> list[PreflightResult]:
-        if self.max_length is not None:
-            return [
-                PreflightResult(
-                    fix=f"'max_length' is ignored when used with {self.__class__.__name__}. Remove 'max_length' from field.",
-                    obj=self,
-                    id="fields.max_length_ignored",
-                    warning=True,
-                )
-            ]
-        return []
-
     @cached_property
     def validators(self) -> list[Callable[..., Any]]:
         # These validators can't be added at field initialization time since
@@ -1646,7 +1632,6 @@ class GenericIPAddressField(Field[str]):
             invalid_error_message,
         ) = validators.ip_address_validators(protocol, unpack_ipv4)
         self.default_error_messages["invalid"] = invalid_error_message
-        kwargs["max_length"] = 39
         super().__init__(**kwargs)
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
@@ -1675,8 +1660,6 @@ class GenericIPAddressField(Field[str]):
             kwargs["unpack_ipv4"] = self.unpack_ipv4
         if self.protocol != "both":
             kwargs["protocol"] = self.protocol
-        if kwargs.get("max_length") == 39:
-            del kwargs["max_length"]
         return name, path, args, kwargs
 
     def to_python(self, value: Any) -> str | None:
@@ -1815,10 +1798,17 @@ class BinaryField(Field[bytes | memoryview]):
     description = "Raw binary data"
     empty_values = [None, b""]
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, *, max_length: int | None = None, **kwargs: Any):
+        self.max_length = max_length
         super().__init__(**kwargs)
         if self.max_length is not None:
             self.validators.append(validators.MaxLengthValidator(self.max_length))
+
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+        name, path, args, kwargs = super().deconstruct()
+        if self.max_length is not None:
+            kwargs["max_length"] = self.max_length
+        return name, path, args, kwargs
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [*super().preflight(**kwargs), *self._check_str_default_value()]
@@ -1877,15 +1867,6 @@ class UUIDField(Field[uuid.UUID]):
     }
     description = "Universally unique identifier"
     empty_strings_allowed = False
-
-    def __init__(self, **kwargs: Any):
-        kwargs["max_length"] = 32
-        super().__init__(**kwargs)
-
-    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
-        name, path, args, kwargs = super().deconstruct()
-        del kwargs["max_length"]
-        return name, path, args, kwargs
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)

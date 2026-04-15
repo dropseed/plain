@@ -74,10 +74,12 @@ class TimeZoneField(Field[zoneinfo.ZoneInfo]):
         "US/Samoa": "Pacific/Pago_Pago",
     }
 
+    # Legacy varchar(100) column — pending migration to text.
+    max_length = 100
+
     def __init__(self, **kwargs: Any):
         if "choices" in kwargs:
             raise TypeError("TimeZoneField does not accept custom choices.")
-        kwargs.setdefault("max_length", 100)
         kwargs["choices"] = self._get_timezone_choices()
         super().__init__(**kwargs)
 
