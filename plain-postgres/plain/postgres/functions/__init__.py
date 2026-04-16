@@ -50,6 +50,7 @@ from .math import (
     Sqrt,
     Tan,
 )
+from .random import RandomString
 from .text import (
     MD5,
     SHA1,
@@ -175,6 +176,8 @@ __all__ = [
     "Substr",
     "Trim",
     "Upper",
+    # random
+    "RandomString",
     # uuid
     "GenRandomUUID",
     # window

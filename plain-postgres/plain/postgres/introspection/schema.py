@@ -209,6 +209,115 @@ def _strip_balanced_parens(s: str) -> str:
     return s
 
 
+def _strip_redundant_parens(s: str) -> str:
+    """Strip balanced ``(...)`` groups that don't alter expression meaning.
+
+    pg_get_expr rewrites stored defaults with aggressive grouping parens
+    (e.g. ``(gen_random_uuid())``, ``(1 + mod(...))``) that the ORM compiler
+    doesn't emit. For DEFAULT-expression drift comparison we normalize both
+    sides by flattening every redundant paren pair outside string literals.
+
+    Caveat: this does not preserve operator precedence — `(a + b) * c` and
+    `a + b * c` would normalize identically. That's acceptable here because
+    both sides come from the same expression source, so precedence is
+    consistent.
+    """
+    if "(" not in s:
+        return s
+    out: list[str] = []
+    n = len(s)
+    i = 0
+    in_single = False
+    while i < n:
+        ch = s[i]
+        if in_single:
+            out.append(ch)
+            if ch == "'":
+                # SQL doubles single quotes to escape them inside literals.
+                if i + 1 < n and s[i + 1] == "'":
+                    out.append(s[i + 1])
+                    i += 2
+                    continue
+                in_single = False
+            i += 1
+            continue
+        if ch == "'":
+            out.append(ch)
+            in_single = True
+            i += 1
+            continue
+        if ch == "(":
+            # Find the matching `)` at the same depth.
+            depth = 1
+            j = i + 1
+            j_in_single = False
+            while j < n and depth:
+                cj = s[j]
+                if j_in_single:
+                    if cj == "'":
+                        if j + 1 < n and s[j + 1] == "'":
+                            j += 2
+                            continue
+                        j_in_single = False
+                elif cj == "'":
+                    j_in_single = True
+                elif cj == "(":
+                    depth += 1
+                elif cj == ")":
+                    depth -= 1
+                j += 1
+            if depth != 0:
+                # Unbalanced — leave the rest alone.
+                out.append(s[i:])
+                break
+            inner = s[i + 1 : j - 1]
+            stripped_inner = _strip_redundant_parens(inner)
+            # A `(...)` is a function call's argument list when the char
+            # immediately before it is an identifier char — those parens are
+            # part of the call syntax and must stay.
+            prev = out[-1] if out else ""
+            is_function_args = bool(prev) and (prev.isalnum() or prev == "_")
+            # Otherwise the parens are grouping: redundant iff the enclosed
+            # expression contains no top-level comma (a comma would mean
+            # we're inside a tuple/row-constructor, not a grouping).
+            if is_function_args or _has_top_level_comma(stripped_inner):
+                out.append("(" + stripped_inner + ")")
+            else:
+                out.append(stripped_inner)
+            i = j
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _has_top_level_comma(s: str) -> bool:
+    depth = 0
+    in_single = False
+    i = 0
+    n = len(s)
+    while i < n:
+        ch = s[i]
+        if in_single:
+            if ch == "'":
+                if i + 1 < n and s[i + 1] == "'":
+                    i += 2
+                    continue
+                in_single = False
+            i += 1
+            continue
+        if ch == "'":
+            in_single = True
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            return True
+        i += 1
+    return False
+
+
 def _normalize_sql(s: str) -> str:
     """Lowercase keywords/identifiers, strip quotes, collapse whitespace."""
     s = sqlparse.format(
@@ -420,7 +529,7 @@ def normalize_default_sql(s: str) -> str:
     """
     s = _normalize_sql(s)
     s = _strip_type_casts(s)
-    s = _strip_balanced_parens(s)
+    s = _strip_redundant_parens(s)
     return s
 
 

@@ -248,10 +248,6 @@ class EncryptedTextField(EncryptedFieldMixin, ColumnField[str]):
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
-        # Override the path rewrite from Field.deconstruct() which would
-        # shorten "plain.postgres.fields.encrypted" to "plain.postgres.encrypted"
-        # (a module that doesn't exist).
-        path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
         if self.max_length is not None:
             kwargs["max_length"] = self.max_length
         return name, path, args, kwargs
@@ -297,9 +293,6 @@ class EncryptedJSONField(EncryptedFieldMixin, ColumnField):
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
-        # Override the path rewrite from Field.deconstruct() which would
-        # shorten to a nonexistent module (same pattern as EncryptedTextField).
-        path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
         if self.encoder is not None:
             kwargs["encoder"] = self.encoder
         if self.decoder is not None:

@@ -249,19 +249,17 @@ class Field[T](RegisterLookupMixin):
         values.
         """
         keywords: dict[str, Any] = {}
-        # Work out path - we shorten it for known Plain core fields
         path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
-        if path.startswith("plain.postgres.fields.related"):
-            path = path.replace("plain.postgres.fields.related", "plain.postgres")
-        elif path.startswith("plain.postgres.fields.json"):
-            path = path.replace("plain.postgres.fields.json", "plain.postgres")
-        elif path.startswith("plain.postgres.fields.proxy"):
-            path = path.replace("plain.postgres.fields.proxy", "plain.postgres")
-        elif path.startswith("plain.postgres.fields.timezones"):
-            path = path.replace("plain.postgres.fields.timezones", "plain.postgres")
-        elif path.startswith("plain.postgres.fields"):
-            path = path.replace("plain.postgres.fields", "plain.postgres")
-        # Return basic info - other fields should override this.
+        # Shorten `plain.postgres.fields.<submod>.X` to `plain.postgres.X`
+        # when the class is re-exported at the top-level `plain.postgres`
+        # namespace. The real submodule (`plain.postgres.fields.text`) is
+        # importable but the shortened form is what migration files use.
+        if path.startswith("plain.postgres.fields."):
+            import plain.postgres as _postgres_root
+
+            cls_name = self.__class__.__qualname__
+            if getattr(_postgres_root, cls_name, None) is self.__class__:
+                path = f"plain.postgres.{cls_name}"
         # Note: self.name can be None during migration state rendering when fields are cloned
         return (self.name, path, [], keywords)
 

@@ -315,6 +315,24 @@ def UUIDField(
     validators: Sequence[Callable[..., Any]] = (),
 ) -> UUID: ...
 @overload
+def RandomStringField(
+    *,
+    length: int,
+    alphabet: str = ...,
+    required: bool = True,
+    allow_null: Literal[True],
+    validators: Sequence[Callable[..., Any]] = (),
+) -> str | None: ...
+@overload
+def RandomStringField(
+    *,
+    length: int,
+    alphabet: str = ...,
+    required: bool = True,
+    allow_null: Literal[False] = False,
+    validators: Sequence[Callable[..., Any]] = (),
+) -> str: ...
+@overload
 def BinaryField(
     *,
     max_length: int | None = None,
@@ -505,6 +523,7 @@ __all__ = [
     "ManyToManyField",
     "ManyToManyManager",
     "PrimaryKeyField",
+    "RandomStringField",
     "ReverseForeignKey",
     "ReverseForeignKeyManager",
     "ReverseManyToMany",

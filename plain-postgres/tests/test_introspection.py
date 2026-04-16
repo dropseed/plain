@@ -422,3 +422,35 @@ class TestNormalizeDefaultSql:
 
     def test_strips_double_precision(self):
         assert normalize_default_sql("1.5::double precision") == "1.5"
+
+    def test_strips_redundant_wrap_around_function_call(self):
+        """pg_get_expr wraps trivial expressions in grouping parens; the
+        compiler doesn't — they must not drive spurious drift."""
+        assert normalize_default_sql("(gen_random_uuid())") == "gen_random_uuid()"
+
+    def test_strips_nested_redundant_wraps(self):
+        assert normalize_default_sql("((gen_random_uuid()))") == "gen_random_uuid()"
+
+    def test_strips_redundant_wrap_around_arithmetic(self):
+        """Grouping parens around arithmetic are redundant for comparison."""
+        assert (
+            normalize_default_sql("(1 + mod(get_byte(x, 0), 36))")
+            == "1 + mod(get_byte(x, 0), 36)"
+        )
+
+    def test_preserves_function_call_argument_parens(self):
+        """`coalesce(a, b)` parens are call syntax — must stay."""
+        assert normalize_default_sql("coalesce(a, b)") == "coalesce(a, b)"
+
+    def test_preserves_row_constructor_parens(self):
+        """Top-level comma inside parens means it's a row/tuple, not grouping."""
+        assert normalize_default_sql("(1, 2)") == "(1, 2)"
+
+    def test_leaves_parens_inside_string_literal(self):
+        """`(` and `)` inside a quoted literal are content, not syntax."""
+        assert normalize_default_sql("'a(b)c'") == "'a(b)c'"
+
+    def test_leaves_parens_inside_literal_with_escaped_quote(self):
+        """SQL doubles `'` to escape it inside string literals — the tokenizer
+        must not mistake the doubled quote for a literal boundary."""
+        assert normalize_default_sql("'it''s (ok)'") == "'it''s (ok)'"

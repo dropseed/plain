@@ -22,7 +22,7 @@ from .numeric import (
     SmallIntegerField,
 )
 from .temporal import DateField, DateTimeField, TimeField
-from .text import EmailField, TextField, URLField
+from .text import EmailField, RandomStringField, TextField, URLField
 from .uuid import UUIDField
 
 __all__ = [
@@ -42,6 +42,7 @@ __all__ = [
     "GenericIPAddressField",
     "IntegerField",
     "NOT_PROVIDED",
+    "RandomStringField",
     "SmallIntegerField",
     "TextField",
     "TimeField",
