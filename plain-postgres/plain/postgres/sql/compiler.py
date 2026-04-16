@@ -43,7 +43,6 @@ from plain.postgres.sql.constants import (
     SINGLE,
 )
 from plain.postgres.sql.query import Query, get_order_dir
-from plain.postgres.sql.where import AND
 from plain.postgres.transaction import TransactionManagementError
 from plain.utils.hashable import make_hashable
 from plain.utils.regex_helper import _lazy_re_compile
@@ -1425,20 +1424,6 @@ class SQLCompiler:
         if self.has_extra_select:
             rows = [r[: self.col_count] for r in rows]
         return rows
-
-    def as_subquery_condition(
-        self, alias: str, columns: list[str], compiler: SQLCompiler
-    ) -> SqlWithParams:
-        qn = compiler.quote_name_unless_alias
-        qn2 = quote_name
-
-        for index, select_col in enumerate(self.query.select):
-            lhs_sql, lhs_params = self.compile(select_col)
-            rhs = f"{qn(alias)}.{qn2(columns[index])}"
-            self.query.where.add(RawSQL(f"{lhs_sql} = {rhs}", lhs_params), AND)
-
-        sql, params = self.as_sql()
-        return f"EXISTS ({sql})", params
 
     def explain_query(self) -> Generator[str]:
         result = self.execute_sql()
