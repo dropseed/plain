@@ -140,22 +140,7 @@ def SmallIntegerField(
     default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> int: ...
-@overload
-def PrimaryKeyField(
-    *,
-    required: bool = True,
-    allow_null: Literal[True],
-    default: Any = ...,
-    validators: Sequence[Callable[..., Any]] = (),
-) -> int | None: ...
-@overload
-def PrimaryKeyField(
-    *,
-    required: bool = True,
-    allow_null: Literal[False] = False,
-    default: Any = ...,
-    validators: Sequence[Callable[..., Any]] = (),
-) -> int: ...
+def PrimaryKeyField() -> int: ...
 
 # Numeric fields
 @overload
