@@ -48,7 +48,6 @@ from plain.postgres.expressions import (
 )
 from plain.postgres.fields import Field
 from plain.postgres.fields.base import ColumnField
-from plain.postgres.fields.related_lookups import MultiColSource
 from plain.postgres.lookups import Lookup
 from plain.postgres.query_utils import (
     PathInfo,
@@ -1285,7 +1284,7 @@ class Query(BaseExpression):
                 self.check_filterable(expr)
 
     def build_lookup(
-        self, lookups: list[str], lhs: BaseExpression | MultiColSource, rhs: Any
+        self, lookups: list[str], lhs: BaseExpression, rhs: Any
     ) -> Lookup | None:
         """
         Try to extract transforms and lookup from given lhs.
@@ -1297,24 +1296,14 @@ class Query(BaseExpression):
         """
         # __exact is the default lookup if one isn't given.
         *transforms, lookup_name = lookups or ["exact"]
-        if transforms:
-            if isinstance(lhs, MultiColSource):
-                raise FieldError(
-                    "Transforms are not supported on multi-column relations."
-                )
-            # At this point, lhs must be BaseExpression
-            for name in transforms:
-                lhs = self.try_transform(lhs, name)
+        for name in transforms:
+            lhs = self.try_transform(lhs, name)
         # First try get_lookup() so that the lookup takes precedence if the lhs
         # supports both transform and lookup for the name.
         lookup_class = lhs.get_lookup(lookup_name)
         if not lookup_class:
             # A lookup wasn't found. Try to interpret the name as a transform
             # and do an Exact lookup against it.
-            if isinstance(lhs, MultiColSource):
-                raise FieldError(
-                    "Transforms are not supported on multi-column relations."
-                )
             lhs = self.try_transform(lhs, lookup_name)
             lookup_name = "exact"
             lookup_class = lhs.get_lookup(lookup_name)
@@ -1491,15 +1480,7 @@ class Query(BaseExpression):
         if can_reuse is not None:
             can_reuse.update(join_list)
 
-        if isinstance(join_info.final_field, RelatedField | ForeignObjectRel):
-            if len(targets) == 1:
-                col = self._get_col(targets[0], join_info.final_field, alias)
-            else:
-                col = MultiColSource(
-                    alias, targets, join_info.targets, join_info.final_field
-                )
-        else:
-            col = self._get_col(targets[0], join_info.final_field, alias)
+        col = self._get_col(targets[0], join_info.final_field, alias)
 
         condition = self.build_lookup(list(lookups), col, value)
         assert condition is not None
