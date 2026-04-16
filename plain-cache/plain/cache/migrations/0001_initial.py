@@ -18,7 +18,10 @@ class Migration(migrations.Migration):
                 ("value", postgres.JSONField(allow_null=True, required=False)),
                 ("expires_at", postgres.DateTimeField(allow_null=True, required=False)),
                 ("created_at", postgres.DateTimeField(create_now=True)),
-                ("updated_at", postgres.DateTimeField(update_now=True)),
+                (
+                    "updated_at",
+                    postgres.DateTimeField(create_now=True, update_now=True),
+                ),
             ],
         ),
     ]

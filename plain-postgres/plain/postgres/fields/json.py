@@ -4,7 +4,7 @@ import json
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-from plain import exceptions, preflight
+from plain import exceptions
 from plain.postgres import expressions, lookups
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import adapt_json_value
@@ -22,7 +22,6 @@ from .base import DefaultableField
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.sql.compiler import SQLCompiler
-    from plain.preflight.results import PreflightResult
 
 __all__ = ["JSONField"]
 
@@ -30,7 +29,6 @@ __all__ = ["JSONField"]
 class JSONField(DefaultableField):
     db_type_sql = "jsonb"
     empty_strings_allowed = False
-    _default_fix = ("dict", "{}")
 
     def __init__(
         self,
@@ -54,38 +52,6 @@ class JSONField(DefaultableField):
             default=default,
             validators=validators,
         )
-
-    def _check_default(self) -> list[PreflightResult]:
-        if (
-            self.has_default()
-            and self.default is not None
-            and not callable(self.default)
-        ):
-            return [
-                preflight.PreflightResult(
-                    fix=(
-                        f"{self.__class__.__name__} default should be a callable instead of an instance "
-                        "so that it's not shared between all field instances. "
-                        "Use a callable instead, e.g., use `{}` instead of "
-                        "`{}`.".format(*self._default_fix)
-                    ),
-                    obj=self,
-                    id="fields.invalid_choice_mixin_default",
-                    warning=True,
-                )
-            ]
-        else:
-            return []
-
-    def preflight(self, **kwargs: Any) -> list[PreflightResult]:
-        errors = super().preflight(**kwargs)
-        errors.extend(self._check_default())
-        errors.extend(self._check_supported())
-        return errors
-
-    def _check_supported(self) -> list[PreflightResult]:
-        # PostgreSQL always supports JSONField (native JSONB type).
-        return []
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()

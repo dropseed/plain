@@ -11,7 +11,7 @@ __all__ = ["Session"]
 @postgres.register_model
 class Session(postgres.Model):
     session_key: str = types.TextField(max_length=40)
-    session_data: dict = types.JSONField(default=dict, required=False)
+    session_data: dict = types.JSONField(default={}, required=False)
     created_at: datetime = types.DateTimeField(create_now=True)
     expires_at: datetime | None = types.DateTimeField(allow_null=True)
 

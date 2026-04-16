@@ -27,7 +27,7 @@ class CachedItem(postgres.Model):
     value: Any = types.JSONField(required=False, allow_null=True)
     expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
     created_at: datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime = types.DateTimeField(update_now=True)
+    updated_at: datetime = types.DateTimeField(create_now=True, update_now=True)
 
     query: CachedItemQuerySet = CachedItemQuerySet()
 

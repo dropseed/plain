@@ -20,7 +20,10 @@ class Migration(migrations.Migration):
                 ("body", postgres.TextField(default="", required=False)),
                 ("created_at", postgres.DateTimeField(create_now=True)),
                 ("title", postgres.TextField(max_length=200)),
-                ("updated_at", postgres.DateTimeField(update_now=True)),
+                (
+                    "updated_at",
+                    postgres.DateTimeField(create_now=True, update_now=True),
+                ),
                 (
                     "author",
                     postgres.ForeignKeyField(

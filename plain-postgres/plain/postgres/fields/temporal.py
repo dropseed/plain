@@ -188,17 +188,22 @@ class DateTimeField(ColumnField[datetime.datetime]):
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [
             *super().preflight(**kwargs),
-            *self._check_mutually_exclusive_options(),
+            *self._check_update_now_backfill(),
         ]
 
-    def _check_mutually_exclusive_options(self) -> list[PreflightResult]:
-        if self.create_now and self.update_now:
+    def _check_update_now_backfill(self) -> list[PreflightResult]:
+        # update_now=True never implies a DB DEFAULT on its own (it only fires
+        # via Python pre_save), so adding the column to an existing table has
+        # no way to backfill rows unless the user also declares either a DB
+        # DEFAULT via create_now=True or a nullable column.
+        if self.update_now and not self.create_now and not self.allow_null:
             return [
                 PreflightResult(
-                    fix="The options create_now and update_now are mutually "
-                    "exclusive. Only one of these options may be present.",
+                    fix="DateTimeField(update_now=True) must be paired with "
+                    "either create_now=True (DB DEFAULT backfills existing "
+                    "rows) or allow_null=True (column is nullable).",
                     obj=self,
-                    id="fields.datetime_auto_options_mutually_exclusive",
+                    id="fields.datetime_update_now_requires_backfill",
                 )
             ]
         return []
@@ -294,11 +299,6 @@ class DateTimeField(ColumnField[datetime.datetime]):
         if not prepared:
             value = self.get_prep_value(value)
         return value
-
-    def get_effective_default(self) -> Any:
-        if self.update_now:
-            return timezone.now()
-        return super().get_effective_default()
 
 
 class TimeField(DefaultableField[datetime.time]):

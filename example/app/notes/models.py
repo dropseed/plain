@@ -18,7 +18,9 @@ class Note(postgres.Model):
     title: str = types.TextField(max_length=200)
     body: str = types.TextField(default="", required=False)
     created_at: datetime.datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime.datetime = types.DateTimeField(update_now=True)
+    updated_at: datetime.datetime = types.DateTimeField(
+        create_now=True, update_now=True
+    )
 
     query: postgres.QuerySet[Note] = postgres.QuerySet()
 

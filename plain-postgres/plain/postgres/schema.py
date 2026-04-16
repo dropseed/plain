@@ -237,7 +237,11 @@ class DatabaseSchemaEditor:
         involve adding a table instead (for M2M fields).
         """
         # Get the column's definition
-        definition, params = self.column_sql(model, field, include_default=True)
+        definition, params = self.column_sql(
+            model,
+            field,
+            include_default=field.has_persistent_column_default(),
+        )
         # It might not actually have a column behind it
         if definition is None:
             return
@@ -251,19 +255,6 @@ class DatabaseSchemaEditor:
             "definition": definition,
         }
         self.execute(sql, params)
-        # Drop the transient DEFAULT we added solely to backfill existing rows.
-        if (
-            not field.has_persistent_column_default()
-            and self.effective_default(field) is not None
-        ):
-            changes_sql, params = self._alter_column_default_sql(
-                model, None, field, drop=True
-            )
-            sql = self.sql_alter_column % {
-                "table": quote_name(model.model_options.db_table),
-                "changes": changes_sql,
-            }
-            self.execute(sql, params)
 
     def remove_field(self, model: type[Model], field: Field) -> None:
         """
@@ -402,19 +393,15 @@ class DatabaseSchemaEditor:
             )
             actions.append(fragment)
             post_actions.extend(other_actions)
-        # When changing a column NULL constraint to NOT NULL with a given
-        # default value, we need to perform 4 steps:
-        #  1. Add a default for new incoming writes
-        #  2. Update existing NULL rows with new default
-        #  3. Replace NULL constraint with NOT NULL
-        #  4. Drop the default again.
-        # Default change?
-        needs_database_default = False
+        # A nullable→NOT NULL transition with a persistent default triggers a
+        # 3-step backfill: SET DEFAULT (or keep the existing one), populate
+        # existing NULL rows, then SET NOT NULL. Without a persistent default
+        # the final SET NOT NULL will raise on any remaining NULL row — the
+        # user must declare `default=`, `allow_null=True`, or run a data
+        # migration first.
         if old_field.allow_null and not new_field.allow_null:
-            old_default = self.effective_default(old_field)
             new_default = self.effective_default(new_field)
-            if old_default != new_default and new_default is not None:
-                needs_database_default = True
+            if new_default is not None:
                 actions.append(
                     self._alter_column_default_sql(model, old_field, new_field)
                 )
@@ -423,20 +410,15 @@ class DatabaseSchemaEditor:
             fragment = self._alter_column_null_sql(model, old_field, new_field)
             if fragment:
                 null_actions.append(fragment)
-        # Only if we have a default and there is a change from NULL to NOT NULL
-        four_way_default_alteration = new_field.has_any_default() and (
+        four_way_default_alteration = new_field.has_persistent_column_default() and (
             old_field.allow_null and not new_field.allow_null
         )
         if actions or null_actions:
             if not four_way_default_alteration:
-                # If we don't have to do a 4-way default alteration we can
-                # directly run a (NOT) NULL alteration
                 actions += null_actions
-            # Combine actions together
             if actions:
                 sql, params = tuple(zip(*actions))
                 actions = [(", ".join(sql), sum(params, []))]
-            # Apply those actions
             for sql, params in actions:
                 self.execute(
                     self.sql_alter_column
@@ -474,7 +456,7 @@ class DatabaseSchemaEditor:
                         }
                     )
                 else:
-                    # Update existing rows with default value
+                    new_default = self.effective_default(new_field)
                     self.execute(
                         self.sql_update_with_default
                         % {
@@ -484,8 +466,6 @@ class DatabaseSchemaEditor:
                         },
                         [new_default],
                     )
-                # Since we didn't run a NOT NULL change before we need to do it
-                # now
                 for sql, params in null_actions:
                     self.execute(
                         self.sql_alter_column
@@ -498,15 +478,6 @@ class DatabaseSchemaEditor:
         if post_actions:
             for sql, params in post_actions:
                 self.execute(sql, params)
-        if needs_database_default and not new_field.has_persistent_column_default():
-            changes_sql, params = self._alter_column_default_sql(
-                model, old_field, new_field, drop=True
-            )
-            sql = self.sql_alter_column % {
-                "table": quote_name(model.model_options.db_table),
-                "changes": changes_sql,
-            }
-            self.execute(sql, params)
 
     def _alter_column_null_sql(
         self,

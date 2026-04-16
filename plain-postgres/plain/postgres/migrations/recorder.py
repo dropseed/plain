@@ -45,10 +45,7 @@ class MigrationRecorder:
             class Migration(postgres.Model):
                 app = postgres.TextField(max_length=255)
                 name = postgres.TextField(max_length=255)
-                # update_now (not create_now) because existing plainmigrations
-                # tables have no column DEFAULT — ensure_schema skips tables
-                # that already exist, so the DB default would never be added.
-                applied = postgres.DateTimeField(update_now=True)
+                applied = postgres.DateTimeField(create_now=True, update_now=True)
 
                 # Use isolated models registry for migrations
                 _model_meta = Meta(models_registry=_models_registry)

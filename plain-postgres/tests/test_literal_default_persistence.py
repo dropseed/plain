@@ -54,24 +54,10 @@ def test_add_field_keeps_literal_default(db):
     assert "drop default" not in joined
 
 
-def test_add_field_drops_callable_default(db):
-    """Callable defaults must still be dropped — persisting the
-    migration-time value would freeze every future INSERT to that value."""
-    field = plain_fields.TextField(max_length=10, default=lambda: "tok")
-    field.set_attributes_from_name("tmp_callable")
-
-    connection = get_connection()
-    with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor.add_field(DefaultsExample, field)
-
-    joined = " ".join(editor.executed_sql).lower()
-    assert "drop default" in joined
-
-
-def test_add_field_drops_synthesized_empty_string_default(db):
-    """`required=False` without an explicit `default=` synthesizes a transient
-    empty-string default for the ADD COLUMN backfill. That value is not
-    user-declared and must not persist on the column."""
+def test_add_field_without_default_emits_no_default_clause(db):
+    """`required=False` without an explicit `default=` no longer auto-fills
+    existing rows — the ADD COLUMN SQL carries no DEFAULT. The user has to
+    declare `default=""` (persists) or `allow_null=True` (nullable column)."""
     field = plain_fields.TextField(max_length=10, required=False)
     field.set_attributes_from_name("tmp_required_false")
 
@@ -80,22 +66,8 @@ def test_add_field_drops_synthesized_empty_string_default(db):
         editor.add_field(DefaultsExample, field)
 
     joined = " ".join(editor.executed_sql).lower()
-    assert "drop default" in joined
-
-
-def test_add_field_drops_update_now_default(db):
-    """`DateTimeField(update_now=True)` synthesizes a migration-time
-    `timezone.now()` value for backfill. Persisting it would pin the column
-    DEFAULT to that one moment — so it must be dropped like today."""
-    field = plain_fields.DateTimeField(update_now=True)
-    field.set_attributes_from_name("tmp_touched_at")
-
-    connection = get_connection()
-    with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor.add_field(DefaultsExample, field)
-
-    joined = " ".join(editor.executed_sql).lower()
-    assert "drop default" in joined
+    assert " default " not in joined
+    assert "drop default" not in joined
 
 
 def test_alter_field_nullable_to_not_null_keeps_literal_default(db):
@@ -165,39 +137,12 @@ def test_alter_field_default_only_change_is_migration_no_op(db):
     assert editor.executed_sql == []
 
 
-def test_alter_field_literal_to_callable_drops_default(db):
-    """If the new field has a callable default (non-persistent) and the
-    4-way backfill triggers a SET DEFAULT for it, the trailing DROP must
-    still run so the column is left without a persistent DEFAULT."""
-    old_field = plain_fields.TextField(max_length=20, allow_null=True, default="active")
-    old_field.set_attributes_from_name("role")
-    new_field = plain_fields.TextField(max_length=20, default=lambda: "paused")
-    new_field.set_attributes_from_name("role")
-
-    connection = get_connection()
-    with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
-
-    joined = " ".join(editor.executed_sql).lower()
-    assert "set not null" in joined
-    assert "drop default" in joined
-
-
 def test_has_persistent_literal_default_predicate():
     """Unit coverage for the predicate that drives all of the above."""
     assert plain_fields.TextField(default="x").has_persistent_literal_default()
     assert plain_fields.IntegerField(default=0).has_persistent_literal_default()
     assert plain_fields.BooleanField(default=False).has_persistent_literal_default()
     assert not plain_fields.TextField().has_persistent_literal_default()
-    assert not plain_fields.TextField(
-        default=lambda: "x"
-    ).has_persistent_literal_default()
     assert not plain_fields.TextField(
         default=None, allow_null=True
     ).has_persistent_literal_default()

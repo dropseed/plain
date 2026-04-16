@@ -53,7 +53,7 @@ class Migration(migrations.Migration):
                     "status",
                     postgres.TextField(default="", max_length=50, required=False),
                 ),
-                ("span_data", postgres.JSONField(default=dict, required=False)),
+                ("span_data", postgres.JSONField(default={}, required=False)),
             ],
             options={
                 "ordering": ["-start_time"],

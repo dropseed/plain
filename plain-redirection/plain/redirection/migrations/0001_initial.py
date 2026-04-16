@@ -19,7 +19,10 @@ class Migration(migrations.Migration):
                 ("to_pattern", postgres.TextField(max_length=255)),
                 ("http_status", postgres.SmallIntegerField(default=301)),
                 ("created_at", postgres.DateTimeField(create_now=True)),
-                ("updated_at", postgres.DateTimeField(update_now=True)),
+                (
+                    "updated_at",
+                    postgres.DateTimeField(create_now=True, update_now=True),
+                ),
                 ("order", postgres.SmallIntegerField(default=0)),
                 ("enabled", postgres.BooleanField(default=True)),
                 ("is_regex", postgres.BooleanField(default=False)),

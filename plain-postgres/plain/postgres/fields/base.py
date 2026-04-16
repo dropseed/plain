@@ -499,9 +499,9 @@ class Field[T](RegisterLookupMixin):
             return value
         return self.get_db_prep_value(value, connection=connection, prepared=False)
 
-    # Empty-value fallback used by ColumnField.get_effective_default when
-    # not-null + not-required + empty_strings_allowed. BinaryField overrides
-    # with b"".
+    # Empty-value fallback used by ColumnField.get_default for the
+    # not-null + not-required + empty_strings_allowed case (Python-side
+    # Model() construction). BinaryField overrides with b"".
     _default_empty_value: Any = ""
 
     def get_effective_default(self) -> Any:
@@ -640,11 +640,6 @@ class ColumnField[T](Field[T]):
             return None
         return self._default_empty_value
 
-    def get_effective_default(self) -> Any:
-        if not self.allow_null and not self.required and self.empty_strings_allowed:
-            return self._default_empty_value
-        return super().get_effective_default()
-
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()
         if self.required is not True:
@@ -669,6 +664,13 @@ class DefaultableField[T](ColumnField[T]):
         allow_null: bool = False,
         validators: Sequence[Callable[..., Any]] = (),
     ):
+        if default is not NOT_PROVIDED and callable(default):
+            raise TypeError(
+                f"{type(self).__name__}(default=...) must be a static literal. "
+                f"For empty collections pass default={{}} or default=[]; for "
+                f"per-row generation use a DB-side expression "
+                f"(create_now=True, generate=True, RandomStringField)."
+            )
         self.default = default
         super().__init__(
             required=required,
@@ -680,22 +682,16 @@ class DefaultableField[T](ColumnField[T]):
         return self.default is not NOT_PROVIDED
 
     def has_persistent_literal_default(self) -> bool:
-        # Callables are evaluated in Python per-row; persisting their
-        # migration-time value as a column DEFAULT would freeze every future
-        # INSERT to that value. `None` would emit `DEFAULT NULL` which is a
-        # no-op we don't want to track as drift.
-        return (
-            self.has_default()
-            and not callable(self.default)
-            and self.default is not None
-        )
+        # `None` would emit `DEFAULT NULL` which is a no-op we don't want to
+        # track as drift.
+        return self.has_default() and self.default is not None
 
     def get_default(self) -> Any:
         if not self.has_default():
             return super().get_default()
-        if callable(self.default):
-            return self.default()
-        return self.default
+        # Deep-copy so mutable literals (default=[] / default={}) don't leak
+        # shared state across instances.
+        return copy.deepcopy(self.default)
 
     def get_id_value_on_save(self, instance: Model) -> T | None:
         if self.has_default():

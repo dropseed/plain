@@ -21,7 +21,7 @@ class Redirect(postgres.Model):
         default=301
     )  # Default to permanent - could be choices?
     created_at: datetime = types.DateTimeField(create_now=True)
-    updated_at: datetime = types.DateTimeField(update_now=True)
+    updated_at: datetime = types.DateTimeField(create_now=True, update_now=True)
     order: int = types.SmallIntegerField(default=0)
     enabled: bool = types.BooleanField(default=True)
     is_regex: bool = types.BooleanField(default=False)

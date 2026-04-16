@@ -18,7 +18,10 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("created_at", postgres.DateTimeField(create_now=True)),
-                ("updated_at", postgres.DateTimeField(update_now=True)),
+                (
+                    "updated_at",
+                    postgres.DateTimeField(create_now=True, update_now=True),
+                ),
                 ("provider_key", postgres.TextField(max_length=100)),
                 ("provider_user_id", postgres.TextField(max_length=100)),
                 ("access_token", postgres.TextField(max_length=2000)),

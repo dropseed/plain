@@ -341,7 +341,7 @@ class Span(postgres.Model):
     start_time: datetime = types.DateTimeField()
     end_time: datetime = types.DateTimeField()
     status: str = types.TextField(max_length=50, default="", required=False)
-    span_data: dict = types.JSONField(default=dict, required=False)
+    span_data: dict = types.JSONField(default={}, required=False)
 
     # Explicit reverse relation
     logs: types.ReverseForeignKey[Log] = types.ReverseForeignKey(to="Log", field="span")

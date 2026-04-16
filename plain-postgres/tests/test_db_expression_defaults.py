@@ -523,18 +523,24 @@ def test_save_with_explicit_pk_falls_back_to_insert(db):
     assert reloaded.db_uuid == inst.db_uuid
 
 
-def test_datetime_create_now_and_update_now_mutually_exclusive():
-    """DateTimeField(create_now=True, update_now=True) must fail preflight —
-    the two mechanisms are at odds (DB fills on INSERT vs Python fills on
-    every save)."""
+def test_datetime_update_now_requires_backfill_companion():
+    """update_now=True has no DB DEFAULT of its own, so adding the column to
+    an existing table has no way to populate rows unless the user also
+    declares create_now=True (DB fills on INSERT) or allow_null=True."""
     from plain.postgres import fields as plain_fields
 
-    field = plain_fields.DateTimeField(create_now=True, update_now=True)
-    field.set_attributes_from_name("touched_at")
+    bare = plain_fields.DateTimeField(update_now=True)
+    bare.set_attributes_from_name("touched_at")
+    bare_ids = {r.id for r in bare.preflight()}
+    assert "fields.datetime_update_now_requires_backfill" in bare_ids
 
-    results = field.preflight()
-    error_ids = {r.id for r in results}
-    assert "fields.datetime_auto_options_mutually_exclusive" in error_ids
+    with_create = plain_fields.DateTimeField(create_now=True, update_now=True)
+    with_create.set_attributes_from_name("touched_at")
+    assert with_create.preflight() == []
+
+    with_null = plain_fields.DateTimeField(update_now=True, allow_null=True)
+    with_null.set_attributes_from_name("touched_at")
+    assert with_null.preflight() == []
 
 
 def test_uuid_default_kwarg_rejected_at_signature():

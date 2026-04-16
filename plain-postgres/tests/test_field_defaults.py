@@ -1,4 +1,4 @@
-"""Pin Python-side `default=` field behavior (callable and static values).
+"""Pin Python-side `default=` field behavior for literal values.
 
 Style: system-level — exercise real inserts and introspect the real schema.
 """
@@ -27,26 +27,6 @@ def _column_default(table_name: str, column_name: str) -> str | None:
     return row[0] if row else None
 
 
-def test_callable_default_evaluated_per_instance_on_save(db):
-    """`default=_make_token` produces a unique value for each saved row."""
-    a = DefaultsExample.query.create(name="a")
-    b = DefaultsExample.query.create(name="b")
-
-    assert isinstance(a.token, str)
-    assert isinstance(b.token, str)
-    assert a.token != b.token
-
-
-def test_callable_default_unique_across_bulk_create(db):
-    """bulk_create evaluates the callable default per row (Python-side)."""
-    rows = DefaultsExample.query.bulk_create(
-        [DefaultsExample(name=f"row-{i}") for i in range(5)]
-    )
-
-    tokens = {r.token for r in rows}
-    assert len(tokens) == 5, "every bulk_created row should get a unique token"
-
-
 def test_static_string_default_applied_on_save(db):
     row = DefaultsExample.query.create(name="row")
     assert row.status == "pending"
@@ -58,26 +38,15 @@ def test_static_int_default_applied_on_save(db):
 
 
 def test_explicit_value_overrides_default(db):
-    explicit = "explicit-token-value"
-    row = DefaultsExample.query.create(
-        name="row", token=explicit, status="done", priority=99
-    )
-    assert row.token == explicit
+    row = DefaultsExample.query.create(name="row", status="done", priority=99)
     assert row.status == "done"
     assert row.priority == 99
 
 
-def test_callable_default_does_not_persist_on_column(db):
-    """Callable defaults are evaluated in Python per row, so persisting the
-    migration-time value would freeze every future INSERT to that value. The
-    column DEFAULT is dropped after CREATE TABLE / ADD COLUMN."""
-    assert _column_default("examples_defaultsexample", "token") is None
-
-
 def test_static_defaults_persist_on_column(db):
-    """Literal (non-callable) defaults are installed as the column's
-    persistent DEFAULT so raw SQL INSERTs get them and convergence owns them
-    uniformly alongside DB-expression defaults."""
+    """Literal defaults are installed as the column's persistent DEFAULT so
+    raw SQL INSERTs get them and convergence owns them uniformly alongside
+    DB-expression defaults."""
     status_default = _column_default("examples_defaultsexample", "status")
     assert status_default is not None
     assert "pending" in status_default
@@ -87,46 +56,26 @@ def test_static_defaults_persist_on_column(db):
     assert "5" in priority_default
 
 
-def test_update_does_not_re_apply_callable_default(db):
-    """Defaults fire on insert, never on update. bulk_update must preserve
-    existing values."""
-    rows = DefaultsExample.query.bulk_create(
-        [DefaultsExample(name=f"row-{i}") for i in range(3)]
-    )
-    original_tokens = [r.token for r in rows]
-
-    # Mutate a non-default field and save.
-    for r in rows:
-        r.name = r.name.upper()
-    DefaultsExample.query.bulk_update(rows, ["name"])
-
-    refreshed = list(DefaultsExample.query.order_by("id"))
-    assert [r.token for r in refreshed] == original_tokens
-    assert [r.name for r in refreshed] == ["ROW-0", "ROW-1", "ROW-2"]
-
-
 def test_queryset_update_does_not_touch_default_column(db):
     """`.filter(...).update(field=...)` only writes the named columns — the
     defaulted column is untouched and keeps its originally-inserted value."""
     row = DefaultsExample.query.create(name="row")
-    original_token = row.token
+    original_status = row.status
 
     DefaultsExample.query.filter(id=row.id).update(name="updated")
 
     reloaded = DefaultsExample.query.get(id=row.id)
-    assert reloaded.token == original_token
+    assert reloaded.status == original_status
     assert reloaded.name == "updated"
 
 
 def test_get_or_create_applies_default_only_on_create(db):
     row, created = DefaultsExample.query.get_or_create(name="only-once")
     assert created is True
-    first_token = row.token
     assert row.status == "pending"
 
     same, created_again = DefaultsExample.query.get_or_create(name="only-once")
     assert created_again is False
-    assert same.token == first_token
     assert same.status == "pending"
 
 
@@ -145,15 +94,14 @@ def test_explicit_none_on_nullable_overrides_default(db):
 
 
 def test_refresh_from_db_reads_persisted_value_not_default(db):
-    """After save, refresh_from_db reflects what's actually in the DB."""
+    """After save, refresh_from_db reflects what's actually in the DB — even
+    after an in-memory attribute has been stomped on."""
     row = DefaultsExample.query.create(name="row")
-    original_token = row.token
 
-    # Stomp on the in-memory attribute; refresh should restore the real value.
-    row.token = "stomped"
+    row.status = "stomped"
     row.refresh_from_db()
 
-    assert row.token == original_token
+    assert row.status == "pending"
 
 
 def test_omitted_required_field_uses_python_empty_at_construction(db):
@@ -175,26 +123,24 @@ def test_raw_insert_uses_persisted_literal_default(db):
     with get_connection().cursor() as cursor:
         cursor.execute(
             """
-            INSERT INTO examples_defaultsexample (name, token, priority)
-            VALUES (%s, %s, %s)
+            INSERT INTO examples_defaultsexample (name, priority)
+            VALUES (%s, %s)
             RETURNING status, note
             """,
-            ["raw", "t", 1],
+            ["raw", 1],
         )
         row = cursor.fetchone()
     assert row == ("pending", "auto")
 
 
-def test_raw_insert_still_fails_when_column_has_no_default(db):
-    """Columns without a literal/expression default still require a value —
-    callable defaults (like `token`) do not persist and the column is
-    NOT NULL."""
+def test_raw_insert_fails_when_required_column_has_no_default(db):
+    """Columns without a literal/expression default still require a value."""
     with pytest.raises(psycopg.errors.NotNullViolation):
         with get_connection().cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO examples_defaultsexample (name, priority)
-                VALUES (%s, %s)
+                INSERT INTO examples_defaultsexample (priority)
+                VALUES (%s)
                 """,
-                ["raw", 1],
+                [1],
             )

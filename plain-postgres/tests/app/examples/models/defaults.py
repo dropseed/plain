@@ -7,18 +7,12 @@ from plain import postgres
 from plain.postgres import types
 
 
-def _make_token() -> str:
-    return uuid.uuid4().hex
-
-
 @postgres.register_model
 class DefaultsExample(postgres.Model):
-    """Exercises Python-side `default=` semantics (callables, static values,
+    """Exercises Python-side literal `default=` semantics (static values,
     explicit overrides)."""
 
     name: str = types.TextField(max_length=100)
-    # Callable default (evaluated in Python per instance)
-    token: str = types.TextField(max_length=100, default=_make_token)
     # Static string default
     status: str = types.TextField(max_length=20, default="pending")
     # Static int default
