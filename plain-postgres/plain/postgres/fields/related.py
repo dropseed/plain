@@ -176,8 +176,8 @@ class RelatedField(FieldCacheMixin, Field):
             return [
                 PreflightResult(
                     fix=(
-                        f"Field defines a relation with model '{model_name}', which is either "
-                        "not installed, or is abstract. Ensure the model is installed and not abstract."
+                        f"Field defines a relation with model '{model_name}', which is not "
+                        "installed. Ensure the model's package is registered."
                     ),
                     obj=self,
                     id="fields.related_model_not_installed",

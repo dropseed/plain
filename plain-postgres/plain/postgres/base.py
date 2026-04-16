@@ -379,9 +379,7 @@ class Model(metaclass=ModelBase):
 
         deferred_fields = self.get_deferred_fields()
         if update_fields is not None:
-            # If update_fields is empty, skip the save. We do also check for
-            # no-op saves later on for inheritance cases. This bailout is
-            # still needed for skipping signal sending.
+            # Empty update_fields is a no-op save — skip the whole pipeline.
             if not update_fields:
                 return
 
@@ -426,13 +424,11 @@ class Model(metaclass=ModelBase):
         update_fields: Iterable[str] | None = None,
     ) -> None:
         """
-        Handle the parts of saving which should be done only once per save,
-        yet need to be done in raw saves, too. This includes some sanity
-        checks and signal sending.
+        Handle the parts of saving shared between the normal and raw paths.
 
-        The 'raw' argument is telling save_base not to save any parent
-        models and not to do any changes to the values before save. This
-        is used by fixture loading.
+        The 'raw' argument tells save_base to skip per-field value
+        conversions — used by fixture loading, which has already produced
+        values in their final form.
         """
         assert not (force_insert and (force_update or update_fields))
         assert update_fields is None or update_fields
@@ -547,11 +543,9 @@ class Model(metaclass=ModelBase):
         """
         filtered = base_qs.filter(id=id_val)
         if not values:
-            # We can end up here when saving a model in inheritance chain where
-            # update_fields doesn't target any field in current model. In that
-            # case we just say the update succeeded. Another case ending up here
-            # is a model with just PK - in that case check that the PK still
-            # exists.
+            # Nothing to update — either the caller passed update_fields
+            # (so "success" means "we ran with no fields"), or the model has
+            # only its PK (in which case confirm the row still exists).
             return update_fields is not None or filtered.exists()
         return filtered._update(values) > 0
 
@@ -747,9 +741,7 @@ class Model(metaclass=ModelBase):
             qs = model_class.query.filter(**lookup_kwargs)
 
             # Exclude the current object from the query if we are editing an
-            # instance (as opposed to creating a new one)
-            # Use the primary key defined by model_class. In previous versions
-            # this could differ from `self.id` due to model inheritance.
+            # instance (as opposed to creating a new one).
             model_class_id = getattr(self, "id")
             if not self._state.adding and model_class_id is not None:
                 qs = qs.exclude(id=model_class_id)
@@ -1017,7 +1009,7 @@ class Model(metaclass=ModelBase):
 
     @classmethod
     def _check_field_name_clashes(cls) -> list[PreflightResult]:
-        """Forbid field shadowing in multi-table inheritance."""
+        """Reject fields that share a name or attname within the same model."""
         errors: list[PreflightResult] = []
         used_fields = {}  # name or attname -> field
 
@@ -1212,7 +1204,7 @@ class Model(metaclass=ModelBase):
                     errors.append(
                         PreflightResult(
                             fix=f"'{option}' refers to field '{field_name}' which is not local to model "
-                            f"'{cls.model_options.object_name}'. This issue may be caused by multi-table inheritance.",
+                            f"'{cls.model_options.object_name}'.",
                             obj=cls,
                             id="postgres.non_local_field_reference",
                         )

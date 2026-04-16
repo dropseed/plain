@@ -393,8 +393,8 @@ class Field[T](RegisterLookupMixin):
         self.model = cls
         cls._model_meta.add_field(self)
 
-        # Field is now a descriptor itself - ensure it's set on the class
-        # This is important for inherited fields that get deepcopied in Meta.__get__
+        # Field is its own descriptor; make sure it is set on the class so
+        # attribute access hits __get__/__set__.
         if self.column:
             setattr(cls, self.attname, self)
 

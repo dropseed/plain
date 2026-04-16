@@ -402,24 +402,18 @@ def check_rel_lookup_compatibility(
     model: type[Model], target_meta: Meta, field: Field | ForeignObjectRel
 ) -> bool:
     """
-    Check that model is compatible with target_meta. Compatibility
-    is OK if:
-      1) model and meta.model match (where proxy inheritance is removed)
-      2) model is parent of meta's model or the other way around
+    Check that model is compatible with target_meta — i.e. model matches
+    the target's model, or the field is a primary key whose model matches.
     """
 
     def check(meta: Meta) -> bool:
         return model == meta.model
 
-    # If the field is a primary key, then doing a query against the field's
-    # model is ok, too. Consider the case:
-    # class Restaurant(models.Model):
-    #     place = OneToOneField(Place, primary_key=True):
-    # Restaurant.query.filter(id__in=Restaurant.query.all()).
-    # If we didn't have the primary key check, then id__in (== place__in) would
-    # give Place's meta as the target meta, but Restaurant isn't compatible
-    # with that. This logic applies only to primary keys, as when doing __in=qs,
-    # we are going to turn this into __in=qs.values('id') later on.
+    # Primary-key fields get a second chance: a queryset like
+    # `Model.query.filter(id__in=Model.query.all())` resolves `id__in` through
+    # the PK field, whose target meta is the remote model. Allow the match
+    # against the field's own model so the subquery (later reduced to
+    # `.values("id")`) is accepted.
     return check(target_meta) or (
         getattr(field, "primary_key", False) and check(field.model._model_meta)
     )
