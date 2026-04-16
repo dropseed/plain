@@ -68,21 +68,23 @@ def test_explicit_value_overrides_default(db):
 
 
 def test_callable_default_does_not_persist_on_column(db):
-    """Callable defaults are evaluated at migration time and the resulting
-    column DEFAULT is dropped after CREATE TABLE. A raw SQL INSERT that
-    omits the column therefore receives NULL (or fails), because the database
-    is not asked to produce a value.
-
-    DB-expression defaults (`create_now=True`, `generate=True`) take a
-    different path — those DO persist on the column."""
+    """Callable defaults are evaluated in Python per row, so persisting the
+    migration-time value would freeze every future INSERT to that value. The
+    column DEFAULT is dropped after CREATE TABLE / ADD COLUMN."""
     assert _column_default("examples_defaultsexample", "token") is None
 
 
-def test_static_defaults_also_not_persisted_on_column(db):
-    """Plain treats ALL Python defaults the same way today — even constants
-    are not kept as column DEFAULTs. This documents that."""
-    assert _column_default("examples_defaultsexample", "status") is None
-    assert _column_default("examples_defaultsexample", "priority") is None
+def test_static_defaults_persist_on_column(db):
+    """Literal (non-callable) defaults are installed as the column's
+    persistent DEFAULT so raw SQL INSERTs get them and convergence owns them
+    uniformly alongside DB-expression defaults."""
+    status_default = _column_default("examples_defaultsexample", "status")
+    assert status_default is not None
+    assert "pending" in status_default
+
+    priority_default = _column_default("examples_defaultsexample", "priority")
+    assert priority_default is not None
+    assert "5" in priority_default
 
 
 def test_update_does_not_re_apply_callable_default(db):
@@ -166,21 +168,33 @@ def test_omitted_required_field_uses_python_empty_at_construction(db):
     assert row.name == ""
 
 
-def test_raw_insert_omitting_defaulted_column_fails_without_column_default(db):
-    """Sanity check that backs up the previous tests: a pure-SQL INSERT that
-    skips `status` errors out — the column has no DEFAULT and is NOT NULL, so
-    Postgres itself cannot fill it. Plain's ORM fills the value in Python
-    before sending the INSERT; the database is never asked.
+def test_raw_insert_uses_persisted_literal_default(db):
+    """A raw SQL INSERT that omits a column with a literal `default=` gets
+    the value from the column's DEFAULT — the backstop the persistent column
+    DEFAULT provides."""
+    with get_connection().cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO examples_defaultsexample (name, token, priority)
+            VALUES (%s, %s, %s)
+            RETURNING status, note
+            """,
+            ["raw", "t", 1],
+        )
+        row = cursor.fetchone()
+    assert row == ("pending", "auto")
 
-    Expression defaults (`create_now=True`, `generate=True`) take a different
-    path — those DO persist on the column and raw INSERT works.
-    """
+
+def test_raw_insert_still_fails_when_column_has_no_default(db):
+    """Columns without a literal/expression default still require a value —
+    callable defaults (like `token`) do not persist and the column is
+    NOT NULL."""
     with pytest.raises(psycopg.errors.NotNullViolation):
         with get_connection().cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO examples_defaultsexample (name, token, priority)
-                VALUES (%s, %s, %s)
+                INSERT INTO examples_defaultsexample (name, priority)
+                VALUES (%s, %s)
                 """,
-                ["raw", "t", 1],
+                ["raw", 1],
             )

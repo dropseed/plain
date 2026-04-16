@@ -245,6 +245,28 @@ class TestNormalizeCheckDefinition:
             == "username <> ''"
         )
 
+    def test_preserves_cast_like_text_inside_string_literal(self):
+        """`::` inside a quoted string must not be mistaken for a cast."""
+        assert (
+            normalize_check_definition("CHECK (note <> 'a::b'::text)")
+            == "note <> 'a::b'"
+        )
+
+    def test_preserves_escaped_quotes_inside_string_literal(self):
+        """SQL escapes single quotes by doubling them; must not terminate the string early."""
+        assert (
+            normalize_check_definition("CHECK (note <> 'it''s'::text)")
+            == "note <> 'it''s'"
+        )
+
+    def test_strips_casts_with_multiple_literals(self):
+        assert (
+            normalize_check_definition(
+                "CHECK (status = 'active'::text OR status = 'paused'::text)"
+            )
+            == "status = 'active' or status = 'paused'"
+        )
+
 
 class TestNormalizeExpression:
     """Unit tests for normalize_expression — used by convergence to compare
@@ -349,3 +371,54 @@ class TestNormalizeDefaultSql:
         pg = "statement_timestamp()"
         orm = "STATEMENT_TIMESTAMP()"
         assert normalize_default_sql(pg) == normalize_default_sql(orm)
+
+    def test_preserves_cast_like_text_inside_string_literal(self):
+        """A default like `'a::b'::text` keeps its inner `::b`."""
+        assert normalize_default_sql("'a::b'::text") == "'a::b'"
+
+    def test_preserves_escaped_quotes_inside_string_literal(self):
+        assert normalize_default_sql("'it''s'::text") == "'it''s'"
+
+    def test_strips_cast_on_function_call_operand(self):
+        """PG wraps function-call operands like `(length(col))::text`; the
+        bare-cast branch drops `::text` and the balanced-paren step then
+        strips the grouping parens."""
+        assert normalize_default_sql("(length(col))::text") == "length(col)"
+
+    def test_handles_coalesce_with_literal_cast(self):
+        assert (
+            normalize_default_sql("coalesce('pending'::text, 'default'::text)")
+            == "coalesce('pending', 'default')"
+        )
+
+    def test_strips_array_type_suffix(self):
+        """`::text[]` — the `[]` suffix is part of the type and must go too."""
+        assert normalize_default_sql("'{a,b}'::text[]") == "'{a,b}'"
+
+    def test_strips_parameterized_type_suffix(self):
+        """`::varchar(10)` — the `(10)` suffix is part of the type and must go too."""
+        assert normalize_default_sql("'abc'::varchar(10)") == "'abc'"
+
+    def test_strips_numeric_with_precision_and_scale(self):
+        assert normalize_default_sql("1.5::numeric(10, 2)") == "1.5"
+
+    def test_strips_multiword_time_type(self):
+        """PG emits ``time without time zone`` for the ``time`` alias —
+        psycopg's model-side cast drops to ``::time``, so both must normalize
+        to the same literal or TimeField defaults drift every sync."""
+        assert normalize_default_sql(
+            "'12:00:00'::time without time zone"
+        ) == normalize_default_sql("'12:00:00'::time")
+
+    def test_strips_multiword_timestamp_type(self):
+        assert normalize_default_sql(
+            "'2020-01-01'::timestamp with time zone"
+        ) == normalize_default_sql("'2020-01-01'::timestamptz")
+
+    def test_strips_character_varying(self):
+        assert normalize_default_sql("'x'::character varying") == normalize_default_sql(
+            "'x'::varchar"
+        )
+
+    def test_strips_double_precision(self):
+        assert normalize_default_sql("1.5::double precision") == "1.5"

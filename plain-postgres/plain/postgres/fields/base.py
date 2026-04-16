@@ -512,6 +512,14 @@ class Field[T](RegisterLookupMixin):
     def has_default(self) -> bool:
         return False
 
+    def has_persistent_literal_default(self) -> bool:
+        return False
+
+    def has_persistent_column_default(self) -> bool:
+        """Whether the column carries a DEFAULT clause that must be preserved
+        (DB-expression default or literal ``default=X``)."""
+        return self.db_returning or self.has_persistent_literal_default()
+
     def get_db_default_expression(self) -> Func | None:
         # Return the expression Postgres should evaluate on INSERT (e.g.
         # Now(), GenRandomUUID()). Subclasses opt in via type-scoped kwargs
@@ -672,6 +680,17 @@ class DefaultableField[T](ColumnField[T]):
 
     def has_default(self) -> bool:
         return self.default is not NOT_PROVIDED
+
+    def has_persistent_literal_default(self) -> bool:
+        # Callables are evaluated in Python per-row; persisting their
+        # migration-time value as a column DEFAULT would freeze every future
+        # INSERT to that value. `None` would emit `DEFAULT NULL` which is a
+        # no-op we don't want to track as drift.
+        return (
+            self.has_default()
+            and not callable(self.default)
+            and self.default is not None
+        )
 
     def get_default(self) -> Any:
         if not self.has_default():

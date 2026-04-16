@@ -108,11 +108,8 @@ class DatabaseSchemaEditor:
         column_sqls = []
         params = []
         for field in model._model_meta.local_fields:
-            # SQL. Expression defaults (`create_now=True`, `generate=True`)
-            # persist on the column and therefore must be inlined during CREATE TABLE.
-            include_default = field.db_returning
             definition, extra_params = self.column_sql(
-                model, field, include_default=include_default
+                model, field, include_default=field.has_persistent_column_default()
             )
             if definition is None:
                 continue
@@ -254,10 +251,11 @@ class DatabaseSchemaEditor:
             "definition": definition,
         }
         self.execute(sql, params)
-        # Drop the default if we need to
-        # (Plain usually does not use in-database defaults — except for
-        # create_now / generate expressions, which PERSIST on the column.)
-        if not field.db_returning and self.effective_default(field) is not None:
+        # Drop the transient DEFAULT we added solely to backfill existing rows.
+        if (
+            not field.has_persistent_column_default()
+            and self.effective_default(field) is not None
+        ):
             changes_sql, params = self._alter_column_default_sql(
                 model, None, field, drop=True
             )
@@ -500,9 +498,7 @@ class DatabaseSchemaEditor:
         if post_actions:
             for sql, params in post_actions:
                 self.execute(sql, params)
-        # Drop the default if we need to
-        # (Plain usually does not use in-database defaults)
-        if needs_database_default:
+        if needs_database_default and not new_field.has_persistent_column_default():
             changes_sql, params = self._alter_column_default_sql(
                 model, old_field, new_field, drop=True
             )

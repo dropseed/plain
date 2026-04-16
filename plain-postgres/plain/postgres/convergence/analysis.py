@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -11,6 +12,7 @@ from ..ddl import (
     compile_database_default_sql,
     compile_expression_sql,
     compile_index_expressions_sql,
+    compile_literal_default_sql,
 )
 from ..deletion import sql_on_delete
 from ..dialect import quote_name
@@ -427,13 +429,42 @@ def _compare_columns(
     return statuses
 
 
+_JSONB_LITERAL_RE = re.compile(r"^\s*'((?:[^']|'')*)'::jsonb\s*$", re.IGNORECASE)
+
+
+def _extract_jsonb_literal(sql: str) -> str | None:
+    m = _JSONB_LITERAL_RE.match(sql)
+    if m is None:
+        return None
+    return m.group(1).replace("''", "'")
+
+
+def _defaults_equivalent(model_sql: str, db_sql: str) -> bool:
+    if normalize_default_sql(model_sql) == normalize_default_sql(db_sql):
+        return True
+    # Semantic compare for jsonb — PG canonicalizes keys (length then lex),
+    # which won't match Python's dict-insertion order in the model dump.
+    m_json = _extract_jsonb_literal(model_sql)
+    d_json = _extract_jsonb_literal(db_sql)
+    if m_json is not None and d_json is not None:
+        try:
+            return json.loads(m_json) == json.loads(d_json)
+        except json.JSONDecodeError:
+            return False
+    return False
+
+
 def _compare_column_default(
     field: Field, actual: ColumnState, table: str
 ) -> ColumnDefaultDrift | None:
+    expected_sql: str | None = None
     db_default_expr = field.get_db_default_expression()
     if db_default_expr is not None:
         expected_sql = compile_database_default_sql(db_default_expr)
+    elif field.has_persistent_literal_default():
+        expected_sql = compile_literal_default_sql(field)
 
+    if expected_sql is not None:
         if actual.default_sql is None:
             return ColumnDefaultDrift(
                 kind=DriftKind.MISSING,
@@ -443,9 +474,7 @@ def _compare_column_default(
                 model_default_sql=expected_sql,
             )
 
-        if normalize_default_sql(actual.default_sql) == normalize_default_sql(
-            expected_sql
-        ):
+        if _defaults_equivalent(expected_sql, actual.default_sql):
             return None
 
         return ColumnDefaultDrift(

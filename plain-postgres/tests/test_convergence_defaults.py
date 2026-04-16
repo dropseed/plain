@@ -95,11 +95,12 @@ class TestColumnDefaultDetection:
         assert default_drifts[0].kind == DriftKind.MISSING
         assert created_col[0].issue is not None
 
-    def test_no_drift_when_static_default_stripped(self, db):
-        """Static defaults are stripped from the column after ADD COLUMN, so
-        both the model's static default and the bare DB column agree (no
-        DB-side DEFAULT).  No drift."""
-        assert column_default_sql("examples_defaultsexample", "status") is None
+    def test_no_drift_when_literal_default_matches(self, db):
+        """Literal defaults persist on the column, and a matching DB DEFAULT
+        produces no drift."""
+        default = column_default_sql("examples_defaultsexample", "status")
+        assert default is not None
+        assert "pending" in default
 
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -124,10 +125,8 @@ class TestColumnDefaultDetection:
         ]
         assert default_drifts == []
 
-    def test_detects_undeclared_default_on_static_field(self, db):
-        """Manual SET DEFAULT on a column whose model declares a static (or
-        no) default → UNDECLARED drift.  Plain owns column DEFAULTs; if you
-        want one to persist, use `create_now=True` or `generate=True`."""
+    def test_detects_changed_literal_default(self, db):
+        """DB has a different DEFAULT than the model's literal `default=` → CHANGED."""
         execute(
             'ALTER TABLE "examples_defaultsexample" '
             "ALTER COLUMN \"status\" SET DEFAULT 'manual-default'"
@@ -141,8 +140,32 @@ class TestColumnDefaultDetection:
             d for d in analysis.drifts if isinstance(d, ColumnDefaultDrift)
         ]
         assert len(default_drifts) == 1
-        assert default_drifts[0].kind == DriftKind.UNDECLARED
+        assert default_drifts[0].kind == DriftKind.CHANGED
         assert default_drifts[0].column == "status"
+        assert default_drifts[0].db_default_sql is not None
+        assert "manual-default" in default_drifts[0].db_default_sql
+        assert default_drifts[0].model_default_sql is not None
+        assert "pending" in default_drifts[0].model_default_sql
+
+    def test_detects_undeclared_default_on_undeclared_field(self, db):
+        """Manual SET DEFAULT on a column whose model declares no default →
+        UNDECLARED drift.  Plain owns column DEFAULTs; declare a default on
+        the field to make it persistent."""
+        execute(
+            'ALTER TABLE "examples_defaultsexample" '
+            "ALTER COLUMN \"name\" SET DEFAULT 'manual-default'"
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, DefaultsExample)
+
+        default_drifts = [
+            d for d in analysis.drifts if isinstance(d, ColumnDefaultDrift)
+        ]
+        assert len(default_drifts) == 1
+        assert default_drifts[0].kind == DriftKind.UNDECLARED
+        assert default_drifts[0].column == "name"
         assert default_drifts[0].db_default_sql is not None
         assert "manual-default" in default_drifts[0].db_default_sql
         assert default_drifts[0].model_default_sql is None
@@ -225,7 +248,7 @@ class TestColumnDefaultPlanning:
         """UNDECLARED drift → executable DropColumnDefaultFix."""
         execute(
             'ALTER TABLE "examples_defaultsexample" '
-            "ALTER COLUMN \"status\" SET DEFAULT 'manual-default'"
+            "ALTER COLUMN \"name\" SET DEFAULT 'manual-default'"
         )
 
         conn = get_connection()
@@ -238,7 +261,7 @@ class TestColumnDefaultPlanning:
         assert len(fixes) == 1
         fix = fixes[0].fix
         assert isinstance(fix, DropColumnDefaultFix)
-        assert fix.column == "status"
+        assert fix.column == "name"
         assert fixes[0].blocks_sync is True
 
     def test_can_auto_fix_undeclared(self):
@@ -356,16 +379,13 @@ class TestColumnDefaultLifecycle:
         assert default_fixes == []
 
     def test_undeclared_default_end_to_end(self, isolated_db):
-        """Removing an expression default from the model (or a manual SET
-        DEFAULT on an undeclared column) → detect UNDECLARED → DROP → converged.
-
-        Simulates "user removed `create_now=True` from the model" by setting
-        a DEFAULT on a column whose field declares no expression default."""
+        """Manual SET DEFAULT on a column whose model declares no default →
+        detect UNDECLARED → DROP → converged."""
         execute(
             'ALTER TABLE "examples_defaultsexample" '
-            "ALTER COLUMN \"status\" SET DEFAULT 'manual-default'"
+            "ALTER COLUMN \"name\" SET DEFAULT 'manual-default'"
         )
-        assert column_default_sql("examples_defaultsexample", "status") is not None
+        assert column_default_sql("examples_defaultsexample", "name") is not None
 
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -376,7 +396,7 @@ class TestColumnDefaultLifecycle:
 
         result = execute_plan(items)
         assert result.ok
-        assert column_default_sql("examples_defaultsexample", "status") is None
+        assert column_default_sql("examples_defaultsexample", "name") is None
 
         # Second pass: fully converged
         with conn.cursor() as cursor:

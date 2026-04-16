@@ -73,6 +73,17 @@ def compile_database_default_sql(expression: Any) -> str:
     return sql
 
 
+def compile_literal_default_sql(field: Any) -> str:
+    """Compile a field's literal ``default=`` value as DDL-ready SQL.
+
+    Result is executed directly (no ``%s`` interpolation), so we use
+    ``psycopg.sql.quote`` — not ``quote_value``, which doubles ``%``.
+    """
+    conn = get_connection()
+    prepared = field.get_db_prep_save(field.default, conn)
+    return psycopg.sql.quote(prepared, conn.connection)
+
+
 def compile_index_expressions_sql(
     model: type[Model], expressions: tuple[Any, ...]
 ) -> str:

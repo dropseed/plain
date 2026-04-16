@@ -3,9 +3,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlparse
+from sqlparse import tokens as T
 
 from ..db import get_connection
 from ..indexes import Index
@@ -217,21 +218,125 @@ def _normalize_sql(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+# Keyword-classified words that appear in PG's canonical multi-word type
+# names (`character varying`, `time without time zone`, etc.). Kept narrow
+# so operator keywords like `or`/`and` aren't mistaken for type continuations.
+_TYPE_KEYWORD_WORDS = frozenset(
+    {
+        "bit",
+        "character",
+        "precision",
+        "time",
+        "timestamp",
+        "varying",
+        "with",
+        "without",
+        "zone",
+    }
+)
+
+
+def _is_type_name(tok: Any) -> bool:
+    # sqlparse's classification is inconsistent: builtin scalars (`text`/`int`)
+    # come back Name.Builtin, unknown types (`varchar`/`numeric`) as Name, and
+    # the reserved multi-word forms (`character varying`, `time without time
+    # zone`) as Keyword/Keyword.CTE.
+    if tok.ttype is T.Name or tok.ttype is T.Name.Builtin:
+        return True
+    if tok.ttype is T.Keyword or tok.ttype is T.Keyword.CTE:
+        return tok.value.lower() in _TYPE_KEYWORD_WORDS
+    return False
+
+
+def _consume_type_name(tokens: list[Any], i: int) -> int:
+    """Advance past a (possibly multi-word) type name starting at ``i``."""
+    n = len(tokens)
+    if i >= n or not _is_type_name(tokens[i]):
+        return i
+    j = i + 1
+    while (
+        j + 1 < n
+        and tokens[j].ttype is T.Text.Whitespace
+        and _is_type_name(tokens[j + 1])
+    ):
+        j += 2
+    return j
+
+
+def _consume_type_suffix(tokens: list[Any], i: int) -> int:
+    """Skip over the tail of a type name: ``[]`` (array) or ``(N)`` / ``(N, M)``
+    (parameterized type like varchar(10)). Returns the new token index.
+
+    PG emits array type suffixes as bare ``[]`` in pg_get_expr output (sizes
+    aren't enforced at the type level); fixed-size ``[N]`` or multi-dim
+    ``[][]`` forms aren't handled here.
+    """
+    n = len(tokens)
+    if i < n and tokens[i].ttype is T.Punctuation and tokens[i].value == "[":
+        j = i + 1
+        if j < n and tokens[j].ttype is T.Punctuation and tokens[j].value == "]":
+            return j + 1
+    if i < n and tokens[i].ttype is T.Punctuation and tokens[i].value == "(":
+        depth = 1
+        j = i + 1
+        while j < n and depth:
+            t = tokens[j]
+            if t.ttype is T.Punctuation and t.value == "(":
+                depth += 1
+            elif t.ttype is T.Punctuation and t.value == ")":
+                depth -= 1
+            j += 1
+        if depth == 0:
+            return j
+    return i
+
+
 def _strip_type_casts(s: str) -> str:
-    """Strip PostgreSQL type casts (e.g. ''::text, 0::integer).
+    """Strip PostgreSQL type casts (e.g. ''::text, 0::integer, ::varchar(10),
+    ::text[]) outside SQL single-quoted string literals.
 
     PostgreSQL adds explicit casts to stored definitions (pg_get_indexdef,
-    pg_get_constraintdef) but the ORM compiler omits them.  Only used for
-    expression/condition comparison where the two generators diverge.
+    pg_get_constraintdef, pg_get_expr) but the ORM compiler omits them.
 
-    Also strips the grouping parens PG adds around cast operands, e.g.
-    (slug)::text → slug, so that lower((slug)::text) normalizes to lower(slug).
+    Also strips the grouping parens PG adds around a single identifier cast
+    operand, e.g. (slug)::text → slug, so that lower((slug)::text) normalizes
+    to lower(slug).
     """
-    # First strip (identifier)::type → identifier (PG wraps cast operands in parens)
-    s = re.sub(r"\((\w+)\)::\w+", r"\1", s)
-    # Then strip any remaining bare ::type casts
-    s = re.sub(r"::\w+", "", s)
-    return s
+    if "::" not in s:
+        return s
+    tokens = list(sqlparse.parse(s)[0].flatten())
+    out: list[str] = []
+    i = 0
+    n = len(tokens)
+    while i < n:
+        tok = tokens[i]
+        # (name)::type[(...)| []]?  →  name
+        if (
+            tok.ttype is T.Punctuation
+            and tok.value == "("
+            and i + 4 < n
+            and tokens[i + 1].ttype in (T.Name, T.Name.Builtin)
+            and tokens[i + 2].ttype is T.Punctuation
+            and tokens[i + 2].value == ")"
+            and tokens[i + 3].ttype is T.Punctuation
+            and tokens[i + 3].value == "::"
+            and _is_type_name(tokens[i + 4])
+        ):
+            out.append(tokens[i + 1].value)
+            i = _consume_type_suffix(tokens, _consume_type_name(tokens, i + 4))
+            continue
+        # ::type[(...)| []]?
+        if (
+            tok.ttype is T.Punctuation
+            and tok.value == "::"
+            and i + 1 < n
+            and _is_type_name(tokens[i + 1])
+        ):
+            i = _consume_type_suffix(tokens, _consume_type_name(tokens, i + 1))
+            continue
+        out.append(tok.value)
+        i += 1
+    return "".join(out)
 
 
 def normalize_check_definition(s: str) -> str:
