@@ -1399,11 +1399,24 @@ def _parse_index_definition(definition: str) -> _IndexParts:
                     expression_text = s[start:i].strip()
                     for part in expression_text.split(","):
                         part = part.strip()
-                        # "col opclass" or just "col"
                         tokens = part.split()
-                        if tokens:
-                            columns.append(tokens[0])
-                            opclasses.append(tokens[1] if len(tokens) > 1 else "")
+                        if not tokens:
+                            continue
+                        columns.append(tokens[0])
+                        # Strip sort modifiers from the right: ASC/DESC
+                        # (stored in pg_index.indoption) and NULLS FIRST/LAST
+                        # are column-level sort options, not opclasses. What's
+                        # left after stripping is the opclass, if any.
+                        rest = tokens[1:]
+                        if (
+                            len(rest) >= 2
+                            and rest[-2] == "nulls"
+                            and rest[-1] in ("first", "last")
+                        ):
+                            rest = rest[:-2]
+                        if rest and rest[-1] in ("asc", "desc"):
+                            rest = rest[:-1]
+                        opclasses.append(rest[0] if rest else "")
                     break
 
     # Strip empty opclasses if none are set

@@ -16,7 +16,12 @@ from plain.postgres.convergence import (
     RenameIndexFix,
     plan_model_convergence,
 )
-from plain.postgres.convergence.analysis import DriftKind, IndexDrift, analyze_model
+from plain.postgres.convergence.analysis import (
+    DriftKind,
+    IndexDrift,
+    _parse_index_definition,
+    analyze_model,
+)
 from plain.postgres.functions.text import Upper
 
 
@@ -114,6 +119,80 @@ class TestUnmanagedIndexTypes:
             assert "name conflict" in conflict.issue
             assert "hash" in conflict.issue
             assert conflict.drift is None  # no auto-fix
+        finally:
+            IndexExample.model_options.indexes = original_indexes
+
+
+class TestParseIndexDefinition:
+    """Unit tests for `_parse_index_definition` — PG sort modifiers (ASC/DESC,
+    NULLS FIRST/LAST) must not be conflated with opclasses."""
+
+    def test_desc_is_not_an_opclass(self):
+        parts = _parse_index_definition(
+            "CREATE INDEX foo ON bar USING btree (col1, col2 DESC)"
+        )
+        assert parts.columns == ["col1", "col2"]
+        assert parts.opclasses == []
+
+    def test_asc_nulls_last_is_not_an_opclass(self):
+        parts = _parse_index_definition(
+            "CREATE INDEX foo ON bar USING btree (col1 ASC NULLS LAST)"
+        )
+        assert parts.columns == ["col1"]
+        assert parts.opclasses == []
+
+    def test_desc_nulls_first_is_not_an_opclass(self):
+        parts = _parse_index_definition(
+            "CREATE INDEX foo ON bar USING btree (col1 DESC NULLS FIRST)"
+        )
+        assert parts.columns == ["col1"]
+        assert parts.opclasses == []
+
+    def test_opclass_with_trailing_desc_preserves_opclass(self):
+        parts = _parse_index_definition(
+            "CREATE INDEX foo ON bar USING btree (col1 varchar_pattern_ops DESC)"
+        )
+        assert parts.columns == ["col1"]
+        assert parts.opclasses == ["varchar_pattern_ops"]
+
+    def test_opclass_with_trailing_desc_nulls_last_preserves_opclass(self):
+        parts = _parse_index_definition(
+            "CREATE INDEX foo ON bar USING btree (col1 varchar_pattern_ops DESC NULLS LAST)"
+        )
+        assert parts.columns == ["col1"]
+        assert parts.opclasses == ["varchar_pattern_ops"]
+
+
+class TestDescendingIndexNoDrift:
+    """A model Index that declares a descending field (`-name`) must converge
+    without drift. Regression: the DB's `col DESC` from pg_get_indexdef was
+    being parsed as an opclass of `"desc"`, flagging every sync as changed."""
+
+    def test_descending_index_has_no_drift_on_second_sync(self, db):
+        original_indexes = list(IndexExample.model_options.indexes)
+        IndexExample.model_options.indexes = [
+            *original_indexes,
+            Index(fields=["-name"], name="examples_indexexample_name_desc_idx"),
+        ]
+
+        try:
+            # First create the index to match the model.
+            execute(
+                'CREATE INDEX "examples_indexexample_name_desc_idx" '
+                'ON "examples_indexexample" ("name" DESC)'
+            )
+
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                analysis = analyze_model(conn, cursor, IndexExample)
+
+            matching = next(
+                idx
+                for idx in analysis.indexes
+                if idx.name == "examples_indexexample_name_desc_idx"
+            )
+            assert matching.drift is None, f"unexpected drift: {matching.issue}"
+            assert matching.issue is None
         finally:
             IndexExample.model_options.indexes = original_indexes
 
