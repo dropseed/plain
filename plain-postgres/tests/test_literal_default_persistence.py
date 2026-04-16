@@ -186,3 +186,51 @@ def test_jsonb_defaults_equivalent_despite_key_reorder(db):
     model = "'{\"a\": 1}'::jsonb"
     db = "'{\"a\": 2}'::jsonb"
     assert not _defaults_equivalent(model, db)
+
+
+def test_special_char_string_default_round_trip(isolated_db):
+    """Literal string defaults with quotes, newlines, and other typical
+    non-ASCII punctuation must survive the round trip: compile → SET DEFAULT
+    → pg_get_expr → compare without drift. Otherwise every sync would flag
+    CHANGED for safe-but-ugly inputs."""
+    from conftest_convergence import column_default_sql, execute
+
+    from plain.postgres.convergence.analysis import _defaults_equivalent
+    from plain.postgres.ddl import compile_literal_default_sql
+
+    cases = [
+        "O'Reilly",  # single quote — psycopg escapes by doubling
+        "line1\nline2",  # newline — standard strings carry it literally
+        "tab\there",  # tab
+        '"quoted"',  # double quotes
+        "percent%sign",  # % isn't interpolated in DDL SET DEFAULT
+        "",  # empty string
+    ]
+
+    for value in cases:
+        field = plain_fields.TextField(max_length=100, default=value)
+        field.set_attributes_from_name("status")
+
+        expected_sql = compile_literal_default_sql(field)
+        execute(
+            'ALTER TABLE "examples_defaultsexample" '
+            f'ALTER COLUMN "status" SET DEFAULT {expected_sql}'
+        )
+
+        actual_sql = column_default_sql("examples_defaultsexample", "status")
+        assert actual_sql is not None
+        assert _defaults_equivalent(expected_sql, actual_sql), (
+            f"round-trip drift for default={value!r}: "
+            f"compiled={expected_sql!r} catalog={actual_sql!r}"
+        )
+
+
+def test_backslash_in_string_default_rejected():
+    """Backslashes force psycopg into ``E'...'`` escape syntax, which
+    pg_get_expr returns as a plain ``'...'`` literal — the two forms don't
+    round-trip, so convergence would flag spurious drift on every sync.
+    DefaultableField rejects them at declaration time."""
+    import pytest
+
+    with pytest.raises(ValueError, match="backslash"):
+        plain_fields.TextField(max_length=100, default=r"C:\Program Files")

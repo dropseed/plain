@@ -659,6 +659,15 @@ class DefaultableField[T](ColumnField[T]):
                 f"per-row generation use a DB-side expression "
                 f"(create_now=True, generate=True, RandomStringField)."
             )
+        if default is not NOT_PROVIDED and isinstance(default, str) and "\\" in default:
+            # psycopg quotes backslash-bearing strings with `E'...'` escape
+            # syntax, but pg_get_expr returns the stored DEFAULT as a standard
+            # `'...'` literal — the two forms don't compare lexically, so
+            # convergence would flag spurious drift on every sync. Reject at
+            # declaration time rather than ship a sync that never converges.
+            raise ValueError(
+                f"{type(self).__name__}(default=...) must not contain a backslash."
+            )
         self.default = default
         super().__init__(
             required=required,
