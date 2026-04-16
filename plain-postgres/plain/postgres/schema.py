@@ -196,8 +196,15 @@ class DatabaseSchemaEditor:
         return compile_database_default_sql(expression)
 
     def effective_default(self, field: Field) -> Any:
-        """Return a field's effective database default value."""
-        return field.get_db_prep_save(field.get_effective_default(), self.connection)
+        """Return a field's declared literal DEFAULT value, prepared for the
+        database. Returns None for fields without a user-declared default —
+        expression defaults take the `get_db_default_expression()` path
+        instead."""
+        from plain.postgres.fields.base import DefaultableField
+
+        if not isinstance(field, DefaultableField) or not field.has_default():
+            return None
+        return field.get_db_prep_save(field.get_default(), self.connection)
 
     # Actions
 

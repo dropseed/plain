@@ -4,7 +4,13 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.expressions import Func
-from plain.postgres.fields import DecimalField, Field, FloatField, IntegerField
+from plain.postgres.fields import (
+    DecimalField,
+    Field,
+    FloatField,
+    IntegerField,
+    PrimaryKeyField,
+)
 from plain.postgres.functions import Cast
 
 if TYPE_CHECKING:
@@ -51,7 +57,7 @@ class NumericOutputFieldMixin(Func):
         source_fields = self.get_source_fields()
         if any(isinstance(s, DecimalField) for s in source_fields):
             return DecimalField()
-        if any(isinstance(s, IntegerField) for s in source_fields):
+        if any(isinstance(s, IntegerField | PrimaryKeyField) for s in source_fields):
             return FloatField()
         if source_fields:
             if result := super()._resolve_output_field():

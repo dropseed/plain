@@ -787,7 +787,7 @@ class MigrationAutodetector:
         # generating a migration that would fail at apply time.
         can_add_without_backfill = (
             isinstance(field, ManyToManyField)
-            or field.has_any_default()
+            or field.has_persistent_column_default()
             or (
                 isinstance(field, ColumnField)
                 and (
@@ -912,7 +912,7 @@ class MigrationAutodetector:
                         and isinstance(new_field, ColumnField)
                         and old_field.allow_null
                         and not new_field.allow_null
-                        and not new_field.has_any_default()
+                        and not new_field.has_persistent_column_default()
                     ):
                         raise MigrationSchemaError(
                             f"Cannot alter field '{model_name}.{field_name}' "

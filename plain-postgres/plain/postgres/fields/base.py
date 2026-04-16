@@ -504,9 +504,6 @@ class Field[T](RegisterLookupMixin):
     # Model() construction). BinaryField overrides with b"".
     _default_empty_value: Any = ""
 
-    def get_effective_default(self) -> Any:
-        return None
-
     def has_default(self) -> bool:
         return False
 
@@ -526,15 +523,6 @@ class Field[T](RegisterLookupMixin):
 
     def has_db_default(self) -> bool:
         return self.get_db_default_expression() is not None
-
-    def has_any_default(self) -> bool:
-        """True when the field will have a value at INSERT time from any
-        source: user-supplied default, DB expression (create_now/generate),
-        or pre_save auto-fill (update_now)."""
-        return self.has_default() or self.has_db_default() or self.auto_fills_on_save
-
-    def get_id_value_on_save(self, instance: Model) -> Any:
-        return None
 
     def save_form_data(self, instance: Model, data: Any) -> None:
         assert self.name is not None
@@ -692,16 +680,6 @@ class DefaultableField[T](ColumnField[T]):
         # Deep-copy so mutable literals (default=[] / default={}) don't leak
         # shared state across instances.
         return copy.deepcopy(self.default)
-
-    def get_id_value_on_save(self, instance: Model) -> T | None:
-        if self.has_default():
-            return self.get_default()
-        return None
-
-    def get_effective_default(self) -> Any:
-        if self.has_default():
-            return self.get_default()
-        return super().get_effective_default()
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
         name, path, args, kwargs = super().deconstruct()

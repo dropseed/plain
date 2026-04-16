@@ -18,9 +18,9 @@ from .numeric import (
     DecimalField,
     FloatField,
     IntegerField,
-    PrimaryKeyField,
     SmallIntegerField,
 )
+from .primary_key import PrimaryKeyField
 from .temporal import DateField, DateTimeField, TimeField
 from .text import EmailField, RandomStringField, TextField, URLField
 from .uuid import UUIDField

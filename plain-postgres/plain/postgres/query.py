@@ -629,11 +629,18 @@ class QuerySet[T: "Model"]:
         return obj
 
     def _prepare_for_bulk_create(self, objs: list[T]) -> None:
+        from plain.postgres.fields.base import DefaultableField
+
         id_field = self.model._model_meta.get_forward_field("id")
+        has_id_default = (
+            isinstance(id_field, DefaultableField) and id_field.has_default()
+        )
         for obj in objs:
-            if obj.id is None:
-                # Populate new primary key values.
-                obj.id = id_field.get_id_value_on_save(obj)
+            if obj.id is None and has_id_default:
+                # User-declared literal default on the PK — materialize it
+                # so the INSERT carries a Python value. Identity PKs take the
+                # DB's DEFAULT path and leave obj.id as None.
+                obj.id = id_field.get_default()
             obj._prepare_related_fields_for_save(operation_name="bulk_create")
 
     def _check_bulk_create_options(

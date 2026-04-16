@@ -414,7 +414,7 @@ class BaseExpression:
                 if value is None
                 else float(value)
             )
-        elif isinstance(field, fields.IntegerField):
+        elif isinstance(field, fields.IntegerField | fields.PrimaryKeyField):
             return (
                 lambda value, expression, connection: None
                 if value is None

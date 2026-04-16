@@ -471,7 +471,12 @@ class Model(metaclass=ModelBase):
         id_field = meta.get_forward_field("id")
         id_val = self.id
         if id_val is None:
-            id_val = id_field.get_id_value_on_save(self)
+            # User-declared literal default on the PK? Materialize it so the
+            # INSERT carries the Python value rather than letting the DB
+            # generate one. Identity PKs have no such default, so id_val
+            # stays None and the INSERT emits DEFAULT.
+            if isinstance(id_field, DefaultableField) and id_field.has_default():
+                id_val = id_field.get_default()
             setattr(self, id_field.attname, id_val)
         id_set = id_val is not None
         if not id_set and (force_update or update_fields):
