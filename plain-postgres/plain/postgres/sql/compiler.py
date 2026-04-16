@@ -50,7 +50,7 @@ from plain.utils.regex_helper import _lazy_re_compile
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.expressions import BaseExpression
-    from plain.postgres.sql.query import InsertQuery
+    from plain.postgres.sql.query import AggregateQuery, InsertQuery
 
 # Type aliases for SQL compilation results
 SqlParams = tuple[Any, ...]
@@ -1813,9 +1813,7 @@ class SQLAggregateCompiler(SQLCompiler):
         sql = ", ".join(sql)
         params = tuple(params)
 
-        inner_query = getattr(self.query, "inner_query", None)
-        if inner_query is None:
-            raise ValueError("Inner query expected for update with related ids")
+        inner_query = cast("AggregateQuery", self.query).inner_query
         inner_query_sql, inner_query_params = inner_query.get_compiler(
             elide_empty=self.elide_empty,
         ).as_sql(with_col_aliases=True)
