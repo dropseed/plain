@@ -837,16 +837,9 @@ class SQLCompiler:
         start_alias = start_alias or self.query.get_initial_alias()
 
         for field in opts.concrete_fields:
-            model = field.model
-            # Since we no longer have proxy models or inheritance,
-            # the field's model should always be the same as opts.model.
-            if model == opts.model:
-                model = None
             if select_mask and field not in select_mask:
                 continue
-
-            column = field.get_col(start_alias)
-            result.append(column)
+            result.append(field.get_col(start_alias))
         return result
 
     def get_distinct(self) -> tuple[list[str], list]:
