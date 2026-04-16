@@ -1,26 +1,19 @@
 """Pin the schema-editor behavior for persistent literal `default=` values.
 
-Literal (non-callable, non-None) defaults should be inlined into CREATE TABLE,
-kept on ADD COLUMN, and preserved by the 4-way ALTER FIELD backfill. Callable
-defaults, `update_now` auto-fills, and the synthesized empty-string default
-for `required=False` text fields must continue to use the transient
-ADD+DROP path.
+Literal (non-callable, non-None) defaults are inlined into CREATE TABLE and
+kept on ADD COLUMN. Callable defaults, `update_now` auto-fills, and the
+synthesized empty-string default for `required=False` text fields must
+continue to use the transient ADD+DROP path. Nullability and column DEFAULT
+changes on existing columns are convergence-managed — the schema editor
+short-circuits on allow_null and default differences.
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 from app.examples.models.defaults import DefaultsExample
 
 from plain.postgres import fields as plain_fields
 from plain.postgres import get_connection
-
-
-def _db_type(field: Any) -> str:
-    t = field.db_type()
-    assert t is not None
-    return t
 
 
 def test_create_table_inlines_literal_default(db):
@@ -70,9 +63,10 @@ def test_add_field_without_default_emits_no_default_clause(db):
     assert "drop default" not in joined
 
 
-def test_alter_field_nullable_to_not_null_keeps_literal_default(db):
-    """The 4-way backfill does a no-op SET DEFAULT pass when old/new defaults
-    are equal and leaves the persistent column DEFAULT alone — no DROP."""
+def test_alter_field_nullable_to_not_null_is_migration_no_op(db):
+    """allow_null is in non_migration_attrs — the schema editor emits nothing for a
+    nullable→NOT NULL transition. Convergence owns the CHECK NOT VALID +
+    VALIDATE + SET NOT NULL dance on the next sync."""
     old_field = plain_fields.TextField(max_length=20, allow_null=True, default="active")
     old_field.set_attributes_from_name("role")
     new_field = plain_fields.TextField(max_length=20, default="active")
@@ -80,24 +74,15 @@ def test_alter_field_nullable_to_not_null_keeps_literal_default(db):
 
     connection = get_connection()
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
+        editor.alter_field(DefaultsExample, old_field, new_field)
 
-    joined = " ".join(editor.executed_sql).lower()
-    assert "set not null" in joined
-    assert "drop default" not in joined
+    assert editor.executed_sql == []
 
 
-def test_alter_field_literal_default_change_skips_drop(db):
-    """Changing `default=` alongside a nullable→NOT NULL transition runs the
-    full 4-way backfill (SET DEFAULT new, UPDATE, SET NOT NULL). The trailing
-    DROP DEFAULT is skipped because the new field declares a persistent
-    literal default."""
+def test_alter_field_literal_default_change_with_null_flip_is_migration_no_op(db):
+    """Flipping allow_null AND changing default= emits nothing from the schema
+    editor. Both attributes are in non_migration_attrs, and convergence handles the
+    column DEFAULT drift + NOT NULL transition independently on the next sync."""
     old_field = plain_fields.TextField(max_length=20, allow_null=True, default="active")
     old_field.set_attributes_from_name("role")
     new_field = plain_fields.TextField(max_length=20, default="paused")
@@ -105,23 +90,14 @@ def test_alter_field_literal_default_change_skips_drop(db):
 
     connection = get_connection()
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
+        editor.alter_field(DefaultsExample, old_field, new_field)
 
-    joined = " ".join(editor.executed_sql).lower()
-    assert "set default 'paused'" in joined
-    assert "set not null" in joined
-    assert "drop default" not in joined
+    assert editor.executed_sql == []
 
 
 def test_alter_field_default_only_change_is_migration_no_op(db):
     """Changing only ``default=`` on an already-NOT-NULL column emits nothing
-    from the schema editor — ``default`` is in ``non_db_attrs``, so the
+    from the schema editor — ``default`` is in ``non_migration_attrs``, so the
     migration path short-circuits. Convergence's ``_compare_column_default``
     detects CHANGED drift and applies ``SetColumnDefaultFix`` on the next sync
     (covered by ``test_detects_changed_literal_default``)."""

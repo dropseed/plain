@@ -104,7 +104,11 @@ def test_create_model_with_not_null_field_no_default_succeeds() -> None:
     assert any(op.__class__.__name__ == "CreateModel" for op in operations)
 
 
-def test_alter_nullable_to_not_null_without_default_raises() -> None:
+def test_alter_nullable_to_not_null_is_autodetector_no_op() -> None:
+    """Nullability is convergence-managed. The autodetector strips non_migration_attrs
+    before comparing, so an allow_null-only diff emits no migration —
+    convergence picks up NullabilityDrift on the next sync and blocks with
+    guidance if NULL rows exist."""
     from_model = ModelState(
         package_label="examples",
         name="Thing",
@@ -121,14 +125,13 @@ def test_alter_nullable_to_not_null_without_default_raises() -> None:
         fields=[("status", types.TextField(max_length=50))],  # ty: ignore[invalid-argument-type]
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
-    with pytest.raises(MigrationSchemaError) as exc:
-        autodetector._detect_changes()
-    msg = str(exc.value)
-    assert "thing.status" in msg.lower()
-    assert "NOT NULL" in msg or "not null" in msg.lower()
+    assert autodetector._detect_changes() == {}
 
 
-def test_alter_nullable_to_not_null_with_default_succeeds() -> None:
+def test_alter_nullable_to_not_null_with_default_is_autodetector_no_op() -> None:
+    """Declaring a default alongside NOT NULL still emits no migration — both
+    allow_null and default are non_migration_attrs. Convergence applies the DEFAULT
+    and SetNotNullFix on the next sync."""
     from_model = ModelState(
         package_label="examples",
         name="Thing",
@@ -145,8 +148,7 @@ def test_alter_nullable_to_not_null_with_default_succeeds() -> None:
         fields=[("status", types.TextField(max_length=50, default="active"))],  # ty: ignore[invalid-argument-type]
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
-    changes = autodetector._detect_changes()
-    assert "examples" in changes
+    assert autodetector._detect_changes() == {}
 
 
 def test_rename_combined_with_null_change_raises() -> None:

@@ -37,23 +37,10 @@ class DatabaseSchemaEditor:
 
     sql_create_column = "ALTER TABLE %(table)s ADD COLUMN %(column)s %(definition)s"
     sql_alter_column = "ALTER TABLE %(table)s %(changes)s"
-    sql_alter_column_type = "ALTER COLUMN %(column)s TYPE %(type)s"
-    sql_alter_column_null = "ALTER COLUMN %(column)s DROP NOT NULL"
-    sql_alter_column_not_null = "ALTER COLUMN %(column)s SET NOT NULL"
-    sql_alter_column_default = "ALTER COLUMN %(column)s SET DEFAULT %(default)s"
     sql_alter_column_no_default = "ALTER COLUMN %(column)s DROP DEFAULT"
     sql_delete_column = "ALTER TABLE %(table)s DROP COLUMN %(column)s CASCADE"
     sql_rename_column = (
         "ALTER TABLE %(table)s RENAME COLUMN %(old_column)s TO %(new_column)s"
-    )
-    # Setting all constraints to IMMEDIATE to allow changing data in the same transaction.
-    sql_update_with_db_default = (
-        "UPDATE %(table)s SET %(column)s = DEFAULT WHERE %(column)s IS NULL"
-        "; SET CONSTRAINTS ALL IMMEDIATE"
-    )
-    sql_update_with_default = (
-        "UPDATE %(table)s SET %(column)s = %(default)s WHERE %(column)s IS NULL"
-        "; SET CONSTRAINTS ALL IMMEDIATE"
     )
 
     def __init__(
@@ -371,250 +358,64 @@ class DatabaseSchemaEditor:
         old_type: str,
         new_type: str,
     ) -> None:
-        """Perform a "physical" (non-ManyToMany) field update."""
-        # Guard: introducing an expression default at the same time as a
-        # nullable→NOT NULL transition would require backfilling existing
-        # NULL rows by evaluating the expression. effective_default() returns
-        # None for expression defaults (they're inlined into DDL, not
-        # parameterized), so the existing 4-step dance would UPDATE NULL rows
-        # with NULL and then fail SET NOT NULL. Handling this cleanly belongs
-        # to convergence-era work; for now, require the user to split it into
-        # two migrations. (If the expression default was already on the column
-        # before this migration, the column has no NULLs and SET NOT NULL is
-        # safe — that path is allowed.)
-        if (
-            old_field.allow_null
-            and not new_field.allow_null
-            and new_field.db_returning
-            and not old_field.db_returning
-        ):
-            raise NotImplementedError(
-                f"Cannot alter {model.__name__}.{new_field.name} to NOT NULL "
-                f"and add an expression default ({new_field.get_db_default_expression()!r}) in the "
-                "same migration. Add the expression default in one migration, "
-                "then change to NOT NULL in a follow-up."
-            )
-        # FK constraints are managed by convergence, not the schema editor.
-        # Have they renamed the column?
+        """Column rename + column type change.
+
+        Also drops the existing expression DEFAULT when the column type is
+        changing (Postgres rejects the cast otherwise). Nullability and
+        column DEFAULT reconciliation are convergence-managed — see
+        ``plain.postgres.convergence``.
+        """
         if old_field.column != new_field.column:
             self.execute(
                 self._rename_field_sql(
-                    model.model_options.db_table, old_field, new_field, new_type
+                    model.model_options.db_table, old_field, new_field
                 )
             )
-        # If the column already carries an expression DEFAULT and we're about
-        # to change its type, drop the DEFAULT first — Postgres rejects
-        # ALTER COLUMN TYPE when the existing DEFAULT can't cast to the new
-        # type. Done after the rename so the column name in the DDL is
-        # consistent with the live schema. The end-of-_alter_field
-        # reconciliation below will re-issue SET DEFAULT for the new field
-        # if it still has an expression default.
-        if old_field.db_returning and old_field.db_type() != new_field.db_type():
-            drop_sql, _ = self._alter_column_default_sql(
-                model, old_field, new_field, drop=True
+        # Postgres rejects ALTER COLUMN TYPE when the existing expression DEFAULT
+        # can't cast to the new type. Drop it first; convergence re-applies it.
+        if old_field.db_returning and old_type != new_type:
+            self.execute(
+                self.sql_alter_column
+                % {
+                    "table": quote_name(model.model_options.db_table),
+                    "changes": self.sql_alter_column_no_default
+                    % {"column": quote_name(new_field.column)},
+                }
+            )
+        if (
+            old_type != new_type
+            or old_field.db_type_suffix() != new_field.db_type_suffix()
+        ):
+            type_sql, type_params = self._alter_column_type_sql(
+                old_field, new_field, new_type
             )
             self.execute(
                 self.sql_alter_column
                 % {
                     "table": quote_name(model.model_options.db_table),
-                    "changes": drop_sql,
-                }
+                    "changes": type_sql,
+                },
+                type_params,
             )
-        # Next, start accumulating actions to do
-        actions = []
-        null_actions = []
-        post_actions = []
-        # Type suffix change? (e.g. auto increment).
-        old_type_suffix = old_field.db_type_suffix()
-        new_type_suffix = new_field.db_type_suffix()
-        # Type change?
-        if old_type != new_type or old_type_suffix != new_type_suffix:
-            fragment, other_actions = self._alter_column_type_sql(
-                model, old_field, new_field, new_type
-            )
-            actions.append(fragment)
-            post_actions.extend(other_actions)
-        # A nullable→NOT NULL transition with a persistent default triggers a
-        # 3-step backfill: SET DEFAULT (or keep the existing one), populate
-        # existing NULL rows, then SET NOT NULL. Without a persistent default
-        # the final SET NOT NULL will raise on any remaining NULL row — the
-        # user must declare `default=`, `allow_null=True`, or run a data
-        # migration first.
-        if old_field.allow_null and not new_field.allow_null:
-            new_default = self.effective_default(new_field)
-            if new_default is not None:
-                actions.append(
-                    self._alter_column_default_sql(model, old_field, new_field)
-                )
-        # Nullability change?
-        if old_field.allow_null != new_field.allow_null:
-            fragment = self._alter_column_null_sql(model, old_field, new_field)
-            if fragment:
-                null_actions.append(fragment)
-        four_way_default_alteration = new_field.has_persistent_column_default() and (
-            old_field.allow_null and not new_field.allow_null
-        )
-        if actions or null_actions:
-            if not four_way_default_alteration:
-                actions += null_actions
-            if actions:
-                sql, params = tuple(zip(*actions))
-                actions = [(", ".join(sql), sum(params, []))]
-            for sql, params in actions:
-                self.execute(
-                    self.sql_alter_column
-                    % {
-                        "table": quote_name(model.model_options.db_table),
-                        "changes": sql,
-                    },
-                    params,
-                )
-            if four_way_default_alteration:
-                if new_field.db_returning:
-                    # Ensure the column's DEFAULT reflects the NEW expression
-                    # before backfilling — otherwise UPDATE col = DEFAULT
-                    # would use whatever the column currently has (the old
-                    # default, or nothing if a type change just dropped it).
-                    set_default_sql, _ = self._alter_column_default_sql(
-                        model, old_field, new_field
-                    )
-                    self.execute(
-                        self.sql_alter_column
-                        % {
-                            "table": quote_name(model.model_options.db_table),
-                            "changes": set_default_sql,
-                        }
-                    )
-                    # Now that the column carries the expression as its DEFAULT,
-                    # tell Postgres to evaluate it for each NULL row — this
-                    # is the only way to get per-row evaluation of a volatile
-                    # function.
-                    self.execute(
-                        self.sql_update_with_db_default
-                        % {
-                            "table": quote_name(model.model_options.db_table),
-                            "column": quote_name(new_field.column),
-                        }
-                    )
-                else:
-                    new_default = self.effective_default(new_field)
-                    self.execute(
-                        self.sql_update_with_default
-                        % {
-                            "table": quote_name(model.model_options.db_table),
-                            "column": quote_name(new_field.column),
-                            "default": "%s",
-                        },
-                        [new_default],
-                    )
-                for sql, params in null_actions:
-                    self.execute(
-                        self.sql_alter_column
-                        % {
-                            "table": quote_name(model.model_options.db_table),
-                            "changes": sql,
-                        },
-                        params,
-                    )
-        if post_actions:
-            for sql, params in post_actions:
-                self.execute(sql, params)
 
-    def _alter_column_null_sql(
+    def _alter_column_type_sql(
         self,
-        model: type[Model],
-        old_field: ColumnField,
-        new_field: ColumnField,
+        old_field: Field,
+        new_field: Field,
+        new_type: str,
     ) -> tuple[str, list[Any]]:
-        """
-        Return a (sql, params) fragment to set a column to null or non-null
-        as required by new_field.
-        """
-        sql = (
-            self.sql_alter_column_null
-            if new_field.allow_null
-            else self.sql_alter_column_not_null
-        )
+        """Return an ``(sql, params)`` ALTER COLUMN TYPE fragment."""
+        sql = "ALTER COLUMN %(column)s TYPE %(type)s"
+        # USING cast when the base data type changed (e.g. varchar → int),
+        # not just a parameter like max_length.
+        if old_field.unqualified_db_type() != new_field.unqualified_db_type():
+            sql += " USING %(column)s::%(type)s"
         return (
             sql
             % {
                 "column": quote_name(new_field.column),
-                "type": new_field.db_type(),
+                "type": new_type,
             },
-            [],
-        )
-
-    def _alter_column_default_sql(
-        self,
-        model: type[Model],
-        old_field: Field | None,
-        new_field: Field,
-        drop: bool = False,
-    ) -> tuple[str, list[Any]]:
-        """
-        Return a (sql, params) fragment to add or drop (depending on the drop
-        argument) a default to new_field's column.
-        """
-        if drop:
-            return (
-                self.sql_alter_column_no_default
-                % {
-                    "column": quote_name(new_field.column),
-                    "type": new_field.db_type(),
-                },
-                [],
-            )
-
-        db_default_expr = new_field.get_db_default_expression()
-        if db_default_expr is not None:
-            # Inline the compiled expression into the DDL; no params.
-            default_sql = self._compile_expression(db_default_expr)
-            return (
-                self.sql_alter_column_default
-                % {
-                    "column": quote_name(new_field.column),
-                    "type": new_field.db_type(),
-                    "default": default_sql,
-                },
-                [],
-            )
-
-        new_default = self.effective_default(new_field)
-        return (
-            self.sql_alter_column_default
-            % {
-                "column": quote_name(new_field.column),
-                "type": new_field.db_type(),
-                "default": "%s",
-            },
-            [new_default],
-        )
-
-    def _alter_column_type_sql(
-        self,
-        model: type[Model],
-        old_field: Field,
-        new_field: Field,
-        new_type: str,
-    ) -> tuple[tuple[str, list[Any]], list[tuple[str, list[Any]]]]:
-        """
-        Return a two-tuple of: an SQL fragment of (sql, params) to insert into
-        an ALTER TABLE statement and a list of extra (sql, params) tuples to
-        run once the field is altered.
-        """
-        self.sql_alter_column_type = "ALTER COLUMN %(column)s TYPE %(type)s"
-        # Cast when data type changed.
-        if old_field.unqualified_db_type() != new_field.unqualified_db_type():
-            self.sql_alter_column_type += " USING %(column)s::%(type)s"
-        return (
-            (
-                self.sql_alter_column_type
-                % {
-                    "column": quote_name(new_field.column),
-                    "type": new_type,
-                },
-                [],
-            ),
             [],
         )
 
@@ -628,9 +429,9 @@ class DatabaseSchemaEditor:
         # - changing only a field name
         # - changing an attribute that doesn't affect the schema
         # - changing an attribute in the provided set of ignored attributes
-        for attr in ignore.union(old_field.non_db_attrs):
+        for attr in ignore.union(old_field.non_migration_attrs):
             old_kwargs.pop(attr, None)
-        for attr in ignore.union(new_field.non_db_attrs):
+        for attr in ignore.union(new_field.non_migration_attrs):
             new_kwargs.pop(attr, None)
         return quote_name(old_field.column) != quote_name(new_field.column) or (
             old_path,
@@ -638,12 +439,9 @@ class DatabaseSchemaEditor:
             old_kwargs,
         ) != (new_path, new_args, new_kwargs)
 
-    def _rename_field_sql(
-        self, table: str, old_field: Field, new_field: Field, new_type: str
-    ) -> str:
+    def _rename_field_sql(self, table: str, old_field: Field, new_field: Field) -> str:
         return self.sql_rename_column % {
             "table": quote_name(table),
             "old_column": quote_name(old_field.column),
             "new_column": quote_name(new_field.column),
-            "type": new_type,
         }

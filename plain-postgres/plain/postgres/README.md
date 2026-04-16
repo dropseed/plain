@@ -693,7 +693,7 @@ POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT = "3s"
 
 `lock_timeout` applies to every DDL. `statement_timeout` applies only to statements that take `ACCESS EXCLUSIVE` — non-blocking operations (`CREATE INDEX CONCURRENTLY`, `VALIDATE CONSTRAINT`) run unbounded because they can't cascade the lock queue.
 
-If a migration issues a row-touching UPDATE (e.g. the 4-way backfill that runs when you flip a nullable column to `NOT NULL` with a persistent default), the 3s `statement_timeout` will kill it on any non-tiny table. That's intentional — the right fix is a batched data migration, not a hidden inline backfill. The common first-time failure mode is applying migrations against a pre-seeded dev or staging database: raise the ceiling for that one run, then lower it back for production deploys.
+If a migration issues a row-touching UPDATE (e.g. a hand-written `RunPython` or `RunSQL` backfill), the 3s `statement_timeout` will kill it on any non-tiny table. That's intentional — the right fix is a batched data migration, not a single long-running UPDATE. The common first-time failure mode is applying migrations against a pre-seeded dev or staging database: raise the ceiling for that one run, then lower it back for production deploys.
 
 Use `RunSQL(no_timeout=True)` to opt out for a specific operation:
 
@@ -1222,7 +1222,14 @@ Add the field to your model class, then run `plain migrations create` to create 
 If the field is required (no `default=` and not `allow_null=True`), the autodetector refuses to generate the migration, since there's no value to seed existing rows with. You have two options:
 
 1. Declare a `default=` on the field so the new column has a value for existing rows.
-2. Add the field as nullable first, scaffold a data migration with `plain migrations create --empty --name backfill_<field>` to populate existing rows, then alter the field to NOT NULL in a third migration.
+2. Add the field with `allow_null=True`, scaffold a data migration with `plain migrations create --empty --name backfill_<field>` to populate existing rows, then remove `allow_null=True` from the field — convergence applies `NOT NULL` on the next `postgres sync`.
+
+#### How do I make an existing column `NOT NULL`?
+
+Edit the field to remove `allow_null=True`. `plain migrations create` won't detect a schema change — nullability is managed by convergence. Run `plain postgres sync`:
+
+- If the column has no `NULL` rows, convergence applies the change with a non-blocking `CHECK NOT VALID` + `VALIDATE` + `SET NOT NULL` pattern.
+- If `NULL` rows exist, convergence blocks and prints the table and column to backfill. Scaffold a data migration with `plain migrations create --empty --name backfill_<field>`, write the backfill, and run `postgres sync` again.
 
 #### How do I create a unique constraint on multiple fields?
 

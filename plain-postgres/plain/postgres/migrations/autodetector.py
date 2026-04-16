@@ -27,6 +27,17 @@ if TYPE_CHECKING:
     from plain.postgres.migrations.state import ProjectState
 
 
+def _strip_non_migration_attrs(
+    dec: tuple[str, list[Any], dict[str, Any]], non_migration_attrs: tuple[str, ...]
+) -> tuple[str, list[Any], dict[str, Any]]:
+    # Mirrors DatabaseSchemaEditor._field_should_be_altered — the schema editor
+    # already short-circuits when only non_migration_attrs differ; stripping
+    # them here skips the no-op AlterField too, so migration files reflect
+    # real DDL.
+    path, args, kwargs = dec
+    return path, args, {k: v for k, v in kwargs.items() if k not in non_migration_attrs}
+
+
 class MigrationAutodetector:
     """
     Take a pair of ProjectStates and compare them to see what the first would
@@ -804,9 +815,9 @@ class MigrationAutodetector:
                 f"Choose one:\n"
                 f"  1. Declare a default on the field in models.py, e.g.\n"
                 f'       {field_name}: str = types.TextField(default="...")\n'
-                f"  2. Split into two migrations: add the field as nullable, "
-                f"write a data migration to populate existing rows, then alter "
-                f"to NOT NULL:\n"
+                f"  2. Add the field with allow_null=True, scaffold a data "
+                f"migration to populate existing rows, then remove allow_null=True "
+                f"— convergence applies NOT NULL on the next sync:\n"
                 f"       uv run plain migrations create --empty --name backfill_{field_name}"
             )
         self.add_operation(
@@ -898,6 +909,16 @@ class MigrationAutodetector:
                     new_field.remote_field.through = old_field.remote_field.through  # ty: ignore[unresolved-attribute]
             old_field_dec = self.deep_deconstruct(old_field)
             new_field_dec = self.deep_deconstruct(new_field)
+            # Exclude non_migration_attrs (allow_null, default, on_delete, choices,
+            # etc.) — convergence handles those transitions, and the schema
+            # editor short-circuits when only non_migration_attrs differ. Emitting
+            # an AlterField here would be a no-op at apply time.
+            old_field_dec = _strip_non_migration_attrs(
+                old_field_dec, old_field.non_migration_attrs
+            )
+            new_field_dec = _strip_non_migration_attrs(
+                new_field_dec, new_field.non_migration_attrs
+            )
             if old_field_dec != new_field_dec and old_field_name == field_name:
                 both_m2m = isinstance(old_field, ManyToManyField) and isinstance(
                     new_field, ManyToManyField
@@ -907,26 +928,6 @@ class MigrationAutodetector:
                 ) and not isinstance(new_field, ManyToManyField)
                 if both_m2m or neither_m2m:
                     # Either both fields are m2m or neither is
-                    if (
-                        isinstance(old_field, ColumnField)
-                        and isinstance(new_field, ColumnField)
-                        and old_field.allow_null
-                        and not new_field.allow_null
-                        and not new_field.has_persistent_column_default()
-                    ):
-                        raise MigrationSchemaError(
-                            f"Cannot alter field '{model_name}.{field_name}' "
-                            f"from nullable to NOT NULL without a default. "
-                            f"Existing NULL rows have no value to fall back "
-                            f"on.\n\n"
-                            f"Choose one:\n"
-                            f"  1. Declare a default on the field in models.py, e.g.\n"
-                            f'       {field_name}: str = types.TextField(default="...")\n'
-                            f"  2. Split into two migrations: write a data "
-                            f"migration to populate the NULL rows first, then "
-                            f"alter to NOT NULL:\n"
-                            f"       uv run plain migrations create --empty --name backfill_{field_name}"
-                        )
                     self.add_operation(
                         package_label,
                         operations.AlterField(

@@ -132,7 +132,7 @@ class Field[T](RegisterLookupMixin):
     # Kwargs that don't affect the column definition; the schema editor
     # ignores these when deciding whether an ALTER is needed. Subclasses
     # that introduce additional non-db kwargs extend this tuple.
-    non_db_attrs: tuple[str, ...] = ()
+    non_migration_attrs: tuple[str, ...] = ()
 
     def __init__(self) -> None:
         self.name = None  # Set by set_attributes_from_name
@@ -536,7 +536,12 @@ class Field[T](RegisterLookupMixin):
 class ColumnField[T](Field[T]):
     """Base for fields backed by a column value (required/allow_null/validators)."""
 
-    non_db_attrs = (*Field.non_db_attrs, "required", "validators")
+    non_migration_attrs = (
+        *Field.non_migration_attrs,
+        "required",
+        "validators",
+        "allow_null",
+    )
 
     def __init__(
         self,
@@ -642,7 +647,7 @@ class ColumnField[T](Field[T]):
 class DefaultableField[T](ColumnField[T]):
     """Base for column-backed fields that accept a user-provided ``default``."""
 
-    non_db_attrs = (*ColumnField.non_db_attrs, "default")
+    non_migration_attrs = (*ColumnField.non_migration_attrs, "default")
 
     def __init__(
         self,
@@ -700,7 +705,7 @@ class DefaultableField[T](ColumnField[T]):
 class ChoicesField[T](DefaultableField[T]):
     """Base for fields that accept a ``choices=`` parameter."""
 
-    non_db_attrs = (*DefaultableField.non_db_attrs, "choices")
+    non_migration_attrs = (*DefaultableField.non_migration_attrs, "choices")
 
     def __init__(
         self,

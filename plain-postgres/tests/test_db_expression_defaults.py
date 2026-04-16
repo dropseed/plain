@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import datetime
 import uuid
-from typing import Any
 
 import pytest
 from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
@@ -19,15 +18,6 @@ from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
 from plain.postgres import get_connection
 from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.functions import GenRandomUUID, Now
-
-
-def _db_type(field: Any) -> str:
-    """Thin narrower: field.db_type() returns `str | None` but _alter_field
-    requires `str`. All of our test fields are concrete columns, so we just
-    assert and pass the narrowed value."""
-    t = field.db_type()
-    assert t is not None
-    return t
 
 
 def _column_default(table_name: str, column_name: str) -> str | None:
@@ -194,13 +184,7 @@ def test_alter_field_is_no_op_for_default_only_expression_change(db):
     new_field.set_attributes_from_name("token")
 
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DBDefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
+        editor.alter_field(DBDefaultsExample, old_field, new_field)
 
     joined = " ".join(editor.executed_sql).lower()
     assert "set default" not in joined
@@ -215,47 +199,19 @@ def test_alter_field_is_no_op_for_default_only_expression_change(db):
     new_field.set_attributes_from_name("token")
 
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DBDefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
+        editor.alter_field(DBDefaultsExample, old_field, new_field)
 
     joined = " ".join(editor.executed_sql).lower()
     assert "set default" not in joined
     assert "drop default" not in joined
 
 
-def test_alter_field_introducing_expression_default_with_not_null_raises(db):
-    """Introducing an expression default in the SAME migration as a
-    null→not-null transition is rejected — the 4-step backfill would write
-    NULLs because effective_default returns None for expression defaults."""
-    from plain.postgres import fields as plain_fields
-
-    connection = get_connection()
-
-    old_field = plain_fields.UUIDField(allow_null=True, required=False)
-    old_field.set_attributes_from_name("token")
-    new_field = plain_fields.UUIDField(generate=True)
-    new_field.set_attributes_from_name("token")
-
-    with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        with pytest.raises(NotImplementedError, match="same migration"):
-            editor._alter_field(
-                DBDefaultsExample,
-                old_field,
-                new_field,
-                old_type=_db_type(old_field),
-                new_type=_db_type(new_field),
-            )
-
-
-def test_alter_field_not_null_after_existing_expression_default_succeeds(db):
-    """Once the expression default already lives on the column, a follow-up
-    migration that adds NOT NULL must succeed — the four-way dance backfills
-    NULL rows by evaluating the column's DEFAULT, then SET NOT NULL."""
+def test_alter_field_nullable_to_not_null_with_expression_default_is_migration_no_op(
+    db,
+):
+    """A nullable→NOT NULL transition on a column that already carries an
+    expression DEFAULT is a schema-editor no-op. Convergence owns the
+    NullabilityDrift (SetNotNullFix blocks if NULL rows exist)."""
     from plain.postgres import fields as plain_fields
 
     connection = get_connection()
@@ -267,20 +223,9 @@ def test_alter_field_not_null_after_existing_expression_default_succeeds(db):
     new_field.set_attributes_from_name("token")
 
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DBDefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
+        editor.alter_field(DBDefaultsExample, old_field, new_field)
 
-    joined = " ".join(editor.executed_sql).lower()
-    assert "set not null" in joined
-    # NULL backfill must use literal DEFAULT so Postgres evaluates the
-    # column's expression per row, not pass NULL as a parameter.
-    assert "= default where" in joined
-    assert "set token = null" not in joined
+    assert editor.executed_sql == []
 
 
 def test_alter_field_renames_column_before_dropping_old_default(db):
@@ -300,13 +245,7 @@ def test_alter_field_renames_column_before_dropping_old_default(db):
     new_field.column = "new_touched_at"
 
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DBDefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
+        editor.alter_field(DBDefaultsExample, old_field, new_field)
 
     statements = [s.lower() for s in editor.executed_sql]
     rename_idx = next((i for i, s in enumerate(statements) if "rename column" in s), -1)
@@ -317,52 +256,6 @@ def test_alter_field_renames_column_before_dropping_old_default(db):
     # The DROP must target the new column name, not the old.
     assert "new_touched_at" in statements[drop_idx]
     assert "old_touched_at" not in statements[drop_idx]
-
-
-def test_alter_field_sets_new_default_before_null_backfill(db):
-    """When the four-way alteration runs with an expression default, the
-    SET DEFAULT for the NEW expression must land before the UPDATE backfill
-    so `UPDATE col = DEFAULT` evaluates the new expression, not whatever
-    the column previously had (or nothing, if a type change just dropped it)."""
-    from plain.postgres import fields as plain_fields
-
-    connection = get_connection()
-
-    # nullable → NOT NULL transition with an expression default on both sides.
-    # The schema editor must SET DEFAULT the expression before backfilling.
-    old_field = plain_fields.DateTimeField(allow_null=True, create_now=True)
-    old_field.set_attributes_from_name("touched_at")
-    new_field = plain_fields.DateTimeField(create_now=True)
-    new_field.set_attributes_from_name("touched_at")
-
-    with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DBDefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
-
-    statements = [s.lower() for s in editor.executed_sql]
-    set_idx = next(
-        (
-            i
-            for i, s in enumerate(statements)
-            if "set default statement_timestamp()" in s
-        ),
-        -1,
-    )
-    update_idx = next(
-        (i for i, s in enumerate(statements) if "= default where" in s), -1
-    )
-    not_null_idx = next(
-        (i for i, s in enumerate(statements) if "set not null" in s), -1
-    )
-
-    assert set_idx >= 0, "expected SET DEFAULT for the new expression"
-    assert update_idx > set_idx, "UPDATE backfill must come after SET DEFAULT new"
-    assert not_null_idx > update_idx, "SET NOT NULL must come after backfill"
 
 
 def test_alter_field_drops_old_expression_default_before_type_change(db):
@@ -380,13 +273,7 @@ def test_alter_field_drops_old_expression_default_before_type_change(db):
     new_field.set_attributes_from_name("touched_at")
 
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DBDefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
+        editor.alter_field(DBDefaultsExample, old_field, new_field)
 
     statements = [s.lower() for s in editor.executed_sql]
     drop_idx = next((i for i, s in enumerate(statements) if "drop default" in s), -1)
@@ -394,6 +281,29 @@ def test_alter_field_drops_old_expression_default_before_type_change(db):
 
     assert drop_idx >= 0, "expected DROP DEFAULT before type change"
     assert type_idx > drop_idx, "type change must come after DROP DEFAULT"
+
+
+def test_alter_field_literal_default_skips_drop_before_type_change(db):
+    """Literal defaults don't need the pre-type-change DROP — the field's
+    `db_returning` is False, so only the ALTER TYPE runs. Postgres only
+    re-evaluates the DEFAULT on subsequent INSERTs, and convergence reconciles
+    any mismatch between the stored DEFAULT and the new type on the next sync."""
+    from plain.postgres import fields as plain_fields
+
+    connection = get_connection()
+
+    old_field = plain_fields.IntegerField(default=0)
+    old_field.set_attributes_from_name("count")
+    new_field = plain_fields.TextField(max_length=50, default="zero")
+    new_field.set_attributes_from_name("count")
+
+    with connection.schema_editor(atomic=False, collect_sql=True) as editor:
+        editor.alter_field(DBDefaultsExample, old_field, new_field)
+
+    joined = " ".join(editor.executed_sql).lower()
+    assert "drop default" not in joined
+    assert "alter column" in joined
+    assert " type " in joined
 
 
 def test_modelfield_to_formfield_excludes_expression_defaults():

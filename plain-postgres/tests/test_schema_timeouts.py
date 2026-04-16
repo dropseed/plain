@@ -11,7 +11,6 @@ from typing import cast
 import pytest
 from app.examples.models.defaults import DefaultsExample
 
-from plain.postgres import fields as plain_fields
 from plain.postgres import get_connection
 from plain.postgres.migrations.operations.special import RunSQL
 from plain.runtime import settings as plain_settings
@@ -66,31 +65,6 @@ def test_create_model_wraps_each_statement(db):
     sql_list = _collect(lambda editor: editor.create_model(DefaultsExample))
     assert sql_list  # not empty
     for stmt in sql_list:
-        assert stmt.startswith("SET LOCAL lock_timeout = '3s';")
-        assert "SET LOCAL statement_timeout = '3s';" in stmt
-
-
-def test_alter_field_backfill_update_carries_statement_timeout(db):
-    """The 4-way backfill UPDATE runs under ACCESS EXCLUSIVE; it intentionally
-    inherits the 3s statement_timeout. Confirm the prelude is on the UPDATE."""
-    old_field = plain_fields.TextField(max_length=20, allow_null=True, default="active")
-    old_field.set_attributes_from_name("role")
-    new_field = plain_fields.TextField(max_length=20, default="active")
-    new_field.set_attributes_from_name("role")
-
-    connection = get_connection()
-    with connection.schema_editor(atomic=True, collect_sql=True) as editor:
-        editor._alter_field(
-            DefaultsExample,
-            old_field,
-            new_field,
-            old_type="character varying(20)",
-            new_type="character varying(20)",
-        )
-
-    update_stmts = [s for s in editor.executed_sql if " UPDATE " in f" {s} "]
-    assert update_stmts, "expected at least one backfill UPDATE"
-    for stmt in update_stmts:
         assert stmt.startswith("SET LOCAL lock_timeout = '3s';")
         assert "SET LOCAL statement_timeout = '3s';" in stmt
 
