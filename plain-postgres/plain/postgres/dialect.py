@@ -115,6 +115,51 @@ def quote_name(name: str) -> str:
     return f'"{name}"'
 
 
+# Postgres interval literals we accept in timeout settings. Requires an
+# explicit unit so a `"1"` typo can't silently become 1ms (Postgres's
+# implicit unit for lock_timeout/statement_timeout). Fractional values
+# and mixed case are allowed to match what Postgres itself accepts.
+# Rejecting single quotes prevents malformed settings from escaping the
+# SQL literal.
+_TIMEOUT_VALUE_RE = _lazy_re_compile(r"(?i)^\d+(\.\d+)?\s*(us|ms|s|min|h|d)$")
+
+
+def _validate_timeout_value(name: str, value: str) -> None:
+    if not _TIMEOUT_VALUE_RE.match(value):
+        raise ValueError(
+            f"Invalid Postgres interval for {name}: {value!r}. "
+            "Expected e.g. '3s', '500ms', '1.5min' — a number with an "
+            "explicit unit (us, ms, s, min, h, d)."
+        )
+
+
+def build_timeout_set_clauses(
+    *,
+    lock_timeout: str,
+    statement_timeout: str | None,
+    local: bool = True,
+) -> str:
+    """Return a `SET [LOCAL] lock_timeout = '...'; [SET [LOCAL] statement_timeout = '...'; ]`
+    prelude to prepend to a DDL statement.
+
+    `local=True` emits `SET LOCAL` (transaction-scoped, auto-restores on commit).
+    `local=False` emits session-level `SET` (used in autocommit mode; requires
+    a matching RESET).
+
+    `statement_timeout=None` omits that SET — used for SHARE UPDATE EXCLUSIVE
+    operations (CONCURRENTLY, VALIDATE CONSTRAINT) that are non-blocking and
+    should run to completion on any table size.
+    """
+    _validate_timeout_value("lock_timeout", lock_timeout)
+    if statement_timeout is not None:
+        _validate_timeout_value("statement_timeout", statement_timeout)
+    scope = "LOCAL " if local else ""
+    parts = [f"SET {scope}lock_timeout = '{lock_timeout}'"]
+    if statement_timeout is not None:
+        parts.append(f"SET {scope}statement_timeout = '{statement_timeout}'")
+    return "; ".join(parts) + "; "
+
+
 def date_extract_sql(
     lookup_type: str, sql: str, params: list[Any] | tuple[Any, ...]
 ) -> tuple[str, list[Any] | tuple[Any, ...]]:

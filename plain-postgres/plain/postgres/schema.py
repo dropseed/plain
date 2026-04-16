@@ -9,12 +9,13 @@ if TYPE_CHECKING:
 
 from plain.logs import get_framework_logger
 from plain.postgres.ddl import compile_database_default_sql
-from plain.postgres.dialect import quote_name
+from plain.postgres.dialect import build_timeout_set_clauses, quote_name
 from plain.postgres.fields import Field
 from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.transaction import atomic
+from plain.runtime import settings as plain_settings
 
 if TYPE_CHECKING:
     from plain.postgres.base import Model
@@ -64,6 +65,13 @@ class DatabaseSchemaEditor:
         self.connection = connection
         self.collect_sql = collect_sql
         self.atomic_migration = atomic and not collect_sql
+        # `atomic_migration` goes False under collect_sql=True (we don't open
+        # a real transaction for preview), but the collected SQL should still
+        # reflect a real atomic run. Track the user's `atomic` intent
+        # separately so the SET LOCAL prelude is emitted in the atomic=True
+        # preview case, and skipped in the atomic=False case (where SET LOCAL
+        # would be a no-op with WARNING outside a transaction block).
+        self._atomic_intent = atomic
 
     # State-managing methods
 
@@ -81,15 +89,41 @@ class DatabaseSchemaEditor:
     # Core utility functions
 
     def execute(
-        self, sql: str, params: tuple[Any, ...] | list[Any] | None = ()
+        self,
+        sql: str,
+        params: tuple[Any, ...] | list[Any] | None = (),
+        *,
+        set_timeouts: bool = True,
     ) -> None:
-        """Execute the given SQL statement, with optional parameters."""
+        """Execute the given SQL statement, with optional parameters.
+
+        When ``set_timeouts`` is True (default), ``SET LOCAL lock_timeout`` and
+        ``SET LOCAL statement_timeout`` are prepended to the SQL so DDL fails
+        fast if it can't acquire its lock or if a blocking statement runs
+        longer than configured. Values come from ``POSTGRES_MIGRATION_*``
+        settings. ``RunSQL(no_timeout=True)`` passes ``set_timeouts=False`` as
+        an escape hatch for long-running data migrations.
+        """
         sql_str = sql
 
         # Merge the query client-side, as PostgreSQL won't do it server-side.
         if params is not None:
             sql_str = self.connection.compose_sql(sql_str, params)
             params = None
+
+        # SET LOCAL only works inside a transaction block. Skip the prelude
+        # when the editor was opened with atomic=False (e.g. a migration that
+        # needs to issue CONCURRENTLY via RunSQL) — otherwise Postgres would
+        # silently WARN and ignore the timeouts. Users of non-atomic
+        # migrations manage timeouts explicitly in their RunSQL if needed.
+        if set_timeouts and self._atomic_intent:
+            sql_str = (
+                build_timeout_set_clauses(
+                    lock_timeout=plain_settings.POSTGRES_MIGRATION_LOCK_TIMEOUT,
+                    statement_timeout=plain_settings.POSTGRES_MIGRATION_STATEMENT_TIMEOUT,
+                )
+                + sql_str
+            )
 
         # Log the command we're running, then run it
         logger.debug("Schema SQL executed", extra={"sql": sql_str, "params": params})

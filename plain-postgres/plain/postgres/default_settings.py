@@ -11,6 +11,24 @@ POSTGRES_CONN_HEALTH_CHECKS: bool = True
 POSTGRES_OPTIONS: dict = {}
 POSTGRES_TIME_ZONE: str | None = None
 
+# DDL timeouts. Applied per-statement via SET LOCAL before every framework-
+# issued DDL in migrations and convergence. Values are Postgres interval
+# strings ("3s", "500ms", "1min"). These do NOT affect application queries.
+#
+# lock_timeout: how long to wait for a lock before failing with
+#   LockNotAvailable. Prevents the lock-queue cascade where a waiting
+#   ACCESS EXCLUSIVE blocks every new query on the table.
+#
+# statement_timeout: how long a statement can run once it has its lock.
+#   Only applied to statements that hold ACCESS EXCLUSIVE. Non-blocking
+#   operations (CREATE INDEX CONCURRENTLY, VALIDATE CONSTRAINT) run
+#   without a statement_timeout — the lock doesn't cascade, so letting
+#   them run to completion on large tables is safe.
+POSTGRES_MIGRATION_LOCK_TIMEOUT: str = "3s"
+POSTGRES_MIGRATION_STATEMENT_TIMEOUT: str = "3s"
+POSTGRES_CONVERGENCE_LOCK_TIMEOUT: str = "3s"
+POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT: str = "3s"
+
 if "DATABASE_URL" in environ:
     _db_url = environ["DATABASE_URL"]
     if _db_url.lower() == "none":

@@ -4,21 +4,58 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
+from plain.logs import get_framework_logger
+from plain.runtime import settings as plain_settings
+
 from ..constraints import BaseConstraint, CheckConstraint, UniqueConstraint
 from ..db import get_connection
-from ..dialect import quote_name
+from ..dialect import build_timeout_set_clauses, quote_name
 from ..indexes import Index
 
 if TYPE_CHECKING:
     from ..base import Model
 
 
-def _execute_and_commit(sql: str) -> None:
-    """Execute SQL and commit. Rolls back on failure so the connection stays usable."""
+logger = get_framework_logger()
+
+
+def _convergence_prelude(*, blocking: bool, local: bool) -> str:
+    """Return the SET prelude for convergence DDL.
+
+    `blocking=True` (ACCESS EXCLUSIVE) sets both lock_timeout and
+    statement_timeout. `blocking=False` (SHARE UPDATE EXCLUSIVE — VALIDATE,
+    CONCURRENTLY) omits statement_timeout so the non-blocking statement can
+    run to completion on any table size.
+    """
+    return build_timeout_set_clauses(
+        lock_timeout=plain_settings.POSTGRES_CONVERGENCE_LOCK_TIMEOUT,
+        statement_timeout=(
+            plain_settings.POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT if blocking else None
+        ),
+        local=local,
+    )
+
+
+def _execute_and_commit(sql: str | list[str], *, blocking: bool = True) -> None:
+    """Execute DDL in a committed transaction with convergence timeouts.
+
+    Accepts a single SQL string or a list of statements that must share one
+    transaction (e.g. SetNotNullFix step 3: SET NOT NULL + DROP temp check
+    together so no orphan constraint can remain after a partial failure).
+    """
+    prelude = _convergence_prelude(blocking=blocking, local=True)
+    if isinstance(sql, str):
+        script = prelude + sql
+    else:
+        script = prelude + "; ".join(sql)
+
+    # psycopg3 simple-query protocol: a single execute() with a multi-statement
+    # script runs every statement in one transaction. params must be None —
+    # these are literal DDL strings assembled above.
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute(sql)
+            cursor.execute(script)
         conn.commit()
     except Exception:
         conn.rollback()
@@ -26,10 +63,17 @@ def _execute_and_commit(sql: str) -> None:
 
 
 def _execute_autocommit(sql: str) -> None:
-    """Execute SQL in autocommit mode (required for CONCURRENTLY operations).
+    """Execute DDL in autocommit mode (required for CONCURRENTLY operations).
 
-    Commits any pending transaction first, since Postgres doesn't allow
-    switching to autocommit while a transaction is active.
+    CONCURRENTLY holds SHARE UPDATE EXCLUSIVE (non-blocking). Only
+    lock_timeout is set — statement_timeout is omitted so the operation can
+    run to completion on any table size.
+
+    Autocommit forbids SET LOCAL, and bundling SET with CONCURRENTLY in a
+    single query forms an implicit transaction block that CONCURRENTLY
+    rejects. So SET, DDL, and RESET are three separate cursor.execute()
+    calls. RESET runs in a finally so the session-level timeout doesn't leak
+    to the next caller even if the DDL fails.
     """
     conn = get_connection()
     if conn.in_atomic_block:
@@ -39,10 +83,41 @@ def _execute_autocommit(sql: str) -> None:
         conn.commit()
         conn.set_autocommit(True)
     try:
-        with conn.cursor() as cursor:
-            cursor.execute(sql)
+        # Session-level SET (no LOCAL — autocommit has no transaction to
+        # scope to). Routed through the dialect helper so the setting value
+        # is validated the same way as every other timeout SET.
+        set_prelude = build_timeout_set_clauses(
+            lock_timeout=plain_settings.POSTGRES_CONVERGENCE_LOCK_TIMEOUT,
+            statement_timeout=None,
+            local=False,
+        )
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(set_prelude)
+                cursor.execute(sql)
+        finally:
+            # Clear the session-level timeouts. Both are RESET even though
+            # only lock_timeout is set today, so a future change that
+            # introduces statement_timeout on this path can't silently leak
+            # it to the next caller. RESET of an unset value is a no-op. If
+            # RESET itself fails, close the connection so the pool can't
+            # hand it back with leaked session state.
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("RESET lock_timeout; RESET statement_timeout")
+            except Exception:
+                logger.warning(
+                    "Failed to RESET session timeouts after autocommit DDL; "
+                    "closing connection to avoid leaking session state",
+                    exc_info=True,
+                )
+                conn.close()
     finally:
-        if not old_autocommit:
+        # Restore autocommit only if the connection is still open — if we
+        # closed it above due to RESET failure, calling set_autocommit would
+        # force a reconnect just to flip a flag, and any failure there would
+        # mask the original DDL error.
+        if not old_autocommit and conn.connection is not None:
             conn.set_autocommit(False)
 
 
@@ -215,7 +290,7 @@ class AddForeignKeyFix(Fix):
             f"ALTER TABLE {quote_name(self.table)}"
             f" VALIDATE CONSTRAINT {quote_name(self.constraint_name)}"
         )
-        _execute_and_commit(validate_sql)
+        _execute_and_commit(validate_sql, blocking=False)
 
         return f"{add_sql}; {validate_sql}"
 
@@ -270,7 +345,7 @@ class ReplaceForeignKeyFix(Fix):
             f"ALTER TABLE {quote_name(self.table)}"
             f" VALIDATE CONSTRAINT {quote_name(self.constraint_name)}"
         )
-        _execute_and_commit(validate_sql)
+        _execute_and_commit(validate_sql, blocking=False)
 
         return f"{replace_sql}; {validate_sql}"
 
@@ -321,7 +396,7 @@ class SetNotNullFix(Fix):
 
         # Step 2: Validate (SHARE UPDATE EXCLUSIVE — non-blocking scan)
         validate_sql = f"ALTER TABLE {t} VALIDATE CONSTRAINT {check}"
-        _execute_and_commit(validate_sql)
+        _execute_and_commit(validate_sql, blocking=False)
 
         # Step 3: SET NOT NULL + drop temp check in one commit.
         # Both are instant catalog operations (SET NOT NULL skips the scan
@@ -329,15 +404,7 @@ class SetNotNullFix(Fix):
         # temp check if SET NOT NULL succeeds.
         set_sql = f"ALTER TABLE {t} ALTER COLUMN {c} SET NOT NULL"
         drop_sql = f"ALTER TABLE {t} DROP CONSTRAINT {check}"
-        conn = get_connection()
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(set_sql)
-                cursor.execute(drop_sql)
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
+        _execute_and_commit([set_sql, drop_sql])
 
         return f"{add_sql}; {validate_sql}; {set_sql}; {drop_sql}"
 
@@ -444,7 +511,7 @@ class ValidateConstraintFix(Fix):
 
     def apply(self) -> str:
         sql = f"ALTER TABLE {quote_name(self.table)} VALIDATE CONSTRAINT {quote_name(self.name)}"
-        _execute_and_commit(sql)
+        _execute_and_commit(sql, blocking=False)
         return sql
 
 

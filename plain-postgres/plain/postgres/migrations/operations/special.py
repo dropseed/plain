@@ -76,10 +76,17 @@ class RunSQL(Operation):
         *,
         state_operations: list[Operation] | None = None,
         elidable: bool = False,
+        no_timeout: bool = False,
     ) -> None:
         self.sql = sql
         self.state_operations = state_operations or []
         self.elidable = elidable
+        # Opt-out of the per-statement SET LOCAL lock_timeout/statement_timeout
+        # that migrations apply by default. Use for long-running data
+        # migrations (batched backfills) or for user-authored DDL that needs
+        # to manage its own timeouts (e.g. CREATE INDEX CONCURRENTLY in a
+        # migration file).
+        self.no_timeout = no_timeout
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         kwargs: dict[str, Any] = {
@@ -87,6 +94,8 @@ class RunSQL(Operation):
         }
         if self.state_operations:
             kwargs["state_operations"] = self.state_operations
+        if self.no_timeout:
+            kwargs["no_timeout"] = self.no_timeout
         return (self.__class__.__qualname__, (), kwargs)
 
     def state_forwards(self, package_label: str, state: ProjectState) -> None:
@@ -112,6 +121,7 @@ class RunSQL(Operation):
         | list[str | tuple[str, list[Any]]]
         | tuple[str | tuple[str, list[Any]], ...],
     ) -> None:
+        set_timeouts = not self.no_timeout
         if isinstance(sqls, list | tuple):
             for sql_item in sqls:
                 params: list[Any] | None = None
@@ -124,10 +134,10 @@ class RunSQL(Operation):
                         raise ValueError("Expected a 2-tuple but got %d" % elements)  # noqa: UP031
                 else:
                     sql = sql_item
-                schema_editor.execute(sql, params=params)
+                schema_editor.execute(sql, params=params, set_timeouts=set_timeouts)
         else:
             # PostgreSQL can handle multi-statement scripts in a single execute call
-            schema_editor.execute(sqls, params=None)
+            schema_editor.execute(sqls, params=None, set_timeouts=set_timeouts)
 
 
 class RunPython(Operation):

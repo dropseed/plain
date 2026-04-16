@@ -679,6 +679,43 @@ Some changes can't be applied automatically. For example, if you add `NOT NULL` 
 
 When you remove an index or constraint from a model, convergence automatically drops the undeclared database object on the next `postgres sync`. Models are the source of truth — if it's not declared, it gets removed.
 
+### DDL timeouts
+
+Every framework-issued DDL statement — both in migrations and in convergence — is wrapped with `lock_timeout` and `statement_timeout` so a deploy can't hang indefinitely waiting for a lock, and so a backfill against an unexpectedly large table fails fast instead of holding `ACCESS EXCLUSIVE` for minutes.
+
+```python
+# app/settings.py — defaults shown
+POSTGRES_MIGRATION_LOCK_TIMEOUT = "3s"
+POSTGRES_MIGRATION_STATEMENT_TIMEOUT = "3s"
+POSTGRES_CONVERGENCE_LOCK_TIMEOUT = "3s"
+POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT = "3s"
+```
+
+`lock_timeout` applies to every DDL. `statement_timeout` applies only to statements that take `ACCESS EXCLUSIVE` — non-blocking operations (`CREATE INDEX CONCURRENTLY`, `VALIDATE CONSTRAINT`) run unbounded because they can't cascade the lock queue.
+
+If a migration issues a row-touching UPDATE (e.g. the 4-way backfill that runs when you flip a nullable column to `NOT NULL` with a persistent default), the 3s `statement_timeout` will kill it on any non-tiny table. That's intentional — the right fix is a batched data migration, not a hidden inline backfill. The common first-time failure mode is applying migrations against a pre-seeded dev or staging database: raise the ceiling for that one run, then lower it back for production deploys.
+
+Use `RunSQL(no_timeout=True)` to opt out for a specific operation:
+
+```python
+from plain.postgres.migrations.operations import RunSQL
+
+operations = [
+    RunSQL(
+        "UPDATE orders SET status = 'pending' WHERE status IS NULL",
+        no_timeout=True,
+    ),
+]
+```
+
+Non-atomic migrations (`Migration.atomic = False`, used for `CREATE INDEX CONCURRENTLY` in a migration) skip the timeout prelude automatically — `SET LOCAL` is a no-op outside a transaction block. Manage timeouts inside your own `RunSQL` if you need them.
+
+Environment overrides: every setting accepts `PLAIN_POSTGRES_*` env vars, so you can raise the ceiling for a specific deploy without a code change:
+
+```bash
+PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT=30s plain migrations apply
+```
+
 ## Fields
 
 You can use many field types for different data:
@@ -1158,17 +1195,21 @@ When `DATABASE_URL` is set, it is parsed into the individual connection settings
 
 Set `DATABASE_URL=none` to explicitly disable the database (e.g. during Docker image builds).
 
-| Setting                       | Type          | Default | Env var                             |
-| ----------------------------- | ------------- | ------- | ----------------------------------- |
-| `POSTGRES_HOST`               | `str`         | —       | `PLAIN_POSTGRES_HOST`               |
-| `POSTGRES_PORT`               | `int \| None` | `None`  | `PLAIN_POSTGRES_PORT`               |
-| `POSTGRES_DATABASE`           | `str`         | —       | `PLAIN_POSTGRES_DATABASE`           |
-| `POSTGRES_USER`               | `str`         | —       | `PLAIN_POSTGRES_USER`               |
-| `POSTGRES_PASSWORD`           | `Secret[str]` | —       | `PLAIN_POSTGRES_PASSWORD`           |
-| `POSTGRES_CONN_MAX_AGE`       | `int`         | `600`   | `PLAIN_POSTGRES_CONN_MAX_AGE`       |
-| `POSTGRES_CONN_HEALTH_CHECKS` | `bool`        | `True`  | `PLAIN_POSTGRES_CONN_HEALTH_CHECKS` |
-| `POSTGRES_OPTIONS`            | `dict`        | `{}`    | —                                   |
-| `POSTGRES_TIME_ZONE`          | `str \| None` | `None`  | `PLAIN_POSTGRES_TIME_ZONE`          |
+| Setting                                  | Type          | Default | Env var                                        |
+| ---------------------------------------- | ------------- | ------- | ---------------------------------------------- |
+| `POSTGRES_HOST`                          | `str`         | —       | `PLAIN_POSTGRES_HOST`                          |
+| `POSTGRES_PORT`                          | `int \| None` | `None`  | `PLAIN_POSTGRES_PORT`                          |
+| `POSTGRES_DATABASE`                      | `str`         | —       | `PLAIN_POSTGRES_DATABASE`                      |
+| `POSTGRES_USER`                          | `str`         | —       | `PLAIN_POSTGRES_USER`                          |
+| `POSTGRES_PASSWORD`                      | `Secret[str]` | —       | `PLAIN_POSTGRES_PASSWORD`                      |
+| `POSTGRES_CONN_MAX_AGE`                  | `int`         | `600`   | `PLAIN_POSTGRES_CONN_MAX_AGE`                  |
+| `POSTGRES_CONN_HEALTH_CHECKS`            | `bool`        | `True`  | `PLAIN_POSTGRES_CONN_HEALTH_CHECKS`            |
+| `POSTGRES_OPTIONS`                       | `dict`        | `{}`    | —                                              |
+| `POSTGRES_TIME_ZONE`                     | `str \| None` | `None`  | `PLAIN_POSTGRES_TIME_ZONE`                     |
+| `POSTGRES_MIGRATION_LOCK_TIMEOUT`        | `str`         | `"3s"`  | `PLAIN_POSTGRES_MIGRATION_LOCK_TIMEOUT`        |
+| `POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   | `str`         | `"3s"`  | `PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   |
+| `POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      | `str`         | `"3s"`  | `PLAIN_POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      |
+| `POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT` | `str`         | `"3s"`  | `PLAIN_POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT` |
 
 See [`default_settings.py`](./default_settings.py) for more details.
 
