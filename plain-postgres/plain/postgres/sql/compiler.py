@@ -819,15 +819,9 @@ class SQLCompiler:
         opts: Meta | None = None,
     ) -> list[Any]:
         """
-        Compute the default columns for selecting every field in the base
-        model. Will sometimes be called to pull in related models (e.g. via
-        select_related), in which case "opts" (Meta) and "start_alias" will be given
-        to provide a starting point for the traversal.
-
-        Return a list of strings, quoted appropriately for use in SQL
-        directly, as well as a set of aliases used in the select statement (if
-        'as_pairs' is True, return a list of (alias, col_name) pairs instead
-        of strings as the first component and None as the second component).
+        Return Col expressions for every concrete field on the model. When
+        pulling in a related model (e.g. via select_related), the caller
+        passes ``opts`` and ``start_alias`` to traverse from that join.
         """
         result = []
         if opts is None:
@@ -1248,11 +1242,9 @@ class SQLCompiler:
 
         def _get_first_selected_col_from_model(klass_info: dict) -> Any | None:
             """
-            Find the first selected column from a model. If it doesn't exist,
-            don't lock a model.
-
-            select_fields is filled recursively, so it also contains fields
-            from the parent models.
+            Find the first selected column whose target field belongs to this
+            klass_info's model. Returns None when the model isn't represented
+            in the select list — callers use that to skip locking the row.
             """
             assert self.select is not None
             model = klass_info["model"]
