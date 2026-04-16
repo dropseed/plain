@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import binascii
 import os
-import uuid
 from datetime import datetime
 from uuid import UUID
 
 from plain import postgres
 from plain.postgres import types
-from plain.postgres.functions import Now
 
 __all__ = ["APIKey"]
 
@@ -19,9 +17,9 @@ def generate_token() -> str:
 
 @postgres.register_model
 class APIKey(postgres.Model):
-    uuid: UUID = types.UUIDField(default=uuid.uuid4)
-    created_at: datetime = types.DateTimeField(default=Now())
-    updated_at: datetime = types.DateTimeField(auto_now=True)
+    uuid: UUID = types.UUIDField(generate=True)
+    created_at: datetime = types.DateTimeField(create_now=True)
+    updated_at: datetime = types.DateTimeField(update_now=True)
     expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
     last_used_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
 

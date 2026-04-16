@@ -31,7 +31,6 @@ Models are Postgres-only:
 # app/users/models.py
 from plain import postgres
 from plain.postgres import types
-from plain.postgres.functions import Now
 from plain.passwords.models import PasswordField
 
 @postgres.register_model
@@ -40,7 +39,7 @@ class User(postgres.Model):
     password: str = PasswordField()
     display_name: str = types.TextField(max_length=100)
     is_admin: bool = types.BooleanField(default=False)
-    created_at: datetime = types.DateTimeField(default=Now())
+    created_at: datetime = types.DateTimeField(create_now=True)
 
     query: postgres.QuerySet[User] = postgres.QuerySet()
 

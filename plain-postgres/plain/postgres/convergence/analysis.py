@@ -14,7 +14,7 @@ from ..ddl import (
 )
 from ..deletion import sql_on_delete
 from ..dialect import quote_name
-from ..fields.base import ColumnField, DefaultableField
+from ..fields.base import ColumnField
 from ..fields.related import ForeignKeyField
 from ..indexes import Index
 from ..introspection import (
@@ -430,9 +430,9 @@ def _compare_columns(
 def _compare_column_default(
     field: Field, actual: ColumnState, table: str
 ) -> ColumnDefaultDrift | None:
-    if field.has_db_default():
-        assert isinstance(field, DefaultableField)
-        expected_sql = compile_database_default_sql(field.default)
+    db_default_expr = field.get_db_default_expression()
+    if db_default_expr is not None:
+        expected_sql = compile_database_default_sql(db_default_expr)
 
         if actual.default_sql is None:
             return ColumnDefaultDrift(

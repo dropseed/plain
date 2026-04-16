@@ -3,7 +3,6 @@
 import plain.postgres.deletion
 from plain import postgres
 from plain.postgres import migrations
-from plain.postgres.functions import Now
 
 
 class Migration(migrations.Migration):
@@ -19,9 +18,9 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", postgres.PrimaryKeyField()),
                 ("body", postgres.TextField(default="", required=False)),
-                ("created_at", postgres.DateTimeField(default=Now())),
+                ("created_at", postgres.DateTimeField(create_now=True)),
                 ("title", postgres.TextField(max_length=200)),
-                ("updated_at", postgres.DateTimeField(auto_now=True)),
+                ("updated_at", postgres.DateTimeField(update_now=True)),
                 (
                     "author",
                     postgres.ForeignKeyField(

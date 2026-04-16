@@ -5,7 +5,6 @@ import datetime
 from app.users.models import User
 from plain import postgres
 from plain.postgres import types
-from plain.postgres.functions import Now
 from plain.urls import reverse
 
 
@@ -18,8 +17,8 @@ class Note(postgres.Model):
     )
     title: str = types.TextField(max_length=200)
     body: str = types.TextField(default="", required=False)
-    created_at: datetime.datetime = types.DateTimeField(default=Now())
-    updated_at: datetime.datetime = types.DateTimeField(auto_now=True)
+    created_at: datetime.datetime = types.DateTimeField(create_now=True)
+    updated_at: datetime.datetime = types.DateTimeField(update_now=True)
 
     query: postgres.QuerySet[Note] = postgres.QuerySet()
 

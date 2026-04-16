@@ -2,7 +2,6 @@
 
 from plain import postgres
 from plain.postgres import migrations
-from plain.postgres.functions import Now
 
 
 class Migration(migrations.Migration):
@@ -14,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="user",
             name="created_at",
-            field=postgres.DateTimeField(default=Now()),
+            field=postgres.DateTimeField(create_now=True),
         ),
     ]

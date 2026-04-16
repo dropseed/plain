@@ -4,7 +4,6 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
-from plain.postgres.functions import Now
 
 __all__ = ["Session"]
 
@@ -13,7 +12,7 @@ __all__ = ["Session"]
 class Session(postgres.Model):
     session_key: str = types.TextField(max_length=40)
     session_data: dict = types.JSONField(default=dict, required=False)
-    created_at: datetime = types.DateTimeField(default=Now())
+    created_at: datetime = types.DateTimeField(create_now=True)
     expires_at: datetime | None = types.DateTimeField(allow_null=True)
 
     query: postgres.QuerySet[Session] = postgres.QuerySet()

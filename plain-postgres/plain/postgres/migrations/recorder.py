@@ -8,7 +8,6 @@ from plain import postgres
 from plain.postgres.meta import Meta
 from plain.postgres.registry import ModelsRegistry
 from plain.utils.functional import classproperty
-from plain.utils.timezone import now
 
 from .exceptions import MigrationSchemaMissing
 
@@ -46,7 +45,10 @@ class MigrationRecorder:
             class Migration(postgres.Model):
                 app = postgres.TextField(max_length=255)
                 name = postgres.TextField(max_length=255)
-                applied = postgres.DateTimeField(default=now)
+                # update_now (not create_now) because existing plainmigrations
+                # tables have no column DEFAULT — ensure_schema skips tables
+                # that already exist, so the DB default would never be added.
+                applied = postgres.DateTimeField(update_now=True)
 
                 # Use isolated models registry for migrations
                 _model_meta = Meta(models_registry=_models_registry)

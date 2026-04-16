@@ -7,7 +7,12 @@ from plain.forms import BaseForm
 from plain.http import Response
 from plain.views import CreateView, UpdateView
 
-from .forms import FormsExampleForm
+from .forms import (
+    ChildCascadeForm,
+    DBDefaultsExampleForm,
+    FormsExampleForm,
+    SecretStoreForm,
+)
 from .models.forms import FormsExample
 
 
@@ -44,3 +49,18 @@ class FormsExampleUpdateView(_NoTemplateFormView, UpdateView):
 
     def get_object(self) -> Any:
         return FormsExample.query.filter(id=self.url_kwargs["pk"]).first()
+
+
+class ChildCascadeCreateView(_NoTemplateFormView, CreateView):
+    form_class = ChildCascadeForm
+    success_url = "/ok/"
+
+
+class DBDefaultsExampleCreateView(_NoTemplateFormView, CreateView):
+    form_class = DBDefaultsExampleForm
+    success_url = "/ok/"
+
+
+class SecretStoreCreateView(_NoTemplateFormView, CreateView):
+    form_class = SecretStoreForm
+    success_url = "/ok/"

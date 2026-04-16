@@ -5,12 +5,7 @@ import re
 from graphlib import TopologicalSorter
 from typing import TYPE_CHECKING, Any
 
-from plain.postgres.fields import (
-    DateField,
-    DateTimeField,
-    Field,
-    TimeField,
-)
+from plain.postgres.fields import Field
 from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.related import ManyToManyField, RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
@@ -790,10 +785,9 @@ class MigrationAutodetector:
         # NOT NULL fields without a default can't be added to an existing
         # table — existing rows have no value. Refuse here rather than
         # generating a migration that would fail at apply time.
-        time_fields = (DateField, DateTimeField, TimeField)
         can_add_without_backfill = (
             isinstance(field, ManyToManyField)
-            or field.has_default()
+            or field.has_any_default()
             or (
                 isinstance(field, ColumnField)
                 and (
@@ -801,7 +795,6 @@ class MigrationAutodetector:
                     or (not field.required and field.empty_strings_allowed)
                 )
             )
-            or (isinstance(field, time_fields) and field.auto_now)
         )
         if not can_add_without_backfill:
             raise MigrationSchemaError(
@@ -919,7 +912,7 @@ class MigrationAutodetector:
                         and isinstance(new_field, ColumnField)
                         and old_field.allow_null
                         and not new_field.allow_null
-                        and not new_field.has_default()
+                        and not new_field.has_any_default()
                     ):
                         raise MigrationSchemaError(
                             f"Cannot alter field '{model_name}.{field_name}' "

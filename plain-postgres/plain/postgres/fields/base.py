@@ -28,7 +28,7 @@ from ..registry import models_registry
 if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.expressions import Col
+    from plain.postgres.expressions import Col, Func
     from plain.postgres.fields.reverse_related import ForeignObjectRel
     from plain.postgres.sql.compiler import SQLCompiler
 
@@ -43,10 +43,10 @@ class NOT_PROVIDED:
 
 class DatabaseDefault:
     """Sentinel assigned to a field attribute when the column's persistent
-    DEFAULT (e.g. `default=Now()`) should produce the value on the next
-    INSERT. The INSERT compiler recognizes the sentinel and emits `DEFAULT`
-    in the VALUES clause; RETURNING then populates the real value back onto
-    the instance."""
+    DEFAULT (e.g. `create_now=True`, `generate=True`) should produce the
+    value on the next INSERT. The INSERT compiler recognizes the sentinel
+    and emits `DEFAULT` in the VALUES clause; RETURNING then populates the
+    real value back onto the instance."""
 
     def __repr__(self) -> str:
         return "<DatabaseDefault>"
@@ -363,7 +363,18 @@ class Field[T](RegisterLookupMixin):
             return [from_db_value]
         return []
 
-    db_returning: bool = False
+    @property
+    def db_returning(self) -> bool:
+        """True when the column produces a value that RETURNING should fetch
+        back (DB-expression default, identity column, etc.)."""
+        return self.has_db_default()
+
+    @property
+    def auto_fills_on_save(self) -> bool:
+        """True when pre_save populates the field's value at save time
+        (e.g. DateTimeField(update_now=True)). full_clean skips these so the
+        None-before-save doesn't fail nullability/required checks."""
+        return False
 
     def set_attributes_from_name(self, name: str) -> None:
         self.name = self.name or name
@@ -501,10 +512,20 @@ class Field[T](RegisterLookupMixin):
     def has_default(self) -> bool:
         return False
 
+    def get_db_default_expression(self) -> Func | None:
+        # Return the expression Postgres should evaluate on INSERT (e.g.
+        # Now(), GenRandomUUID()). Subclasses opt in via type-scoped kwargs
+        # (DateTimeField(create_now=True), UUIDField(generate=True)).
+        return None
+
     def has_db_default(self) -> bool:
-        # True when the field's default is a DatabaseDefaultExpression that
-        # Postgres evaluates on INSERT (e.g. Now(), GenRandomUUID()).
-        return False
+        return self.get_db_default_expression() is not None
+
+    def has_any_default(self) -> bool:
+        """True when the field will have a value at INSERT time from any
+        source: user-supplied default, DB expression (create_now/generate),
+        or pre_save auto-fill (update_now)."""
+        return self.has_default() or self.has_db_default() or self.auto_fills_on_save
 
     def get_id_value_on_save(self, instance: Model) -> Any:
         return None
@@ -652,11 +673,6 @@ class DefaultableField[T](ColumnField[T]):
     def has_default(self) -> bool:
         return self.default is not NOT_PROVIDED
 
-    def has_db_default(self) -> bool:
-        from plain.postgres.expressions import DatabaseDefaultExpression
-
-        return isinstance(self.default, DatabaseDefaultExpression)
-
     def get_default(self) -> Any:
         if not self.has_default():
             return super().get_default()
@@ -669,19 +685,9 @@ class DefaultableField[T](ColumnField[T]):
             return self.get_default()
         return None
 
-    @property
-    def db_returning(self) -> bool:  # type: ignore[override]
-        return self.has_db_default()
-
     def get_effective_default(self) -> Any:
-        from plain.postgres.expressions import DatabaseDefaultExpression
-
         if self.has_default():
-            default = self.get_default()
-            if isinstance(default, DatabaseDefaultExpression):
-                # Expression defaults are inlined via DDL, not parameterized.
-                return None
-            return default
+            return self.get_default()
         return super().get_effective_default()
 
     def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:

@@ -14,6 +14,9 @@ import json
 import uuid
 from decimal import Decimal
 
+from app.examples.models.defaults import DBDefaultsExample
+from app.examples.models.delete import ChildCascade, DeleteParent
+from app.examples.models.encrypted import SecretStore
 from app.examples.models.forms import FormsExample
 
 from plain.test import Client
@@ -176,3 +179,117 @@ class TestFormsExampleUpdate:
         existing.refresh_from_db()
         assert existing.name == "Before"
         assert existing.count == 1
+
+
+class TestForeignKeyRoundTrip:
+    """Exercises the explicit ForeignKeyField → ModelChoiceField handler."""
+
+    def test_create_with_valid_fk(self, db):
+        parent = DeleteParent.query.create(name="parent-1")
+        client = Client()
+        response = client.post(
+            "/examples/child-cascade/create/", data={"parent": str(parent.id)}
+        )
+
+        assert response.status_code == 302, response.content
+        child = ChildCascade.query.get()
+        assert child.parent_id == parent.id  # ty: ignore[unresolved-attribute]
+
+    def test_create_with_nonexistent_fk_returns_400(self, db):
+        client = Client()
+        response = client.post(
+            "/examples/child-cascade/create/", data={"parent": "999999"}
+        )
+
+        assert response.status_code == 400
+        errors = json.loads(response.content)
+        assert "parent" in errors
+
+    def test_create_with_blank_required_fk_returns_400(self, db):
+        client = Client()
+        response = client.post("/examples/child-cascade/create/", data={"parent": ""})
+
+        assert response.status_code == 400
+        errors = json.loads(response.content)
+        assert "parent" in errors
+
+
+class TestDBExpressionDefaultsRoundTrip:
+    """DB-expression defaults (create_now=True, generate=True) must let the
+    user omit the value so Postgres fills it on INSERT. modelfield_to_formfield
+    sets required=False for fields where db_returning is True."""
+
+    def test_blank_db_default_fields_are_filled_by_database(self, db):
+        client = Client()
+        response = client.post(
+            "/examples/db-defaults/create/",
+            data={"name": "sample", "db_uuid": "", "created_at": ""},
+        )
+
+        assert response.status_code == 302, response.content
+        obj = DBDefaultsExample.query.get()
+        assert obj.name == "sample"
+        assert isinstance(obj.db_uuid, uuid.UUID)
+        assert isinstance(obj.created_at, datetime.datetime)
+
+    def test_user_supplied_value_overrides_db_default(self, db):
+        supplied = "11111111-1111-1111-1111-111111111111"
+        client = Client()
+        response = client.post(
+            "/examples/db-defaults/create/",
+            data={
+                "name": "sample",
+                "db_uuid": supplied,
+                "created_at": "2026-01-02 03:04:05",
+            },
+        )
+
+        assert response.status_code == 302, response.content
+        obj = DBDefaultsExample.query.get()
+        assert obj.db_uuid == uuid.UUID(supplied)
+        assert obj.created_at.year == 2026
+        assert obj.created_at.month == 1
+        assert obj.created_at.day == 2
+
+
+class TestEncryptedFieldsRoundTrip:
+    """EncryptedTextField and EncryptedJSONField round-trip through the
+    ModelForm → POST → save path with transparent encrypt/decrypt."""
+
+    def test_create_roundtrip_with_encrypted_text(self, db):
+        client = Client()
+        response = client.post(
+            "/examples/secret-store/create/",
+            data={
+                "name": "prod-key",
+                "api_key": "sk-live-abc123",
+                "notes": "rotate monthly",
+                "config": json.dumps({"region": "us-east-1"}),
+            },
+        )
+
+        assert response.status_code == 302, response.content
+        obj = SecretStore.query.get()
+        assert obj.name == "prod-key"
+        assert obj.api_key == "sk-live-abc123"
+        assert obj.notes == "rotate monthly"
+        assert obj.config == {"region": "us-east-1"}
+
+    def test_blank_optional_encrypted_text_accepted(self, db):
+        client = Client()
+        response = client.post(
+            "/examples/secret-store/create/",
+            data={
+                "name": "minimal",
+                "api_key": "sk-test",
+                "notes": "",
+                "config": "",
+            },
+        )
+
+        assert response.status_code == 302, response.content
+        obj = SecretStore.query.get()
+        assert obj.name == "minimal"
+        assert obj.api_key == "sk-test"
+        assert obj.notes == ""
+        assert obj.config is None

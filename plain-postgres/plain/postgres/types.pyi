@@ -217,7 +217,6 @@ def BooleanField(
 @overload
 def DateField(
     *,
-    auto_now: bool = False,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -226,7 +225,6 @@ def DateField(
 @overload
 def DateField(
     *,
-    auto_now: bool = False,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -235,25 +233,24 @@ def DateField(
 @overload
 def DateTimeField(
     *,
-    auto_now: bool = False,
+    create_now: bool = False,
+    update_now: bool = False,
     required: bool = True,
     allow_null: Literal[True],
-    default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> datetime | None: ...
 @overload
 def DateTimeField(
     *,
-    auto_now: bool = False,
+    create_now: bool = False,
+    update_now: bool = False,
     required: bool = True,
     allow_null: Literal[False] = False,
-    default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> datetime: ...
 @overload
 def TimeField(
     *,
-    auto_now: bool = False,
     required: bool = True,
     allow_null: Literal[True],
     default: Any = ...,
@@ -262,7 +259,6 @@ def TimeField(
 @overload
 def TimeField(
     *,
-    auto_now: bool = False,
     required: bool = True,
     allow_null: Literal[False] = False,
     default: Any = ...,
@@ -305,17 +301,17 @@ def TimeZoneField(
 @overload
 def UUIDField(
     *,
+    generate: bool = False,
     required: bool = True,
     allow_null: Literal[True],
-    default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> UUID | None: ...
 @overload
 def UUIDField(
     *,
+    generate: bool = False,
     required: bool = True,
     allow_null: Literal[False] = False,
-    default: Any = ...,
     validators: Sequence[Callable[..., Any]] = (),
 ) -> UUID: ...
 @overload

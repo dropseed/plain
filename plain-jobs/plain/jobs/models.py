@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import traceback
 from typing import TYPE_CHECKING, Any, Self
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
@@ -25,7 +25,6 @@ from plain import postgres
 from plain.logs import get_framework_logger
 from plain.postgres import transaction, types
 from plain.postgres.expressions import F
-from plain.postgres.functions import Now
 from plain.runtime import settings
 from plain.utils import timezone
 from plain.utils.otel import format_exception_type
@@ -48,8 +47,8 @@ class JobRequest(postgres.Model):
     Keep all pending job requests in a single table.
     """
 
-    created_at: datetime.datetime = types.DateTimeField(default=Now())
-    uuid: UUID = types.UUIDField(default=uuid4)
+    created_at: datetime.datetime = types.DateTimeField(create_now=True)
+    uuid: UUID = types.UUIDField(generate=True)
 
     job_class: str = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
@@ -171,8 +170,8 @@ class JobProcess(postgres.Model):
     All active jobs are stored in this table.
     """
 
-    uuid: UUID = types.UUIDField(default=uuid4)
-    created_at: datetime.datetime = types.DateTimeField(default=Now())
+    uuid: UUID = types.UUIDField(generate=True)
+    created_at: datetime.datetime = types.DateTimeField(create_now=True)
     started_at: datetime.datetime | None = types.DateTimeField(
         required=False, allow_null=True
     )
@@ -526,8 +525,8 @@ class JobResult(postgres.Model):
     All in-process and completed jobs are stored in this table.
     """
 
-    uuid: UUID = types.UUIDField(default=uuid4)
-    created_at: datetime.datetime = types.DateTimeField(default=Now())
+    uuid: UUID = types.UUIDField(generate=True)
+    created_at: datetime.datetime = types.DateTimeField(create_now=True)
 
     # From the Job
     job_process_uuid: UUID = types.UUIDField()

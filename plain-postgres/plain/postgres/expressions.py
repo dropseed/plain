@@ -220,20 +220,6 @@ class Combinable:
         return NegatedExpression(self)
 
 
-class DatabaseDefaultExpression:
-    """Marker mixin for expressions that are safe to use as a field `default=`.
-
-    Opt-in: an expression must explicitly inherit from this class to be
-    recognized by the schema editor and INSERT compiler. This keeps the
-    surface narrow — arbitrary `BaseExpression` subclasses (F references,
-    Subquery, aggregates, RawSQL, etc.) won't silently slip through.
-
-    Instances must compile to parameter-free SQL that Postgres accepts
-    inside a DEFAULT clause — i.e. a volatile, self-contained function
-    call like `gen_random_uuid()` or `STATEMENT_TIMESTAMP()`.
-    """
-
-
 class BaseExpression:
     """Base class for all query expressions."""
 
@@ -789,7 +775,9 @@ class CombinedExpression(Expression):
                 rhs_field = rhs.output_field
             except (AttributeError, FieldError):
                 rhs_field = None
-            is_temporal = isinstance(lhs_field, fields.DateField | fields.TimeField)
+            is_temporal = isinstance(
+                lhs_field, fields.DateField | fields.DateTimeField | fields.TimeField
+            )
             same_type = (
                 lhs_field is not None
                 and rhs_field is not None

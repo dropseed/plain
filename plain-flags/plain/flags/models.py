@@ -6,7 +6,6 @@ from datetime import datetime
 from plain import postgres
 from plain.exceptions import ValidationError
 from plain.postgres import types
-from plain.postgres.functions import Now
 
 __all__ = ["Flag", "FlagResult"]
 
@@ -18,8 +17,8 @@ def validate_flag_name(value: str) -> None:
 
 @postgres.register_model
 class FlagResult(postgres.Model):
-    created_at: datetime = types.DateTimeField(default=Now())
-    updated_at: datetime = types.DateTimeField(auto_now=True)
+    created_at: datetime = types.DateTimeField(create_now=True)
+    updated_at: datetime = types.DateTimeField(update_now=True)
     flag: Flag = types.ForeignKeyField("Flag", on_delete=postgres.CASCADE)
     key: str = types.TextField(max_length=255)
     value = types.JSONField()
@@ -40,8 +39,8 @@ class FlagResult(postgres.Model):
 
 @postgres.register_model
 class Flag(postgres.Model):
-    created_at: datetime = types.DateTimeField(default=Now())
-    updated_at: datetime = types.DateTimeField(auto_now=True)
+    created_at: datetime = types.DateTimeField(create_now=True)
+    updated_at: datetime = types.DateTimeField(update_now=True)
     name: str = types.TextField(max_length=255, validators=[validate_flag_name])
 
     # Optional description that can be filled in after the flag is used/created

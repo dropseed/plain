@@ -13,7 +13,7 @@ from plain.postgres.dialect import (
     time_extract_sql,
     time_trunc_sql,
 )
-from plain.postgres.expressions import DatabaseDefaultExpression, Func
+from plain.postgres.expressions import Func
 from plain.postgres.fields import (
     DateField,
     DateTimeField,
@@ -213,13 +213,21 @@ DateField.register_lookup(ExtractWeek)
 DateField.register_lookup(ExtractIsoYear)
 DateField.register_lookup(ExtractQuarter)
 
-TimeField.register_lookup(ExtractHour)
-TimeField.register_lookup(ExtractMinute)
-TimeField.register_lookup(ExtractSecond)
-
+DateTimeField.register_lookup(ExtractYear)
+DateTimeField.register_lookup(ExtractMonth)
+DateTimeField.register_lookup(ExtractDay)
+DateTimeField.register_lookup(ExtractWeekDay)
+DateTimeField.register_lookup(ExtractIsoWeekDay)
+DateTimeField.register_lookup(ExtractWeek)
+DateTimeField.register_lookup(ExtractIsoYear)
+DateTimeField.register_lookup(ExtractQuarter)
 DateTimeField.register_lookup(ExtractHour)
 DateTimeField.register_lookup(ExtractMinute)
 DateTimeField.register_lookup(ExtractSecond)
+
+TimeField.register_lookup(ExtractHour)
+TimeField.register_lookup(ExtractMinute)
+TimeField.register_lookup(ExtractSecond)
 
 ExtractYear.register_lookup(YearExact)
 ExtractYear.register_lookup(YearGt)
@@ -234,7 +242,7 @@ ExtractIsoYear.register_lookup(YearLt)
 ExtractIsoYear.register_lookup(YearLte)
 
 
-class Now(DatabaseDefaultExpression, Func):
+class Now(Func):
     # STATEMENT_TIMESTAMP() returns the time at the start of the current statement,
     # as opposed to CURRENT_TIMESTAMP which returns the time at the start of the
     # transaction.
@@ -296,8 +304,7 @@ class TruncBase(TimezoneMixin, Transform):
             query, allow_joins, reuse, summarize, for_save
         )
         field = copy.lhs.output_field
-        # DateTimeField is a subclass of DateField so this works for both.
-        if not isinstance(field, DateField | TimeField):
+        if not isinstance(field, DateField | DateTimeField | TimeField):
             raise TypeError(
                 f"{field.name!r} isn't a DateField, TimeField, or DateTimeField."
             )

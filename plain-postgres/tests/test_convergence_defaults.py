@@ -111,9 +111,9 @@ class TestColumnDefaultDetection:
         assert default_drifts == []
 
     def test_no_drift_when_callable_default_stripped(self, db):
-        """Callable defaults (e.g. uuid.uuid4) are evaluated in Python; Plain
-        strips them from the column, so DB has no DEFAULT and there's no drift."""
-        assert column_default_sql("examples_defaultsexample", "token_uuid") is None
+        """Callable defaults are evaluated in Python; Plain strips them from
+        the column, so DB has no DEFAULT and there's no drift."""
+        assert column_default_sql("examples_defaultsexample", "token") is None
 
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -127,7 +127,7 @@ class TestColumnDefaultDetection:
     def test_detects_undeclared_default_on_static_field(self, db):
         """Manual SET DEFAULT on a column whose model declares a static (or
         no) default → UNDECLARED drift.  Plain owns column DEFAULTs; if you
-        want one to persist, use a `DatabaseDefaultExpression` subclass."""
+        want one to persist, use `create_now=True` or `generate=True`."""
         execute(
             'ALTER TABLE "examples_defaultsexample" '
             "ALTER COLUMN \"status\" SET DEFAULT 'manual-default'"
@@ -359,7 +359,7 @@ class TestColumnDefaultLifecycle:
         """Removing an expression default from the model (or a manual SET
         DEFAULT on an undeclared column) → detect UNDECLARED → DROP → converged.
 
-        Simulates "user removed `default=Now()` from the model" by setting
+        Simulates "user removed `create_now=True` from the model" by setting
         a DEFAULT on a column whose field declares no expression default."""
         execute(
             'ALTER TABLE "examples_defaultsexample" '

@@ -1,4 +1,5 @@
-"""Tests for DB-expression defaults (`default=Now()`, `default=GenRandomUUID()`).
+"""Tests for DB-expression defaults (`DateTimeField(create_now=True)`,
+`UUIDField(generate=True)`).
 
 Covers:
 - DDL: column DEFAULT persists after CREATE TABLE
@@ -16,7 +17,6 @@ import pytest
 from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
 
 from plain.postgres import get_connection
-from plain.postgres.expressions import DatabaseDefaultExpression
 from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.functions import GenRandomUUID, Now
 
@@ -166,24 +166,6 @@ def test_refresh_from_db_returns_persisted_value(db):
     assert inst.db_uuid == original_uuid
 
 
-def test_builtin_expressions_opt_in_to_marker():
-    """Now and GenRandomUUID are explicit about being usable as defaults —
-    the mixin is the opt-in contract, not BaseExpression."""
-    assert isinstance(Now(), DatabaseDefaultExpression)
-    assert isinstance(GenRandomUUID(), DatabaseDefaultExpression)
-
-
-def test_non_opted_in_func_subclasses_are_not_defaults():
-    """The marker is opt-in: arbitrary Func subclasses (Lower, Concat, …)
-    are NOT treated as DB-expression defaults even though they're valid
-    expressions. This prevents users from accidentally creating defaults
-    that would fail at compile time or behave surprisingly."""
-    from plain.postgres.functions import Concat, Lower
-
-    assert not isinstance(Lower("name"), DatabaseDefaultExpression)
-    assert not isinstance(Concat("a", "b"), DatabaseDefaultExpression)
-
-
 def test_full_clean_skips_constraints_on_sentinel_fields(db):
     """A UniqueConstraint over an expression-default field shouldn't trigger
     a SELECT lookup using the sentinel during save's full_clean — the value
@@ -208,27 +190,8 @@ def test_alter_field_is_no_op_for_default_only_expression_change(db):
     # Adding an expression default: schema editor emits nothing.
     old_field = plain_fields.UUIDField()
     old_field.set_attributes_from_name("token")
-    new_field = plain_fields.UUIDField(default=GenRandomUUID())
+    new_field = plain_fields.UUIDField(generate=True)
     new_field.set_attributes_from_name("token")
-
-    with connection.schema_editor(atomic=False, collect_sql=True) as editor:
-        editor._alter_field(
-            DBDefaultsExample,
-            old_field,
-            new_field,
-            old_type=_db_type(old_field),
-            new_type=_db_type(new_field),
-        )
-
-    joined = " ".join(editor.executed_sql).lower()
-    assert "set default" not in joined
-    assert "drop default" not in joined
-
-    # Swapping one expression default for another: same story.
-    old_field = plain_fields.DateTimeField(default=Now())
-    old_field.set_attributes_from_name("touched_at")
-    new_field = plain_fields.DateTimeField(default=GenRandomUUID())
-    new_field.set_attributes_from_name("touched_at")
 
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
         editor._alter_field(
@@ -246,7 +209,7 @@ def test_alter_field_is_no_op_for_default_only_expression_change(db):
     # Removing an expression default: also no-op (user must take a data
     # migration to DROP DEFAULT; convergence treats unmanaged DB DEFAULTs as
     # out of scope).
-    old_field = plain_fields.UUIDField(default=GenRandomUUID())
+    old_field = plain_fields.UUIDField(generate=True)
     old_field.set_attributes_from_name("token")
     new_field = plain_fields.UUIDField()
     new_field.set_attributes_from_name("token")
@@ -275,7 +238,7 @@ def test_alter_field_introducing_expression_default_with_not_null_raises(db):
 
     old_field = plain_fields.UUIDField(allow_null=True, required=False)
     old_field.set_attributes_from_name("token")
-    new_field = plain_fields.UUIDField(default=GenRandomUUID())
+    new_field = plain_fields.UUIDField(generate=True)
     new_field.set_attributes_from_name("token")
 
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
@@ -298,11 +261,9 @@ def test_alter_field_not_null_after_existing_expression_default_succeeds(db):
     connection = get_connection()
 
     # Same expression default on both sides; only allow_null changes.
-    old_field = plain_fields.UUIDField(
-        allow_null=True, required=False, default=GenRandomUUID()
-    )
+    old_field = plain_fields.UUIDField(allow_null=True, generate=True)
     old_field.set_attributes_from_name("token")
-    new_field = plain_fields.UUIDField(default=GenRandomUUID())
+    new_field = plain_fields.UUIDField(generate=True)
     new_field.set_attributes_from_name("token")
 
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
@@ -331,10 +292,10 @@ def test_alter_field_renames_column_before_dropping_old_default(db):
 
     connection = get_connection()
 
-    old_field = plain_fields.DateTimeField(default=Now())
+    old_field = plain_fields.DateTimeField(create_now=True)
     old_field.set_attributes_from_name("touched_at")
     old_field.column = "old_touched_at"
-    new_field = plain_fields.UUIDField(default=GenRandomUUID())
+    new_field = plain_fields.UUIDField(generate=True)
     new_field.set_attributes_from_name("touched_at")
     new_field.column = "new_touched_at"
 
@@ -367,15 +328,11 @@ def test_alter_field_sets_new_default_before_null_backfill(db):
 
     connection = get_connection()
 
-    # Same field type, but the OLD expression default differs from the NEW.
-    # nullable → NOT NULL combined with a default change.
-    old_field = plain_fields.DateTimeField(
-        allow_null=True, required=False, default=Now()
-    )
+    # nullable → NOT NULL transition with an expression default on both sides.
+    # The schema editor must SET DEFAULT the expression before backfilling.
+    old_field = plain_fields.DateTimeField(allow_null=True, create_now=True)
     old_field.set_attributes_from_name("touched_at")
-    new_field = plain_fields.DateTimeField(
-        default=GenRandomUUID()
-    )  # contrived but valid
+    new_field = plain_fields.DateTimeField(create_now=True)
     new_field.set_attributes_from_name("touched_at")
 
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
@@ -389,7 +346,11 @@ def test_alter_field_sets_new_default_before_null_backfill(db):
 
     statements = [s.lower() for s in editor.executed_sql]
     set_idx = next(
-        (i for i, s in enumerate(statements) if "set default gen_random_uuid()" in s),
+        (
+            i
+            for i, s in enumerate(statements)
+            if "set default statement_timestamp()" in s
+        ),
         -1,
     )
     update_idx = next(
@@ -413,9 +374,9 @@ def test_alter_field_drops_old_expression_default_before_type_change(db):
 
     connection = get_connection()
 
-    old_field = plain_fields.DateTimeField(default=Now())
+    old_field = plain_fields.DateTimeField(create_now=True)
     old_field.set_attributes_from_name("touched_at")
-    new_field = plain_fields.UUIDField(default=GenRandomUUID())
+    new_field = plain_fields.UUIDField(generate=True)
     new_field.set_attributes_from_name("touched_at")
 
     with connection.schema_editor(atomic=False, collect_sql=True) as editor:
@@ -560,3 +521,59 @@ def test_save_with_explicit_pk_falls_back_to_insert(db):
 
     reloaded = DBDefaultsExample.query.get(id=999_999)
     assert reloaded.db_uuid == inst.db_uuid
+
+
+def test_datetime_create_now_and_update_now_mutually_exclusive():
+    """DateTimeField(create_now=True, update_now=True) must fail preflight —
+    the two mechanisms are at odds (DB fills on INSERT vs Python fills on
+    every save)."""
+    from plain.postgres import fields as plain_fields
+
+    field = plain_fields.DateTimeField(create_now=True, update_now=True)
+    field.set_attributes_from_name("touched_at")
+
+    results = field.preflight()
+    error_ids = {r.id for r in results}
+    assert "fields.datetime_auto_options_mutually_exclusive" in error_ids
+
+
+def test_uuid_default_kwarg_rejected_at_signature():
+    """UUIDField no longer accepts `default=` — Python-side UUID generation
+    isn't supported; use `generate=True` or set the value explicitly."""
+    from plain.postgres import fields as plain_fields
+
+    with pytest.raises(TypeError, match="unexpected keyword argument 'default'"):
+        plain_fields.UUIDField(default=uuid.uuid4)  # ty: ignore[unknown-argument]
+
+
+def test_datetime_default_kwarg_rejected_at_signature():
+    """DateTimeField no longer accepts `default=` — use `create_now=True` or
+    `update_now=True`, or set the value explicitly."""
+    from plain.postgres import fields as plain_fields
+
+    with pytest.raises(TypeError, match="unexpected keyword argument 'default'"):
+        plain_fields.DateTimeField(default=datetime.datetime(2020, 1, 1))  # ty: ignore[unknown-argument]
+
+
+def test_get_db_default_expression_returns_now_when_create_now():
+    from plain.postgres import fields as plain_fields
+
+    field = plain_fields.DateTimeField(create_now=True)
+    expr = field.get_db_default_expression()
+    assert isinstance(expr, Now)
+
+
+def test_get_db_default_expression_returns_gen_random_uuid_when_generate():
+    from plain.postgres import fields as plain_fields
+
+    field = plain_fields.UUIDField(generate=True)
+    expr = field.get_db_default_expression()
+    assert isinstance(expr, GenRandomUUID)
+
+
+def test_get_db_default_expression_returns_none_by_default():
+    from plain.postgres import fields as plain_fields
+
+    assert plain_fields.DateTimeField().get_db_default_expression() is None
+    assert plain_fields.UUIDField().get_db_default_expression() is None
+    assert plain_fields.TextField().get_db_default_expression() is None

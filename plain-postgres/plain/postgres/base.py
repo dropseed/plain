@@ -858,10 +858,14 @@ class Model(metaclass=ModelBase):
         # uniqueness-check, or feed into a constraint lookup. Exclude them
         # from every validation step until the value is populated. Read via
         # __dict__ to avoid triggering refresh_from_db on deferred fields.
+        # Also exclude fields that pre_save fills in (e.g. update_now) —
+        # the value isn't present yet but will be before the INSERT/UPDATE.
         for f in self._model_meta.fields:
             if f.name in exclude:
                 continue
             if self.__dict__.get(f.attname) is DATABASE_DEFAULT:
+                exclude.add(f.name)
+            elif f.auto_fills_on_save:
                 exclude.add(f.name)
 
         try:

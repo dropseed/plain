@@ -18,4 +18,19 @@ class ExamplesRouter(Router):
             views.FormsExampleUpdateView,
             name="forms_update",
         ),
+        path(
+            "child-cascade/create/",
+            views.ChildCascadeCreateView,
+            name="child_cascade_create",
+        ),
+        path(
+            "db-defaults/create/",
+            views.DBDefaultsExampleCreateView,
+            name="db_defaults_create",
+        ),
+        path(
+            "secret-store/create/",
+            views.SecretStoreCreateView,
+            name="secret_store_create",
+        ),
     ]

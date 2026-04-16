@@ -11,7 +11,7 @@ from plain.logs import get_framework_logger
 from plain.postgres.ddl import compile_database_default_sql
 from plain.postgres.dialect import quote_name
 from plain.postgres.fields import Field
-from plain.postgres.fields.base import ColumnField, DefaultableField
+from plain.postgres.fields.base import ColumnField
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.fields.reverse_related import ManyToManyRel
 from plain.postgres.transaction import atomic
@@ -108,7 +108,7 @@ class DatabaseSchemaEditor:
         column_sqls = []
         params = []
         for field in model._model_meta.local_fields:
-            # SQL. Expression defaults (`default=Now()`, `default=GenRandomUUID()`)
+            # SQL. Expression defaults (`create_now=True`, `generate=True`)
             # persist on the column and therefore must be inlined during CREATE TABLE.
             include_default = field.db_returning
             definition, extra_params = self.column_sql(
@@ -146,12 +146,12 @@ class DatabaseSchemaEditor:
         null = field.allow_null
         # Include a default value, if requested.
         if include_default:
-            if field.has_db_default():
-                assert isinstance(field, DefaultableField)
+            db_default_expr = field.get_db_default_expression()
+            if db_default_expr is not None:
                 # Expression defaults are inlined into the DDL — they render
                 # as parameter-free SQL and become the column's persistent
                 # DEFAULT.
-                yield f"DEFAULT {self._compile_expression(field.default)}"
+                yield f"DEFAULT {self._compile_expression(db_default_expr)}"
             else:
                 default_value = self.effective_default(field)
                 if default_value is not None:
@@ -195,7 +195,7 @@ class DatabaseSchemaEditor:
         )
 
     def _compile_expression(self, expression: Any) -> str:
-        """Compile a DatabaseDefaultExpression for inlining into DDL."""
+        """Compile a DB-default expression (Now, GenRandomUUID) for inlining into DDL."""
         return compile_database_default_sql(expression)
 
     def effective_default(self, field: Field) -> Any:
@@ -256,7 +256,7 @@ class DatabaseSchemaEditor:
         self.execute(sql, params)
         # Drop the default if we need to
         # (Plain usually does not use in-database defaults — except for
-        # DatabaseDefaultExpression defaults, which PERSIST on the column.)
+        # create_now / generate expressions, which PERSIST on the column.)
         if not field.db_returning and self.effective_default(field) is not None:
             changes_sql, params = self._alter_column_default_sql(
                 model, None, field, drop=True
@@ -355,13 +355,12 @@ class DatabaseSchemaEditor:
         if (
             old_field.allow_null
             and not new_field.allow_null
-            and isinstance(new_field, DefaultableField)
             and new_field.db_returning
             and not old_field.db_returning
         ):
             raise NotImplementedError(
                 f"Cannot alter {model.__name__}.{new_field.name} to NOT NULL "
-                f"and add an expression default ({new_field.default!r}) in the "
+                f"and add an expression default ({new_field.get_db_default_expression()!r}) in the "
                 "same migration. Add the expression default in one migration, "
                 "then change to NOT NULL in a follow-up."
             )
@@ -427,7 +426,7 @@ class DatabaseSchemaEditor:
             if fragment:
                 null_actions.append(fragment)
         # Only if we have a default and there is a change from NULL to NOT NULL
-        four_way_default_alteration = new_field.has_default() and (
+        four_way_default_alteration = new_field.has_any_default() and (
             old_field.allow_null and not new_field.allow_null
         )
         if actions or null_actions:
@@ -558,10 +557,10 @@ class DatabaseSchemaEditor:
                 [],
             )
 
-        if new_field.has_db_default():
-            assert isinstance(new_field, DefaultableField)
+        db_default_expr = new_field.get_db_default_expression()
+        if db_default_expr is not None:
             # Inline the compiled expression into the DDL; no params.
-            default_sql = self._compile_expression(new_field.default)
+            default_sql = self._compile_expression(db_default_expr)
             return (
                 self.sql_alter_column_default
                 % {

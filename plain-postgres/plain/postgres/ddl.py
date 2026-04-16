@@ -61,7 +61,7 @@ def compile_expression_sql(model: type[Model], expression_q: Q) -> str:
 
 
 def compile_database_default_sql(expression: Any) -> str:
-    """Compile a DatabaseDefaultExpression to parameter-free DDL SQL."""
+    """Compile a DB-default expression (Now, GenRandomUUID) to parameter-free DDL SQL."""
     compiler = Query(None).get_compiler()
     conn = get_connection()
     sql, params = expression.as_sql(compiler, conn)

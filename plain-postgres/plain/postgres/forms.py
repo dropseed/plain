@@ -669,20 +669,19 @@ def modelfield_to_formfield(
     if not isinstance(modelfield, ColumnField):
         return None
 
-    # DB-expression defaults (`default=Now()`, `default=GenRandomUUID()`)
-    # produce a value on the INSERT — there is no meaningful Python initial
-    # to show in a form, and the form field must allow the user to omit the
-    # value so it reaches the INSERT as the DATABASE_DEFAULT sentinel.
-    has_db_default = modelfield.db_returning
+    # DB-expression defaults (`create_now=True`, `generate=True`) and
+    # pre_save-filled fields (`update_now=True`) produce values automatically.
+    # The form field must allow the user to omit the value.
+    auto_filled = modelfield.db_returning or modelfield.auto_fills_on_save
 
     defaults: dict[str, Any] = {
-        "required": modelfield.required and not has_db_default,
+        "required": modelfield.required and not auto_filled,
     }
 
     if (
         isinstance(modelfield, DefaultableField)
         and modelfield.has_default()
-        and not has_db_default
+        and not auto_filled
     ):
         defaults["initial"] = modelfield.get_default()
 
@@ -719,6 +718,7 @@ def modelfield_to_formfield(
 
     # Avoid a circular import
     from plain import postgres
+    from plain.postgres.fields.encrypted import EncryptedJSONField, EncryptedTextField
 
     # Primary key fields aren't rendered by default
     if isinstance(modelfield, postgres.PrimaryKeyField):
@@ -740,6 +740,16 @@ def modelfield_to_formfield(
             decimal_places=modelfield.decimal_places,
             **defaults,
         )
+
+    if isinstance(modelfield, EncryptedJSONField):
+        return fields.JSONField(
+            encoder=modelfield.encoder, decoder=modelfield.decoder, **defaults
+        )
+
+    if isinstance(modelfield, EncryptedTextField):
+        if modelfield.allow_null:
+            defaults["empty_value"] = None
+        return fields.TextField(max_length=modelfield.max_length, **defaults)
 
     if isinstance(modelfield, postgres.TextField):
         # Passing max_length to fields.TextField means that the value's length

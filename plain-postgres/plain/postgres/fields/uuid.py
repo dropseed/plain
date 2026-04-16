@@ -1,19 +1,54 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from plain import exceptions
 
-from .base import DefaultableField
+from .base import ColumnField
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
+    from plain.postgres.expressions import Func
 
 
-class UUIDField(DefaultableField[UUID]):
+class UUIDField(ColumnField[UUID]):
     db_type_sql = "uuid"
     empty_strings_allowed = False
+
+    def __init__(
+        self,
+        *,
+        generate: bool = False,
+        required: bool = True,
+        allow_null: bool = False,
+        validators: Sequence[Callable[..., Any]] = (),
+    ):
+        self.generate = generate
+        super().__init__(
+            required=required,
+            allow_null=allow_null,
+            validators=validators,
+        )
+
+    @cached_property
+    def _db_default_expression(self) -> Func | None:
+        if self.generate:
+            from plain.postgres.functions.uuid import GenRandomUUID
+
+            return GenRandomUUID()
+        return None
+
+    def get_db_default_expression(self) -> Func | None:
+        return self._db_default_expression
+
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+        name, path, args, kwargs = super().deconstruct()
+        if self.generate:
+            kwargs["generate"] = True
+        return name, path, args, kwargs
 
     def get_prep_value(self, value: Any) -> Any:
         value = super().get_prep_value(value)

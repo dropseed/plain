@@ -5,7 +5,6 @@ from typing import Any, Self
 
 from plain import postgres
 from plain.postgres import types
-from plain.postgres.functions import Now
 from plain.utils import timezone
 
 __all__ = ["CachedItem", "CachedItemQuerySet"]
@@ -27,8 +26,8 @@ class CachedItem(postgres.Model):
     key: str = types.TextField(max_length=255)
     value: Any = types.JSONField(required=False, allow_null=True)
     expires_at: datetime | None = types.DateTimeField(required=False, allow_null=True)
-    created_at: datetime = types.DateTimeField(default=Now())
-    updated_at: datetime = types.DateTimeField(auto_now=True)
+    created_at: datetime = types.DateTimeField(create_now=True)
+    updated_at: datetime = types.DateTimeField(update_now=True)
 
     query: CachedItemQuerySet = CachedItemQuerySet()
 

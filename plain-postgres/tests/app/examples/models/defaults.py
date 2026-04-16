@@ -5,16 +5,20 @@ from datetime import datetime
 
 from plain import postgres
 from plain.postgres import types
-from plain.postgres.functions import GenRandomUUID, Now
+
+
+def _make_token() -> str:
+    return uuid.uuid4().hex
 
 
 @postgres.register_model
 class DefaultsExample(postgres.Model):
-    """Model for pinning current `default=` behavior before fields-db-defaults Phase 1."""
+    """Exercises Python-side `default=` semantics (callables, static values,
+    explicit overrides)."""
 
     name: str = types.TextField(max_length=100)
     # Callable default (evaluated in Python per instance)
-    token_uuid: uuid.UUID = types.UUIDField(default=uuid.uuid4)
+    token: str = types.TextField(max_length=100, default=_make_token)
     # Static string default
     status: str = types.TextField(max_length=20, default="pending")
     # Static int default
@@ -33,9 +37,9 @@ class DBDefaultsExample(postgres.Model):
 
     name: str = types.TextField(max_length=100)
     # Expression default — rendered as `DEFAULT gen_random_uuid()` in DDL
-    db_uuid: uuid.UUID = types.UUIDField(default=GenRandomUUID())
+    db_uuid: uuid.UUID = types.UUIDField(generate=True)
     # Expression default — rendered as `DEFAULT STATEMENT_TIMESTAMP()` in DDL
-    created_at: datetime = types.DateTimeField(default=Now())
+    created_at: datetime = types.DateTimeField(create_now=True)
 
     query: postgres.QuerySet[DBDefaultsExample] = postgres.QuerySet()
 
