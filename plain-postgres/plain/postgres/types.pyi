@@ -303,7 +303,6 @@ def UUIDField(
 def RandomStringField(
     *,
     length: int,
-    alphabet: str = ...,
     required: bool = True,
     allow_null: Literal[True],
     validators: Sequence[Callable[..., Any]] = (),
@@ -312,7 +311,6 @@ def RandomStringField(
 def RandomStringField(
     *,
     length: int,
-    alphabet: str = ...,
     required: bool = True,
     allow_null: Literal[False] = False,
     validators: Sequence[Callable[..., Any]] = (),

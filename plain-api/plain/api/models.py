@@ -19,7 +19,7 @@ class APIKey(postgres.Model):
 
     name: str = types.TextField(max_length=255, required=False)
 
-    token: str = types.RandomStringField(length=40, alphabet="0123456789abcdef")
+    token: str = types.RandomStringField(length=40)
 
     api_version: str = types.TextField(max_length=255, required=False)
 

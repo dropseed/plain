@@ -14,44 +14,54 @@ class TestRandomStringInit:
         with pytest.raises(ValueError, match=">= 1"):
             RandomString(length=0)
 
-    def test_rejects_empty_alphabet(self):
-        with pytest.raises(ValueError, match="non-empty"):
-            RandomString(length=4, alphabet="")
-
-    def test_rejects_oversized_alphabet(self):
-        with pytest.raises(ValueError, match="256"):
-            RandomString(length=4, alphabet="x" * 257)
-
-    def test_accepts_max_alphabet(self):
-        RandomString(length=4, alphabet="x" * 256)
-
-    def test_rejects_percent_in_alphabet(self):
-        """`%` collides with psycopg placeholders — reject at construction."""
-        with pytest.raises(ValueError, match="'%'"):
-            RandomString(length=4, alphabet="ab%c")
-
-    def test_rejects_single_quote_in_alphabet(self):
-        """`'` would need escaping inside the DDL string literal — reject."""
-        with pytest.raises(ValueError, match="'"):
-            RandomString(length=4, alphabet="ab'c")
+    def test_rejects_negative_length(self):
+        with pytest.raises(ValueError, match=">= 1"):
+            RandomString(length=-1)
 
 
 class TestRandomStringFieldInit:
-    def test_default_alphabet_not_serialized(self):
+    def test_deconstruct_serializes_length(self):
         f = RandomStringField(length=10)
         _, _, _, kwargs = f.deconstruct()
         assert kwargs == {"length": 10}
-
-    def test_custom_alphabet_serialized(self):
-        f = RandomStringField(length=10, alphabet="0123456789abcdef")
-        _, _, _, kwargs = f.deconstruct()
-        assert kwargs == {"length": 10, "alphabet": "0123456789abcdef"}
 
     def test_has_db_default_expression(self):
         f = RandomStringField(length=16)
         expr = f.get_db_default_expression()
         assert isinstance(expr, RandomString)
         assert expr.length == 16
+
+
+class TestRandomStringSQL:
+    """Pin the exact SQL shape so a refactor that breaks the slicing math
+    fails loudly instead of silently changing the persisted DEFAULT."""
+
+    def _sql(self, length: int) -> str:
+        from plain.postgres.ddl import compile_database_default_sql
+
+        return compile_database_default_sql(RandomString(length=length))
+
+    def test_short_length_uses_single_uuid_slice(self):
+        assert (
+            self._sql(16) == "substr(replace(gen_random_uuid()::text, '-', ''), 1, 16)"
+        )
+
+    def test_exact_uuid_length_uses_single_uuid_slice(self):
+        assert (
+            self._sql(32) == "substr(replace(gen_random_uuid()::text, '-', ''), 1, 32)"
+        )
+
+    def test_over_uuid_length_concats_uuid_slices(self):
+        assert self._sql(40) == (
+            "(substr(replace(gen_random_uuid()::text, '-', ''), 1, 32)"
+            " || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8))"
+        )
+
+    def test_multiple_full_uuids(self):
+        assert self._sql(64) == (
+            "(substr(replace(gen_random_uuid()::text, '-', ''), 1, 32)"
+            " || substr(replace(gen_random_uuid()::text, '-', ''), 1, 32))"
+        )
 
 
 class TestRandomStringRoundTrip:
@@ -70,9 +80,9 @@ class TestRandomStringRoundTrip:
         tokens = {r.token for r in rows}
         assert len(tokens) == 5
 
-    def test_value_drawn_from_default_alphabet(self, db):
+    def test_value_drawn_from_hex_alphabet(self, db):
         row = DBDefaultsExample.query.create(name="r")
-        assert set(row.token).issubset(set("abcdefghijklmnopqrstuvwxyz0123456789"))
+        assert set(row.token).issubset(set("0123456789abcdef"))
 
     def test_column_has_persisted_default(self, db):
         with get_connection().cursor() as cursor:

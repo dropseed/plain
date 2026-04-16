@@ -27,10 +27,7 @@ class Migration(migrations.Migration):
                     postgres.DateTimeField(allow_null=True, required=False),
                 ),
                 ("name", postgres.TextField(max_length=255, required=False)),
-                (
-                    "token",
-                    postgres.RandomStringField(length=40, alphabet="0123456789abcdef"),
-                ),
+                ("token", postgres.RandomStringField(length=40)),
                 ("api_version", postgres.TextField(max_length=255, required=False)),
             ],
         ),
