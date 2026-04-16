@@ -2785,14 +2785,7 @@ class UpdateQuery(Query):
         Run on initialization and at the end of chaining. Any attributes that
         would normally be set in __init__() should go here instead.
         """
-        self.values: list[tuple[Any, Any, Any]] = []
-        self.related_ids: dict[Any, list[Any]] | None = None
-        self.related_updates: dict[Any, list[tuple[Any, Any, Any]]] = {}
-
-    def clone(self) -> UpdateQuery:
-        obj = super().clone()
-        obj.related_updates = self.related_updates.copy()
-        return obj
+        self.values: list[tuple[Any, Any]] = []
 
     def update_batch(self, id_list: list[Any], values: dict[str, Any]) -> None:
         from plain.postgres.sql.constants import GET_ITERATOR_CHUNK_SIZE, NO_RESULTS
@@ -2817,59 +2810,26 @@ class UpdateQuery(Query):
         values_seq = []
         for name, val in values.items():
             field = meta.get_field(name)
-            direct = (
-                not (field.auto_created and not field.concrete) or not field.concrete
-            )
-            model = field.model
             from plain.postgres.fields.related import ManyToManyField
 
-            if not direct or isinstance(field, ManyToManyField):
+            if isinstance(field, ManyToManyField):
                 raise FieldError(
                     f"Cannot update model field {field!r} (only non-relations and "
                     "foreign keys permitted)."
                 )
-            if model is not meta.model:
-                self.add_related_update(model, field, val)
-                continue
-            values_seq.append((field, model, val))
+            values_seq.append((field, val))
         return self.add_update_fields(values_seq)
 
-    def add_update_fields(self, values_seq: list[tuple[Any, Any, Any]]) -> None:
+    def add_update_fields(self, values_seq: list[tuple[Any, Any]]) -> None:
         """
-        Append a sequence of (field, model, value) triples to the internal list
-        that will be used to generate the UPDATE query. Might be more usefully
-        called add_update_targets() to hint at the extra information here.
+        Append a sequence of (field, value) pairs to the internal list that
+        will be used to generate the UPDATE query.
         """
-        for field, model, val in values_seq:
+        for field, val in values_seq:
             if isinstance(val, ResolvableExpression):
                 # Resolve expressions here so that annotations are no longer needed
                 val = val.resolve_expression(self, allow_joins=False, for_save=True)
-            self.values.append((field, model, val))
-
-    def add_related_update(self, model: Any, field: Any, value: Any) -> None:
-        """
-        Add (name, value) to an update query for an ancestor model.
-
-        Update are coalesced so that only one update query per ancestor is run.
-        """
-        self.related_updates.setdefault(model, []).append((field, None, value))
-
-    def get_related_updates(self) -> list[UpdateQuery]:
-        """
-        Return a list of query objects: one for each update required to an
-        ancestor model. Each query will have the same filtering conditions as
-        the current query but will only update a single table.
-        """
-        if not self.related_updates:
-            return []
-        result = []
-        for model, values in self.related_updates.items():
-            query = UpdateQuery(model)
-            query.values = values
-            if self.related_ids is not None:
-                query.add_filter("id__in", self.related_ids[model])
-            result.append(query)
-        return result
+            self.values.append((field, val))
 
 
 class InsertQuery(Query):

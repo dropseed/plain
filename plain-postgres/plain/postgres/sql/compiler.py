@@ -1705,7 +1705,7 @@ class SQLUpdateCompiler(SQLCompiler):
             return "", ()
         qn = self.quote_name_unless_alias
         values, update_params = [], []
-        for field, model, val in query_values:
+        for field, val in query_values:
             if isinstance(val, ResolvableExpression):
                 val = val.resolve_expression(
                     self.query, allow_joins=False, for_save=True
@@ -1759,79 +1759,39 @@ class SQLUpdateCompiler(SQLCompiler):
         return " ".join(result), tuple(update_params + list(params))
 
     def execute_sql(self, result_type: str) -> int:  # ty: ignore[invalid-method-override]
-        """
-        Execute the specified update. Return the number of rows affected by
-        the primary update query. The "primary update query" is the first
-        non-empty query that is executed. Row counts for any subsequent,
-        related queries are not available.
-        """
+        """Execute the update and return the number of rows affected."""
         cursor = super().execute_sql(result_type)
         try:
-            rows = cursor.rowcount if cursor else 0
-            is_empty = cursor is None
+            return cursor.rowcount if cursor else 0
         finally:
             if cursor:
                 cursor.close()
-        related_update_queries = getattr(self.query, "get_related_updates", None)
-        if related_update_queries is None:
-            return rows
-        for query in related_update_queries():
-            aux_rows = query.get_compiler().execute_sql(result_type)
-            if is_empty and aux_rows:
-                rows = aux_rows
-                is_empty = False
-        return rows
 
     def pre_sql_setup(
         self, with_col_aliases: bool = False
     ) -> tuple[list[Any], list[Any], list[SqlWithParams]] | None:
         """
-        If the update depends on results from other tables, munge the "where"
-        conditions to match the format required for (portable) SQL updates.
-
-        If multiple updates are required, pull out the id values to update at
-        this point so that they don't change as a result of the progressive
-        updates.
+        If the update depends on other tables (JOINs in the WHERE clause),
+        rewrite the query so the current table is filtered by `id IN (subquery)`.
         """
         refcounts_before = self.query.alias_refcount.copy()
         # Ensure base table is in the query
         self.query.get_initial_alias()
         count = self.query.count_active_tables()
-        related_updates = getattr(self.query, "related_updates", [])
-        if not related_updates and count == 1:
+        if count == 1:
             return
         query = self.query.chain(klass=Query)
         query.select_related = False
         query.clear_ordering(force=True)
         query.extra = {}
         query.select = []
-        fields = ["id"]
-        related_ids_index = []
-        for related in related_updates:
-            # If a primary key chain exists to the targeted related update,
-            # then the primary key value can be used for it.
-            related_ids_index.append((related, 0))
-
-        query.add_fields(fields)
+        query.add_fields(["id"])
         super().pre_sql_setup()
 
-        # Now we adjust the current query: reset the where clause and get rid
-        # of all the tables we don't need (since they're in the sub-select).
+        # Reset the where clause and drop the tables we no longer need (they
+        # live in the sub-select now).
         self.query.clear_where()
-        if related_updates:
-            # We're using the idents in multiple update queries (so
-            # don't want them to change).
-            idents = []
-            related_ids = collections.defaultdict(list)
-            for row in query.get_compiler().execute_sql(MULTI):
-                idents.append(row[0])
-                for parent, index in related_ids_index:
-                    related_ids[parent].append(row[index])
-            self.query.add_filter("id__in", idents)
-            self.query.related_ids = related_ids  # ty: ignore[invalid-assignment]
-        else:
-            # The fast path. Filters and updates in one query using a subquery.
-            self.query.add_filter("id__in", query)
+        self.query.add_filter("id__in", query)
         self.query.reset_refcounts(refcounts_before)
 
 

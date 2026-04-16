@@ -1020,7 +1020,7 @@ class QuerySet[T: "Model"]:
         self._result_cache = None
         return rows
 
-    def _update(self, values: list[tuple[Field, Any, Any]]) -> int:
+    def _update(self, values: list[tuple[Field, Any]]) -> int:
         """
         A version of update() that accepts field objects instead of field names.
         Used primarily for model saving and not intended for use by general

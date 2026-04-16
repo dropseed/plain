@@ -495,11 +495,7 @@ class Model(metaclass=ModelBase):
         if id_set and not force_insert:
             base_qs = meta.base_queryset
             values = [
-                (
-                    f,
-                    None,
-                    (getattr(self, f.attname) if raw else f.pre_save(self, False)),
-                )
+                (f, (getattr(self, f.attname) if raw else f.pre_save(self, False)))
                 for f in non_pks
             ]
             # DATABASE_DEFAULT fields represent "let the DB produce this on
@@ -509,9 +505,9 @@ class Model(metaclass=ModelBase):
             # need to refresh those fields from the DB so the in-memory
             # instance doesn't keep the sentinel.
             db_default_attnames = [
-                v[0].attname for v in values if v[2] is DATABASE_DEFAULT
+                v[0].attname for v in values if v[1] is DATABASE_DEFAULT
             ]
-            values = [v for v in values if v[2] is not DATABASE_DEFAULT]
+            values = [v for v in values if v[1] is not DATABASE_DEFAULT]
             forced_update = bool(update_fields or force_update)
             updated = self._do_update(
                 base_qs, id_val, values, update_fields, forced_update
@@ -541,7 +537,7 @@ class Model(metaclass=ModelBase):
         self,
         base_qs: QuerySet,
         id_val: Any,
-        values: list[tuple[Any, Any, Any]],
+        values: list[tuple[Any, Any]],
         update_fields: Iterable[str] | None,
         forced_update: bool,
     ) -> bool:
