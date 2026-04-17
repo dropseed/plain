@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.49.3](https://github.com/dropseed/plain/releases/plain-oauth@0.49.3) (2026-04-17)
+
+### What's changed
+
+- Updated `OAuthConnection` timestamps to use `DateTimeField(create_now=True)` / `(create_now=True, update_now=True)` for plain-postgres 0.96.0. ([5d145e4](https://github.com/dropseed/plain/commit/5d145e4), [a44e5ec](https://github.com/dropseed/plain/commit/a44e5ec), [091bac7](https://github.com/dropseed/plain/commit/091bac7))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.96.0`. Run `plain postgres sync` after upgrading to reconcile column defaults.
+
 ## [0.49.2](https://github.com/dropseed/plain/releases/plain-oauth@0.49.2) (2026-04-13)
 
 ### What's changed
