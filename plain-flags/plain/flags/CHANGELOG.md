@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.36.2](https://github.com/dropseed/plain/releases/plain-flags@0.36.2) (2026-04-17)
+
+### What's changed
+
+- Updated `Flag` and `FlagResult` timestamps to use `DateTimeField(create_now=True)` / `(create_now=True, update_now=True)` for plain-postgres 0.96.0. ([5d145e4](https://github.com/dropseed/plain/commit/5d145e4), [a44e5ec](https://github.com/dropseed/plain/commit/a44e5ec), [091bac7](https://github.com/dropseed/plain/commit/091bac7))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.96.0`. Run `plain postgres sync` after upgrading to reconcile column defaults.
+
 ## [0.36.1](https://github.com/dropseed/plain/releases/plain-flags@0.36.1) (2026-03-29)
 
 ### What's changed
