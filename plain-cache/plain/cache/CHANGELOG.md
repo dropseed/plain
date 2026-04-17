@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.27.4](https://github.com/dropseed/plain/releases/plain-cache@0.27.4) (2026-04-17)
+
+### What's changed
+
+- Updated `CachedItem.created_at` and `CachedItem.updated_at` to the new `create_now` / `update_now` kwargs for plain-postgres 0.96.0. ([5d145e4](https://github.com/dropseed/plain/commit/5d145e4), [a44e5ec](https://github.com/dropseed/plain/commit/a44e5ec))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.96.0`. Run `plain postgres sync` after upgrading to reconcile column defaults.
+
 ## [0.27.3](https://github.com/dropseed/plain/releases/plain-cache@0.27.3) (2026-04-14)
 
 ### What's changed
