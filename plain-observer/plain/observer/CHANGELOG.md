@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.34.4](https://github.com/dropseed/plain/releases/plain-observer@0.34.4) (2026-04-17)
+
+### What's changed
+
+- Changed `Span.span_data` from `default=dict` to `default={}` — callable `default=` values are banned in plain-postgres 0.96.0. ([091bac7](https://github.com/dropseed/plain/commit/091bac7))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.96.0`.
+
 ## [0.34.3](https://github.com/dropseed/plain/releases/plain-observer@0.34.3) (2026-04-14)
 
 ### What's changed
