@@ -67,12 +67,12 @@ def test_safe_widening_allowed(from_field, to_field) -> None:
     from_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("count", from_field())],  # ty: ignore[invalid-argument-type]
+        fields=[("count", from_field())],
     )
     to_model = ModelState(
         package_label="examples",
         name="Thing",
-        fields=[("count", to_field())],  # ty: ignore[invalid-argument-type]
+        fields=[("count", to_field())],
     )
     autodetector = MigrationAutodetector(_state_with(from_model), _state_with(to_model))
     changes = autodetector._detect_changes()
