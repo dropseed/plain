@@ -1,12 +1,12 @@
 [project]
 name = "plain.jobs"
-version = "0.47.4"
+version = "0.47.5"
 description = "Process background jobs with a database-driven job queue."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.13"
-dependencies = ["plain>=0.126.0,<1.0.0", "plain.postgres>=0.95.0,<1.0.0"]
+dependencies = ["plain>=0.126.0,<1.0.0", "plain.postgres>=0.96.0,<1.0.0"]
 
 [dependency-groups]
 dev = ["plain.postgres<1.0.0", "plain.pytest<1.0.0"]

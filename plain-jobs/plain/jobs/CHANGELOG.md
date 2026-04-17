@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.47.5](https://github.com/dropseed/plain/releases/plain-jobs@0.47.5) (2026-04-17)
+
+### What's changed
+
+- Updated `JobRequest`, `JobProcess`, and `JobResult` to use the new plain-postgres 0.96.0 field API: `UUIDField(generate=True)` (Postgres-side `gen_random_uuid()` per row) and `DateTimeField(create_now=True)`. Dropped the `uuid4` import. ([a44e5ec](https://github.com/dropseed/plain/commit/a44e5ec), [5d145e4](https://github.com/dropseed/plain/commit/5d145e4))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.96.0`. Run `plain postgres sync` after upgrading to reconcile column defaults.
+
 ## [0.47.4](https://github.com/dropseed/plain/releases/plain-jobs@0.47.4) (2026-04-14)
 
 ### What's changed
