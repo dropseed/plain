@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.34.3](https://github.com/dropseed/plain/releases/plain-support@0.34.3) (2026-04-17)
+
+### What's changed
+
+- Updated `SupportFormEntry.created_at` to `DateTimeField(create_now=True)` for plain-postgres 0.96.0. ([5d145e4](https://github.com/dropseed/plain/commit/5d145e4), [a44e5ec](https://github.com/dropseed/plain/commit/a44e5ec))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.96.0`. Run `plain postgres sync` after upgrading to reconcile column defaults.
+
 ## [0.34.2](https://github.com/dropseed/plain/releases/plain-support@0.34.2) (2026-04-13)
 
 ### What's changed

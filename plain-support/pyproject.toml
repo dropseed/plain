@@ -1,6 +1,6 @@
 [project]
 name = "plain.support"
-version = "0.34.2"
+version = "0.34.3"
 description = "Provides support forms for your application."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
@@ -8,7 +8,7 @@ license = "BSD-3-Clause"
 requires-python = ">=3.13"
 dependencies = [
   "plain>=0.132.0,<1.0.0",
-  "plain.postgres>=0.91.0,<1.0.0",
+  "plain.postgres>=0.96.0,<1.0.0",
   "plain.auth>=0.29.0,<1.0.0",
 ]
 
