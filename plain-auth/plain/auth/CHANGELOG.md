@@ -1,5 +1,16 @@
 # plain-auth changelog
 
+## [0.29.2](https://github.com/dropseed/plain/releases/plain-auth@0.29.2) (2026-04-17)
+
+### What's changed
+
+- Updated README example to use `DateTimeField(create_now=True)` for plain-postgres 0.96.0. ([5d145e4](https://github.com/dropseed/plain/commit/5d145e4))
+- Raised `plain-postgres` floor to `>=0.96.0`.
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.96.0`. See the plain-postgres 0.96.0 notes for field-API migration guidance.
+
 ## [0.29.1](https://github.com/dropseed/plain/releases/plain-auth@0.29.1) (2026-04-13)
 
 ### What's changed

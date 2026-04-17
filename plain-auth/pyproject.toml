@@ -1,6 +1,6 @@
 [project]
 name = "plain.auth"
-version = "0.29.1"
+version = "0.29.2"
 description = "Add users to your app and decide what they can access."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
@@ -8,7 +8,7 @@ license = "BSD-3-Clause"
 requires-python = ">=3.13"
 dependencies = [
   "plain>=0.132.0,<1.0.0",
-  "plain.postgres>=0.84.0,<1.0.0",
+  "plain.postgres>=0.96.0,<1.0.0",
   # Technically you can swap out sessions entirely with your own,
   # so long as the request.session exists and has a similar API.
   "plain.sessions<1.0.0",
