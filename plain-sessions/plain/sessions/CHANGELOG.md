@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.45.4](https://github.com/dropseed/plain/releases/plain-sessions@0.45.4) (2026-04-17)
+
+### What's changed
+
+- Updated `Session` for plain-postgres 0.96.0: `created_at` uses `DateTimeField(create_now=True)`, and `session_data` uses literal `default={}` (callable `default=dict` is no longer allowed). ([5d145e4](https://github.com/dropseed/plain/commit/5d145e4), [091bac7](https://github.com/dropseed/plain/commit/091bac7))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.96.0`. Run `plain postgres sync` after upgrading to reconcile column defaults.
+
 ## [0.45.3](https://github.com/dropseed/plain/releases/plain-sessions@0.45.3) (2026-04-14)
 
 ### What's changed
