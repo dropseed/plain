@@ -38,6 +38,17 @@ def _strip_non_migration_attrs(
     return path, args, {k: v for k, v in kwargs.items() if k not in non_migration_attrs}
 
 
+# Lossless widenings — no truncation, no range overflow. Every other base-type
+# change rejects (see _check_alter_column_type_allowed).
+_SAFE_TYPE_WIDENINGS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("smallint", "integer"),
+        ("smallint", "bigint"),
+        ("integer", "bigint"),
+    }
+)
+
+
 class MigrationAutodetector:
     """
     Take a pair of ProjectStates and compare them to see what the first would
@@ -926,6 +937,10 @@ class MigrationAutodetector:
                 neither_m2m = not isinstance(
                     old_field, ManyToManyField
                 ) and not isinstance(new_field, ManyToManyField)
+                if neither_m2m:
+                    self._check_alter_column_type_allowed(
+                        model_name, field_name, old_field, new_field
+                    )
                 if both_m2m or neither_m2m:
                     # Either both fields are m2m or neither is
                     self.add_operation(
@@ -941,6 +956,49 @@ class MigrationAutodetector:
                     # We cannot alter between m2m and concrete fields
                     self._generate_removed_field(package_label, model_name, field_name)
                     self._generate_added_field(package_label, model_name, field_name)
+
+    def _check_alter_column_type_allowed(
+        self,
+        model_name: str,
+        field_name: str,
+        old_field: Field,
+        new_field: Field,
+    ) -> None:
+        # The schema editor compiles a base-type change to
+        # `ALTER COLUMN c TYPE newtype USING c::newtype`. Arbitrary casts fail
+        # at apply time (e.g. timestamp → uuid) or silently corrupt data (e.g.
+        # bigint FK → text stringifies PK integers). Plain migrations are
+        # forward-only — there's no rollback. Reject at autodetection unless
+        # the transition is in the allowlist.
+        try:
+            old_udt = old_field.unqualified_db_type()
+            new_udt = new_field.unqualified_db_type()
+        except ValueError:
+            # RelatedField.resolve_related_fields raises ValueError when the
+            # target model is a string ref that hasn't been resolved on the
+            # state instance. Let the AlterField through — the schema editor
+            # will surface any mismatch at apply time.
+            return
+        if old_udt is None or new_udt is None or old_udt == new_udt:
+            return
+        if (old_udt, new_udt) in _SAFE_TYPE_WIDENINGS:
+            return
+        raise MigrationSchemaError(
+            f"Cannot change column type for '{model_name}.{field_name}' "
+            f"from '{old_udt}' to '{new_udt}' automatically. Arbitrary type "
+            f"casts can fail at apply time or silently corrupt data, and "
+            f"plain-postgres migrations are forward-only.\n\n"
+            f"Choose one:\n"
+            f"  1. Revert the field type change in models.py.\n"
+            f"  2. Scaffold an empty migration and write an explicit RunSQL "
+            f"with a USING expression you've reviewed:\n"
+            f"       uv run plain migrations create --empty --name alter_{model_name.lower()}_{field_name}_type\n\n"
+            f"     Then add an operation like:\n"
+            f"       operations.RunSQL(\n"
+            f'           "ALTER TABLE <table> ALTER COLUMN <column> TYPE {new_udt} "\n'
+            f'           "USING <your explicit cast>",\n'
+            f"       )"
+        )
 
     @staticmethod
     def _get_dependencies_for_foreign_key(

@@ -440,18 +440,19 @@ Schema changes fall into three categories, each with a different author and appl
 - **Structural migrations** — tables, columns, renames, column type changes. Framework-generated from the model diff, but you review them and decide when to deploy (a column type change can rewrite the table; a column drop is destructive).
 - **Data migrations** — backfills, transformations, one-time cleanup. Authored by you via `RunPython` or `RunSQL`. The framework only sequences them.
 
-| Change                                | Category             | Safe apply pattern                              |
-| ------------------------------------- | -------------------- | ----------------------------------------------- |
-| Add / drop index                      | Convergence          | `CREATE INDEX CONCURRENTLY`                     |
-| Add / drop unique or check constraint | Convergence          | `ADD CONSTRAINT NOT VALID` + `VALIDATE`         |
-| Add / remove NOT NULL                 | Convergence          | `CHECK NOT VALID` + `VALIDATE` + `SET NOT NULL` |
-| Change FK `on_delete` action          | Convergence          | drop + re-add with `NOT VALID` + `VALIDATE`     |
-| Set / change / drop column `DEFAULT`  | Convergence          | catalog-only `ALTER COLUMN SET/DROP DEFAULT`    |
-| Create / drop table                   | Structural migration | framework-generated, you review                 |
-| Add / drop / rename column            | Structural migration | framework-generated, you review                 |
-| Column type change                    | Structural migration | may rewrite the table                           |
-| Data backfill or transformation       | Data migration       | you author (`RunPython` / `RunSQL`)             |
-| One-time cleanup, seeding             | Data migration       | you author                                      |
+| Change                                | Category             | Safe apply pattern                                  |
+| ------------------------------------- | -------------------- | --------------------------------------------------- |
+| Add / drop index                      | Convergence          | `CREATE INDEX CONCURRENTLY`                         |
+| Add / drop unique or check constraint | Convergence          | `ADD CONSTRAINT NOT VALID` + `VALIDATE`             |
+| Add / remove NOT NULL                 | Convergence          | `CHECK NOT VALID` + `VALIDATE` + `SET NOT NULL`     |
+| Change FK `on_delete` action          | Convergence          | drop + re-add with `NOT VALID` + `VALIDATE`         |
+| Set / change / drop column `DEFAULT`  | Convergence          | catalog-only `ALTER COLUMN SET/DROP DEFAULT`        |
+| Create / drop table                   | Structural migration | framework-generated, you review                     |
+| Add / drop / rename column            | Structural migration | framework-generated, you review                     |
+| Column type change (safe widening)    | Structural migration | framework-generated `ALTER TYPE` with implicit cast |
+| Column type change (other)            | Data migration       | you author (explicit `RunSQL` with `USING`)         |
+| Data backfill or transformation       | Data migration       | you author (`RunPython` / `RunSQL`)                 |
+| One-time cleanup, seeding             | Data migration       | you author                                          |
 
 **The principle: who authors the change, and can the framework guarantee safety?** If the framework can derive both the change and a universally-safe apply pattern from model definitions, it belongs to convergence. If the framework can generate the DDL but safety depends on context (table size, deploy timing, destructiveness), it's a structural migration — you review it before deploying. If only you know what to do, it's a data migration.
 
@@ -470,6 +471,10 @@ Many convergence-managed changes produce DB-enforced behavior — cascading dele
 **Drift correction is a convergence-only behavior.** Convergence re-runs on every `sync` and compares models against the database. An index created manually outside a model declaration will be dropped on the next run because models are the source of truth. Migrations don't behave this way — once applied, they're recorded and never re-applied.
 
 **Caveats.** The safety promise isn't absolute. Structural migrations aren't lint-checked yet: adding a column with a volatile default (`gen_random_uuid()`, `now()`) on a large table will rewrite it without warning. Review structural migrations before deploying to production.
+
+**Column type changes.** The autodetector only auto-generates `AlterField` for a small allowlist of lossless widenings (`smallint → integer`, `smallint → bigint`, `integer → bigint`) and for parameter-only changes like `max_length`. Every other base-type change rejects with guidance — arbitrary `USING col::newtype` casts either fail at apply time (e.g. timestamp → uuid) or silently corrupt data (e.g. bigint FK → text stringifies PKs), and migrations are forward-only. For anything outside the allowlist, scaffold `plain migrations create --empty --name alter_<model>_<field>_type` and author an explicit `RunSQL` with a `USING` expression you've reviewed.
+
+"Safe" here means data-integrity safe, not operationally cheap. An `ALTER COLUMN ... TYPE` that changes on-disk width (any of the allowlisted widenings) takes `ACCESS EXCLUSIVE` and rewrites the table — on a large table this can block writes for minutes. Deploy these during a maintenance window, not in the middle of traffic.
 
 **Out of scope for convergence.** Triggers, views, stored procedures, and other non-standard DDL stay outside convergence — it won't create them from models, and it won't drop them if they exist. Manage them with `RunSQL` data migrations.
 
