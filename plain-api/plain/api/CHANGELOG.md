@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.29.3](https://github.com/dropseed/plain/releases/plain-api@0.29.3) (2026-04-17)
+
+### What's changed
+
+- Updated `APIKey` to use the new plain-postgres 0.96.0 field API: `UUIDField(generate=True)`, `DateTimeField(create_now=True)` / `(create_now=True, update_now=True)`, and `RandomStringField(length=40)` for `token`. Dropped the internal `generate_token()` helper — tokens are now generated per-row by Postgres via `gen_random_uuid()::text`. ([0918702](https://github.com/dropseed/plain/commit/0918702), [091bac7](https://github.com/dropseed/plain/commit/091bac7), [a44e5ec](https://github.com/dropseed/plain/commit/a44e5ec), [5d145e4](https://github.com/dropseed/plain/commit/5d145e4))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.96.0`. Run `plain postgres sync` after upgrading to reconcile column defaults.
+
 ## [0.29.2](https://github.com/dropseed/plain/releases/plain-api@0.29.2) (2026-04-13)
 
 ### What's changed
