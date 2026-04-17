@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.77.5](https://github.com/dropseed/plain/releases/plain-admin@0.77.5) (2026-04-17)
+
+### What's changed
+
+- Updated `PinnedNavItem.created_at` to `DateTimeField(create_now=True)` for plain-postgres 0.96.0, which drops `auto_now_add`. ([5d145e4](https://github.com/dropseed/plain/commit/5d145e4), [a44e5ec](https://github.com/dropseed/plain/commit/a44e5ec))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.96.0`. Run `plain postgres sync` after upgrading to reconcile column defaults.
+
 ## [0.77.4](https://github.com/dropseed/plain/releases/plain-admin@0.77.4) (2026-04-13)
 
 ### What's changed
