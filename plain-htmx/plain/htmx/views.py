@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from http import HTTPMethod
 from typing import Any
 
 from plain.http import ResponseBase
@@ -38,15 +39,20 @@ class HTMXView(TemplateView):
         return response
 
     def get_request_handler(self) -> Callable[[], Any] | None:
-        if self.is_htmx_request() and self.request.method:
+        if (
+            self.is_htmx_request()
+            and self.request.method
+            and self.request.method in HTTPMethod.__members__
+        ):
             # You can use an htmx_{method} method on views
             # (or htmx_{method}_{action} for specific actions)
             method = f"htmx_{self.request.method.lower()}"
 
             if action := self.get_htmx_action_name():
-                # If an action is specified, we throw an error if
-                # the associated method isn't found
-                return getattr(self, f"{method}_{action}")
+                # Action must be a plain identifier to be a valid attribute name
+                if not action.isidentifier():
+                    return None
+                return getattr(self, f"{method}_{action}", None)
 
             if handler := getattr(self, method, None):
                 # If it's just an htmx post, for example,

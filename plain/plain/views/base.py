@@ -52,6 +52,9 @@ class View:
         if not self.request.method:
             raise AttributeError("HTTP method is not set")
 
+        if self.request.method not in HTTPMethod.__members__:
+            return None
+
         return getattr(self, self.request.method.lower(), None)
 
     def get_response(self) -> ResponseBase:
