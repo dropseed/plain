@@ -40,14 +40,16 @@ class View:
         request: Request,
         url_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        if hasattr(self, "get") and not hasattr(self, "head"):
-            self.head = self.get
-
         self.request = request
         self.url_kwargs = url_kwargs or {}
 
     def get_request_handler(self) -> Callable[[], Any] | None:
-        """Return the handler for the current request method."""
+        """Return the handler for the current request method.
+
+        HEAD falls back to `get` when no explicit `head` handler is defined,
+        per HTTP semantics (HEAD == GET without a response body). The body
+        is stripped at the transport layer, not here.
+        """
 
         if not self.request.method:
             raise AttributeError("HTTP method is not set")
@@ -55,7 +57,10 @@ class View:
         if self.request.method not in HTTPMethod.__members__:
             return None
 
-        return getattr(self, self.request.method.lower(), None)
+        handler = getattr(self, self.request.method.lower(), None)
+        if handler is None and self.request.method == "HEAD":
+            handler = getattr(self, "get", None)
+        return handler
 
     def get_response(self) -> ResponseBase:
         handler = self.get_request_handler()
@@ -131,4 +136,7 @@ class View:
         return response
 
     def _allowed_methods(self) -> list[str]:
-        return [m.upper() for m in HTTPMethod if hasattr(self, m.lower())]
+        methods = [m.upper() for m in HTTPMethod if hasattr(self, m.lower())]
+        if "GET" in methods and "HEAD" not in methods:
+            methods.append("HEAD")
+        return methods
