@@ -48,14 +48,11 @@ class SupportFormView(AuthView, FormView):
 class SupportIFrameView(SupportFormView):
     template_name = "support/iframe.html"
 
-    def get_response(self) -> ResponseBase:
-        response = super().get_response()
-
+    def after_response(self, response: ResponseBase) -> ResponseBase:
         # X-Frame-Options are typically in DEFAULT_RESPONSE_HEADERS.
         # Set to None to signal the middleware to skip applying this default header.
         # We can't del/pop it because middleware runs after and would add it back.
         response.headers["X-Frame-Options"] = None
-
         return response
 
 

@@ -373,7 +373,7 @@ Note: browsers limit HTTP/1.1 to 6 SSE connections per domain. Use HTTP/2 to avo
 
 ## Lifecycle hooks
 
-Every view has two hooks around its handler: `before_request` runs before the HTTP method handler; `handle_exception` converts any exception raised during dispatch into a response.
+Every view has three hooks around its handler: `before_request` runs before the HTTP method handler, `after_response` runs after the response is built (including error responses), and `handle_exception` converts any exception raised during dispatch into a response.
 
 ### `before_request`
 
@@ -389,6 +389,22 @@ class MyView(View):
 ```
 
 Use it for auth checks, rate limiting, or any precondition. `AuthView` overrides it to call `check_auth()`; `APIKeyView` uses it to validate the API key.
+
+### `after_response`
+
+Runs after the response is built — for successes, responses from `handle_exception`, and 405 method-not-allowed. Return the response (mutated or replaced). Default is a no-op.
+
+```python
+from plain.http import ResponseBase
+from plain.utils.cache import patch_cache_control
+
+class MyView(View):
+    def after_response(self, response: ResponseBase) -> ResponseBase:
+        patch_cache_control(response, private=True)
+        return response
+```
+
+Exceptions raised inside `after_response` are not routed through `handle_exception` — they escape to the framework's error renderer. Guard in `before_request` or inside the handler for anything that might raise.
 
 ### `handle_exception`
 

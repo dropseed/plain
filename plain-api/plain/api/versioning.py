@@ -78,13 +78,13 @@ class VersionedAPIView(View):
 
         return self.default_api_version
 
-    def get_response(self) -> ResponseBase:
+    def before_request(self) -> None:
+        super().before_request()
         if self.request.content_type == "application/json":
             self.transform_request(self.request)
 
-        # Process the request normally
-        response = super().get_response()
-
+    def after_response(self, response: ResponseBase) -> ResponseBase:
+        response = super().after_response(response)
         if response.headers.get("Content-Type") == "application/json":
             self.transform_response(response)
 

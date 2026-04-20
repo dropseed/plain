@@ -72,16 +72,16 @@ class AdminView(AuthView, TemplateView):
     template_name = "admin/page.html"
     cards: list[Card] = []
 
-    def get_response(self) -> ResponseBase:
+    def before_request(self) -> None:
+        super().before_request()
         # Track this page visit for recent nav tabs
         if self.nav_section is not None:
             track_recent_nav(self.request, self.get_slug())
 
-        response = super().get_response()
+    def after_response(self, response: ResponseBase) -> ResponseBase:
         response.headers["Cache-Control"] = (
             "no-cache, no-store, must-revalidate, max-age=0"
         )
-
         return response
 
     def get_template_context(self) -> dict[str, Any]:

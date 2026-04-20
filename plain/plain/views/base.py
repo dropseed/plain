@@ -65,6 +65,15 @@ class View:
     def before_request(self) -> None:
         """Pre-dispatch hook. Raise to reject the request."""
 
+    def after_response(self, response: ResponseBase) -> ResponseBase:
+        """Post-dispatch hook. Runs for every response — successes, errors, 405s.
+
+        Return the response (possibly mutated or replaced). Exceptions
+        raised here escape to the framework error renderer — they are
+        not routed through `handle_exception`.
+        """
+        return response
+
     def handle_exception(self, exc: Exception) -> ResponseBase:
         """Translate a raised exception into a response. Re-raise to defer to the framework default."""
         raise exc
@@ -84,22 +93,22 @@ class View:
                         "request": self.request,
                     },
                 )
-                return NotAllowedResponse(self._allowed_methods())
-
-            if inspect.iscoroutinefunction(handler):
+                response: ResponseBase = NotAllowedResponse(self._allowed_methods())
+            elif inspect.iscoroutinefunction(handler):
                 return self._dispatch_handler_async(handler)  # ty: ignore[invalid-return-type]
-
-            result: Any = handler()
-            return self.convert_value_to_response(result)
+            else:
+                response = self.convert_value_to_response(handler())
         except Exception as e:
-            return self._respond_to_exception(e)
+            response = self._respond_to_exception(e)
+        return self.after_response(response)
 
     async def _dispatch_handler_async(self, handler: Callable[[], Any]) -> ResponseBase:
         try:
             result = await handler()
-            return self.convert_value_to_response(result)
+            response = self.convert_value_to_response(result)
         except Exception as e:
-            return self._respond_to_exception(e)
+            response = self._respond_to_exception(e)
+        return self.after_response(response)
 
     def _respond_to_exception(self, exc: Exception) -> ResponseBase:
         if isinstance(exc, ResponseException):

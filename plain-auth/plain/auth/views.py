@@ -114,8 +114,7 @@ class AuthView(SessionView):
             )
         ) from exc
 
-    def get_response(self) -> ResponseBase:
-        response = super().get_response()
+    def after_response(self, response: ResponseBase) -> ResponseBase:
         if self.user:
             # Make sure it at least has private as a default
             patch_cache_control(response, private=True)
