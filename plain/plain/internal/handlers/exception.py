@@ -1,21 +1,23 @@
+"""Framework default error renderer.
+
+Called for pre-view failures (URL resolution, middleware) and for view
+exceptions that escape `View.handle_exception`. Maps the exception to a
+status code, tries `{status}.html`, and falls back to a plain-text body
+if the template is missing or rendering itself raises.
+
+Logging is delegated to `plain.logs.log_exception`, which is idempotent
+— view-origin exceptions were already logged inside `View.get_response`,
+and this call is a no-op for them.
+"""
+
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
-from plain.forms.exceptions import FormFieldMissingError
-from plain.http import (
-    BadRequestError400,
-    ForbiddenError403,
-    NotFoundError404,
-    Response,
-    ResponseBase,
-    SuspiciousOperationError400,
-)
-from plain.http.multipartparser import MultiPartParserError
-from plain.logs import get_framework_logger
+from plain.http import HTTPException, Response, ResponseBase
+from plain.logs import get_framework_logger, log_exception
 from plain.runtime import settings
-from plain.views.errors import ErrorView
+from plain.templates import Template, TemplateFileMissing
 
 if TYPE_CHECKING:
     from plain.http import Request
@@ -25,111 +27,37 @@ request_logger = get_framework_logger("plain.request")
 
 
 def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
-    if isinstance(exc, NotFoundError404):
-        response = get_exception_response(
-            request=request, status_code=404, exception=None
-        )
+    log_exception(request, exc)
 
-    elif isinstance(exc, ForbiddenError403):
-        response = get_exception_response(
-            request=request, status_code=403, exception=exc
-        )
-        request_logger.warning(
-            "Forbidden, permission denied",
-            extra={
-                "path": request.path,
-                "status_code": response.status_code,
-                "request": request,
-            },
-        )
+    status = exc.status_code if isinstance(exc, HTTPException) else 500
 
-    elif isinstance(exc, MultiPartParserError):
-        response = get_exception_response(
-            request=request, status_code=400, exception=None
-        )
-        request_logger.warning(
-            "Bad request, unable to parse request body",
-            extra={
-                "path": request.path,
-                "status_code": response.status_code,
-                "request": request,
-            },
-        )
-
-    elif isinstance(exc, BadRequestError400):
-        response = get_exception_response(
-            request=request, status_code=400, exception=exc
-        )
-        request_logger.warning(
-            "Bad request",
-            extra={
-                "error": str(exc),
-                "path": request.path,
-                "status_code": response.status_code,
-                "request": request,
-            },
-        )
-    elif isinstance(exc, SuspiciousOperationError400):
-        # The request logger receives events for any problematic request
-        # The security logger receives events for all SuspiciousOperationError400s
-        security_logger = logging.getLogger(f"plain.security.{exc.__class__.__name__}")
-        security_logger.error(
-            str(exc),
-            extra={"status_code": 400, "request": request},
-            exc_info=exc,
-        )
-        response = get_exception_response(
-            request=request, status_code=400, exception=None
-        )
-
-    elif isinstance(exc, FormFieldMissingError):
-        response = get_exception_response(
-            request=request, status_code=400, exception=None
-        )
-        request_logger.warning(
-            "Bad request, missing form field",
-            extra={
-                "field_name": exc.field_name,
-                "path": request.path,
-                "status_code": 400,
-                "request": request,
-            },
-        )
-
-    else:
-        response = get_exception_response(
-            request=request, status_code=500, exception=exc
-        )
-        request_logger.error(
-            "Server error",
-            extra={
-                "reason": response.reason_phrase,
-                "path": request.path,
-                "status_code": response.status_code,
-                "request": request,
-            },
-            exc_info=exc,
-        )
-
-    return response
-
-
-def get_exception_response(
-    *, request: Request, status_code: int, exception: Exception | None
-) -> ResponseBase:
     try:
-        view = ErrorView(request=request, status_code=status_code, exception=exception)
-        response = view.get_response()
-        if response.status_code >= 500 and exception is not None:
-            # Attach the exception to the response for logging/observability
-            response.exception = exception
-        return response
-    except Exception as e:
-        # In development mode, re-raise the exception to get a full stack trace
+        body = Template(f"{status}.html").render(
+            {
+                "request": request,
+                "status_code": status,
+                "exception": exc,
+                "DEBUG": settings.DEBUG,
+            }
+        )
+        response = Response(body, status_code=status)
+    except TemplateFileMissing:
+        response = Response(
+            status_code=status, content_type="text/plain; charset=utf-8"
+        )
+        response.content = f"{status} {response.reason_phrase}"
+    except Exception as render_exc:
         if settings.DEBUG:
             raise
+        request_logger.error(
+            "Error template render failed",
+            extra={"path": request.path, "status_code": status, "request": request},
+            exc_info=render_exc,
+        )
+        response = Response(status_code=status)
 
-        # If we can't load the view, return a 500 response
-        response = Response(status_code=500)
-        response.exception = e
-        return response
+    if status >= 500:
+        # Attach the original exception so observability tooling
+        # (Sentry, OTel span recorders) can upload it from the response.
+        response.exception = exc
+    return response

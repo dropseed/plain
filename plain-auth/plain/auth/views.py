@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 from urllib.parse import urlparse, urlunparse
 
 from plain.http import (
@@ -16,6 +16,7 @@ from plain.sessions.views import SessionView
 from plain.urls import reverse
 from plain.utils.cache import patch_cache_control
 from plain.views import View
+from plain.views.exceptions import ResponseException
 
 from .sessions import logout
 from .utils import resolve_url
@@ -61,11 +62,7 @@ class AuthView(SessionView):
         return context
 
     def check_auth(self) -> None:
-        """
-        Raises either LoginRequired or ForbiddenError403.
-        - LoginRequired can specify a login_url and redirect_field_name
-        - ForbiddenError403 can specify a message
-        """
+        """Raise LoginRequired, ForbiddenError403, or NotFoundError404 when access is denied."""
         if not self.login_required and not self.admin_required:
             return None
 
@@ -89,38 +86,39 @@ class AuthView(SessionView):
                 # Show a 404 so we don't expose admin urls to non-admin users
                 raise NotFoundError404()
 
-    def get_response(self) -> ResponseBase:
+    def before_request(self) -> None:
         try:
             self.check_auth()
-        except LoginRequired as e:
-            if self.login_url:
-                # Ideally this could be handled elsewhere... like PermissionDenied
-                # also seems like this code is used multiple places anyway...
-                # could be easier to get redirect query param
-                path = self.request.build_absolute_uri()
-                resolved_login_url = reverse(e.login_url)
-                # If the login url is the same scheme and net location then use the
-                # path as the "next" url.
-                login_scheme, login_netloc = urlparse(resolved_login_url)[:2]
-                current_scheme, current_netloc = urlparse(path)[:2]
-                if (not login_scheme or login_scheme == current_scheme) and (
-                    not login_netloc or login_netloc == current_netloc
-                ):
-                    path = self.request.get_full_path()
-                return redirect_to_login(
-                    path,
-                    resolved_login_url,
-                    e.redirect_field_name,
-                )
-            else:
-                raise ForbiddenError403("Login required")
+        except LoginRequired as exc:
+            self._deny_unauthenticated(exc)
 
+    def _deny_unauthenticated(self, exc: LoginRequired) -> NoReturn:
+        if not self.login_url:
+            raise ForbiddenError403("Login required") from exc
+
+        path = self.request.build_absolute_uri()
+        resolved_login_url = reverse(exc.login_url)
+        # If the login url is the same scheme and net location then use
+        # the path as the "next" url.
+        login_scheme, login_netloc = urlparse(resolved_login_url)[:2]
+        current_scheme, current_netloc = urlparse(path)[:2]
+        if (not login_scheme or login_scheme == current_scheme) and (
+            not login_netloc or login_netloc == current_netloc
+        ):
+            path = self.request.get_full_path()
+        raise ResponseException(
+            redirect_to_login(
+                path,
+                resolved_login_url,
+                exc.redirect_field_name,
+            )
+        ) from exc
+
+    def get_response(self) -> ResponseBase:
         response = super().get_response()
-
         if self.user:
             # Make sure it at least has private as a default
             patch_cache_control(response, private=True)
-
         return response
 
 

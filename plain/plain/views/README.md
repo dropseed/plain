@@ -15,6 +15,7 @@
     - [ListView](#listview)
 - [RedirectView](#redirectview)
 - [ServerSentEventsView](#serversenteventsview)
+- [Lifecycle hooks](#lifecycle-hooks)
 - [ResponseException](#responseexception)
 - [Error views](#error-views)
 - [View patterns](#view-patterns)
@@ -370,6 +371,52 @@ ServerSentEventsView only accepts GET requests. The `stream()` method runs on th
 
 Note: browsers limit HTTP/1.1 to 6 SSE connections per domain. Use HTTP/2 to avoid this limit.
 
+## Lifecycle hooks
+
+Every view has two hooks around its handler: `before_request` runs before the HTTP method handler; `handle_exception` converts any exception raised during dispatch into a response.
+
+### `before_request`
+
+Runs before the HTTP method handler (`get`, `post`, etc.). Default is a no-op. Raise to reject the request — the exception flows through `handle_exception`.
+
+```python
+from plain.http import ForbiddenError403
+
+class MyView(View):
+    def before_request(self):
+        if self.request.user and self.request.user.is_banned:
+            raise ForbiddenError403("Banned")
+```
+
+Use it for auth checks, rate limiting, or any precondition. `AuthView` overrides it to call `check_auth()`; `APIKeyView` uses it to validate the API key.
+
+### `handle_exception`
+
+Converts an exception raised during `before_request` or the handler into a response. Subclasses override it to format errors for their clients.
+
+```python
+from plain.http import ResponseBase
+
+class MyView(View):
+    def handle_exception(self, exc: Exception) -> ResponseBase:
+        if isinstance(exc, MyAppError):
+            return JsonResponse({"error": str(exc)}, status_code=400)
+        return super().handle_exception(exc)
+```
+
+The framework's default renders `{status}.html` ([`Error views`](#error-views)) — most views don't need to override this hook. Override when you want a non-HTML format: `APIView` emits JSON. The base `View.handle_exception` re-raises, so unhandled cases fall through to the framework default.
+
+`ResponseException` is unwrapped by `get_response` before `handle_exception` runs, so you don't need to handle it in overrides. The exception is logged once — before `handle_exception` is called — so overrides focus purely on response shape, not observability.
+
+Plain's HTTP exceptions (`NotFoundError404`, `ForbiddenError403`, `BadRequestError400`, etc.) inherit [`HTTPException`](../http/exceptions.py#HTTPException) and carry their own `status_code`. Subclass `HTTPException` to define your own:
+
+```python
+from plain.http import HTTPException
+
+class PaymentRequiredError402(HTTPException):
+    status_code = 402
+```
+
 ## ResponseException
 
 At any point during request handling, you can raise a [`ResponseException`](./exceptions.py#ResponseException) to immediately return a response. This is useful for authorization checks or rate limiting in nested helper functions.
@@ -392,15 +439,15 @@ class ExampleView(DetailView):
 
 ## Error views
 
-HTTP errors are rendered using templates. Create templates for the errors users see.
+HTTP errors are rendered from templates named after the status code:
 
 - `templates/404.html` - Page not found
 - `templates/403.html` - Forbidden
 - `templates/500.html` - Server error
 
-Plain looks for `{status_code}.html` templates, then returns a plain HTTP response if not found. Most apps only need these three templates.
+Plain looks for `{status_code}.html` and renders it with `request`, `status_code`, and `exception` in context. If the template is missing or fails to render, a plain-text body is returned (`404 Not Found`, `500 Internal Server Error`, etc.). Most apps only need the three templates above.
 
-Templates receive `status_code` and `exception` in context.
+This covers every error source — exceptions raised inside views, URL resolution failures, middleware errors — so `404.html` renders for any 404, not just ones raised from your own code. Views that want a different format (e.g. JSON for an API) override `handle_exception` to opt out.
 
 Your `500.html` template should be self-contained. Avoid extending base templates or accessing the database/session, since server errors can occur during middleware or template rendering. `404.html` and `403.html` can safely extend base templates since they occur during view execution after middleware runs.
 

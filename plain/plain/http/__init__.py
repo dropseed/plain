@@ -2,6 +2,7 @@ from .cookie import parse_cookie
 from .exceptions import (
     BadRequestError400,
     ForbiddenError403,
+    HTTPException,
     NotFoundError404,
     RequestDataTooBigError400,
     SuspiciousFileOperationError400,
@@ -54,6 +55,7 @@ __all__ = [
     "FileResponse",
     "BadHeaderError",
     # Exceptions
+    "HTTPException",
     "NotFoundError404",
     "ForbiddenError403",
     "BadRequestError400",

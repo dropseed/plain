@@ -1,11 +1,15 @@
 import datetime
 from functools import cached_property
+from http.client import responses as http_status_phrases
 from typing import Any
 
 from plain.exceptions import ValidationError
 from plain.forms.exceptions import FormFieldMissingError
-from plain.http import ForbiddenError403, JsonResponse, NotFoundError404, ResponseBase
-from plain.logs import get_framework_logger
+from plain.http import (
+    HTTPException,
+    JsonResponse,
+    ResponseBase,
+)
 from plain.utils import timezone
 from plain.utils.cache import patch_cache_control
 from plain.views.base import View
@@ -25,7 +29,24 @@ __all__ = [
     "APIView",
 ]
 
-logger = get_framework_logger()
+
+def _error_response(*, error_id: str, message: str, status_code: int) -> JsonResponse:
+    return JsonResponse(
+        ErrorSchema(id=error_id, message=message, url=""),
+        status_code=status_code,
+    )
+
+
+# Snake-case ids are part of the public API surface — client libs key off them.
+_STATUS_ERROR_IDS = {
+    400: "bad_request",
+    401: "unauthorized",
+    403: "permission_denied",
+    404: "not_found",
+    405: "method_not_allowed",
+    409: "conflict",
+    429: "rate_limited",
+}
 
 
 # @openapi.response_typed_dict(400, ErrorSchema)
@@ -37,19 +58,19 @@ class APIKeyView(View):
     def api_key(self) -> Any:
         return self.get_api_key()
 
-    def get_response(self) -> ResponseBase:
+    def before_request(self) -> None:
         if self.api_key:
             self.use_api_key()
         elif self.api_key_required:
-            return JsonResponse(
-                ErrorSchema(
-                    id="api_key_required",
+            raise ResponseException(
+                _error_response(
+                    error_id="api_key_required",
                     message="API key required",
-                    url="",
-                ),
-                status_code=401,
+                    status_code=401,
+                )
             )
 
+    def get_response(self) -> ResponseBase:
         response = super().get_response()
         # Make sure it at least has private as a default
         patch_cache_control(response, private=True)
@@ -76,12 +97,9 @@ class APIKeyView(View):
                 header_token = header_value.split("Bearer ")[1]
             except IndexError:
                 raise ResponseException(
-                    JsonResponse(
-                        ErrorSchema(
-                            id="invalid_authorization_header",
-                            message="Invalid Authorization header",
-                            url="",
-                        ),
+                    _error_response(
+                        error_id="invalid_authorization_header",
+                        message="Invalid Authorization header",
                         status_code=400,
                     )
                 )
@@ -90,24 +108,18 @@ class APIKeyView(View):
                 api_key = APIKey.query.get(token=header_token)  # ty: ignore[unresolved-attribute]
             except APIKey.DoesNotExist:  # ty: ignore[unresolved-attribute]
                 raise ResponseException(
-                    JsonResponse(
-                        ErrorSchema(
-                            id="invalid_api_token",
-                            message="Invalid API token",
-                            url="",
-                        ),
+                    _error_response(
+                        error_id="invalid_api_token",
+                        message="Invalid API token",
                         status_code=400,
                     )
                 )
 
             if api_key.expires_at and api_key.expires_at < datetime.datetime.now():
                 raise ResponseException(
-                    JsonResponse(
-                        ErrorSchema(
-                            id="api_token_expired",
-                            message="API token has expired",
-                            url="",
-                        ),
+                    _error_response(
+                        error_id="api_token_expired",
+                        message="API token has expired",
                         status_code=400,
                     )
                 )
@@ -123,56 +135,29 @@ class APIKeyView(View):
     "5XX", ErrorSchema, description="Unexpected Error", component_name="ServerError"
 )
 class APIView(View):
-    def get_response(self) -> ResponseBase:
-        try:
-            return super().get_response()
-        except ResponseException as e:
-            # Catch any response exceptions in APIKeyView or elsewhere before View.get_response
-            return e.response
-        except ValidationError as e:
-            return JsonResponse(
-                ErrorSchema(
-                    id="validation_error",
-                    message=f"Validation error: {e.message}",
-                    url="",
-                    # "errors": {field: e.errors[field] for field in e.errors},
-                ),
+    def handle_exception(self, exc: Exception) -> ResponseBase:
+        if isinstance(exc, ValidationError):
+            return _error_response(
+                error_id="validation_error",
+                message=f"Validation error: {exc.message}",
                 status_code=400,
             )
-        except FormFieldMissingError as e:
-            return JsonResponse(
-                ErrorSchema(
-                    id="missing_field",
-                    message=f"Missing field: {e.field_name}",
-                    url="",
-                ),
+        if isinstance(exc, FormFieldMissingError):
+            return _error_response(
+                error_id="missing_field",
+                message=f"Missing field: {exc.field_name}",
                 status_code=400,
             )
-        except ForbiddenError403:
-            return JsonResponse(
-                ErrorSchema(
-                    id="permission_denied",
-                    message="Permission denied",
-                    url="",
-                ),
-                status_code=403,
+        if isinstance(exc, HTTPException):
+            error_id = _STATUS_ERROR_IDS.get(exc.status_code, "http_error")
+            return _error_response(
+                error_id=error_id,
+                message=str(exc)
+                or http_status_phrases.get(exc.status_code, "HTTP error"),
+                status_code=exc.status_code,
             )
-        except NotFoundError404:
-            return JsonResponse(
-                ErrorSchema(
-                    id="not_found",
-                    message="Not found",
-                    url="",
-                ),
-                status_code=404,
-            )
-        except Exception:
-            logger.exception("Internal server error", extra={"request": self.request})
-            return JsonResponse(
-                ErrorSchema(
-                    id="server_error",
-                    message="Internal server error",
-                    url="",
-                ),
-                status_code=500,
-            )
+        return _error_response(
+            error_id="server_error",
+            message="Internal server error",
+            status_code=500,
+        )

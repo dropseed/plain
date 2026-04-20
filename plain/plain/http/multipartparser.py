@@ -23,6 +23,7 @@ from plain.utils.module_loading import import_string
 from plain.utils.regex_helper import _lazy_re_compile
 
 from .exceptions import (
+    BadRequestError400,
     RequestDataTooBigError400,
     SuspiciousMultipartFormError400,
     TooManyFieldsSentError400,
@@ -36,7 +37,7 @@ if TYPE_CHECKING:
 __all__ = ("MultiPartParser", "MultiPartParserError", "InputStreamExhausted")
 
 
-class MultiPartParserError(Exception):
+class MultiPartParserError(BadRequestError400):
     pass
 
 
