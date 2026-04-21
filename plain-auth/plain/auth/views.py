@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse, urlunparse
 
 from plain.http import (
     ForbiddenError403,
+    HTTPException,
     NotFoundError404,
     QueryDict,
     RedirectResponse,
@@ -16,7 +17,6 @@ from plain.sessions.views import SessionView
 from plain.urls import reverse
 from plain.utils.cache import patch_cache_control
 from plain.views import View
-from plain.views.exceptions import ResponseException
 
 from .sessions import logout
 from .utils import resolve_url
@@ -37,9 +37,20 @@ __all__ = [
 ]
 
 
-class LoginRequired(Exception):
-    def __init__(self, login_url: str | None = None, redirect_field_name: str = "next"):
-        self.login_url = login_url or settings.AUTH_LOGIN_URL
+class LoginRequired(HTTPException):
+    """Raised by `check_auth` when a view requires a logged-in user.
+
+    Subclasses an HTTPException so generic handlers (logging, APIs, MCP)
+    treat it as a 401 by default. HTML views rely on `AuthView.handle_exception`
+    to render a redirect to the configured login page instead.
+    """
+
+    status_code = 401
+
+    def __init__(self, login_url: str | None, redirect_field_name: str = "next"):
+        # Caller is responsible for resolving `login_url` — pass `None`
+        # to signal "no login page configured, render as 403 instead".
+        self.login_url = login_url
         self.redirect_field_name = redirect_field_name
 
 
@@ -87,32 +98,31 @@ class AuthView(SessionView):
                 raise NotFoundError404()
 
     def before_request(self) -> None:
-        try:
-            self.check_auth()
-        except LoginRequired as exc:
-            self._deny_unauthenticated(exc)
+        self.check_auth()
 
-    def _deny_unauthenticated(self, exc: LoginRequired) -> NoReturn:
-        if not self.login_url:
-            raise ForbiddenError403("Login required") from exc
+    def handle_exception(self, exc: Exception) -> ResponseBase:
+        if isinstance(exc, LoginRequired):
+            if not exc.login_url:
+                # No configured login page — treat as a plain 403 and let
+                # the surrounding view's `handle_exception` chain render it.
+                return super().handle_exception(ForbiddenError403("Login required"))
 
-        path = self.request.build_absolute_uri()
-        resolved_login_url = reverse(exc.login_url)
-        # If the login url is the same scheme and net location then use
-        # the path as the "next" url.
-        login_scheme, login_netloc = urlparse(resolved_login_url)[:2]
-        current_scheme, current_netloc = urlparse(path)[:2]
-        if (not login_scheme or login_scheme == current_scheme) and (
-            not login_netloc or login_netloc == current_netloc
-        ):
-            path = self.request.get_full_path()
-        raise ResponseException(
-            redirect_to_login(
+            path = self.request.build_absolute_uri()
+            resolved_login_url = reverse(exc.login_url)
+            # If the login url is the same scheme and net location then
+            # use the path as the "next" url.
+            login_scheme, login_netloc = urlparse(resolved_login_url)[:2]
+            current_scheme, current_netloc = urlparse(path)[:2]
+            if (not login_scheme or login_scheme == current_scheme) and (
+                not login_netloc or login_netloc == current_netloc
+            ):
+                path = self.request.get_full_path()
+            return redirect_to_login(
                 path,
                 resolved_login_url,
                 exc.redirect_field_name,
             )
-        ) from exc
+        return super().handle_exception(exc)
 
     def after_response(self, response: ResponseBase) -> ResponseBase:
         if self.user:
