@@ -10,6 +10,7 @@ from ..convergence.planning import can_auto_fix
 from ..db import get_connection
 from ..introspection import MANAGED_CONSTRAINT_TYPES, get_unknown_tables
 from ..registry import models_registry
+from .decorators import database_management_command
 
 
 def _ok() -> None:
@@ -108,6 +109,7 @@ def _render_model(analysis: ModelAnalysis) -> None:
 @click.command()
 @click.argument("model_label", required=False)
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@database_management_command
 def schema(model_label: str | None, output_json: bool) -> None:
     """Show database schema from models, compared against the actual database"""
     models = models_registry.get_models()

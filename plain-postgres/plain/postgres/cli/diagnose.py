@@ -8,6 +8,7 @@ import click
 
 from ..db import get_connection
 from ..introspection import CheckItem, CheckResult, build_table_owners, run_all_checks
+from .decorators import database_management_command
 
 STATUS_SYMBOLS = {
     "ok": ("✓", "green"),
@@ -182,6 +183,7 @@ def format_human(
 @click.option(
     "--all", "show_all", is_flag=True, help="Include package issues in detail"
 )
+@database_management_command
 def diagnose(output_json: bool, show_all: bool) -> None:
     """Run health checks against the database"""
     conn = get_connection()

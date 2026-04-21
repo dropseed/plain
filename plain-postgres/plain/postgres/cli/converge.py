@@ -5,6 +5,7 @@ import sys
 import click
 
 from ..convergence import execute_plan, plan_convergence
+from .decorators import database_management_command
 
 
 @click.command()
@@ -14,6 +15,7 @@ from ..convergence import execute_plan, plan_convergence
     is_flag=True,
     help="Skip confirmation prompt.",
 )
+@database_management_command
 def converge(yes: bool) -> None:
     """Fix schema mismatches between models and the database.
 

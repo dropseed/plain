@@ -8,6 +8,13 @@ POSTGRES_URL: Secret[str]
 if _env_url := environ.get("DATABASE_URL"):
     POSTGRES_URL = _env_url
 
+# Optional second URL for management operations (migrations, convergence,
+# schema changes). When set, management commands connect via this URL
+# instead of POSTGRES_URL. Common uses: bypassing a transaction-mode
+# pgbouncer that can't handle DDL, or connecting as a DDL-capable role.
+# Falls back to POSTGRES_URL when empty.
+POSTGRES_MANAGEMENT_URL: Secret[str] = ""
+
 # Connection behavior
 POSTGRES_CONN_MAX_AGE: int = 600
 POSTGRES_CONN_HEALTH_CHECKS: bool = True

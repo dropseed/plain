@@ -27,6 +27,7 @@ from ..migrations.recorder import MigrationRecorder
 from ..migrations.state import ModelState, ProjectState
 from ..migrations.writer import MigrationWriter
 from ..registry import models_registry
+from .decorators import database_management_command
 
 if TYPE_CHECKING:
     from ..connection import DatabaseConnection
@@ -68,6 +69,7 @@ def cli() -> None:
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
+@database_management_command
 def create(
     package_labels: tuple[str, ...],
     dry_run: bool,
@@ -345,6 +347,7 @@ def create(
     is_flag=True,
     help="Suppress migration output (used for test database creation).",
 )
+@database_management_command
 def apply(
     package_label: str | None,
     migration_name: str | None,
@@ -638,6 +641,7 @@ def apply(
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
+@database_management_command
 def list_migrations(
     package_labels: tuple[str, ...], format: str, verbosity: int
 ) -> None:
@@ -777,6 +781,7 @@ def list_migrations(
     is_flag=True,
     help="Skip confirmation prompt.",
 )
+@database_management_command
 def prune(yes: bool) -> None:
     """Remove stale migration records from the database"""
     # Load migrations from disk and database
@@ -899,6 +904,7 @@ def prune(yes: bool) -> None:
     default=1,
     help="Verbosity level; 0=minimal output, 1=normal output, 2=verbose output, 3=very verbose output",
 )
+@database_management_command
 def squash(
     package_label: str,
     start_migration_name: str | None,

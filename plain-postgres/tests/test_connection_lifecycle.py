@@ -19,7 +19,6 @@ import pytest
 
 from plain.http import Response
 from plain.postgres.connection import DatabaseConnection
-from plain.postgres.connections import _create_connection as _original_create_connection
 from plain.postgres.connections import _db_conn, get_connection, has_connection
 from plain.postgres.db import close_old_connections
 from plain.runtime import settings
@@ -135,12 +134,14 @@ class TestConnectionLifecycle:
 
         create_count = 0
 
-        def counting_create():
+        original_from_url = DatabaseConnection.from_url
+
+        def counting_from_url(url):
             nonlocal create_count
             create_count += 1
-            return _original_create_connection()
+            return original_from_url(url)
 
-        with patch("plain.postgres.connections._create_connection", counting_create):
+        with patch.object(DatabaseConnection, "from_url", counting_from_url):
             client = _fresh_client()
             response = client.get("/db-query/")
 
@@ -154,12 +155,14 @@ class TestConnectionLifecycle:
         """Three sequential requests should create exactly one connection, reused across all."""
         create_count = 0
 
-        def counting_create():
+        original_from_url = DatabaseConnection.from_url
+
+        def counting_from_url(url):
             nonlocal create_count
             create_count += 1
-            return _original_create_connection()
+            return original_from_url(url)
 
-        with patch("plain.postgres.connections._create_connection", counting_create):
+        with patch.object(DatabaseConnection, "from_url", counting_from_url):
             client = _fresh_client()
 
             response1 = client.get("/db-query/")
@@ -188,17 +191,17 @@ class TestConnectionLifecycle:
         """
         create_count = 0
 
-        def counting_create():
+        original_from_url = DatabaseConnection.from_url
+
+        def counting_from_url(url):
             nonlocal create_count
             create_count += 1
-            return _original_create_connection()
+            return original_from_url(url)
 
         request_started.connect(close_old_connections)
         request_finished.connect(close_old_connections)
         try:
-            with patch(
-                "plain.postgres.connections._create_connection", counting_create
-            ):
+            with patch.object(DatabaseConnection, "from_url", counting_from_url):
                 client = _fresh_client()
 
                 response1 = client.get("/db-query/")
@@ -272,12 +275,14 @@ class TestAsyncViewConnectionLifecycle:
         """
         create_count = 0
 
-        def counting_create():
+        original_from_url = DatabaseConnection.from_url
+
+        def counting_from_url(url):
             nonlocal create_count
             create_count += 1
-            return _original_create_connection()
+            return original_from_url(url)
 
-        with patch("plain.postgres.connections._create_connection", counting_create):
+        with patch.object(DatabaseConnection, "from_url", counting_from_url):
             client = _fresh_client()
             response = client.get("/async-db-query/")
 
@@ -295,12 +300,14 @@ class TestAsyncViewConnectionLifecycle:
         """
         create_count = 0
 
-        def counting_create():
+        original_from_url = DatabaseConnection.from_url
+
+        def counting_from_url(url):
             nonlocal create_count
             create_count += 1
-            return _original_create_connection()
+            return original_from_url(url)
 
-        with patch("plain.postgres.connections._create_connection", counting_create):
+        with patch.object(DatabaseConnection, "from_url", counting_from_url):
             client = _fresh_client()
             response = client.get("/sse-db-query/")
 

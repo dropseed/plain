@@ -6,7 +6,7 @@ from . import (
 # Imports that would create circular imports if sorted
 from .base import Model
 from .constraints import CheckConstraint, UniqueConstraint
-from .db import get_connection
+from .db import get_connection, use_management_connection
 from .deletion import CASCADE, NO_ACTION, RESTRICT, SET_NULL
 from .expressions import F
 from .enums import TextChoices
@@ -104,6 +104,7 @@ __all__ = [
     "ReverseManyToMany",
     # From db
     "get_connection",
+    "use_management_connection",
     # From registry
     "register_model",
     "models_registry",

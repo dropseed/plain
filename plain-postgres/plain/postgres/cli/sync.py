@@ -7,6 +7,7 @@ import click
 from plain.runtime import settings
 
 from ..convergence import execute_plan, plan_convergence
+from .decorators import database_management_command
 
 
 @click.command()
@@ -15,6 +16,7 @@ from ..convergence import execute_plan, plan_convergence
     is_flag=True,
     help="Exit with non-zero status if sync would make any database changes.",
 )
+@database_management_command
 def sync(check: bool) -> None:
     """Sync the database schema with models.
 

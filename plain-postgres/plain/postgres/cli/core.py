@@ -13,6 +13,7 @@ from plain.cli import register_cli
 from ..db import get_connection
 from ..dialect import quote_name
 from .converge import converge
+from .decorators import database_management_command
 from .diagnose import diagnose
 from .schema import schema
 from .sync import sync
@@ -32,6 +33,7 @@ cli.add_command(sync)
 
 @cli.command()
 @click.argument("parameters", nargs=-1)
+@database_management_command
 def shell(parameters: tuple[str, ...]) -> None:
     """Open an interactive database shell"""
     conn = get_connection()
@@ -67,6 +69,7 @@ def shell(parameters: tuple[str, ...]) -> None:
     is_flag=True,
     help="Skip confirmation prompt.",
 )
+@database_management_command
 def drop_unknown_tables(yes: bool) -> None:
     """Drop all tables not associated with a Plain model"""
     from ..introspection import get_unknown_tables

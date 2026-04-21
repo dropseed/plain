@@ -99,6 +99,35 @@ To explicitly disable the database (e.g. during Docker builds where no database 
 PLAIN_POSTGRES_URL=none
 ```
 
+### Bypassing a connection pooler for management operations
+
+Transaction-mode poolers (PlanetScale, Supabase's pooler, Neon's pooler, standalone pgbouncer in transaction mode) can't run DDL, long transactions, or `pg_dump`. To work around this, set a second URL that management commands use to reach Postgres directly:
+
+```sh
+PLAIN_POSTGRES_URL=postgresql://app@pooler:6432/myapp
+PLAIN_POSTGRES_MANAGEMENT_URL=postgresql://app@postgres:5432/myapp
+```
+
+When `POSTGRES_MANAGEMENT_URL` is set, these commands connect through it instead of `POSTGRES_URL`:
+
+- `plain migrations create`, `plain migrations apply`, `plain migrations list`, `plain migrations prune`, `plain migrations squash`
+- `plain postgres sync`, `plain postgres converge`, `plain postgres schema`
+- `plain postgres diagnose`, `plain postgres drop-unknown-tables`, `plain postgres shell`
+
+When it's unset, all commands use `POSTGRES_URL` — there's no behavior change for existing apps.
+
+To route custom code through the management connection, use the `use_management_connection()` context manager:
+
+```python
+from plain.postgres import use_management_connection
+
+with use_management_connection():
+    # Any get_connection() / ORM calls inside this block use POSTGRES_MANAGEMENT_URL.
+    run_custom_schema_change()
+```
+
+You _can_ point the two URLs at different Postgres roles — e.g. a least-privilege DML role for runtime and a DDL-capable role for management. Plain does not currently automate the grant/ownership plumbing that split requires (default privileges for newly-created tables, ownership reassignment, preflight checks that the runtime role can see the schema). If you adopt that pattern, you're responsible for wiring those up yourself.
+
 **PostgreSQL is the only supported database.** You need to install a PostgreSQL driver separately — [psycopg](https://www.psycopg.org/) is recommended:
 
 ```bash
@@ -1207,6 +1236,7 @@ The connection is configured with a single URL (`POSTGRES_URL`). `DATABASE_URL` 
 | Setting                                  | Type          | Default                 | Env var                                        |
 | ---------------------------------------- | ------------- | ----------------------- | ---------------------------------------------- |
 | `POSTGRES_URL`                           | `Secret[str]` | `$DATABASE_URL` or `""` | `PLAIN_POSTGRES_URL`                           |
+| `POSTGRES_MANAGEMENT_URL`                | `Secret[str]` | `""`                    | `PLAIN_POSTGRES_MANAGEMENT_URL`                |
 | `POSTGRES_CONN_MAX_AGE`                  | `int`         | `600`                   | `PLAIN_POSTGRES_CONN_MAX_AGE`                  |
 | `POSTGRES_CONN_HEALTH_CHECKS`            | `bool`        | `True`                  | `PLAIN_POSTGRES_CONN_HEALTH_CHECKS`            |
 | `POSTGRES_TIME_ZONE`                     | `str \| None` | `None`                  | `PLAIN_POSTGRES_TIME_ZONE`                     |

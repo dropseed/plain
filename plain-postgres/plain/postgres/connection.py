@@ -28,7 +28,7 @@ from psycopg.types.string import TextLoader
 from plain.exceptions import ImproperlyConfigured
 from plain.logs import get_framework_logger
 from plain.postgres import utils
-from plain.postgres.database_url import replace_database_name
+from plain.postgres.database_url import parse_database_url, replace_database_name
 from plain.postgres.dialect import MAX_NAME_LENGTH, quote_name
 from plain.postgres.fields import GenericIPAddressField, TimeField, UUIDField
 from plain.postgres.indexes import Index
@@ -223,6 +223,24 @@ class DatabaseConnection:
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__qualname__} vendor='postgresql'>"
+
+    @classmethod
+    def from_url(cls, url: str) -> DatabaseConnection:
+        """Build a connection from a URL, merging in Plain's connection-knob settings."""
+        parsed = parse_database_url(url)
+        config: DatabaseConfig = {
+            "DATABASE": parsed.get("DATABASE", ""),
+            "USER": parsed.get("USER", ""),
+            "PASSWORD": parsed.get("PASSWORD", ""),
+            "HOST": parsed.get("HOST", ""),
+            "PORT": parsed.get("PORT"),
+            "OPTIONS": parsed.get("OPTIONS", {}),
+            "CONN_MAX_AGE": settings.POSTGRES_CONN_MAX_AGE,
+            "CONN_HEALTH_CHECKS": settings.POSTGRES_CONN_HEALTH_CHECKS,
+            "TIME_ZONE": settings.POSTGRES_TIME_ZONE,
+            "TEST": {"DATABASE": None},
+        }
+        return cls(config)
 
     @cached_property
     def timezone(self) -> datetime.tzinfo:
@@ -1108,6 +1126,7 @@ class DatabaseConnection:
         to isolate it from other test databases.
         """
         from plain.postgres.cli.migrations import apply
+        from plain.postgres.connections import use_management_connection
 
         test_database_name = self._get_test_db_name(prefix)
 
@@ -1122,36 +1141,46 @@ class DatabaseConnection:
         settings.POSTGRES_URL = replace_database_name(
             str(settings.POSTGRES_URL), test_database_name
         )
+        # If a separate management URL is configured, point it at the test DB too
+        # so decorated management commands (like `migrations apply` below) don't
+        # run against the real management database.
+        if str(settings.POSTGRES_MANAGEMENT_URL):
+            settings.POSTGRES_MANAGEMENT_URL = replace_database_name(
+                str(settings.POSTGRES_MANAGEMENT_URL), test_database_name
+            )
         self.settings_dict["DATABASE"] = test_database_name
 
-        apply.callback(
-            package_label=None,
-            migration_name=None,
-            fake=False,
-            plan=False,
-            check_unapplied=False,
-            no_input=True,
-            atomic_batch=False,  # No need for atomic batch when creating test database
-            quiet=verbosity < 2,  # Show migration output when verbosity is 2+
-        )
-
-        # Apply convergence fixes (constraints, indexes) after migrations.
+        # Route both migrations and convergence through the management URL so
+        # DDL always reaches a DDL-capable connection (bypassing a transaction-
+        # mode pooler when POSTGRES_MANAGEMENT_URL is set).
         from plain.postgres.convergence import execute_plan, plan_convergence
 
-        plan = plan_convergence()
-        result = execute_plan(plan.executable())
-        if not result.ok:
-            failed = [r for r in result.results if not r.ok]
-            raise RuntimeError(
-                f"Convergence failed during test DB setup: {failed[0].item.describe()} — {failed[0].error}"
+        with use_management_connection():
+            apply.callback(
+                package_label=None,
+                migration_name=None,
+                fake=False,
+                plan=False,
+                check_unapplied=False,
+                no_input=True,
+                atomic_batch=False,  # No need for atomic batch when creating test database
+                quiet=verbosity < 2,  # Show migration output when verbosity is 2+
             )
-        # Shouldn't happen — a fresh DB from migrations has no undeclared objects
-        # or changed definitions. Safety net so test setup follows sync policy.
-        if plan.blocked:
-            problem = plan.blocked[0]
-            raise RuntimeError(
-                f"Convergence blocked during test DB setup: {problem.describe()}"
-            )
+
+            plan = plan_convergence()
+            result = execute_plan(plan.executable())
+            if not result.ok:
+                failed = [r for r in result.results if not r.ok]
+                raise RuntimeError(
+                    f"Convergence failed during test DB setup: {failed[0].item.describe()} — {failed[0].error}"
+                )
+            # Shouldn't happen — a fresh DB from migrations has no undeclared objects
+            # or changed definitions. Safety net so test setup follows sync policy.
+            if plan.blocked:
+                problem = plan.blocked[0]
+                raise RuntimeError(
+                    f"Convergence blocked during test DB setup: {problem.describe()}"
+                )
 
         # Ensure a connection for the side effect of initializing the test database.
         self.ensure_connection()
@@ -1269,6 +1298,10 @@ class DatabaseConnection:
             settings.POSTGRES_URL = replace_database_name(
                 str(settings.POSTGRES_URL), old_database_name
             )
+            if str(settings.POSTGRES_MANAGEMENT_URL):
+                settings.POSTGRES_MANAGEMENT_URL = replace_database_name(
+                    str(settings.POSTGRES_MANAGEMENT_URL), old_database_name
+                )
             self.settings_dict["DATABASE"] = old_database_name
 
     def _destroy_test_db(self, test_database_name: str, verbosity: int) -> None:

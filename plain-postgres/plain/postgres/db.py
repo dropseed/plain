@@ -4,7 +4,7 @@ from typing import Any
 
 from plain import signals
 
-from .connections import get_connection, has_connection
+from .connections import get_connection, has_connection, use_management_connection
 
 PLAIN_VERSION_PICKLE_KEY = "_plain_version"
 
@@ -32,6 +32,7 @@ signals.request_finished.connect(close_old_connections)
 __all__ = [
     "get_connection",
     "has_connection",
+    "use_management_connection",
     "PLAIN_VERSION_PICKLE_KEY",
     "close_old_connections",
 ]
