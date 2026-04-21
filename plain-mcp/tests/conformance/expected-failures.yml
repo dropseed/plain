@@ -1,0 +1,43 @@
+# Baseline of MCP conformance scenarios that plain-mcp does not yet pass.
+# Most of these require features we haven't implemented (prompts, resources,
+# logging, subscriptions, completions, URI templates, binary/image/audio
+# content, elicitation, JSON Schema 2020-12, SSE).
+#
+# When we ship one of these features, remove its entry from this file —
+# the conformance CLI will exit 1 on "stale baseline" to force the update.
+#
+# Exit-code semantics (--expected-failures):
+#   fail + expected  -> exit 0
+#   fail + unexpected -> exit 1  (regression)
+#   pass + expected  -> exit 1  (stale baseline)
+#   pass + unexpected -> exit 0  (normal pass)
+
+server:
+  # Resources: text, binary, and URI template reads supported.
+  # Subscriptions require a long-lived SSE stream + cross-worker pub/sub
+  # for change fan-out — not implemented. Clients re-read for freshness.
+  - resources-subscribe
+  - resources-unsubscribe
+
+  # Logging capability — not implemented.
+  - logging-set-level
+  - tools-call-with-logging
+
+  # Completions — not implemented.
+  - completion-complete
+
+  # Progress notifications on tools/call — not implemented.
+  - tools-call-with-progress
+
+  # Sampling (server-initiated LLM calls) — not implemented.
+  - tools-call-sampling
+
+  # Elicitation — not implemented.
+  - tools-call-elicitation
+  - elicitation-sep1034-defaults
+  - elicitation-sep1330-enums
+
+  # SEP-1699 SSE session management — we don't emit session IDs or SSE
+  # streams on POST yet.
+  - server-sse-polling
+  - server-sse-multiple-streams

@@ -20,6 +20,7 @@ members = [
     "plain-htmx",
     "plain-jobs",
     "plain-loginlink",
+    "plain-mcp",
     "plain-oauth",
     "plain-observer",
     "plain-pages",
@@ -206,6 +207,7 @@ dependencies = [
     { name = "plain-htmx" },
     { name = "plain-jobs" },
     { name = "plain-loginlink" },
+    { name = "plain-mcp" },
     { name = "plain-oauth" },
     { name = "plain-observer" },
     { name = "plain-pages" },
@@ -241,6 +243,7 @@ requires-dist = [
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-jobs", editable = "plain-jobs" },
     { name = "plain-loginlink", editable = "plain-loginlink" },
+    { name = "plain-mcp", editable = "plain-mcp" },
     { name = "plain-oauth", editable = "plain-oauth" },
     { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },
@@ -868,6 +871,25 @@ requires-dist = [
 ]
 
 [[package]]
+name = "plain-mcp"
+version = "0.0.0"
+source = { editable = "plain-mcp" }
+dependencies = [
+    { name = "plain" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "plain-pytest" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "plain", editable = "plain" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+
+[[package]]
 name = "plain-oauth"
 version = "0.49.3"
 source = { editable = "plain-oauth" }
@@ -1216,6 +1238,7 @@ dev = [
     { name = "plain-htmx" },
     { name = "plain-jobs" },
     { name = "plain-loginlink" },
+    { name = "plain-mcp" },
     { name = "plain-oauth" },
     { name = "plain-observer" },
     { name = "plain-pages" },
@@ -1255,6 +1278,7 @@ dev = [
     { name = "plain-htmx", editable = "plain-htmx" },
     { name = "plain-jobs", editable = "plain-jobs" },
     { name = "plain-loginlink", editable = "plain-loginlink" },
+    { name = "plain-mcp", editable = "plain-mcp" },
     { name = "plain-oauth", editable = "plain-oauth" },
     { name = "plain-observer", editable = "plain-observer" },
     { name = "plain-pages", editable = "plain-pages" },

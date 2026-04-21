@@ -31,6 +31,7 @@ plain-api
 plain-elements
 plain-htmx
 plain-email
+plain-mcp
 plain-pages
 EOF
 )"
@@ -123,6 +124,13 @@ else
     tools/h2spec
   else
     bold "Skipping h2spec (not installed — brew install h2spec)"
+  fi
+
+  # MCP conformance suite (requires Node.js/npx, spins up a live server)
+  if printf '%s\n' $packages | grep -qx "plain-mcp"; then
+    echo
+    bold "Running MCP conformance suite for plain-mcp"
+    plain-mcp/tests/conformance/run
   fi
 fi
 

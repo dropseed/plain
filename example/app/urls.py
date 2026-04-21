@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import NoReturn
 
+from app.mcp import NotesMCP
 from app.notes.urls import NotesRouter
 from app.views.sse import ClockView, StockTickerView
 from plain.admin.urls import AdminRouter
@@ -40,6 +41,7 @@ class AppRouter(Router):
         include("assets/", AssetsRouter),
         include("observer/", ObserverRouter),
         include("notes/", NotesRouter),
+        path("mcp/", NotesMCP, name="mcp"),
         path("login/", LoginView, name="login"),
         path("logout/", LogoutView, name="logout"),
         path("error/", ErrorView, name="error"),
