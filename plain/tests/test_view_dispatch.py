@@ -93,3 +93,66 @@ def test_allowed_methods_includes_head_when_get_defined():
 
     view = MyView(request=_FakeRequest("GET"))  # ty: ignore[invalid-argument-type]
     assert "HEAD" in view._allowed_methods()
+
+
+def test_implemented_methods_tracks_overrides():
+    """`implemented_methods` should reflect exactly the handlers a subclass provides."""
+
+    class GetOnly(View):
+        def get(self):
+            return "x"
+
+    class GetAndPost(View):
+        def get(self):
+            return "x"
+
+        def post(self):
+            return "y"
+
+    assert GetOnly.implemented_methods == frozenset({"get"})
+    assert GetAndPost.implemented_methods == frozenset({"get", "post"})
+    assert View.implemented_methods == frozenset()
+
+
+def test_implemented_methods_picks_up_mixins():
+    """Handlers defined on mixins should count as implemented on the composed class."""
+
+    class PostMixin:
+        def post(self):
+            return "m"
+
+    class Composed(PostMixin, View):
+        def get(self):
+            return "g"
+
+    assert Composed.implemented_methods == frozenset({"get", "post"})
+
+
+def test_options_always_responds():
+    """OPTIONS should always dispatch to the base handler and return an Allow header."""
+    client = Client()
+    response = client.options("/")
+    assert response.status_code == 200
+    assert "OPTIONS" in response.headers.get("Allow", "")
+
+
+def test_undefined_method_returns_405():
+    """A view defining only `get` should 405 on POST."""
+
+    class GetOnly(View):
+        def get(self):
+            return "x"
+
+    view = GetOnly(request=_FakeRequest("POST"))  # ty: ignore[invalid-argument-type]
+    assert view.get_request_handler() is None
+
+
+def test_trace_and_connect_are_not_dispatched():
+    """TRACE and CONNECT are intentionally excluded from view handlers."""
+
+    class MyView(View):
+        def get(self):
+            return "x"
+
+    assert _dispatch(MyView, "TRACE") is None
+    assert _dispatch(MyView, "CONNECT") is None

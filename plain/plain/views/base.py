@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable
-from http import HTTPMethod
-from typing import TYPE_CHECKING, Any
+from collections.abc import Awaitable, Callable
+from typing import Any, ClassVar
 
 from plain.http import (
     JsonResponse,
@@ -20,19 +19,56 @@ from .exceptions import ResponseException
 logger = get_framework_logger("plain.request")
 
 
+type ViewResult = (
+    ResponseBase
+    | int
+    | str
+    | list[Any]
+    | dict[str, Any]
+    | tuple[int, str | list[Any] | dict[str, Any]]
+    | None
+)
+
+type ViewHandlerReturn = ViewResult | Awaitable[ViewResult]
+
+
+# TRACE is an XST-adjacent debugging verb, CONNECT is a proxy concept —
+# neither belongs in an application view. OPTIONS is provided by the base
+# directly; HEAD falls back to GET at dispatch time.
+_HANDLER_NAMES = ("get", "post", "put", "patch", "delete", "head")
+
+
 class View:
     request: Request
     url_kwargs: dict[str, Any]
 
-    if TYPE_CHECKING:
+    implemented_methods: ClassVar[frozenset[str]] = frozenset()
 
-        def get(self) -> Any: ...
-        def post(self) -> Any: ...
-        def put(self) -> Any: ...
-        def patch(self) -> Any: ...
-        def delete(self) -> Any: ...
-        def head(self) -> Any: ...
-        def trace(self) -> Any: ...
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        cls.implemented_methods = frozenset(
+            name
+            for name in _HANDLER_NAMES
+            if getattr(cls, name, None) is not getattr(View, name, None)
+        )
+
+    def get(self) -> ViewHandlerReturn:
+        raise NotImplementedError
+
+    def post(self) -> ViewHandlerReturn:
+        raise NotImplementedError
+
+    def put(self) -> ViewHandlerReturn:
+        raise NotImplementedError
+
+    def patch(self) -> ViewHandlerReturn:
+        raise NotImplementedError
+
+    def delete(self) -> ViewHandlerReturn:
+        raise NotImplementedError
+
+    def head(self) -> ViewHandlerReturn:
+        raise NotImplementedError
 
     def __init__(
         self,
@@ -54,13 +90,17 @@ class View:
         if not self.request.method:
             raise AttributeError("HTTP method is not set")
 
-        if self.request.method not in HTTPMethod.__members__:
-            return None
+        if self.request.method == "OPTIONS":
+            return self.options
 
-        handler = getattr(self, self.request.method.lower(), None)
-        if handler is None and self.request.method == "HEAD":
-            handler = getattr(self, "get", None)
-        return handler
+        name = self.request.method.lower()
+        if name in self.implemented_methods:
+            return getattr(self, name)
+
+        if self.request.method == "HEAD" and "get" in self.implemented_methods:
+            return self.get
+
+        return None
 
     def before_request(self) -> None:
         """Pre-dispatch hook. Raise to reject the request."""
@@ -116,7 +156,7 @@ class View:
         log_exception(self.request, exc)
         return self.handle_exception(exc)
 
-    def convert_value_to_response(self, value: Any) -> ResponseBase:
+    def convert_value_to_response(self, value: ViewResult) -> ResponseBase:
         """Convert a return value to a Response."""
         if isinstance(value, ResponseBase):
             return value
@@ -135,8 +175,7 @@ class View:
                     "Tuple response must be of length 2 (status_code, value)"
                 )
 
-            status_code: int = value[0]
-            value: Any = value[1]
+            status_code, value = value
 
         if isinstance(value, str):
             return Response(value, status_code=status_code)
@@ -157,7 +196,8 @@ class View:
         return response
 
     def _allowed_methods(self) -> list[str]:
-        methods = [m.upper() for m in HTTPMethod if hasattr(self, m.lower())]
-        if "GET" in methods and "HEAD" not in methods:
-            methods.append("HEAD")
-        return methods
+        methods = {m.upper() for m in self.implemented_methods}
+        if "GET" in methods:
+            methods.add("HEAD")
+        methods.add("OPTIONS")
+        return sorted(methods)

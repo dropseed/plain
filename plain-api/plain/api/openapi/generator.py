@@ -1,5 +1,4 @@
 import json
-from http import HTTPMethod
 from typing import Any
 
 from plain.urls import Router, URLPattern, URLResolver
@@ -73,17 +72,16 @@ class OpenAPISchemaGenerator:
     def operations_for_url_pattern(self, url_pattern: URLPattern) -> dict[str, Any]:
         operations = {}
 
-        for vc in reversed(url_pattern.view_class.__mro__):
-            exclude_http_methods = [
-                HTTPMethod.TRACE,
-                HTTPMethod.OPTIONS,
-                HTTPMethod.CONNECT,
-            ]
+        # `View` defines runtime stubs for every handler, so gating on
+        # `implemented_methods` is what tells us which verbs the leaf class
+        # actually handles (vs. inheriting a stub that will 405).
+        implemented = getattr(
+            url_pattern.view_class, "implemented_methods", frozenset()
+        )
 
-            for method in [
-                x.lower() for x in HTTPMethod if x not in exclude_http_methods
-            ]:
-                class_method = getattr(vc, method, None)
+        for vc in reversed(url_pattern.view_class.__mro__):
+            for method in implemented:
+                class_method = vc.__dict__.get(method)
                 if not class_method:
                     continue
 
