@@ -12,10 +12,7 @@ from plain.signals import request_finished, request_started
 from .. import transaction
 from ..connection import DatabaseConnection
 from ..db import close_old_connections, get_connection
-from .utils import (
-    setup_database,
-    teardown_database,
-)
+from .database import use_test_database
 
 
 @pytest.fixture(autouse=True)
@@ -46,21 +43,23 @@ def setup_db(request: Any) -> Generator[None]:
     """
     verbosity = request.config.option.verbose
 
-    # Set up the test db across the entire session
-    _old_db_name = setup_database(verbosity=verbosity)
-
-    # Keep connections open during request client / testing
+    # Keep connections open during request client / testing. Disconnect
+    # before entering `use_test_database` — migrations and convergence run
+    # inside it and we don't want close_old_connections firing in that window.
     request_started.disconnect(close_old_connections)
     request_finished.disconnect(close_old_connections)
-
-    yield
-
-    # Put the signals back...
-    request_started.connect(close_old_connections)
-    request_finished.connect(close_old_connections)
-
-    # When the test session is done, tear down the test db
-    teardown_database(_old_db_name, verbosity=verbosity)
+    try:
+        ctx = use_test_database(verbosity=verbosity)
+        with suppress_db_tracing():
+            ctx.__enter__()
+        try:
+            yield
+        finally:
+            with suppress_db_tracing():
+                ctx.__exit__(None, None, None)
+    finally:
+        request_started.connect(close_old_connections)
+        request_finished.connect(close_old_connections)
 
 
 @pytest.fixture
@@ -108,10 +107,11 @@ def isolated_db(request: Any) -> Generator[None]:
     raw_name = request.node.name
     prefix = re.sub(r"[^0-9A-Za-z_]+", "_", raw_name)
 
-    # Set up a fresh test database for this test, using the prefix
-    _old_db_name = setup_database(verbosity=verbosity, prefix=prefix)
-
-    yield
-
-    # Tear down the test database created for this test
-    teardown_database(_old_db_name, verbosity=verbosity)
+    ctx = use_test_database(verbosity=verbosity, prefix=prefix)
+    with suppress_db_tracing():
+        ctx.__enter__()
+    try:
+        yield
+    finally:
+        with suppress_db_tracing():
+            ctx.__exit__(None, None, None)

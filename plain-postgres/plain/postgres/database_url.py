@@ -36,7 +36,6 @@ class DatabaseConfig(TypedDict, total=False):
     OPTIONS: dict[str, Any]
     PASSWORD: str
     PORT: int | None
-    TEST: dict[str, Any]
     TIME_ZONE: str | None
     USER: str
 

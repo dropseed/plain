@@ -5,7 +5,6 @@ import datetime
 import os
 import signal
 import subprocess
-import sys
 import time
 import warnings
 import zoneinfo
@@ -28,14 +27,14 @@ from psycopg.types.string import TextLoader
 from plain.exceptions import ImproperlyConfigured
 from plain.logs import get_framework_logger
 from plain.postgres import utils
-from plain.postgres.database_url import parse_database_url, replace_database_name
+from plain.postgres.database_url import parse_database_url
 from plain.postgres.dialect import MAX_NAME_LENGTH, quote_name
 from plain.postgres.fields import GenericIPAddressField, TimeField, UUIDField
 from plain.postgres.indexes import Index
 from plain.postgres.schema import DatabaseSchemaEditor
 from plain.postgres.transaction import TransactionManagementError
 from plain.postgres.utils import CursorDebugWrapper as BaseCursorDebugWrapper
-from plain.postgres.utils import CursorWrapper, debug_transaction, names_digest
+from plain.postgres.utils import CursorWrapper, debug_transaction
 from plain.runtime import settings
 
 if TYPE_CHECKING:
@@ -45,10 +44,6 @@ if TYPE_CHECKING:
     from plain.postgres.fields import Field
 
 logger = get_framework_logger()
-
-# The prefix to put on the default database name when creating
-# the test database.
-TEST_DATABASE_PREFIX = "test_"
 
 
 def get_migratable_models() -> Generator[Any]:
@@ -238,7 +233,6 @@ class DatabaseConnection:
             "CONN_MAX_AGE": settings.POSTGRES_CONN_MAX_AGE,
             "CONN_HEALTH_CHECKS": settings.POSTGRES_CONN_HEALTH_CHECKS,
             "TIME_ZONE": settings.POSTGRES_TIME_ZONE,
-            "TEST": {"DATABASE": None},
         }
         return cls(config)
 
@@ -1111,219 +1105,6 @@ class DatabaseConnection:
                     "valid": valid,
                 }
         return constraints
-
-    # ##### Test database creation methods (merged from DatabaseCreation) #####
-
-    def _log(self, msg: str) -> None:
-        sys.stderr.write(msg + os.linesep)
-
-    def create_test_db(self, verbosity: int = 1, prefix: str = "") -> str:
-        """
-        Create a test database, prompting the user for confirmation if the
-        database already exists. Return the name of the test database created.
-
-        If prefix is provided, it will be prepended to the database name
-        to isolate it from other test databases.
-        """
-        from plain.postgres.cli.migrations import apply
-        from plain.postgres.connections import use_management_connection
-
-        test_database_name = self._get_test_db_name(prefix)
-
-        if verbosity >= 1:
-            self._log(f"Creating test database '{test_database_name}'...")
-
-        self._create_test_db(
-            test_database_name=test_database_name, verbosity=verbosity, autoclobber=True
-        )
-
-        self.close()
-        settings.POSTGRES_URL = replace_database_name(
-            str(settings.POSTGRES_URL), test_database_name
-        )
-        # If a separate management URL is configured, point it at the test DB too
-        # so decorated management commands (like `migrations apply` below) don't
-        # run against the real management database.
-        if str(settings.POSTGRES_MANAGEMENT_URL):
-            settings.POSTGRES_MANAGEMENT_URL = replace_database_name(
-                str(settings.POSTGRES_MANAGEMENT_URL), test_database_name
-            )
-        self.settings_dict["DATABASE"] = test_database_name
-
-        # Route both migrations and convergence through the management URL so
-        # DDL always reaches a DDL-capable connection (bypassing a transaction-
-        # mode pooler when POSTGRES_MANAGEMENT_URL is set).
-        from plain.postgres.convergence import execute_plan, plan_convergence
-
-        with use_management_connection():
-            apply.callback(
-                package_label=None,
-                migration_name=None,
-                fake=False,
-                plan=False,
-                check_unapplied=False,
-                no_input=True,
-                atomic_batch=False,  # No need for atomic batch when creating test database
-                quiet=verbosity < 2,  # Show migration output when verbosity is 2+
-            )
-
-            plan = plan_convergence()
-            result = execute_plan(plan.executable())
-            if not result.ok:
-                failed = [r for r in result.results if not r.ok]
-                raise RuntimeError(
-                    f"Convergence failed during test DB setup: {failed[0].item.describe()} — {failed[0].error}"
-                )
-            # Shouldn't happen — a fresh DB from migrations has no undeclared objects
-            # or changed definitions. Safety net so test setup follows sync policy.
-            if plan.blocked:
-                problem = plan.blocked[0]
-                raise RuntimeError(
-                    f"Convergence blocked during test DB setup: {problem.describe()}"
-                )
-
-        # Ensure a connection for the side effect of initializing the test database.
-        self.ensure_connection()
-
-        return test_database_name
-
-    def _get_test_db_name(self, prefix: str = "") -> str:
-        """
-        Internal implementation - return the name of the test DB that will be
-        created. Only useful when called from create_test_db() and
-        _create_test_db() and when no external munging is done with the 'DATABASE'
-        settings.
-
-        If prefix is provided, it will be prepended to the database name.
-        """
-        # Determine the base name: explicit TEST.DATABASE overrides base DATABASE.
-        base_name = (
-            self.settings_dict["TEST"]["DATABASE"] or self.settings_dict["DATABASE"]
-        )
-        if prefix:
-            name = f"{prefix}_{base_name}"
-            if len(name) > MAX_NAME_LENGTH:
-                hash_suffix = names_digest(name, length=8)
-                name = name[: MAX_NAME_LENGTH - 9] + "_" + hash_suffix
-            return name
-        if self.settings_dict["TEST"]["DATABASE"]:
-            return self.settings_dict["TEST"]["DATABASE"]
-        name = self.settings_dict["DATABASE"]
-        if name is None:
-            raise ValueError("POSTGRES_URL must include a database name")
-        return TEST_DATABASE_PREFIX + name
-
-    def _get_database_create_suffix(
-        self, encoding: str | None = None, template: str | None = None
-    ) -> str:
-        """Return PostgreSQL-specific CREATE DATABASE suffix."""
-        suffix = ""
-        if encoding:
-            suffix += f" ENCODING '{encoding}'"
-        if template:
-            suffix += f" TEMPLATE {quote_name(template)}"
-        return suffix and "WITH" + suffix
-
-    def _execute_create_test_db(self, cursor: Any, parameters: dict[str, str]) -> None:
-        try:
-            cursor.execute("CREATE DATABASE {dbname} {suffix}".format(**parameters))
-        except Exception as e:
-            cause = e.__cause__
-            if cause and not isinstance(cause, errors.DuplicateDatabase):
-                # All errors except "database already exists" cancel tests.
-                self._log(f"Got an error creating the test database: {e}")
-                sys.exit(2)
-            else:
-                raise
-
-    def _create_test_db(
-        self, *, test_database_name: str, verbosity: int, autoclobber: bool
-    ) -> str:
-        """
-        Internal implementation - create the test db tables.
-        """
-        test_db_params = {
-            "dbname": quote_name(test_database_name),
-            "suffix": self.sql_table_creation_suffix(),
-        }
-        # Create the test database and connect to it.
-        with self._maintenance_cursor() as cursor:
-            try:
-                self._execute_create_test_db(cursor, test_db_params)
-            except Exception as e:
-                self._log(f"Got an error creating the test database: {e}")
-                if not autoclobber:
-                    confirm = input(
-                        "Type 'yes' if you would like to try deleting the test "
-                        f"database '{test_database_name}', or 'no' to cancel: "
-                    )
-                if autoclobber or confirm == "yes":
-                    try:
-                        if verbosity >= 1:
-                            self._log(
-                                f"Destroying old test database '{test_database_name}'..."
-                            )
-                        cursor.execute(
-                            "DROP DATABASE {dbname}".format(**test_db_params)
-                        )
-                        self._execute_create_test_db(cursor, test_db_params)
-                    except Exception as e:
-                        self._log(f"Got an error recreating the test database: {e}")
-                        sys.exit(2)
-                else:
-                    self._log("Tests cancelled.")
-                    sys.exit(1)
-
-        return test_database_name
-
-    def destroy_test_db(
-        self, old_database_name: str | None = None, verbosity: int = 1
-    ) -> None:
-        """
-        Destroy a test database, prompting the user for confirmation if the
-        database already exists.
-        """
-        self.close()
-
-        test_database_name = self.settings_dict["DATABASE"]
-        if test_database_name is None:
-            raise ValueError("Test database name is not set")
-
-        if verbosity >= 1:
-            self._log(f"Destroying test database '{test_database_name}'...")
-        self._destroy_test_db(test_database_name, verbosity)
-
-        # Restore the original database name
-        if old_database_name is not None:
-            settings.POSTGRES_URL = replace_database_name(
-                str(settings.POSTGRES_URL), old_database_name
-            )
-            if str(settings.POSTGRES_MANAGEMENT_URL):
-                settings.POSTGRES_MANAGEMENT_URL = replace_database_name(
-                    str(settings.POSTGRES_MANAGEMENT_URL), old_database_name
-                )
-            self.settings_dict["DATABASE"] = old_database_name
-
-    def _destroy_test_db(self, test_database_name: str, verbosity: int) -> None:
-        """
-        Internal implementation - remove the test db tables.
-        """
-        # Remove the test database to clean up after
-        # ourselves. Connect to the previous database (not the test database)
-        # to do so, because it's not allowed to delete a database while being
-        # connected to it.
-        with self._maintenance_cursor() as cursor:
-            cursor.execute(f"DROP DATABASE {quote_name(test_database_name)}")
-
-    def sql_table_creation_suffix(self) -> str:
-        """
-        SQL to append to the end of the test table creation statements.
-        """
-        test_settings = self.settings_dict["TEST"]
-        return self._get_database_create_suffix(
-            encoding=test_settings.get("CHARSET"),
-            template=test_settings.get("TEMPLATE"),
-        )
 
 
 class CursorMixin:
