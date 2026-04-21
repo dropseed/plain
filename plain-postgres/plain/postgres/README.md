@@ -70,26 +70,34 @@ admin_users = User.query.filter(is_admin=True)
 
 ## Database connection
 
-To connect to a database, you can provide a `DATABASE_URL` environment variable:
+Configure the database with a single URL. The canonical Plain setting is `POSTGRES_URL`:
+
+```python
+# app/settings.py
+POSTGRES_URL = "postgresql://user:password@localhost:5432/dbname"
+```
+
+Or via environment variable:
+
+```sh
+PLAIN_POSTGRES_URL=postgresql://user:password@localhost:5432/dbname
+```
+
+Plain also reads the `DATABASE_URL` environment variable as a fallback — it's the widely-used convention for Postgres connection strings, so most hosting setups work without extra configuration:
 
 ```sh
 DATABASE_URL=postgresql://user:password@localhost:5432/dbname
 ```
 
-Or you can set the individual `POSTGRES_*` settings (via `PLAIN_POSTGRES_*` environment variables or in `app/settings.py`):
+Precedence (highest to lowest): `PLAIN_POSTGRES_URL` → `POSTGRES_URL` in `settings.py` → `DATABASE_URL` environment variable.
 
-```python
-# app/settings.py
-POSTGRES_HOST = "localhost"
-POSTGRES_PORT = 5432
-POSTGRES_DATABASE = "dbname"
-POSTGRES_USER = "user"
-POSTGRES_PASSWORD = "password"
+The URL supports any libpq connection parameter as a query string — for example `?sslmode=require&application_name=web&connect_timeout=10`. These are parsed and passed through to the driver.
+
+To explicitly disable the database (e.g. during Docker builds where no database is available), set the URL to the string `none`:
+
+```sh
+PLAIN_POSTGRES_URL=none
 ```
-
-If `DATABASE_URL` is set, it takes priority and the individual connection settings are parsed from it.
-
-To explicitly disable the database (e.g. during Docker builds where no database is available), set `DATABASE_URL=none`.
 
 **PostgreSQL is the only supported database.** You need to install a PostgreSQL driver separately — [psycopg](https://www.psycopg.org/) is recommended:
 
@@ -1194,27 +1202,18 @@ These are static, code-level checks that catch issues before you deploy. The `di
 
 ## Settings
 
-Connection settings are configured via `DATABASE_URL` or individual `POSTGRES_*` settings.
+The connection is configured with a single URL (`POSTGRES_URL`). `DATABASE_URL` is read as a platform-compat fallback. Set the URL to `none` to explicitly disable the database (e.g. during Docker image builds).
 
-When `DATABASE_URL` is set, it is parsed into the individual connection settings automatically. When `DATABASE_URL` is not set, the connection settings are required individually.
-
-Set `DATABASE_URL=none` to explicitly disable the database (e.g. during Docker image builds).
-
-| Setting                                  | Type          | Default | Env var                                        |
-| ---------------------------------------- | ------------- | ------- | ---------------------------------------------- |
-| `POSTGRES_HOST`                          | `str`         | —       | `PLAIN_POSTGRES_HOST`                          |
-| `POSTGRES_PORT`                          | `int \| None` | `None`  | `PLAIN_POSTGRES_PORT`                          |
-| `POSTGRES_DATABASE`                      | `str`         | —       | `PLAIN_POSTGRES_DATABASE`                      |
-| `POSTGRES_USER`                          | `str`         | —       | `PLAIN_POSTGRES_USER`                          |
-| `POSTGRES_PASSWORD`                      | `Secret[str]` | —       | `PLAIN_POSTGRES_PASSWORD`                      |
-| `POSTGRES_CONN_MAX_AGE`                  | `int`         | `600`   | `PLAIN_POSTGRES_CONN_MAX_AGE`                  |
-| `POSTGRES_CONN_HEALTH_CHECKS`            | `bool`        | `True`  | `PLAIN_POSTGRES_CONN_HEALTH_CHECKS`            |
-| `POSTGRES_OPTIONS`                       | `dict`        | `{}`    | —                                              |
-| `POSTGRES_TIME_ZONE`                     | `str \| None` | `None`  | `PLAIN_POSTGRES_TIME_ZONE`                     |
-| `POSTGRES_MIGRATION_LOCK_TIMEOUT`        | `str`         | `"3s"`  | `PLAIN_POSTGRES_MIGRATION_LOCK_TIMEOUT`        |
-| `POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   | `str`         | `"3s"`  | `PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   |
-| `POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      | `str`         | `"3s"`  | `PLAIN_POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      |
-| `POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT` | `str`         | `"3s"`  | `PLAIN_POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT` |
+| Setting                                  | Type          | Default                 | Env var                                        |
+| ---------------------------------------- | ------------- | ----------------------- | ---------------------------------------------- |
+| `POSTGRES_URL`                           | `Secret[str]` | `$DATABASE_URL` or `""` | `PLAIN_POSTGRES_URL`                           |
+| `POSTGRES_CONN_MAX_AGE`                  | `int`         | `600`                   | `PLAIN_POSTGRES_CONN_MAX_AGE`                  |
+| `POSTGRES_CONN_HEALTH_CHECKS`            | `bool`        | `True`                  | `PLAIN_POSTGRES_CONN_HEALTH_CHECKS`            |
+| `POSTGRES_TIME_ZONE`                     | `str \| None` | `None`                  | `PLAIN_POSTGRES_TIME_ZONE`                     |
+| `POSTGRES_MIGRATION_LOCK_TIMEOUT`        | `str`         | `"3s"`                  | `PLAIN_POSTGRES_MIGRATION_LOCK_TIMEOUT`        |
+| `POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   | `str`         | `"3s"`                  | `PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   |
+| `POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      | `str`         | `"3s"`                  | `PLAIN_POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      |
+| `POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT` | `str`         | `"3s"`                  | `PLAIN_POSTGRES_CONVERGENCE_STATEMENT_TIMEOUT` |
 
 See [`default_settings.py`](./default_settings.py) for more details.
 

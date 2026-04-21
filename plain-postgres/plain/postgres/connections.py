@@ -3,26 +3,14 @@ from __future__ import annotations
 from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING
 
 from plain.exceptions import ImproperlyConfigured
+from plain.postgres.database_url import DatabaseConfig, parse_database_url
 from plain.runtime import settings as plain_settings
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
-
-
-class DatabaseConfig(TypedDict, total=False):
-    CONN_MAX_AGE: int | None
-    CONN_HEALTH_CHECKS: bool
-    HOST: str
-    DATABASE: str  # Required (validated in _configure_settings)
-    OPTIONS: dict[str, Any]
-    PASSWORD: str
-    PORT: int | None
-    TEST: dict[str, Any]
-    TIME_ZONE: str | None
-    USER: str
 
 
 # Module-level ContextVar for per-task/per-thread connection storage.
@@ -33,26 +21,31 @@ _db_conn: ContextVar[DatabaseConnection | None] = ContextVar("_db_conn", default
 
 
 def _configure_settings() -> DatabaseConfig:
-    if plain_settings.POSTGRES_DATABASE == "":
-        raise ImproperlyConfigured(
-            "The PostgreSQL database has been disabled (DATABASE_URL=none). "
-            "No database operations are available in this context."
-        )
-    if not plain_settings.POSTGRES_DATABASE:  # None or unresolved setting
+    url = str(plain_settings.POSTGRES_URL)
+
+    if not url:
         raise ImproperlyConfigured(
             "PostgreSQL database is not configured. "
-            "Set DATABASE_URL or the individual POSTGRES_* settings."
+            "Set POSTGRES_URL (or DATABASE_URL) to a postgres://... connection string."
         )
 
+    if url.lower() == "none":
+        raise ImproperlyConfigured(
+            "The PostgreSQL database has been disabled (POSTGRES_URL=none). "
+            "No database operations are available in this context."
+        )
+
+    parsed = parse_database_url(url)
+
     return {
-        "DATABASE": plain_settings.POSTGRES_DATABASE,
-        "USER": plain_settings.POSTGRES_USER,
-        "PASSWORD": plain_settings.POSTGRES_PASSWORD,
-        "HOST": plain_settings.POSTGRES_HOST,
-        "PORT": plain_settings.POSTGRES_PORT,
+        "DATABASE": parsed.get("DATABASE", ""),
+        "USER": parsed.get("USER", ""),
+        "PASSWORD": parsed.get("PASSWORD", ""),
+        "HOST": parsed.get("HOST", ""),
+        "PORT": parsed.get("PORT"),
         "CONN_MAX_AGE": plain_settings.POSTGRES_CONN_MAX_AGE,
         "CONN_HEALTH_CHECKS": plain_settings.POSTGRES_CONN_HEALTH_CHECKS,
-        "OPTIONS": plain_settings.POSTGRES_OPTIONS,
+        "OPTIONS": parsed.get("OPTIONS", {}),
         "TIME_ZONE": plain_settings.POSTGRES_TIME_ZONE,
         "TEST": {"DATABASE": None},
     }

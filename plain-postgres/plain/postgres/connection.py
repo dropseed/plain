@@ -28,6 +28,7 @@ from psycopg.types.string import TextLoader
 from plain.exceptions import ImproperlyConfigured
 from plain.logs import get_framework_logger
 from plain.postgres import utils
+from plain.postgres.database_url import replace_database_name
 from plain.postgres.dialect import MAX_NAME_LENGTH, quote_name
 from plain.postgres.fields import GenericIPAddressField, TimeField, UUIDField
 from plain.postgres.indexes import Index
@@ -40,7 +41,7 @@ from plain.runtime import settings
 if TYPE_CHECKING:
     from psycopg import Connection as PsycopgConnection
 
-    from plain.postgres.connections import DatabaseConfig
+    from plain.postgres.database_url import DatabaseConfig
     from plain.postgres.fields import Field
 
 logger = get_framework_logger()
@@ -270,7 +271,7 @@ class DatabaseConnection:
             raise ImproperlyConfigured(
                 "The database name '%s' (%d characters) is longer than "  # noqa: UP031
                 "PostgreSQL's limit of %d characters. Supply a shorter "
-                "POSTGRES_DATABASE setting."
+                "database name in POSTGRES_URL."
                 % (
                     db_name,
                     len(db_name),
@@ -1118,7 +1119,9 @@ class DatabaseConnection:
         )
 
         self.close()
-        settings.POSTGRES_DATABASE = test_database_name
+        settings.POSTGRES_URL = replace_database_name(
+            str(settings.POSTGRES_URL), test_database_name
+        )
         self.settings_dict["DATABASE"] = test_database_name
 
         apply.callback(
@@ -1178,7 +1181,7 @@ class DatabaseConnection:
             return self.settings_dict["TEST"]["DATABASE"]
         name = self.settings_dict["DATABASE"]
         if name is None:
-            raise ValueError("POSTGRES_DATABASE must be set")
+            raise ValueError("POSTGRES_URL must include a database name")
         return TEST_DATABASE_PREFIX + name
 
     def _get_database_create_suffix(
@@ -1255,7 +1258,7 @@ class DatabaseConnection:
 
         test_database_name = self.settings_dict["DATABASE"]
         if test_database_name is None:
-            raise ValueError("Test POSTGRES_DATABASE must be set")
+            raise ValueError("Test database name is not set")
 
         if verbosity >= 1:
             self._log(f"Destroying test database '{test_database_name}'...")
@@ -1263,7 +1266,9 @@ class DatabaseConnection:
 
         # Restore the original database name
         if old_database_name is not None:
-            settings.POSTGRES_DATABASE = old_database_name
+            settings.POSTGRES_URL = replace_database_name(
+                str(settings.POSTGRES_URL), old_database_name
+            )
             self.settings_dict["DATABASE"] = old_database_name
 
     def _destroy_test_db(self, test_database_name: str, verbosity: int) -> None:

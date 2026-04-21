@@ -23,10 +23,23 @@ from __future__ import annotations
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import urllib.parse as urlparse
-
-from .connections import DatabaseConfig
+from typing import Any, TypedDict
 
 SCHEMES = {"postgres", "postgresql", "pgsql"}
+
+
+class DatabaseConfig(TypedDict, total=False):
+    CONN_MAX_AGE: int | None
+    CONN_HEALTH_CHECKS: bool
+    HOST: str
+    DATABASE: str  # Required (validated in _configure_settings)
+    OPTIONS: dict[str, Any]
+    PASSWORD: str
+    PORT: int | None
+    TEST: dict[str, Any]
+    TIME_ZONE: str | None
+    USER: str
+
 
 # Register database schemes in URLs.
 for scheme in SCHEMES:
@@ -92,3 +105,14 @@ def build_database_url(config: DatabaseConfig) -> str:
         netloc += f":{port}"
 
     return urlparse.urlunsplit(("postgresql", netloc, f"/{name}", query, ""))
+
+
+def replace_database_name(url: str, name: str) -> str:
+    """Return the URL with the database name (path segment) replaced.
+
+    Preserves scheme, netloc, query string, and fragment exactly — only the
+    path changes. Avoids the round-trip through parse/build, which normalizes
+    the scheme and collapses duplicate query keys.
+    """
+    spliturl = urlparse.urlsplit(url)
+    return urlparse.urlunsplit(spliturl._replace(path=f"/{urlparse.quote(name)}"))
