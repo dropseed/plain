@@ -71,6 +71,7 @@ class APIKeyView(View):
             )
 
     def after_response(self, response: ResponseBase) -> ResponseBase:
+        response = super().after_response(response)
         # Make sure it at least has private as a default
         patch_cache_control(response, private=True)
         return response

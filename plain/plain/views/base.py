@@ -12,7 +12,7 @@ from plain.http import (
     Response,
     ResponseBase,
 )
-from plain.logs import get_framework_logger, log_exception
+from plain.logs import get_framework_logger
 
 from .exceptions import ResponseException
 
@@ -115,7 +115,15 @@ class View:
         return response
 
     def handle_exception(self, exc: Exception) -> ResponseBase:
-        """Translate a raised exception into a response. Re-raise to defer to the framework default."""
+        """Translate a raised exception into a response. Re-raise to defer to the framework default.
+
+        Returning a response suppresses logging — the view has chosen to
+        map this exception to a handled outcome (e.g. ValidationError →
+        400). Re-raising escapes to the framework error renderer, which
+        logs via `log_exception` and renders `{status}.html`. Views that
+        want to log a handled branch (e.g. a self-mapped 500) must call
+        `log_exception(self.request, exc)` explicitly.
+        """
         raise exc
 
     def get_response(self) -> ResponseBase:
@@ -153,7 +161,6 @@ class View:
     def _respond_to_exception(self, exc: Exception) -> ResponseBase:
         if isinstance(exc, ResponseException):
             return exc.response
-        log_exception(self.request, exc)
         return self.handle_exception(exc)
 
     def convert_value_to_response(self, value: ViewResult) -> ResponseBase:

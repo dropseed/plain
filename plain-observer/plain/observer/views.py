@@ -30,6 +30,7 @@ class ObserverTracesView(AuthView, HTMXView, ListView):
         super().check_auth()
 
     def after_response(self, response: ResponseBase) -> ResponseBase:
+        response = super().after_response(response)
         # So we can load it in the toolbar
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         return response

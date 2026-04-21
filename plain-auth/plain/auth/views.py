@@ -125,6 +125,7 @@ class AuthView(SessionView):
         return super().handle_exception(exc)
 
     def after_response(self, response: ResponseBase) -> ResponseBase:
+        response = super().after_response(response)
         if self.user:
             # Make sure it at least has private as a default
             patch_cache_control(response, private=True)

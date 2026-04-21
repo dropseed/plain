@@ -79,6 +79,7 @@ class AdminView(AuthView, TemplateView):
             track_recent_nav(self.request, self.get_slug())
 
     def after_response(self, response: ResponseBase) -> ResponseBase:
+        response = super().after_response(response)
         response.headers["Cache-Control"] = (
             "no-cache, no-store, must-revalidate, max-age=0"
         )

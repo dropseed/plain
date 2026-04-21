@@ -30,6 +30,7 @@ class HTMXView(TemplateView):
         return template.render(context)
 
     def after_response(self, response: ResponseBase) -> ResponseBase:
+        response = super().after_response(response)
         # Tell browser caching to also consider the fragment header,
         # not just the url/cookie.
         patch_vary_headers(

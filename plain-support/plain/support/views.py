@@ -49,6 +49,7 @@ class SupportIFrameView(SupportFormView):
     template_name = "support/iframe.html"
 
     def after_response(self, response: ResponseBase) -> ResponseBase:
+        response = super().after_response(response)
         # X-Frame-Options are typically in DEFAULT_RESPONSE_HEADERS.
         # Set to None to signal the middleware to skip applying this default header.
         # We can't del/pop it because middleware runs after and would add it back.
