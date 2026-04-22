@@ -1,5 +1,18 @@
 # plain-api changelog
 
+## [0.29.4](https://github.com/dropseed/plain/releases/plain-api@0.29.4) (2026-04-21)
+
+### What's changed
+
+- **Migrated `APIView` to `View.handle_exception`.** Exception-to-JSON mapping moved out of a `get_response()` wrapper and into a clean `handle_exception(exc)` override. Any `HTTPException` subclass (including user-defined ones) now maps to a JSON error response keyed off its `status_code` — previously only a fixed list (`ForbiddenError403`, `NotFoundError404`, …) was recognized. ([c1234c14be1d](https://github.com/dropseed/plain/commit/c1234c14be1d), [48effac976a9](https://github.com/dropseed/plain/commit/48effac976a9))
+- **Migrated `APIKeyView` and `VersionedAPIView` to `before_request` / `after_response` hooks.** API-key validation and request-body version transforms run in `before_request`; `Cache-Control: private` and response transforms run in `after_response`. ([c1234c14be1d](https://github.com/dropseed/plain/commit/c1234c14be1d), [0da5639d17e2](https://github.com/dropseed/plain/commit/0da5639d17e2))
+- **OpenAPI generation now reads `View.implemented_methods`.** Replaces the runtime `HTTPMethod`-by-`hasattr` scan — the new class-level frozenset is what the framework uses for dispatch. ([23baeea0653a](https://github.com/dropseed/plain/commit/23baeea0653a))
+
+### Upgrade instructions
+
+- Requires `plain>=0.133.0`.
+- **If you subclassed `APIView` and overrode `get_response()`** to add custom exception handling, migrate that logic to `handle_exception(exc)` instead. Return a response to short-circuit, or call `super().handle_exception(exc)` to fall back to the default JSON error mapping.
+
 ## [0.29.3](https://github.com/dropseed/plain/releases/plain-api@0.29.3) (2026-04-17)
 
 ### What's changed
