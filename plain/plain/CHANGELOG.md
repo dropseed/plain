@@ -1,5 +1,25 @@
 # plain changelog
 
+## [0.133.0](https://github.com/dropseed/plain/releases/plain@0.133.0) (2026-04-21)
+
+### What's changed
+
+- **Added `View` lifecycle hooks: `before_request`, `after_response`, and `handle_exception`.** `before_request` runs before the method handler (raise to reject the request). `after_response` runs after the response is built — including error responses — and can mutate or replace it. `handle_exception` converts an exception raised during dispatch into a response; the base re-raises to defer to the framework error renderer. Subclasses can now override these hooks instead of wrapping `get_response()`. ([c1234c14be1d](https://github.com/dropseed/plain/commit/c1234c14be1d), [0da5639d17e2](https://github.com/dropseed/plain/commit/0da5639d17e2), [48effac976a9](https://github.com/dropseed/plain/commit/48effac976a9))
+- **Added `HTTPException` base class in `plain.http`.** All HTTP exceptions (`BadRequestError400`, `ForbiddenError403`, `NotFoundError404`, etc.) now inherit from it and carry a `status_code` attribute. Subclass it to define your own status-mapped exceptions (e.g. `class PaymentRequiredError402(HTTPException): status_code = 402`). `FormFieldMissingError` and `MultiPartParserError` now subclass `BadRequestError400`. ([48effac976a9](https://github.com/dropseed/plain/commit/48effac976a9))
+- **Restricted `View` dispatch to IANA HTTP methods.** Handlers for `get`, `post`, `put`, `patch`, `delete`, `head`, and `options` dispatch; `TRACE` and `CONNECT` are no longer dispatched to. Non-HTTP-method attribute names on a view class can no longer collide with the dispatcher. ([5da708a057db](https://github.com/dropseed/plain/commit/5da708a057db))
+- **`View` now tracks implemented methods via `__init_subclass__`.** A `View.implemented_methods` frozenset is computed once per subclass, replacing the runtime `hasattr()` scan. This is what OpenAPI generation and `Allow:` header construction should read. ([23baeea0653a](https://github.com/dropseed/plain/commit/23baeea0653a))
+- **HEAD now falls back to `get` at dispatch time without mutating `self.head`.** Previously `__init__` aliased `self.head = self.get`, which polluted the instance. ([5848c010d66c](https://github.com/dropseed/plain/commit/5848c010d66c))
+- **Error rendering simplified.** The internal `ErrorView` / `TemplateView`-based path is gone — `response_for_exception` now renders `{status}.html` directly via `Template(...).render(...)` and falls back to a plain-text body if the template is missing. ([48effac976a9](https://github.com/dropseed/plain/commit/48effac976a9))
+- **Added `plain.logs.log_exception`.** A single idempotent entry point for request-exception logging used by both `View.get_response` and the framework error renderer. A sentinel on the exception prevents double-logging when it surfaces at multiple layers. ([48effac976a9](https://github.com/dropseed/plain/commit/48effac976a9))
+- **Exception logging deferred to `handle_exception`.** Logging now happens once — inside `View.get_response` when an exception reaches the handler. `ResponseException` is unwrapped before `handle_exception` runs, so overrides focus purely on response shape. Returning a response from `handle_exception` suppresses logging (the view opted to map the exception to a handled outcome); re-raising lets the framework log and render `{status}.html`. ([48effac976a9](https://github.com/dropseed/plain/commit/48effac976a9))
+
+### Upgrade instructions
+
+- **If you override `get_response()` on a subclass of `View`**, migrate to the new hooks — `before_request` for pre-handler work, `after_response(response)` for post-handler mutation, `handle_exception(exc)` for exception-to-response mapping.
+- **If you catch specific HTTP exception classes**, nothing changes — they still exist. If you want your own status-mapped exceptions, subclass `HTTPException` with a `status_code` attribute instead of catching and re-raising.
+- **If you import `ErrorView` from `plain.views`**, it has been removed. Use the default framework renderer (which reads `{status}.html`) or override `View.handle_exception` for custom formats.
+- **If you read `hasattr(view, "get")` / `hasattr(view, "post")`** to detect implemented methods, switch to `view.implemented_methods` (a frozenset of lowercase method names) — base `View` now provides stub handlers for every verb.
+
 ## [0.132.1](https://github.com/dropseed/plain/releases/plain@0.132.1) (2026-04-14)
 
 ### What's changed
