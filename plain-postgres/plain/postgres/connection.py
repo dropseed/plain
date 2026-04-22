@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import _thread
-import os
-import signal
-import subprocess
 import warnings
 from collections import deque
 from collections.abc import Generator, Sequence
@@ -57,41 +54,6 @@ class TableInfo(NamedTuple):
     comment: str | None
 
 
-def _psql_settings_to_cmd_args_env(
-    settings_dict: DatabaseConfig, parameters: list[str]
-) -> tuple[list[str], dict[str, str] | None]:
-    """Build psql command-line arguments from database settings."""
-    args = ["psql"]
-    options = settings_dict.get("OPTIONS", {})
-
-    if user := settings_dict.get("USER"):
-        args += ["-U", user]
-    if host := settings_dict.get("HOST"):
-        args += ["-h", host]
-    if port := settings_dict.get("PORT"):
-        args += ["-p", str(port)]
-    args.extend(parameters)
-    args += [settings_dict["DATABASE"]]
-
-    env: dict[str, str] = {}
-    if password := settings_dict.get("PASSWORD"):
-        env["PGPASSWORD"] = str(password)
-
-    # Map OPTIONS keys to their corresponding environment variables.
-    option_env_vars = {
-        "passfile": "PGPASSFILE",
-        "sslmode": "PGSSLMODE",
-        "sslrootcert": "PGSSLROOTCERT",
-        "sslcert": "PGSSLCERT",
-        "sslkey": "PGSSLKEY",
-    }
-    for option_key, env_var in option_env_vars.items():
-        if value := options.get(option_key):
-            env[env_var] = str(value)
-
-    return args, (env or None)
-
-
 class DatabaseConnection:
     """
     PostgreSQL database connection.
@@ -100,7 +62,6 @@ class DatabaseConnection:
     """
 
     queries_limit: int = 9000
-    executable_name: str = "psql"
 
     index_default_access_method = "btree"
     ignored_tables: list[str] = []
@@ -414,19 +375,6 @@ class DatabaseConnection:
     def schema_editor(self, *args: Any, **kwargs: Any) -> DatabaseSchemaEditor:
         """Return a new instance of the schema editor."""
         return DatabaseSchemaEditor(self, *args, **kwargs)
-
-    def runshell(self, parameters: list[str]) -> None:
-        """Run an interactive psql shell."""
-        args, env = _psql_settings_to_cmd_args_env(self.settings_dict, parameters)
-        env = {**os.environ, **env} if env else None
-        sigint_handler = signal.getsignal(signal.SIGINT)
-        try:
-            # Allow SIGINT to pass to psql to abort queries.
-            signal.signal(signal.SIGINT, signal.SIG_IGN)
-            subprocess.run(args, env=env, check=True)
-        finally:
-            # Restore the original SIGINT handler.
-            signal.signal(signal.SIGINT, sigint_handler)
 
     def on_commit(self, func: Any, robust: bool = False) -> None:
         if not callable(func):

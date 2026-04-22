@@ -77,6 +77,37 @@ def parse_database_url(url: str) -> DatabaseConfig:
     }
 
 
+_CLI_FLAGS: list[tuple[str, str]] = [("USER", "-U"), ("HOST", "-h"), ("PORT", "-p")]
+_CLI_OPTION_ENV_VARS: dict[str, str] = {
+    "passfile": "PGPASSFILE",
+    "sslmode": "PGSSLMODE",
+    "sslrootcert": "PGSSLROOTCERT",
+    "sslcert": "PGSSLCERT",
+    "sslkey": "PGSSLKEY",
+}
+
+
+def postgres_cli_args(config: DatabaseConfig) -> list[str]:
+    """Build connection flags for libpq-based tools (psql, pg_dump, pg_restore)."""
+    args: list[str] = []
+    for key, flag in _CLI_FLAGS:
+        if value := config.get(key):
+            args += [flag, str(value)]
+    return args
+
+
+def postgres_cli_env(config: DatabaseConfig) -> dict[str, str]:
+    """Build env vars for libpq-based tools (psql, pg_dump, pg_restore)."""
+    env: dict[str, str] = {}
+    if password := config.get("PASSWORD"):
+        env["PGPASSWORD"] = str(password)
+    options = config.get("OPTIONS", {})
+    for option_key, env_var in _CLI_OPTION_ENV_VARS.items():
+        if value := options.get(option_key):
+            env[env_var] = str(value)
+    return env
+
+
 def build_database_url(config: DatabaseConfig) -> str:
     """Build a database URL from a configuration dictionary."""
     options = config.get("OPTIONS", {})

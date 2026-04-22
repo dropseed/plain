@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -10,6 +12,7 @@ import psycopg
 
 from plain.cli import register_cli
 
+from ..database_url import postgres_cli_args, postgres_cli_env
 from ..db import get_connection
 from ..dialect import quote_name
 from .converge import converge
@@ -36,16 +39,20 @@ cli.add_command(sync)
 @database_management_command
 def shell(parameters: tuple[str, ...]) -> None:
     """Open an interactive database shell"""
-    conn = get_connection()
+    config = get_connection().settings_dict
+    args = ["psql", *postgres_cli_args(config), *parameters, config["DATABASE"]]
+    env = {**os.environ, **postgres_cli_env(config)}
+    sigint_handler = signal.getsignal(signal.SIGINT)
     try:
-        conn.runshell(list(parameters))
+        # Allow SIGINT to pass to psql to abort queries.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        subprocess.run(args, env=env, check=True)
     except FileNotFoundError:
-        # Note that we're assuming the FileNotFoundError relates to the
-        # command missing. It could be raised for some other reason, in
-        # which case this error message would be inaccurate. Still, this
-        # message catches the common case.
+        # FileNotFoundError almost always means psql isn't installed or on
+        # PATH, but could be raised for other reasons — the message covers
+        # the common case.
         click.secho(
-            f"You appear not to have the {conn.executable_name!r} program installed or on your path.",
+            "You appear not to have the 'psql' program installed or on your path.",
             fg="red",
             err=True,
         )
@@ -60,6 +67,8 @@ def shell(parameters: tuple[str, ...]) -> None:
             err=True,
         )
         sys.exit(e.returncode)
+    finally:
+        signal.signal(signal.SIGINT, sigint_handler)
 
 
 @cli.command("drop-unknown-tables")
