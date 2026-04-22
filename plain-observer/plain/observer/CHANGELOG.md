@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.34.5](https://github.com/dropseed/plain/releases/plain-observer@0.34.5) (2026-04-21)
+
+### What's changed
+
+- Migrated `ObserverTracesView` to the new `View.after_response` hook for the `X-Frame-Options: SAMEORIGIN` header (so the trace viewer loads inside the toolbar iframe). ([0da5639d17e2](https://github.com/dropseed/plain/commit/0da5639d17e2), [48effac976a9](https://github.com/dropseed/plain/commit/48effac976a9))
+
+### Upgrade instructions
+
+- Requires `plain>=0.133.0`.
+
 ## [0.34.4](https://github.com/dropseed/plain/releases/plain-observer@0.34.4) (2026-04-17)
 
 ### What's changed
