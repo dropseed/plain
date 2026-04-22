@@ -1,12 +1,12 @@
 [project]
 name = "plain.htmx"
-version = "0.18.1"
+version = "0.18.2"
 description = "Integrate HTMX with templates and views."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["plain>=0.119.0,<1.0.0"]
+dependencies = ["plain>=0.133.0,<1.0.0"]
 
 [dependency-groups]
 dev = ["plain.pytest<1.0.0"]

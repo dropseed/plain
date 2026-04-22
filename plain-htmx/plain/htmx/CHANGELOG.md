@@ -1,5 +1,16 @@
 # plain-htmx changelog
 
+## [0.18.2](https://github.com/dropseed/plain/releases/plain-htmx@0.18.2) (2026-04-21)
+
+### What's changed
+
+- Migrated `HTMXView` to the new `View.after_response` hook for the `Vary` header patch (`Plain-HX-Action`, `Plain-HX-Fragment`). ([0da5639d17e2](https://github.com/dropseed/plain/commit/0da5639d17e2), [48effac976a9](https://github.com/dropseed/plain/commit/48effac976a9))
+- `get_request_handler()` now validates the request method against `http.HTTPMethod` and requires the `Plain-HX-Action` value to be a valid Python identifier before dispatching to `htmx_{method}_{action}`. Invalid methods or non-identifier actions fall through to 405 instead of raising. ([5da708a057db](https://github.com/dropseed/plain/commit/5da708a057db))
+
+### Upgrade instructions
+
+- Requires `plain>=0.133.0`.
+
 ## [0.18.1](https://github.com/dropseed/plain/releases/plain-htmx@0.18.1) (2026-04-01)
 
 ### What's changed
