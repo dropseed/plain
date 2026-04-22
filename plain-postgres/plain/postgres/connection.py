@@ -8,7 +8,6 @@ import warnings
 from collections import deque
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
-from functools import cached_property
 from typing import TYPE_CHECKING, Any, LiteralString, NamedTuple, cast
 
 import psycopg
@@ -200,12 +199,6 @@ class DatabaseConnection:
         with self.cursor() as cursor:
             cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
             cursor.execute("SET CONSTRAINTS ALL DEFERRED")
-
-    @cached_property
-    def pg_version(self) -> int:
-        with self.temporary_connection():
-            assert self.connection is not None
-            return self.connection.info.server_version
 
     def make_debug_cursor(self, cursor: psycopg.Cursor[Any]) -> CursorDebugWrapper:
         return CursorDebugWrapper(cursor, self)
@@ -417,23 +410,6 @@ class DatabaseConnection:
     def make_cursor(self, cursor: psycopg.Cursor[Any]) -> utils.CursorWrapper:
         """Create a cursor without debug logging."""
         return utils.CursorWrapper(cursor, self)
-
-    @contextmanager
-    def temporary_connection(self) -> Generator[utils.CursorWrapper]:
-        """
-        Context manager that ensures that a connection is established, and
-        if it opened one, closes it to avoid leaving a dangling connection.
-        This is useful for operations outside of the request-response cycle.
-
-        Provide a cursor: with self.temporary_connection() as cursor: ...
-        """
-        must_close = self.connection is None
-        try:
-            with self.cursor() as cursor:
-                yield cursor
-        finally:
-            if must_close:
-                self.close()
 
     def schema_editor(self, *args: Any, **kwargs: Any) -> DatabaseSchemaEditor:
         """Return a new instance of the schema editor."""

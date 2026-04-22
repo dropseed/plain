@@ -262,7 +262,9 @@ class CheckPostgresVersion(PreflightCheck):
 
     def run(self) -> list[PreflightResult]:
         conn = get_connection()
-        major, minor = divmod(conn.pg_version, 10000)
+        conn.ensure_connection()
+        assert conn.connection is not None
+        major, minor = divmod(conn.connection.info.server_version, 10000)
         if major < self.MINIMUM_VERSION:
             return [
                 PreflightResult(
