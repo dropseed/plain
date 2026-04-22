@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.77.6](https://github.com/dropseed/plain/releases/plain-admin@0.77.6) (2026-04-21)
+
+### What's changed
+
+- Migrated `AdminView` to the new `View` lifecycle hooks: `track_recent_nav()` runs in `before_request`, and the no-cache headers are set in `after_response`. Behavior is unchanged. ([0da5639d17e2](https://github.com/dropseed/plain/commit/0da5639d17e2), [48effac976a9](https://github.com/dropseed/plain/commit/48effac976a9))
+
+### Upgrade instructions
+
+- Requires `plain>=0.133.0`.
+
 ## [0.77.5](https://github.com/dropseed/plain/releases/plain-admin@0.77.5) (2026-04-17)
 
 ### What's changed

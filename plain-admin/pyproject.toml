@@ -1,13 +1,13 @@
 [project]
 name = "plain.admin"
-version = "0.77.5"
+version = "0.77.6"
 description = "Manage your app with a backend interface."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-  "plain>=0.132.0,<1.0.0",
+  "plain>=0.133.0,<1.0.0",
   "plain.auth>=0.29.0,<1.0.0",
   "plain.elements<1.0.0",
   "plain.htmx<1.0.0",
