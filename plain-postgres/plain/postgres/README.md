@@ -443,9 +443,9 @@ with transaction.atomic():
     safe_operation()  # This still runs in the outer transaction
 ```
 
-### Read-only connections
+### Read-only transactions
 
-Enforce read-only mode on the current database connection using `read_only()`. Any write (INSERT, UPDATE, DELETE, DDL) raises `psycopg.errors.ReadOnlySqlTransaction`:
+Run a block of code in a read-only transaction using `read_only()`. Any write (INSERT, UPDATE, DELETE, DDL) raises `psycopg.errors.ReadOnlySqlTransaction`:
 
 ```python
 from plain.postgres.connections import read_only
@@ -455,19 +455,21 @@ with read_only():
     User.query.create(name="x")   # raises psycopg.errors.ReadOnlySqlTransaction
 ```
 
-This works with both autocommit queries and explicit `atomic()` blocks.
+`read_only()` opens a single `BEGIN READ ONLY` transaction for the block. Nested `atomic()` blocks inside become savepoints of the outer read-only transaction and inherit read-only.
 
-For sticky read-only mode (e.g., a shell session), use `set_read_only()` on the connection directly:
+Because it opens its own transaction, `read_only()` cannot be entered inside an existing `atomic()` block — doing so raises `TransactionManagementError`.
+
+Because the whole block is one transaction, catching a database error inside `read_only()` and trying to keep reading will fail — the transaction is aborted and any further query raises `TransactionManagementError`. Wrap the write in a nested `atomic()` savepoint if you need to recover and continue:
 
 ```python
-from plain.postgres.db import get_connection
-
-conn = get_connection()
-conn.set_read_only(True)   # all subsequent queries are read-only
-conn.set_read_only(False)  # back to normal
+with read_only():
+    try:
+        with atomic():
+            User.query.create(name="x")   # raises, savepoint rolls back
+    except psycopg.errors.ReadOnlySqlTransaction:
+        pass
+    User.query.count()   # still works — outer txn is healthy
 ```
-
-Read-only mode must be set outside a transaction — calling it inside `atomic()` raises `TransactionManagementError`.
 
 ## Schema management
 

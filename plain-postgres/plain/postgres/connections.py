@@ -109,18 +109,39 @@ def use_management_connection() -> Generator[DatabaseConnection]:
 
 @contextmanager
 def read_only() -> Generator[None]:
-    """Set the current database connection to read-only for the duration of this block.
+    """Run a block of code inside a read-only transaction.
 
-    Any INSERT/UPDATE/DELETE/DDL will raise a database error. This applies
-    to all queries in the block — both explicit transactions and implicit
-    autocommit queries.
+    Opens a single ``BEGIN READ ONLY`` transaction for the duration of the
+    block — any INSERT/UPDATE/DELETE/DDL raises
+    ``psycopg.errors.ReadOnlySqlTransaction``. Nested ``atomic()`` blocks
+    inside become savepoints of the outer read-only transaction and inherit
+    read-only.
+
+    Because this opens its own transaction, it cannot be entered while an
+    ``atomic()`` block is already active.
     """
+    from plain.postgres.transaction import (
+        TransactionManagementError,
+        atomic,
+    )
+
     conn = get_connection()
-    conn.set_read_only(True)
+    if conn.in_atomic_block:
+        raise TransactionManagementError(
+            "read_only() cannot be entered inside an existing atomic() block; "
+            "it opens its own transaction."
+        )
+    conn.ensure_connection()
+    psy_conn = conn.connection
+    assert psy_conn is not None
+    # psycopg lazily emits BEGIN on the first query once autocommit is off;
+    # setting read_only=True makes it a READ ONLY transaction.
+    psy_conn.read_only = True
     try:
-        yield
+        with atomic():
+            yield
     finally:
         try:
-            conn.set_read_only(False)
+            psy_conn.read_only = None
         except Exception:
-            pass
+            logger.debug("Error clearing read_only on connection", exc_info=True)
