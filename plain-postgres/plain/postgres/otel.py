@@ -136,10 +136,13 @@ def db_span(
     else:
         span_name = operation
 
+    # Single settings_dict read — the property delegates to source.config.
+    cfg = db.settings_dict
+
     # Build attribute set following semantic conventions
     attrs: dict[str, Any] = {
         DB_SYSTEM_NAME: DB_SYSTEM,
-        DB_NAMESPACE: db.settings_dict.get("DATABASE"),
+        DB_NAMESPACE: cfg.get("DATABASE"),
         DB_QUERY_TEXT: sql,  # Already parameterized from Django/Plain
         DB_QUERY_SUMMARY: summary,
         DB_OPERATION_NAME: operation,
@@ -152,10 +155,10 @@ def db_span(
         attrs[DB_COLLECTION_NAME] = collection_name
 
     # Network attributes
-    if host := db.settings_dict.get("HOST"):
+    if host := cfg.get("HOST"):
         attrs[NETWORK_PEER_ADDRESS] = host
 
-    if port := db.settings_dict.get("PORT"):
+    if port := cfg.get("PORT"):
         try:
             attrs[NETWORK_PEER_PORT] = int(port)
         except (TypeError, ValueError):

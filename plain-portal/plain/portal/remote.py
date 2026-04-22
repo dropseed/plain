@@ -156,7 +156,7 @@ async def run_remote(
             ctx.enter_context(redirect_stderr(output_writer))
             if not writable:
                 try:
-                    from plain.postgres.connections import read_only
+                    from plain.postgres.db import read_only
 
                     ctx.enter_context(read_only())
                 except Exception:
@@ -188,7 +188,7 @@ async def run_remote(
             output_writer.flush()
             # Close DB connection to prevent leaks across to_thread calls
             try:
-                from plain.postgres.connections import get_connection, has_connection
+                from plain.postgres.db import get_connection, has_connection
 
                 if has_connection():
                     get_connection().close()

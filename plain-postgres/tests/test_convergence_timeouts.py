@@ -43,6 +43,7 @@ from plain.postgres.convergence.fixes import (
     _convergence_prelude,
 )
 from plain.postgres.dialect import build_timeout_set_clauses
+from plain.postgres.sources import build_connection_params
 from plain.runtime import settings as plain_settings
 
 # ---- Prelude builder ------------------------------------------------------
@@ -308,7 +309,7 @@ def test_convergence_fix_hits_lock_timeout(
     """
     monkeypatch.setattr(plain_settings, "POSTGRES_CONVERGENCE_LOCK_TIMEOUT", "100ms")
 
-    conn_params = get_connection().get_connection_params()
+    conn_params = build_connection_params(get_connection().settings_dict)
     release_lock = threading.Event()
     holder_ready = threading.Event()
     holder_error: list[Exception] = []

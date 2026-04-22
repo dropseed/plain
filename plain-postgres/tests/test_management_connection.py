@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from plain.postgres.connections import _db_conn, use_management_connection
+from plain.postgres.db import _db_conn, use_management_connection
 from plain.runtime import settings
 
 
@@ -64,7 +64,7 @@ def test_context_manager_reuses_active_connection_when_management_url_unset(
     isolated_db,
 ):
     """When POSTGRES_MANAGEMENT_URL is unset, the active connection is reused."""
-    from plain.postgres.connections import get_connection
+    from plain.postgres.db import get_connection
 
     outer = get_connection()
     with use_management_connection() as inside:
@@ -74,7 +74,7 @@ def test_context_manager_reuses_active_connection_when_management_url_unset(
 
 def test_context_manager_swaps_active_connection(isolated_db):
     """When POSTGRES_MANAGEMENT_URL differs, a new connection is used inside the block."""
-    from plain.postgres.connections import get_connection
+    from plain.postgres.db import get_connection
 
     # Make the management URL distinct from POSTGRES_URL so a new connection opens.
     settings.POSTGRES_MANAGEMENT_URL = (

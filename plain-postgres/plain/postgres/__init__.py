@@ -7,6 +7,7 @@ from . import (
 from .base import Model
 from .constraints import CheckConstraint, UniqueConstraint
 from .db import get_connection, use_management_connection
+from .middleware import DatabaseConnectionMiddleware
 from .deletion import CASCADE, NO_ACTION, RESTRICT, SET_NULL
 from .expressions import F
 from .enums import TextChoices
@@ -105,6 +106,8 @@ __all__ = [
     # From db
     "get_connection",
     "use_management_connection",
+    # From middleware
+    "DatabaseConnectionMiddleware",
     # From registry
     "register_model",
     "models_registry",

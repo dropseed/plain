@@ -5,13 +5,14 @@ from collections.abc import Generator
 from typing import Any
 
 import pytest
+from psycopg import pq
 
 from plain.postgres.otel import suppress_db_tracing
-from plain.signals import request_finished, request_started
 
 from .. import transaction
 from ..connection import DatabaseConnection
-from ..db import close_old_connections, get_connection
+from ..db import get_connection
+from ..sources import runtime_pool_source
 from .database import use_test_database
 
 
@@ -43,23 +44,20 @@ def setup_db(request: Any) -> Generator[None]:
     """
     verbosity = request.config.option.verbose
 
-    # Keep connections open during request client / testing. Disconnect
-    # before entering `use_test_database` — migrations and convergence run
-    # inside it and we don't want close_old_connections firing in that window.
-    request_started.disconnect(close_old_connections)
-    request_finished.disconnect(close_old_connections)
+    # Test DB points at a different database name, so a pool built
+    # against the runtime URL would connect to the wrong place. Close
+    # any existing pool so the next checkout rebuilds against the
+    # active POSTGRES_URL (which use_test_database swaps).
+    runtime_pool_source.close()
+    ctx = use_test_database(verbosity=verbosity)
+    with suppress_db_tracing():
+        ctx.__enter__()
     try:
-        ctx = use_test_database(verbosity=verbosity)
-        with suppress_db_tracing():
-            ctx.__enter__()
-        try:
-            yield
-        finally:
-            with suppress_db_tracing():
-                ctx.__exit__(None, None, None)
+        yield
     finally:
-        request_started.connect(close_old_connections)
-        request_finished.connect(close_old_connections)
+        with suppress_db_tracing():
+            ctx.__exit__(None, None, None)
+        runtime_pool_source.close()
 
 
 @pytest.fixture
@@ -79,8 +77,14 @@ def db(setup_db: Any, request: Any) -> Generator[None]:
 
     with suppress_db_tracing():
         conn = get_connection()
-        # PostgreSQL can defer constraint checks
-        if not conn.needs_rollback and conn.is_usable():
+        # PostgreSQL can defer constraint checks. Skip when the connection is
+        # already in an aborted-transaction state (e.g. the test raised a
+        # DB error) — further commands would just raise InFailedSqlTransaction.
+        if (
+            not conn.needs_rollback
+            and conn.connection is not None
+            and conn.connection.info.transaction_status != pq.TransactionStatus.INERROR
+        ):
             conn.check_constraints()
 
         conn.set_rollback(True)
@@ -107,6 +111,8 @@ def isolated_db(request: Any) -> Generator[None]:
     raw_name = request.node.name
     prefix = re.sub(r"[^0-9A-Za-z_]+", "_", raw_name)
 
+    # Per-test pool, rebuilt against this test's DB.
+    runtime_pool_source.close()
     ctx = use_test_database(verbosity=verbosity, prefix=prefix)
     with suppress_db_tracing():
         ctx.__enter__()
@@ -115,3 +121,4 @@ def isolated_db(request: Any) -> Generator[None]:
     finally:
         with suppress_db_tracing():
             ctx.__exit__(None, None, None)
+        runtime_pool_source.close()

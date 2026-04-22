@@ -15,9 +15,13 @@ if _env_url := environ.get("DATABASE_URL"):
 # Falls back to POSTGRES_URL when empty.
 POSTGRES_MANAGEMENT_URL: Secret[str] = ""
 
-# Connection behavior
-POSTGRES_CONN_MAX_AGE: int = 600
-POSTGRES_CONN_HEALTH_CHECKS: bool = True
+# Connection pool options forwarded to psycopg_pool.ConnectionPool.
+# Defaults match psycopg_pool's own defaults (max_size mirrors min_size when
+# left alone).
+POSTGRES_POOL_MIN_SIZE: int = 4
+POSTGRES_POOL_MAX_SIZE: int = 20
+POSTGRES_POOL_MAX_LIFETIME: float = 3600.0
+POSTGRES_POOL_TIMEOUT: float = 30.0
 
 # DDL timeouts. Applied per-statement via SET LOCAL before every framework-
 # issued DDL in migrations and convergence. Values are Postgres interval

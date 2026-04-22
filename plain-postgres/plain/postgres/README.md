@@ -4,6 +4,8 @@
 
 - [Overview](#overview)
 - [Database connection](#database-connection)
+    - [Middleware](#middleware)
+    - [Bypassing a connection pooler for management operations](#bypassing-a-connection-pooler-for-management-operations)
 - [Querying](#querying)
 - [Schema management](#schema-management)
     - [Syncing](#syncing)
@@ -99,6 +101,24 @@ To explicitly disable the database (e.g. during Docker builds where no database 
 PLAIN_POSTGRES_URL=none
 ```
 
+### Middleware
+
+Connections are checked out lazily on first use and returned to the pool when the HTTP request finishes. That's handled by [`DatabaseConnectionMiddleware`](./middleware.py#DatabaseConnectionMiddleware) — add it to `MIDDLEWARE` once you install `plain.postgres`:
+
+```python
+# app/settings.py
+MIDDLEWARE = [
+    "plain.postgres.DatabaseConnectionMiddleware",
+    # ...other middleware
+]
+```
+
+Place it near the top so downstream middleware can use the database inside `before_request` / `after_response` and still have the connection returned cleanly at the end.
+
+For `StreamingResponse` / `AsyncStreamingResponse`, the connection is returned after the body is fully drained (not when the view returns), so generators that lazily query the database — for example `Model.query.iterator()` or raw cursor loops — keep their cursor alive until the last chunk is sent.
+
+Without the middleware, connections keep living on their thread until something explicitly calls `plain.postgres.db.return_database_connection()` (or the process exits). That's fine for short-lived scripts but wastes a connection per thread in long-running servers.
+
 ### Bypassing a connection pooler for management operations
 
 Transaction-mode poolers (PlanetScale, Supabase's pooler, Neon's pooler, standalone pgbouncer in transaction mode) can't run DDL, long transactions, or `pg_dump`. To work around this, set a second URL that management commands use to reach Postgres directly:
@@ -127,14 +147,6 @@ with use_management_connection():
 ```
 
 You _can_ point the two URLs at different Postgres roles — e.g. a least-privilege DML role for runtime and a DDL-capable role for management. Plain does not currently automate the grant/ownership plumbing that split requires (default privileges for newly-created tables, ownership reassignment, preflight checks that the runtime role can see the schema). If you adopt that pattern, you're responsible for wiring those up yourself.
-
-**PostgreSQL is the only supported database.** You need to install a PostgreSQL driver separately — [psycopg](https://www.psycopg.org/) is recommended:
-
-```bash
-uv add psycopg[binary]  # Pre-built wheels, easiest for local development
-# or
-uv add psycopg[c]       # Compiled against your system's libpq, recommended for production
-```
 
 ## Querying
 
@@ -448,7 +460,7 @@ with transaction.atomic():
 Run a block of code in a read-only transaction using `read_only()`. Any write (INSERT, UPDATE, DELETE, DDL) raises `psycopg.errors.ReadOnlySqlTransaction`:
 
 ```python
-from plain.postgres.connections import read_only
+from plain.postgres.db import read_only
 
 with read_only():
     users = User.query.all()       # reads work
@@ -1239,8 +1251,10 @@ The connection is configured with a single URL (`POSTGRES_URL`). `DATABASE_URL` 
 | ---------------------------------------- | ------------- | ----------------------- | ---------------------------------------------- |
 | `POSTGRES_URL`                           | `Secret[str]` | `$DATABASE_URL` or `""` | `PLAIN_POSTGRES_URL`                           |
 | `POSTGRES_MANAGEMENT_URL`                | `Secret[str]` | `""`                    | `PLAIN_POSTGRES_MANAGEMENT_URL`                |
-| `POSTGRES_CONN_MAX_AGE`                  | `int`         | `600`                   | `PLAIN_POSTGRES_CONN_MAX_AGE`                  |
-| `POSTGRES_CONN_HEALTH_CHECKS`            | `bool`        | `True`                  | `PLAIN_POSTGRES_CONN_HEALTH_CHECKS`            |
+| `POSTGRES_POOL_MIN_SIZE`                 | `int`         | `4`                     | `PLAIN_POSTGRES_POOL_MIN_SIZE`                 |
+| `POSTGRES_POOL_MAX_SIZE`                 | `int`         | `20`                    | `PLAIN_POSTGRES_POOL_MAX_SIZE`                 |
+| `POSTGRES_POOL_MAX_LIFETIME`             | `float`       | `3600.0`                | `PLAIN_POSTGRES_POOL_MAX_LIFETIME`             |
+| `POSTGRES_POOL_TIMEOUT`                  | `float`       | `30.0`                  | `PLAIN_POSTGRES_POOL_TIMEOUT`                  |
 | `POSTGRES_MIGRATION_LOCK_TIMEOUT`        | `str`         | `"3s"`                  | `PLAIN_POSTGRES_MIGRATION_LOCK_TIMEOUT`        |
 | `POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   | `str`         | `"3s"`                  | `PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   |
 | `POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      | `str`         | `"3s"`                  | `PLAIN_POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      |
@@ -1284,18 +1298,25 @@ Currently, Plain supports a single database connection per application. For appl
 
 ## Installation
 
-Install the `plain.postgres` package from [PyPI](https://pypi.org/project/plain.postgres/):
+Install the `plain.postgres` package from [PyPI](https://pypi.org/project/plain.postgres/). You must also pick a `psycopg` implementation — `plain.postgres` depends on `psycopg` but does not pick one for you, so installing `plain.postgres` alone will not be able to connect.
 
 ```bash
-uv add plain.postgres psycopg[binary]
+uv add plain.postgres psycopg[binary]  # Pre-built wheels, easiest for local development
+# or
+uv add plain.postgres psycopg[c]       # Compiled against your system's libpq, recommended for production
 ```
 
-Then add to your `INSTALLED_PACKAGES`:
+Then add to your `INSTALLED_PACKAGES` and register [`DatabaseConnectionMiddleware`](#middleware) so pooled connections are returned at the end of each request:
 
 ```python
 # app/settings.py
 INSTALLED_PACKAGES = [
     ...
     "plain.postgres",
+]
+
+MIDDLEWARE = [
+    "plain.postgres.DatabaseConnectionMiddleware",
+    ...
 ]
 ```

@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Any
 from plain import postgres
 from plain.logs import get_framework_logger
 from plain.postgres import transaction
+from plain.postgres.db import return_database_connection
 from plain.runtime import settings
-from plain.signals import request_finished, request_started
 from plain.utils import timezone
 from plain.utils.module_loading import import_string
 from plain.utils.os import get_cpu_count
@@ -328,8 +328,6 @@ def process_job(job_process_uuid: str) -> None:
     try:
         worker_pid = os.getpid()
 
-        request_started.send(sender=None)
-
         job_process = JobProcess.query.get(uuid=job_process_uuid)
 
         logger.info(
@@ -380,5 +378,5 @@ def process_job(job_process_uuid: str) -> None:
         # (A job should catch it's own user-code errors, so this is for library errors)
         logger.exception(e)
     finally:
-        request_finished.send(sender=None)
+        return_database_connection()
         gc.collect()

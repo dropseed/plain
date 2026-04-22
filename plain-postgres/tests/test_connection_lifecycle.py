@@ -2,8 +2,9 @@
 System tests for database connection lifecycle through the request pipeline.
 
 These tests use the test Client to make real HTTP requests through the full
-middleware/signal/view pipeline and verify that database connections are
-properly created, reused, and cleaned up via the ContextVar storage.
+middleware pipeline and verify that database connections are properly
+created, reused, and cleaned up via the ContextVar storage and
+`DatabaseConnectionMiddleware`.
 
 Unlike test_connection_isolation.py (which uses FakeConn and manipulates the
 ContextVar directly), these tests exercise the real DatabaseConnection against
@@ -13,17 +14,24 @@ a real database.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import pytest
 
-from plain.http import Response
+import plain.postgres.middleware
+from plain.http import Response, ResponseBase, StreamingResponse
+from plain.internal.handlers.base import BaseHandler
 from plain.postgres.connection import DatabaseConnection
-from plain.postgres.connections import _db_conn, get_connection, has_connection
-from plain.postgres.db import close_old_connections
+from plain.postgres.db import (
+    _db_conn,
+    get_connection,
+    has_connection,
+)
+from plain.postgres.middleware import DatabaseConnectionMiddleware
 from plain.runtime import settings
-from plain.signals import request_finished, request_started
-from plain.test import Client
+from plain.test import Client, RequestFactory
 from plain.urls import Router, path
 from plain.urls.resolvers import _get_cached_resolver
 from plain.views import ServerSentEvent, ServerSentEventsView, View
@@ -61,19 +69,44 @@ class DBQuerySSEView(ServerSentEventsView):
         yield ServerSentEvent(data=str(result))
 
 
+class StreamingDBQueryView(View):
+    """Touches the DB in-request, then returns a StreamingResponse.
+
+    The view runs a query so the wrapper exists (with a checked-out
+    psycopg connection) *inside* the per-request ContextVar context
+    when middleware's `after_response` runs. The streaming body itself
+    yields static bytes — the test is about whether the wrapper the
+    middleware captured gets closed when the body drains, not about DB
+    access during streaming.
+    """
+
+    def get(self):
+        _sync_db_query()
+
+        def generate():
+            yield b"streaming-chunk"
+
+        return StreamingResponse(generate())
+
+
 class TestRouter(Router):
     namespace = ""
     urls = [
         path("db-query/", DBQueryView, name="db_query"),
         path("async-db-query/", AsyncDBQueryView, name="async_db_query"),
         path("sse-db-query/", DBQuerySSEView, name="sse_db_query"),
+        path("streaming-db-query/", StreamingDBQueryView, name="streaming_db_query"),
     ]
 
 
-@pytest.fixture
-def _unblock_cursor():
-    """Restore the real cursor method (blocked by the autouse _db_disabled fixture)."""
-    DatabaseConnection.cursor = getattr(DatabaseConnection, "_enabled_cursor")
+_tracking_seen: list[int | None] = []
+
+
+class _ContextVarTrackingMiddleware(DatabaseConnectionMiddleware):
+    def after_response(self, request, response):
+        conn = _db_conn.get()
+        _tracking_seen.append(id(conn) if conn is not None else None)
+        return super().after_response(request, response)
 
 
 @pytest.fixture
@@ -116,12 +149,37 @@ def _test_router():
     _get_cached_resolver.cache_clear()
 
 
+@pytest.fixture
+def _with_db_middleware():
+    """Insert `DatabaseConnectionMiddleware` at the top of MIDDLEWARE."""
+    path = "plain.postgres.DatabaseConnectionMiddleware"
+    original = list(settings.MIDDLEWARE)
+    if path not in original:
+        settings.MIDDLEWARE = [path] + original
+    yield
+    settings.MIDDLEWARE = original
+
+
 def _fresh_client():
     """Create a Client with a fresh middleware chain."""
     client = Client(raise_request_exception=True)
     client.handler._middleware_chain = None
     client.handler.load_middleware()
     return client
+
+
+@contextmanager
+def _patched_init_counter():
+    """Patch DatabaseConnection.__init__ to count instantiations."""
+    count = [0]
+    original = DatabaseConnection.__init__
+
+    def counting(self, *args, **kwargs):
+        count[0] += 1
+        original(self, *args, **kwargs)
+
+    with patch.object(DatabaseConnection, "__init__", counting):
+        yield count
 
 
 class TestConnectionLifecycle:
@@ -132,37 +190,19 @@ class TestConnectionLifecycle:
         """A request should create exactly one DatabaseConnection, stored in the ContextVar."""
         assert not has_connection()
 
-        create_count = 0
-
-        original_from_url = DatabaseConnection.from_url
-
-        def counting_from_url(url):
-            nonlocal create_count
-            create_count += 1
-            return original_from_url(url)
-
-        with patch.object(DatabaseConnection, "from_url", counting_from_url):
+        with _patched_init_counter() as count:
             client = _fresh_client()
             response = client.get("/db-query/")
 
         assert response.status_code == 200
         assert response.content == b"1"
-        assert create_count == 1, f"Expected 1 connection created, got {create_count}"
+        assert count[0] == 1, f"Expected 1 connection created, got {count[0]}"
         assert isinstance(_db_conn.get(), DatabaseConnection)
 
     @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection", "_test_router")
     def test_multiple_requests_create_one_connection_total(self, setup_db):
         """Three sequential requests should create exactly one connection, reused across all."""
-        create_count = 0
-
-        original_from_url = DatabaseConnection.from_url
-
-        def counting_from_url(url):
-            nonlocal create_count
-            create_count += 1
-            return original_from_url(url)
-
-        with patch.object(DatabaseConnection, "from_url", counting_from_url):
+        with _patched_init_counter() as count:
             client = _fresh_client()
 
             response1 = client.get("/db-query/")
@@ -175,93 +215,64 @@ class TestConnectionLifecycle:
             response3 = client.get("/db-query/")
             assert response3.status_code == 200
 
-        assert create_count == 1, (
-            f"Expected 1 connection for 3 requests, got {create_count}"
-        )
+        assert count[0] == 1, f"Expected 1 connection for 3 requests, got {count[0]}"
         assert id(_db_conn.get()) == first_conn_id, (
             "All requests should use the same connection object"
         )
 
-    @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection", "_test_router")
-    def test_close_old_connections_with_contextvar(self, setup_db):
+    @pytest.mark.usefixtures(
+        "_unblock_cursor",
+        "_clean_connection",
+        "_test_router",
+        "_with_db_middleware",
+    )
+    def test_middleware_returns_connection_between_requests(self, setup_db):
         """
-        With close_old_connections signals connected, the connection lifecycle
-        works correctly with ContextVar storage: connections are kept alive
-        within CONN_MAX_AGE and reused across requests.
+        With `DatabaseConnectionMiddleware` installed, the wrapper persists
+        in the ContextVar across requests but its underlying psycopg
+        connection is returned to the pool between requests.
         """
-        create_count = 0
+        with _patched_init_counter() as count:
+            client = _fresh_client()
 
-        original_from_url = DatabaseConnection.from_url
+            response1 = client.get("/db-query/")
+            assert response1.status_code == 200
 
-        def counting_from_url(url):
-            nonlocal create_count
-            create_count += 1
-            return original_from_url(url)
-
-        request_started.connect(close_old_connections)
-        request_finished.connect(close_old_connections)
-        try:
-            with patch.object(DatabaseConnection, "from_url", counting_from_url):
-                client = _fresh_client()
-
-                response1 = client.get("/db-query/")
-                assert response1.status_code == 200
-
-                # CONN_MAX_AGE=600s — connection stays alive
-                conn = _db_conn.get()
-                assert conn is not None
-                assert conn.connection is not None, (
-                    "Connection should be alive within CONN_MAX_AGE"
-                )
-
-                # Second request — close_old_connections on request_started
-                # checks the connection, keeps it, view reuses it
-                response2 = client.get("/db-query/")
-                assert response2.status_code == 200
-
-            assert create_count == 1, (
-                f"Expected 1 connection with signals connected, got {create_count}"
+            # Wrapper persists; inner connection was returned to the pool.
+            conn = _db_conn.get()
+            assert conn is not None
+            assert conn.connection is None, (
+                "Inner psycopg connection should be returned to pool between requests"
             )
-        finally:
-            request_started.disconnect(close_old_connections)
-            request_finished.disconnect(close_old_connections)
+
+            # Second request: same wrapper, checks out a connection, returns it.
+            response2 = client.get("/db-query/")
+            assert response2.status_code == 200
+            assert conn is _db_conn.get()
+
+        assert count[0] == 1, f"Expected 1 wrapper across requests, got {count[0]}"
 
     @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection", "_test_router")
-    def test_view_and_signals_see_same_contextvar(self, setup_db):
+    def test_middleware_after_response_sees_view_connection(self, setup_db):
         """
-        The request_started signal, view, and request_finished signal all
-        run on the same thread and see the same ContextVar — verifying the
-        ContextVar replaces threading.local() correctly for the sync path.
+        `after_response` runs on the same thread as the view, so it sees
+        the ContextVar-backed DB connection the view just used.
         """
-        seen_connections: list[int | None] = []
-
-        def track_connection(**kwargs):
-            if has_connection():
-                seen_connections.append(id(_db_conn.get()))
-            else:
-                seen_connections.append(None)
-
-        request_started.connect(track_connection)
-        request_finished.connect(track_connection)
+        _tracking_seen.clear()
+        original = list(settings.MIDDLEWARE)
+        settings.MIDDLEWARE = [
+            "test_connection_lifecycle._ContextVarTrackingMiddleware"
+        ] + original
         try:
             client = _fresh_client()
             response = client.get("/db-query/")
             assert response.status_code == 200
 
-            assert len(seen_connections) == 2
-
-            # request_started fires before the view — no connection yet
-            assert seen_connections[0] is None
-
-            # request_finished fires after the view — connection exists
-            assert seen_connections[1] is not None
-
-            # The connection seen by request_finished is the same one
-            # still in the ContextVar
-            assert seen_connections[1] == id(_db_conn.get())
+            assert len(_tracking_seen) == 1
+            assert _tracking_seen[0] is not None
+            assert _tracking_seen[0] == id(_db_conn.get())
         finally:
-            request_started.disconnect(track_connection)
-            request_finished.disconnect(track_connection)
+            settings.MIDDLEWARE = original
 
 
 class TestAsyncViewConnectionLifecycle:
@@ -273,23 +284,14 @@ class TestAsyncViewConnectionLifecycle:
         An async view that accesses the DB via asyncio.to_thread() should
         work correctly — to_thread propagates the ContextVar context.
         """
-        create_count = 0
-
-        original_from_url = DatabaseConnection.from_url
-
-        def counting_from_url(url):
-            nonlocal create_count
-            create_count += 1
-            return original_from_url(url)
-
-        with patch.object(DatabaseConnection, "from_url", counting_from_url):
+        with _patched_init_counter() as count:
             client = _fresh_client()
             response = client.get("/async-db-query/")
 
         assert response.status_code == 200
         assert response.content == b"1"
-        assert create_count == 1, (
-            f"Async view should create exactly 1 connection, got {create_count}"
+        assert count[0] == 1, (
+            f"Async view should create exactly 1 connection, got {count[0]}"
         )
 
     @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection", "_test_router")
@@ -298,57 +300,84 @@ class TestAsyncViewConnectionLifecycle:
         An SSE view that accesses the DB via asyncio.to_thread() during
         streaming should work correctly.
         """
-        create_count = 0
-
-        original_from_url = DatabaseConnection.from_url
-
-        def counting_from_url(url):
-            nonlocal create_count
-            create_count += 1
-            return original_from_url(url)
-
-        with patch.object(DatabaseConnection, "from_url", counting_from_url):
+        with _patched_init_counter() as count:
             client = _fresh_client()
             response = client.get("/sse-db-query/")
 
         assert response.status_code == 200
         assert "text/event-stream" in response.headers["Content-Type"]
         assert "data: 1\n\n" in response.content.decode()
-        assert create_count == 1, (
-            f"SSE view should create exactly 1 connection, got {create_count}"
+        assert count[0] == 1, (
+            f"SSE view should create exactly 1 connection, got {count[0]}"
         )
 
+
+class TestStreamingResponseCleanup:
+    """Streaming responses must return their DB connection once drained."""
+
     @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection", "_test_router")
-    def test_async_view_connection_stays_on_worker_thread(self, setup_db):
+    def test_streaming_connection_returned_after_body_drains(self, setup_db):
         """
-        For async views using to_thread(), the DB connection is created on
-        the worker thread's ContextVar — it does NOT propagate back to the
-        calling context. This is correct: each thread owns its connection.
+        Drive `handler.handle()` directly so the per-request ContextVar
+        boundary actually fires. The view opens a DB connection
+        in-request, then returns a StreamingResponse. Middleware must
+        capture the wrapper at `after_response` time (inside request_ctx)
+        and hand it to a closer — looking up `_db_conn.get()` lazily at
+        `response.close()` time would miss it because `close()` runs
+        outside request_ctx.
 
-        request_started and request_finished both fire on the calling thread,
-        which never had a connection. close_old_connections handles this
-        gracefully (it's a no-op when has_connection() is False).
+        Asserts: the closer is called with the captured wrapper, and
+        the wrapper's psycopg connection is released to the pool.
         """
-        seen_connections: list[int | None] = []
+        calls: list[DatabaseConnection | None] = []
+        original_return = plain.postgres.middleware.return_database_connection
 
-        def track_connection(**kwargs):
-            if has_connection():
-                seen_connections.append(id(_db_conn.get()))
-            else:
-                seen_connections.append(None)
+        def tracking_return(conn: DatabaseConnection | None = None) -> None:
+            calls.append(conn)
+            original_return(conn)
 
-        request_started.connect(track_connection)
-        request_finished.connect(track_connection)
+        original_middleware = list(settings.MIDDLEWARE)
+        settings.MIDDLEWARE = [
+            "plain.postgres.DatabaseConnectionMiddleware",
+            *original_middleware,
+        ]
         try:
-            client = _fresh_client()
-            response = client.get("/async-db-query/")
-            assert response.status_code == 200
+            with patch.object(
+                plain.postgres.middleware,
+                "return_database_connection",
+                tracking_return,
+            ):
+                handler = BaseHandler()
+                handler.load_middleware()
+                request = RequestFactory().get("/streaming-db-query/")
 
-            assert len(seen_connections) == 2
-            # Both signals fire on the calling thread — neither sees the
-            # connection that was created on the to_thread worker
-            assert seen_connections[0] is None
-            assert seen_connections[1] is None
+                async def run() -> ResponseBase:
+                    with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=2
+                    ) as executor:
+                        return await handler.handle(request, executor)
+
+                response = asyncio.run(run())
+                assert response.status_code == 200
+                assert isinstance(response, StreamingResponse)
+
+                # Streaming path: no close at after_response time.
+                assert calls == []
+
+                # Drain the body and close — that fires the resource closer.
+                body = b"".join(response)
+                assert body == b"streaming-chunk"
+                response.close()
+
+                # The closer ran exactly once and received the wrapper
+                # captured during after_response.
+                assert len(calls) == 1
+                captured = calls[0]
+                assert captured is not None, (
+                    "Middleware failed to capture the wrapper at append time"
+                )
+                assert captured.connection is None, (
+                    "Captured wrapper's psycopg connection should be returned"
+                )
         finally:
-            request_started.disconnect(track_connection)
-            request_finished.disconnect(track_connection)
+            settings.MIDDLEWARE = original_middleware

@@ -11,6 +11,7 @@ from plain.postgres.db import get_connection
 from plain.postgres.fields.related import ForeignKeyField
 from plain.postgres.registry import ModelsRegistry, models_registry
 from plain.preflight import PreflightCheck, PreflightResult, register_check
+from plain.runtime import settings
 
 
 def _get_app_models() -> list[Any]:
@@ -224,6 +225,33 @@ class CheckLazyReferences(PreflightCheck):
 
     def run(self) -> list[PreflightResult]:
         return _check_lazy_references(models_registry, packages_registry)
+
+
+@register_check("postgres.middleware_installed")
+class CheckMiddlewareInstalled(PreflightCheck):
+    """Errors if `DatabaseConnectionMiddleware` isn't in `MIDDLEWARE`.
+
+    Without it, pooled connections are only released by GC at the end of
+    each request — relying on refcount timing under load is a recipe for
+    pool exhaustion under cyclic refs or delayed finalization.
+    """
+
+    REQUIRED = "plain.postgres.DatabaseConnectionMiddleware"
+
+    def run(self) -> list[PreflightResult]:
+        if self.REQUIRED in settings.MIDDLEWARE:
+            return []
+        return [
+            PreflightResult(
+                fix=(
+                    f"Add '{self.REQUIRED}' to MIDDLEWARE so pooled "
+                    "database connections are returned at the end of each "
+                    "request. Place it first so its after_response runs "
+                    "after any middleware that queries the database."
+                ),
+                id="postgres.middleware_not_installed",
+            )
+        ]
 
 
 @register_check("postgres.postgres_version")

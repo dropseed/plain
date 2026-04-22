@@ -95,7 +95,7 @@ The [`@register_config`](./registry.py#register_config) decorator registers your
 
 ### The `ready()` method
 
-Override the `ready()` method to run code when Plain starts. This is useful for connecting signals, initializing caches, or other one-time setup.
+Override the `ready()` method to run code when Plain starts. This is useful for initializing caches, registering handlers, or other one-time setup.
 
 ```python
 # teams/config.py
@@ -105,8 +105,6 @@ from plain.packages import PackageConfig, register_config
 @register_config
 class TeamsConfig(PackageConfig):
     def ready(self):
-        # Import signal handlers
-        from . import signals  # noqa: F401
         print("Teams package ready!")
 ```
 

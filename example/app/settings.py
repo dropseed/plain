@@ -54,6 +54,7 @@ SUPPORT_EMAIL = "support@example.com"
 OAUTH_LOGIN_PROVIDERS = {}
 
 MIDDLEWARE = [
+    "plain.postgres.DatabaseConnectionMiddleware",
     "plain.sessions.middleware.SessionMiddleware",
     "plain.auth.middleware.AuthMiddleware",
     "plain.admin.AdminMiddleware",

@@ -5,13 +5,19 @@ import sys
 from collections.abc import Generator
 from contextlib import contextmanager
 
-from psycopg import errors
+import psycopg
+from psycopg import errors, sql
 
 from plain.postgres.connection import DatabaseConnection
-from plain.postgres.connections import _db_conn
-from plain.postgres.database_url import parse_database_url, replace_database_name
-from plain.postgres.dialect import MAX_NAME_LENGTH, quote_name
+from plain.postgres.database_url import (
+    DatabaseConfig,
+    parse_database_url,
+    replace_database_name,
+)
+from plain.postgres.db import _db_conn
+from plain.postgres.dialect import MAX_NAME_LENGTH
 from plain.postgres.migrations.executor import MigrationExecutor
+from plain.postgres.sources import DirectSource, build_connection_params
 from plain.postgres.utils import names_digest
 from plain.runtime import settings
 
@@ -33,22 +39,38 @@ def _compute_test_db_name(base_name: str, prefix: str = "") -> str:
     return TEST_DATABASE_PREFIX + base_name
 
 
+@contextmanager
+def _maintenance_cursor(config: DatabaseConfig) -> Generator[psycopg.Cursor]:
+    """Yield a cursor on the `postgres` maintenance DB.
+
+    CREATE DATABASE / DROP DATABASE can't run against the target database
+    itself and can't run inside a transaction — so connect to `postgres`
+    with autocommit and use a raw psycopg cursor (no wrapper machinery,
+    no pool).
+    """
+    maint_config: DatabaseConfig = {**config, "DATABASE": "postgres"}
+    params = build_connection_params(maint_config)
+    with psycopg.connect(**params, autocommit=True) as conn:
+        with conn.cursor() as cursor:
+            yield cursor
+
+
 def _create_database_on_server(
-    conn: DatabaseConnection, *, name: str, verbosity: int, autoclobber: bool
+    config: DatabaseConfig, *, name: str, verbosity: int, autoclobber: bool
 ) -> None:
     """CREATE DATABASE via the maintenance connection, with autoclobber fallback."""
-    quoted = quote_name(name)
-    with conn._maintenance_cursor() as cursor:
+    ident = sql.Identifier(name)
+    create = sql.SQL("CREATE DATABASE {}").format(ident)
+    drop = sql.SQL("DROP DATABASE {}").format(ident)
+    with _maintenance_cursor(config) as cursor:
         try:
-            cursor.execute(f"CREATE DATABASE {quoted}")
+            cursor.execute(create)
             return
-        except Exception as e:
-            cause = e.__cause__
-            if not (cause and isinstance(cause, errors.DuplicateDatabase)):
-                _log(f"Got an error creating the test database: {e}")
-                sys.exit(2)
-            # Database already exists — fall through to autoclobber handling.
+        except errors.DuplicateDatabase as e:
             _log(f"Got an error creating the test database: {e}")
+        except Exception as e:
+            _log(f"Got an error creating the test database: {e}")
+            sys.exit(2)
 
         if not autoclobber:
             confirm = input(
@@ -62,16 +84,16 @@ def _create_database_on_server(
         try:
             if verbosity >= 1:
                 _log(f"Destroying old test database '{name}'...")
-            cursor.execute(f"DROP DATABASE {quoted}")
-            cursor.execute(f"CREATE DATABASE {quoted}")
+            cursor.execute(drop)
+            cursor.execute(create)
         except Exception as e:
             _log(f"Got an error recreating the test database: {e}")
             sys.exit(2)
 
 
-def _drop_database_on_server(conn: DatabaseConnection, name: str) -> None:
-    with conn._maintenance_cursor() as cursor:
-        cursor.execute(f"DROP DATABASE {quote_name(name)}")
+def _drop_database_on_server(config: DatabaseConfig, name: str) -> None:
+    with _maintenance_cursor(config) as cursor:
+        cursor.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(name)))
 
 
 @contextmanager
@@ -101,13 +123,14 @@ def use_test_database(*, verbosity: int = 1, prefix: str = "") -> Generator[str]
         _log(f"Creating test database '{test_db_name}'...")
 
     test_url = replace_database_name(runtime_url, test_db_name)
-    test_conn = DatabaseConnection.from_url(test_url)
+    test_config = parse_database_url(test_url)
+    test_conn = DatabaseConnection(DirectSource(test_config))
 
-    # Create the test database on the server via a sibling maintenance
-    # connection. `_maintenance_cursor` builds its own `postgres`-targeted
-    # connection from settings_dict, so test_conn itself is not opened yet.
+    # Create the test database on the server via a direct `postgres`-DB
+    # connection — test_conn itself can't connect to a DB that doesn't
+    # exist yet, so we open a sibling connection against `postgres`.
     _create_database_on_server(
-        test_conn, name=test_db_name, verbosity=verbosity, autoclobber=True
+        test_config, name=test_db_name, verbosity=verbosity, autoclobber=True
     )
 
     conn_token = _db_conn.set(test_conn)
@@ -145,6 +168,6 @@ def use_test_database(*, verbosity: int = 1, prefix: str = "") -> Generator[str]
         if verbosity >= 1:
             _log(f"Destroying test database '{test_db_name}'...")
         try:
-            _drop_database_on_server(test_conn, test_db_name)
+            _drop_database_on_server(test_config, test_db_name)
         except Exception as e:
             _log(f"Got an error destroying the test database: {e}")

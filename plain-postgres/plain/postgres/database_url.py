@@ -29,8 +29,6 @@ SCHEMES = {"postgres", "postgresql", "pgsql"}
 
 
 class DatabaseConfig(TypedDict, total=False):
-    CONN_MAX_AGE: int | None
-    CONN_HEALTH_CHECKS: bool
     HOST: str
     DATABASE: str  # Required (validated in _configure_settings)
     OPTIONS: dict[str, Any]
@@ -45,7 +43,11 @@ for scheme in SCHEMES:
 
 
 def parse_database_url(url: str) -> DatabaseConfig:
-    """Parses a database URL."""
+    """Parse a database URL into a fully-populated `DatabaseConfig`.
+
+    All keys are present; empty values are `""` (strings), `None` (PORT),
+    or `{}` (OPTIONS) — callers can index without `.get(...)` defaults.
+    """
     spliturl = urlparse.urlsplit(url)
 
     if spliturl.scheme not in SCHEMES:
@@ -65,20 +67,14 @@ def parse_database_url(url: str) -> DatabaseConfig:
             hostname = hostname.rsplit("@", 1)[1]
         hostname = urlparse.unquote(hostname)
 
-    parsed_config: DatabaseConfig = {
+    return {
         "DATABASE": urlparse.unquote(path or ""),
         "USER": urlparse.unquote(spliturl.username or ""),
         "PASSWORD": urlparse.unquote(spliturl.password or ""),
         "HOST": hostname,
         "PORT": spliturl.port,
+        "OPTIONS": {key: values[-1] for key, values in query.items()},
     }
-
-    # Pass the query string into OPTIONS.
-    options = {key: values[-1] for key, values in query.items()}
-    if options:
-        parsed_config["OPTIONS"] = options
-
-    return parsed_config
 
 
 def build_database_url(config: DatabaseConfig) -> str:

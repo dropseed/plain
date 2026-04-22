@@ -2,12 +2,47 @@
 
 from __future__ import annotations
 
+import asyncio
+from contextvars import ContextVar
+
 from plain.http import HttpMiddleware, Response
 from plain.urls import Router, path
 from plain.views import ServerSentEvent, ServerSentEventsView, View
 
 # Shared log that tests can inspect and clear
 call_log: list[str] = []
+
+# Exercised by the cross-thread context-propagation test — `before_request`
+# stashes a value here and `after_response` reads it back.
+request_ctxvar: ContextVar[str | None] = ContextVar("request_ctxvar", default=None)
+ctxvar_seen: list[str | None] = []
+
+
+class CtxVarRoundTripMiddleware(HttpMiddleware):
+    """Writes a sentinel in `before_request`, reads it back in `after_response`."""
+
+    def before_request(self, request):
+        request_ctxvar.set("set-by-before-request")
+        return None
+
+    def after_response(self, request, response):
+        ctxvar_seen.append(request_ctxvar.get())
+        return response
+
+
+class AsyncAwaitView(View):
+    """Async view that yields to the event loop so the executor hop splits."""
+
+    async def get(self):
+        await asyncio.sleep(0)
+        return Response("ok")
+
+
+class AsyncCtxVarRouter(Router):
+    namespace = ""
+    urls = [
+        path("", AsyncAwaitView, name="index"),
+    ]
 
 
 class TrackingMiddleware(HttpMiddleware):

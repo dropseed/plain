@@ -492,7 +492,7 @@ def _make_execute_code(*, writable: bool = False):
             ctx.enter_context(redirect_stderr(stderr_capture))
             if not writable:
                 try:
-                    from plain.postgres.connections import read_only
+                    from plain.postgres.db import read_only
 
                     ctx.enter_context(read_only())
                 except Exception:

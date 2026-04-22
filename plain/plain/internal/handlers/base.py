@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import contextlib
+import contextvars
 import dataclasses
 import inspect
 import time
@@ -23,7 +24,6 @@ from opentelemetry.semconv.attributes import (
 )
 from opentelemetry.semconv.metrics.http_metrics import HTTP_SERVER_REQUEST_DURATION
 
-from plain import signals
 from plain.http import Response
 from plain.runtime import settings
 from plain.urls import get_resolver
@@ -192,28 +192,25 @@ class BaseHandler:
     async def _run_in_executor(
         self,
         executor: concurrent.futures.Executor,
+        ctx: contextvars.Context,
         fn: Any,
         *args: Any,
     ) -> Any:
-        """Run a sync function in the executor, propagating OTel context.
+        """Run `fn` in the executor inside the supplied request context.
 
-        Propagates the OpenTelemetry span context so traces from the event
-        loop continue into the executor thread.  Other ContextVars (e.g. the
-        DB connection) are intentionally NOT copied — they live on the
-        executor thread's native context so connections persist across
-        requests (honoring CONN_MAX_AGE).
+        `ctx` is mutated by `ctx.run()` — ContextVar values set inside
+        `fn` persist on the same `ctx` object across subsequent
+        `_run_in_executor` calls. That keeps per-request state (e.g. the
+        DB connection wrapper) request-scoped instead of thread-scoped, so
+        async pipelines see consistent state even when their two executor
+        calls land on different worker threads.
+
+        The OTel context is layered on top of `contextvars` too, so
+        copying `ctx` after the request span is active carries the span
+        through executor hops and async tasks without a separate attach.
         """
         loop = asyncio.get_running_loop()
-        ctx = context.get_current()
-
-        def _wrapper() -> Any:
-            token = context.attach(ctx)
-            try:
-                return fn(*args)
-            finally:
-                context.detach(token)
-
-        return await loop.run_in_executor(executor, _wrapper)
+        return await loop.run_in_executor(executor, ctx.run, fn, *args)
 
     async def handle(
         self,
@@ -222,40 +219,60 @@ class BaseHandler:
     ) -> ResponseBase:
         """Single entry point for handling a request.
 
-        Creates OTel span and runs the full pipeline: signal → before
-        middleware → resolve/dispatch view → after middleware → signal.
+        Creates OTel span and runs the full pipeline: before middleware →
+        resolve/dispatch view → after middleware.
 
-        For sync views, the entire pipeline runs in a single executor call
-        so that signals, middleware, and the view all execute on the same
-        thread (sharing the same DB connection via ContextVar).
+        A fresh, empty `contextvars.Context` is built per request and
+        shared by every phase of the pipeline — both executor hops run
+        via `ctx.run()`, and async view coroutines are driven on a task
+        bound to the same context via `asyncio.create_task(coro,
+        context=request_ctx)`. That keeps middleware state (e.g.
+        `DatabaseConnectionMiddleware`'s connection wrapper) request-
+        scoped, so `after_response` sees ContextVars that `before_request`
+        or the view set regardless of which worker thread it lands on.
 
-        For async views, the sync portion (signal + before middleware +
-        URL resolution) runs in one executor call, the coroutine is awaited
-        on the event loop, then after-middleware + request_finished runs in
-        a second executor call.
+        Starting from an empty `Context()` rather than `copy_context()`
+        is deliberate: the server task's ambient ContextVar state may
+        carry stale values from a previous keep-alive request's
+        streaming body, and inheriting that would contaminate this
+        request's view of per-request state. The OTel server span is
+        attached explicitly below so executor hops and the async task
+        still see it.
         """
         assert self._middleware_chain is not None, (
             "load_middleware() must be called before handle()"
         )
 
         with self._start_request_span(request) as span:
+            request_ctx = contextvars.Context()
+            # Prime the empty context with the current OTel context
+            # (which has the server span active) so `ctx.run` and the
+            # async view's task see the span without inheriting
+            # anything else from the server task.
+            request_ctx.run(context.attach, context.get_current())
             start = time.perf_counter()
 
             result = await self._run_in_executor(
-                executor, self._run_sync_pipeline, request
+                executor, request_ctx, self._run_sync_pipeline, request
             )
 
             if isinstance(result, _AsyncViewPending):
-                # Async view: await the coroutine on the event loop, then
-                # run after-middleware + request_finished back in the executor.
+                # Drive the coroutine on a task bound to request_ctx so
+                # any ContextVars the view sets (e.g. a DB wrapper via
+                # `get_connection()`) land on request_ctx and are visible
+                # to after_response below.
                 try:
-                    response = await result.coroutine
+                    task = asyncio.get_running_loop().create_task(
+                        result.coroutine, context=request_ctx
+                    )
+                    response = await task
                     self._check_response(response, result.view_class)
                 except Exception as exc:
                     response = response_for_exception(request, exc)
 
                 response = await self._run_in_executor(
                     executor,
+                    request_ctx,
                     self._finish_pipeline,
                     request,
                     response,
@@ -290,14 +307,12 @@ class BaseHandler:
     def _run_sync_pipeline(self, request: Request) -> ResponseBase | _AsyncViewPending:
         """Run the entire sync request pipeline on a single thread.
 
-        Sends request_started, runs before-middleware, resolves and dispatches
-        the view, runs after-middleware, and sends request_finished.
+        Runs before-middleware, resolves and dispatches the view, then runs
+        after-middleware.
 
         If the view is async, returns an _AsyncViewPending so the caller
         can await the coroutine on the event loop.
         """
-        signals.request_started.send(sender=self.__class__, request=request)
-
         # 1. Before middleware
         response, ran_before = self._run_before_request(request)
 
@@ -324,7 +339,7 @@ class BaseHandler:
             except Exception as exc:
                 response = response_for_exception(request, exc)
 
-        # 3. After middleware + request_finished signal
+        # 3. After middleware
         return self._finish_pipeline(request, response, ran_before)
 
     def _finish_pipeline(
@@ -333,26 +348,14 @@ class BaseHandler:
         response: ResponseBase,
         ran_before: list[HttpMiddleware],
     ) -> ResponseBase:
-        """Run after-middleware and send request_finished signal.
+        """Run after-middleware.
 
-        For sync views, this runs on the same thread as request_started
-        (part of the single _run_sync_pipeline call).
-
-        For async views, this runs in a separate executor call and may
-        land on a different thread than request_started. The DB connection
-        ContextVar on each thread is independent, so this thread may see
-        a different (or no) connection. This is safe because
-        close_old_connections is idempotent — it only acts on whatever
-        connection exists on the current thread.
-
-        The signal fires before streaming response bodies are transmitted.
-        Handlers like close_old_connections should not affect in-progress
-        streams since request_started on the next request also handles
-        stale connections.
+        Always runs inside the request's shared `ctx.run(request_ctx)`,
+        so it sees any ContextVars that `before_request` or the view set.
+        For async views it may land on a different executor thread than
+        before-middleware; the shared context bridges that gap.
         """
-        response = self._run_after_response(request, response, ran_before)
-        signals.request_finished.send(sender=self.__class__)
-        return response
+        return self._run_after_response(request, response, ran_before)
 
     def _resolve_request(self, request: Request) -> ResolverMatch:
         """Resolve the URL, caching on request.resolver_match."""

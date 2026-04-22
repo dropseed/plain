@@ -19,7 +19,7 @@ import threading
 
 import pytest
 
-from plain.postgres.connections import _db_conn, has_connection
+from plain.postgres.db import _db_conn, has_connection
 
 
 class FakeConn:
@@ -172,12 +172,11 @@ def test_executor_sees_connection_with_context_propagation():
 
 def test_executor_without_context_does_not_see_connection():
     """
-    Without explicit context propagation, a plain run_in_executor call
-    should NOT see the caller's connection.
-
-    This matches how BaseHandler._run_in_executor works — it only
-    propagates OTel context, not DB connections, so executor threads
-    keep their own persistent connections (honoring CONN_MAX_AGE).
+    Raw `loop.run_in_executor` does not propagate the caller's
+    ContextVar context. Documented here as a sanity check on the
+    asyncio mechanics that `BaseHandler._run_in_executor` builds on top
+    of (the framework wraps each request in its own copied context to
+    propagate state across executor hops).
     """
 
     async def run() -> bool:
@@ -200,13 +199,15 @@ def test_executor_without_context_does_not_see_connection():
 
 def test_executor_connection_persists_across_calls_on_same_thread():
     """
-    A ContextVar set inside an executor thread persists for subsequent
-    run_in_executor calls that land on the same thread.
+    Asyncio's ThreadPoolExecutor worker threads maintain a persistent
+    ContextVar context across work items — a value set in one
+    `loop.run_in_executor` call is visible to the next call that lands
+    on the same thread.
 
-    This is the CONN_MAX_AGE behavior: ThreadPoolExecutor worker threads
-    maintain a persistent context across work items, so a DB connection
-    created during request 1 is reused by request 2 on the same thread.
-    Without this, connections would be orphaned after every request.
+    The framework opts out of this thread-level persistence by passing
+    a per-request context to `BaseHandler._run_in_executor` (via
+    `ctx.run`). This test documents the underlying asyncio behavior the
+    framework is overriding.
     """
 
     async def run() -> tuple[int, int, int, int]:
@@ -230,6 +231,5 @@ def test_executor_connection_persists_across_calls_on_same_thread():
     tid1, tid2, conn_id1, conn_id2 = asyncio.run(run())
     assert tid1 == tid2, "Both calls should run on the same executor thread"
     assert conn_id1 == conn_id2, (
-        "Connection set in request 1 should persist for request 2 on the same thread "
-        "(CONN_MAX_AGE behavior)"
+        "Connection set in request 1 should persist for request 2 on the same thread"
     )

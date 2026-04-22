@@ -4,30 +4,24 @@ import _thread
 import os
 import signal
 import subprocess
-import time
 import warnings
 from collections import deque
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
-from functools import cached_property, lru_cache
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, LiteralString, NamedTuple, cast
 
 import psycopg
-from psycopg import adapt, adapters, errors
+from psycopg import errors
 from psycopg import sql as psycopg_sql
-from psycopg.abc import PyFormat
-from psycopg.postgres import types as pg_types
-from psycopg.types.range import BaseRangeDumper, Range, RangeDumper
-from psycopg.types.string import TextLoader
 
-from plain.exceptions import ImproperlyConfigured
 from plain.logs import get_framework_logger
 from plain.postgres import utils
-from plain.postgres.database_url import parse_database_url
-from plain.postgres.dialect import MAX_NAME_LENGTH, quote_name
+from plain.postgres.dialect import quote_name
 from plain.postgres.fields import GenericIPAddressField, TimeField, UUIDField
 from plain.postgres.indexes import Index
 from plain.postgres.schema import DatabaseSchemaEditor
+from plain.postgres.sources import ConnectionSource
 from plain.postgres.transaction import TransactionManagementError
 from plain.postgres.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.postgres.utils import CursorWrapper, debug_transaction
@@ -62,33 +56,6 @@ class TableInfo(NamedTuple):
     name: str
     type: str
     comment: str | None
-
-
-# Type OIDs
-TSRANGE_OID = pg_types["tsrange"].oid
-TSTZRANGE_OID = pg_types["tstzrange"].oid
-
-
-class PlainRangeDumper(RangeDumper):
-    """A Range dumper customized for Plain."""
-
-    def upgrade(self, obj: Range[Any], format: PyFormat) -> BaseRangeDumper:
-        dumper = super().upgrade(obj, format)
-        if dumper is not self and dumper.oid == TSRANGE_OID:
-            dumper.oid = TSTZRANGE_OID
-        return dumper
-
-
-@lru_cache
-def get_adapters_template() -> adapt.AdaptersMap:
-    ctx = adapt.AdaptersMap(adapters)
-    # No-op JSON loader to avoid psycopg3 round trips
-    ctx.register_loader("jsonb", TextLoader)
-    # Treat inet/cidr as text
-    ctx.register_loader("inet", TextLoader)
-    ctx.register_loader("cidr", TextLoader)
-    ctx.register_dumper(Range, PlainRangeDumper)
-    return ctx
 
 
 def _psql_settings_to_cmd_args_env(
@@ -139,14 +106,10 @@ class DatabaseConnection:
     index_default_access_method = "btree"
     ignored_tables: list[str] = []
 
-    def __init__(self, settings_dict: DatabaseConfig):
-        # Connection related attributes.
-        # The underlying database connection (from the database library, not a wrapper).
+    def __init__(self, source: ConnectionSource):
+        # Lazy — acquired on first use via self._source.
         self.connection: PsycopgConnection[Any] | None = None
-        # `settings_dict` should be a dictionary containing keys such as
-        # DATABASE, USER, etc. It's called `settings_dict` instead of `settings`
-        # to disambiguate it from Plain settings modules.
-        self.settings_dict: DatabaseConfig = settings_dict
+        self._source: ConnectionSource = source
         # Query logging in debug mode or when explicitly enabled.
         self.queries_log: deque[dict[str, Any]] = deque(maxlen=self.queries_limit)
         self.force_debug_cursor: bool = False
@@ -169,10 +132,7 @@ class DatabaseConnection:
         self.rollback_exc: Exception | None = None
 
         # Connection termination related attributes.
-        self.close_at: float | None = None
         self.closed_in_transaction: bool = False
-        self.health_check_enabled: bool = False
-        self.health_check_done: bool = False
 
         # A list of no-argument functions to run when the transaction commits.
         # Each entry is an (sids, func, robust) tuple, where sids is a set of
@@ -193,21 +153,27 @@ class DatabaseConnection:
     def __repr__(self) -> str:
         return f"<{self.__class__.__qualname__} vendor='postgresql'>"
 
-    @classmethod
-    def from_url(cls, url: str) -> DatabaseConnection:
-        """Build a connection from a URL, merging in Plain's connection-knob settings."""
-        parsed = parse_database_url(url)
-        config: DatabaseConfig = {
-            "DATABASE": parsed.get("DATABASE", ""),
-            "USER": parsed.get("USER", ""),
-            "PASSWORD": parsed.get("PASSWORD", ""),
-            "HOST": parsed.get("HOST", ""),
-            "PORT": parsed.get("PORT"),
-            "OPTIONS": parsed.get("OPTIONS", {}),
-            "CONN_MAX_AGE": settings.POSTGRES_CONN_MAX_AGE,
-            "CONN_HEALTH_CHECKS": settings.POSTGRES_CONN_HEALTH_CHECKS,
-        }
-        return cls(config)
+    def __del__(self) -> None:
+        # Safety net for wrappers GC'd without an explicit close() —
+        # e.g. inside a short-lived `asyncio.to_thread` context copy.
+        # Returns the pooled connection to the pool. Guards handle
+        # interpreter shutdown, when attrs may already be cleared.
+        conn = getattr(self, "connection", None)
+        if conn is None:
+            return
+        source = getattr(self, "_source", None)
+        if source is None:
+            return
+        try:
+            source.release(conn)
+        except Exception:
+            pass
+
+    @property
+    def settings_dict(self) -> DatabaseConfig:
+        """Config of the server this wrapper talks to. For pool-backed
+        wrappers this always reflects the live `POSTGRES_URL`."""
+        return self._source.config
 
     @property
     def queries_logged(self) -> bool:
@@ -224,43 +190,6 @@ class DatabaseConnection:
 
     # ##### Connection and cursor methods #####
 
-    def get_connection_params(self) -> dict[str, Any]:
-        """Return a dict of parameters suitable for psycopg.connect()."""
-        settings_dict = self.settings_dict
-        options = settings_dict.get("OPTIONS", {})
-        db_name = settings_dict["DATABASE"]
-        if len(db_name) > MAX_NAME_LENGTH:
-            raise ImproperlyConfigured(
-                "The database name '%s' (%d characters) is longer than "  # noqa: UP031
-                "PostgreSQL's limit of %d characters. Supply a shorter "
-                "database name in POSTGRES_URL."
-                % (
-                    db_name,
-                    len(db_name),
-                    MAX_NAME_LENGTH,
-                )
-            )
-        conn_params: dict[str, Any] = {
-            "dbname": db_name,
-            **options,
-        }
-
-        if settings_dict["USER"]:
-            conn_params["user"] = settings_dict["USER"]
-        if settings_dict["PASSWORD"]:
-            conn_params["password"] = settings_dict["PASSWORD"]
-        if settings_dict["HOST"]:
-            conn_params["host"] = settings_dict["HOST"]
-        if settings_dict["PORT"]:
-            conn_params["port"] = settings_dict["PORT"]
-        conn_params["context"] = get_adapters_template()
-        # ClientCursor does client-side parameter binding and issues no
-        # server-side prepared statements — safe behind transaction-mode
-        # poolers like pgbouncer.
-        conn_params["cursor_factory"] = psycopg.ClientCursor
-        conn_params["prepare_threshold"] = conn_params.pop("prepare_threshold", None)
-        return conn_params
-
     def _set_autocommit(self, autocommit: bool) -> None:
         """Backend-specific implementation to enable or disable autocommit."""
         assert self.connection is not None
@@ -274,37 +203,6 @@ class DatabaseConnection:
         with self.cursor() as cursor:
             cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
             cursor.execute("SET CONSTRAINTS ALL DEFERRED")
-
-    def is_usable(self) -> bool:
-        """
-        Test if the database connection is usable.
-
-        This method may assume that self.connection is not None.
-
-        Actual implementations should take care not to raise exceptions
-        as that may prevent Plain from recycling unusable connections.
-        """
-        assert self.connection is not None
-        try:
-            # Use psycopg directly, bypassing Plain's utilities.
-            self.connection.execute("SELECT 1")
-        except psycopg.Error:
-            return False
-        else:
-            return True
-
-    @contextmanager
-    def _maintenance_cursor(self) -> Generator[utils.CursorWrapper]:
-        """
-        Return a cursor connected to the PostgreSQL maintenance database
-        for admin operations like test db creation/deletion.
-        """
-        conn = DatabaseConnection({**self.settings_dict, "DATABASE": "postgres"})
-        try:
-            with conn.cursor() as cursor:
-                yield cursor
-        finally:
-            conn.close()
 
     @cached_property
     def pg_version(self) -> int:
@@ -324,15 +222,8 @@ class DatabaseConnection:
         self.savepoint_ids = []
         self.atomic_blocks = []
         self.needs_rollback = False
-        # Reset parameters defining when to close/health-check the connection.
-        self.health_check_enabled = self.settings_dict["CONN_HEALTH_CHECKS"]
-        max_age = self.settings_dict["CONN_MAX_AGE"]
-        self.close_at = None if max_age is None else time.monotonic() + max_age
         self.closed_in_transaction = False
-        # New connections are healthy.
-        self.health_check_done = True
-        # Establish the connection
-        self.connection = psycopg.connect(**self.get_connection_params())
+        self.connection = self._source.acquire()
         self.set_autocommit(True)
 
         self.run_on_commit = []
@@ -355,7 +246,6 @@ class DatabaseConnection:
         return wrapped_cursor
 
     def _cursor(self) -> utils.CursorWrapper:
-        self.close_if_health_check_failed()
         self.ensure_connection()
         assert self.connection is not None
         return self._prepare_cursor(self.connection.cursor())
@@ -372,7 +262,7 @@ class DatabaseConnection:
 
     def _close(self) -> None:
         if self.connection is not None:
-            return self.connection.close()
+            self._source.release(self.connection)
 
     # ##### Generic wrappers for PEP-249 connection methods #####
 
@@ -405,11 +295,12 @@ class DatabaseConnection:
         try:
             self._close()
         finally:
+            # Null the reference so __del__ (and ensure_connection) can't
+            # touch an already-released psycopg connection.
+            self.connection = None
             if self.in_atomic_block:
                 self.closed_in_transaction = True
                 self.needs_rollback = True
-            else:
-                self.connection = None
 
     # ##### Savepoint management #####
 
@@ -492,7 +383,6 @@ class DatabaseConnection:
         directly — use atomic() instead.
         """
         self.validate_no_atomic_block()
-        self.close_if_health_check_failed()
         self.ensure_connection()
 
         if autocommit:
@@ -537,45 +427,6 @@ class DatabaseConnection:
                 "An error occurred in the current transaction. You can't "
                 "execute queries until the end of the 'atomic' block."
             ) from self.rollback_exc
-
-    # ##### Connection termination handling #####
-
-    def close_if_health_check_failed(self) -> None:
-        """Close existing connection if it fails a health check."""
-        if (
-            self.connection is None
-            or not self.health_check_enabled
-            or self.health_check_done
-        ):
-            return
-
-        if not self.is_usable():
-            self.close()
-        self.health_check_done = True
-
-    def close_if_unusable_or_obsolete(self) -> None:
-        """
-        Close the current connection if it's broken, improperly restored,
-        or has outlived its maximum age.
-        """
-        if self.connection is not None:
-            self.health_check_done = False
-            # If autocommit was not restored (e.g. a transaction was not
-            # properly closed), don't take chances, drop the connection.
-            if not self.get_autocommit():
-                self.close()
-                return
-
-            # If psycopg detected the connection is dead (e.g. server
-            # terminated the backend), close our wrapper so the next
-            # request gets a fresh connection.
-            if self.connection.closed:
-                self.close()
-                return
-
-            if self.close_at is not None and time.monotonic() >= self.close_at:
-                self.close()
-                return
 
     # ##### Miscellaneous #####
 
