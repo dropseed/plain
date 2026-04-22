@@ -1,26 +1,22 @@
 from __future__ import annotations
 
 import _thread
-import datetime
 import os
 import signal
 import subprocess
 import time
 import warnings
-import zoneinfo
 from collections import deque
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, Any, LiteralString, NamedTuple, cast
 
-import psycopg as Database
-from psycopg import ClientCursor, IsolationLevel, adapt, adapters, errors
+import psycopg
+from psycopg import adapt, adapters, errors
 from psycopg import sql as psycopg_sql
-from psycopg.abc import Buffer, PyFormat
+from psycopg.abc import PyFormat
 from psycopg.postgres import types as pg_types
-from psycopg.pq import Format
-from psycopg.types.datetime import TimestamptzLoader
 from psycopg.types.range import BaseRangeDumper, Range, RangeDumper
 from psycopg.types.string import TextLoader
 
@@ -69,29 +65,8 @@ class TableInfo(NamedTuple):
 
 
 # Type OIDs
-TIMESTAMPTZ_OID = adapters.types["timestamptz"].oid
 TSRANGE_OID = pg_types["tsrange"].oid
 TSTZRANGE_OID = pg_types["tstzrange"].oid
-
-
-class BaseTzLoader(TimestamptzLoader):
-    """
-    Load a PostgreSQL timestamptz using a specific timezone.
-    The timezone can be None too, in which case it will be chopped.
-    """
-
-    timezone: datetime.tzinfo | None = None
-
-    def load(self, data: Buffer) -> datetime.datetime:
-        res = super().load(data)
-        return res.replace(tzinfo=self.timezone)
-
-
-def register_tzloader(tz: datetime.tzinfo | None, context: Any) -> None:
-    class SpecificTzLoader(BaseTzLoader):
-        timezone = tz
-
-    context.adapters.register_loader("timestamptz", SpecificTzLoader)
 
 
 class PlainRangeDumper(RangeDumper):
@@ -105,7 +80,7 @@ class PlainRangeDumper(RangeDumper):
 
 
 @lru_cache
-def get_adapters_template(timezone: datetime.tzinfo | None) -> adapt.AdaptersMap:
+def get_adapters_template() -> adapt.AdaptersMap:
     ctx = adapt.AdaptersMap(adapters)
     # No-op JSON loader to avoid psycopg3 round trips
     ctx.register_loader("jsonb", TextLoader)
@@ -113,7 +88,6 @@ def get_adapters_template(timezone: datetime.tzinfo | None) -> adapt.AdaptersMap
     ctx.register_loader("inet", TextLoader)
     ctx.register_loader("cidr", TextLoader)
     ctx.register_dumper(Range, PlainRangeDumper)
-    register_tzloader(timezone, ctx)
     return ctx
 
 
@@ -232,32 +206,8 @@ class DatabaseConnection:
             "OPTIONS": parsed.get("OPTIONS", {}),
             "CONN_MAX_AGE": settings.POSTGRES_CONN_MAX_AGE,
             "CONN_HEALTH_CHECKS": settings.POSTGRES_CONN_HEALTH_CHECKS,
-            "TIME_ZONE": settings.POSTGRES_TIME_ZONE,
         }
         return cls(config)
-
-    @cached_property
-    def timezone(self) -> datetime.tzinfo:
-        """
-        Return a tzinfo of the database connection time zone.
-
-        When a datetime is read from the database, it is returned in this time
-        zone. Since PostgreSQL supports time zones, it doesn't matter which
-        time zone Plain uses, as long as aware datetimes are used everywhere.
-        Other users connecting to the database can choose their own time zone.
-        """
-        if self.settings_dict["TIME_ZONE"] is None:
-            return datetime.UTC
-        return zoneinfo.ZoneInfo(self.settings_dict["TIME_ZONE"])
-
-    @cached_property
-    def timezone_name(self) -> str:
-        """
-        Name of the time zone of the database connection.
-        """
-        if self.settings_dict["TIME_ZONE"] is None:
-            return "UTC"
-        return self.settings_dict["TIME_ZONE"]
 
     @property
     def queries_logged(self) -> bool:
@@ -275,7 +225,7 @@ class DatabaseConnection:
     # ##### Connection and cursor methods #####
 
     def get_connection_params(self) -> dict[str, Any]:
-        """Return a dict of parameters suitable for get_new_connection."""
+        """Return a dict of parameters suitable for psycopg.connect()."""
         settings_dict = self.settings_dict
         options = settings_dict.get("OPTIONS", {})
         db_name = settings_dict["DATABASE"]
@@ -295,9 +245,6 @@ class DatabaseConnection:
             **options,
         }
 
-        conn_params.pop("assume_role", None)
-        conn_params.pop("isolation_level", None)
-        conn_params.pop("server_side_binding", None)
         if settings_dict["USER"]:
             conn_params["user"] = settings_dict["USER"]
         if settings_dict["PASSWORD"]:
@@ -306,89 +253,13 @@ class DatabaseConnection:
             conn_params["host"] = settings_dict["HOST"]
         if settings_dict["PORT"]:
             conn_params["port"] = settings_dict["PORT"]
-        conn_params["context"] = get_adapters_template(self.timezone)
-        # Disable prepared statements by default to keep connection poolers
-        # working. Can be reenabled via OPTIONS in the settings dict.
+        conn_params["context"] = get_adapters_template()
+        # ClientCursor does client-side parameter binding and issues no
+        # server-side prepared statements — safe behind transaction-mode
+        # poolers like pgbouncer.
+        conn_params["cursor_factory"] = psycopg.ClientCursor
         conn_params["prepare_threshold"] = conn_params.pop("prepare_threshold", None)
         return conn_params
-
-    def get_new_connection(self, conn_params: dict[str, Any]) -> PsycopgConnection[Any]:
-        """Open a connection to the database."""
-        # self.isolation_level must be set:
-        # - after connecting to the database in order to obtain the database's
-        #   default when no value is explicitly specified in options.
-        # - before calling _set_autocommit() because if autocommit is on, that
-        #   will set connection.isolation_level to ISOLATION_LEVEL_AUTOCOMMIT.
-        options = self.settings_dict.get("OPTIONS", {})
-        set_isolation_level = False
-        try:
-            isolation_level_value = options["isolation_level"]
-        except KeyError:
-            self.isolation_level = IsolationLevel.READ_COMMITTED
-        else:
-            # Set the isolation level to the value from OPTIONS.
-            try:
-                self.isolation_level = IsolationLevel(isolation_level_value)
-                set_isolation_level = True
-            except ValueError:
-                raise ImproperlyConfigured(
-                    f"Invalid transaction isolation level {isolation_level_value} "
-                    f"specified. Use one of the psycopg.IsolationLevel values."
-                )
-        connection = Database.connect(**conn_params)
-        if set_isolation_level:
-            connection.isolation_level = self.isolation_level
-        # Use server-side binding cursor if requested, otherwise standard cursor
-        connection.cursor_factory = (
-            ServerBindingCursor
-            if options.get("server_side_binding") is True
-            else Cursor
-        )
-        return connection
-
-    def ensure_timezone(self) -> bool:
-        """
-        Ensure the connection's timezone is set to `self.timezone_name` and
-        return whether it changed or not.
-        """
-        if self.connection is None:
-            return False
-        conn_timezone_name = self.connection.info.parameter_status("TimeZone")
-        timezone_name = self.timezone_name
-        if timezone_name and conn_timezone_name != timezone_name:
-            self.connection.execute(
-                "SELECT set_config('TimeZone', %s, false)", [timezone_name]
-            )
-            return True
-        return False
-
-    def ensure_role(self) -> bool:
-        if self.connection is None:
-            return False
-        if new_role := self.settings_dict.get("OPTIONS", {}).get("assume_role"):
-            sql_str = self.compose_sql("SET ROLE %s", [new_role])
-            self.connection.execute(sql_str)  # ty: ignore[invalid-argument-type]
-            return True
-        return False
-
-    def init_connection_state(self) -> None:
-        """Initialize the database connection settings."""
-        self.ensure_timezone()
-        # Set the role on the connection. This is useful if the credential used
-        # to login is not the same as the role that owns database resources. As
-        # can be the case when using temporary or ephemeral credentials.
-        self.ensure_role()
-
-    def create_cursor(self) -> Any:
-        """Create a cursor. Assume that a connection is established."""
-        assert self.connection is not None
-        cursor = self.connection.cursor()
-
-        # Register the cursor timezone only if the connection disagrees, to avoid copying the adapter map.
-        tzloader = self.connection.adapters.get_loader(TIMESTAMPTZ_OID, Format.TEXT)
-        if self.timezone != tzloader.timezone:  # ty: ignore[unresolved-attribute]
-            register_tzloader(self.timezone, cursor)
-        return cursor
 
     def _set_autocommit(self, autocommit: bool) -> None:
         """Backend-specific implementation to enable or disable autocommit."""
@@ -440,7 +311,7 @@ class DatabaseConnection:
         try:
             # Use psycopg directly, bypassing Plain's utilities.
             self.connection.execute("SELECT 1")
-        except Database.Error:
+        except psycopg.Error:
             return False
         else:
             return True
@@ -464,7 +335,7 @@ class DatabaseConnection:
             assert self.connection is not None
             return self.connection.info.server_version
 
-    def make_debug_cursor(self, cursor: Any) -> CursorDebugWrapper:
+    def make_debug_cursor(self, cursor: psycopg.Cursor[Any]) -> CursorDebugWrapper:
         return CursorDebugWrapper(cursor, self)
 
     # ##### Connection lifecycle #####
@@ -484,10 +355,8 @@ class DatabaseConnection:
         # New connections are healthy.
         self.health_check_done = True
         # Establish the connection
-        conn_params = self.get_connection_params()
-        self.connection = self.get_new_connection(conn_params)
+        self.connection = psycopg.connect(**self.get_connection_params())
         self.set_autocommit(True)
-        self.init_connection_state()
 
         self.run_on_commit = []
 
@@ -498,7 +367,7 @@ class DatabaseConnection:
 
     # ##### PEP-249 connection method wrappers #####
 
-    def _prepare_cursor(self, cursor: Any) -> utils.CursorWrapper:
+    def _prepare_cursor(self, cursor: psycopg.Cursor[Any]) -> utils.CursorWrapper:
         """
         Validate the connection is usable and perform database cursor wrapping.
         """
@@ -511,7 +380,8 @@ class DatabaseConnection:
     def _cursor(self) -> utils.CursorWrapper:
         self.close_if_health_check_failed()
         self.ensure_connection()
-        return self._prepare_cursor(self.create_cursor())
+        assert self.connection is not None
+        return self._prepare_cursor(self.connection.cursor())
 
     def _commit(self) -> None:
         if self.connection is not None:
@@ -732,7 +602,7 @@ class DatabaseConnection:
 
     # ##### Miscellaneous #####
 
-    def make_cursor(self, cursor: Any) -> utils.CursorWrapper:
+    def make_cursor(self, cursor: psycopg.Cursor[Any]) -> utils.CursorWrapper:
         """Create a cursor without debug logging."""
         return utils.CursorWrapper(cursor, self)
 
@@ -830,7 +700,7 @@ class DatabaseConnection:
         cursor to properly format parameters.
         """
         assert self.connection is not None
-        return ClientCursor(self.connection).mogrify(
+        return psycopg.ClientCursor(self.connection).mogrify(
             psycopg_sql.SQL(cast(LiteralString, query)), params
         )
 
@@ -1105,42 +975,6 @@ class DatabaseConnection:
                     "valid": valid,
                 }
         return constraints
-
-
-class CursorMixin:
-    """
-    A subclass of psycopg cursor implementing callproc.
-    """
-
-    def callproc(
-        self, name: str | psycopg_sql.Identifier, args: list[Any] | None = None
-    ) -> list[Any] | None:
-        if not isinstance(name, psycopg_sql.Identifier):
-            name = psycopg_sql.Identifier(name)
-
-        qparts: list[psycopg_sql.Composable] = [
-            psycopg_sql.SQL("SELECT * FROM "),
-            name,
-            psycopg_sql.SQL("("),
-        ]
-        if args:
-            for item in args:
-                qparts.append(psycopg_sql.Literal(item))
-                qparts.append(psycopg_sql.SQL(","))
-            del qparts[-1]
-
-        qparts.append(psycopg_sql.SQL(")"))
-        stmt = psycopg_sql.Composed(qparts)
-        self.execute(stmt)  # ty: ignore[unresolved-attribute]
-        return args
-
-
-class ServerBindingCursor(CursorMixin, Database.Cursor):
-    pass
-
-
-class Cursor(CursorMixin, Database.ClientCursor):
-    pass
 
 
 class CursorDebugWrapper(BaseCursorDebugWrapper):

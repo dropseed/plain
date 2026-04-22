@@ -18,7 +18,6 @@ POSTGRES_MANAGEMENT_URL: Secret[str] = ""
 # Connection behavior
 POSTGRES_CONN_MAX_AGE: int = 600
 POSTGRES_CONN_HEALTH_CHECKS: bool = True
-POSTGRES_TIME_ZONE: str | None = None
 
 # DDL timeouts. Applied per-statement via SET LOCAL before every framework-
 # issued DDL in migrations and convergence. Values are Postgres interval

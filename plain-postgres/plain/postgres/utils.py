@@ -112,25 +112,8 @@ class CursorWrapper:
                 except psycopg.Error:
                     pass
 
-    # The following methods cannot be implemented in __getattr__, because the
-    # code must run when the method is invoked, not just when it is accessed.
-
-    def callproc(
-        self,
-        procname: str,
-        params: Sequence[Any] | None = None,
-        kparams: Mapping[str, Any] | None = None,
-    ) -> Any:
-        # Keyword parameters for callproc aren't supported in PEP 249.
-        # PostgreSQL's psycopg doesn't support them either.
-        if kparams is not None:
-            raise psycopg.NotSupportedError(
-                "Keyword parameters for callproc are not supported."
-            )
-        self.db.validate_no_broken_transaction()
-        if params is None:
-            return self.cursor.callproc(procname)
-        return self.cursor.callproc(procname, params)
+    # execute() and executemany() cannot be implemented in __getattr__ because
+    # the code must run when the method is invoked, not just when it is accessed.
 
     def execute(
         self, sql: str, params: Sequence[Any] | Mapping[str, Any] | None = None
@@ -171,8 +154,6 @@ class CursorWrapper:
 
 
 class CursorDebugWrapper(CursorWrapper):
-    # XXX callproc isn't instrumented at this time.
-
     def stream(
         self, sql: str, params: Sequence[Any] | None = None
     ) -> Generator[tuple[Any, ...]]:

@@ -1239,7 +1239,6 @@ The connection is configured with a single URL (`POSTGRES_URL`). `DATABASE_URL` 
 | `POSTGRES_MANAGEMENT_URL`                | `Secret[str]` | `""`                    | `PLAIN_POSTGRES_MANAGEMENT_URL`                |
 | `POSTGRES_CONN_MAX_AGE`                  | `int`         | `600`                   | `PLAIN_POSTGRES_CONN_MAX_AGE`                  |
 | `POSTGRES_CONN_HEALTH_CHECKS`            | `bool`        | `True`                  | `PLAIN_POSTGRES_CONN_HEALTH_CHECKS`            |
-| `POSTGRES_TIME_ZONE`                     | `str \| None` | `None`                  | `PLAIN_POSTGRES_TIME_ZONE`                     |
 | `POSTGRES_MIGRATION_LOCK_TIMEOUT`        | `str`         | `"3s"`                  | `PLAIN_POSTGRES_MIGRATION_LOCK_TIMEOUT`        |
 | `POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   | `str`         | `"3s"`                  | `PLAIN_POSTGRES_MIGRATION_STATEMENT_TIMEOUT`   |
 | `POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      | `str`         | `"3s"`                  | `PLAIN_POSTGRES_CONVERGENCE_LOCK_TIMEOUT`      |
