@@ -131,9 +131,6 @@ class DatabaseConnection:
         self.needs_rollback: bool = False
         self.rollback_exc: Exception | None = None
 
-        # Connection termination related attributes.
-        self.closed_in_transaction: bool = False
-
         # A list of no-argument functions to run when the transaction commits.
         # Each entry is an (sids, func, robust) tuple, where sids is a set of
         # the active savepoint IDs when this function was registered and robust
@@ -217,16 +214,8 @@ class DatabaseConnection:
 
     def connect(self) -> None:
         """Connect to the database. Assume that the connection is closed."""
-        # In case the previous connection was closed while in an atomic block
-        self.in_atomic_block = False
-        self.savepoint_ids = []
-        self.atomic_blocks = []
-        self.needs_rollback = False
-        self.closed_in_transaction = False
         self.connection = self._source.acquire()
         self.set_autocommit(True)
-
-        self.run_on_commit = []
 
     def ensure_connection(self) -> None:
         """Guarantee that a connection to the database is established."""
@@ -260,10 +249,6 @@ class DatabaseConnection:
             with debug_transaction(self, "ROLLBACK"):
                 return self.connection.rollback()
 
-    def _close(self) -> None:
-        if self.connection is not None:
-            self._source.release(self.connection)
-
     # ##### Generic wrappers for PEP-249 connection methods #####
 
     def cursor(self) -> utils.CursorWrapper:
@@ -285,22 +270,21 @@ class DatabaseConnection:
 
     def close(self) -> None:
         """Close the connection to the database."""
-        self.run_on_commit = []
+        # Closing mid-atomic would reopen a fresh autocommit connection on
+        # the next cursor() and silently run the rest of the block outside
+        # its transaction. Callers that drop a connection during error
+        # recovery (see Atomic.__exit__) unwind the atomic state first.
+        self.validate_no_atomic_block()
 
-        # Don't call validate_no_atomic_block() to avoid making it difficult
-        # to get rid of a connection in an invalid state. The next connect()
-        # will reset the transaction state anyway.
-        if self.closed_in_transaction or self.connection is None:
+        self.run_on_commit = []
+        if self.connection is None:
             return
         try:
-            self._close()
+            self._source.release(self.connection)
         finally:
             # Null the reference so __del__ (and ensure_connection) can't
             # touch an already-released psycopg connection.
             self.connection = None
-            if self.in_atomic_block:
-                self.closed_in_transaction = True
-                self.needs_rollback = True
 
     # ##### Savepoint management #####
 

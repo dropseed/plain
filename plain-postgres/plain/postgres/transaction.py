@@ -142,12 +142,7 @@ class Atomic(ContextDecorator):
             conn.in_atomic_block = False
 
         try:
-            if conn.closed_in_transaction:
-                # The database will perform a rollback by itself.
-                # Wait until we exit the outermost block.
-                pass
-
-            elif exc_type is None and not conn.needs_rollback:
+            if exc_type is None and not conn.needs_rollback:
                 if conn.in_atomic_block:
                     # Release savepoint if there is one
                     if sid is not None:
@@ -207,12 +202,13 @@ class Atomic(ContextDecorator):
                         conn.close()
 
         finally:
-            # Outermost block exit when autocommit was enabled.
-            if not conn.in_atomic_block:
-                if conn.closed_in_transaction:
-                    conn.connection = None
-                else:
-                    conn.set_autocommit(True)
+            # Outermost block exit when autocommit was enabled. Skip when
+            # the connection was dropped during rollback/commit failure —
+            # ensure_connection() would otherwise acquire a fresh pool
+            # connection just to flip autocommit while the original error
+            # is still propagating.
+            if not conn.in_atomic_block and conn.connection is not None:
+                conn.set_autocommit(True)
 
 
 def atomic[F: Callable[..., Any]](
