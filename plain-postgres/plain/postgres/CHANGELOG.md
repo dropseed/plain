@@ -1,5 +1,35 @@
 # plain-postgres changelog
 
+## [0.97.0](https://github.com/dropseed/plain/releases/plain-postgres@0.97.0) (2026-04-21)
+
+### What's changed
+
+- **Replaced individual `POSTGRES_*` connection fields with a single `POSTGRES_URL` setting.** `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DATABASE`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_OPTIONS`, and `POSTGRES_TIME_ZONE` are gone — configure the connection with one URL (e.g. `postgresql://user:pass@host:5432/db?sslmode=require`). `DATABASE_URL` is still read as a fallback. Set the URL to `none` to explicitly disable the database (e.g. during Docker image builds). ([770a74606463](https://github.com/dropseed/plain/commit/770a74606463))
+- **Added `POSTGRES_MANAGEMENT_URL` for routing DDL through a separate connection.** When set, `plain migrations create|apply|list|prune|squash`, `plain postgres sync|converge|schema|diagnose|drop-unknown-tables|shell` connect through this URL instead of `POSTGRES_URL`. Use it to bypass transaction-mode poolers (PlanetScale, Supabase's pooler, Neon's pooler, pgbouncer) for schema changes, long transactions, and `pg_dump`. A new `use_management_connection()` context manager routes custom code through the same connection. When unset, all commands use `POSTGRES_URL` — no behavior change for existing apps. ([d1cc9630d049](https://github.com/dropseed/plain/commit/d1cc9630d049))
+- **Extracted the test-database lifecycle off `DatabaseConnection`.** Test setup/teardown now lives in `plain.postgres.test` instead of coupling it to the runtime connection class. ([ea67f82c746c](https://github.com/dropseed/plain/commit/ea67f82c746c))
+- **Removed thin psycopg re-export wrappers.** Internal code now imports directly from `psycopg` rather than the redundant Plain-level passthroughs. ([d1cb74100e0d](https://github.com/dropseed/plain/commit/d1cb74100e0d))
+
+### Upgrade instructions
+
+- **Replace individual `POSTGRES_*` settings with `POSTGRES_URL`** in `app/settings.py` (or `PLAIN_POSTGRES_URL` in the environment). For example:
+
+    ```python
+    # Before
+    POSTGRES_HOST = "localhost"
+    POSTGRES_PORT = 5432
+    POSTGRES_DATABASE = "myapp"
+    POSTGRES_USER = "app"
+    POSTGRES_PASSWORD = "secret"
+
+    # After
+    POSTGRES_URL = "postgresql://app:secret@localhost:5432/myapp"
+    ```
+
+    Apps that already set `DATABASE_URL` in the environment don't need any change.
+
+- **If `POSTGRES_OPTIONS` or `POSTGRES_TIME_ZONE` were set**, move them into the URL as query parameters (e.g. `?application_name=web&timezone=UTC`).
+- **If you run behind a transaction-mode pooler**, consider setting `POSTGRES_MANAGEMENT_URL` to a direct-to-Postgres connection string so `plain migrations` and `plain postgres sync` can issue DDL.
+
 ## [0.96.0](https://github.com/dropseed/plain/releases/plain-postgres@0.96.0) (2026-04-17)
 
 ### What's changed
