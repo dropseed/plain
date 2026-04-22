@@ -1,5 +1,17 @@
 # plain-auth changelog
 
+## [0.29.3](https://github.com/dropseed/plain/releases/plain-auth@0.29.3) (2026-04-21)
+
+### What's changed
+
+- **Migrated `AuthView` to the new `View` lifecycle hooks.** `check_auth()` runs in `before_request`, the login-redirect logic runs in `handle_exception` (triggered when `check_auth` raises `LoginRequired`), and the `Cache-Control: private` header is set in `after_response`. Behavior is unchanged for users. ([48effac976a9](https://github.com/dropseed/plain/commit/48effac976a9), [a4a88ed08cb9](https://github.com/dropseed/plain/commit/a4a88ed08cb9), [0da5639d17e2](https://github.com/dropseed/plain/commit/0da5639d17e2))
+- **`LoginRequired` now subclasses `plain.http.HTTPException`** with `status_code = 401`. Generic handlers (logging, APIs) treat it as a 401 by default; `AuthView.handle_exception` still renders the login redirect for HTML views. The constructor no longer defaults `login_url` to `settings.AUTH_LOGIN_URL` — callers resolve it explicitly (pass `None` to render as 403). ([a4a88ed08cb9](https://github.com/dropseed/plain/commit/a4a88ed08cb9))
+
+### Upgrade instructions
+
+- Requires `plain>=0.133.0`.
+- **If you raise `LoginRequired()` directly** with no arguments, pass the login URL explicitly: `LoginRequired(settings.AUTH_LOGIN_URL)`. Passing `None` keeps the old "no login page → 403" behavior.
+
 ## [0.29.2](https://github.com/dropseed/plain/releases/plain-auth@0.29.2) (2026-04-17)
 
 ### What's changed
