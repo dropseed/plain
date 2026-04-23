@@ -370,11 +370,11 @@ Use it for auth checks, rate limiting, or any precondition. `AuthView` overrides
 Runs after the response is built — for successes, responses from `handle_exception`, and 405 method-not-allowed. Return the response (mutated or replaced). Default is a no-op.
 
 ```python
-from plain.http import ResponseBase
+from plain.http import Response
 from plain.utils.cache import patch_cache_control
 
 class MyView(View):
-    def after_response(self, response: ResponseBase) -> ResponseBase:
+    def after_response(self, response: Response) -> Response:
         patch_cache_control(response, private=True)
         return response
 ```
@@ -386,10 +386,10 @@ Exceptions raised inside `after_response` are not routed through `handle_excepti
 Converts an exception raised during `before_request` or the handler into a response. Subclasses override it to format errors for their clients.
 
 ```python
-from plain.http import ResponseBase
+from plain.http import Response
 
 class MyView(View):
-    def handle_exception(self, exc: Exception) -> ResponseBase:
+    def handle_exception(self, exc: Exception) -> Response:
         if isinstance(exc, MyAppError):
             return JsonResponse({"error": str(exc)}, status_code=400)
         return super().handle_exception(exc)

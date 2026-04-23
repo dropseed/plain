@@ -17,7 +17,7 @@ from .registry import registry, track_recent_nav
 from .types import Img
 
 if TYPE_CHECKING:
-    from plain.http import ResponseBase
+    from plain.http import Response
     from plain.postgres import Model
 
     from ..cards import Card
@@ -78,7 +78,7 @@ class AdminView(AuthView, TemplateView):
         if self.nav_section is not None:
             track_recent_nav(self.request, self.get_slug())
 
-    def after_response(self, response: ResponseBase) -> ResponseBase:
+    def after_response(self, response: Response) -> Response:
         response = super().after_response(response)
         response.headers["Cache-Control"] = (
             "no-cache, no-store, must-revalidate, max-age=0"

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plain.http import HTTPException, Response, ResponseBase
+from plain.http import HTTPException, Response
 from plain.logs import get_framework_logger, log_exception
 from plain.runtime import settings
 from plain.templates import Template, TemplateFileMissing
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 request_logger = get_framework_logger("plain.request")
 
 
-def response_for_exception(request: Request, exc: Exception) -> ResponseBase:
+def response_for_exception(request: Request, exc: Exception) -> Response:
     log_exception(request, exc)
 
     status = exc.status_code if isinstance(exc, HTTPException) else 500

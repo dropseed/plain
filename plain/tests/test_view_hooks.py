@@ -8,7 +8,7 @@ import logging
 
 import pytest
 
-from plain.http import Response, ResponseBase
+from plain.http import Response
 from plain.internal.handlers.exception import response_for_exception
 from plain.test import RequestFactory
 from plain.views import View
@@ -59,13 +59,13 @@ class TestAfterResponseChaining:
 
     def test_two_mixins_both_run(self, caplog):
         class AHeader(View):
-            def after_response(self, response: ResponseBase) -> ResponseBase:
+            def after_response(self, response: Response) -> Response:
                 response = super().after_response(response)
                 response.headers["X-A"] = "a"
                 return response
 
         class BHeader(View):
-            def after_response(self, response: ResponseBase) -> ResponseBase:
+            def after_response(self, response: Response) -> Response:
                 response = super().after_response(response)
                 response.headers["X-B"] = "b"
                 return response
@@ -85,13 +85,13 @@ class TestAfterResponseChaining:
         order: list[str] = []
 
         class Outer(View):
-            def after_response(self, response: ResponseBase) -> ResponseBase:
+            def after_response(self, response: Response) -> Response:
                 response = super().after_response(response)
                 order.append("outer")
                 return response
 
         class Inner(View):
-            def after_response(self, response: ResponseBase) -> ResponseBase:
+            def after_response(self, response: Response) -> Response:
                 response = super().after_response(response)
                 order.append("inner")
                 return response
@@ -107,13 +107,13 @@ class TestAfterResponseChaining:
         """Sanity: confirms the failure mode the fix is guarding against."""
 
         class Outer(View):
-            def after_response(self, response: ResponseBase) -> ResponseBase:
+            def after_response(self, response: Response) -> Response:
                 # Intentionally does NOT super() — proves regression shape.
                 response.headers["X-Outer"] = "1"
                 return response
 
         class Inner(View):
-            def after_response(self, response: ResponseBase) -> ResponseBase:
+            def after_response(self, response: Response) -> Response:
                 response = super().after_response(response)
                 response.headers["X-Inner"] = "1"
                 return response
@@ -140,7 +140,7 @@ class TestHandleExceptionLogging:
             def get(self):
                 raise AppError("nope")
 
-            def handle_exception(self, exc: Exception) -> ResponseBase:
+            def handle_exception(self, exc: Exception) -> Response:
                 if isinstance(exc, AppError):
                     return Response("bad", status_code=400)
                 return super().handle_exception(exc)

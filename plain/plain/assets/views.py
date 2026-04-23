@@ -38,7 +38,7 @@ class AssetView(View):
     def get_url_path(self) -> str | None:
         return self.url_kwargs["path"]
 
-    def get(self) -> Response | FileResponse | StreamingResponse:
+    def get(self) -> Response:
         url_path = self.get_url_path()
 
         if not url_path:
@@ -299,7 +299,7 @@ class AssetView(View):
             response.log_access = False
         return response
 
-    def get_range_response(self, path: str) -> Response | StreamingResponse | None:
+    def get_range_response(self, path: str) -> Response | None:
         """
         Support range requests (HTTP 206 response).
         """

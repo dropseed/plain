@@ -8,7 +8,7 @@ from io import BytesIO, IOBase
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse, urlsplit
 
-from plain.http import AsyncStreamingResponse, QueryDict, Request
+from plain.http import AsyncStreamingResponse, QueryDict, Request, StreamingResponse
 from plain.http import Response as HttpResponse
 from plain.internal.handlers.base import BaseHandler
 from plain.json import PlainJSONEncoder
@@ -22,7 +22,7 @@ from .encoding import encode_multipart
 from .exceptions import RedirectCycleError
 
 if TYPE_CHECKING:
-    from plain.http import ResponseBase
+    from plain.http import Response
     from plain.urls import ResolverMatch
 
 __all__ = (
@@ -43,13 +43,13 @@ class ClientResponse:
     """
     Response wrapper returned by test Client with test-specific attributes.
 
-    Wraps any ResponseBase subclass and adds attributes useful for testing,
+    Wraps any Response subclass and adds attributes useful for testing,
     while delegating all other attribute access to the wrapped response.
     """
 
     def __init__(
         self,
-        response: ResponseBase,
+        response: Response,
         client: Client,
     ):
         # Store wrapped response in __dict__ directly to avoid __setattr__ recursion
@@ -158,24 +158,22 @@ class FakePayload(IOBase):
         self.__len += len(content)
 
 
-def _conditional_content_removal(
-    request: Request, response: ResponseBase
-) -> ResponseBase:
+def _conditional_content_removal(request: Request, response: Response) -> Response:
     """
     Simulate the behavior of most web servers by removing the content of
     responses for HEAD requests, 1xx, 204, and 304 responses. Ensure
     compliance with RFC 9112 Section 6.3.
     """
-    if 100 <= response.status_code < 200 or response.status_code in (204, 304):
-        if hasattr(response, "streaming") and response.streaming:
-            response.streaming_content = []  # ty: ignore[invalid-assignment]
-        elif hasattr(response, "content"):
-            response.content = b""  # ty: ignore[invalid-assignment]
-    if request.method == "HEAD":
-        if hasattr(response, "streaming") and response.streaming:
-            response.streaming_content = []  # ty: ignore[invalid-assignment]
-        elif hasattr(response, "content"):
-            response.content = b""  # ty: ignore[invalid-assignment]
+    should_strip = (
+        100 <= response.status_code < 200
+        or response.status_code in (204, 304)
+        or request.method == "HEAD"
+    )
+    if should_strip:
+        if isinstance(response, StreamingResponse):
+            response.streaming_content = iter([])
+        elif not response.streaming:
+            response.content = b""
     return response
 
 
@@ -186,7 +184,7 @@ class ClientHandler(BaseHandler):
     Request attached to its ``request`` attribute.
     """
 
-    def __call__(self, request: Request) -> ResponseBase:
+    def __call__(self, request: Request) -> Response:
         # Set up middleware if needed. We couldn't do this earlier, because
         # settings weren't available.
         if self._middleware_chain is None:
@@ -225,9 +223,7 @@ class ClientHandler(BaseHandler):
 
         return response
 
-    def _collect_async_streaming(
-        self, response: AsyncStreamingResponse
-    ) -> ResponseBase:
+    def _collect_async_streaming(self, response: AsyncStreamingResponse) -> Response:
         """Collect async streaming content into a regular Response for tests."""
 
         async def _collect(resp: AsyncStreamingResponse) -> HttpResponse:
@@ -252,11 +248,11 @@ class ClientHandler(BaseHandler):
 
         return asyncio.run(_collect(response))
 
-    def _handle_async_view(self, request: Request, pending: Any) -> ResponseBase:
+    def _handle_async_view(self, request: Request, pending: Any) -> Response:
         """Await an async view coroutine and run after-middleware."""
         from plain.internal.handlers.exception import response_for_exception
 
-        async def _run() -> ResponseBase:
+        async def _run() -> Response:
             try:
                 resp = await pending.coroutine
                 self._check_response(resp, pending.view_class)

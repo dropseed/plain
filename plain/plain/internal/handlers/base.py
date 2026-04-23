@@ -24,7 +24,6 @@ from opentelemetry.semconv.attributes import (
 )
 from opentelemetry.semconv.metrics.http_metrics import HTTP_SERVER_REQUEST_DURATION
 
-from plain.http import Response
 from plain.runtime import settings
 from plain.urls import get_resolver
 from plain.utils.module_loading import import_string
@@ -33,7 +32,7 @@ from plain.utils.otel import format_exception_type
 from .exception import response_for_exception
 
 if TYPE_CHECKING:
-    from plain.http import Request, ResponseBase
+    from plain.http import Request, Response
     from plain.http.middleware import HttpMiddleware
     from plain.urls import ResolverMatch
 
@@ -169,12 +168,12 @@ class BaseHandler:
             kind=trace.SpanKind.SERVER,
         )
 
-    def _finalize_span(self, span: trace.Span, response: ResponseBase) -> None:
+    def _finalize_span(self, span: trace.Span, response: Response) -> None:
         """Set span status and record exceptions from the response."""
         span.set_attribute(
             http_attributes.HTTP_RESPONSE_STATUS_CODE, response.status_code
         )
-        if isinstance(response, Response):
+        if not response.streaming:
             span.set_attribute(HTTP_RESPONSE_BODY_SIZE, len(response.content))
         if response.status_code >= 500:
             span.set_status(trace.StatusCode.ERROR)
@@ -216,7 +215,7 @@ class BaseHandler:
         self,
         request: Request,
         executor: concurrent.futures.Executor,
-    ) -> ResponseBase:
+    ) -> Response:
         """Single entry point for handling a request.
 
         Creates OTel span and runs the full pipeline: before middleware →
@@ -304,7 +303,7 @@ class BaseHandler:
 
             return response
 
-    def _run_sync_pipeline(self, request: Request) -> ResponseBase | _AsyncViewPending:
+    def _run_sync_pipeline(self, request: Request) -> Response | _AsyncViewPending:
         """Run the entire sync request pipeline on a single thread.
 
         Runs before-middleware, resolves and dispatches the view, then runs
@@ -345,9 +344,9 @@ class BaseHandler:
     def _finish_pipeline(
         self,
         request: Request,
-        response: ResponseBase,
+        response: Response,
         ran_before: list[HttpMiddleware],
-    ) -> ResponseBase:
+    ) -> Response:
         """Run after-middleware.
 
         Always runs inside the request's shared `ctx.run(request_ctx)`,
@@ -379,7 +378,7 @@ class BaseHandler:
 
     def _run_before_request(
         self, request: Request
-    ) -> tuple[ResponseBase | None, list[HttpMiddleware]]:
+    ) -> tuple[Response | None, list[HttpMiddleware]]:
         """Run before_request forward through middleware chain."""
         chain = self._middleware_chain
         assert chain is not None
@@ -405,13 +404,13 @@ class BaseHandler:
     def _run_after_response(
         self,
         request: Request,
-        response: ResponseBase,
+        response: Response,
         ran_before: list[HttpMiddleware],
-    ) -> ResponseBase:
+    ) -> Response:
         """Run after_response in reverse through middleware that ran before_request."""
         for mw in reversed(ran_before):
             try:
-                response = mw.after_response(request, response)  # ty: ignore[invalid-argument-type]
+                response = mw.after_response(request, response)
             except Exception as exc:
                 response = response_for_exception(request, exc)
 
@@ -419,7 +418,7 @@ class BaseHandler:
 
     def _check_response(
         self,
-        response: ResponseBase | None,
+        response: Response | None,
         view_class: type,
     ) -> None:
         """Raise an error if the view returned None."""

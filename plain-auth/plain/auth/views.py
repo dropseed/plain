@@ -10,7 +10,7 @@ from plain.http import (
     NotFoundError404,
     QueryDict,
     RedirectResponse,
-    ResponseBase,
+    Response,
 )
 from plain.runtime import settings
 from plain.sessions.views import SessionView
@@ -100,7 +100,7 @@ class AuthView(SessionView):
     def before_request(self) -> None:
         self.check_auth()
 
-    def handle_exception(self, exc: Exception) -> ResponseBase:
+    def handle_exception(self, exc: Exception) -> Response:
         if isinstance(exc, LoginRequired):
             if not exc.login_url:
                 # No configured login page — treat as a plain 403 and let
@@ -124,7 +124,7 @@ class AuthView(SessionView):
             )
         return super().handle_exception(exc)
 
-    def after_response(self, response: ResponseBase) -> ResponseBase:
+    def after_response(self, response: Response) -> Response:
         response = super().after_response(response)
         if self.user:
             # Make sure it at least has private as a default

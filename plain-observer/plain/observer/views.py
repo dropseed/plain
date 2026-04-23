@@ -5,7 +5,7 @@ from typing import Any
 from plain import postgres
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
-from plain.http import JsonResponse, Response, ResponseBase
+from plain.http import JsonResponse, Response
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.views import DetailView, ListView
@@ -29,7 +29,7 @@ class ObserverTracesView(AuthView, HTMXView, ListView):
 
         super().check_auth()
 
-    def after_response(self, response: ResponseBase) -> ResponseBase:
+    def after_response(self, response: Response) -> Response:
         response = super().after_response(response)
         # So we can load it in the toolbar
         response.headers["X-Frame-Options"] = "SAMEORIGIN"

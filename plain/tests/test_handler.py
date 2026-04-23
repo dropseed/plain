@@ -9,7 +9,7 @@ from middleware_helpers import (
     request_ctxvar,
 )
 
-from plain.http import ResponseBase
+from plain.http import Response
 from plain.internal.handlers.base import BaseHandler
 from plain.runtime import settings
 from plain.test import Client, RequestFactory
@@ -51,7 +51,7 @@ def test_async_pipeline_shares_contextvars_across_threads():
         handler.load_middleware()
         request = RequestFactory().get("/")
 
-        async def run() -> ResponseBase:
+        async def run() -> Response:
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                 return await handler.handle(request, executor)
 

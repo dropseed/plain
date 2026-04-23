@@ -10,7 +10,6 @@ from plain.http import (
     JsonResponse,
     NotFoundError404,
     Response,
-    ResponseBase,
 )
 from plain.utils import timezone
 from plain.utils.cache import patch_cache_control
@@ -33,7 +32,7 @@ __all__ = [
 ]
 
 type APIResult = (
-    ResponseBase
+    Response
     | int
     | None
     | dict[str, Any]
@@ -82,7 +81,7 @@ class APIKeyView(View):
                 )
             )
 
-    def after_response(self, response: ResponseBase) -> ResponseBase:
+    def after_response(self, response: Response) -> Response:
         response = super().after_response(response)
         # Make sure it at least has private as a default
         patch_cache_control(response, private=True)
@@ -147,8 +146,8 @@ class APIKeyView(View):
     "5XX", ErrorSchema, description="Unexpected Error", component_name="ServerError"
 )
 class APIView(View):
-    def convert_value_to_response(self, value: APIResult) -> ResponseBase:
-        if isinstance(value, ResponseBase):
+    def convert_value_to_response(self, value: APIResult) -> Response:
+        if isinstance(value, Response):
             return value
 
         if value is None:
@@ -174,7 +173,7 @@ class APIView(View):
 
         raise TypeError(f"Unexpected APIView return type: {type(value).__name__}")
 
-    def handle_exception(self, exc: Exception) -> ResponseBase:
+    def handle_exception(self, exc: Exception) -> Response:
         if isinstance(exc, ValidationError):
             return _error_response(
                 error_id="validation_error",

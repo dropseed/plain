@@ -103,18 +103,27 @@ class BadHeaderError(ValueError):
     pass
 
 
-class ResponseBase:
-    """
-    An HTTP response base class with dictionary-accessed headers.
+# Private sentinel streaming subclasses pass to skip bytes-body setup in
+# Response.__init__. Using a dedicated object (not None) keeps Response(None)
+# working as before — it goes through the content setter and becomes b"None".
+_NO_CONTENT: Any = object()
 
-    This class doesn't handle content. It should not be used directly.
-    Use the Response and StreamingResponse subclasses instead.
+
+class Response:
+    """
+    An HTTP response class with a bytes body.
+
+    Base class for all response types — streaming variants subclass this
+    and swap the body for an iterator. Users annotate handler returns and
+    middleware with `Response` to cover all response shapes.
     """
 
     status_code = 200
+    streaming = False
 
     def __init__(
         self,
+        content: bytes | str | Iterator[bytes] = b"",
         *,
         content_type: str | None = None,
         status_code: int | None = None,
@@ -149,6 +158,8 @@ class ResponseBase:
         self.exception: Exception | None = None
         # Whether the server should log this response in the access log
         self.log_access: bool = True
+        if content is not _NO_CONTENT:
+            self.content = content
 
     @property
     def reason_phrase(self) -> str:
@@ -317,36 +328,6 @@ class ResponseBase:
         self._resource_closers.clear()
         self.closed = True
 
-
-class Response(ResponseBase):
-    """
-    An HTTP response class with a string as content.
-
-    This content can be read, appended to, or replaced.
-    """
-
-    streaming = False
-
-    def __init__(
-        self,
-        content: bytes | str | Iterator[bytes] = b"",
-        *,
-        content_type: str | None = None,
-        status_code: int | None = None,
-        reason: str | None = None,
-        charset: str | None = None,
-        headers: dict[str, Any] | None = None,
-    ):
-        super().__init__(
-            content_type=content_type,
-            status_code=status_code,
-            reason=reason,
-            charset=charset,
-            headers=headers,
-        )
-        # Content is a bytestring. See the `content` property methods.
-        self.content = content
-
     def __repr__(self) -> str:
         return "<%(cls)s status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
             "cls": self.__class__.__name__,
@@ -378,7 +359,7 @@ class Response(ResponseBase):
         return iter(self._container)
 
 
-class StreamingResponse(ResponseBase):
+class StreamingResponse(Response):
     """
     A streaming HTTP response class with an iterator as content.
 
@@ -400,6 +381,7 @@ class StreamingResponse(ResponseBase):
         headers: dict[str, Any] | None = None,
     ):
         super().__init__(
+            content=_NO_CONTENT,
             content_type=content_type,
             status_code=status_code,
             reason=reason,
@@ -409,13 +391,6 @@ class StreamingResponse(ResponseBase):
         # `streaming_content` should be an iterable of bytestrings.
         # See the `streaming_content` property methods.
         self.streaming_content = streaming_content
-
-    def __repr__(self) -> str:
-        return "<%(cls)s status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
-            "cls": self.__class__.__qualname__,
-            "status_code": self.status_code,
-            "content_type": self._content_type_for_repr,
-        }
 
     @property
     def content(self) -> bytes:
@@ -442,7 +417,7 @@ class StreamingResponse(ResponseBase):
         return iter(self.streaming_content)
 
 
-class AsyncStreamingResponse(ResponseBase):
+class AsyncStreamingResponse(Response):
     """
     A streaming HTTP response class with an async iterator as content.
 
@@ -464,6 +439,7 @@ class AsyncStreamingResponse(ResponseBase):
         headers: dict[str, Any] | None = None,
     ):
         super().__init__(
+            content=_NO_CONTENT,
             content_type=content_type,
             status_code=status_code,
             reason=reason,
@@ -472,18 +448,16 @@ class AsyncStreamingResponse(ResponseBase):
         )
         self._async_iterator = streaming_content
 
-    def __repr__(self) -> str:
-        return "<%(cls)s status_code=%(status_code)d%(content_type)s>" % {  # noqa: UP031
-            "cls": self.__class__.__qualname__,
-            "status_code": self.status_code,
-            "content_type": self._content_type_for_repr,
-        }
-
     @property
     def content(self) -> bytes:
         raise AttributeError(
             f"This {self.__class__.__name__} instance has no `content` attribute. Use "
             "`streaming_content` instead."
+        )
+
+    def __iter__(self) -> Iterator[bytes]:
+        raise TypeError(
+            f"{self.__class__.__name__} is async — use `async for` / `__aiter__` instead."
         )
 
     async def __aiter__(self) -> AsyncIterator[bytes]:

@@ -9,7 +9,6 @@ from plain.http import (
     HTTPException,
     JsonResponse,
     Response,
-    ResponseBase,
 )
 from plain.logs import log_exception
 from plain.runtime import settings
@@ -135,7 +134,7 @@ class MCPView(View):
         """
         return [r for r in self.resources if r.allowed_for(self)]
 
-    def handle_exception(self, exc: Exception) -> ResponseBase:
+    def handle_exception(self, exc: Exception) -> Response:
         """Translate framework exceptions into JSON-RPC responses.
 
         MCP clients expect JSON bodies and can't follow HTTP redirects, so
@@ -160,7 +159,7 @@ class MCPView(View):
             status_code=status,
         )
 
-    def post(self) -> ResponseBase:
+    def post(self) -> Response:
         response = self.handle_message(self.request.body)
         if response is None:
             return Response(status_code=204)

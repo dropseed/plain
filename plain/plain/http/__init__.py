@@ -28,7 +28,6 @@ from .response import (
     NotModifiedResponse,
     RedirectResponse,
     Response,
-    ResponseBase,
     StreamingResponse,
 )
 
@@ -45,7 +44,6 @@ __all__ = [
     "UnreadablePostError",
     # Response
     "Response",
-    "ResponseBase",
     "StreamingResponse",
     "AsyncStreamingResponse",
     "RedirectResponse",

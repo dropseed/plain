@@ -5,7 +5,7 @@ from typing import Any
 from plain.assets.urls import get_asset_url
 from plain.auth.views import AuthView
 from plain.forms import Form
-from plain.http import RedirectResponse, Response, ResponseBase
+from plain.http import RedirectResponse, Response
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
 from plain.views import FormView, View
@@ -48,7 +48,7 @@ class SupportFormView(AuthView, FormView):
 class SupportIFrameView(SupportFormView):
     template_name = "support/iframe.html"
 
-    def after_response(self, response: ResponseBase) -> ResponseBase:
+    def after_response(self, response: Response) -> Response:
         response = super().after_response(response)
         # X-Frame-Options are typically in DEFAULT_RESPONSE_HEADERS.
         # Set to None to signal the middleware to skip applying this default header.

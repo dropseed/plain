@@ -4,7 +4,7 @@ from collections.abc import Callable
 from http import HTTPMethod
 from typing import Any
 
-from plain.http import ResponseBase
+from plain.http import Response
 from plain.utils.cache import patch_vary_headers
 from plain.views import TemplateView
 
@@ -29,7 +29,7 @@ class HTMXView(TemplateView):
 
         return template.render(context)
 
-    def after_response(self, response: ResponseBase) -> ResponseBase:
+    def after_response(self, response: Response) -> Response:
         response = super().after_response(response)
         # Tell browser caching to also consider the fragment header,
         # not just the url/cookie.

@@ -2,7 +2,7 @@ import json
 from functools import cached_property
 from typing import Any
 
-from plain.http import Request, Response, ResponseBase
+from plain.http import Request, Response
 from plain.views.exceptions import ResponseException
 
 from .views import APIView
@@ -24,7 +24,7 @@ class APIVersionChange:
         pass
 
     def transform_response_backward(
-        self, response: ResponseBase, data: dict[str, Any]
+        self, response: Response, data: dict[str, Any]
     ) -> None:
         """
         Transform the response data for this version.
@@ -84,7 +84,7 @@ class VersionedAPIView(APIView):
         if self.request.content_type == "application/json":
             self.transform_request(self.request)
 
-    def after_response(self, response: ResponseBase) -> ResponseBase:
+    def after_response(self, response: Response) -> Response:
         response = super().after_response(response)
         if response.headers.get("Content-Type") == "application/json":
             self.transform_response(response)
@@ -120,7 +120,7 @@ class VersionedAPIView(APIView):
         # Update the request body with the transformed data
         request._body = json.dumps(request_data).encode("utf-8")
 
-    def transform_response(self, response: ResponseBase) -> None:
+    def transform_response(self, response: Response) -> None:
         response_changes = []
 
         # Get the changes starting AFTER the current version
@@ -137,11 +137,11 @@ class VersionedAPIView(APIView):
             return
 
         # Get the original response JSON
-        response_data = json.loads(response.content)  # ty: ignore[unresolved-attribute]
+        response_data = json.loads(response.content)
 
         for change in reversed(response_changes):
             # Transform the response data for this version
             change().transform_response_backward(response, response_data)
 
         # Update the response body with the transformed data
-        response.content = json.dumps(response_data).encode("utf-8")  # ty: ignore[unresolved-attribute]
+        response.content = json.dumps(response_data).encode("utf-8")

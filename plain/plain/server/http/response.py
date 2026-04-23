@@ -166,7 +166,7 @@ class Response:
         return headers
 
     def prepare_response(self, http_response: Any) -> None:
-        """Set status and headers from a plain.http.ResponseBase without writing body.
+        """Set status and headers from a plain.http.Response without writing body.
 
         After calling this, use async_write() to send body chunks and async_close() to finish.
         """
@@ -223,7 +223,7 @@ class Response:
             await self._async_send(arg)
 
     async def async_write_response(self, http_response: Any) -> None:
-        """Write a plain.http.ResponseBase using async I/O."""
+        """Write a plain.http.Response using async I/O."""
         self.prepare_response(http_response)
 
         if (

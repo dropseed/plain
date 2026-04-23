@@ -21,7 +21,7 @@ from unittest.mock import patch
 import pytest
 
 import plain.postgres.middleware
-from plain.http import Response, ResponseBase, StreamingResponse
+from plain.http import Response, StreamingResponse
 from plain.internal.handlers.base import BaseHandler
 from plain.postgres.connection import DatabaseConnection
 from plain.postgres.db import (
@@ -351,7 +351,7 @@ class TestStreamingResponseCleanup:
                 handler.load_middleware()
                 request = RequestFactory().get("/streaming-db-query/")
 
-                async def run() -> ResponseBase:
+                async def run() -> Response:
                     with concurrent.futures.ThreadPoolExecutor(
                         max_workers=2
                     ) as executor:

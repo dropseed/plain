@@ -8,7 +8,6 @@ from plain.http import (
     NotAllowedResponse,
     Request,
     Response,
-    ResponseBase,
 )
 from plain.logs import get_framework_logger
 
@@ -37,22 +36,22 @@ class View:
             if getattr(cls, name, None) is not getattr(View, name, None)
         )
 
-    def get(self) -> ResponseBase:
+    def get(self) -> Response:
         raise NotImplementedError
 
-    def post(self) -> ResponseBase:
+    def post(self) -> Response:
         raise NotImplementedError
 
-    def put(self) -> ResponseBase:
+    def put(self) -> Response:
         raise NotImplementedError
 
-    def patch(self) -> ResponseBase:
+    def patch(self) -> Response:
         raise NotImplementedError
 
-    def delete(self) -> ResponseBase:
+    def delete(self) -> Response:
         raise NotImplementedError
 
-    def head(self) -> ResponseBase:
+    def head(self) -> Response:
         raise NotImplementedError
 
     def __init__(
@@ -90,7 +89,7 @@ class View:
     def before_request(self) -> None:
         """Pre-dispatch hook. Raise to reject the request."""
 
-    def after_response(self, response: ResponseBase) -> ResponseBase:
+    def after_response(self, response: Response) -> Response:
         """Post-dispatch hook. Runs for every response — successes, errors, 405s.
 
         Return the response (possibly mutated or replaced). Exceptions
@@ -99,7 +98,7 @@ class View:
         """
         return response
 
-    def handle_exception(self, exc: Exception) -> ResponseBase:
+    def handle_exception(self, exc: Exception) -> Response:
         """Translate a raised exception into a response. Re-raise to defer to the framework default.
 
         Returning a response suppresses logging — the view has chosen to
@@ -111,7 +110,7 @@ class View:
         """
         raise exc
 
-    def get_response(self) -> ResponseBase:
+    def get_response(self) -> Response:
         try:
             self.before_request()
 
@@ -126,7 +125,7 @@ class View:
                         "request": self.request,
                     },
                 )
-                response: ResponseBase = NotAllowedResponse(self._allowed_methods())
+                response: Response = NotAllowedResponse(self._allowed_methods())
             elif inspect.iscoroutinefunction(handler):
                 return self._dispatch_handler_async(handler)  # ty: ignore[invalid-return-type]
             else:
@@ -136,8 +135,8 @@ class View:
         return self.after_response(response)
 
     async def _dispatch_handler_async(
-        self, handler: Callable[[], Awaitable[ResponseBase]]
-    ) -> ResponseBase:
+        self, handler: Callable[[], Awaitable[Response]]
+    ) -> Response:
         try:
             result = await handler()
             response = self.convert_value_to_response(result)
@@ -145,14 +144,14 @@ class View:
             response = self._respond_to_exception(e)
         return self.after_response(response)
 
-    def _respond_to_exception(self, exc: Exception) -> ResponseBase:
+    def _respond_to_exception(self, exc: Exception) -> Response:
         if isinstance(exc, ResponseException):
             return exc.response
         return self.handle_exception(exc)
 
-    def convert_value_to_response(self, value: Any) -> ResponseBase:
+    def convert_value_to_response(self, value: Any) -> Response:
         """Hook for subclasses (e.g. `APIView`) to accept shorthand return types."""
-        if isinstance(value, ResponseBase):
+        if isinstance(value, Response):
             return value
 
         raise TypeError(
