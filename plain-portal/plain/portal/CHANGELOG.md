@@ -1,5 +1,15 @@
 # plain-portal changelog
 
+## [0.2.6](https://github.com/dropseed/plain/releases/plain-portal@0.2.6) (2026-04-22)
+
+### What's changed
+
+- Updated `read_only`, `get_connection`, and `has_connection` imports from `plain.postgres.connections` to `plain.postgres.db` (the module was renamed in plain-postgres 0.98.0). ([2a51b25](https://github.com/dropseed/plain/commit/2a51b25))
+
+### Upgrade instructions
+
+- If portal is used against a Plain project, that project should be on `plain-postgres>=0.98.0`.
+
 ## [0.2.5](https://github.com/dropseed/plain/releases/plain-portal@0.2.5) (2026-04-13)
 
 ### What's changed

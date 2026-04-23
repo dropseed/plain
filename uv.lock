@@ -998,7 +998,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 
 [[package]]
 name = "plain-portal"
-version = "0.2.5"
+version = "0.2.6"
 source = { editable = "plain-portal" }
 dependencies = [
     { name = "plain" },
