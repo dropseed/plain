@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.34.7](https://github.com/dropseed/plain/releases/plain-observer@0.34.7) (2026-04-23)
+
+### What's changed
+
+- `ObserverTracesView.after_response` annotates against `Response` after plain 0.135.0 merged `ResponseBase` into `Response`. ([f5007281d7fa](https://github.com/dropseed/plain/commit/f5007281d7fa))
+
+### Upgrade instructions
+
+- Requires `plain>=0.135.0`.
+
 ## [0.34.6](https://github.com/dropseed/plain/releases/plain-observer@0.34.6) (2026-04-22)
 
 ### What's changed
