@@ -1028,6 +1028,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "opentelemetry-sdk" },
     { name = "plain-pytest" },
 ]
 
@@ -1040,7 +1041,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
+dev = [
+    { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
+    { name = "plain-pytest", editable = "plain-pytest" },
+]
 
 [[package]]
 name = "plain-pytest"

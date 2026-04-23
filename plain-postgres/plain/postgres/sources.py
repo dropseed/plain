@@ -6,17 +6,23 @@ and is otherwise source-agnostic."""
 from __future__ import annotations
 
 import threading
+import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 import psycopg
-from psycopg_pool import ConnectionPool
+from psycopg_pool import ConnectionPool, PoolTimeout
 
 from plain.exceptions import ImproperlyConfigured
 from plain.logs import get_framework_logger
 from plain.postgres.adapters import get_adapters_template
 from plain.postgres.database_url import DatabaseConfig, parse_database_url
 from plain.postgres.dialect import MAX_NAME_LENGTH
+from plain.postgres.otel import (
+    record_connection_acquire,
+    record_connection_release,
+    record_connection_timeout,
+)
 from plain.runtime import settings as plain_settings
 
 logger = get_framework_logger()
@@ -91,9 +97,14 @@ class DirectSource(ConnectionSource):
 
 class PoolSource(ConnectionSource):
     """Lazily-opened `psycopg_pool.ConnectionPool`. `close()` drops the pool
-    so the next acquire rebuilds against current settings."""
+    so the next acquire rebuilds against current settings.
 
-    def __init__(self) -> None:
+    The `name` is used as the `db.client.connection.pool.name` attribute on
+    the `db.client.connection.*` OpenTelemetry metric family.
+    """
+
+    def __init__(self, name: str = "runtime") -> None:
+        self.name = name
         self._pool: ConnectionPool | None = None
         self._config: DatabaseConfig | None = None
         self._lock = threading.Lock()
@@ -108,9 +119,19 @@ class PoolSource(ConnectionSource):
         return self._config
 
     def acquire(self) -> PsycopgConnection[Any]:
-        return self._get_pool().getconn()
+        pool = self._get_pool()
+        start = time.perf_counter()
+        try:
+            conn = pool.getconn()
+        except PoolTimeout:
+            record_connection_timeout(self.name)
+            raise
+        checkout_time = time.perf_counter()
+        record_connection_acquire(self.name, conn, checkout_time - start, checkout_time)
+        return conn
 
     def release(self, conn: PsycopgConnection[Any]) -> None:
+        record_connection_release(self.name, conn, time.perf_counter())
         pool = self._pool
         if pool is None:
             conn.close()
@@ -120,6 +141,16 @@ class PoolSource(ConnectionSource):
         except Exception:
             logger.debug("Error returning connection to pool", exc_info=True)
             conn.close()
+
+    def get_stats(self) -> dict[str, int] | None:
+        """Return pool statistics, or None if the pool is closed."""
+        pool = self._pool
+        if pool is None:
+            return None
+        try:
+            return pool.get_stats()
+        except Exception:
+            return None
 
     def close(self, timeout: float = 5.0) -> None:
         with self._lock:
@@ -187,4 +218,4 @@ def _reset_pooled_connection(conn: PsycopgConnection[Any]) -> None:
 
 
 # Process-wide singleton. Pool is lazy-opened on first acquire.
-runtime_pool_source = PoolSource()
+runtime_pool_source = PoolSource(name="runtime")

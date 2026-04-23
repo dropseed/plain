@@ -1,23 +1,42 @@
 from __future__ import annotations
 
+import importlib.metadata
 import re
 import time
 import traceback
-from collections.abc import Generator
+import weakref
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import context as otel_context
 from opentelemetry import metrics, trace
+from opentelemetry.metrics import CallbackOptions, Observation
 from opentelemetry.semconv.metrics.db_metrics import DB_CLIENT_OPERATION_DURATION
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Span
+    from psycopg import Connection as PsycopgConnection
 
     from plain.postgres.connection import DatabaseConnection
+    from plain.postgres.sources import PoolSource
 
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
+    DB_CLIENT_CONNECTION_POOL_NAME,
+    DB_CLIENT_CONNECTION_STATE,
     DB_QUERY_PARAMETER_TEMPLATE,
+    DbClientConnectionStateValues,
+)
+from opentelemetry.semconv._incubating.metrics.db_metrics import (
+    DB_CLIENT_CONNECTION_COUNT,
+    DB_CLIENT_CONNECTION_IDLE_MAX,
+    DB_CLIENT_CONNECTION_IDLE_MIN,
+    DB_CLIENT_CONNECTION_MAX,
+    DB_CLIENT_CONNECTION_PENDING_REQUESTS,
+    DB_CLIENT_CONNECTION_TIMEOUTS,
+    DB_CLIENT_CONNECTION_USE_TIME,
+    DB_CLIENT_CONNECTION_WAIT_TIME,
+    DB_CLIENT_RESPONSE_RETURNED_ROWS,
 )
 from opentelemetry.semconv.attributes.code_attributes import (
     CODE_COLUMN_NUMBER,
@@ -40,6 +59,10 @@ from opentelemetry.semconv.attributes.network_attributes import (
     NETWORK_PEER_ADDRESS,
     NETWORK_PEER_PORT,
 )
+from opentelemetry.semconv.attributes.server_attributes import (
+    SERVER_ADDRESS,
+    SERVER_PORT,
+)
 from opentelemetry.trace import SpanKind
 
 from plain.runtime import settings
@@ -48,16 +71,149 @@ from plain.utils.otel import format_exception_type
 # Use a stable string key so OpenTelemetry context APIs receive the expected type.
 _SUPPRESS_KEY = "plain.postgres.suppress_db_tracing"
 
-tracer = trace.get_tracer("plain.postgres")
+try:
+    _package_version = importlib.metadata.version("plain.postgres")
+except importlib.metadata.PackageNotFoundError:
+    _package_version = "dev"
 
-meter = metrics.get_meter("plain.postgres")
+tracer = trace.get_tracer("plain.postgres", _package_version)
+
+meter = metrics.get_meter("plain.postgres", version=_package_version)
 query_duration_histogram = meter.create_histogram(
     name=DB_CLIENT_OPERATION_DURATION,
     unit="s",
     description="Duration of database client operations.",
 )
+returned_rows_histogram = meter.create_histogram(
+    name=DB_CLIENT_RESPONSE_RETURNED_ROWS,
+    unit="{row}",
+    description="Number of rows returned by the operation.",
+)
+connection_wait_time_histogram = meter.create_histogram(
+    name=DB_CLIENT_CONNECTION_WAIT_TIME,
+    unit="s",
+    description="The time it took to obtain an open connection from the pool.",
+)
+connection_use_time_histogram = meter.create_histogram(
+    name=DB_CLIENT_CONNECTION_USE_TIME,
+    unit="s",
+    description="The time between borrowing a connection and returning it to the pool.",
+)
+connection_timeouts_counter = meter.create_counter(
+    name=DB_CLIENT_CONNECTION_TIMEOUTS,
+    unit="{timeout}",
+    description="The number of connection timeouts that have occurred trying to obtain a connection from the pool.",
+)
+
+# WeakKeyDictionary prevents leaks if a conn is GC'd without explicit release().
+_use_start: weakref.WeakKeyDictionary[PsycopgConnection[Any], float] = (
+    weakref.WeakKeyDictionary()
+)
 
 DB_SYSTEM = DbSystemNameValues.POSTGRESQL.value
+
+
+def record_connection_acquire(
+    pool_name: str,
+    conn: PsycopgConnection[Any],
+    wait_seconds: float,
+    checkout_time: float,
+) -> None:
+    connection_wait_time_histogram.record(
+        wait_seconds, {DB_CLIENT_CONNECTION_POOL_NAME: pool_name}
+    )
+    _use_start[conn] = checkout_time
+
+
+def record_connection_release(
+    pool_name: str, conn: PsycopgConnection[Any], return_time: float
+) -> None:
+    start = _use_start.pop(conn, None)
+    if start is None:
+        return
+    connection_use_time_histogram.record(
+        return_time - start, {DB_CLIENT_CONNECTION_POOL_NAME: pool_name}
+    )
+
+
+def record_connection_timeout(pool_name: str) -> None:
+    connection_timeouts_counter.add(1, {DB_CLIENT_CONNECTION_POOL_NAME: pool_name})
+
+
+def register_pool_observables(pool_source: PoolSource) -> None:
+    """Register observable gauges that read `pool.get_stats()` at collection time.
+
+    Safe to call multiple times — the OTel SDK keeps one instrument per name.
+    """
+    pool_attrs = {DB_CLIENT_CONNECTION_POOL_NAME: pool_source.name}
+    idle_attrs = {
+        **pool_attrs,
+        DB_CLIENT_CONNECTION_STATE: DbClientConnectionStateValues.IDLE.value,
+    }
+    used_attrs = {
+        **pool_attrs,
+        DB_CLIENT_CONNECTION_STATE: DbClientConnectionStateValues.USED.value,
+    }
+
+    def _count(_options: CallbackOptions) -> list[Observation]:
+        stats = pool_source.get_stats()
+        if stats is None:
+            return []
+        size = stats.get("pool_size", 0)
+        available = stats.get("pool_available", 0)
+        used = max(size - available, 0)
+        return [
+            Observation(used, used_attrs),
+            Observation(available, idle_attrs),
+        ]
+
+    def _single(stats_key: str) -> Callable[[CallbackOptions], list[Observation]]:
+        def callback(_options: CallbackOptions) -> list[Observation]:
+            stats = pool_source.get_stats()
+            if stats is None:
+                return []
+            return [Observation(stats.get(stats_key, 0), pool_attrs)]
+
+        return callback
+
+    meter.create_observable_up_down_counter(
+        name=DB_CLIENT_CONNECTION_COUNT,
+        unit="{connection}",
+        description="The number of connections that are currently in state described by the state attribute.",
+        callbacks=[_count],
+    )
+    for name, unit, description, stats_key in (
+        (
+            DB_CLIENT_CONNECTION_MAX,
+            "{connection}",
+            "The maximum number of open connections allowed.",
+            "pool_max",
+        ),
+        (
+            DB_CLIENT_CONNECTION_IDLE_MIN,
+            "{connection}",
+            "The minimum number of idle open connections allowed.",
+            "pool_min",
+        ),
+        (
+            DB_CLIENT_CONNECTION_IDLE_MAX,
+            "{connection}",
+            "The maximum number of idle open connections allowed.",
+            "pool_max",
+        ),
+        (
+            DB_CLIENT_CONNECTION_PENDING_REQUESTS,
+            "{request}",
+            "The number of current pending requests for an open connection.",
+            "requests_waiting",
+        ),
+    ):
+        meter.create_observable_up_down_counter(
+            name=name,
+            unit=unit,
+            description=description,
+            callbacks=[_single(stats_key)],
+        )
 
 
 def extract_operation_and_target(sql: str) -> tuple[str, str | None, str | None]:
@@ -109,12 +265,22 @@ def _clean_identifier(identifier: str) -> str:
 
 @contextmanager
 def db_span(
-    db: DatabaseConnection, sql: Any, *, many: bool = False, params: Any = None
+    db: DatabaseConnection,
+    sql: Any,
+    *,
+    many: bool = False,
+    params: Any = None,
+    row_count_provider: Callable[[], int] | None = None,
 ) -> Generator[Span | None]:
     """Open an OpenTelemetry CLIENT span for a database query.
 
-    All common attributes (`db.*`, `network.*`, etc.) are set automatically.
-    Follows OpenTelemetry semantic conventions for database instrumentation.
+    All common attributes (`db.*`, `network.*`, `server.*`, etc.) are set
+    automatically. Follows OpenTelemetry semantic conventions for database
+    instrumentation.
+
+    If `row_count_provider` is given, `db.client.response.returned_rows` is
+    recorded for SELECT operations using its return value (callable so the
+    final count is read after streaming consumers finish iterating).
     """
 
     # Fast-exit if instrumentation suppression flag set in context.
@@ -154,15 +320,20 @@ def db_span(
     if collection_name:
         attrs[DB_COLLECTION_NAME] = collection_name
 
-    # Network attributes
+    # Server/network endpoint. `server.*` is the primary pair per current
+    # semconv; `network.peer.*` is recommended supplementary.
     if host := cfg.get("HOST"):
+        attrs[SERVER_ADDRESS] = host
         attrs[NETWORK_PEER_ADDRESS] = host
 
     if port := cfg.get("PORT"):
         try:
-            attrs[NETWORK_PEER_PORT] = int(port)
+            port_int = int(port)
         except (TypeError, ValueError):
             pass
+        else:
+            attrs[SERVER_PORT] = port_int
+            attrs[NETWORK_PEER_PORT] = port_int
 
     # Add query parameters as attributes when DEBUG is True
     if settings.DEBUG and params is not None:
@@ -199,6 +370,13 @@ def db_span(
         if collection_name:
             metric_attrs[DB_COLLECTION_NAME] = collection_name
         query_duration_histogram.record(duration_s, metric_attrs)
+
+        # Scope returned_rows to SELECT; rowcount for INSERT/UPDATE/DELETE
+        # is rows-affected, which is a different semantic.
+        if row_count_provider is not None and operation == "SELECT":
+            count = row_count_provider()
+            if count >= 0:
+                returned_rows_histogram.record(count, metric_attrs)
 
 
 @contextmanager

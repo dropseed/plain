@@ -100,12 +100,19 @@ class CursorWrapper:
         self, sql: str, params: Sequence[Any] | None = None
     ) -> Generator[tuple[Any, ...]]:
         self.db.validate_no_broken_transaction()
-        with db_span(self.db, sql, params=params):
+        # psycopg's server-side cursor leaves rowcount at -1, so count rows as
+        # they're yielded and feed db_span via the closure.
+        count = 0
+        with db_span(self.db, sql, params=params, row_count_provider=lambda: count):
             try:
-                if params is None:
-                    yield from self.cursor.stream(sql)
-                else:
-                    yield from self.cursor.stream(sql, params)
+                iterator = (
+                    self.cursor.stream(sql)
+                    if params is None
+                    else self.cursor.stream(sql, params)
+                )
+                for row in iterator:
+                    count += 1
+                    yield row
             finally:
                 try:
                     self.close()
@@ -137,8 +144,9 @@ class CursorWrapper:
         return self
 
     def _execute(self, sql: str, params: Any, *ignored_wrapper_args: Any) -> None:
-        # Wrap in an OpenTelemetry span with standard attributes.
-        with db_span(self.db, sql, params=params):
+        with db_span(
+            self.db, sql, params=params, row_count_provider=lambda: self.cursor.rowcount
+        ):
             self.db.validate_no_broken_transaction()
             if params is None:
                 self.cursor.execute(sql)
@@ -148,7 +156,13 @@ class CursorWrapper:
     def _executemany(
         self, sql: str, param_list: Any, *ignored_wrapper_args: Any
     ) -> None:
-        with db_span(self.db, sql, many=True, params=param_list):
+        with db_span(
+            self.db,
+            sql,
+            many=True,
+            params=param_list,
+            row_count_provider=lambda: self.cursor.rowcount,
+        ):
             self.db.validate_no_broken_transaction()
             self.cursor.executemany(sql, param_list)
 
