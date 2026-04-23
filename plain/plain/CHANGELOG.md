@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.135.0](https://github.com/dropseed/plain/releases/plain@0.135.0) (2026-04-23)
+
+### What's changed
+
+- **Merged `ResponseBase` into `Response` as the common supertype.** `ResponseBase` is no longer exported from `plain.http` — `Response` is now the base class for `StreamingResponse` and `AsyncStreamingResponse`. Type hints across the framework (`View.after_response`, `View.handle_exception`, `View.convert_value_to_response`, etc.) use `Response`. ([f5007281d7fa](https://github.com/dropseed/plain/commit/f5007281d7fa))
+
+### Upgrade instructions
+
+- **If you imported `ResponseBase`** — replace it with `Response`. `from plain.http import Response` covers bytes-body, streaming, and async-streaming responses.
+
 ## [0.134.0](https://github.com/dropseed/plain/releases/plain@0.134.0) (2026-04-22)
 
 ### What's changed
