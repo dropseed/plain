@@ -1,5 +1,16 @@
 # plain-api changelog
 
+## [0.30.1](https://github.com/dropseed/plain/releases/plain-api@0.30.1) (2026-04-23)
+
+### What's changed
+
+- `APIView` and `VersionedAPIView` type hints switched from `ResponseBase` to `Response` after plain 0.135.0 merged the two. The `APIResult` type alias, `after_response`, `handle_exception`, and `convert_value_to_response` now reference `Response`. ([f5007281d7fa](https://github.com/dropseed/plain/commit/f5007281d7fa))
+- Dropped the `requests` dependency from the OpenAPI validator command — `plain api generate-openapi --validate` now calls the Swagger validator via `urllib.request` from the standard library. ([1a9050fc42e0](https://github.com/dropseed/plain/commit/1a9050fc42e0))
+
+### Upgrade instructions
+
+- Requires `plain>=0.135.0`.
+
 ## [0.30.0](https://github.com/dropseed/plain/releases/plain-api@0.30.0) (2026-04-22)
 
 ### What's changed
