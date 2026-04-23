@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.47.6](https://github.com/dropseed/plain/releases/plain-jobs@0.47.6) (2026-04-22)
+
+### What's changed
+
+- Replaced the `request_started` / `request_finished` signal calls around `process_job()` with an explicit `return_database_connection()` in the `finally` block. Matches the new pool-backed connection lifecycle in `plain-postgres` 0.98.0 and follows the removal of `plain.signals` in plain 0.134.0. ([2a51b25](https://github.com/dropseed/plain/commit/2a51b25))
+
+### Upgrade instructions
+
+- Requires `plain>=0.134.0` and `plain-postgres>=0.98.0`.
+
 ## [0.47.5](https://github.com/dropseed/plain/releases/plain-jobs@0.47.5) (2026-04-17)
 
 ### What's changed
