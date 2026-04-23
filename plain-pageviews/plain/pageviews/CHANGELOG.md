@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.35.5](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.5) (2026-04-22)
+
+### What's changed
+
+- `TrackView.post` now returns `Response(status_code=...)` instead of bare status-code ints, matching the narrowed `View` handler return type in plain 0.134.0. ([1935f3f](https://github.com/dropseed/plain/commit/1935f3f))
+
+### Upgrade instructions
+
+- Requires `plain>=0.134.0` and `plain-postgres>=0.98.0`.
+
 ## [0.35.4](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.4) (2026-04-17)
 
 ### What's changed
