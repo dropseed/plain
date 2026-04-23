@@ -1,5 +1,19 @@
 # plain changelog
 
+## [0.134.0](https://github.com/dropseed/plain/releases/plain@0.134.0) (2026-04-22)
+
+### What's changed
+
+- **Removed `plain.signals`.** The `request_started` / `request_finished` built-in signals and the entire `plain.signals` module (including `plain.signals.dispatch.Signal`, `receiver`, and the dispatcher internals) are gone. Plain no longer emits `request_started` / `request_finished` around request handling — pool-backed connection lifecycle in `plain-postgres` replaced the one consumer. ([2a51b25](https://github.com/dropseed/plain/commit/2a51b25))
+- **Narrowed `View` handler return types to `Response`.** `get`, `post`, `put`, `patch`, `delete`, and `head` must now return a `Response` (or subclass like `JsonResponse`, `RedirectResponse`). The shorthand coercion that accepted `str`, `int`, `dict`, `list`, `tuple`, and `None` has moved to `APIView` in `plain-api` — base views raise `TypeError` if you return something that isn't a `ResponseBase`. `TemplateView.get` and the `form_valid` hooks on `CreateView` / `UpdateView` / `DeleteView` are typed to return `Response` too. ([1935f3f](https://github.com/dropseed/plain/commit/1935f3f))
+- **Per-request `contextvars.Context` bridges async view pipelines.** Each request now runs through a single `contextvars.Context` — sync executor hops go through `ctx.run(...)` and async view coroutines run on a task bound to that context. `before_request`, the view, and `after_response` see a consistent view of request-scoped `ContextVar`s (e.g. the `plain-postgres` connection wrapper) even when they land on different worker threads. Starts from a fresh context rather than copying ambient state, so stale values from a previous keep-alive request's streaming body can't leak in. ([2a51b25](https://github.com/dropseed/plain/commit/2a51b25))
+
+### Upgrade instructions
+
+- **If you imported anything from `plain.signals`** — remove the imports. `request_started` / `request_finished` listeners need to move off signals; hook into the request lifecycle with middleware or `View.before_request` / `View.after_response` instead. Custom `Signal()` usage has no replacement in Plain — roll your own event dispatch or use an external library if you need it.
+- **If a `View` handler returned a dict, list, str, int, tuple, or `None`** — wrap it in a `Response` (or `JsonResponse(...)`, `Response(status_code=...)`, etc.). For JSON APIs that want the shorthand back, switch to `plain.api.APIView` — it accepts dict/list/int/tuple/None returns via its `convert_value_to_response` override.
+- **If you subclassed `View` and overrode `convert_value_to_response`** — it now receives an `Any`-typed value and must raise `TypeError` for non-`Response` inputs unless your override coerces them. Re-check your logic against the trimmed base implementation.
+
 ## [0.133.0](https://github.com/dropseed/plain/releases/plain@0.133.0) (2026-04-21)
 
 ### What's changed
