@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.36.3](https://github.com/dropseed/plain/releases/plain-flags@0.36.3) (2026-04-23)
+
+### What's changed
+
+- Declared `plain.postgres` as a runtime dependency (previously listed only in `dev` dependencies). The flag models use the PostgreSQL backend, so it must be installed for the package to work at runtime. ([1a9050fc42e0](https://github.com/dropseed/plain/commit/1a9050fc42e0))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.36.2](https://github.com/dropseed/plain/releases/plain-flags@0.36.2) (2026-04-17)
 
 ### What's changed
