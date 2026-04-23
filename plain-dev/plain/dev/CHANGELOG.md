@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.60.3](https://github.com/dropseed/plain/releases/plain-dev@0.60.3) (2026-04-23)
+
+### What's changed
+
+- `PostgresBackupClient` now imports `postgres_cli_args` / `postgres_cli_env` lazily inside its methods so projects without `plain.postgres` installed can still load `plain.dev` without an `ImportError`. ([0583d1da5602](https://github.com/dropseed/plain/commit/0583d1da5602))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.60.2](https://github.com/dropseed/plain/releases/plain-dev@0.60.2) (2026-04-22)
 
 ### What's changed
