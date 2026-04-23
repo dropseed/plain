@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.34.6](https://github.com/dropseed/plain/releases/plain-observer@0.34.6) (2026-04-22)
+
+### What's changed
+
+- `ObserverTraceDetailView.get` now returns a `JsonResponse` for JSON content negotiation instead of a bare dict, matching the narrowed `View` handler return type in plain 0.134.0. ([1935f3f](https://github.com/dropseed/plain/commit/1935f3f))
+
+### Upgrade instructions
+
+- Requires `plain>=0.134.0` and `plain-postgres>=0.98.0`.
+
 ## [0.34.5](https://github.com/dropseed/plain/releases/plain-observer@0.34.5) (2026-04-21)
 
 ### What's changed
