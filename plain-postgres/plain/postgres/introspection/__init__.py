@@ -1,6 +1,7 @@
 from .health import (
     CheckItem,
     CheckResult,
+    Informational,
     TableOwner,
     build_table_owners,
     run_all_checks,
@@ -26,6 +27,7 @@ from .schema import (
 __all__ = [
     "CheckItem",
     "CheckResult",
+    "Informational",
     "ColumnState",
     "ConType",
     "ConstraintState",

@@ -1184,37 +1184,110 @@ graph TB
 
 ## Diagnostics
 
-You can run health checks against your database to find issues like missing indexes, redundant indexes, and configuration problems.
+Run health checks against your database. `diagnose` is designed to produce
+only actionable findings — every warning has a copy-paste fix or specific
+resource to investigate, and noisy one-off signals (hit ratios, XID age) are
+surfaced as informational context rather than as warnings.
 
 ```bash
 uv run plain postgres diagnose
 ```
 
-Use `--json` for structured output (useful for scripting and AI agents):
+Output modes:
 
 ```bash
-uv run plain postgres diagnose --json
+uv run plain postgres diagnose --json      # structured output for scripts/agents
+uv run plain postgres diagnose --verbose   # expand to show every check, including passing
+uv run plain postgres diagnose --all       # include findings on installed-package tables
 ```
 
-Use `--all` to include issues in installed packages (by default, only your app's issues are shown):
+### Guiding principle
 
-```bash
-uv run plain postgres diagnose --all
+`diagnose` emits a **warning** only if the remedy fits in the user's codebase
+or is an app-level action they own. If the remedy is "run SQL against your
+DB" or "configure your Postgres server," the check emits **operational
+context** or an **informational number**, not a warning. This keeps the
+warning surface high-trust — every warning has an edit-to-make — and prevents
+`diagnose` from bleeding into DB-host concerns.
+
+### Warning-tier checks
+
+Things the user can fix by editing code + running `plain postgres sync`, or
+app-level incidents they must act on.
+
+**Structural — always-real; a fix is possible immediately.**
+
+| Check                   | What it finds                                                                                       | Severity         |
+| ----------------------- | --------------------------------------------------------------------------------------------------- | ---------------- |
+| **Invalid indexes**     | Broken indexes from failed `CREATE INDEX CONCURRENTLY` — maintained on writes, never used for reads | Warning          |
+| **Duplicate indexes**   | One index is a column-prefix of another on the same table                                           | Warning          |
+| **Missing FK indexes**  | Foreign key columns without any index coverage                                                      | Warning          |
+| **Sequence exhaustion** | Identity sequences approaching their type max                                                       | Warning/Critical |
+
+**Cumulative — depends on stats since the last reset.**
+
+| Check                        | What it finds                                                                                                        | Severity |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------- |
+| **Unused indexes**           | Indexes with zero scans since stats reset (>1 MB). Excludes unique, constraint-backing, and sole-FK-coverage indexes | Warning  |
+| **Missing index candidates** | Tables with seq-scan activity suggesting a missing index. Includes top contributing queries from pg_stat_statements  | Warning  |
+
+**Snapshot — point-in-time incidents.**
+
+| Check                        | What it finds                                                           | Severity         |
+| ---------------------------- | ----------------------------------------------------------------------- | ---------------- |
+| **Long-running connections** | Client backends idle-in-transaction or running a query past a threshold | Warning/Critical |
+| **Blocking queries**         | Queries currently blocking other queries via held locks                 | Warning/Critical |
+
+### Operational-context findings
+
+These are facts about the database whose remedies live outside Plain today
+(`ANALYZE`, `VACUUM`, `REINDEX`, autovacuum server tuning). They're surfaced
+so agents and humans can interpret findings correctly, but the CLI renders
+them as context rather than alarming warnings — the user can't express the
+fix in their model code. (In JSON output each finding still carries
+`status: "warning"`; the `tier: "operational"` field is what distinguishes
+it.) Each finding still carries the exact SQL in its suggestion for anyone
+who wants to act.
+
+| Finding             | What it reports                                                                  |
+| ------------------- | -------------------------------------------------------------------------------- |
+| **Stats freshness** | Tables whose planner statistics are missing (never analyzed) or stale            |
+| **Vacuum health**   | Tables with >10% dead tuples                                                     |
+| **Index bloat**     | btree indexes with significant estimated wasted space (≥10 MB, ioguix estimator) |
+
+If a future release exposes per-table autovacuum / fillfactor parameters in
+`model_options` (see the `postgres-model-storage-parameters` arc), these
+findings can graduate back to the warning tier — because the remedy will be
+expressible in code.
+
+### Informational context
+
+Alongside checks, `diagnose` surfaces context an agent or human may want to read but that isn't actionable on its own:
+
+- **Cache hit ratio**, **Index hit ratio** — buffer hit rates (volatile after restart; not a warning in themselves)
+- **XID wraparound** — transaction ID age as a percent of the 2B limit. Autovacuum usually keeps this low; long-running transactions can block the freeze process even on managed Postgres
+- **Connection saturation** — active/max connections at this moment
+- **Stats reset** — when cumulative stats were last reset (affects the confidence of operational checks)
+- **pg_stat_statements** — whether the extension is installed
+
+### Cross-check caveats
+
+Findings whose confidence depends on another check are tagged with a caveat. For example:
+
+- `unused_indexes` on a table flagged by `stats_freshness` → caveat: "this table has never been analyzed — the planner may not yet use this index; re-check after running ANALYZE"
+- `missing_index_candidates` on a never-analyzed table → caveat: "planner statistics are absent — running ANALYZE may change query plans and make this finding moot"
+
+This prevents false confidence: dropping an "unused" index on a never-analyzed table is often the wrong move.
+
+### Model-aware suggestions
+
+Findings on app-owned tables include the Plain model class and its source file. Suggestions reference the exact edit point:
+
+```
+  app/processing/models.py :: ProcessingResult — Add an Index on ["is_processing"] to the model, then run plain postgres sync
 ```
 
-### Checks
-
-| Check                   | What it finds                                                                                                                                                  | Severity         |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| **Invalid indexes**     | Broken indexes from failed `CREATE INDEX CONCURRENTLY` — maintained on writes, never used for reads                                                            | Warning          |
-| **Duplicate indexes**   | Indexes where one is a column-prefix of another on the same table (e.g., an auto FK index that's redundant with a composite index)                             | Warning          |
-| **Unused indexes**      | Indexes with zero scans since stats reset (>1 MB). Excludes unique indexes, constraint-backing indexes, and indexes that are the sole coverage for a FK column | Warning          |
-| **Missing FK indexes**  | Foreign key columns without any index coverage — parent DELETE/UPDATE operations will sequentially scan the child table                                        | Warning          |
-| **Sequence exhaustion** | Identity sequences approaching their type max (>50% warning, >90% critical)                                                                                    | Warning/Critical |
-| **XID wraparound**      | Transaction ID age approaching the 2 billion wraparound limit (>25% warning, >40% critical)                                                                    | Warning/Critical |
-| **Cache hit ratio**     | Heap buffer hit ratio below 98.5% — indicates insufficient `shared_buffers` or RAM                                                                             | Warning          |
-| **Index hit ratio**     | Index buffer hit ratio below 98.5%                                                                                                                             | Warning          |
-| **Vacuum health**       | Tables with significant dead tuple accumulation (>10% of live rows) where autovacuum may be falling behind                                                     | Warning          |
+This closes the loop from detection to fix — agents can draft the model edit without guessing.
 
 ### App vs package issues
 
@@ -1234,6 +1307,8 @@ heroku run -a your-app "plain postgres diagnose --json"
 
 The `--json` flag must be quoted so Heroku passes it through to the command.
 
+Cumulative-stat checks (`stats_freshness`, `vacuum_health`, `unused_indexes`, `missing_index_candidates`, `index_bloat`) need cumulative stat history after the last reset to be reliable. Check the `stats_reset` informational to see how much history you have. (Note: this list spans both the warning and operational tiers — the common thread is that all five depend on counters that `pg_stat_reset()` wipes.)
+
 ### Preflight checks
 
 Two related checks run automatically during `uv run plain preflight` (and `uv run plain check`):
@@ -1242,6 +1317,12 @@ Two related checks run automatically during `uv run plain preflight` (and `uv ru
 - **`postgres.duplicate_indexes`** — warns about prefix-redundant indexes in your model constraints
 
 These are static, code-level checks that catch issues before you deploy. The `diagnose` command complements them with runtime stats from the actual database.
+
+### What diagnose deliberately doesn't do
+
+- **LLM-powered column recommendations for missing indexes** — `missing_index_candidates` shows the culprit queries and lets you decide. For precise column-level suggestions, use a platform tool (PlanetScale Insights, Dexter, pg_qualstats + hypopg).
+- **Historical trending** — `diagnose` is stateless; it reports on the current state of cumulative stats. Continuous monitoring is out of scope.
+- **Niche server checks** (WAL bloat, replication slot age, etc.) — better covered by your Postgres provider's monitoring or a dedicated tool; users on self-hosted setups that need them typically have their own tooling.
 
 ## Settings
 
