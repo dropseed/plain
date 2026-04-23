@@ -1,5 +1,53 @@
 # plain-postgres changelog
 
+## [0.98.0](https://github.com/dropseed/plain/releases/plain-postgres@0.98.0) (2026-04-22)
+
+### What's changed
+
+- **Pool-backed connections via `psycopg_pool.ConnectionPool`.** A new `sources` abstraction routes `DatabaseConnection` through either a long-lived `PoolSource` (runtime) or a `DirectSource` (management / one-shot). Each request checks a connection out of the pool on first use and returns it when the HTTP request finishes. `psycopg>=3.2` and `psycopg-pool>=3.2` are now declared as hard dependencies. ([2a51b25](https://github.com/dropseed/plain/commit/2a51b25))
+- **New `DatabaseConnectionMiddleware` (required).** Add `"plain.postgres.DatabaseConnectionMiddleware"` to `MIDDLEWARE` — it's what returns the pooled connection at the end of each request. For `StreamingResponse` / `AsyncStreamingResponse` the connection is returned after the body fully drains, so generators that lazily query the database (e.g. `Model.query.iterator()`) keep their cursor alive until the last chunk is sent. A new `postgres.middleware_installed` preflight check errors if the middleware is missing. ([2a51b25](https://github.com/dropseed/plain/commit/2a51b25))
+- **Connection settings replaced with pool settings.** `POSTGRES_CONN_MAX_AGE` and `POSTGRES_CONN_HEALTH_CHECKS` are gone. Tune the pool with `POSTGRES_POOL_MIN_SIZE` (default `4`), `POSTGRES_POOL_MAX_SIZE` (default `20`), `POSTGRES_POOL_MAX_LIFETIME` seconds (default `3600.0`), and `POSTGRES_POOL_TIMEOUT` seconds (default `30.0`). Each is also available as a `PLAIN_POSTGRES_POOL_*` environment variable. ([2a51b25](https://github.com/dropseed/plain/commit/2a51b25))
+- **`plain.postgres.connections` module removed.** `get_connection`, `has_connection`, `use_management_connection`, and `read_only` now live in `plain.postgres.db` (the underscore-less counterpart). ([2a51b25](https://github.com/dropseed/plain/commit/2a51b25))
+- **`read_only()` is now pgbouncer-safe.** It opens a single `BEGIN READ ONLY` transaction for the block (previously a session-level `SET default_transaction_read_only = on`). Nested `atomic()` blocks become savepoints of the outer read-only transaction. Entering `read_only()` inside an existing `atomic()` block now raises `TransactionManagementError`. The old `DatabaseConnection.set_read_only()` method is removed. ([ebdec30](https://github.com/dropseed/plain/commit/ebdec30))
+- **Added OTel pool + rowcount metrics and semconv polish.** Wires the `db.client.connection.*` metric family (count, max, idle.min/max, pending_requests, wait_time, use_time, timeouts) from the pool's stats and the acquire/release path, plus `db.client.response.returned_rows` for SELECT queries including streamed iterators. Query spans now carry `server.address` / `server.port` alongside `network.peer.*`, and the tracer/meter are tagged with the `plain.postgres` package version for `InstrumentationScope`. ([61278d5](https://github.com/dropseed/plain/commit/61278d5))
+- **Moved `psql` CLI orchestration off `DatabaseConnection`.** New `postgres_cli_args` / `postgres_cli_env` helpers in `plain.postgres.database_url` build the arguments and environment for `psql`, `pg_dump`, etc.; `plain postgres shell` and the `plain-dev` backup client both use them. `DatabaseConnection.runshell()` and `executable_name` are gone. ([5b4a488](https://github.com/dropseed/plain/commit/5b4a488))
+- **Removed dead connection-lifecycle plumbing.** `close_if_unusable_or_obsolete`, `close_if_health_check_failed`, `closed_in_transaction`, `is_usable`, `health_check_enabled`, `health_check_done`, `close_at`, `_maintenance_cursor`, and `DatabaseConnection.from_url` are gone — the pool handles recycling, health checks, and URL parsing. `close()` now validates there's no open atomic block instead of silently deferring. ([044e942](https://github.com/dropseed/plain/commit/044e942), [2a51b25](https://github.com/dropseed/plain/commit/2a51b25))
+- **Inlined `pg_version` and removed `temporary_connection()`.** The single caller now reads `connection.info.server_version` directly; `temporary_connection()` has no remaining users. ([319f6ac](https://github.com/dropseed/plain/commit/319f6ac))
+- **`APIResult` shorthand returns moved out of `View`.** Any internal views that relied on dict/int shorthand now wrap their returns in `JsonResponse` / `Response(status_code=...)` to match plain 0.134.0's narrower `View` handler return type. ([1935f3f](https://github.com/dropseed/plain/commit/1935f3f))
+- **Adapter registration extracted to `plain.postgres.adapters`.** `PlainRangeDumper` and `get_adapters_template()` moved out of `connection.py` into their own module.
+
+### Upgrade instructions
+
+- Requires `plain>=0.134.0`.
+- **Add the middleware** to `app/settings.py`:
+
+    ```python
+    MIDDLEWARE = [
+        "plain.postgres.DatabaseConnectionMiddleware",
+        # ...the rest of your middleware
+    ]
+    ```
+
+    Place it near the top so downstream middleware can use the database inside `before_request` / `after_response` and still have the connection returned cleanly. Preflight will error if it's missing.
+
+- **Replace `POSTGRES_CONN_MAX_AGE` / `POSTGRES_CONN_HEALTH_CHECKS`** with the pool settings (`POSTGRES_POOL_MIN_SIZE`, `POSTGRES_POOL_MAX_SIZE`, `POSTGRES_POOL_MAX_LIFETIME`, `POSTGRES_POOL_TIMEOUT`) or remove them to take the defaults.
+
+- **Update imports from `plain.postgres.connections`** to `plain.postgres.db`:
+
+    ```python
+    # Before
+    from plain.postgres.connections import get_connection, read_only, use_management_connection
+
+    # After
+    from plain.postgres.db import get_connection, read_only, use_management_connection
+    ```
+
+- **If you called `DatabaseConnection.set_read_only(True)`** for a sticky read-only session, switch to the `read_only()` context manager around the block you want read-only. If you need session-level enforcement outside a transaction, open a `DirectSource` connection yourself and issue `SET default_transaction_read_only = on` on it.
+
+- **If you entered `read_only()` inside an `atomic()` block**, move `read_only()` to the outer position — it now owns the transaction. Nested `atomic()` blocks inside `read_only()` are fine (they become savepoints).
+
+- **If you pinned `psycopg` via your own dependency**, make sure it's `>=3.2`, and add `psycopg-pool>=3.2` if you were installing psycopg without extras.
+
 ## [0.97.0](https://github.com/dropseed/plain/releases/plain-postgres@0.97.0) (2026-04-21)
 
 ### What's changed
