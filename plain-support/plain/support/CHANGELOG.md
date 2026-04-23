@@ -1,5 +1,15 @@
 # plain-support changelog
 
+## [0.34.5](https://github.com/dropseed/plain/releases/plain-support@0.34.5) (2026-04-23)
+
+### What's changed
+
+- `SupportIFrameView.after_response` annotates against `Response` after plain 0.135.0 merged `ResponseBase` into `Response`. ([f5007281d7fa](https://github.com/dropseed/plain/commit/f5007281d7fa))
+
+### Upgrade instructions
+
+- Requires `plain>=0.135.0`.
+
 ## [0.34.4](https://github.com/dropseed/plain/releases/plain-support@0.34.4) (2026-04-21)
 
 ### What's changed
