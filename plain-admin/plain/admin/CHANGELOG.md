@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.77.7](https://github.com/dropseed/plain/releases/plain-admin@0.77.7) (2026-04-23)
+
+### What's changed
+
+- Updated `AdminView.after_response` to annotate against `Response` after plain 0.135.0 merged `ResponseBase` into `Response`. ([f5007281d7fa](https://github.com/dropseed/plain/commit/f5007281d7fa))
+
+### Upgrade instructions
+
+- Requires `plain>=0.135.0`.
+
 ## [0.77.6](https://github.com/dropseed/plain/releases/plain-admin@0.77.6) (2026-04-21)
 
 ### What's changed
