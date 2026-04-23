@@ -48,3 +48,4 @@ jobs:
       - run: uv sync
       - run: uv run plain-code check . --skip-ty
       - run: ./scripts/type-validate
+      - run: ./scripts/test-package-imports

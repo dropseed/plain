@@ -1,0 +1,53 @@
+#!/bin/bash -e
+
+# Verify each workspace package imports cleanly with only its declared
+# dependencies installed.
+#
+# Plain loads two things eagerly on every CLI invocation:
+#   1. <pkg>      — the package module (via INSTALLED_PACKAGES)
+#   2. <pkg>.cli  — via packages_registry.autodiscover_modules("cli")
+#
+# If either top-level imports a sibling plain-* package that isn't
+# declared in pyproject.toml, `plain <anything>` crashes for users who
+# don't happen to have that sibling installed.
+#
+# admin.py, chores.py, jobs.py, etc. are discovered by their own
+# optional packages and are intentionally allowed to depend on them.
+
+fail=0
+
+for pkg_dir in plain-*/; do
+  pkg="${pkg_dir%/}"
+  [ -f "$pkg/pyproject.toml" ] || continue
+  mod="${pkg//-/.}"
+
+  echo "Checking $pkg (as $mod)"
+
+  if ! uv run --isolated --no-project --quiet --python 3.13 \
+      --with-editable "./plain" --with-editable "./$pkg" \
+      python -c "
+import importlib, importlib.util, sys
+for name in ['$mod', '$mod.cli']:
+    if importlib.util.find_spec(name) is None:
+        continue
+    try:
+        importlib.import_module(name)
+    except ImportError as e:
+        print(f'  MISSING DEPENDENCY while importing {name}: {e}', file=sys.stderr)
+        sys.exit(1)
+    except Exception:
+        # Unrelated to dep-declaration (e.g. settings not configured).
+        pass
+    print(f'  imported {name}')
+"; then
+    echo "  FAILED: $pkg imports reach outside its declared dependencies" >&2
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo "One or more packages failed the import smoke test." >&2
+  exit 1
+fi
+
+echo "All packages import cleanly."
