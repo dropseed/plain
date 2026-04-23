@@ -1,5 +1,20 @@
 # plain-postgres changelog
 
+## [0.99.0](https://github.com/dropseed/plain/releases/plain-postgres@0.99.0) (2026-04-23)
+
+### What's changed
+
+- **Reworked `plain postgres diagnose` around tiered findings.** Warnings are now reserved for things the user can fix by editing model code or taking an app-level action — every warning carries a copy-paste fix or a model-file pointer (`app/path.py :: ModelName`). Noisy one-off signals (cache/index hit ratios, XID wraparound, connection saturation, pg_stat_statements availability, stats reset age) render as **informational context**; DB-state facts whose remedies live outside Plain (stats freshness, vacuum health, index bloat) render as **operational context** instead of warnings. Added `--verbose` to expand every check, and `--all` still includes installed-package tables. ([26abb6cbc075](https://github.com/dropseed/plain/commit/26abb6cbc075))
+- **New diagnostic checks:** `stats_freshness` (uses `pg_class.reltuples` so it survives `pg_stat_reset`), `index_bloat` (ioguix btree estimator, public schema only), `missing_index_candidates` (seq-scan heuristics with per-query drill-down from `pg_stat_statements`), `blocking_queries` (wait age from `pg_locks.waitstart`, PG 14+), and `long_running_connections` (xact age for idle-in-transaction). Findings include **cross-check caveats** — e.g. an `unused_indexes` finding on a table that's also flagged by `stats_freshness` or `vacuum_health` now carries a warning that dropping the index may be premature. ([26abb6cbc075](https://github.com/dropseed/plain/commit/26abb6cbc075))
+- **Permission-safe probes.** Checks that may hit permission errors (`pg_stat_statements`, `pg_stat_activity`, `pg_locks`) now wrap their queries in `cursor.connection.transaction()` so a failure rolls back cleanly in either autocommit or transaction mode without cascade-failing later checks. ([26abb6cbc075](https://github.com/dropseed/plain/commit/26abb6cbc075))
+- **Refactored internals.** The 1800+ line `introspection/health.py` split into an `introspection/health/` package along natural seams (types, ownership, context, helpers, checks grouped by `structural`/`cumulative`/`snapshot`, and a runner). Public re-exports are unchanged. ([26abb6cbc075](https://github.com/dropseed/plain/commit/26abb6cbc075))
+- Adapter annotations use `Response` after plain 0.135.0 merged `ResponseBase` into `Response`. ([f5007281d7fa](https://github.com/dropseed/plain/commit/f5007281d7fa))
+
+### Upgrade instructions
+
+- Requires `plain>=0.135.0`.
+- No code changes required. If you parse `plain postgres diagnose --json`, note the new `tier` field on each finding (`"structural"`, `"cumulative"`, `"snapshot"`, or `"operational"`) — operational findings still carry `status: "warning"` but the CLI renders them as context rather than as alarming warnings.
+
 ## [0.98.0](https://github.com/dropseed/plain/releases/plain-postgres@0.98.0) (2026-04-22)
 
 ### What's changed
