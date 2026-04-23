@@ -1,5 +1,18 @@
 # plain-api changelog
 
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-api@0.30.0) (2026-04-22)
+
+### What's changed
+
+- **`APIView` now owns the dict/list/int/tuple/None shorthand.** Plain 0.134.0 narrowed base `View` handler returns to `Response`; `APIView` overrides `convert_value_to_response` to keep the ergonomic shorthand: return a dict or list for a `JsonResponse`, an int for a `Response(status_code=...)`, a `(status_code, data)` tuple, or `None` to raise `NotFoundError404`. The new `APIResult` type alias is exported for annotating handlers. ([1935f3f](https://github.com/dropseed/plain/commit/1935f3f))
+- **`VersionedAPIView` now extends `APIView`** (it was a plain `View`), so versioned endpoints get the shorthand coercion and JSON error handling without extra wiring.
+
+### Upgrade instructions
+
+- Requires `plain>=0.134.0`.
+- **If you returned raw data from a plain `View` subclass for a JSON endpoint** — move it to `APIView`, or wrap the value in `JsonResponse(...)` yourself. Base `View` no longer coerces.
+- Annotate handlers with `APIResult` if you want a type that captures all the accepted shorthand forms: `def get(self) -> APIResult: ...`.
+
 ## [0.29.4](https://github.com/dropseed/plain/releases/plain-api@0.29.4) (2026-04-21)
 
 ### What's changed
