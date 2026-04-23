@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from plain.exceptions import ImproperlyConfigured
-from plain.postgres.database_url import postgres_cli_args, postgres_cli_env
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
@@ -17,10 +16,14 @@ class PostgresBackupClient:
         self.connection = connection
 
     def _run(self, cmd: str | list[str], *, shell: bool = False) -> None:
+        from plain.postgres.database_url import postgres_cli_env
+
         env = {**os.environ, **postgres_cli_env(self.connection.settings_dict)}
         subprocess.run(cmd, env=env, check=True, shell=shell)
 
     def create_backup(self, backup_path: Path, *, pg_dump: str = "pg_dump") -> None:
+        from plain.postgres.database_url import postgres_cli_args
+
         settings_dict = self.connection.settings_dict
         dbname = settings_dict.get("DATABASE")
         if not dbname:
@@ -36,6 +39,8 @@ class PostgresBackupClient:
     def restore_backup(
         self, backup_path: Path, *, pg_restore: str = "pg_restore", psql: str = "psql"
     ) -> None:
+        from plain.postgres.database_url import postgres_cli_args
+
         settings_dict = self.connection.settings_dict
         dbname = settings_dict.get("DATABASE")
         if not dbname:
