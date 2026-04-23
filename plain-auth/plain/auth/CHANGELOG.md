@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.29.4](https://github.com/dropseed/plain/releases/plain-auth@0.29.4) (2026-04-23)
+
+### What's changed
+
+- `AuthView.handle_exception` and `AuthView.after_response` annotate against `Response` after plain 0.135.0 merged `ResponseBase` into `Response`. ([f5007281d7fa](https://github.com/dropseed/plain/commit/f5007281d7fa))
+
+### Upgrade instructions
+
+- Requires `plain>=0.135.0`.
+
 ## [0.29.3](https://github.com/dropseed/plain/releases/plain-auth@0.29.3) (2026-04-21)
 
 ### What's changed
