@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.60.2](https://github.com/dropseed/plain/releases/plain-dev@0.60.2) (2026-04-22)
+
+### What's changed
+
+- Moved the backup client's psql connection-argument and environment construction onto the shared `postgres_cli_args` / `postgres_cli_env` helpers in `plain.postgres.database_url`, so `plain dev backups` and `plain postgres shell` build their `psql`/`pg_dump` invocations from the same place. ([5b4a488](https://github.com/dropseed/plain/commit/5b4a488))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.60.1](https://github.com/dropseed/plain/releases/plain-dev@0.60.1) (2026-04-13)
 
 ### What's changed
