@@ -3,8 +3,9 @@ from functools import cached_property
 from typing import Any
 
 from plain.http import Request, Response, ResponseBase
-from plain.views import View
 from plain.views.exceptions import ResponseException
+
+from .views import APIView
 
 __all__ = [
     "APIVersionChange",
@@ -34,7 +35,7 @@ class APIVersionChange:
         pass
 
 
-class VersionedAPIView(View):
+class VersionedAPIView(APIView):
     # API versions from newest to oldest
     api_versions: dict[str, list[type[APIVersionChange]]] = {}
     api_version_header = "API-Version"

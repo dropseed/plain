@@ -17,7 +17,7 @@
 
 This package includes lightweight view classes for building APIs using the same patterns as regular HTML views. It also provides an [`APIKey`](./models.py#APIKey) model and support for generating [OpenAPI](#openapi) documents.
 
-Because [Views](/plain/plain/views/README.md) can convert built-in types to responses, an API view can simply return a dict or list to send a JSON response back to the client.
+`APIView` accepts shorthand return types — return a dict or list and it's converted to a `JsonResponse`. (The base `View` only accepts `Response` objects; this coercion is specific to `APIView`.)
 
 ```python
 # app/api/views.py

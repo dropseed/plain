@@ -5,7 +5,7 @@ from typing import Any
 from plain import postgres
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
-from plain.http import Response, ResponseBase
+from plain.http import JsonResponse, Response, ResponseBase
 from plain.runtime import settings
 from plain.urls import reverse
 from plain.views import DetailView, ListView
@@ -98,14 +98,14 @@ class ObserverTraceDetailView(AuthView, HTMXView, DetailView):
             return
         super().check_auth()
 
-    def get(self) -> Response | dict[str, Any]:
+    def get(self) -> Response:
         """Return trace data as HTML, JSON, or logs based on content negotiation."""
         preferred = self.request.get_preferred_type("text/html", "application/json")
         if (
             preferred == "application/json"
             or self.request.query_params.get("format") == "json"
         ):
-            return self.object.as_dict()
+            return JsonResponse(self.object.as_dict())
 
         if self.request.query_params.get("logs") == "true":
             logs = self.object.logs.query.all().order_by("timestamp")

@@ -33,7 +33,7 @@ class CtxVarRoundTripMiddleware(HttpMiddleware):
 class AsyncAwaitView(View):
     """Async view that yields to the event loop so the executor hop splits."""
 
-    async def get(self):
+    async def get(self) -> Response:  # ty: ignore[invalid-method-override]
         await asyncio.sleep(0)
         return Response("ok")
 

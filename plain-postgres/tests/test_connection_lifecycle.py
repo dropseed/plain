@@ -56,7 +56,7 @@ class DBQueryView(View):
 class AsyncDBQueryView(View):
     """Async view that accesses the DB via asyncio.to_thread()."""
 
-    async def get(self):
+    async def get(self) -> Response:  # ty: ignore[invalid-method-override]
         result = await asyncio.to_thread(_sync_db_query)
         return Response(str(result))
 

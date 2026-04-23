@@ -10,7 +10,7 @@ except ImportError:
     ObjectDoesNotExist = None  # ty: ignore[invalid-assignment]
 
 from plain.forms import BaseForm, Form
-from plain.http import NotFoundError404
+from plain.http import NotFoundError404, Response
 
 from .forms import FormView
 from .templates import TemplateView
@@ -36,7 +36,7 @@ class CreateView(FormView):
                 )
         return url
 
-    def form_valid(self, form: BaseForm) -> Any:
+    def form_valid(self, form: BaseForm) -> Response:
         """If the form is valid, save the associated model."""
         self.object = form.save()  # ty: ignore[unresolved-attribute]
         return super().form_valid(form)
@@ -100,7 +100,7 @@ class UpdateView(DetailView, FormView):
                 )
         return url
 
-    def form_valid(self, form: BaseForm) -> Any:
+    def form_valid(self, form: BaseForm) -> Response:
         """If the form is valid, save the associated model."""
         form.save()  # ty: ignore[unresolved-attribute]
         return super().form_valid(form)
@@ -134,7 +134,7 @@ class DeleteView(DetailView, FormView):
         kwargs.update({"instance": self.object})
         return kwargs
 
-    def form_valid(self, form: BaseForm) -> Any:
+    def form_valid(self, form: BaseForm) -> Response:
         """If the form is valid, save the associated model."""
         form.save()  # ty: ignore[unresolved-attribute]
         return super().form_valid(form)

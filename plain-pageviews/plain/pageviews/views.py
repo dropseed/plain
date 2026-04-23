@@ -1,10 +1,11 @@
+from plain.http import Response
 from plain.views import View
 
 from .models import Pageview
 
 
 class TrackView(View):
-    def post(self) -> int:
+    def post(self) -> Response:
         data = self.request.json_data
 
         try:
@@ -16,9 +17,9 @@ class TrackView(View):
                 timestamp=data["timestamp"],
             )
         except KeyError:
-            return 400
+            return Response(status_code=400)
 
         if pageview is None:
-            return 200
+            return Response(status_code=200)
 
-        return 201
+        return Response(status_code=201)

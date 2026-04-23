@@ -1,3 +1,4 @@
+from plain.http import Response
 from plain.sessions.views import SessionView
 from plain.urls import Router, path
 
@@ -6,7 +7,7 @@ class IndexView(SessionView):
     def get(self):
         # Store something so the session is saved
         self.session["foo"] = "bar"
-        return "test"
+        return Response("test")
 
 
 class AppRouter(Router):

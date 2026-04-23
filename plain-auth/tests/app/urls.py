@@ -1,32 +1,33 @@
 from plain.auth.views import AuthView
+from plain.http import Response
 from plain.urls import Router, path
 from plain.views import View
 
 
 class LoginView(View):
     def get(self):
-        return "login"
+        return Response("login")
 
 
 class ProtectedView(AuthView):
     login_required = True
 
     def get(self):
-        return "protected"
+        return Response("protected")
 
 
 class OpenView(AuthView):
     # login_required = False
 
     def get(self):
-        return "open"
+        return Response("open")
 
 
 class AdminView(AuthView):
     admin_required = True
 
     def get(self):
-        return "admin"
+        return Response("admin")
 
 
 class NoLoginUrlView(AuthView):
@@ -34,7 +35,7 @@ class NoLoginUrlView(AuthView):
     login_url = None
 
     def get(self):
-        return "none"
+        return Response("none")
 
 
 class AppRouter(Router):

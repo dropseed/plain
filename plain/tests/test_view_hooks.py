@@ -72,7 +72,7 @@ class TestAfterResponseChaining:
 
         class Composed(AHeader, BHeader):
             def get(self):
-                return "hi"
+                return Response("hi")
 
         request = RequestFactory().get("/")
         response = Composed(request=request).get_response()
@@ -98,7 +98,7 @@ class TestAfterResponseChaining:
 
         class Composed(Outer, Inner):
             def get(self):
-                return "hi"
+                return Response("hi")
 
         Composed(request=RequestFactory().get("/")).get_response()
         assert order == ["inner", "outer"]
@@ -120,7 +120,7 @@ class TestAfterResponseChaining:
 
         class Composed(Outer, Inner):
             def get(self):
-                return "hi"
+                return Response("hi")
 
         response = Composed(request=RequestFactory().get("/")).get_response()
         assert response.headers.get("X-Outer") == "1"

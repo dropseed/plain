@@ -1,10 +1,11 @@
+from plain.http import Response
 from plain.urls import Router, path
 from plain.views import View
 
 
 class TestView(View):
     def get(self):
-        return "Hello, world!"
+        return Response("Hello, world!")
 
 
 class AppRouter(Router):

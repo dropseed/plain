@@ -4,7 +4,6 @@
 
 - [Overview](#overview)
 - [HTTP methods map to class methods](#http-methods-map-to-class-methods)
-- [Return types](#return-types)
 - [TemplateView](#templateview)
 - [FormView](#formview)
 - [Object views](#object-views)
@@ -27,15 +26,16 @@
 Plain views are class-based, with a straightforward API that keeps simple views simple while giving you the full power of a class for complex cases.
 
 ```python
+from plain.http import Response
 from plain.views import View
 
 
 class ExampleView(View):
     def get(self):
-        return "<html><body>Hello, world!</body></html>"
+        return Response("<html><body>Hello, world!</body></html>")
 ```
 
-You can return strings, dicts, lists, integers (status codes), or full `Response` objects. Plain automatically converts them to the appropriate HTTP response.
+View handlers return a [`Response`](../http/response.py#Response) (or subclass like `JsonResponse`, `RedirectResponse`, etc.). To return a dict/list shorthand for JSON APIs, use [`APIView`](/plain-api/plain/api/README.md).
 
 ## HTTP methods map to class methods
 
@@ -65,33 +65,6 @@ class ExampleView(View):
 If a request comes in for a method your view doesn't implement, Plain returns a `405 Method Not Allowed` response automatically.
 
 The [base `View` class](./base.py#View) provides default `options` and `head` behavior, but you can override these too.
-
-## Return types
-
-You can return common Python types directly from view methods without wrapping them in a `Response` object.
-
-```python
-class JsonView(View):
-    def get(self):
-        return {"message": "Hello, world!"}
-
-
-class HtmlView(View):
-    def get(self):
-        return "<html><body>Hello, world!</body></html>"
-
-
-class StatusCodeView(View):
-    def get(self):
-        return 204  # No content
-
-
-class TupleView(View):
-    def get(self):
-        return (201, {"id": 123})  # Status code + data
-```
-
-Returning `None` triggers a 404 response, which is useful when an object isn't found.
 
 ## TemplateView
 
@@ -319,6 +292,8 @@ To wrap a blocking call safely: `await asyncio.get_running_loop().run_in_executo
 Use async views only for true async I/O (SSE, async HTTP clients). For standard request/response views that use the ORM, use regular sync views — they run in the thread pool and don't block other connections.
 
 In development (`DEBUG=True`), the server enables asyncio debug mode which logs warnings when a callback blocks the event loop for more than 100ms.
+
+Type checkers will flag `async def get` as an LSP violation against the sync `View.get` base stub. Add `# ty: ignore[invalid-method-override]` on the async handler line — the dispatch layer handles sync and async uniformly at runtime.
 
 ## ServerSentEventsView
 

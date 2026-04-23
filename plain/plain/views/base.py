@@ -5,9 +5,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 
 from plain.http import (
-    JsonResponse,
     NotAllowedResponse,
-    NotFoundError404,
     Request,
     Response,
     ResponseBase,
@@ -17,19 +15,6 @@ from plain.logs import get_framework_logger
 from .exceptions import ResponseException
 
 logger = get_framework_logger("plain.request")
-
-
-type ViewResult = (
-    ResponseBase
-    | int
-    | str
-    | list[Any]
-    | dict[str, Any]
-    | tuple[int, str | list[Any] | dict[str, Any]]
-    | None
-)
-
-type ViewHandlerReturn = ViewResult | Awaitable[ViewResult]
 
 
 # TRACE is an XST-adjacent debugging verb, CONNECT is a proxy concept —
@@ -52,22 +37,22 @@ class View:
             if getattr(cls, name, None) is not getattr(View, name, None)
         )
 
-    def get(self) -> ViewHandlerReturn:
+    def get(self) -> ResponseBase:
         raise NotImplementedError
 
-    def post(self) -> ViewHandlerReturn:
+    def post(self) -> ResponseBase:
         raise NotImplementedError
 
-    def put(self) -> ViewHandlerReturn:
+    def put(self) -> ResponseBase:
         raise NotImplementedError
 
-    def patch(self) -> ViewHandlerReturn:
+    def patch(self) -> ResponseBase:
         raise NotImplementedError
 
-    def delete(self) -> ViewHandlerReturn:
+    def delete(self) -> ResponseBase:
         raise NotImplementedError
 
-    def head(self) -> ViewHandlerReturn:
+    def head(self) -> ResponseBase:
         raise NotImplementedError
 
     def __init__(
@@ -150,7 +135,9 @@ class View:
             response = self._respond_to_exception(e)
         return self.after_response(response)
 
-    async def _dispatch_handler_async(self, handler: Callable[[], Any]) -> ResponseBase:
+    async def _dispatch_handler_async(
+        self, handler: Callable[[], Awaitable[ResponseBase]]
+    ) -> ResponseBase:
         try:
             result = await handler()
             response = self.convert_value_to_response(result)
@@ -163,37 +150,17 @@ class View:
             return exc.response
         return self.handle_exception(exc)
 
-    def convert_value_to_response(self, value: ViewResult) -> ResponseBase:
-        """Convert a return value to a Response."""
+    def convert_value_to_response(self, value: Any) -> ResponseBase:
+        """Hook for subclasses (e.g. `APIView`) to accept shorthand return types."""
         if isinstance(value, ResponseBase):
             return value
 
-        if isinstance(value, int):
-            return Response(status_code=value)
-
-        if value is None:
-            raise NotFoundError404
-
-        status_code = 200
-
-        if isinstance(value, tuple):
-            if len(value) != 2:
-                raise ValueError(
-                    "Tuple response must be of length 2 (status_code, value)"
-                )
-
-            status_code, value = value
-
-        if isinstance(value, str):
-            return Response(value, status_code=status_code)
-
-        if isinstance(value, list):
-            return JsonResponse(value, status_code=status_code, safe=False)
-
-        if isinstance(value, dict):
-            return JsonResponse(value, status_code=status_code)
-
-        raise ValueError(f"Unexpected view return type: {type(value)}")
+        raise TypeError(
+            f"{type(self).__name__} handlers must return a Response "
+            f"(got {type(value).__name__}). "
+            "Wrap raw data in a Response/JsonResponse, or use APIView for "
+            "dict/list/tuple shorthand returns."
+        )
 
     def options(self) -> Response:
         """Handle responding to requests for the OPTIONS HTTP verb."""

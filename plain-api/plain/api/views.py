@@ -8,6 +8,8 @@ from plain.forms.exceptions import FormFieldMissingError
 from plain.http import (
     HTTPException,
     JsonResponse,
+    NotFoundError404,
+    Response,
     ResponseBase,
 )
 from plain.utils import timezone
@@ -26,8 +28,18 @@ except ImportError:
 
 __all__ = [
     "APIKeyView",
+    "APIResult",
     "APIView",
 ]
+
+type APIResult = (
+    ResponseBase
+    | int
+    | None
+    | dict[str, Any]
+    | list[Any]
+    | tuple[int, dict[str, Any] | list[Any]]
+)
 
 
 def _error_response(*, error_id: str, message: str, status_code: int) -> JsonResponse:
@@ -135,6 +147,33 @@ class APIKeyView(View):
     "5XX", ErrorSchema, description="Unexpected Error", component_name="ServerError"
 )
 class APIView(View):
+    def convert_value_to_response(self, value: APIResult) -> ResponseBase:
+        if isinstance(value, ResponseBase):
+            return value
+
+        if value is None:
+            raise NotFoundError404
+
+        if isinstance(value, int):
+            return Response(status_code=value)
+
+        status_code = 200
+
+        if isinstance(value, tuple):
+            if len(value) != 2:
+                raise ValueError(
+                    "Tuple response must be of length 2 (status_code, value)"
+                )
+            status_code, value = value
+
+        if isinstance(value, dict):
+            return JsonResponse(value, status_code=status_code)
+
+        if isinstance(value, list):
+            return JsonResponse(value, status_code=status_code, safe=False)
+
+        raise TypeError(f"Unexpected APIView return type: {type(value).__name__}")
+
     def handle_exception(self, exc: Exception) -> ResponseBase:
         if isinstance(exc, ValidationError):
             return _error_response(
