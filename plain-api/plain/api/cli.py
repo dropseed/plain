@@ -1,8 +1,8 @@
 import json
 import sys
+import urllib.request
 
 import click
-import requests
 
 from plain.cli import register_cli
 from plain.runtime import settings
@@ -42,19 +42,19 @@ def generate_openapi(validate: bool, indent: int, format: str) -> None:
 
     if validate:
         click.secho("\nOpenAPI schema validation: ", err=True, nl=False)
-        response = requests.post(
+        request = urllib.request.Request(
             "https://validator.swagger.io/validator/debug",
+            data=json.dumps(schema.schema).encode("utf-8"),
             headers={"Content-Type": "application/json"},
-            json=schema.schema,
+            method="POST",
         )
-        response.raise_for_status()
-        failed = response.json().get(
-            "schemaValidationMessages", []
-        ) or response.json().get("messages", [])
+        with urllib.request.urlopen(request) as response:
+            body = json.loads(response.read())
+        failed = body.get("schemaValidationMessages", []) or body.get("messages", [])
         if failed:
             click.secho("Failed", fg="red", err=True)
             click.secho(
-                json.dumps(response.json(), indent=2, sort_keys=True),
+                json.dumps(body, indent=2, sort_keys=True),
                 fg="yellow",
                 err=True,
             )
