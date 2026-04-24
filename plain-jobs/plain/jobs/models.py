@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import datetime
+import time
 import traceback
 from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID
 
-from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MESSAGING_CONSUMER_GROUP_NAME,
     MESSAGING_DESTINATION_NAME,
@@ -18,7 +18,6 @@ from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
 from opentelemetry.semconv.attributes.code_attributes import (
     CODE_FUNCTION_NAME,
 )
-from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind, TraceFlags
 
 from plain import postgres
@@ -27,9 +26,14 @@ from plain.postgres import transaction, types
 from plain.postgres.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
-from plain.utils.otel import format_exception_type
 
 from .exceptions import DeferError, DeferJob
+from .otel import (
+    consumed_messages_counter,
+    operation_duration_histogram,
+    record_span_error,
+    tracer,
+)
 from .registry import jobs_registry
 
 if TYPE_CHECKING:
@@ -38,7 +42,6 @@ if TYPE_CHECKING:
 __all__ = ["JobRequest", "JobProcess", "JobResult", "JobResultStatuses"]
 
 logger = get_framework_logger()
-tracer = trace.get_tracer("plain.jobs")
 
 
 @postgres.register_model
@@ -271,70 +274,75 @@ class JobProcess(postgres.Model):
                     extra={"job_uuid": self.uuid},
                 )
 
-        with tracer.start_as_current_span(
-            f"process {self.queue}",
-            kind=SpanKind.CONSUMER,
-            attributes={
-                MESSAGING_SYSTEM: "plain.jobs",
-                MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.PROCESS.value,
-                MESSAGING_OPERATION_NAME: "process",
-                MESSAGING_MESSAGE_ID: str(self.uuid),
-                MESSAGING_DESTINATION_NAME: self.queue,
-                MESSAGING_CONSUMER_GROUP_NAME: self.queue,
-                CODE_FUNCTION_NAME: f"{self.job_class}.run",
-            },
-            links=links,
-        ) as span:
-            # This is how we know it has been picked up
-            self.started_at = timezone.now()
-            self.save(update_fields=["started_at"])
-
-            try:
-                job = jobs_registry.load_job(self.job_class, self.parameters or {})
-                job.job_process = self
+        metric_attributes: dict[str, Any] = {
+            MESSAGING_SYSTEM: "plain.jobs",
+            MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.PROCESS.value,
+            MESSAGING_DESTINATION_NAME: self.queue,
+            CODE_FUNCTION_NAME: f"{self.job_class}.run",
+        }
+        start_time = time.perf_counter()
+        try:
+            with tracer.start_as_current_span(
+                f"process {self.queue}",
+                kind=SpanKind.CONSUMER,
+                attributes={
+                    **metric_attributes,
+                    MESSAGING_OPERATION_NAME: "process",
+                    MESSAGING_MESSAGE_ID: str(self.uuid),
+                    MESSAGING_CONSUMER_GROUP_NAME: self.queue,
+                },
+                links=links,
+            ) as span:
+                # This is how we know it has been picked up
+                self.started_at = timezone.now()
+                self.save(update_fields=["started_at"])
 
                 try:
-                    job.run()
-                except DeferJob as e:
-                    # Job deferred - not an error, log at INFO level
-                    logger.info(
-                        "Job deferred",
-                        extra={
-                            "delay": e.delay,
-                            "increment_retries": e.increment_retries,
-                            "job_class": self.job_class,
-                            "job_process_uuid": self.uuid,
-                        },
+                    job = jobs_registry.load_job(self.job_class, self.parameters or {})
+                    job.job_process = self
+
+                    try:
+                        job.run()
+                    except DeferJob as e:
+                        # Job deferred - not an error, log at INFO level
+                        logger.info(
+                            "Job deferred",
+                            extra={
+                                "delay": e.delay,
+                                "increment_retries": e.increment_retries,
+                                "job_class": self.job_class,
+                                "job_process_uuid": self.uuid,
+                            },
+                        )
+                        return self.defer(job=job, defer_exception=e)
+
+                    return self.convert_to_result(status=JobResultStatuses.SUCCESSFUL)
+
+                except DeferError as e:
+                    # Defer failed (e.g., concurrency limit reached during re-enqueue)
+                    # The transaction was rolled back, so the JobProcess still exists in DB.
+                    # The pk was restored in defer() before raising, so we can proceed normally.
+                    logger.warning(
+                        "Defer failed",
+                        extra={"job_class": self.job_class, "error": str(e)},
                     )
-                    return self.defer(job=job, defer_exception=e)
+                    record_span_error(span, e, metric_attributes)
+                    return self.convert_to_result(
+                        status=JobResultStatuses.ERRORED,
+                        error=str(e),
+                    )
 
-                return self.convert_to_result(status=JobResultStatuses.SUCCESSFUL)
-
-            except DeferError as e:
-                # Defer failed (e.g., concurrency limit reached during re-enqueue)
-                # The transaction was rolled back, so the JobProcess still exists in DB.
-                # The pk was restored in defer() before raising, so we can proceed normally.
-                logger.warning(
-                    "Defer failed",
-                    extra={"job_class": self.job_class, "error": str(e)},
-                )
-                span.record_exception(e)
-                span.set_status(trace.StatusCode.ERROR)
-                span.set_attribute(ERROR_TYPE, format_exception_type(e))
-                return self.convert_to_result(
-                    status=JobResultStatuses.ERRORED,
-                    error=str(e),
-                )
-
-            except Exception as e:
-                logger.exception(e)
-                span.record_exception(e)
-                span.set_status(trace.StatusCode.ERROR)
-                span.set_attribute(ERROR_TYPE, format_exception_type(e))
-                return self.convert_to_result(
-                    status=JobResultStatuses.ERRORED,
-                    error="".join(traceback.format_tb(e.__traceback__)),
-                )
+                except Exception as e:
+                    logger.exception(e)
+                    record_span_error(span, e, metric_attributes)
+                    return self.convert_to_result(
+                        status=JobResultStatuses.ERRORED,
+                        error="".join(traceback.format_tb(e.__traceback__)),
+                    )
+        finally:
+            duration = time.perf_counter() - start_time
+            consumed_messages_counter.add(1, metric_attributes)
+            operation_duration_histogram.record(duration, metric_attributes)
 
     def defer(self, *, job: Job, defer_exception: DeferJob) -> JobResult:
         """Defer this job by re-enqueueing it for later execution.

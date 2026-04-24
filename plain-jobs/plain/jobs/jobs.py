@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import inspect
+import time
 from abc import ABCMeta, abstractmethod
 from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING, Any
@@ -20,20 +21,20 @@ from opentelemetry.semconv.attributes.code_attributes import (
     CODE_FUNCTION_NAME,
     CODE_LINE_NUMBER,
 )
+from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
 
 from plain import postgres
 from plain.postgres import transaction
 from plain.utils import timezone
+from plain.utils.otel import format_exception_type
 
 from .locks import postgres_advisory_lock
+from .otel import operation_duration_histogram, sent_messages_counter, tracer
 from .registry import JobParameters, jobs_registry
 
 if TYPE_CHECKING:
     from .models import JobProcess, JobRequest
-
-
-tracer = trace.get_tracer("plain.jobs")
 
 
 class JobType(ABCMeta):
@@ -80,96 +81,121 @@ class Job(metaclass=JobType):
         if queue is None:
             queue = self.default_queue()
 
-        with tracer.start_as_current_span(
-            f"send {queue}",
-            kind=SpanKind.PRODUCER,
-            attributes={
-                MESSAGING_SYSTEM: "plain.jobs",
-                MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.SEND.value,
-                MESSAGING_OPERATION_NAME: "send",
-                MESSAGING_DESTINATION_NAME: queue,
-                CODE_FUNCTION_NAME: f"{job_class_name}.run_in_worker",
-            },
-        ) as span:
-            try:
-                # Try to automatically annotate the source of the job
-                caller = inspect.stack()[1]
-                source = f"{caller.filename}:{caller.lineno}"
-                span.set_attributes(
-                    {
-                        CODE_FILE_PATH: caller.filename,
-                        CODE_LINE_NUMBER: caller.lineno,
-                    }
-                )
-            except (IndexError, AttributeError):
-                source = ""
-
-            parameters = JobParameters.to_json(self._init_args, self._init_kwargs)
-
-            if priority is None:
-                priority = self.default_priority()
-
-            if retries is None:
-                retries = self.default_retries()
-
-            if delay is None:
-                start_at = None
-            elif isinstance(delay, int):
-                start_at = timezone.now() + datetime.timedelta(seconds=delay)
-            elif isinstance(delay, datetime.timedelta):
-                start_at = timezone.now() + delay
-            elif isinstance(delay, datetime.datetime):
-                start_at = delay
-            else:
-                raise ValueError(f"Invalid delay: {delay}")
-
-            if concurrency_key is None:
-                concurrency_key = self.default_concurrency_key()
-
-            # Capture current trace context
-            current_span = trace.get_current_span()
-            span_context = current_span.get_span_context()
-
-            # Only include trace context if the span is being recorded (sampled)
-            # This ensures jobs are only linked to traces that are actually being collected
-            if current_span.is_recording() and span_context.is_valid:
-                trace_id = f"0x{format_trace_id(span_context.trace_id)}"
-                span_id = f"0x{format_span_id(span_context.span_id)}"
-            else:
-                trace_id = None
-                span_id = None
-
-            # Use transaction with optional locking for race-free enqueue
-            with transaction.atomic():
-                # Acquire lock via context manager (or nullcontext if None)
-                with self.get_enqueue_lock(concurrency_key) or nullcontext():
-                    # Check with lock held (if using locks)
-                    if not self.should_enqueue(concurrency_key):
-                        span.set_attribute("job.enqueue.skipped", True)
-                        return None
-
-                    # Create job with lock held
-                    job_request = JobRequest(
-                        job_class=job_class_name,
-                        parameters=parameters,
-                        start_at=start_at,
-                        source=source,
-                        queue=queue,
-                        priority=priority,
-                        retries=retries,
-                        retry_attempt=retry_attempt,
-                        concurrency_key=concurrency_key,
-                        trace_id=trace_id,
-                        span_id=span_id,
+        metric_attributes: dict[str, Any] = {
+            MESSAGING_SYSTEM: "plain.jobs",
+            MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.SEND.value,
+            MESSAGING_DESTINATION_NAME: queue,
+            CODE_FUNCTION_NAME: f"{job_class_name}.run_in_worker",
+        }
+        start_time = time.perf_counter()
+        skipped = False
+        try:
+            with tracer.start_as_current_span(
+                f"send {queue}",
+                kind=SpanKind.PRODUCER,
+                attributes={**metric_attributes, MESSAGING_OPERATION_NAME: "send"},
+            ) as span:
+                try:
+                    # Try to automatically annotate the source of the job
+                    caller = inspect.stack()[1]
+                    source = f"{caller.filename}:{caller.lineno}"
+                    span.set_attributes(
+                        {
+                            CODE_FILE_PATH: caller.filename,
+                            CODE_LINE_NUMBER: caller.lineno,
+                        }
                     )
-                    job_request.save()
+                except (IndexError, AttributeError):
+                    source = ""
 
-                    span.set_attribute(
-                        MESSAGING_MESSAGE_ID,
-                        str(job_request.uuid),
-                    )
+                parameters = JobParameters.to_json(self._init_args, self._init_kwargs)
 
-                    return job_request
+                if priority is None:
+                    priority = self.default_priority()
+
+                if retries is None:
+                    retries = self.default_retries()
+
+                if delay is None:
+                    start_at = None
+                elif isinstance(delay, int):
+                    start_at = timezone.now() + datetime.timedelta(seconds=delay)
+                elif isinstance(delay, datetime.timedelta):
+                    start_at = timezone.now() + delay
+                elif isinstance(delay, datetime.datetime):
+                    start_at = delay
+                else:
+                    raise ValueError(f"Invalid delay: {delay}")
+
+                if concurrency_key is None:
+                    concurrency_key = self.default_concurrency_key()
+
+                # Capture current trace context
+                current_span = trace.get_current_span()
+                span_context = current_span.get_span_context()
+
+                # Only include trace context if the span is being recorded (sampled)
+                # This ensures jobs are only linked to traces that are actually being collected
+                if current_span.is_recording() and span_context.is_valid:
+                    trace_id = f"0x{format_trace_id(span_context.trace_id)}"
+                    span_id = f"0x{format_span_id(span_context.span_id)}"
+                else:
+                    trace_id = None
+                    span_id = None
+
+                # Use transaction with optional locking for race-free enqueue
+                with transaction.atomic():
+                    # Acquire lock via context manager (or nullcontext if None)
+                    with self.get_enqueue_lock(concurrency_key) or nullcontext():
+                        # Check with lock held (if using locks)
+                        if not self.should_enqueue(concurrency_key):
+                            span.set_attribute("job.enqueue.skipped", True)
+                            skipped = True
+                            return None
+
+                        # Create job with lock held
+                        job_request = JobRequest(
+                            job_class=job_class_name,
+                            parameters=parameters,
+                            start_at=start_at,
+                            source=source,
+                            queue=queue,
+                            priority=priority,
+                            retries=retries,
+                            retry_attempt=retry_attempt,
+                            concurrency_key=concurrency_key,
+                            trace_id=trace_id,
+                            span_id=span_id,
+                        )
+                        job_request.save()
+
+                        span.set_attribute(
+                            MESSAGING_MESSAGE_ID,
+                            str(job_request.uuid),
+                        )
+
+                        return job_request
+        except Exception as e:
+            metric_attributes[ERROR_TYPE] = format_exception_type(e)
+            raise
+        finally:
+            if not skipped:
+                duration = time.perf_counter() - start_time
+                if ERROR_TYPE in metric_attributes:
+                    # No commit is coming — record now so failed sends are visible.
+                    sent_messages_counter.add(1, metric_attributes)
+                    operation_duration_histogram.record(duration, metric_attributes)
+                else:
+                    # Defer to the outer commit so a caller-level rollback
+                    # doesn't leave a phantom send. Runs immediately if not
+                    # inside a transaction.
+                    attrs = metric_attributes
+
+                    def _emit() -> None:
+                        sent_messages_counter.add(1, attrs)
+                        operation_duration_histogram.record(duration, attrs)
+
+                    transaction.on_commit(_emit)
 
     def get_requested_jobs(
         self, *, concurrency_key: str | None = None, include_retries: bool = False
