@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.136.0](https://github.com/dropseed/plain/releases/plain@0.136.0) (2026-04-24)
+
+### What's changed
+
+- **`View` is now generic over its handler return type.** The base class is `View[HandlerResult = Response]`, and `get` / `post` / `put` / `patch` / `delete` / `head` are typed to return `HandlerResult` instead of `Response`. Subclasses that accept richer return types (e.g. `APIView` in plain-api) can parameterize the base as `View[APIResult]` and have their handler signatures reflect that in type checkers. ([9c0c12df13fd](https://github.com/dropseed/plain/commit/9c0c12df13fd))
+- **Renamed `View.convert_value_to_response` → `View.convert_result_to_response`.** The parameter is now `result: HandlerResult` instead of `value: Any`, which keeps the type flowing through the generic parameter. ([11c8fe16b544](https://github.com/dropseed/plain/commit/11c8fe16b544))
+
+### Upgrade instructions
+
+- **If you overrode `convert_value_to_response` on a `View` subclass** — rename it to `convert_result_to_response` and update the parameter name from `value` to `result`. The signature is otherwise unchanged.
+
 ## [0.135.0](https://github.com/dropseed/plain/releases/plain@0.135.0) (2026-04-23)
 
 ### What's changed
