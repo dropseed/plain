@@ -141,7 +141,7 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 ## Email backends
 
-The `EMAIL_BACKEND` setting controls how emails are sent. Plain includes three backends.
+The `EMAIL_BACKEND` setting controls how emails are sent. Plain includes two backends.
 
 ### SMTP backend
 
