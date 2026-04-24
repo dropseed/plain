@@ -146,32 +146,32 @@ class APIKeyView(View):
     "5XX", ErrorSchema, description="Unexpected Error", component_name="ServerError"
 )
 class APIView(View[APIResult]):
-    def convert_value_to_response(self, value: APIResult) -> Response:
-        if isinstance(value, Response):
-            return value
+    def convert_result_to_response(self, result: APIResult) -> Response:
+        if isinstance(result, Response):
+            return result
 
-        if value is None:
+        if result is None:
             raise NotFoundError404
 
-        if isinstance(value, int):
-            return Response(status_code=value)
+        if isinstance(result, int):
+            return Response(status_code=result)
 
         status_code = 200
 
-        if isinstance(value, tuple):
-            if len(value) != 2:
+        if isinstance(result, tuple):
+            if len(result) != 2:
                 raise ValueError(
-                    "Tuple response must be of length 2 (status_code, value)"
+                    "Tuple response must be of length 2 (status_code, data)"
                 )
-            status_code, value = value
+            status_code, result = result
 
-        if isinstance(value, dict):
-            return JsonResponse(value, status_code=status_code)
+        if isinstance(result, dict):
+            return JsonResponse(result, status_code=status_code)
 
-        if isinstance(value, list):
-            return JsonResponse(value, status_code=status_code, safe=False)
+        if isinstance(result, list):
+            return JsonResponse(result, status_code=status_code, safe=False)
 
-        raise TypeError(f"Unexpected APIView return type: {type(value).__name__}")
+        raise TypeError(f"Unexpected APIView return type: {type(result).__name__}")
 
     def handle_exception(self, exc: Exception) -> Response:
         if isinstance(exc, ValidationError):

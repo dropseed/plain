@@ -129,7 +129,7 @@ class View[HandlerResult = Response]:
             elif inspect.iscoroutinefunction(handler):
                 return self._dispatch_handler_async(handler)  # ty: ignore[invalid-return-type]
             else:
-                response = self.convert_value_to_response(handler())
+                response = self.convert_result_to_response(handler())
         except Exception as e:
             response = self._respond_to_exception(e)
         return self.after_response(response)
@@ -139,7 +139,7 @@ class View[HandlerResult = Response]:
     ) -> Response:
         try:
             result = await handler()
-            response = self.convert_value_to_response(result)
+            response = self.convert_result_to_response(result)
         except Exception as e:
             response = self._respond_to_exception(e)
         return self.after_response(response)
@@ -149,14 +149,14 @@ class View[HandlerResult = Response]:
             return exc.response
         return self.handle_exception(exc)
 
-    def convert_value_to_response(self, value: HandlerResult) -> Response:
+    def convert_result_to_response(self, result: HandlerResult) -> Response:
         """Hook for subclasses (e.g. `APIView`) to accept shorthand return types."""
-        if isinstance(value, Response):
-            return value
+        if isinstance(result, Response):
+            return result
 
         raise TypeError(
             f"{type(self).__name__} handlers must return a Response "
-            f"(got {type(value).__name__}). "
+            f"(got {type(result).__name__}). "
             "Wrap raw data in a Response/JsonResponse, or use APIView for "
             "dict/list/tuple shorthand returns."
         )
