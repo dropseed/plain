@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.34.8](https://github.com/dropseed/plain/releases/plain-observer@0.34.8) (2026-04-24)
+
+### What's changed
+
+- Added an `ObserverIndexView` at `/observer/` that redirects to the traces list, so visiting the observer root no longer 404s. ([2116e54976d2](https://github.com/dropseed/plain/commit/2116e54976d2))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.34.7](https://github.com/dropseed/plain/releases/plain-observer@0.34.7) (2026-04-23)
 
 ### What's changed
