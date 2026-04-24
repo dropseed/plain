@@ -1,5 +1,17 @@
 # plain-api changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-api@0.31.0) (2026-04-24)
+
+### What's changed
+
+- **`APIView` now subclasses `View[APIResult]`.** plain 0.136.0 made `View` generic over its handler return type, so `APIView` parameterizes it with `APIResult` — type checkers now see `get` / `post` / etc. as returning `APIResult` (dict, list, int, tuple, None, or `Response`) instead of just `Response`. ([9c0c12df13fd](https://github.com/dropseed/plain/commit/9c0c12df13fd))
+- **Renamed `APIView.convert_value_to_response` → `APIView.convert_result_to_response`** to match the rename in plain 0.136.0. ([11c8fe16b544](https://github.com/dropseed/plain/commit/11c8fe16b544))
+
+### Upgrade instructions
+
+- Requires `plain>=0.136.0`.
+- **If you overrode `convert_value_to_response` on an `APIView` subclass** — rename it to `convert_result_to_response` and update the parameter name from `value` to `result`.
+
 ## [0.30.1](https://github.com/dropseed/plain/releases/plain-api@0.30.1) (2026-04-23)
 
 ### What's changed
