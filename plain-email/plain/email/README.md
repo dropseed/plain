@@ -1,6 +1,6 @@
 # plain.email
 
-**Send emails from your Plain application using SMTP, console output, or file-based backends.**
+**Send emails from your Plain application using SMTP, console output, or the development preview backend.**
 
 - [Overview](#overview)
     - [Sending a simple email](#sending-a-simple-email)
@@ -11,7 +11,7 @@
 - [Email backends](#email-backends)
     - [SMTP backend](#smtp-backend)
     - [Console backend](#console-backend)
-    - [File-based backend](#file-based-backend)
+    - [Preview backend](#preview-backend)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -141,7 +141,7 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 ## Email backends
 
-The `EMAIL_BACKEND` setting controls how emails are sent. Plain includes two backends.
+The `EMAIL_BACKEND` setting controls how emails are sent. Plain includes three backends.
 
 ### SMTP backend
 
@@ -158,6 +158,18 @@ Prints emails to the console instead of sending them. Useful during development.
 ```python
 EMAIL_BACKEND = "plain.email.backends.console.EmailBackend"
 ```
+
+### Preview backend
+
+Captures each sent message as a `.eml` file in `.plain/emails/` for inspection during development. Nothing is delivered to an SMTP server.
+
+```python
+EMAIL_BACKEND = "plain.email.backends.preview.EmailBackend"
+```
+
+Or via env var: `PLAIN_EMAIL_BACKEND=plain.email.backends.preview.EmailBackend`.
+
+When [`plain.toolbar`](../../plain-toolbar/plain/toolbar/README.md) is installed, the toolbar gains an **Email** panel that lists recent captured messages and renders their HTML bodies inline. You can also open any `.eml` file directly in Mail.app.
 
 ## FAQs
 

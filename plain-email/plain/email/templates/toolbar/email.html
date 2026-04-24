@@ -1,0 +1,43 @@
+<div class="px-6 py-4 space-y-2 text-sm">
+    {% if not emails %}
+        <p class="text-white/50">No emails captured yet. Send an email to see it here.</p>
+        <p class="text-white/30 text-xs">Writing to <code>{{ email_file_path }}</code></p>
+    {% else %}
+        <div class="flex items-center justify-between mb-2">
+            <p class="text-white/50 text-xs">
+                Recent emails ({{ emails|length }}) from <code class="text-white/40">{{ email_file_path }}</code>
+            </p>
+        </div>
+        {% for email in emails %}
+        <details class="rounded border border-white/10 bg-white/5">
+            <summary class="cursor-pointer px-3 py-2 hover:bg-white/5 flex items-center gap-2">
+                <span class="text-[10px] uppercase text-white/30 tabular-nums w-10">{{ email.kind }}</span>
+                <span class="flex-1 truncate">
+                    <span class="text-white/90">{{ email.subject }}</span>
+                    <span class="text-white/50 text-xs">→ {{ email.to }}</span>
+                </span>
+                <span class="text-[11px] text-white/30 tabular-nums">{{ email.date }}</span>
+            </summary>
+            <div class="border-t border-white/10 bg-zinc-900">
+                <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 px-3 py-2 text-xs text-white/70">
+                    {% if email.from %}<dt class="text-white/40">From</dt><dd>{{ email.from }}</dd>{% endif %}
+                    {% if email.to %}<dt class="text-white/40">To</dt><dd>{{ email.to }}</dd>{% endif %}
+                    {% if email.cc %}<dt class="text-white/40">Cc</dt><dd>{{ email.cc }}</dd>{% endif %}
+                    {% if email.date %}<dt class="text-white/40">Date</dt><dd>{{ email.date }}</dd>{% endif %}
+                </dl>
+                {% if email.html_body %}
+                <iframe
+                    sandbox
+                    loading="lazy"
+                    srcdoc="{{ email.html_body }}"
+                    class="w-full bg-white rounded-b"
+                    style="height: 400px; border: 0;"
+                ></iframe>
+                {% elif email.text_body %}
+                <pre class="px-3 py-3 bg-zinc-950 text-white/80 text-xs whitespace-pre-wrap rounded-b">{{ email.text_body }}</pre>
+                {% endif %}
+            </div>
+        </details>
+        {% endfor %}
+    {% endif %}
+</div>

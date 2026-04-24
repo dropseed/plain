@@ -48,7 +48,7 @@ DEFAULT_RESPONSE_HEADERS = {
 }
 
 
-EMAIL_BACKEND = "plain.email.backends.console.EmailBackend"
+EMAIL_BACKEND = "plain.email.backends.preview.EmailBackend"
 EMAIL_DEFAULT_FROM = "from@example.com"
 SUPPORT_EMAIL = "support@example.com"
 OAUTH_LOGIN_PROVIDERS = {}
