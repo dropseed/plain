@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.48.0](https://github.com/dropseed/plain/releases/plain-jobs@0.48.0) (2026-04-24)
+
+### What's changed
+
+- **Added OpenTelemetry messaging semantic-convention metrics.** `plain.jobs` now records `messaging.client.sent.messages`, `messaging.client.consumed.messages`, and `messaging.client.operation.duration` around enqueue and process. Metric attributes follow the messaging semconv (`messaging.system=plain.jobs`, `messaging.operation.type`, `messaging.destination.name`, `code.function.name`), and errors are tagged with `error.type`. A new `plain.jobs.otel` module holds the shared tracer, meter, metric instruments, and a `record_span_error` helper. ([6fc7c4e04910](https://github.com/dropseed/plain/commit/6fc7c4e04910))
+- Switched enqueue source capture from `inspect.stack()` to `sys._getframe(1)` — same `source` (`filename:lineno`) attribute on the producer span, without the full stack walk. ([aabc7d7fe97f](https://github.com/dropseed/plain/commit/aabc7d7fe97f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.47.6](https://github.com/dropseed/plain/releases/plain-jobs@0.47.6) (2026-04-22)
 
 ### What's changed
