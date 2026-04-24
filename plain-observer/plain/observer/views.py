@@ -8,10 +8,14 @@ from plain.htmx.views import HTMXView
 from plain.http import JsonResponse, Response
 from plain.runtime import settings
 from plain.urls import reverse
-from plain.views import DetailView, ListView
+from plain.views import DetailView, ListView, RedirectView
 
 from .core import Observer
 from .models import Trace
+
+
+class ObserverIndexView(RedirectView):
+    url_name = "observer:traces"
 
 
 class ObserverTracesView(AuthView, HTMXView, ListView):
