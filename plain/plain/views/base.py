@@ -22,7 +22,7 @@ logger = get_framework_logger("plain.request")
 _HANDLER_NAMES = ("get", "post", "put", "patch", "delete", "head")
 
 
-class View:
+class View[HandlerResult = Response]:
     request: Request
     url_kwargs: dict[str, Any]
 
@@ -36,22 +36,22 @@ class View:
             if getattr(cls, name, None) is not getattr(View, name, None)
         )
 
-    def get(self) -> Response:
+    def get(self) -> HandlerResult:
         raise NotImplementedError
 
-    def post(self) -> Response:
+    def post(self) -> HandlerResult:
         raise NotImplementedError
 
-    def put(self) -> Response:
+    def put(self) -> HandlerResult:
         raise NotImplementedError
 
-    def patch(self) -> Response:
+    def patch(self) -> HandlerResult:
         raise NotImplementedError
 
-    def delete(self) -> Response:
+    def delete(self) -> HandlerResult:
         raise NotImplementedError
 
-    def head(self) -> Response:
+    def head(self) -> HandlerResult:
         raise NotImplementedError
 
     def __init__(
@@ -149,7 +149,7 @@ class View:
             return exc.response
         return self.handle_exception(exc)
 
-    def convert_value_to_response(self, value: Any) -> Response:
+    def convert_value_to_response(self, value: HandlerResult) -> Response:
         """Hook for subclasses (e.g. `APIView`) to accept shorthand return types."""
         if isinstance(value, Response):
             return value

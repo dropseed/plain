@@ -145,7 +145,7 @@ class APIKeyView(View):
 @openapi.response_typed_dict(
     "5XX", ErrorSchema, description="Unexpected Error", component_name="ServerError"
 )
-class APIView(View):
+class APIView(View[APIResult]):
     def convert_value_to_response(self, value: APIResult) -> Response:
         if isinstance(value, Response):
             return value
