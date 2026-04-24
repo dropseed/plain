@@ -1,5 +1,16 @@
 # plain-email changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-email@0.19.0) (2026-04-24)
+
+### What's changed
+
+- **Added a preview email backend** (`plain.email.backends.preview.EmailBackend`) that captures sent messages as `.eml` files in `.plain/emails/` instead of delivering them. When `plain.toolbar` is installed, the toolbar gains an **Email** panel that lists recent captured messages and renders their HTML bodies inline; `.eml` files can also be opened directly in Mail.app. ([9c3cef100997](https://github.com/dropseed/plain/commit/9c3cef100997))
+- Fixed a stale backend count in the README. ([c487206dc3db](https://github.com/dropseed/plain/commit/c487206dc3db))
+
+### Upgrade instructions
+
+- No changes required. To use the new preview backend in development, set `EMAIL_BACKEND = "plain.email.backends.preview.EmailBackend"` (or `PLAIN_EMAIL_BACKEND=plain.email.backends.preview.EmailBackend`).
+
 ## [0.18.2](https://github.com/dropseed/plain/releases/plain-email@0.18.2) (2026-04-13)
 
 ### What's changed
