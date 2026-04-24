@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime
-import inspect
+import sys
 import time
 from abc import ABCMeta, abstractmethod
 from contextlib import AbstractContextManager, nullcontext
@@ -96,16 +96,17 @@ class Job(metaclass=JobType):
                 attributes={**metric_attributes, MESSAGING_OPERATION_NAME: "send"},
             ) as span:
                 try:
-                    # Try to automatically annotate the source of the job
-                    caller = inspect.stack()[1]
-                    source = f"{caller.filename}:{caller.lineno}"
+                    frame = sys._getframe(1)
+                    filename = frame.f_code.co_filename
+                    lineno = frame.f_lineno
+                    source = f"{filename}:{lineno}"
                     span.set_attributes(
                         {
-                            CODE_FILE_PATH: caller.filename,
-                            CODE_LINE_NUMBER: caller.lineno,
+                            CODE_FILE_PATH: filename,
+                            CODE_LINE_NUMBER: lineno,
                         }
                     )
-                except (IndexError, AttributeError):
+                except (ValueError, AttributeError):
                     source = ""
 
                 parameters = JobParameters.to_json(self._init_args, self._init_kwargs)
