@@ -126,6 +126,174 @@ class TestStructuralScenarios:
         assert flagged[0]["name"] == "_diag_dup_a_idx"
         assert "_diag_dup_ab_idx" in flagged[0]["detail"]
 
+    def test_duplicate_indexes_detected_against_expression_index(self) -> None:
+        """A plain-column index is redundant with a longer index whose
+        trailing columns are expressions (e.g. `(team, LOWER(email))`)."""
+        _execute(
+            'CREATE TABLE "_diag_dup_expr" ('
+            '"id" serial PRIMARY KEY, "team_id" int, "email" text)'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_expr_team_idx" ON "_diag_dup_expr" ("team_id")'
+        )
+        _execute(
+            'CREATE UNIQUE INDEX "_diag_dup_expr_team_lower_email_uniq" '
+            'ON "_diag_dup_expr" ("team_id", LOWER("email"))'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_duplicate_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_dup_expr"]
+        assert len(flagged) == 1, (
+            f"expected one duplicate on _diag_dup_expr, got {flagged}"
+        )
+        assert flagged[0]["name"] == "_diag_dup_expr_team_idx"
+        assert "_diag_dup_expr_team_lower_email_uniq" in flagged[0]["detail"]
+
+    def test_duplicate_indexes_detected_when_shorter_is_expression(self) -> None:
+        """A `(LOWER(email))` index is redundant with `(LOWER(email), team_id)`
+        — the longer index's leading column satisfies any read on the shorter,
+        and `pg_get_indexdef` per-column comparison catches the match."""
+        _execute(
+            'CREATE TABLE "_diag_dup_expr_short" ('
+            '"id" serial PRIMARY KEY, "email" text, "team_id" int)'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_expr_short_lower_idx" '
+            'ON "_diag_dup_expr_short" (LOWER("email"))'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_expr_short_lower_team_idx" '
+            'ON "_diag_dup_expr_short" (LOWER("email"), "team_id")'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_duplicate_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_dup_expr_short"]
+        assert len(flagged) == 1, (
+            f"expected one duplicate on _diag_dup_expr_short, got {flagged}"
+        )
+        assert flagged[0]["name"] == "_diag_dup_expr_short_lower_idx"
+        assert "_diag_dup_expr_short_lower_team_idx" in flagged[0]["detail"]
+
+    def test_duplicate_indexes_not_flagged_for_same_length_expression_indexes(
+        self,
+    ) -> None:
+        """Two single-column expression indexes with different expressions
+        (`LOWER(email)` vs `UPPER(email)`) — neither qualifies as shorter
+        under `len(defs_s) < len(defs_l)`, so no false positive."""
+        _execute(
+            'CREATE TABLE "_diag_dup_expr_eq" ("id" serial PRIMARY KEY, "email" text)'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_expr_eq_lower_idx" '
+            'ON "_diag_dup_expr_eq" (LOWER("email"))'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_expr_eq_upper_idx" '
+            'ON "_diag_dup_expr_eq" (UPPER("email"))'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_duplicate_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_dup_expr_eq"]
+        assert flagged == [], (
+            f"expected no duplicates flagged for same-length expression indexes, got {flagged}"
+        )
+
+    def test_duplicate_indexes_detected_when_longer_expression_index_is_not_unique(
+        self,
+    ) -> None:
+        """Uniqueness only matters for the shorter side (a unique short index
+        serves a constraint purpose). The longer side's uniqueness is
+        irrelevant — a redundant non-unique short index should still be
+        flagged against a non-unique longer expression index."""
+        _execute(
+            'CREATE TABLE "_diag_dup_expr_nonuniq" ('
+            '"id" serial PRIMARY KEY, "team_id" int, "email" text)'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_expr_nonuniq_team_idx" '
+            'ON "_diag_dup_expr_nonuniq" ("team_id")'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_expr_nonuniq_team_lower_idx" '
+            'ON "_diag_dup_expr_nonuniq" ("team_id", LOWER("email"))'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_duplicate_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_dup_expr_nonuniq"]
+        assert len(flagged) == 1, (
+            f"expected one duplicate on _diag_dup_expr_nonuniq, got {flagged}"
+        )
+        assert flagged[0]["name"] == "_diag_dup_expr_nonuniq_team_idx"
+        assert "_diag_dup_expr_nonuniq_team_lower_idx" in flagged[0]["detail"]
+
+    def test_duplicate_indexes_not_flagged_across_access_methods(self) -> None:
+        """A hash index and a btree index on the same column support different
+        operators (hash: only `=`; btree: ordering, range, etc.). Per-column
+        text is identical, so we must check `pg_am.amname` to avoid telling
+        the user to drop a deliberately-chosen hash index."""
+        _execute(
+            'CREATE TABLE "_diag_dup_am" ('
+            '"id" serial PRIMARY KEY, "team_id" int, "email" text)'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_am_team_hash_idx" '
+            'ON "_diag_dup_am" USING hash ("team_id")'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_am_team_email_idx" '
+            'ON "_diag_dup_am" USING btree ("team_id", LOWER("email"))'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_duplicate_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_dup_am"]
+        assert flagged == [], (
+            f"expected no duplicates flagged across access methods, got {flagged}"
+        )
+
+    def test_duplicate_indexes_not_flagged_when_longer_starts_with_expression(
+        self,
+    ) -> None:
+        """A column-only shorter index `(team_id)` is not a true prefix of a
+        longer index that leads with an expression `(LOWER(email), team_id)`
+        — Postgres can't satisfy `WHERE team_id = ?` from the longer index,
+        and per-column text comparison correctly skips it."""
+        _execute(
+            'CREATE TABLE "_diag_dup_expr_lead" ('
+            '"id" serial PRIMARY KEY, "email" text, "team_id" int)'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_expr_lead_team_idx" '
+            'ON "_diag_dup_expr_lead" ("team_id")'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_expr_lead_lower_team_idx" '
+            'ON "_diag_dup_expr_lead" (LOWER("email"), "team_id")'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_duplicate_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_dup_expr_lead"]
+        assert flagged == [], (
+            f"expected no duplicates flagged when longer leads with expression, got {flagged}"
+        )
+
     def test_missing_fk_index_detected(self) -> None:
         _execute('CREATE TABLE "_diag_fk_parent" ("id" serial PRIMARY KEY)')
         _execute(

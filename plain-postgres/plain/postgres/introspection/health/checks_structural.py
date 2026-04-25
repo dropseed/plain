@@ -66,50 +66,65 @@ def check_invalid_indexes(
 def check_duplicate_indexes(
     cursor: Any, table_owners: dict[str, TableOwner]
 ) -> CheckResult:
-    """Indexes where one is a column-prefix of another on the same table."""
+    """Indexes where one is a column-prefix of another on the same table.
+
+    Each index column's canonical definition comes from
+    ``pg_get_indexdef(indexrelid, k, false)`` — that text includes the
+    column name or expression, plus any non-default operator class,
+    collation, or sort order. Comparing per-column definitions means we
+    catch expression duplicates (e.g. two ``LOWER(email)`` columns) and
+    won't false-positive across different opclasses or collations.
+    Access method (``pg_am.amname``) is checked separately because the
+    per-column text doesn't include it — a hash and btree on the same
+    column have identical column text but support different operators.
+    """
     cursor.execute("""
         SELECT
             ct.relname AS table_name,
             ci.relname AS index_name,
-            i.indkey::int[] AS column_numbers,
-            i.indclass::int[] AS opclass_numbers,
+            am.amname AS access_method,
+            array(
+                SELECT pg_get_indexdef(i.indexrelid, k, false)
+                FROM generate_series(1, i.indnatts) AS k
+            ) AS column_defs,
             i.indisunique,
-            pg_size_pretty(pg_relation_size(ci.oid)) AS index_size,
-            pg_relation_size(ci.oid) AS index_size_bytes
+            pg_size_pretty(pg_relation_size(ci.oid)) AS index_size
         FROM pg_catalog.pg_index i
         JOIN pg_catalog.pg_class ci ON ci.oid = i.indexrelid
         JOIN pg_catalog.pg_class ct ON ct.oid = i.indrelid
+        JOIN pg_catalog.pg_am am ON am.oid = ci.relam
         JOIN pg_catalog.pg_namespace n ON n.oid = ct.relnamespace
         WHERE n.nspname = 'public'
           AND i.indisvalid
-          AND i.indexprs IS NULL
           AND i.indpred IS NULL
         ORDER BY ct.relname, ci.relname
     """)
     rows = cursor.fetchall()
 
-    # Group by table
-    by_table: dict[str, list[tuple[str, list[int], list[int], bool, str, int]]] = {}
-    for table_name, index_name, cols, opclasses, is_unique, size, size_bytes in rows:
+    by_table: dict[str, list[tuple[str, str, list[str], bool, str]]] = {}
+    for table_name, index_name, am_name, defs, is_unique, size in rows:
         by_table.setdefault(table_name, []).append(
-            (index_name, cols, opclasses, is_unique, size, size_bytes)
+            (index_name, am_name, defs, is_unique, size)
         )
 
     items: list[CheckItem] = []
-    flagged: set[str] = set()  # avoid reporting the same index multiple times
+    flagged: set[str] = set()
     for table_name, indexes in by_table.items():
         for i, idx_a in enumerate(indexes):
             for idx_b in indexes[i + 1 :]:
                 # Check both directions: is either a prefix of the other?
                 for shorter, longer in [(idx_a, idx_b), (idx_b, idx_a)]:
-                    name_s, cols_s, ops_s, unique_s, size_s, _ = shorter
-                    name_l, cols_l, ops_l, _, _, _ = longer
+                    name_s, am_s, defs_s, unique_s, size_s = shorter
+                    name_l, am_l, defs_l, _, _ = longer
+                    # Different access methods serve different operators
+                    # (e.g. hash supports `=` only, btree supports ordering),
+                    # and unique indexes serve a constraint purpose.
                     if (
                         name_s not in flagged
-                        and len(cols_s) < len(cols_l)
-                        and cols_l[: len(cols_s)] == cols_s
-                        and ops_l[: len(cols_s)] == ops_s
-                        and not unique_s  # unique indexes serve a constraint purpose
+                        and am_s == am_l
+                        and not unique_s
+                        and len(defs_s) < len(defs_l)
+                        and defs_l[: len(defs_s)] == defs_s
                     ):
                         source, package, model_class, model_file = _table_info(
                             table_name, table_owners
