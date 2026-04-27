@@ -1,5 +1,16 @@
 # plain changelog
 
+## [0.137.0](https://github.com/dropseed/plain/releases/plain@0.137.0) (2026-04-27)
+
+### What's changed
+
+- **Added `plain.test.otel` for capturing OpenTelemetry signals in tests.** New `install_test_tracer()` and `install_test_meter()` helpers install in-memory providers and return an `InMemorySpanExporter` / `InMemoryMetricReader` so tests can read the spans and metrics emitted during a request. Both are idempotent — they handle OpenTelemetry's install-once-per-process global providers — so they're safe to call from multiple test modules. If you're using `plain.pytest`, prefer the new `otel_spans` / `otel_metrics` fixtures. ([e650b556447f](https://github.com/dropseed/plain/commit/e650b556447f))
+- **Documented the OTel context propagation in the request handler.** No behavior change — the existing `request_ctx.run(context.attach, context.get_current())` line is now flagged as load-bearing with a comment explaining why removing it would silently turn child spans into root spans. ([aeaef9fd6a8e](https://github.com/dropseed/plain/commit/aeaef9fd6a8e))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.136.1](https://github.com/dropseed/plain/releases/plain@0.136.1) (2026-04-26)
 
 ### What's changed
