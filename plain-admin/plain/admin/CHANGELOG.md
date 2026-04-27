@@ -1,5 +1,17 @@
 # plain-admin changelog
 
+## [0.78.0](https://github.com/dropseed/plain/releases/plain-admin@0.78.0) (2026-04-27)
+
+### What's changed
+
+- **Added `KeyValueCard` for label/value pairs.** A new card type that renders a list of label/value pairs as a definition list — useful for short metric- or identity-style data (server stats, version info, account summaries) where the values are pre-formatted strings. Override `get_items()` (or set `items`) to provide the dict. ([d4892c17a5a0](https://github.com/dropseed/plain/commit/d4892c17a5a0))
+- **Cards now stretch to match row height.** Removed the `min-height: auto; height: auto` override on `.card.col-span-1` and dropped `items-start` from the dashboard grid so cards in the same row align to a consistent height. ([6303c2519f93](https://github.com/dropseed/plain/commit/6303c2519f93))
+- **Fixed the chart `hasData` check to scan every dataset.** The dashboard previously decided a chart was empty if the first dataset had no positive values, hiding charts where data lived in a later dataset. The check now iterates all datasets. ([5ce0de9ed1da](https://github.com/dropseed/plain/commit/5ce0de9ed1da))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.77.7](https://github.com/dropseed/plain/releases/plain-admin@0.77.7) (2026-04-23)
 
 ### What's changed
