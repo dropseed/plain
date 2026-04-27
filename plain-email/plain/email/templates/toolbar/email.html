@@ -30,8 +30,7 @@
                     sandbox
                     loading="lazy"
                     srcdoc="{{ email.html_body }}"
-                    class="w-full bg-white rounded-b"
-                    style="height: 400px; border: 0;"
+                    class="w-full h-[400px] border-0 bg-white rounded-b"
                 ></iframe>
                 {% elif email.text_body %}
                 <pre class="px-3 py-3 bg-zinc-950 text-white/80 text-xs whitespace-pre-wrap rounded-b">{{ email.text_body }}</pre>

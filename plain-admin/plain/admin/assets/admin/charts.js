@@ -253,13 +253,13 @@ window.AdminCharts = {
     }
 
     if (!hasData) {
-      ctx.style.display = "none";
+      ctx.classList.add("hidden!");
       if (emptyState) emptyState.classList.remove("hidden");
       if (statsRoot) statsRoot.classList.add("hidden");
       return;
     }
 
-    ctx.style.display = "";
+    ctx.classList.remove("hidden!");
     if (emptyState) emptyState.classList.add("hidden");
     if (statsRoot) statsRoot.classList.remove("hidden");
 

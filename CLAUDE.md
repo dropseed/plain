@@ -40,6 +40,18 @@ Deeper breaking changes that users can't directly control or fix in their own co
 - Prefer unique, greppable names over overloaded terms
 - Verify changes with `print()` statements, then remove before committing
 
+## CSP-safe by default (this repo's templates and assets)
+
+This is an internal stance for code we ship in Plain itself — packages, the admin, the toolbar, the example app. User projects pick their own CSP and are free to relax it; our shipped templates and assets must work under a strict policy.
+
+- **No inline `style="..."` attributes in our HTML templates.** Use Tailwind utility classes; for one-offs use Tailwind arbitrary values (`h-[400px]`, `bg-[#abcdef]`).
+- **No `el.style.x = ...` mutations in our JS.** Toggle classes (`classList.add/remove`) instead. Tailwind v4's `!` suffix (`hidden!`) provides `!important` when needed to defeat library-internal inline styles.
+- **Inline `<style>` and `<script>` tags must carry `nonce="{{ request.csp_nonce }}"`.**
+- **No inline event handlers** (`onclick=`, `onload=`, etc.). Wire behavior in the relevant JS file.
+- For dynamic SVG colors, use the `fill=`/`stroke=` presentation attributes — those aren't covered by `style-src`.
+
+The `example/` app runs the strict CSP — exercise admin/toolbar/template changes there before shipping. Library-internal violations from third-party deps (e.g. Chart.js setting canvas inline styles) are a known cost; don't add to them on our side.
+
 ## Docs, rules, and skills
 
 Plain ships three tiers of AI guidance per package, each with a different purpose:
