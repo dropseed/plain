@@ -181,11 +181,21 @@ plain jobs worker --stats-every 60
 
 The worker integrates with OpenTelemetry for distributed tracing. Spans are created for:
 
-- Job scheduling (`run_in_worker`)
-- Job execution
-- Job completion/failure
+- Job scheduling (`run_in_worker`) — emits a `send {queue}` PRODUCER span with the OTel `messaging.*` semconv attributes
+- Job execution — emits a `process {queue}` CONSUMER span linked back to the originating send span
+- Job completion/failure — recorded as the span's status and `error.type` attribute on failure
 
-Jobs can be linked to the originating trace context, allowing you to track jobs initiated from web requests.
+Jobs are linked to the originating trace context, allowing you to follow jobs initiated from web requests.
+
+Two messaging metrics are recorded:
+
+- `messaging.client.sent.messages` — counter incremented for each enqueue
+- `messaging.client.operation.duration` — histogram of enqueue/process durations
+
+Two contract details to be aware of:
+
+- **Successful enqueues record metrics on transaction commit.** If you call `run_in_worker` inside a transaction that later rolls back, the message was never actually persisted — so the counter and histogram do not fire. This matches the OTel semconv: "MUST NOT count messages that were created but haven't yet been sent." Failed enqueues record immediately so transient errors are still visible.
+- **Skipped enqueues are visible in spans, not in metrics.** When `should_enqueue` returns `False` (e.g., a concurrency-key collision), the span gets `job.enqueue.skipped=True` but no metric is recorded — there was no send to count.
 
 ## Settings
 

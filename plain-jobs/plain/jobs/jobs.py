@@ -180,6 +180,9 @@ class Job(metaclass=JobType):
             metric_attributes[ERROR_TYPE] = format_exception_type(e)
             raise
         finally:
+            # Skipped enqueues are visible on the span (`job.enqueue.skipped`)
+            # but do not fire the messaging counter — no message was sent, so
+            # there's nothing for `messaging.client.sent.messages` to count.
             if not skipped:
                 duration = time.perf_counter() - start_time
                 if ERROR_TYPE in metric_attributes:
