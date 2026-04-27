@@ -1,5 +1,15 @@
 # plain-flags changelog
 
+## [0.36.4](https://github.com/dropseed/plain/releases/plain-flags@0.36.4) (2026-04-27)
+
+### What's changed
+
+- **Aligned flag-evaluation `result.reason` with the OpenTelemetry semconv.** Cached evaluations now report `targeting_match` instead of `static`. Per the spec, `targeting_match` is "dynamic evaluation, such as a rule or specific user-targeting" — which is what `get_value()` does — and `static` would mean "no dynamic evaluation," which doesn't apply. The `feature_flag.key` span attribute is also now set in the disabled / no-key paths so dashboards filtering by key see every evaluation. ([db810e131499](https://github.com/dropseed/plain/commit/db810e131499))
+
+### Upgrade instructions
+
+- **If you alert or filter on `feature_flag.result.reason == "static"`**, update those queries to look for `"targeting_match"` instead.
+
 ## [0.36.3](https://github.com/dropseed/plain/releases/plain-flags@0.36.3) (2026-04-23)
 
 ### What's changed
