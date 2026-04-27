@@ -1,5 +1,15 @@
 # plain-pageviews changelog
 
+## [0.35.6](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.6) (2026-04-27)
+
+### What's changed
+
+- `PageviewsTrendCard` now sets `aggregates = ("sum", "avg")` so the dashboard shows both the period total and the per-day average alongside the chart. ([7c9a7d2e5671](https://github.com/dropseed/plain/commit/7c9a7d2e5671))
+
+### Upgrade instructions
+
+- Requires `plain-admin>=0.79.0` for the new `aggregates` field on `TrendCard`.
+
 ## [0.35.5](https://github.com/dropseed/plain/releases/plain-pageviews@0.35.5) (2026-04-22)
 
 ### What's changed
