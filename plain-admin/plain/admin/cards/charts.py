@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Any
+from typing import Any, Literal
 
 from plain.admin.dates import DatetimeRangeAliases
 from plain.postgres.aggregates import Count
@@ -58,15 +58,10 @@ class TrendCard(ChartCard):
         },  # muted plum
     ]
     group_colors: dict[str, dict[str, str]] | None = None
+    aggregates: tuple[Literal["sum", "avg", "max"], ...] = ("sum",)
     default_filter = DatetimeRangeAliases.SINCE_30_DAYS_AGO
 
     filters = DatetimeRangeAliases
-
-    def get_description(self) -> str:
-        datetime_range = DatetimeRangeAliases.to_range(self.get_current_filter())
-        start = datetime_range.start.strftime("%b %d, %Y")
-        end = datetime_range.end.strftime("%b %d, %Y")
-        return f"{start} to {end}"
 
     def get_current_filter(self) -> str:
         if s := super().get_current_filter():
@@ -115,7 +110,8 @@ class TrendCard(ChartCard):
 
         groups: dict[str, defaultdict[Any, int]] = defaultdict(lambda: defaultdict(int))
         for row in rows:
-            raw_value = row[self.group_field] or "Unknown"
+            raw = row[self.group_field]
+            raw_value = "Unknown" if raw is None else str(raw)
             groups[raw_value][row["chart_date"]] = row["chart_date_count"]
 
         return {
@@ -138,15 +134,19 @@ class TrendCard(ChartCard):
                 "labels": list(data.keys()),
                 "datasets": [
                     {
+                        "label": self.title,
                         "data": list(data.values()),
                         "backgroundColor": "rgba(168, 162, 158, 0.7)",  # stone-400
                         "hoverBackgroundColor": "rgba(120, 113, 108, 0.9)",  # stone-500
                         "borderRadius": {"topLeft": 2, "topRight": 2},
                         "borderSkipped": False,
+                        "categoryPercentage": 0.9,
+                        "barPercentage": 1.0,
                     },
                 ],
             },
-            **self._chart_options(show_legend=False, stacked=False),
+            **self._chart_options(stacked=False),
+            "plain": self._plain_meta(),
         }
 
     def _build_grouped_chart(self, data: dict) -> dict:
@@ -170,6 +170,8 @@ class TrendCard(ChartCard):
                     "data": list(date_counts.values()),
                     "backgroundColor": colors["bg"],
                     "hoverBackgroundColor": colors["hover"],
+                    "categoryPercentage": 0.9,
+                    "barPercentage": 1.0,
                 }
             )
 
@@ -179,28 +181,16 @@ class TrendCard(ChartCard):
                 "labels": labels,
                 "datasets": datasets,
             },
-            **self._chart_options(show_legend=True, stacked=True),
+            **self._chart_options(stacked=True),
+            "plain": self._plain_meta(),
         }
 
-    def _chart_options(self, *, show_legend: bool, stacked: bool) -> dict:
-        legend = (
-            {
-                "display": True,
-                "position": "top",
-                "align": "end",
-                "labels": {
-                    "boxWidth": 12,
-                    "boxHeight": 12,
-                    "borderRadius": 2,
-                    "useBorderRadius": True,
-                    "padding": 16,
-                    "font": {"size": 11},
-                },
-            }
-            if show_legend
-            else {"display": False}
-        )
+    def _plain_meta(self) -> dict:
+        return {
+            "aggregates": list(self.aggregates),
+        }
 
+    def _chart_options(self, *, stacked: bool) -> dict:
         return {
             "options": {
                 "responsive": True,
@@ -209,19 +199,14 @@ class TrendCard(ChartCard):
                     "duration": 600,
                     "easing": "easeOutQuart",
                 },
+                "interaction": {
+                    "mode": "index",
+                    "intersect": False,
+                    "axis": "x",
+                },
                 "plugins": {
-                    "legend": legend,
-                    "tooltip": {
-                        "enabled": True,
-                        "backgroundColor": "rgba(41, 37, 36, 0.95)",  # stone-800
-                        "titleColor": "rgba(255, 255, 255, 0.7)",
-                        "bodyColor": "#ffffff",
-                        "bodyFont": {"size": 13, "weight": "600"},
-                        "titleFont": {"size": 11},
-                        "padding": {"x": 12, "y": 8},
-                        "cornerRadius": 6,
-                        "displayColors": show_legend,
-                    },
+                    "legend": {"display": False},
+                    "tooltip": {"enabled": False},
                 },
                 "scales": {
                     "x": {
@@ -231,18 +216,7 @@ class TrendCard(ChartCard):
                     },
                     "y": {
                         "beginAtZero": True,
-                        "display": True,
-                        "position": "right",
-                        "grid": {
-                            "display": True,
-                            "color": "rgba(0, 0, 0, 0.04)",
-                            "drawTicks": False,
-                        },
-                        "border": {"display": False},
-                        "ticks": {
-                            "display": False,
-                            "maxTicksLimit": 4,
-                        },
+                        "display": False,
                         "stacked": stacked,
                     },
                 },

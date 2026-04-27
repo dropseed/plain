@@ -401,6 +401,11 @@ See /admin/style/ for the full style guide.
       padding-right: 1.25rem;
     }
 
+    /* Align chart content with card header */
+    .card.col-span-4 > section > .chart-wrapper {
+      padding: 0 1.25rem;
+    }
+
     /* Table text should not be bold */
     .card table td {
       font-weight: 400;

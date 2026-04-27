@@ -16,6 +16,7 @@ class PageviewsTrendCard(TrendCard):
     size = TrendCard.Sizes.FULL
     group_field = "source"
     group_labels = {"": "Direct"}
+    aggregates = ("sum", "avg")
 
 
 @register_viewset
