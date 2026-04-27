@@ -15,7 +15,7 @@ window.AdminCharts = {
 
     const dataText = dataElement.textContent;
     const data = JSON.parse(dataText);
-    const hasData = data.data?.datasets?.[0]?.data?.some((v) => v > 0) ?? false;
+    const hasData = data.data?.datasets?.some((ds) => ds.data?.some((v) => v > 0)) ?? false;
 
     // Destroy existing chart if present
     if (ctx._chart) {
