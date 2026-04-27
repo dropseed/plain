@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 from contextvars import ContextVar
 
+from opentelemetry import trace
+
 from plain.http import HttpMiddleware, Response
 from plain.urls import Router, path
 from plain.views import ServerSentEvent, ServerSentEventsView, View
@@ -42,6 +44,39 @@ class AsyncCtxVarRouter(Router):
     namespace = ""
     urls = [
         path("", AsyncAwaitView, name="index"),
+    ]
+
+
+class SyncSpanEmittingView(View):
+    """Sync view that emits a child span across the executor hop."""
+
+    def get(self) -> Response:
+        tracer = trace.get_tracer("plain.tests")
+        with tracer.start_as_current_span("view-child-span"):
+            return Response("ok")
+
+
+class SyncSpanRouter(Router):
+    namespace = ""
+    urls = [
+        path("", SyncSpanEmittingView, name="index"),
+    ]
+
+
+class AsyncSpanEmittingView(View):
+    """Async view that emits a child span across the asyncio task hop."""
+
+    async def get(self) -> Response:  # ty: ignore[invalid-method-override]
+        tracer = trace.get_tracer("plain.tests")
+        with tracer.start_as_current_span("view-child-span"):
+            await asyncio.sleep(0)
+        return Response("ok")
+
+
+class AsyncSpanRouter(Router):
+    namespace = ""
+    urls = [
+        path("", AsyncSpanEmittingView, name="index"),
     ]
 
 

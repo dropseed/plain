@@ -244,10 +244,19 @@ class BaseHandler:
 
         with self._start_request_span(request) as span:
             request_ctx = contextvars.Context()
-            # Prime the empty context with the current OTel context
-            # (which has the server span active) so `ctx.run` and the
-            # async view's task see the span without inheriting
-            # anything else from the server task.
+            # LOAD-BEARING: carry the OTel context (with the SERVER span
+            # active) into the empty `request_ctx` so it is visible across
+            # every hop the pipeline takes — the `ctx.run` calls in
+            # `_run_in_executor` (sync hop on a worker thread) and the
+            # `asyncio.create_task(coro, context=request_ctx)` below (async
+            # view's task).
+            #
+            # Without this line every child span emitted by the view, by a
+            # template render, by middleware, etc. silently becomes a root
+            # span instead of nesting under the server span. There is no
+            # fallback; OTel's context is contextvar-based and an empty
+            # context means no parent. Tests covering this live in
+            # `plain/tests/test_otel_spans.py` (`*_child_span_is_parented_*`).
             request_ctx.run(context.attach, context.get_current())
             start = time.perf_counter()
 
