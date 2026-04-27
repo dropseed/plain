@@ -326,12 +326,6 @@ See /admin/style/ for the full style guide.
       padding: 0.75rem 1rem;
     }
 
-    /* Size 1 cards (small metric cards) - ensure consistent height */
-    .card.col-span-1 {
-      min-height: auto;
-      height: auto;
-    }
-
     .card > header {
       margin-bottom: 0.5rem;
     }
