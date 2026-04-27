@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.99.1](https://github.com/dropseed/plain/releases/plain-postgres@0.99.1) (2026-04-26)
+
+### What's changed
+
+- **Duplicate-index check now catches expression-prefix duplicates.** Previously the check excluded any index containing expressions (it compared raw `indkey`/`indclass` arrays), so a redundant `(LOWER(email))` alongside `(LOWER(email), team_id)` was missed. The query now compares per-column `pg_get_indexdef(indexrelid, k, false)` text — canonical output that includes column name/expression, opclass, collation, and sort order — and checks `pg_am.amname` separately so a hash and btree on the same column don't false-match. ([4bd8a713649f](https://github.com/dropseed/plain/commit/4bd8a713649f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.99.0](https://github.com/dropseed/plain/releases/plain-postgres@0.99.0) (2026-04-23)
 
 ### What's changed
