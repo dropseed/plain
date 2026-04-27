@@ -24,11 +24,11 @@ If `CLOUD_EXPORT_TOKEN` is not set, the package is a no-op — safe to install w
 
 ## Settings
 
-| Setting                   | Default                             | Description                                              |
-| ------------------------- | ----------------------------------- | -------------------------------------------------------- |
-| `CLOUD_EXPORT_URL`        | `"https://plainframework.com/otel"` | OTLP ingest endpoint (override to use a custom endpoint) |
-| `CLOUD_EXPORT_TOKEN`      | `""`                                | Auth token for the export endpoint                       |
-| `CLOUD_TRACE_SAMPLE_RATE` | `1.0`                               | Probability of exporting a trace (0.0–1.0)               |
+| Setting                   | Default                               | Description                                              |
+| ------------------------- | ------------------------------------- | -------------------------------------------------------- |
+| `CLOUD_EXPORT_URL`        | `"https://ingest.plainframework.com"` | OTLP ingest endpoint (override to use a custom endpoint) |
+| `CLOUD_EXPORT_TOKEN`      | `""`                                  | Auth token for the export endpoint                       |
+| `CLOUD_TRACE_SAMPLE_RATE` | `1.0`                                 | Probability of exporting a trace (0.0–1.0)               |
 
 All settings can be set via `PLAIN_`-prefixed environment variables or in `app/settings.py`.
 
