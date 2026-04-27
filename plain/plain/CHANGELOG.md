@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.136.1](https://github.com/dropseed/plain/releases/plain@0.136.1) (2026-04-26)
+
+### What's changed
+
+- **Fixed empty-string routes losing their OTel `http.route` attribute and span name.** Homepage routes (URL pattern `""`) were being treated like unmatched 404s because the truthy-check on `resolver_match.route` skipped them. Switched to `is not None` so matched routes with empty patterns get `http.route="/"` and a span name of `"GET /"` (or the matching method). ([57c3255b36cc](https://github.com/dropseed/plain/commit/57c3255b36cc))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.136.0](https://github.com/dropseed/plain/releases/plain@0.136.0) (2026-04-24)
 
 ### What's changed

@@ -553,7 +553,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.136.0"
+version = "0.136.1"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },
@@ -566,6 +566,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "opentelemetry-sdk" },
     { name = "pytest" },
 ]
 
@@ -580,7 +581,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0.0" }]
+dev = [
+    { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
+    { name = "pytest", specifier = ">=8.0.0" },
+]
 
 [[package]]
 name = "plain-admin"
