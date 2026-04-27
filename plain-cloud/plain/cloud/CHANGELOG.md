@@ -1,5 +1,15 @@
 # plain-cloud changelog
 
+## [0.2.0](https://github.com/dropseed/plain/releases/plain-cloud@0.2.0) (2026-04-27)
+
+### What's changed
+
+- **Changed the default `CLOUD_EXPORT_URL` to `https://ingest.plainframework.com`** (was `https://plainframework.com/otel`). Projects relying on the default will now export to the dedicated ingest subdomain. ([e58c02eaab9e](https://github.com/dropseed/plain/commit/e58c02eaab9e))
+
+### Upgrade instructions
+
+- If you were depending on the previous default, set `PLAIN_CLOUD_EXPORT_URL=https://plainframework.com/otel` (or assign `CLOUD_EXPORT_URL` in `app/settings.py`) to keep the old endpoint. Otherwise no changes required.
+
 ## [0.1.5](https://github.com/dropseed/plain/releases/plain-cloud@0.1.5) (2026-04-13)
 
 ### What's changed
