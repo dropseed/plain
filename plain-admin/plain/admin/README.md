@@ -12,6 +12,7 @@
     - [Basic cards](#basic-cards)
     - [Trend cards](#trend-cards)
     - [Table cards](#table-cards)
+    - [Key/value cards](#keyvalue-cards)
 - [Admin forms](#admin-forms)
 - [List filters](#list-filters)
 - [Actions](#actions)
@@ -281,6 +282,28 @@ class RecentOrdersCard(TableCard):
             for order in orders
         ]
 ```
+
+### Key/value cards
+
+The [`KeyValueCard`](./cards/key_values.py#KeyValueCard) displays a list of label/value pairs as a definition list. Useful for short metric- or identity-style data (server stats, version info, account summaries) where the values are pre-formatted strings.
+
+```python
+from plain.admin.cards import KeyValueCard
+
+
+class ServerCard(KeyValueCard):
+    title = "Server"
+    size = KeyValueCard.Sizes.MEDIUM
+
+    def get_items(self):
+        return {
+            "Version": "1.2.3",
+            "Uptime": "3d 4h",
+            "Region": "us-east",
+        }
+```
+
+For a single object's full field set, use a [model detail view](#model-views) instead — it dispatches each value through a per-type renderer.
 
 ## Admin forms
 
