@@ -1,5 +1,18 @@
 # plain-admin changelog
 
+## [0.79.0](https://github.com/dropseed/plain/releases/plain-admin@0.79.0) (2026-04-27)
+
+### What's changed
+
+- **Redesigned chart cards with a stat row and aggregates.** The chart card no longer renders the Chart.js legend or tooltip; instead, a stat row above the chart shows per-series chips (with the period value or hovered-day value) and a cross-series aggregates readout, while a custom hover guide draws a vertical line at the active bucket. A date axis is now rendered beneath the chart. ([7c9a7d2e5671](https://github.com/dropseed/plain/commit/7c9a7d2e5671))
+- **Added `aggregates` to `TrendCard`.** New class attribute (`tuple[Literal["sum", "avg", "max"], ...]`, defaults to `("sum",)`) that controls which cross-series rollups are rendered in the stat row. Subclasses can opt into multiple aggregates, e.g. `aggregates = ("sum", "avg")`. ([7c9a7d2e5671](https://github.com/dropseed/plain/commit/7c9a7d2e5671))
+- **Series chips are interactive on grouped charts.** Clicking a chip toggles the corresponding dataset's visibility, replacing the legend's role. Single-series charts render the chip as a static label. ([7c9a7d2e5671](https://github.com/dropseed/plain/commit/7c9a7d2e5671))
+- **Eliminated inline styles in shipped chart templates and JS.** `display: none/""` mutations and inline `style="..."` attributes have been replaced with Tailwind utility classes (including `hidden!` for `!important`) so the admin renders cleanly under a strict CSP. ([e084bd8ad395](https://github.com/dropseed/plain/commit/e084bd8ad395))
+
+### Upgrade instructions
+
+- No changes required. If you've subclassed `TrendCard` and overridden `_chart_options`, note that its `show_legend` argument has been removed (the legend is no longer rendered) and a new `_plain_meta()` method is now part of the chart payload.
+
 ## [0.78.0](https://github.com/dropseed/plain/releases/plain-admin@0.78.0) (2026-04-27)
 
 ### What's changed
