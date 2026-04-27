@@ -1,5 +1,15 @@
 # plain-email changelog
 
+## [0.19.1](https://github.com/dropseed/plain/releases/plain-email@0.19.1) (2026-04-27)
+
+### What's changed
+
+- Replaced the inline `style="height: 400px; border: 0;"` on the toolbar email iframe with Tailwind utility classes (`h-[400px] border-0`) so the toolbar renders cleanly under a strict CSP. ([e084bd8ad395](https://github.com/dropseed/plain/commit/e084bd8ad395))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.19.0](https://github.com/dropseed/plain/releases/plain-email@0.19.0) (2026-04-24)
 
 ### What's changed
