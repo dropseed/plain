@@ -293,7 +293,7 @@ class BaseHandler:
                 url_attributes.URL_SCHEME: request.scheme,
                 network_attributes.NETWORK_PROTOCOL_NAME: "http",
             }
-            if request.resolver_match and request.resolver_match.route:
+            if request.resolver_match and request.resolver_match.route is not None:
                 duration_attrs[http_attributes.HTTP_ROUTE] = (
                     f"/{request.resolver_match.route}"
                 )
@@ -367,7 +367,7 @@ class BaseHandler:
 
         # Update span with route info
         span = trace.get_current_span()
-        if resolver_match.route:
+        if resolver_match.route is not None:
             route_with_slash = f"/{resolver_match.route}"
             span.set_attribute(http_attributes.HTTP_ROUTE, route_with_slash)
             method = request.method or ""
