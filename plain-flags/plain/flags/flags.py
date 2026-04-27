@@ -70,6 +70,14 @@ class Flag(ABC):
                 FEATURE_FLAG_PROVIDER_NAME: "plain.flags",
             },
         ) as span:
+            # Resolve the key first so it's set on the span regardless of
+            # which path we take below — including the disabled path, where
+            # dashboards filtering by key still need to see the evaluation.
+            key = self.get_key()
+            if key:
+                key = coerce_key(key)
+                span.set_attribute(FEATURE_FLAG_KEY, key)
+
             # Create an associated DB Flag that we can use to enable/disable
             # and tie the results to
             flag_obj, _ = Flag.query.update_or_create(
@@ -91,7 +99,6 @@ class Flag(ABC):
                     # Might not be the type of return value expected! Better than totally crashing now though.
                     return None
 
-            key = self.get_key()
             if not key:
                 # No key, so we always recompute the value and return it
                 value = self.get_value()
@@ -103,10 +110,6 @@ class Flag(ABC):
                 span.set_attribute(FEATURE_FLAG_RESULT_VALUE, str(value))
 
                 return value
-
-            key = coerce_key(key)
-
-            span.set_attribute(FEATURE_FLAG_KEY, key)
 
             try:
                 flag_result = FlagResult.query.get(flag=flag_obj, key=key)
@@ -124,9 +127,13 @@ class Flag(ABC):
                     flag=flag_obj, key=key, value=value
                 )
 
+                # Per OTel semconv, `targeting_match` is "dynamic evaluation,
+                # such as a rule or specific user-targeting" — `get_value()`
+                # ran with this key. `static` would mean "no dynamic
+                # evaluation," which doesn't apply here.
                 span.set_attribute(
                     FEATURE_FLAG_RESULT_REASON,
-                    FeatureFlagResultReasonValues.STATIC.value,
+                    FeatureFlagResultReasonValues.TARGETING_MATCH.value,
                 )
                 span.set_attribute(FEATURE_FLAG_RESULT_VALUE, str(value))
 
