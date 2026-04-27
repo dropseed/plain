@@ -1,5 +1,16 @@
 # plain-pytest changelog
 
+## [0.18.0](https://github.com/dropseed/plain/releases/plain-pytest@0.18.0) (2026-04-27)
+
+### What's changed
+
+- **Added `otel_spans` and `otel_metrics` fixtures.** Both wrap the new `plain.test.otel` helpers, drain prior state on entry, and return an `InMemorySpanExporter` / `InMemorySpanReader`. Use `otel_spans.get_finished_spans()` to read spans emitted during the test, or `otel_metrics.get_metrics_data()` / `.collect()` to read metrics. Safe to use both in the same test — they share the global tracer/meter providers. ([e650b556447f](https://github.com/dropseed/plain/commit/e650b556447f))
+- Added `opentelemetry-sdk>=1.34.1` as a dependency to back the new fixtures, and bumped the `plain` minimum to `>=0.137.0` (which ships `plain.test.otel`).
+
+### Upgrade instructions
+
+- Requires `plain>=0.137.0`.
+
 ## [0.17.1](https://github.com/dropseed/plain/releases/plain-pytest@0.17.1) (2026-03-18)
 
 ### What's changed
