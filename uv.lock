@@ -1057,6 +1057,7 @@ source = { editable = "plain-pytest" }
 dependencies = [
     { name = "click" },
     { name = "cryptography" },
+    { name = "opentelemetry-sdk" },
     { name = "plain" },
     { name = "pytest" },
 ]
@@ -1065,6 +1066,7 @@ dependencies = [
 requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
     { name = "cryptography" },
+    { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
     { name = "plain", editable = "plain" },
     { name = "pytest", specifier = ">=7.0.0" },
 ]

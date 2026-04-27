@@ -9,33 +9,6 @@ only when the template is missing or fails to render.
 
 from __future__ import annotations
 
-import pytest
-
-from plain.runtime import settings
-from plain.test import Client
-from plain.urls.resolvers import _get_cached_resolver
-
-
-@pytest.fixture
-def error_client():
-    """Client routed to the error-raising views in `error_routers.py`."""
-    original = settings.URLS_ROUTER
-    original_debug = settings.DEBUG
-    settings.URLS_ROUTER = "error_routers.ErrorRouter"
-    settings.DEBUG = False
-    _get_cached_resolver.cache_clear()
-    try:
-        client = Client(raise_request_exception=False)
-        # Middleware chain was built on init with the old router;
-        # rebuild it after the settings swap.
-        client.handler._middleware_chain = None
-        client.handler.load_middleware()
-        yield client
-    finally:
-        settings.URLS_ROUTER = original
-        settings.DEBUG = original_debug
-        _get_cached_resolver.cache_clear()
-
 
 class TestPlainViewRendersHtml:
     """A plain `View` re-raises; the framework renders `{status}.html`."""

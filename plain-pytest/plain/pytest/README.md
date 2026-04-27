@@ -6,6 +6,8 @@
 - [Fixtures](#fixtures)
     - [`settings`](#settings)
     - [`testbrowser`](#testbrowser)
+    - [`otel_spans`](#otel_spans)
+    - [`otel_metrics`](#otel_metrics)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -101,6 +103,46 @@ def test_no_broken_links(testbrowser, user):
 **Database isolation**
 
 If `plain.postgres` is installed, the `testbrowser` fixture automatically uses the [`isolated_db`](/plain-postgres/plain/postgres/test/pytest.py#isolated_db) fixture and passes the database connection to the test server. This means your browser tests and your test code share the same database state.
+
+### `otel_spans`
+
+The [`otel_spans`](./plugin.py#otel_spans) fixture gives you the OpenTelemetry spans emitted during the test. It returns an [`InMemorySpanExporter`](https://opentelemetry-python.readthedocs.io/en/latest/sdk/trace.export.html#opentelemetry.sdk.trace.export.in_memory_span_exporter.InMemorySpanExporter) — call `.get_finished_spans()` to read them.
+
+```python
+from opentelemetry import trace
+
+
+def test_homepage_span(otel_spans):
+    Client().get("/")
+
+    spans = otel_spans.get_finished_spans()
+    server_span = next(s for s in spans if s.kind == trace.SpanKind.SERVER)
+    assert server_span.name == "GET /"
+    assert server_span.attributes["http.route"] == "/"
+    assert server_span.attributes["http.response.status_code"] == 200
+```
+
+The fixture clears previously captured spans on entry, so each test sees only its own.
+
+### `otel_metrics`
+
+The [`otel_metrics`](./plugin.py#otel_metrics) fixture gives you the OpenTelemetry metrics emitted during the test. It returns an [`InMemoryMetricReader`](https://opentelemetry-python.readthedocs.io/en/latest/sdk/metrics.export.html#opentelemetry.sdk.metrics.export.InMemoryMetricReader) — call `.get_metrics_data()` to read accumulated points, or `.collect()` to force collection of observable instruments.
+
+```python
+def test_request_duration_metric(otel_metrics):
+    Client().get("/")
+
+    data = otel_metrics.get_metrics_data()
+    metric_names = {
+        m.name
+        for rm in data.resource_metrics
+        for sm in rm.scope_metrics
+        for m in sm.metrics
+    }
+    assert "http.server.request.duration" in metric_names
+```
+
+The fixture drains any prior observations on entry. Both fixtures share the same global tracer/meter providers — fine to use them together in one test.
 
 ## FAQs
 

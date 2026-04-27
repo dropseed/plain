@@ -15,6 +15,7 @@
 - [Authentication](#authentication)
 - [Sessions](#sessions)
 - [RequestFactory](#requestfactory)
+- [Capturing OpenTelemetry signals](#capturing-opentelemetry-signals)
 - [FAQs](#faqs)
     - [What is the difference between Client and RequestFactory?](#what-is-the-difference-between-client-and-requestfactory)
     - [How do I test file uploads?](#how-do-i-test-file-uploads)
@@ -166,6 +167,27 @@ assert response.status_code == 200
 ```
 
 The factory supports the same HTTP methods as the client: `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, and `trace`.
+
+## Capturing OpenTelemetry signals
+
+The [`plain.test.otel`](./otel.py) module installs in-memory OpenTelemetry providers so tests can read the spans and metrics emitted during a request.
+
+```python
+from plain.test import Client
+from plain.test.otel import install_test_tracer
+
+exporter = install_test_tracer()
+
+def test_homepage_span():
+    exporter.clear()
+    Client().get("/")
+    span = exporter.get_finished_spans()[-1]
+    assert span.name == "GET /"
+```
+
+[`install_test_tracer`](./otel.py#install_test_tracer) and [`install_test_meter`](./otel.py#install_test_meter) are idempotent — they handle the install-once-per-process constraint of OpenTelemetry's global providers, so it's safe to call them from multiple test modules.
+
+If you're using [`plain.pytest`](../../../../plain-pytest/plain/pytest/README.md), prefer the [`otel_spans`](../../../../plain-pytest/plain/pytest/README.md#otel_spans) and [`otel_metrics`](../../../../plain-pytest/plain/pytest/README.md#otel_metrics) fixtures — they wrap these helpers and clear state automatically between tests.
 
 ## FAQs
 

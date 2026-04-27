@@ -4,9 +4,15 @@ import os
 from collections.abc import Generator
 from typing import Any
 
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
+
 import pytest
 from plain.runtime import settings as plain_settings
 from plain.runtime import setup
+from plain.test.otel import install_test_meter, install_test_tracer
 from plain.utils.dotenv import load_dotenv
 
 from .browser import TestBrowser
@@ -48,6 +54,29 @@ def settings() -> Generator[SettingsProxy]:
     proxy = SettingsProxy()
     yield proxy
     proxy._restore()
+
+
+@pytest.fixture
+def otel_spans() -> InMemorySpanExporter:
+    """OpenTelemetry spans emitted during the test.
+
+    Returns the InMemorySpanExporter; call `.get_finished_spans()` to read.
+    """
+    exporter = install_test_tracer()
+    exporter.clear()
+    return exporter
+
+
+@pytest.fixture
+def otel_metrics() -> InMemoryMetricReader:
+    """OpenTelemetry metrics emitted during the test.
+
+    Returns the InMemoryMetricReader; call `.get_metrics_data()` or
+    `.collect()` to read. Drains any prior observations on entry.
+    """
+    reader = install_test_meter()
+    reader.get_metrics_data()  # drain
+    return reader
 
 
 @pytest.fixture
