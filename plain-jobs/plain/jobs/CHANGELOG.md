@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.48.1](https://github.com/dropseed/plain/releases/plain-jobs@0.48.1) (2026-04-27)
+
+### What's changed
+
+- **Documented the OpenTelemetry metric contract in the README.** Two contract details now spelled out: successful enqueues record metrics on transaction commit (matching the OTel semconv: "MUST NOT count messages that were created but haven't yet been sent"), and skipped enqueues — when `should_enqueue` returns `False` — are visible on the span via `job.enqueue.skipped` but do not fire the messaging counter. Also clarified that send / process spans use the messaging semconv naming. No behavior change. ([2a106fbad26c](https://github.com/dropseed/plain/commit/2a106fbad26c))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.48.0](https://github.com/dropseed/plain/releases/plain-jobs@0.48.0) (2026-04-24)
 
 ### What's changed
