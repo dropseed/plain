@@ -102,8 +102,8 @@ class ItemListView(HTMXView):
         return context
 
     def htmx_post_toggle(self):
-        # Handle the action...
-        return self.render_template()
+        # Handle the action — the fragment is re-rendered automatically.
+        return None
 ```
 
 ### Lazy template fragments
@@ -214,16 +214,16 @@ class PullRequestDetailView(HTMXView, DetailView):
 
     # Action handling methods follow this format:
     # htmx_{method}_{action}
+    #
+    # Return `None` to re-render the current template (or active fragment).
+    # Return a `Response` only when you need to do something else —
+    # a redirect, a 204, a custom payload.
     def htmx_post_open(self):
         if self.object.state != "closed":
             raise ValueError("Only a closed pull request can be opened")
 
         self.object.state = "closed"
         self.object.save()
-
-        # Render the updated content with the standard calls
-        # (which will selectively render the fragment if applicable)
-        return self.render_template()
 
     def htmx_post_close(self):
         if self.object.state != "open":
@@ -232,16 +232,12 @@ class PullRequestDetailView(HTMXView, DetailView):
         self.object.state = "open"
         self.object.save()
 
-        return self.render_template()
-
     def htmx_post_merge(self):
         if self.object.state != "open":
             raise ValueError("Only an open pull request can be merged")
 
         self.object.state = "merged"
         self.object.save()
-
-        return self.render_template()
 ```
 
 This can be a matter of preference, but typically you may end up building out an entire form, API, or set of URLs to handle these behaviors. If your application is only going to handle these actions via HTMX, then a single View may be a simpler way to do it.
@@ -327,8 +323,6 @@ urlpatterns = [
 class PullRequestDetailView(HTMXView, DetailView):
   def htmx_post_update(self):
       self.object.update()
-
-      return self.render_template()
 ```
 
 ## FAQs

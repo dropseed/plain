@@ -14,7 +14,13 @@ __all__ = ["HTMXView"]
 
 
 class HTMXView(TemplateView):
-    """View with HTMX-specific functionality."""
+    """View with HTMX-specific functionality.
+
+    Action handlers (`htmx_post_<action>` etc.) may return `None` to mean
+    "re-render the current template (or active fragment)". Return an
+    explicit `Response` only when the action diverges from a re-render —
+    e.g. a redirect, a 204, or a custom payload.
+    """
 
     def render_template(self) -> str:
         template = self.get_template()
@@ -28,6 +34,18 @@ class HTMXView(TemplateView):
             )
 
         return template.render(context)
+
+    def convert_result_to_response(self, result: Response | None) -> Response:
+        if result is None:
+            return Response(self.render_template())
+        if isinstance(result, Response):
+            return result
+        raise TypeError(
+            f"{type(self).__name__} action handlers must return a Response or None "
+            f"(got {type(result).__name__}). "
+            "Return None to re-render the current template/fragment, or a Response "
+            "to diverge (redirect, 204, custom payload)."
+        )
 
     def after_response(self, response: Response) -> Response:
         response = super().after_response(response)
