@@ -1,5 +1,15 @@
 # plain-htmx changelog
 
+## [0.19.0](https://github.com/dropseed/plain/releases/plain-htmx@0.19.0) (2026-04-28)
+
+### What's changed
+
+- `HTMXView` action handlers (`htmx_post_<action>`, etc.) can now return `None` to re-render the current template or active fragment automatically. Return an explicit `Response` only when the action diverges from a re-render (redirect, 204, custom payload). Returning a value that is neither `Response` nor `None` raises `TypeError` with a hint pointing back to these two options. ([cd80f719de09](https://github.com/dropseed/plain/commit/cd80f719de09))
+
+### Upgrade instructions
+
+- If you have action handlers that ended in `return self.render_template()` (which returns a `str`, not a `Response`), change them to `return None` or drop the trailing return — they would otherwise hit the new `TypeError`. Handlers that already return `Response(self.render_template())` or another `Response` continue to work unchanged.
+
 ## [0.18.3](https://github.com/dropseed/plain/releases/plain-htmx@0.18.3) (2026-04-23)
 
 ### What's changed
