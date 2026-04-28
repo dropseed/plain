@@ -30,7 +30,7 @@ class ActionView(HTMXView):
     def htmx_post_redirect(self) -> Response:
         return Response("redirected", status_code=204)
 
-    def htmx_post_bad_return(self) -> str:  # ty: ignore[invalid-return-type]
+    def htmx_post_bad_return(self) -> str:
         # Wrong return type — must raise loudly, not silently propagate.
         return "not a response"
 
