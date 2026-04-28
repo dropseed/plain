@@ -5,6 +5,7 @@ import threading
 
 from opentelemetry import _logs, metrics, trace
 from opentelemetry._logs._internal import ProxyLoggerProvider
+from opentelemetry.exporter.otlp.proto.http import Compression
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -84,6 +85,8 @@ class Config(PackageConfig):
         span_exporter = OTLPSpanExporter(
             endpoint=f"{export_url}/v1/traces",
             headers=headers,
+            timeout=30,
+            compression=Compression.Gzip,
         )
         sampler = sampling.TraceIdRatioBased(settings.CLOUD_TRACE_SAMPLE_RATE)
         tracer_provider = TracerProvider(sampler=sampler, resource=resource)
@@ -96,6 +99,8 @@ class Config(PackageConfig):
         metric_exporter = OTLPMetricExporter(
             endpoint=f"{export_url}/v1/metrics",
             headers=headers,
+            timeout=30,
+            compression=Compression.Gzip,
             preferred_temporality={
                 Counter: AggregationTemporality.DELTA,
                 Histogram: AggregationTemporality.DELTA,
@@ -131,6 +136,8 @@ class Config(PackageConfig):
             log_exporter = OTLPLogExporter(
                 endpoint=f"{export_url}/v1/logs",
                 headers=headers,
+                timeout=30,
+                compression=Compression.Gzip,
             )
             logger_provider = LoggerProvider(resource=resource)
             logger_provider.add_log_record_processor(
