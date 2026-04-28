@@ -1,5 +1,15 @@
 # plain-cloud changelog
 
+## [0.3.1](https://github.com/dropseed/plain/releases/plain-cloud@0.3.1) (2026-04-28)
+
+### What's changed
+
+- The OTLP span, metric, and log exporters now use gzip compression and a 30-second timeout, reducing egress bandwidth and giving slow ingest endpoints more headroom before requests are dropped. ([891864bcf710](https://github.com/dropseed/plain/commit/891864bcf710))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.3.0](https://github.com/dropseed/plain/releases/plain-cloud@0.3.0) (2026-04-27)
 
 ### What's changed
