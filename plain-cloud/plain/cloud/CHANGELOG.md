@@ -1,5 +1,16 @@
 # plain-cloud changelog
 
+## [0.3.0](https://github.com/dropseed/plain/releases/plain-cloud@0.3.0) (2026-04-27)
+
+### What's changed
+
+- **Added OTLP log export.** Records from the `plain` and `app` loggers, plus anything propagating to the root logger, are bridged into OTLP log records and exported alongside traces and metrics, with `trace_id` / `span_id` populated from the active span. Two new settings: `CLOUD_EXPORT_LOGS` (default `True`) and `CLOUD_LOG_LEVEL` (default `"INFO"`, accepts a level name or int). The root logger's effective level is widened upward to `CLOUD_LOG_LEVEL` when narrower so libraries using `getLogger(__name__)` reach the exporter; it is never narrowed. To prevent feedback loops under transport failure, the exporter ignores records from the `opentelemetry` namespace and from any OTel SDK exporter thread (`OtelBatchSpanRecordProcessor`, `OtelBatchLogRecordProcessor`, `OtelPeriodicExportingMetricReader`). Application urllib3 logs are exported normally. ([3937adee2153](https://github.com/dropseed/plain/commit/3937adee2153))
+- Added a `LoggerProvider` collision check that mirrors the existing `TracerProvider` check, so `plain.cloud` will fail loudly with the "list before plain.observer" message if another package has already installed a logger provider. ([3937adee2153](https://github.com/dropseed/plain/commit/3937adee2153))
+
+### Upgrade instructions
+
+- No changes required. To opt out of log export, set `CLOUD_EXPORT_LOGS=False` (or `PLAIN_CLOUD_EXPORT_LOGS=false`). To raise/lower the severity floor, set `CLOUD_LOG_LEVEL` (e.g. `"WARNING"`).
+
 ## [0.2.0](https://github.com/dropseed/plain/releases/plain-cloud@0.2.0) (2026-04-27)
 
 ### What's changed
