@@ -53,14 +53,14 @@
     {% block header_scripts %}{% endblock %}
 </head>
 <body
-    class="flex flex-col min-h-screen bg-background text-foreground pb-12"
+    class="flex flex-col min-h-screen pb-12"
     {% if is_package_installed('plaintoolbar') %}data-toolbar-installed{% endif %}
     >
 
     {% include "admin/_header.html" %}
 
     <div class="flex flex-1 min-h-[calc(100vh-5.5rem)]"> <!-- h-11 + h-11 = 5.5rem -->
-        <div id="plain-admin-content" class="w-full min-w-0 bg-background text-foreground flex-grow">
+        <div id="plain-admin-content" class="w-full min-w-0 flex-grow">
             <header class="px-4 lg:px-8 inset-x-0 pt-6 pb-4">
                 {% block header %}
                 {# Breadcrumbs - small, above title #}
