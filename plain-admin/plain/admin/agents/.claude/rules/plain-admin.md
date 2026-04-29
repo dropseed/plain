@@ -38,8 +38,7 @@ plain-admin/plain/admin/
     │   ├── dropdown-menu.js
     │   ├── popover.js
     │   ├── select.js
-    │   ├── tabs.js
-    │   └── toast.js
+    │   └── tabs.js
     ├── admin.js                          ← jQuery glue, HTMX hooks, dialog handlers
     ├── theme.js                          ← dark-mode toggle + persistence
     └── …
