@@ -225,35 +225,41 @@ def _search_docs(doc_paths: list[Path], pattern: re.Pattern[str]) -> dict[str, s
     """Search docs for matching sections.
 
     Returns a dict of {section_heading: first_matching_line} for each
-    section that contains at least one match. Prefers prose over code for previews.
+    section that contains at least one match. Matches inside fenced code
+    blocks too, but prefers a prose line for the preview when one exists
+    in the same section.
     """
     results: dict[str, str] = {}
     for doc_path in doc_paths:
         current_section = ""
         in_code_block = False
         for line in doc_path.read_text().split("\n"):
-            if line.strip().startswith("```"):
+            stripped = line.strip()
+            if stripped.startswith("```"):
                 in_code_block = not in_code_block
                 continue
-            if in_code_block:
+            if not stripped:
                 continue
+
+            if in_code_block:
+                if pattern.search(stripped) and current_section not in results:
+                    results[current_section] = stripped
+                continue
+
             if line.startswith("## "):
                 current_section = line[3:].strip()
                 if pattern.search(current_section) and current_section not in results:
                     results[current_section] = ""
                 continue
 
-            stripped = line.strip()
-            if not stripped or _TOC_LINK_RE.match(stripped):
+            if _TOC_LINK_RE.match(stripped):
                 continue
 
-            # If this section has an empty preview, fill it with the first prose line
             if current_section in results and _should_upgrade_preview(
                 results[current_section], stripped
             ):
                 results[current_section] = stripped
 
-            # Check if this line matches the search pattern
             if pattern.search(stripped):
                 if current_section not in results:
                     results[current_section] = stripped
