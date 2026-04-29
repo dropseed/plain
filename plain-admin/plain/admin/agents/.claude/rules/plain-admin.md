@@ -37,7 +37,6 @@ plain-admin/plain/admin/
     │   ├── basecoat.js                   ← registry; exposes window.basecoat
     │   ├── dropdown-menu.js
     │   ├── popover.js
-    │   ├── select.js
     │   └── tabs.js
     ├── admin.js                          ← jQuery glue, HTMX hooks, dialog handlers
     ├── theme.js                          ← dark-mode toggle + persistence
