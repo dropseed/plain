@@ -124,9 +124,12 @@
     ("admin-cards", "Admin card classes"),
     ("tables", "Tables"),
     ("forms", "Form fields"),
+    ("field-wrapper", "Field wrapper"),
     ("dialogs", "Dialogs"),
     ("dropdowns", "Dropdowns"),
     ("tabs", "Tabs"),
+    ("collapsible", "Collapsible"),
+    ("tooltips", "Tooltips"),
     ("icons", "Icons")
 ] %}
 
@@ -579,6 +582,63 @@ document.addEventListener("DOMContentLoaded", () => {
     <input class="input" type="checkbox" checked /> Send me email updates
 </label>
 {% endcall %}
+
+{% call example("Radio group") %}
+<div class="space-y-2 text-sm">
+    <label class="flex items-center gap-2">
+        <input class="input" type="radio" name="example-role" value="reader" checked /> Reader
+    </label>
+    <label class="flex items-center gap-2">
+        <input class="input" type="radio" name="example-role" value="editor" /> Editor
+    </label>
+    <label class="flex items-center gap-2">
+        <input class="input" type="radio" name="example-role" value="admin" /> Admin
+    </label>
+</div>
+{% endcall %}
+
+{% call example("Switch") %}
+<label class="flex items-center gap-2 text-sm">
+    <input class="input" type="checkbox" role="switch" checked /> Enable notifications
+</label>
+{% endcall %}
+
+{% call example("Range") %}
+<div class="space-y-1 w-72">
+    <label for="example-range" class="label">Volume</label>
+    <input id="example-range" class="input" type="range" min="0" max="100" value="40" />
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("field-wrapper", "Field wrapper",
+   "Wrap a label, control, and helper/error text in a `.field` for consistent vertical rhythm. Group several fields under a `.fieldset` with a legend. Set `data-orientation=\"horizontal\"` on a `.field` to lay the label and control side-by-side (handy for switches and checkboxes). Mark a field as invalid with `data-invalid=\"true\"` to flip its label/helper to the danger color.") %}
+
+{% call example("Vertical fieldset") %}
+<fieldset class="fieldset w-72">
+    <legend>Profile</legend>
+    <p>Public information shown on your account page.</p>
+
+    <div class="field">
+        <label for="field-name" class="label">Display name</label>
+        <input id="field-name" class="input" type="text" value="Ada" />
+        <p>Visible to other admins.</p>
+    </div>
+
+    <div class="field" data-orientation="horizontal">
+        <label for="field-notify" class="label">Email notifications</label>
+        <input id="field-notify" class="input" type="checkbox" role="switch" checked />
+    </div>
+
+    <div class="field" data-invalid="true">
+        <label for="field-email" class="label">Email</label>
+        <input id="field-email" class="input" type="email" value="not an email" aria-invalid="true" />
+        <div role="alert">Enter a valid email address.</div>
+    </div>
+</fieldset>
+{% endcall %}
 {% endcall %}
 
 
@@ -662,6 +722,44 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {# ====================================================================== #}
+{% call section("collapsible", "Collapsible",
+   "Native `<details>` / `<summary>` get a smooth expand/collapse transition (via the new `::details-content` pseudo-element) and the default disclosure triangle is hidden so you can ship your own affordance. Used implicitly by the \"Show markup\" disclosures on this page.") %}
+
+{% call example() %}
+<details class="rounded-md border border-border p-3 w-96">
+    <summary class="gap-2 text-sm font-medium">
+        <admin.Icon name="chevron-right" class="transition-transform group-open:rotate-90" />
+        Advanced options
+    </summary>
+    <div class="text-sm text-muted-foreground mt-2">
+        Tucked-away configuration the everyday user shouldn't have to think about.
+    </div>
+</details>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("tooltips", "Tooltips",
+   "Pure-CSS tooltip via the `data-tooltip=\"…\"` attribute. Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). Hover or focus the trigger to reveal — no JS, no popper.") %}
+
+{% call example("Sides") %}
+<div class="flex flex-wrap gap-3">
+    <button type="button" class="btn-outline" data-tooltip="Top tooltip" data-side="top">Top</button>
+    <button type="button" class="btn-outline" data-tooltip="Bottom tooltip" data-side="bottom">Bottom</button>
+    <button type="button" class="btn-outline" data-tooltip="Left tooltip" data-side="left">Left</button>
+    <button type="button" class="btn-outline" data-tooltip="Right tooltip" data-side="right">Right</button>
+</div>
+{% endcall %}
+
+{% call example("On an icon button") %}
+<button type="button" class="btn-icon-ghost" data-tooltip="Refresh" aria-label="Refresh">
+    <admin.Icon name="arrow-clockwise" />
+</button>
+{% endcall %}
+{% endcall %}
+
+
 {# ====================================================================== #}
 {% call section("icons", "Icons",
    "Bootstrap Icons are vendored. Use the admin.Icon element with a name.") %}
