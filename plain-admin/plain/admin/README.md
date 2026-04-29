@@ -480,30 +480,63 @@ def my_view(request):
 
 ### Theming
 
-The admin's UI is built on a vendored copy of [Basecoat UI](https://basecoatui.com)
-(MIT licensed) plus a Plain-specific brand palette. Both palettes are exposed
-as CSS custom properties on `:root` (light) and `.dark`, so you can re-skin
-the admin without forking templates.
+The admin's UI is built on a per-component CSS layer derived from
+[Basecoat UI](https://basecoatui.com) (MIT licensed) with Plain's brand
+palette layered on top. Every color, radius, and chrome surface is a CSS
+custom property declared on `.plain-admin` (light) and
+`.dark.plain-admin, .dark .plain-admin` (dark) — redeclare any token in
+your own stylesheet to retheme the admin without forking templates.
+
+The cleanest place for overrides is your project's Tailwind input file
+(typically `tailwind.css` at the repo root), since `plain.tailwind`
+auto-discovers `plain.admin`'s `tailwind.css` and compiles its tokens
+into the same bundle. Anything you add after that import wins:
 
 ```css
-/* app/static/admin-overrides.css */
-:root {
-  --primary: #4f46e5;        /* swap olive for indigo */
+/* tailwind.css */
+@import "tailwindcss";
+@import "./.plain/tailwind.css";
+
+.plain-admin {
+  --primary: #4f46e5;             /* drives .btn-primary, focus rings, active tab */
   --primary-foreground: white;
   --ring: #4f46e5;
+  --header-bg: #eef2ff;           /* sticky top header surface */
+  --link: #4f46e5;
+  --link-hover: #3730a3;
 }
-.dark {
+.dark.plain-admin,
+.dark .plain-admin {
   --primary: #818cf8;
   --primary-foreground: #1e1b4b;
+  --ring: #818cf8;
+  --header-bg: oklch(0.22 0.05 270);
+  --link: #c7d2fe;
+  --link-hover: #e0e7ff;
 }
 ```
 
-Load the override stylesheet after the admin's own CSS in your
-`admin/base.html` block. Every `.btn-primary`, focus ring, and brand-colored
-link in the admin will pick up the new color.
+Match the source selectors so specificity ties — a bare `:root { --primary: ... }`
+will be beaten by the admin's own `.plain-admin` declarations and won't take
+effect.
 
-The full list of tokens (and side-by-side swatches) lives at
-[`/admin/components/`](#components) under "Design tokens".
+The most commonly retuned tokens:
+
+- **Brand palette** — `--primary`, `--primary-foreground`, `--ring`, `--link`,
+  `--link-hover`, `--header-bg`.
+- **Status family** — `--success`, `--warning`, `--danger`, `--info`, each with
+  a `*-foreground` for legible text on solid fills (used by `.btn-danger`,
+  `.alert-warning`, etc.).
+- **Chart palette** — `--chart-1` through `--chart-5`, used by `TrendCard` and
+  any other chart in the admin.
+- **Radius scale** — override `--radius` once to retighten or loosen every
+  component's corners (Tailwind exposes this as `rounded-sm`/`-md`/`-lg`/`-xl`).
+- **Surfaces** — `--background`, `--card`, `--muted`, `--accent`, `--popover`,
+  plus their `*-foreground` pairs.
+
+The full list of tokens with side-by-side swatches is rendered live at
+[`/admin/customization/`](#components) — visit it in your own running admin
+to see every token, every component variant, and copy-pasteable markup.
 
 The admin ships with light and dark mode out of the box. A toggle in the top
 bar cycles **Light → Dark → System**, persisted in `localStorage`. The dark
@@ -512,45 +545,52 @@ is no flash of the wrong theme on page load.
 
 ### Components
 
-The admin includes a live component catalog at `/admin/components/`. Each
-section shows the rendered component with copy-pasteable markup — buttons,
-badges, alerts, cards, form fields, dialogs, dropdowns, tabs, tables, and
-icons. Use these classes when building admin views and you'll inherit
-both light/dark theming and the user's brand overrides.
+The admin includes a live component catalog at `/admin/customization/`.
+Each section shows the rendered component with copy-pasteable markup —
+buttons, badges, alerts, cards, form fields, dialogs, dropdowns, tabs,
+tables, and icons. Use these classes when building admin views and
+you'll inherit both light/dark theming and the user's brand overrides.
 
-| Pattern           | Class(es)                                                                    |
-| ----------------- | ---------------------------------------------------------------------------- |
-| Buttons           | `.btn`, `.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-link`            |
-| Sizes / icon-only | prefix `.btn-sm-…`, `.btn-lg-…`, `.btn-icon-…`                               |
-| Status buttons    | `.btn-success`, `.btn-warning`, `.btn-danger`, `.btn-info`                   |
-| Badges            | `.badge`, `.badge-secondary`, `.badge-outline`                               |
-| Status badges     | `.badge-success`, `.badge-warning`, `.badge-danger`, `.badge-info`           |
-| Alerts            | `.alert`, `.alert-success`, `.alert-warning`, `.alert-danger`, `.alert-info` |
-| Cards             | `.card` (basecoat) or `.admin-card` (Plain's denser metric card)             |
-| Form inputs       | `.input`, `.textarea` — and `<select>` is auto-styled                        |
-| Dialogs           | `<dialog class="dialog">` + `data-dialog-open="…"` / `data-dialog-close`     |
-| Tabs              | `.tabs > [role="tablist"] > [role="tab"]`                                    |
-| Dropdowns         | legacy `data-dropdown` + `<template>` (Tippy-backed)                         |
+| Pattern           | Class(es)                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| Buttons           | `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-outline`, `.btn-ghost`, `.btn-link`    |
+| Sizes / icon-only | prefix `.btn-sm-…`, `.btn-lg-…`, `.btn-icon-…`                                         |
+| Status buttons    | `.btn-success`, `.btn-warning`, `.btn-danger`, `.btn-info` (solid fill + paired fg)    |
+| Badges            | `.badge`, `.badge-secondary`, `.badge-outline`                                         |
+| Status badges     | `.badge-success`, `.badge-warning`, `.badge-danger`, `.badge-info` (translucent)       |
+| Alerts            | `.alert`, `.alert-success`, `.alert-warning`, `.alert-danger`, `.alert-info`           |
+| Cards             | `.card` — pad with utilities (e.g. `class="card gap-2 py-4"` for dense layouts)        |
+| Form inputs       | `.input`, `.textarea`, `.select` — opt in via class; pair with `-sm` for compact rows  |
+| Dialogs           | `<dialog class="dialog">` + `data-dialog-open="…"` / `data-dialog-close`               |
+| Tabs              | `.tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                             |
+| Dropdowns         | `.dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` with `[role="menu"]` |
 
 When writing custom admin templates, prefer the design tokens over hardcoded
 colors so dark mode and theme overrides work automatically:
 
-| Use             | Class / token                                              |
-| --------------- | ---------------------------------------------------------- |
-| Page background | `bg-background`, `text-foreground`                         |
-| Cards / panels  | `bg-card text-card-foreground`                             |
-| Subtle surfaces | `bg-muted`, `bg-muted/40`                                  |
-| Hover surface   | `hover:bg-accent hover:text-accent-foreground`             |
-| Borders         | `border-border` (general), `border-input` (form fields)    |
-| Muted text      | `text-muted-foreground`                                    |
-| Status colors   | `text-success`, `text-warning`, `text-danger`, `text-info` |
-| Focus ring      | `ring-ring`                                                |
+| Use                 | Class / token                                                                                             |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| Page background     | `bg-background`, `text-foreground`                                                                        |
+| Cards / panels      | `bg-card text-card-foreground`                                                                            |
+| Subtle surfaces     | `bg-muted`, `bg-muted/40`                                                                                 |
+| Hover surface       | `hover:bg-accent hover:text-accent-foreground`                                                            |
+| Borders             | `border-border` (general), `border-input` (form fields)                                                   |
+| Muted text          | `text-muted-foreground`                                                                                   |
+| Primary action      | `bg-primary` / `text-primary-foreground`                                                                  |
+| Link                | `text-link hover:text-link-hover`                                                                         |
+| Status text         | `text-success`, `text-warning`, `text-danger`, `text-info`                                                |
+| Status backgrounds  | `bg-success/10`, `bg-warning/10`, `bg-danger/10`, `bg-info/10` (translucent fills, used by status badges) |
+| Status solid action | `bg-{success,warning,danger,info}` / `text-{name}-foreground`                                             |
+| Focus ring          | `ring-ring`                                                                                               |
+| Header surface      | `bg-header-bg`                                                                                            |
 
-The vendored Basecoat source is in
-[`plain/admin/assets/admin/basecoat/`](./assets/admin/basecoat/) along with
-its `LICENSE.md` and a `README.md` documenting how to update it. Plain's
-overrides and admin-only chrome live in
-[`plain/admin/assets/admin/admin.css`](./assets/admin/admin.css).
+The component CSS source lives in
+[`plain/admin/styles/`](./styles/): `tokens.css` declares every design
+token (light + dark) and the `@theme` bindings, `components/*.css` holds
+one file per UI primitive, and `tailwind.css` (next to the package's
+`__init__.py`) is the entry that `plain.tailwind` auto-imports into the
+user's build. See [`styles/ATTRIBUTIONS.md`](./styles/ATTRIBUTIONS.md)
+for Basecoat MIT credit.
 
 ### Header branding
 
