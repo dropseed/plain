@@ -14,20 +14,13 @@
         <div class="flex items-center gap-2 sm:gap-3">
             <!-- Search (desktop) -->
             <form method="GET" action="{{ url('admin:search') }}" class="hidden sm:flex">
-                <div class="relative group">
-                    <label for="topbar-search" class="sr-only">Search</label>
-                    <input
-                        type="text"
-                        name="query"
-                        id="topbar-search"
-                        class="w-52 pr-10 pl-8 text-sm bg-muted/60 border border-transparent py-1.5 rounded-md transition-all duration-150 placeholder:text-muted-foreground focus:outline-none focus:bg-background focus:border-input focus:ring-1 focus:ring-ring focus:w-64"
-                        placeholder="Search..."
-                        value="{{ global_search_query|default('') }}"
-                    >
-                    <div class="absolute inset-y-0 left-2.5 flex items-center pointer-events-none">
-                        <admin.Icon name="search" class="text-sm text-muted-foreground" />
-                    </div>
-                </div>
+                <admin.SearchInput
+                    name="query"
+                    id="topbar-search"
+                    value={global_search_query|default('')}
+                    placeholder="Search..."
+                    class="w-52 pr-10 pl-8 text-sm bg-muted/60 border border-transparent py-1.5 rounded-md transition-all duration-150 placeholder:text-muted-foreground focus:outline-none focus:bg-background focus:border-input focus:ring-1 focus:ring-ring focus:w-64"
+                    />
             </form>
 
             <!-- Search (mobile) -->
@@ -179,15 +172,11 @@
                 class="w-80 max-h-[75vh] flex flex-col p-0! overflow-hidden!"
             >
                 <div class="p-3 bg-muted/40 border-b border-border">
-                    <div class="relative">
-                        <admin.Icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none" />
-                        <input
-                            type="text"
-                            id="menu-filter-input"
-                            placeholder="Filter pages..."
-                            class="w-full pl-8 pr-3 py-2 text-base sm:text-sm bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring placeholder:text-muted-foreground transition-shadow"
+                    <admin.SearchInput
+                        id="menu-filter-input"
+                        placeholder="Filter pages..."
+                        class="w-full pl-8 pr-3 py-2 text-base sm:text-sm bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring placeholder:text-muted-foreground transition-shadow"
                         />
-                    </div>
                 </div>
 
                 <div class="overflow-auto flex-1 py-2 px-1.5" id="menu-items-container">

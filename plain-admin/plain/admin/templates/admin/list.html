@@ -45,20 +45,12 @@
             {% endif %}
 
             {% if search_fields %}
-            <div class="relative">
-                <label for="search" class="sr-only">Search</label>
-                <input
-                    type="text"
-                    name="search"
-                    id="search"
-                    class="input input-sm w-auto pl-8!"
-                    placeholder="Search"
-                    value="{{ search_query|default('') }}"
-                    >
-                <div class="absolute top-1/2 -translate-y-1/2 left-2 flex items-center pointer-events-none">
-                    <admin.Icon name="search" class="text-sm text-muted-foreground" />
-                </div>
-            </div>
+            <admin.SearchInput
+                name="search"
+                id="search"
+                value={search_query|default('')}
+                class="input input-sm w-auto pl-8!"
+                />
             {% endif %}
         </form>
         {% endif %}

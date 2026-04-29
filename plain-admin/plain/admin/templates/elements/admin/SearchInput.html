@@ -1,0 +1,21 @@
+{# Text input with a leading search-icon overlay. Default `class="input pl-8"`
+   pairs with the icon's `left-2.5`; pass `class` to override input styling.
+   `wrapper_class` adds utilities to the relative wrapper. #}
+{% if id is defined %}
+<label for="{{ id }}" class="sr-only">{{ label|default('Search') }}</label>
+{% endif %}
+<div class="relative {{ wrapper_class|default('') }}">
+    <input
+        type="text"
+        {% if name is defined %}name="{{ name }}"{% endif %}
+        {% if id is defined %}id="{{ id }}"{% endif %}
+        {% if value is defined %}value="{{ value }}"{% endif %}
+        placeholder="{{ placeholder|default('Search') }}"
+        class="{{ class|default('input pl-8') }}"
+        {% if autofocus is defined %}autofocus{% endif %}
+        >
+    <admin.Icon
+        name="search"
+        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none"
+        />
+</div>
