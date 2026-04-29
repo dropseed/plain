@@ -107,24 +107,12 @@
     ("chart-4", "bg-chart-4"),
     ("chart-5", "bg-chart-5")
 ] %}
-{% set _sidebar = [
-    ("sidebar", "bg-sidebar"),
-    ("sidebar-foreground", "bg-sidebar-foreground"),
-    ("sidebar-primary", "bg-sidebar-primary"),
-    ("sidebar-primary-foreground", "bg-sidebar-primary-foreground"),
-    ("sidebar-accent", "bg-sidebar-accent"),
-    ("sidebar-accent-foreground", "bg-sidebar-accent-foreground"),
-    ("sidebar-border", "bg-sidebar-border"),
-    ("sidebar-ring", "bg-sidebar-ring")
-] %}
-
 {% set _toc = [
     ("customizing", "Customizing"),
     ("tokens-surface", "Surface tokens"),
     ("tokens-action", "Action tokens"),
     ("tokens-status", "Status tokens"),
     ("tokens-header", "Header tokens"),
-    ("tokens-sidebar", "Sidebar tokens"),
     ("tokens-sizing", "Sizing tokens"),
     ("dark-mode", "Dark mode"),
     ("typography", "Typography"),
@@ -235,7 +223,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 {# ====================================================================== #}
 {% call section("tokens-surface", "Surface tokens",
-   "The neutral palette: page backgrounds, muted/accent surfaces, borders. Component-scoped surfaces (`--card`, `--popover`, chart, sidebar) live in their respective component sections below.") %}
+   "The neutral palette: page backgrounds, muted/accent surfaces, borders. Component-scoped surfaces (`--card`, `--popover`, chart) live in their respective component sections below.") %}
 {{ swatch_grid(_surface) }}
 {% endcall %}
 
@@ -262,13 +250,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {# ====================================================================== #}
-{% call section("tokens-sidebar", "Sidebar tokens",
-   "Reserved tokens for Basecoat's `.sidebar` component. Plain's admin doesn't ship a sidebar yet, but the tokens are available for downstream use.") %}
-{{ swatch_grid(_sidebar) }}
-{% endcall %}
-
-
-{# ====================================================================== #}
 {% call section("tokens-sizing", "Sizing tokens") %}
 
 <table class="table">
@@ -281,8 +262,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <tr><td><code>--radius-md</code></td><td>calc(var(--radius) - 2px)</td></tr>
         <tr><td><code>--radius-lg</code></td><td>var(--radius)</td></tr>
         <tr><td><code>--radius-xl</code></td><td>calc(var(--radius) + 4px)</td></tr>
-        <tr><td><code>--sidebar-width</code></td><td>16rem</td></tr>
-        <tr><td><code>--sidebar-mobile-width</code></td><td>18rem</td></tr>
         <tr><td><code>--scrollbar-width</code></td><td>6px</td></tr>
         <tr><td><code>--scrollbar-radius</code></td><td>6px</td></tr>
     </tbody>
