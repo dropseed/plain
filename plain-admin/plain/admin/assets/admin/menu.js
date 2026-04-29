@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
       group.querySelectorAll(".menu-item").forEach((item) => {
         const title = item.getAttribute("data-title") || "";
         const titleMatches = query === "" || title.includes(query);
-        item.style.display = titleMatches || sectionMatches ? "" : "none";
+        item.classList.toggle("hidden", !(titleMatches || sectionMatches));
       });
     });
 
@@ -61,19 +61,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const nextGroup = subsection.nextElementSibling;
       if (nextGroup?.classList.contains("menu-items-group")) {
         const hasVisibleItems = Array.from(nextGroup.querySelectorAll(".menu-item")).some(
-          (item) => item.style.display !== "none",
+          (item) => !item.classList.contains("hidden"),
         );
-        subsection.style.display = hasVisibleItems ? "" : "none";
+        subsection.classList.toggle("hidden", !hasVisibleItems);
       }
     });
 
     // Hide the App / Packages section entirely if nothing under it
     // matches.
     sections.forEach((section) => {
-      const visibleItems = Array.from(section.querySelectorAll(".menu-item")).filter(
-        (item) => item.style.display !== "none",
+      const hasVisibleItems = Array.from(section.querySelectorAll(".menu-item")).some(
+        (item) => !item.classList.contains("hidden"),
       );
-      section.style.display = visibleItems.length > 0 ? "" : "none";
+      section.classList.toggle("hidden", !hasVisibleItems);
     });
   }
 

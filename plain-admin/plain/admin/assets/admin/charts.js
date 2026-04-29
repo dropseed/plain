@@ -307,7 +307,14 @@ const startChart = ({ ctx, statsRoot, data }) => {
 };
 
 // Re-resolve chart colors when the theme toggles (light <-> dark).
+// HTMX flips an `htmx-request` class on <html> during in-flight requests,
+// which would otherwise re-trigger this on every request — gate on the
+// resolved dark state so we only redraw when the theme actually changes.
+let lastIsDark = document.documentElement.classList.contains("dark");
 new MutationObserver(() => {
+  const isDark = document.documentElement.classList.contains("dark");
+  if (isDark === lastIsDark) return;
+  lastIsDark = isDark;
   for (const state of liveStates) state.refreshColors();
 }).observe(document.documentElement, {
   attributes: true,

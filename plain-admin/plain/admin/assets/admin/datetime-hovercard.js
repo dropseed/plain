@@ -67,20 +67,10 @@
       // Idempotent: skip if already wrapped (e.g., HTMX swap re-runs).
       if (timeEl.closest(".hovercard")) return;
 
-      const date = new Date(timeEl.getAttribute("datetime"));
-      const unix = Math.floor(date.getTime() / 1000);
-
       const panel = document.createElement("div");
       panel.dataset.hovercard = "";
       panel.setAttribute("aria-hidden", "true");
       panel.className = "min-w-56 flex flex-col";
-
-      panel.appendChild(createRow(localTz, formatDatetime(date, localTz)));
-      panel.appendChild(createRow("UTC", formatDatetime(date, "UTC")));
-      const relativeRow = createRow("Relative", relativeTime(date));
-      panel.appendChild(relativeRow);
-      panel.appendChild(createRow("Unix", String(unix)));
-      panel.appendChild(createRow("ISO", timeEl.getAttribute("datetime")));
 
       const wrapper = document.createElement("span");
       wrapper.className = "hovercard";
@@ -88,10 +78,21 @@
       wrapper.appendChild(timeEl);
       wrapper.appendChild(panel);
 
-      // Refresh the relative time on each show — "5 minutes ago" goes
-      // stale if the user leaves the tab open. components.js fires this
-      // event before applying the show transition.
+      // Build the panel rows on first show — list views can have hundreds
+      // of <time> elements, and most are never hovered. Subsequent shows
+      // refresh the relative-time row in place.
+      let relativeRow;
       wrapper.addEventListener("hovercard:show", () => {
+        const date = new Date(timeEl.getAttribute("datetime"));
+        if (!relativeRow) {
+          panel.appendChild(createRow(localTz, formatDatetime(date, localTz)));
+          panel.appendChild(createRow("UTC", formatDatetime(date, "UTC")));
+          relativeRow = createRow("Relative", relativeTime(date));
+          panel.appendChild(relativeRow);
+          panel.appendChild(createRow("Unix", String(Math.floor(date.getTime() / 1000))));
+          panel.appendChild(createRow("ISO", timeEl.getAttribute("datetime")));
+          return;
+        }
         const rel = relativeTime(date);
         relativeRow.dataset.copyValue = rel;
         relativeRow.querySelector("[data-copy-feedback]").textContent = rel;

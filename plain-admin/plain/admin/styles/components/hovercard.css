@@ -8,16 +8,15 @@
        <div data-hovercard aria-hidden="true">…panel content…</div>
      </span>
 
-   Surface tokens come from the popover family (`bg-popover`,
-   `text-popover-foreground`, `border-border`) so customization affects
-   both primitives uniformly. */
+   Surface treatment (bg, border, shadow, radius) is shared with
+   [data-popover] in popover.css. */
 @layer components {
   .hovercard {
     @apply relative inline-flex;
   }
 
   [data-hovercard] {
-    @apply fixed bg-popover text-popover-foreground border border-border shadow-md rounded-md p-1 text-sm whitespace-nowrap z-50 transition-opacity duration-100;
+    @apply fixed p-1 text-sm whitespace-nowrap z-50 transition-opacity duration-100;
   }
   [data-hovercard][aria-hidden='true'] {
     @apply opacity-0 invisible pointer-events-none;

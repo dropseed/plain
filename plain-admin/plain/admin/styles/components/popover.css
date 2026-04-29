@@ -1,7 +1,15 @@
 /* Popover */
 @layer components {
+  /* Shared surface treatment for popover-family panels (popover,
+     dropdown-menu, hovercard) so theming `--popover` / `--border`
+     affects all of them in one place. */
+  [data-popover],
+  [data-hovercard] {
+    @apply bg-popover text-popover-foreground border shadow-md rounded-md;
+  }
+
   [data-popover] {
-    @apply absolute bg-popover text-popover-foreground overflow-x-hidden overflow-y-auto rounded-md border shadow-md z-50 visible opacity-100 scale-100 min-w-full w-max transition-all;
+    @apply absolute overflow-x-hidden overflow-y-auto z-50 visible opacity-100 scale-100 min-w-full w-max transition-all;
 
     &[aria-hidden='true'] {
       @apply invisible opacity-0 scale-95;

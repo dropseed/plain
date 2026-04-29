@@ -9,7 +9,7 @@ from typing import Any
 from plain.http import NotFoundError404, RedirectResponse, Response
 from plain.packages import packages_registry
 from plain.postgres import QuerySet
-from plain.preflight import run_checks, set_check_counts
+from plain.preflight import iter_check_summaries, set_check_counts
 from plain.runtime import settings as plain_settings
 
 from .cards import Card, KeyValueCard, TableCard, TrendCard
@@ -228,29 +228,15 @@ class PreflightView(AdminView):
         """Run all preflight checks and return (checks, passed, warnings, errors)."""
         packages_registry.autodiscover_modules("preflight", include_app=True)
 
-        include_deploy = not plain_settings.DEBUG
-
         checks = []
         passed_count = 0
         warning_count = 0
         error_count = 0
 
-        for check_class, name, results in run_checks(
-            include_deploy_checks=include_deploy
+        for name, visible, has_errors in iter_check_summaries(
+            include_deploy_checks=not plain_settings.DEBUG
         ):
-            issues = []
-            for result in results:
-                if result.is_silenced():
-                    continue
-                issues.append(
-                    {
-                        "fix": result.fix,
-                        "id": result.id,
-                        "warning": result.warning,
-                    }
-                )
-
-            has_errors = any(not issue["warning"] for issue in issues)
+            issues = [{"fix": r.fix, "id": r.id, "warning": r.warning} for r in visible]
             if issues:
                 if has_errors:
                     error_count += 1

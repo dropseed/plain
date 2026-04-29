@@ -21,16 +21,20 @@
   const registry = [];
   const register = (selector, init) => registry.push({ selector, init });
 
-  const initAll = () => {
+  const initAll = (root) => {
     for (const { selector, init } of registry) {
-      document.querySelectorAll(selector).forEach(init);
+      if (root.matches?.(selector)) init(root);
+      root.querySelectorAll?.(selector).forEach(init);
     }
   };
 
-  document.addEventListener("DOMContentLoaded", initAll);
-  document.addEventListener("htmx:afterSwap", initAll);
+  document.addEventListener("DOMContentLoaded", () => initAll(document));
+  document.addEventListener("htmx:afterSwap", (evt) => initAll(evt.detail.target));
 
   // ---------- Shared popover lifecycle ----------
+  // Open popovers are tracked in a Set so global outside-click and
+  // cross-popover-close don't have to scan the whole document.
+  const openComponents = new Set();
 
   const closePopover = (component, focusTrigger = true) => {
     const trigger = component.querySelector(":scope > button");
@@ -39,6 +43,7 @@
     trigger.setAttribute("aria-expanded", "false");
     trigger.removeAttribute("aria-activedescendant");
     if (content) content.setAttribute("aria-hidden", "true");
+    openComponents.delete(component);
     if (focusTrigger) trigger.focus();
     return true;
   };
@@ -50,20 +55,25 @@
     document.dispatchEvent(new CustomEvent(POPOVER_OPEN_EVENT, { detail: { source: component } }));
     trigger.setAttribute("aria-expanded", "true");
     content.setAttribute("aria-hidden", "false");
+    openComponents.add(component);
     return { trigger, content };
   };
 
   // Global delegated listeners — attached once, never per instance.
+  // Set iteration is safe under in-place delete: closePopover removes the
+  // current entry before the loop advances to the next.
   document.addEventListener("click", (event) => {
-    document.querySelectorAll(POPOVER_SELECTOR).forEach((c) => {
-      if (!c.contains(event.target)) closePopover(c);
-    });
+    if (!openComponents.size) return;
+    const inside = event.target.closest(POPOVER_SELECTOR);
+    for (const c of openComponents) {
+      if (c !== inside) closePopover(c);
+    }
   });
 
   document.addEventListener(POPOVER_OPEN_EVENT, (event) => {
-    document.querySelectorAll(POPOVER_SELECTOR).forEach((c) => {
+    for (const c of openComponents) {
       if (c !== event.detail.source) closePopover(c, false);
-    });
+    }
   });
 
   // ---------- Popover ----------

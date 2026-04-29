@@ -9,6 +9,15 @@
  * don't change how user pages render.
  */
 
+/* Shared focus / aria-invalid treatment for form controls. Used by
+   button.css, input.css, textarea.css, select.css, checkbox.css, and
+   radio.css so the keyboard-focus and validation rings are themed in
+   one place. (Switch opts out of aria-invalid — see switch.css.) */
+@utility focus-control {
+  @apply focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px];
+  @apply aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40 aria-invalid:border-danger;
+}
+
 @layer base {
   /* Default border color and focus outline for admin descendants. */
   .plain-admin * {

@@ -98,6 +98,20 @@ run_checks = checks_registry.run_checks
 _check_counts: dict[str, int] | None = None
 
 
+def iter_check_summaries(*, include_deploy_checks: bool):
+    """Yield ``(name, visible_issues, has_errors)`` per registered check.
+
+    Filters silenced results and pre-computes the error-vs-warning split so
+    callers don't each reimplement that logic.
+    """
+    for _check_class, name, results in run_checks(
+        include_deploy_checks=include_deploy_checks
+    ):
+        visible = [r for r in results if not r.is_silenced()]
+        has_errors = any(not r.warning for r in visible)
+        yield name, visible, has_errors
+
+
 def get_check_counts() -> dict[str, int]:
     """Return ``{"errors": N, "warnings": N}``, caching for the process lifetime."""
     global _check_counts
@@ -109,19 +123,18 @@ def get_check_counts() -> dict[str, int]:
 
     packages_registry.autodiscover_modules("preflight", include_app=True)
 
-    include_deploy = not settings.DEBUG
     warning_count = 0
     error_count = 0
 
-    for _check_class, _name, results in run_checks(
-        include_deploy_checks=include_deploy
+    for _name, issues, has_errors in iter_check_summaries(
+        include_deploy_checks=not settings.DEBUG
     ):
-        issues = [r for r in results if not r.is_silenced()]
-        if issues:
-            if any(not issue.warning for issue in issues):
-                error_count += 1
-            else:
-                warning_count += 1
+        if not issues:
+            continue
+        if has_errors:
+            error_count += 1
+        else:
+            warning_count += 1
 
     _check_counts = {"errors": error_count, "warnings": warning_count}
     return _check_counts

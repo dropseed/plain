@@ -21,14 +21,13 @@
         {% set is_pinned = view_slug in pinned_slugs %}
         {% set is_current = view_slug == slug %}
         <div
-            class="menu-item group flex items-center gap-1 rounded-lg transition-colors data-[current]:bg-muted"
+            class="menu-item group flex items-center gap-1 rounded-lg transition-colors data-[current]:bg-muted [&[data-current]_a]:text-foreground [&[data-current]_a]:font-medium [&[data-current]_a]:hover:bg-transparent"
             data-title="{{ view.get_nav_title()|lower }}"
             {% if is_current %}data-current{% endif %}
         >
             <a
                 href="{{ nav_url }}"
-                class="flex-1 flex items-center gap-2 px-1.5 py-2 text-sm rounded-lg transition-colors text-foreground/85 hover:text-foreground hover:bg-muted/40 data-[current]:text-foreground data-[current]:font-medium data-[current]:hover:bg-transparent"
-                {% if is_current %}data-current{% endif %}
+                class="flex-1 flex items-center gap-2 px-1.5 py-2 text-sm rounded-lg transition-colors text-foreground/85 hover:text-foreground hover:bg-muted/40"
             >
                 {% if view.nav_icon %}<admin.Icon name={view.nav_icon} class="text-muted-foreground/80 flex-shrink-0" />{% endif %}
                 <span>{{ view.get_nav_title() }}</span>

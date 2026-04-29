@@ -29,8 +29,8 @@ plain-admin/plain/admin/
 │   │   ├── …
 │   │   └── tooltip.css
 │   ├── admin/                            ← admin-only chrome (not @scope-wrapped)
-│   │   ├── code.css
-│   │   └── nav.css
+│   │   ├── nav.css
+│   │   └── prose.css
 │   └── ATTRIBUTIONS.md                   ← MIT credit for Basecoat-derived code
 └── assets/admin/
     ├── components.js                     ← popover, dropdown-menu, hovercard, tabs
@@ -73,7 +73,7 @@ for every primitive plus the design tokens and customization guide.
 
 ## Behaviors
 
-Declarative `data-*` attributes you sprinkle on existing elements. No CSS, no markup pattern — delegated handlers live in `assets/admin/behaviors/`.
+Declarative `data-*` attributes you sprinkle on existing elements. No CSS, no markup pattern — delegated handlers live in `assets/admin/behaviors.js`.
 
 | Attribute                      | What it does                                                                |
 | ------------------------------ | --------------------------------------------------------------------------- |
@@ -111,7 +111,7 @@ opacity modifier on the same token: `bg-success/10`, `bg-warning/10`.
 
 Same rules as the rest of the admin: no inline `style=`, no inline `<script>`
 without a `nonce`, no inline event handlers (`onclick=`, ...). Wire JS via
-delegated handlers in `assets/admin/behaviors/` (or native HTML where it
+delegated handlers in `assets/admin/behaviors.js` (or native HTML where it
 exists — see dialogs).
 
 For dialogs, use the native HTML Invoker Commands API — never write
@@ -138,7 +138,7 @@ closes the enclosing dialog and returns the button's `value`.
 
 1. Create `styles/components/<name>.css` with a single `@layer components { ... }` block.
 2. Add `@import "./styles/components/<name>.css";` inside the `@scope (.plain-admin) { ... }` block in `tailwind.css`.
-3. If the component needs JS, drop a vanilla module in `assets/admin/components/<name>.js` and `<script>` it from `base.html`.
+3. If the component needs JS, add an init block to `assets/admin/components.js` (one delegated handler per primitive — no per-instance listeners; outside-click is shared).
 4. Document it on `/admin/customization/`.
 
 Run `uv run plain docs admin --section components` for the full list and

@@ -40,19 +40,19 @@ class Tailwind:
     def update_plain_sources(self) -> None:
         paths = set()
         imports = set()
+        abs_app_path = Path(APP_PATH).resolve()
 
         # Walk every installed package outside of APP_PATH and collect:
         #   • its directory, so Tailwind scans it for utility-class usage
         #   • its `tailwind.css` (if any), so packages can contribute design
         #     tokens, @theme blocks, and component @apply rules to the build
         for package_config in packages_registry.get_package_configs():
-            abs_package_path = os.path.abspath(package_config.path)
-            abs_app_path = os.path.abspath(APP_PATH)
-            if os.path.commonpath([abs_app_path, abs_package_path]) == abs_app_path:
+            abs_package_path = Path(package_config.path).resolve()
+            if abs_package_path.is_relative_to(abs_app_path):
                 continue
             paths.add(os.path.relpath(abs_package_path, self.target_directory))
-            tailwind_css = os.path.join(abs_package_path, "tailwind.css")
-            if os.path.isfile(tailwind_css):
+            tailwind_css = abs_package_path / "tailwind.css"
+            if tailwind_css.is_file():
                 imports.add(os.path.relpath(tailwind_css, self.target_directory))
 
         plain_sources_path = os.path.join(self.target_directory, "tailwind.css")
