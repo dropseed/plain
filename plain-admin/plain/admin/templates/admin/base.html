@@ -11,16 +11,14 @@
             {{ app_name }} Admin
         {%- endif -%}
     </title>
-    {# Resolve theme choice before paint to avoid a flash of light/dark mismatch. #}
+    {# Resolve theme choice before paint to avoid a flash of light/dark
+       mismatch. Storage key + resolver shape must match theme.js. #}
     <script nonce="{{ request.csp_nonce }}">
     (() => {
         const stored = localStorage.getItem("plain-admin-theme");
-        const choice = stored === "light" || stored === "dark" ? stored : "system";
-        const dark = choice === "dark"
-            || (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+        const dark = stored === "dark"
+            || (stored !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
         document.documentElement.classList.toggle("dark", dark);
-        document.documentElement.dataset.themeChoice = choice;
-        document.documentElement.dataset.themeResolved = dark ? "dark" : "light";
     })();
     </script>
     {# Component CSS is compiled into the Tailwind build via
