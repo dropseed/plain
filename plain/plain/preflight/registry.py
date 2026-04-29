@@ -55,17 +55,6 @@ class CheckRegistry:
             results = check.run()
             yield check_class, name, results
 
-    def get_checks(
-        self, include_deploy_checks: bool = False
-    ) -> list[tuple[type[Any], str]]:
-        """Get list of (check_class, name) tuples."""
-        result: list[tuple[type[Any], str]] = []
-        for name, (check_class, deploy) in self.checks.items():
-            if deploy and not include_deploy_checks:
-                continue
-            result.append((check_class, name))
-        return result
-
 
 checks_registry = CheckRegistry()
 
@@ -109,19 +98,19 @@ def get_check_counts() -> dict[str, int]:
 
     packages_registry.autodiscover_modules("preflight", include_app=True)
 
-    include_deploy = not settings.DEBUG
     warning_count = 0
     error_count = 0
 
     for _check_class, _name, results in run_checks(
-        include_deploy_checks=include_deploy
+        include_deploy_checks=not settings.DEBUG
     ):
-        issues = [r for r in results if not r.is_silenced()]
-        if issues:
-            if any(not issue.warning for issue in issues):
-                error_count += 1
-            else:
-                warning_count += 1
+        visible = [r for r in results if not r.is_silenced()]
+        if not visible:
+            continue
+        if any(not r.warning for r in visible):
+            error_count += 1
+        else:
+            warning_count += 1
 
     _check_counts = {"errors": error_count, "warnings": warning_count}
     return _check_counts
