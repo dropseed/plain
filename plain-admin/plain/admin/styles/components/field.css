@@ -8,14 +8,14 @@
     }
   }
   .field {
-    @apply flex flex-col w-full gap-3 data-[invalid=true]:text-destructive [&>*]:w-full [&>.sr-only]:w-auto;
+    @apply flex flex-col w-full gap-3 data-[invalid=true]:text-danger [&>*]:w-full [&>.sr-only]:w-auto;
 
     h2,
     h3 {
       @apply flex w-fit items-center gap-2 text-sm leading-snug font-medium;
     }
     [role="alert"] {
-      @apply text-sm text-destructive font-normal;
+      @apply text-sm text-danger font-normal;
       
       ul {
         @apply ml-4 flex list-disc flex-col gap-1;

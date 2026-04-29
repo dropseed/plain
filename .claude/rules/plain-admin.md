@@ -53,17 +53,19 @@ or `class="btn"` on their own pages doesn't pick up admin styling.
 
 Use the component classes for UI primitives:
 
-| Pattern        | Class                                                                        |
-| -------------- | ---------------------------------------------------------------------------- |
-| Buttons        | `btn`, `btn-primary`, `btn-outline`, `btn-ghost`, `btn-destructive`, ...     |
-| Sizes / icons  | prefix with `btn-sm-`, `btn-lg-`, `btn-icon-`, etc.                          |
-| Badges         | `badge`, `badge-secondary`, `badge-destructive`, `badge-outline`             |
-| Plain semantic | `badge-success`, `badge-warning`, `badge-danger`, `badge-info`               |
-| Cards          | `card` — pad with utilities (e.g. `card gap-2 py-4` for dense layouts)       |
-| Form fields    | `input`, `textarea`; native `<select>` is auto-styled inside `.plain-admin`  |
-| Dialogs        | `<dialog class="dialog">` + `data-dialog-open="..."` / `data-dialog-close`   |
-| Dropdowns      | `.dropdown-menu` wrapping a `<button>` + `[data-popover]` w/ `[role="menu"]` |
-| Tabs           | `.tabs > [role="tablist"] > [role="tab"]` (uses tabs.js)                     |
+| Pattern        | Class                                                                              |
+| -------------- | ---------------------------------------------------------------------------------- |
+| Buttons        | `btn`, `btn-primary`, `btn-outline`, `btn-ghost`, `btn-link`                       |
+| Sizes / icons  | prefix with `btn-sm-`, `btn-lg-`, `btn-icon-`, etc.                                |
+| Status buttons | `btn-success`, `btn-warning`, `btn-danger`, `btn-info` (solid; paired fg)          |
+| Badges         | `badge`, `badge-secondary`, `badge-outline`                                        |
+| Status badges  | `badge-success`, `badge-warning`, `badge-danger`, `badge-info` (translucent)       |
+| Alerts         | `alert`, `alert-success`, `alert-warning`, `alert-danger`, `alert-info`            |
+| Cards          | `card` — pad with utilities (e.g. `card gap-2 py-4` for dense layouts)             |
+| Form fields    | `input`, `textarea`, `select` — opt in via class; pair with `-sm` for compact rows |
+| Dialogs        | `<dialog class="dialog">` + `data-dialog-open="..."` / `data-dialog-close`         |
+| Dropdowns      | `.dropdown-menu` wrapping a `<button>` + `[data-popover]` w/ `[role="menu"]`       |
+| Tabs           | `.tabs > [role="tablist"] > [role="tab"]` (uses tabs.js)                           |
 
 The live catalog is at `/admin/customization/` — copy-pasteable markup
 for every primitive plus the design tokens and customization guide.
@@ -73,20 +75,20 @@ for every primitive plus the design tokens and customization guide.
 The admin runs in light or dark mode based on the `.dark` class on `<html>`.
 Templates and CSS should reference design tokens, not stone/black/white.
 
-| Use                 | Token / class                                              |
-| ------------------- | ---------------------------------------------------------- |
-| Page background     | `bg-background`                                            |
-| Body text           | `text-foreground`                                          |
-| Secondary text      | `text-muted-foreground`                                    |
-| Subtle surfaces     | `bg-muted`, `bg-muted/40`                                  |
-| Hover surface       | `hover:bg-accent` (`hover:text-accent-foreground`)         |
-| Borders             | `border-border` (general), `border-input` (fields)         |
-| Focus ring          | `ring-ring`                                                |
-| Popover/dropdown bg | `bg-popover` / `text-popover-foreground`                   |
-| Primary action      | `bg-primary` / `text-primary-foreground`                   |
-| Link                | `text-link hover:text-link-hover`                          |
-| Destructive action  | `bg-destructive` / `text-white`                            |
-| Status colors       | `text-success`, `text-warning`, `text-danger`, `text-info` |
+| Use                 | Token / class                                                 |
+| ------------------- | ------------------------------------------------------------- |
+| Page background     | `bg-background`                                               |
+| Body text           | `text-foreground`                                             |
+| Secondary text      | `text-muted-foreground`                                       |
+| Subtle surfaces     | `bg-muted`, `bg-muted/40`                                     |
+| Hover surface       | `hover:bg-accent` (`hover:text-accent-foreground`)            |
+| Borders             | `border-border` (general), `border-input` (fields)            |
+| Focus ring          | `ring-ring`                                                   |
+| Popover/dropdown bg | `bg-popover` / `text-popover-foreground`                      |
+| Primary action      | `bg-primary` / `text-primary-foreground`                      |
+| Link                | `text-link hover:text-link-hover`                             |
+| Status actions      | `bg-{success,warning,danger,info}` / `text-{name}-foreground` |
+| Status text         | `text-success`, `text-warning`, `text-danger`, `text-info`    |
 
 For status backgrounds at lower opacity (badges, alerts), use the
 opacity modifier on the same token: `bg-success/10`, `bg-warning/10`.

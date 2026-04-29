@@ -6,43 +6,61 @@
   .btn-outline,
   .btn-ghost,
   .btn-link,
-  .btn-destructive,
+  .btn-success,
+  .btn-warning,
+  .btn-danger,
+  .btn-info,
   .btn-sm,
   .btn-sm-primary,
   .btn-sm-secondary,
   .btn-sm-outline,
   .btn-sm-ghost,
   .btn-sm-link,
-  .btn-sm-destructive,
+  .btn-sm-success,
+  .btn-sm-warning,
+  .btn-sm-danger,
+  .btn-sm-info,
   .btn-lg,
   .btn-lg-primary,
   .btn-lg-secondary,
   .btn-lg-outline,
   .btn-lg-ghost,
   .btn-lg-link,
-  .btn-lg-destructive,
+  .btn-lg-success,
+  .btn-lg-warning,
+  .btn-lg-danger,
+  .btn-lg-info,
   .btn-icon,
   .btn-icon-primary,
   .btn-icon-secondary,
   .btn-icon-outline,
   .btn-icon-ghost,
   .btn-icon-link,
-  .btn-icon-destructive,
+  .btn-icon-success,
+  .btn-icon-warning,
+  .btn-icon-danger,
+  .btn-icon-info,
   .btn-sm-icon,
   .btn-sm-icon-primary,
   .btn-sm-icon-secondary,
   .btn-sm-icon-outline,
   .btn-sm-icon-ghost,
   .btn-sm-icon-link,
-  .btn-sm-icon-destructive,
+  .btn-sm-icon-success,
+  .btn-sm-icon-warning,
+  .btn-sm-icon-danger,
+  .btn-sm-icon-info,
   .btn-lg-icon,
   .btn-lg-icon-primary,
   .btn-lg-icon-secondary,
   .btn-lg-icon-outline,
   .btn-lg-icon-ghost,
   .btn-lg-icon-link,
-  .btn-lg-icon-destructive {
-    @apply inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive cursor-pointer rounded-md;
+  .btn-lg-icon-success,
+  .btn-lg-icon-warning,
+  .btn-lg-icon-danger,
+  .btn-lg-icon-info {
+    @apply inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40 aria-invalid:border-danger cursor-pointer rounded-md;
   }
   .btn,
   .btn-primary,
@@ -50,7 +68,10 @@
   .btn-outline,
   .btn-ghost,
   .btn-link,
-  .btn-destructive {
+  .btn-success,
+  .btn-warning,
+  .btn-danger,
+  .btn-info {
     @apply gap-2 h-9 px-4 py-2 has-[>svg]:px-3;
   }
   .btn-icon,
@@ -59,7 +80,10 @@
   .btn-icon-outline,
   .btn-icon-ghost,
   .btn-icon-link,
-  .btn-icon-destructive {
+  .btn-icon-success,
+  .btn-icon-warning,
+  .btn-icon-danger,
+  .btn-icon-info {
     @apply size-9;
   }
   .btn-sm,
@@ -68,7 +92,10 @@
   .btn-sm-outline,
   .btn-sm-ghost,
   .btn-sm-link,
-  .btn-sm-destructive {
+  .btn-sm-success,
+  .btn-sm-warning,
+  .btn-sm-danger,
+  .btn-sm-info {
     @apply gap-1.5 h-8 px-3 has-[>svg]:px-2.5;
   }
   .btn-sm-icon,
@@ -77,7 +104,10 @@
   .btn-sm-icon-outline,
   .btn-sm-icon-ghost,
   .btn-sm-icon-link,
-  .btn-sm-icon-destructive {
+  .btn-sm-icon-success,
+  .btn-sm-icon-warning,
+  .btn-sm-icon-danger,
+  .btn-sm-icon-info {
     @apply size-8;
   }
   .btn-lg,
@@ -86,7 +116,10 @@
   .btn-lg-outline,
   .btn-lg-ghost,
   .btn-lg-link,
-  .btn-lg-destructive {
+  .btn-lg-success,
+  .btn-lg-warning,
+  .btn-lg-danger,
+  .btn-lg-info {
     @apply gap-2 h-10 px-6 has-[>svg]:px-4;
   }
   .btn-lg-icon,
@@ -95,7 +128,10 @@
   .btn-lg-icon-outline,
   .btn-lg-icon-ghost,
   .btn-lg-icon-link,
-  .btn-lg-icon-destructive {
+  .btn-lg-icon-success,
+  .btn-lg-icon-warning,
+  .btn-lg-icon-danger,
+  .btn-lg-icon-info {
     @apply size-10;
   }
   .btn,
@@ -162,16 +198,56 @@
       @apply hover:underline;
     }
   }
-  .btn-destructive,
-  .btn-sm-destructive,
-  .btn-lg-destructive,
-  .btn-icon-destructive,
-  .btn-sm-icon-destructive,
-  .btn-lg-icon-destructive {
-    @apply bg-destructive text-white shadow-xs focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60;
+  /* Status buttons. Dark mode renders the bg at 70% opacity so the
+     saturated hue mixes with the page bg into a softer tone — purely
+     aesthetic; the foreground tokens already give enough contrast at
+     full opacity. Tweak the `/70` and `/60` modifiers to taste. */
+  .btn-success,
+  .btn-sm-success,
+  .btn-lg-success,
+  .btn-icon-success,
+  .btn-sm-icon-success,
+  .btn-lg-icon-success {
+    @apply bg-success text-success-foreground shadow-xs focus-visible:ring-success/20 dark:focus-visible:ring-success/40 dark:bg-success/70;
     &:hover,
     &[aria-pressed='true'] {
-      @apply bg-destructive/90 dark:bg-destructive/50;
+      @apply bg-success/90 dark:bg-success/60;
+    }
+  }
+  .btn-warning,
+  .btn-sm-warning,
+  .btn-lg-warning,
+  .btn-icon-warning,
+  .btn-sm-icon-warning,
+  .btn-lg-icon-warning {
+    @apply bg-warning text-warning-foreground shadow-xs focus-visible:ring-warning/20 dark:focus-visible:ring-warning/40 dark:bg-warning/70;
+    &:hover,
+    &[aria-pressed='true'] {
+      @apply bg-warning/90 dark:bg-warning/60;
+    }
+  }
+  .btn-danger,
+  .btn-sm-danger,
+  .btn-lg-danger,
+  .btn-icon-danger,
+  .btn-sm-icon-danger,
+  .btn-lg-icon-danger {
+    @apply bg-danger text-danger-foreground shadow-xs focus-visible:ring-danger/20 dark:focus-visible:ring-danger/40 dark:bg-danger/70;
+    &:hover,
+    &[aria-pressed='true'] {
+      @apply bg-danger/90 dark:bg-danger/60;
+    }
+  }
+  .btn-info,
+  .btn-sm-info,
+  .btn-lg-info,
+  .btn-icon-info,
+  .btn-sm-icon-info,
+  .btn-lg-icon-info {
+    @apply bg-info text-info-foreground shadow-xs focus-visible:ring-info/20 dark:focus-visible:ring-info/40 dark:bg-info/70;
+    &:hover,
+    &[aria-pressed='true'] {
+      @apply bg-info/90 dark:bg-info/60;
     }
   }
 }

@@ -1,17 +1,19 @@
 /*
  * Card
  *
- * Padded, rounded, shadowed wrapper for grouped content. Uses optional
- * <header> / <section> / <footer> children with built-in padding.
+ * Padded wrapper for grouped content with optional <header> / <section> /
+ * <footer> children. Plain's default is flat (no shadow) — the border
+ * carries the separation. Corner radius follows the system-wide
+ * `--radius` token via `rounded-xl`; tighten or loosen the entire scale
+ * by overriding `--radius` rather than this class.
  *
- * Override the defaults with utility classes when you need a denser look
- * (e.g. dashboard cards in `templates/admin/cards/base.html` use
- * `class="card gap-2 py-4"` to tighten the vertical rhythm).
+ * Dashboard cards in `templates/admin/cards/base.html` use
+ * `class="card gap-2 py-4"` to tighten the vertical rhythm.
  */
 
 @layer components {
   .card {
-    @apply bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm;
+    @apply bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6;
 
     > header {
       @apply @container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6;

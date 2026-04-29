@@ -1,9 +1,36 @@
-/* Alert */
+/*
+ * Alert
+ *
+ * Variants: neutral (default) plus Plain's status family (success,
+ * warning, danger, info) that tints the icon and body text in the
+ * matching token color over a card background.
+ *
+ * The icon column is reserved when either a `<svg>` (raw SVG icon)
+ * or `<i>` (Bootstrap Icons font glyph via admin.Icon) is the first
+ * child. Authors can use either.
+ */
+
 @layer components {
   .alert,
-  .alert-destructive {
-    @apply relative w-full rounded-lg border px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current;
-    
+  .alert-success,
+  .alert-warning,
+  .alert-danger,
+  .alert-info {
+    @apply relative w-full rounded-lg border px-4 py-3 text-sm grid grid-cols-[0_1fr] gap-y-0.5 items-start;
+
+    &:has(> svg),
+    &:has(> i) {
+      grid-template-columns: calc(var(--spacing) * 4) 1fr;
+      column-gap: calc(var(--spacing) * 3);
+    }
+
+    > svg {
+      @apply size-4 translate-y-0.5 text-current;
+    }
+    > i {
+      @apply translate-y-0.5 text-current;
+    }
+
     > h2,
     > h3,
     > h4,
@@ -24,11 +51,32 @@
   .alert {
     @apply bg-card text-card-foreground;
   }
-  .alert-destructive {
-    @apply text-destructive bg-card [&>svg]:text-current;
+  .alert-success {
+    @apply text-success bg-card;
 
     > section {
-      @apply text-destructive;
+      @apply text-success;
+    }
+  }
+  .alert-warning {
+    @apply text-warning bg-card;
+
+    > section {
+      @apply text-warning;
+    }
+  }
+  .alert-danger {
+    @apply text-danger bg-card;
+
+    > section {
+      @apply text-danger;
+    }
+  }
+  .alert-info {
+    @apply text-info bg-card;
+
+    > section {
+      @apply text-info;
     }
   }
 }

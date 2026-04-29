@@ -518,17 +518,19 @@ badges, alerts, cards, form fields, dialogs, dropdowns, tabs, tables, and
 icons. Use these classes when building admin views and you'll inherit
 both light/dark theming and the user's brand overrides.
 
-| Pattern               | Class(es)                                                                |
-| --------------------- | ------------------------------------------------------------------------ |
-| Buttons               | `.btn`, `.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-destructive` |
-| Sizes / icon-only     | prefix `.btn-sm-…`, `.btn-lg-…`, `.btn-icon-…`                           |
-| Badges                | `.badge`, `.badge-secondary`, `.badge-destructive`, `.badge-outline`     |
-| Plain semantic badges | `.badge-success`, `.badge-warning`, `.badge-danger`, `.badge-info`       |
-| Cards                 | `.card` (basecoat) or `.admin-card` (Plain's denser metric card)         |
-| Form inputs           | `.input`, `.textarea` — and `<select>` is auto-styled                    |
-| Dialogs               | `<dialog class="dialog">` + `data-dialog-open="…"` / `data-dialog-close` |
-| Tabs                  | `.tabs > [role="tablist"] > [role="tab"]`                                |
-| Dropdowns             | legacy `data-dropdown` + `<template>` (Tippy-backed)                     |
+| Pattern           | Class(es)                                                                    |
+| ----------------- | ---------------------------------------------------------------------------- |
+| Buttons           | `.btn`, `.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-link`            |
+| Sizes / icon-only | prefix `.btn-sm-…`, `.btn-lg-…`, `.btn-icon-…`                               |
+| Status buttons    | `.btn-success`, `.btn-warning`, `.btn-danger`, `.btn-info`                   |
+| Badges            | `.badge`, `.badge-secondary`, `.badge-outline`                               |
+| Status badges     | `.badge-success`, `.badge-warning`, `.badge-danger`, `.badge-info`           |
+| Alerts            | `.alert`, `.alert-success`, `.alert-warning`, `.alert-danger`, `.alert-info` |
+| Cards             | `.card` (basecoat) or `.admin-card` (Plain's denser metric card)             |
+| Form inputs       | `.input`, `.textarea` — and `<select>` is auto-styled                        |
+| Dialogs           | `<dialog class="dialog">` + `data-dialog-open="…"` / `data-dialog-close`     |
+| Tabs              | `.tabs > [role="tablist"] > [role="tab"]`                                    |
+| Dropdowns         | legacy `data-dropdown` + `<template>` (Tippy-backed)                         |
 
 When writing custom admin templates, prefer the design tokens over hardcoded
 colors so dark mode and theme overrides work automatically:

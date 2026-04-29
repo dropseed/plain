@@ -4,7 +4,7 @@
    containing the full app/packages nav with a filter input. #}
 {# Context: app_name, user, nav_tabs, slug, parent_view_classes, pinned_slugs, admin_registry #}
 
-<header id="admin-header" class="sticky top-0 z-50 border-b border-border pt-2 bg-header-bg/95 supports-[backdrop-filter]:bg-header-bg/75 backdrop-blur">
+<header id="admin-header" class="sticky top-0 z-50 pt-2 bg-header-bg/95 supports-[backdrop-filter]:bg-header-bg/75 backdrop-blur">
     <!-- Top row -->
     <div class="flex items-center justify-between px-4 lg:px-8 h-11">
         <div class="flex items-center gap-1.5">
@@ -36,7 +36,7 @@
             <!-- Search (mobile) -->
             <a
                 href="{{ url('admin:search') }}"
-                class="sm:hidden flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded hover:bg-accent"
+                class="sm:hidden btn-sm-icon-ghost text-muted-foreground"
             >
                 <admin.Icon name="search" />
             </a>
@@ -50,7 +50,7 @@
                     aria-controls="theme-menu-popover"
                     title="Theme"
                     aria-label="Theme"
-                    class="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded hover:bg-accent cursor-pointer"
+                    class="btn-sm-icon-ghost text-muted-foreground"
                 >
                     <admin.Icon name="sun" class="block dark:hidden" />
                     <admin.Icon name="moon-stars" class="hidden dark:block" />
@@ -85,7 +85,7 @@
             {% set preflight_total = preflight_counts.errors + preflight_counts.warnings %}
             <a
                 href="{{ url('admin:preflight') }}"
-                class="relative flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded hover:bg-accent"
+                class="relative btn-sm-icon-ghost text-muted-foreground"
                 title="Preflight checks"
             >
                 <admin.Icon name="shield-check" />
@@ -142,8 +142,12 @@
 
     <!-- Pinned + recent tabs row. The Menu button at the right opens a
          Basecoat popover holding the full app/packages nav with filter. -->
-    <nav id="pinned-nav" class="flex items-center justify-between px-4 lg:px-8">
-        <div id="nav-tabs-container" class="flex items-center -ml-3 overflow-x-auto scrollbar-hide" data-reorder-url="{{ url('admin:reorder') }}">
+    <nav id="pinned-nav" class="relative flex items-center justify-between px-4 lg:px-8">
+        <!-- Bottom baseline. Sits behind the tabs so the active tab's
+             border-b can paint over the bottom 1px of its underline,
+             merging visually with the line. -->
+        <div class="absolute inset-x-0 bottom-0 h-px bg-border z-0"></div>
+        <div id="nav-tabs-container" class="relative z-10 flex items-center -ml-3 overflow-x-auto scrollbar-hide" data-reorder-url="{{ url('admin:reorder') }}">
             {% for tab in nav_tabs %}
             {% set nav_url = tab.view.get_view_url() %}
             {% set view_slug = tab.view.get_slug() %}
@@ -159,13 +163,13 @@
 
         <!-- Menu (Basecoat popover): full app/packages nav with a filter
              input. popover.js handles open/close, click-outside, ESC. -->
-        <div class="popover ml-auto">
+        <div class="popover relative z-10 ml-auto">
             <button
                 type="button"
                 aria-haspopup="dialog"
                 aria-expanded="false"
                 aria-controls="admin-menu-popover"
-                class="flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded hover:bg-accent"
+                class="btn-sm-ghost text-muted-foreground"
             >
                 <admin.Icon name="grid-3x3-gap" />
                 <span class="hidden sm:inline">Menu</span>

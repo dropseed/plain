@@ -16,13 +16,13 @@
             <div class="flex gap-8 py-1.5">
                 <dt class="w-40 flex-shrink-0 text-muted-foreground">Source</dt>
                 <dd class="min-w-0">
-                    <span
-                        data-source="{{ setting.source }}"
-                        class="inline-flex items-center px-1.5 py-0.5 text-xs rounded-md
-                               data-[source=default]:bg-muted data-[source=default]:text-muted-foreground/80
-                               data-[source=explicit]:bg-muted/70 data-[source=explicit]:text-foreground/70
-                               data-[source=env]:bg-amber-50 data-[source=env]:text-amber-800 data-[source=env]:font-mono"
-                    >{{ setting.env_var_name or setting.source }}</span>
+                    {% if setting.source == 'env' %}
+                    <span class="badge-warning font-mono">{{ setting.env_var_name }}</span>
+                    {% elif setting.source == 'explicit' %}
+                    <span class="badge-outline">{{ setting.source }}</span>
+                    {% else %}
+                    <span class="badge-secondary">{{ setting.source }}</span>
+                    {% endif %}
                 </dd>
             </div>
             <div class="flex gap-8 py-1.5">

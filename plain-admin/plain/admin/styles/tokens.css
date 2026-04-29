@@ -1,16 +1,14 @@
 /*
  * Design tokens.
  *
- * Vendored from Basecoat UI's defaults — see ATTRIBUTIONS.md. Scoped to
+ * Derived from Basecoat UI's defaults — see ATTRIBUTIONS.md. Scoped to
  * `.plain-admin` so admin styles don't leak onto the user's own pages.
  *
- * The Plain-flavored brand colors (olive primary, steel link, warm
- * status palette) are gone for now — these are pure shadcn-style
- * Basecoat values. The Plain-only semantic slots (`--success`,
- * `--warning`, `--danger`, `--info`, `--link`) are kept as alias
- * shims so consumers like `text-success` / `badge-success` /
- * `var(--link)` still resolve to *something* and the templates don't
- * need to change while we figure out which of these to keep.
+ * The base palette is shadcn-style Basecoat values with Plain's olive
+ * primary on top. Plain semantic slots (`--success`, `--warning`,
+ * `--danger`, `--info`, `--link`) are real values, not aliases, with
+ * earthy hues tuned to harmonize with the olive. `--danger` replaces
+ * Basecoat's `--destructive` — same role, single name.
  *
  * Customizing: re-declare any token in your own stylesheet loaded
  * after this one to retheme the admin without forking templates.
@@ -41,7 +39,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: #4d5246;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -49,16 +47,22 @@
   --muted-foreground: oklch(0.556 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  --danger: oklch(0.577 0.245 27.325);
+  --danger-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
 
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  /* Chart palette: earthy, brand-coordinated hues (Sage / Steel /
+     Terracotta / Teal / Plum). Chroma kept modest (0.08–0.13) so the
+     series feel like cousins of the olive primary, not a vibrant
+     rainbow. Lightnesses cluster around 0.5–0.6 so no series visually
+     outweighs another in stacked / grouped charts. */
+  --chart-1: oklch(0.55 0.09 140);     /* Sage */
+  --chart-2: oklch(0.55 0.08 225);     /* Steel */
+  --chart-3: oklch(0.58 0.13 35);      /* Terracotta */
+  --chart-4: oklch(0.6 0.11 195);      /* Teal */
+  --chart-5: oklch(0.5 0.11 340);      /* Plum */
 
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -79,14 +83,21 @@
   --chevron-down-icon-50: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.556 0 0 / 0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');
   --check-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.556 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-icon lucide-check"><path d="M20 6 9 17l-5-5"/></svg>');
 
-  /* Plain-only semantic slots, aliased to Basecoat tokens for now.
-     Replace these with real values when restoring brand colors. */
-  --success: var(--primary);
-  --warning: var(--primary);
-  --danger: var(--destructive);
-  --info: var(--primary);
-  --link: var(--primary);
-  --link-hover: var(--primary);
+  /* Plain-only semantic slots. Earthy, brand-coordinated hues — sage
+     green / warm amber / steel blue — desaturated enough to read
+     alongside the olive primary without fighting it. Used directly
+     (`text-success`) and at 10% opacity for badge/alert backgrounds.
+     `--danger` is declared above with the rest of the Basecoat-style
+     tokens since it underpins both status (badge) and emphasis
+     (button, alert) variants. */
+  --success: oklch(0.55 0.13 145);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.62 0.15 75);
+  --warning-foreground: oklch(0.205 0 0);
+  --info: oklch(0.55 0.13 230);
+  --info-foreground: oklch(0.985 0 0);
+  --link: oklch(0.5 0.13 235);
+  --link-hover: oklch(0.4 0.13 235);
 
   /* Prose tokens — surfaces that prose content uses, broken out from
      the chrome tokens so they can be themed independently. (E.g.
@@ -94,12 +105,12 @@
      hover surfaces.) */
   --code-bg: var(--muted);
 
-  /* Header surface. Defaults to the page background so the header
-     blends; override to make it a distinct chrome bar. (For full
+  /* Header surface. Plain ships a warm off-white chrome bar in light
+     mode; override this token to match your own brand. (For full
      contrast inversion — light page, dark header — add `class="dark"`
      to the `<header>` element instead, which flips every token via
      the dark variant.) */
-  --header-bg: var(--background);
+  --header-bg: #f6f3f2;
 }
 
 
@@ -118,7 +129,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.269 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
+  --primary: #a8b09a;
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -126,16 +137,19 @@
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.371 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --danger: oklch(0.704 0.191 22.216);
+  --danger-foreground: oklch(0.205 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
 
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  /* Chart palette: same hues as light mode, lightness raised so the
+     series read on the dark page bg. Chroma unchanged. */
+  --chart-1: oklch(0.7 0.09 140);      /* Sage */
+  --chart-2: oklch(0.7 0.08 225);      /* Steel */
+  --chart-3: oklch(0.72 0.13 35);      /* Terracotta */
+  --chart-4: oklch(0.72 0.11 195);     /* Teal */
+  --chart-5: oklch(0.65 0.11 340);     /* Plum */
 
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
@@ -145,6 +159,21 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.439 0 0);
+
+  --header-bg: oklch(0.18 0.004 50);
+
+  /* Plain-only semantic slots — same hues as light mode, lighter
+     lightness for contrast on dark surfaces. The status backgrounds
+     are now light enough that `*-foreground` flips to a dark text
+     color (the inverse of light mode). */
+  --success: oklch(0.78 0.14 145);
+  --success-foreground: oklch(0.205 0 0);
+  --warning: oklch(0.8 0.14 78);
+  --warning-foreground: oklch(0.205 0 0);
+  --info: oklch(0.78 0.13 230);
+  --info-foreground: oklch(0.205 0 0);
+  --link: oklch(0.78 0.12 230);
+  --link-hover: oklch(0.85 0.1 230);
 
   --scrollbar-thumb: rgba(255, 255, 255, 0.3);
   --chevron-down-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.708 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');
@@ -180,7 +209,6 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -198,13 +226,19 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Plain-only semantic Tailwind utilities. Kept so `text-success` /
-     `bg-warning/10` / `text-link` keep compiling. They resolve through
-     the alias shims above to neutral Basecoat tokens. */
+  /* Plain semantic Tailwind utilities so `text-success` / `bg-warning/10`
+     / `border-danger` / `text-link` resolve to the corresponding tokens
+     above. `--danger` doubles as the Basecoat-style emphasis color used
+     by `btn-danger` / `alert-danger`. The `*-foreground` pairings carry
+     the legible text color for solid status backgrounds (buttons). */
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
   --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-link: var(--link);
   --color-link-hover: var(--link-hover);
   --color-code-bg: var(--code-bg);

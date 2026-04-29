@@ -1,7 +1,7 @@
-<span
-    data-source="{{ object.source }}"
-    class="inline-flex items-center px-1.5 py-0.5 text-xs rounded-md
-           data-[source=default]:bg-muted data-[source=default]:text-muted-foreground/80
-           data-[source=explicit]:bg-muted/70 data-[source=explicit]:text-foreground/70
-           data-[source=env]:bg-amber-50 data-[source=env]:text-amber-800 data-[source=env]:font-mono"
->{{ value }}</span>
+{% if object.source == 'env' %}
+<span class="badge-warning font-mono">{{ value }}</span>
+{% elif object.source == 'explicit' %}
+<span class="badge-outline">{{ value }}</span>
+{% else %}
+<span class="badge-secondary">{{ value }}</span>
+{% endif %}

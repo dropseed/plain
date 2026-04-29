@@ -1,21 +1,21 @@
 /*
  * Badge
  *
- * Variants: primary (default), secondary, destructive, outline,
- * plus Plain's semantic variants (success, warning, danger, info).
+ * Variants: primary (default), secondary, outline,
+ * plus Plain's semantic variants (success, warning, danger, info)
+ * which use a translucent fill of the matching color.
  */
 
 @layer components {
   .badge,
   .badge-primary,
   .badge-secondary,
-  .badge-destructive,
   .badge-outline,
   .badge-success,
   .badge-warning,
   .badge-danger,
   .badge-info {
-    @apply inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden;
+    @apply inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40 aria-invalid:border-danger transition-[color,box-shadow] overflow-hidden;
   }
   .badge,
   .badge-primary {
@@ -23,9 +23,6 @@
   }
   .badge-secondary {
     @apply border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90;
-  }
-  .badge-destructive {
-    @apply border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60;
   }
   .badge-outline {
     @apply text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground;

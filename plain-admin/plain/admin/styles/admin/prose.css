@@ -73,30 +73,5 @@
       border: 1px solid var(--border);
     }
 
-    /* Native `<select>` — styled so admin filter dropdowns get a chevron
-       and theme-aware colors out of the box. The `.select` component
-       class (Basecoat's JS-backed combobox) is excluded so this doesn't
-       fight with that. */
-    select:not(.select *) {
-      display: block;
-      width: 100%;
-      padding: 0.375rem 1.75rem 0.375rem 0.75rem;
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-      color: var(--foreground);
-      background-color: var(--background);
-      background-image: var(--chevron-down-icon);
-      background-position: right 0.25rem center;
-      background-repeat: no-repeat;
-      background-size: 1.25rem 1.25rem;
-      border: 1px solid var(--input);
-      border-radius: 6px;
-      appearance: none;
-    }
-    select:focus {
-      outline: none;
-      border-color: var(--ring);
-      box-shadow: 0 0 0 1px var(--ring);
-    }
   }
 }

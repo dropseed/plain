@@ -70,14 +70,17 @@
 {% set _action = [
     ("primary", "bg-primary"),
     ("primary-foreground", "bg-primary-foreground"),
-    ("ring", "bg-ring"),
-    ("destructive", "bg-destructive")
+    ("ring", "bg-ring")
 ] %}
 {% set _status = [
     ("success", "bg-success"),
+    ("success-foreground", "bg-success-foreground"),
     ("warning", "bg-warning"),
+    ("warning-foreground", "bg-warning-foreground"),
     ("danger", "bg-danger"),
-    ("info", "bg-info")
+    ("danger-foreground", "bg-danger-foreground"),
+    ("info", "bg-info"),
+    ("info-foreground", "bg-info-foreground")
 ] %}
 {# Component-scoped tokens — rendered alongside their component sections
    below rather than in the top-level token reference. #}
@@ -239,7 +242,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 {# ====================================================================== #}
 {% call section("tokens-action", "Action tokens",
-   "Colors for buttons, focus rings, and destructive actions. `--primary` and `--ring` drive `.btn-primary`, focus outlines, and the active-tab indicator.") %}
+   "Colors for buttons and focus rings. `--primary` and `--ring` drive `.btn-primary`, focus outlines, and the active-tab indicator. (Danger actions like `.btn-danger` pull from the `--danger` status token below.)") %}
 {{ swatch_grid(_action) }}
 {% endcall %}
 
@@ -253,7 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 {# ====================================================================== #}
 {% call section("tokens-header", "Header tokens",
-   "The admin's sticky top header. Defaults to the page background so it blends; override `--header-bg` to make it a distinct chrome bar. For full contrast inversion (light page, dark header), add `class=\"dark\"` to the `<header>` element instead — that flips every token via the dark variant.") %}
+   "The admin's sticky top header. Plain ships a faint warm tint that's a hair off the page background — `#f6f3f2` (slightly darker than white) in light mode, and a subtly lighter shade in dark mode. Override `--header-bg` to match your own brand. For full contrast inversion (light page, dark header), add `class=\"dark\"` to the `<header>` element instead — that flips every token via the dark variant.") %}
 {{ swatch_grid(_header_tokens) }}
 {% endcall %}
 
@@ -332,7 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 {# ====================================================================== #}
 {% call section("prose", "Prose",
-   "Element-level defaults for raw HTML inside admin views — prose links, description lists, code, native `<select>`. Plain ships these because the admin renders content (Basecoat alone doesn't address them).") %}
+   "Element-level defaults for raw HTML inside admin views — prose links, description lists, code blocks. Plain ships these because the admin renders content (Basecoat alone doesn't address them). Form chrome stays opt-in via component classes.") %}
 
 <p class="text-sm text-muted-foreground mb-3">Plain-only prose tokens:</p>
 {{ swatch_grid(_prose_tokens) }}
@@ -367,15 +370,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
 {# ====================================================================== #}
 {% call section("buttons", "Buttons",
-   "Variants: primary, secondary, outline, ghost, link, destructive. Sizes: default, -sm, -lg. Add -icon for square icon-only.") %}
+   "Neutral variants (primary, secondary, outline, ghost, link) plus the status family (success, warning, danger, info) for actions that match an alert tone. Sizes: default, -sm, -lg. Add -icon for square icon-only.") %}
 
-{% call example("Variants") %}
+{% call example("Neutral variants") %}
 <button class="btn-primary">Primary</button>
 <button class="btn-secondary">Secondary</button>
 <button class="btn-outline">Outline</button>
 <button class="btn-ghost">Ghost</button>
 <button class="btn-link">Link</button>
-<button class="btn-destructive">Destructive</button>
+{% endcall %}
+
+{% call example("Status variants") %}
+<button class="btn-success">Success</button>
+<button class="btn-warning">Warning</button>
+<button class="btn-danger">Danger</button>
+<button class="btn-info">Info</button>
 {% endcall %}
 
 {% call example("Sizes") %}
@@ -388,19 +397,18 @@ document.addEventListener("DOMContentLoaded", () => {
 <button class="btn-primary"><admin.Icon name="plus-lg" />Create</button>
 <button class="btn-outline"><admin.Icon name="download" />Export</button>
 <button class="btn-icon-outline" title="Refresh"><admin.Icon name="arrow-clockwise" /></button>
-<button class="btn-destructive" disabled>Disabled</button>
+<button class="btn-danger" disabled>Disabled</button>
 {% endcall %}
 {% endcall %}
 
 
 {# ====================================================================== #}
 {% call section("badges", "Badges",
-   "Semantic badges for status indicators. The colored variants (-success/-warning/-danger/-info) are Plain additions on top of basecoat's primary/secondary/destructive/outline.") %}
+   "Semantic badges for status indicators. Neutral variants (primary/secondary/outline) and Plain's translucent status family (success/warning/danger/info) — the latter use a 10% fill of the matching token so they read in dense table contexts.") %}
 
-{% call example("Basecoat variants") %}
+{% call example("Neutral variants") %}
 <span class="badge">Primary</span>
 <span class="badge-secondary">Secondary</span>
-<span class="badge-destructive">Destructive</span>
 <span class="badge-outline">Outline</span>
 {% endcall %}
 
@@ -426,10 +434,34 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 {% call example() %}
-<div class="alert-destructive w-full">
+<div class="alert-success w-full">
+    <admin.Icon name="check-circle" />
+    <h4>All checks passed</h4>
+    <section>The success variant confirms a positive outcome.</section>
+</div>
+{% endcall %}
+
+{% call example() %}
+<div class="alert-warning w-full">
     <admin.Icon name="exclamation-triangle" />
+    <h4>Heads up</h4>
+    <section>The warning variant is for non-fatal issues that need attention.</section>
+</div>
+{% endcall %}
+
+{% call example() %}
+<div class="alert-danger w-full">
+    <admin.Icon name="x-circle" />
     <h4>Something went wrong</h4>
-    <section>The destructive variant is for errors and failed actions.</section>
+    <section>The danger variant is for errors and failed actions.</section>
+</div>
+{% endcall %}
+
+{% call example() %}
+<div class="alert-info w-full">
+    <admin.Icon name="info-circle" />
+    <h4>Just so you know</h4>
+    <section>The info variant is for incidental notes and pointers.</section>
 </div>
 {% endcall %}
 {% endcall %}
@@ -541,7 +573,7 @@ document.addEventListener("DOMContentLoaded", () => {
 <div class="space-y-1 w-72">
     <label for="example-input-invalid" class="label">Email</label>
     <input id="example-input-invalid" class="input" type="email" value="not an email" aria-invalid="true" />
-    <p class="text-xs text-destructive">Enter a valid email address.</p>
+    <p class="text-xs text-danger">Enter a valid email address.</p>
 </div>
 {% endcall %}
 
@@ -552,10 +584,10 @@ document.addEventListener("DOMContentLoaded", () => {
 </div>
 {% endcall %}
 
-{% call example("Native select") %}
+{% call example("Select") %}
 <div class="space-y-1 w-72">
     <label for="example-select" class="label">Role</label>
-    <select id="example-select">
+    <select id="example-select" class="select">
         <option>Reader</option>
         <option>Editor</option>
         <option>Admin</option>
@@ -625,7 +657,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <a role="menuitem" href="#">Edit</a>
             <a role="menuitem" href="#">Duplicate</a>
             <hr role="separator">
-            <a role="menuitem" href="#" class="text-destructive">Delete</a>
+            <a role="menuitem" href="#" class="text-danger">Delete</a>
         </div>
     </div>
 </div>
@@ -658,7 +690,7 @@ document.addEventListener("DOMContentLoaded", () => {
 {% call example() %}
 <admin.Icon name="check-circle-fill" class="text-success" />
 <admin.Icon name="exclamation-triangle-fill" class="text-warning" />
-<admin.Icon name="x-circle-fill" class="text-destructive" />
+<admin.Icon name="x-circle-fill" class="text-danger" />
 <admin.Icon name="info-circle-fill" class="text-info" />
 <admin.Icon name="gear" />
 <admin.Icon name="search" />
