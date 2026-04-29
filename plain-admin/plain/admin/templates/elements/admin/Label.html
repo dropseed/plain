@@ -1,4 +1,4 @@
-<label for="{{ field.html_id }}" class="flex items-baseline gap-1 w-full">
-    <div class="text-sm font-medium">{{ children }}</div>
-    {% if field.field.required %}<span class="text-[var(--plain-danger)] text-sm">*</span>{% endif %}
+<label for="{{ field.html_id }}" class="label w-full">
+    {{ children }}
+    {% if field.field.required %}<span class="text-destructive">*</span>{% endif %}
 </label>

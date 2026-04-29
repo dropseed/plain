@@ -110,17 +110,9 @@
     element.setAttribute("aria-hidden", "true");
     element.addEventListener("transitionend", () => element.remove(), { once: true });
   }
-
-  function executeAction(button, toast) {
-    const actionString = button.dataset.toastAction;
-    if (!actionString) return;
-    try {
-      const func = new Function("close", actionString);
-      func(() => closeToast(toast));
-    } catch (event) {
-      console.error("Error executing toast action:", event);
-    }
-  }
+  /* Upstream's `executeAction` was removed: it used `new Function(...)` on a
+     `data-toast-action` string, which violates the admin's strict CSP
+     (`script-src 'nonce-...'` blocks runtime-constructed scripts). */
 
   function createToast(config) {
     const { category = "info", title, description, action, cancel, duration, icon } = config;

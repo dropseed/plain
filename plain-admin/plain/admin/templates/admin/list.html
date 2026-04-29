@@ -67,7 +67,7 @@
 
 {% if objects %}
 <div class="w-full overflow-auto mt-2">
-    <table class="text-sm table-auto">
+    <table class="table table-auto">
         <thead>
             <tr class="[&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
                 {% if table_style != "preview" and actions %}
@@ -140,20 +140,26 @@
                 {% set object_links = get_object_links(object) %}
                 {% if object_links %}
                 <td class="py-0">
-                    <button data-dropdown class="bg-transparent inline-flex rounded-md border border-transparent hover:bg-accent hover:border-border px-3 py-1 text-sm font-medium text-foreground/80 focus:outline-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
-                            <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3"/>
-                        </svg>
-                        <template>
-                            <div class="py-1">
+                    <div class="dropdown-menu">
+                        <button
+                            type="button"
+                            aria-haspopup="menu"
+                            aria-expanded="false"
+                            aria-controls="row-actions-{{ get_object_id(object) }}"
+                            class="bg-transparent inline-flex rounded-md border border-transparent hover:bg-accent hover:border-border px-3 py-1 text-sm font-medium text-foreground/80 focus:outline-none"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
+                                <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3"/>
+                            </svg>
+                        </button>
+                        <div id="row-actions-{{ get_object_id(object) }}" data-popover data-align="end" aria-hidden="true" class="w-48">
+                            <div role="menu">
                                 {% for text, url in object_links.items() %}
-                                <a href="{{ url }}" class="block px-4 py-2 text-sm text-foreground/80 hover:bg-accent rounded">
-                                    {{ text }}
-                                </a>
+                                <a role="menuitem" href="{{ url }}">{{ text }}</a>
                                 {% endfor %}
                             </div>
-                        </template>
-                    </button>
+                        </div>
+                    </div>
                 </td>
                 {% endif %}
             </tr>

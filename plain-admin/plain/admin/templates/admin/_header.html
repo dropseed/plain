@@ -1,8 +1,10 @@
 {% use_elements %}
-{# Admin header partial - includes nav tabs and menu dialog #}
+{# Admin header partial — top bar + pinned/recent tabs strip. The "Menu"
+   button at the right end of the tabs row opens a Basecoat popover
+   containing the full app/packages nav with a filter input. #}
 {# Context: app_name, user, nav_tabs, slug, parent_view_classes, pinned_slugs, admin_registry #}
 
-<header id="admin-header" class="sticky top-0 z-50 border-b border-border pt-2 bg-muted/40">
+<header id="admin-header" class="sticky top-0 z-50 border-b border-border pt-2 bg-header-bg/95 supports-[backdrop-filter]:bg-header-bg/75 backdrop-blur">
     <!-- Top row -->
     <div class="flex items-center justify-between px-4 lg:px-8 h-11">
         <div class="flex items-center gap-1.5">
@@ -39,17 +41,45 @@
                 <admin.Icon name="search" />
             </a>
 
-            <!-- Theme toggle (cycles light → dark → system) -->
-            <button
-                type="button"
-                data-theme-toggle
-                title="Toggle theme"
-                aria-label="Toggle theme"
-                class="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded hover:bg-accent"
-            >
-                <admin.Icon name="sun" class="block dark:hidden" />
-                <admin.Icon name="moon-stars" class="hidden dark:block" />
-            </button>
+            <!-- Theme menu (light / dark / system) -->
+            <div class="dropdown-menu">
+                <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    aria-controls="theme-menu-popover"
+                    title="Theme"
+                    aria-label="Theme"
+                    class="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded hover:bg-accent cursor-pointer"
+                >
+                    <admin.Icon name="sun" class="block dark:hidden" />
+                    <admin.Icon name="moon-stars" class="hidden dark:block" />
+                </button>
+                <div id="theme-menu-popover" data-popover data-align="end" aria-hidden="true" class="w-44">
+                    <div role="menu">
+                        <button role="menuitemradio" type="button" data-theme-set="light" aria-checked="false" class="group">
+                            <admin.Icon name="sun" />
+                            Light
+                            <admin.Icon name="check" class="ml-auto opacity-0 group-aria-checked:opacity-100" />
+                        </button>
+                        <button role="menuitemradio" type="button" data-theme-set="dark" aria-checked="false" class="group">
+                            <admin.Icon name="moon-stars" />
+                            Dark
+                            <admin.Icon name="check" class="ml-auto opacity-0 group-aria-checked:opacity-100" />
+                        </button>
+                        <button role="menuitemradio" type="button" data-theme-set="system" aria-checked="false" class="group">
+                            <admin.Icon name="display" />
+                            System
+                            <admin.Icon name="check" class="ml-auto opacity-0 group-aria-checked:opacity-100" />
+                        </button>
+                        <div role="separator"></div>
+                        <a role="menuitem" href="{{ url('admin:customization') }}">
+                            <admin.Icon name="palette" />
+                            Customization
+                        </a>
+                    </div>
+                </div>
+            </div>
 
             <!-- Preflight -->
             {% set preflight_total = preflight_counts.errors + preflight_counts.warnings %}
@@ -61,59 +91,57 @@
                 <admin.Icon name="shield-check" />
                 {% if preflight_total > 0 %}
                 <span
-                    class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 text-[10px] font-bold leading-4 text-center text-white rounded-full {{ 'bg-red-500' if preflight_counts.errors > 0 else 'bg-amber-500' }}"
+                    data-status="{{ 'error' if preflight_counts.errors else 'warning' }}"
+                    class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 text-[10px] font-bold leading-4 text-center text-white rounded-full data-[status=error]:bg-danger data-[status=warning]:bg-warning"
                 >{{ preflight_total }}</span>
                 {% endif %}
             </a>
 
-            <button type="button" data-dropdown class="flex items-center cursor-pointer">
-                {% set avatar_url = user.get_avatar_url() if user.get_avatar_url is defined else None %}
-                {% if avatar_url %}
-                    <img
-                        src="{{ avatar_url }}"
-                        alt="{{ user }}"
-                        class="w-7 h-7 rounded-full"
-                    />
-                {% else %}
-                    <div class="w-7 h-7 rounded-full bg-muted flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 text-muted-foreground" viewBox="0 0 16 16">
-                            <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
-                            <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
-                        </svg>
-                    </div>
-                {% endif %}
-                <template>
-                    <div class="py-1">
+            <div class="dropdown-menu">
+                <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    aria-controls="user-menu-popover"
+                    class="flex items-center cursor-pointer"
+                >
+                    {% set avatar_url = user.get_avatar_url() if user.get_avatar_url is defined else None %}
+                    {% if avatar_url %}
+                        <img
+                            src="{{ avatar_url }}"
+                            alt="{{ user }}"
+                            class="w-7 h-7 rounded-full"
+                        />
+                    {% else %}
+                        <div class="w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 text-muted-foreground" viewBox="0 0 16 16">
+                                <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                                <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                            </svg>
+                        </div>
+                    {% endif %}
+                </button>
+                <div id="user-menu-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                    <div role="menu">
                         {% include "admin/user_menu_items.html" ignore missing %}
-                        <a href="{{ url('admin:settings') }}" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
+                        <a role="menuitem" href="{{ url('admin:settings') }}">
                             <admin.Icon name="gear" />
                             App Settings
                         </a>
-                        <a href="{{ url('admin:components') }}" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
-                            <admin.Icon name="palette" />
-                            Components
-                        </a>
                         <form method="POST" action="{{ url('admin:logout') }}">
-                            <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
+                            <button role="menuitem" type="submit" class="w-full text-left">
                                 <admin.Icon name="box-arrow-right" />
                                 Log out
                             </button>
                         </form>
                     </div>
-                </template>
-            </button>
-
-            <!-- Menu button (mobile) -->
-            <button
-                type="button"
-                class="menu-toggle sm:hidden flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded hover:bg-accent"
-            >
-                <admin.Icon name="grid-3x3-gap" />
-            </button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Nav tabs row -->
+    <!-- Pinned + recent tabs row. The Menu button at the right opens a
+         Basecoat popover holding the full app/packages nav with filter. -->
     <nav id="pinned-nav" class="flex items-center justify-between px-4 lg:px-8">
         <div id="nav-tabs-container" class="flex items-center -ml-3 overflow-x-auto scrollbar-hide" data-reorder-url="{{ url('admin:reorder') }}">
             {% for tab in nav_tabs %}
@@ -124,50 +152,43 @@
                 href="{{ nav_url }}"
                 {% if is_current %}data-active{% endif %}
                 {% if tab.pinned %}draggable="true" data-slug="{{ view_slug }}"{% else %}data-recent{% endif %}
-                class="nav-tab flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap text-muted-foreground hover:text-foreground border-b-2 hover:border-border data-[active]:text-foreground data-[active]:font-medium data-[recent]:text-muted-foreground/80 data-[recent]:font-normal data-[recent]:italic {% if is_current %}border-[var(--plain-olive)]{% else %}border-transparent{% endif %}"
+                class="nav-tab flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-border data-[active]:text-foreground data-[active]:font-medium data-[active]:border-primary data-[recent]:text-muted-foreground/80 data-[recent]:font-normal data-[recent]:italic"
             >{% if tab.view.nav_icon %}<admin.Icon name={tab.view.nav_icon} class="opacity-60" />{% endif %}{{ tab.view.get_nav_title() }}</a>
             {% endfor %}
         </div>
 
-        <!-- Menu button (desktop) -->
-        <button
-            type="button"
-            class="menu-toggle hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded hover:bg-accent ml-auto"
-        >
-            <admin.Icon name="grid-3x3-gap" />
-            <span>Menu</span>
-        </button>
-    </nav>
-
-    <!-- Menu dialog -->
-    <dialog id="admin-menu-dialog" class="m-0 p-0 bg-transparent border-none max-w-none max-h-none w-full h-full overflow-visible">
-        <div class="fixed inset-0 flex justify-end pt-14 sm:pt-16 px-4 sm:px-6">
-            {# Backdrop - clicking closes the menu #}
-            <div class="menu-toggle absolute inset-0 bg-black/20 backdrop-blur-sm -z-10 cursor-default"></div>
-            <div class="w-full sm:w-80 max-h-[75vh] overflow-hidden flex flex-col bg-popover text-popover-foreground rounded-xl shadow-2xl ring-1 ring-border">
-                {# Filter input #}
+        <!-- Menu (Basecoat popover): full app/packages nav with a filter
+             input. popover.js handles open/close, click-outside, ESC. -->
+        <div class="popover ml-auto">
+            <button
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                aria-controls="admin-menu-popover"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded hover:bg-accent"
+            >
+                <admin.Icon name="grid-3x3-gap" />
+                <span class="hidden sm:inline">Menu</span>
+            </button>
+            <div
+                id="admin-menu-popover"
+                data-popover
+                data-align="end"
+                aria-hidden="true"
+                class="w-80 max-h-[75vh] flex flex-col p-0! overflow-hidden!"
+            >
                 <div class="p-3 bg-muted/40 border-b border-border">
-                    <div class="flex items-center gap-2">
-                        <div class="relative flex-1">
-                            <admin.Icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none" />
-                            <input
-                                type="text"
-                                id="menu-filter-input"
-                                placeholder="Filter pages..."
-                                class="w-full pl-8 pr-3 py-2 text-base sm:text-sm bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring placeholder:text-muted-foreground transition-shadow"
-                            />
-                        </div>
-                        <button
-                            type="button"
-                            class="menu-toggle flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-                            aria-label="Close menu"
-                        >
-                            <admin.Icon name="x-lg" />
-                        </button>
+                    <div class="relative">
+                        <admin.Icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none" />
+                        <input
+                            type="text"
+                            id="menu-filter-input"
+                            placeholder="Filter pages..."
+                            class="w-full pl-8 pr-3 py-2 text-base sm:text-sm bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring placeholder:text-muted-foreground transition-shadow"
+                        />
                     </div>
                 </div>
 
-                {# Menu content #}
                 <div class="overflow-auto flex-1 py-2 px-1.5" id="menu-items-container">
                     {% with sections=admin_registry.get_nav_sections(plain_packages=False, user=user), header_label="App" %}
                         {% include "admin/_menu_section.html" %}
@@ -179,5 +200,5 @@
                 </div>
             </div>
         </div>
-    </dialog>
+    </nav>
 </header>

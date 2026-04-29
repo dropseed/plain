@@ -10,11 +10,11 @@
         <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
                 {% if error_count %}
-                    <admin.Icon name="x-circle-fill" class="text-[var(--plain-danger)]" />
+                    <admin.Icon name="x-circle-fill" class="text-danger" />
                 {% elif warning_count %}
-                    <admin.Icon name="exclamation-triangle-fill" class="text-[var(--plain-warning)]" />
+                    <admin.Icon name="exclamation-triangle-fill" class="text-warning" />
                 {% else %}
-                    <admin.Icon name="check-circle-fill" class="text-[var(--plain-success)]" />
+                    <admin.Icon name="check-circle-fill" class="text-success" />
                 {% endif %}
                 <span class="font-medium text-foreground">{{ passed_count }}/{{ total_count }} checks passed</span>
             </div>
@@ -31,8 +31,10 @@
             </div>
         </div>
         <div class="h-1.5 bg-muted rounded-full overflow-hidden">
+            {# Bar color tracks worst severity: errors > warnings > all-clear. #}
             <div
-                class="h-full rounded-full {% if error_count %}bg-[var(--plain-danger)]{% elif warning_count %}bg-[var(--plain-warning)]{% else %}bg-[var(--plain-success)]{% endif %}"
+                data-status="{{ 'error' if error_count else ('warning' if warning_count else 'ok') }}"
+                class="h-full rounded-full data-[status=error]:bg-danger data-[status=warning]:bg-warning data-[status=ok]:bg-success"
                 style="width: {{ pass_percent }}%"
             ></div>
         </div>
@@ -45,17 +47,19 @@
         <details class="group border border-border rounded-lg">
             <summary class="flex items-center gap-3 px-4 py-3 cursor-pointer select-none hover:bg-muted/40 rounded-lg">
                 {% if check.has_errors %}
-                    <admin.Icon name="x-circle-fill" class="text-[var(--plain-danger)] shrink-0" />
+                    <admin.Icon name="x-circle-fill" class="text-danger shrink-0" />
                 {% else %}
-                    <admin.Icon name="exclamation-triangle-fill" class="text-[var(--plain-warning)] shrink-0" />
+                    <admin.Icon name="exclamation-triangle-fill" class="text-warning shrink-0" />
                 {% endif %}
                 <span class="text-sm font-medium text-foreground/90 flex-1">{{ check.name }}</span>
                 <span class="text-xs text-muted-foreground/80">{{ check.issues|length }} issue{{ "s" if check.issues|length != 1 else "" }}</span>
                 <admin.Icon name="chevron-down" class="text-muted-foreground/80 text-xs transition-transform group-open:rotate-180" />
             </summary>
-            <div class="px-4 pb-3 pt-1 border-t border-border/60">
+            {# `divide-y` puts a border between adjacent children but not at
+               the bottom — replaces the per-row `{% if not loop.last %}`. #}
+            <div class="px-4 pb-3 pt-1 border-t border-border/60 divide-y divide-border/40">
                 {% for issue in check.issues %}
-                <div class="flex items-start gap-2 py-2 text-sm {% if not loop.last %}border-b border-border/40{% endif %}">
+                <div class="flex items-start gap-2 py-2 text-sm">
                     {% if issue.warning %}
                         <span class="badge-warning shrink-0">{{ issue.id }}</span>
                     {% else %}
@@ -68,7 +72,7 @@
         </details>
         {% else %}
         <div class="flex items-center gap-3 px-4 py-3 border border-border rounded-lg">
-            <admin.Icon name="check-circle-fill" class="text-[var(--plain-success)] shrink-0" />
+            <admin.Icon name="check-circle-fill" class="text-success shrink-0" />
             <span class="text-sm font-medium text-foreground/90">{{ check.name }}</span>
         </div>
         {% endif %}

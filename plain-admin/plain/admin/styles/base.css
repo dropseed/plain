@@ -1,0 +1,51 @@
+/*
+ * Base layer.
+ *
+ * Resets and admin-chrome painting. Element-level defaults for prose
+ * content (`<dl>`, `<a>` in paragraphs, `<code>`, native `<select>`,
+ * etc.) live in `admin/prose.css`.
+ *
+ * Everything is scoped to `.plain-admin` (or its descendants) so we
+ * don't change how user pages render.
+ */
+
+@layer base {
+  /* Default border color and focus outline for admin descendants. */
+  .plain-admin * {
+    @apply border-border outline-ring/50;
+  }
+
+  /* Smooth scroll is harmless globally. */
+  html {
+    @apply scroll-smooth;
+  }
+
+  /* Paint the admin chrome. (Basecoat upstream applies this to `body`;
+     we apply it to `.plain-admin` so user pages keep their own bg.) */
+  .plain-admin {
+    @apply bg-background text-foreground overscroll-none antialiased font-sans;
+  }
+
+  /* Mono-family elements use the admin's `--font-mono` stack. Scoped so
+     we don't change how `<code>` / `<pre>` look on user pages. */
+  .plain-admin :is(code, kbd, samp, pre) {
+    font-family: var(--font-mono);
+  }
+
+  /* Opt-in slim scrollbar (used by the admin's nav-tab strip etc.). */
+  .scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+
+    &::-webkit-scrollbar {
+      width: var(--scrollbar-width);
+    }
+    &::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+    &::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: var(--scrollbar-radius);
+    }
+  }
+}

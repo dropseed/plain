@@ -14,19 +14,8 @@
     };
   };
 
-  const initComponent = (element, componentName) => {
-    const component = componentRegistry[componentName];
-    if (!component) return;
-
-    try {
-      component.init(element);
-    } catch (error) {
-      console.error(`Failed to initialize ${componentName}:`, error);
-    }
-  };
-
   const initAllComponents = () => {
-    Object.entries(componentRegistry).forEach(([name, { selector, init }]) => {
+    Object.values(componentRegistry).forEach(({ selector, init }) => {
       document.querySelectorAll(selector).forEach(init);
     });
   };
@@ -34,7 +23,7 @@
   const initNewComponents = (node) => {
     if (node.nodeType !== Node.ELEMENT_NODE) return;
 
-    Object.entries(componentRegistry).forEach(([name, { selector, init }]) => {
+    Object.values(componentRegistry).forEach(({ selector, init }) => {
       if (node.matches(selector)) {
         init(node);
       }
@@ -79,7 +68,7 @@
 
   const reinitAll = () => {
     // Clear all initialization flags using the registry
-    Object.entries(componentRegistry).forEach(([name, { selector }]) => {
+    Object.keys(componentRegistry).forEach((name) => {
       const flag = `data-${name}-initialized`;
       document.querySelectorAll(`[${flag}]`).forEach((el) => {
         el.removeAttribute(flag);

@@ -1,51 +1,42 @@
 /**
- * Admin Menu - handles menu dialog, filter, and nav tab drag-and-drop
+ * Admin menu — filter input inside the menu popover, plus drag-and-drop
+ * reordering for pinned tabs in the header strip. The popover's
+ * open/close behavior comes from basecoat (assets/admin/components/popover.js)
+ * — this file only wires the filter and the tab DnD.
  */
 document.addEventListener("DOMContentLoaded", () => {
-  const dialog = document.getElementById("admin-menu-dialog");
   const filterInput = document.getElementById("menu-filter-input");
+  const menuPopover = document.getElementById("admin-menu-popover");
 
-  function openMenu() {
-    dialog.showModal();
-    filterInput.value = "";
-    filterInput.focus();
-    filterItems("");
+  if (filterInput) {
+    filterInput.addEventListener("input", (e) => {
+      filterItems(e.target.value.toLowerCase());
+    });
   }
 
-  function closeMenu() {
-    dialog.close();
+  // Reset and focus the filter every time the menu popover opens.
+  // basecoat:popover fires from popover.js when a popover starts opening
+  // (before aria-hidden is flipped, so defer the focus by a frame).
+  if (filterInput && menuPopover) {
+    document.addEventListener("basecoat:popover", (e) => {
+      if (!e.detail.source.contains(menuPopover)) return;
+      setTimeout(() => {
+        filterInput.value = "";
+        filterItems("");
+        filterInput.focus();
+      }, 0);
+    });
   }
-
-  // Menu toggle buttons (use class for both mobile and desktop)
-  document.addEventListener("click", (e) => {
-    if (e.target.closest(".menu-toggle")) {
-      if (dialog.open) {
-        closeMenu();
-      } else {
-        openMenu();
-      }
-    }
-  });
-
-  // Close on backdrop click (click on dialog itself, not its contents)
-  dialog.addEventListener("click", (e) => {
-    if (e.target === dialog) {
-      closeMenu();
-    }
-  });
-
-  // Filter functionality
-  filterInput.addEventListener("input", (e) => {
-    filterItems(e.target.value.toLowerCase());
-  });
 
   function filterItems(query) {
     const container = document.getElementById("menu-items-container");
+    if (!container) return;
     const sections = container.querySelectorAll(".menu-section");
     const subsections = container.querySelectorAll(".menu-subsection");
     const itemGroups = container.querySelectorAll(".menu-items-group");
 
-    // First, find which sections match the query
+    // Find sub-sections whose name matches the query — items in those
+    // groups all show even if their own title doesn't match.
     const matchingSections = new Set();
     subsections.forEach((subsection) => {
       const sectionName = subsection.getAttribute("data-section") || "";
@@ -54,11 +45,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // Show/hide items based on title match OR being in a matching section
+    // Show items by title match OR by being in a matching sub-section.
     itemGroups.forEach((group) => {
       const groupSection = group.getAttribute("data-section") || "";
       const sectionMatches = matchingSections.has(groupSection);
-
       group.querySelectorAll(".menu-item").forEach((item) => {
         const title = item.getAttribute("data-title") || "";
         const titleMatches = query === "" || title.includes(query);
@@ -66,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-    // Show/hide subsection headers
+    // Hide sub-section headers with no visible items left.
     subsections.forEach((subsection) => {
       const nextGroup = subsection.nextElementSibling;
       if (nextGroup?.classList.contains("menu-items-group")) {
@@ -77,7 +67,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // Hide empty top-level sections (App/Packages)
+    // Hide the App / Packages section entirely if nothing under it
+    // matches.
     sections.forEach((section) => {
       const visibleItems = Array.from(section.querySelectorAll(".menu-item")).filter(
         (item) => item.style.display !== "none",
@@ -103,7 +94,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!tab) return;
     tab.classList.remove("dragging");
     draggedTab = null;
-    // Remove any lingering drag-over styles
     document.querySelectorAll(".nav-tab").forEach((el) => {
       el.classList.remove("drag-over");
     });
@@ -114,8 +104,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!tab || tab === draggedTab) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-
-    // Visual feedback - show drop indicator on left side
     document.querySelectorAll(".nav-tab").forEach((el) => {
       el.classList.remove("drag-over");
     });
@@ -126,27 +114,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const targetTab = e.target.closest(".nav-tab[data-slug]");
     if (!targetTab || !draggedTab || targetTab === draggedTab) return;
     e.preventDefault();
-
-    // Always insert before target (matches the left border indicator)
     targetTab.before(draggedTab);
-
-    // Remove visual feedback
     targetTab.classList.remove("drag-over");
 
-    // Get new order of pinned items and POST to server
     const container = document.getElementById("nav-tabs-container");
     const newOrder = Array.from(container.querySelectorAll(".nav-tab[data-slug]")).map(
       (t) => t.dataset.slug,
     );
-
-    // Get the reorder URL from the container's data attribute
     const reorderUrl = container.dataset.reorderUrl;
     if (reorderUrl) {
       fetch(reorderUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: `slugs=${encodeURIComponent(JSON.stringify(newOrder))}`,
       });
     }

@@ -74,20 +74,20 @@ def test_has_permission_setting(db):
         settings.ADMIN_HAS_PERMISSION = original
 
 
-def test_components_view_renders(db):
-    """The components catalog page renders for an admin user."""
+def test_customization_view_renders(db):
+    """The customization page renders for an admin user."""
     user = User.query.create(username="admin", is_admin=True)
     client = Client()
     client.force_login(user)
 
-    resp = client.get("/admin/components/")
+    resp = client.get("/admin/customization/")
     assert resp.status_code == 200
     body = resp.content.decode()
     # Sanity-check a few markers from each major section
     assert "Customizing the admin" in body
     assert "btn-primary" in body
     assert "badge-success" in body
-    assert "data-theme-toggle" in body
+    assert "data-theme-set" in body
 
 
 def test_nav_sections_exclude_denied_views(db):

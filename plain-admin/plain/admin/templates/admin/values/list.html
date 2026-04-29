@@ -1,4 +1,4 @@
-<div data-collapsible>
+<details>
+  <summary class="text-xs text-muted-foreground">{{ value|length }} item{{ "s" if value|length != 1 else "" }}</summary>
   <pre><code>{{ value|tojson(indent=2) }}</code></pre>
-</div>
-<button type="button" data-collapsible-toggle>Expand ▾</button>
+</details>

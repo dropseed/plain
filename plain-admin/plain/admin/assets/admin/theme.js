@@ -46,12 +46,8 @@
 
   const refreshButtons = () => {
     const choice = getStoredChoice();
-    document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
-      btn.setAttribute("data-theme-choice", choice);
-      const label = btn.querySelector("[data-theme-label]");
-      if (label) {
-        label.textContent = choice === "light" ? "Light" : choice === "dark" ? "Dark" : "System";
-      }
+    document.querySelectorAll("[data-theme-set]").forEach((item) => {
+      item.setAttribute("aria-checked", item.dataset.themeSet === choice ? "true" : "false");
     });
   };
 
@@ -63,12 +59,10 @@
   });
 
   document.addEventListener("click", (event) => {
-    const btn = event.target.closest("[data-theme-toggle]");
-    if (!btn) return;
+    const item = event.target.closest("[data-theme-set]");
+    if (!item) return;
     event.preventDefault();
-    const current = getStoredChoice();
-    const next = current === "light" ? "dark" : current === "dark" ? "system" : "light";
-    setChoice(next);
+    setChoice(item.dataset.themeSet);
   });
 
   // First paint is handled by the inline init in <head>; this just makes

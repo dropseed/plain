@@ -2,13 +2,63 @@
  * Plain admin — Tailwind entry.
  *
  * Auto-discovered by plain-tailwind: any package shipping a `tailwind.css`
- * next to its `__init__.py` gets imported into the user's Tailwind build.
- * That's how the admin's `@theme` tokens, `@custom-variant dark`, and the
- * `@apply`-based component rules in basecoat.css end up compiled.
+ * next to its `__init__.py` is auto-`@import`-ed into the user's Tailwind
+ * build. That's how the admin's `@theme` tokens, component rules, and
+ * dark-mode variant end up compiled.
  *
- * This file is build-time only — it does not get served as an asset.
- * Plain-specific overrides live in admin.css; basecoat is vendored verbatim.
+ * Build-time only — this file is not served to the browser.
+ *
+ * Layout:
+ *   styles/tokens.css         design tokens (light + dark) + @theme
+ *   styles/base.css           @layer base resets
+ *   styles/components/*.css   one file per UI primitive (basecoat-derived,
+ *                             wrapped in @scope (.plain-admin) below so
+ *                             `class="card"` etc. on user pages don't
+ *                             pick up admin styling)
+ *   styles/admin/prose.css    element-level defaults for raw HTML
+ *                             content inside the admin (dl/dt, prose
+ *                             links, table link inheritance, code/pre,
+ *                             native select)
+ *   styles/admin/nav.css      pinned-nav drag-and-drop states
+ *
+ * See ATTRIBUTIONS.md for credit / MIT license preservation.
  */
 
-@import "./assets/admin/basecoat/basecoat.css";
-@import "./assets/admin/admin.css";
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+
+/* Component primitives. Wrapped in @scope (.plain-admin) so a user using
+   class="card" or class="btn" on their own pages doesn't inherit admin
+   styles. Each file underneath is a single @layer components block. */
+@scope (.plain-admin) {
+  @import "./styles/components/alert.css";
+  @import "./styles/components/badge.css";
+  @import "./styles/components/button.css";
+  @import "./styles/components/card.css";
+  @import "./styles/components/checkbox.css";
+  @import "./styles/components/collapsible.css";
+  @import "./styles/components/command.css";
+  @import "./styles/components/dialog.css";
+  @import "./styles/components/dropdown-menu.css";
+  @import "./styles/components/field.css";
+  @import "./styles/components/input.css";
+  @import "./styles/components/kbd.css";
+  @import "./styles/components/label.css";
+  @import "./styles/components/popover.css";
+  @import "./styles/components/radio.css";
+  @import "./styles/components/range.css";
+  @import "./styles/components/select.css";
+  @import "./styles/components/sidebar.css";
+  @import "./styles/components/switch.css";
+  @import "./styles/components/table.css";
+  @import "./styles/components/tabs.css";
+  @import "./styles/components/textarea.css";
+  @import "./styles/components/toast.css";
+  @import "./styles/components/tooltip.css";
+}
+
+/* Admin-only stylesheets. Loaded outside `@scope (.plain-admin)`
+   because they style descendants (prose elements, drag states) rather
+   than `.foo` component classes that need the scope to avoid leaking. */
+@import "./styles/admin/prose.css";
+@import "./styles/admin/nav.css";

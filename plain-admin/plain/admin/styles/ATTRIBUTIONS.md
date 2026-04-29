@@ -1,3 +1,21 @@
+# Third-party attributions
+
+Plain's admin component styles started life as a fork of
+[Basecoat UI](https://basecoatui.com) (MIT) by Ronan Berder. The
+component class names, the shadcn-flavored token palette in
+`tokens.css`, and the `@apply`-based component rules under `components/`
+all derive from that work.
+
+Basecoat's MIT license is preserved in full below as required by the
+license. The original upstream is at <https://github.com/hunvreus/basecoat>.
+
+The vendored JavaScript component modules under
+`../assets/admin/components/` are also derived from Basecoat (vanilla JS,
+also MIT) and carry the original copyright header at the top of each
+file.
+
+---
+
 MIT License
 
 Copyright (c) 2025 Ronan Berder

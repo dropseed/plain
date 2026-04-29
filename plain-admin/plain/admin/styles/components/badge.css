@@ -1,0 +1,50 @@
+/*
+ * Badge
+ *
+ * Variants: primary (default), secondary, destructive, outline,
+ * plus Plain's semantic variants (success, warning, danger, info).
+ */
+
+@layer components {
+  .badge,
+  .badge-primary,
+  .badge-secondary,
+  .badge-destructive,
+  .badge-outline,
+  .badge-success,
+  .badge-warning,
+  .badge-danger,
+  .badge-info {
+    @apply inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden;
+  }
+  .badge,
+  .badge-primary {
+    @apply border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90;
+  }
+  .badge-secondary {
+    @apply border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90;
+  }
+  .badge-destructive {
+    @apply border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60;
+  }
+  .badge-outline {
+    @apply text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground;
+  }
+
+  /* Status variants — translucent fill of the matching semantic color so
+     they read well in dense table contexts. The text color is the
+     saturated semantic color itself, which has plenty of contrast over
+     a 10% bg of the same hue. */
+  .badge-success {
+    @apply border-transparent bg-success/10 text-success;
+  }
+  .badge-warning {
+    @apply border-transparent bg-warning/10 text-warning;
+  }
+  .badge-danger {
+    @apply border-transparent bg-danger/10 text-danger;
+  }
+  .badge-info {
+    @apply border-transparent bg-info/10 text-info;
+  }
+}

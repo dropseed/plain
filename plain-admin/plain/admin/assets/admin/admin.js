@@ -24,33 +24,6 @@ jQuery(($) => {
     submitFormClean(this);
   });
 
-  function createDropdowns(target) {
-    $(target)
-      .find("[data-dropdown]")
-      .each(function () {
-        const template = this.querySelector("template");
-        if (!template) return; // Skip if no template found
-        tippy(this, {
-          content: template.innerHTML,
-          trigger: "click",
-          allowHTML: true,
-          interactive: true,
-          duration: 100,
-          placement: "bottom-end",
-          offset: [0, 6],
-          arrow: false,
-          appendTo: () => document.body,
-          onCreate: (instance) => {
-            // Layout-only utilities; colors come from .tippy-box rules in
-            // admin.css so they track the active theme.
-            instance.popper.classList.add("*:w-48");
-            instance.popper.classList.add("*:rounded-md");
-            instance.popper.classList.add("*:shadow-lg");
-          },
-        });
-      });
-  }
-
   function autolinkColumns(target) {
     $(target)
       .find("[data-column-autolink]")
@@ -72,13 +45,12 @@ jQuery(($) => {
       });
   }
 
-  createDropdowns(document);
   autolinkColumns(document);
 
-  // Search uses htmx to load elements,
-  // so we need to hook those up too.
+  // Search uses htmx to load elements; re-autolink after swaps. The
+  // basecoat dropdown-menu / popover modules already self-init via
+  // MutationObserver, so we don't have to do anything for them here.
   htmx.on("htmx:afterSwap", (evt) => {
-    createDropdowns(evt.detail.target);
     autolinkColumns(evt.detail.target);
   });
 
@@ -137,37 +109,6 @@ jQuery(($) => {
         .removeClass("text-stone-400 hover:text-stone-500")
         .addClass("text-amber-900");
     }
-  });
-
-  // Collapsible content - detect overflow and show expand button
-  function initCollapsibles(target) {
-    $(target)
-      .find("[data-collapsible]")
-      .addBack("[data-collapsible]")
-      .each(function () {
-        if (this.scrollHeight > this.clientHeight) {
-          this.dataset.collapsible = "overflowing";
-        }
-      });
-  }
-
-  $(document).on("click", "[data-collapsible-toggle]", function () {
-    const collapsible = $(this).prev("[data-collapsible]")[0];
-    if (!collapsible) return;
-
-    if (collapsible.dataset.collapsible === "expanded") {
-      collapsible.dataset.collapsible = "overflowing";
-      $(this).text("Expand ▾");
-    } else {
-      collapsible.dataset.collapsible = "expanded";
-      $(this).text("Collapse ▴");
-    }
-  });
-
-  initCollapsibles(document);
-
-  htmx.on("htmx:afterSwap", (evt) => {
-    initCollapsibles(evt.detail.target);
   });
 
   // Global search keyboard shortcut

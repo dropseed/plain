@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 from typing import Any
 
@@ -11,6 +12,7 @@ from plain.postgres import QuerySet
 from plain.preflight import run_checks, set_check_counts
 from plain.runtime import settings as plain_settings
 
+from .cards import Card, KeyValueCard, TableCard, TrendCard
 from .models import PinnedNavItem
 from .views.base import AdminView
 from .views.objects import AdminListView
@@ -288,13 +290,94 @@ class PreflightView(AdminView):
         return context
 
 
-class ComponentsView(AdminView):
-    """Component catalog: customization guide + live examples of every built-in
-    UI primitive (buttons, badges, cards, forms, dialogs, dropdowns, ...).
-    Shipped with the admin so users can copy markup straight from the page
-    they see rendered."""
+class _DemoMetricCard(Card):
+    title = "Active users"
+    description = "Last 30 days"
+    metric = 1284
+    text = "View all"
+    link = "#"
+
+
+class _DemoKeyValueCard(KeyValueCard):
+    title = "Latest deploy"
+    size = Card.Sizes.MEDIUM
+    items = {
+        "Branch": "main",
+        "Commit": "4bc9003d",
+        "Status": "Succeeded",
+        "Author": "dave",
+    }
+
+
+class _DemoTableCard(TableCard):
+    title = "Recent jobs"
+    headers = ["Job", "Result", "Duration"]
+    rows = [
+        ["send_welcome_email", "Successful", "1.2s"],
+        ["rebuild_search_index", "Successful", "12.4s"],
+        ["expire_sessions", "Errored", "0.3s"],
+    ]
+
+
+class _DemoTrendCard(TrendCard):
+    title = "Sample trend"
+    description = "Synthetic 14-day stack across all five chart tokens"
+    size = Card.Sizes.FULL
+    aggregates = ("sum", "avg")
+
+    _SERIES: list[tuple[str, str, list[int]]] = [
+        ("Sage", "var(--chart-1)", [4, 5, 6, 5, 7, 8, 6, 5, 6, 7, 8, 9, 7, 6]),
+        ("Steel", "var(--chart-2)", [3, 2, 4, 3, 4, 5, 4, 3, 4, 5, 4, 5, 6, 4]),
+        ("Terracotta", "var(--chart-3)", [2, 3, 2, 3, 4, 3, 4, 5, 3, 4, 3, 4, 5, 3]),
+        ("Teal", "var(--chart-4)", [1, 2, 2, 3, 2, 3, 4, 2, 3, 4, 3, 4, 3, 5]),
+        ("Plum", "var(--chart-5)", [2, 1, 2, 1, 2, 2, 3, 2, 1, 2, 3, 2, 3, 2]),
+    ]
+
+    def get_filters(self) -> Any:
+        return None
+
+    def get_chart_data(self) -> dict[str, Any]:
+        today = datetime.date.today()
+        days = len(self._SERIES[0][2])
+        labels = [
+            (today - datetime.timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
+            for i in range(days)
+        ]
+        datasets = [
+            {
+                "label": label,
+                "data": data,
+                "backgroundColor": color,
+                "categoryPercentage": 0.9,
+                "barPercentage": 1.0,
+            }
+            for label, color, data in self._SERIES
+        ]
+        return {
+            "type": "bar",
+            "data": {"labels": labels, "datasets": datasets},
+            **self._chart_options(stacked=True),
+            "plain": self._plain_meta(),
+        }
+
+
+class CustomizationView(AdminView):
+    """Design system reference + customization controls. Lists every CSS
+    token, shows live examples of each UI primitive, and (eventually) lets
+    you tweak tokens in-page to preview overrides before applying them in
+    your own stylesheet."""
 
     is_builtin = True
-    template_name = "admin/components.html"
-    title = "Components"
+    template_name = "admin/customization.html"
+    title = "Customization"
     nav_section = None
+
+    def get_template_context(self) -> dict[str, Any]:
+        context = super().get_template_context()
+        context["demo_cards"] = [
+            _DemoMetricCard,
+            _DemoKeyValueCard,
+            _DemoTrendCard,
+            _DemoTableCard,
+        ]
+        return context

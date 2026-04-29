@@ -226,7 +226,7 @@
         }
 
         updateValue(initialOptions, false);
-      } catch (e) {
+      } catch {
         updateValue(ariaSelected, false);
       }
     } else {

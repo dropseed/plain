@@ -34,30 +34,16 @@ class TrendCard(ChartCard):
     datetime_field = None
     group_field: str | None = None
     group_labels: dict[str, str] | None = None
-    default_group_colors: list[dict[str, str]] = [
-        {"bg": "rgba(85, 107, 68, 0.8)", "hover": "rgba(85, 107, 68, 1)"},  # sage
-        {
-            "bg": "rgba(74, 111, 165, 0.8)",
-            "hover": "rgba(74, 111, 165, 1)",
-        },  # slate blue
-        {
-            "bg": "rgba(176, 110, 70, 0.8)",
-            "hover": "rgba(176, 110, 70, 1)",
-        },  # terracotta
-        {
-            "bg": "rgba(82, 126, 126, 0.8)",
-            "hover": "rgba(82, 126, 126, 1)",
-        },  # dusty teal
-        {
-            "bg": "rgba(140, 100, 75, 0.8)",
-            "hover": "rgba(140, 100, 75, 1)",
-        },  # warm brown
-        {
-            "bg": "rgba(130, 100, 140, 0.8)",
-            "hover": "rgba(130, 100, 140, 1)",
-        },  # muted plum
+    # CSS color values resolved by charts.js. `var(--chart-N)` reads the
+    # admin's chart palette so charts retheme automatically (incl. dark mode).
+    default_group_colors: list[str] = [
+        "var(--chart-1)",
+        "var(--chart-2)",
+        "var(--chart-3)",
+        "var(--chart-4)",
+        "var(--chart-5)",
     ]
-    group_colors: dict[str, dict[str, str]] | None = None
+    group_colors: dict[str, str] | None = None
     aggregates: tuple[Literal["sum", "avg", "max"], ...] = ("sum",)
     default_filter = DatetimeRangeAliases.SINCE_30_DAYS_AGO
 
@@ -136,8 +122,7 @@ class TrendCard(ChartCard):
                     {
                         "label": self.title,
                         "data": list(data.values()),
-                        "backgroundColor": "rgba(168, 162, 158, 0.7)",  # stone-400
-                        "hoverBackgroundColor": "rgba(120, 113, 108, 0.9)",  # stone-500
+                        "backgroundColor": "var(--chart-1)",
                         "borderRadius": {"topLeft": 2, "topRight": 2},
                         "borderSkipped": False,
                         "categoryPercentage": 0.9,
@@ -161,15 +146,14 @@ class TrendCard(ChartCard):
         for i, (raw_name, date_counts) in enumerate(data.items()):
             display_name = group_labels.get(raw_name, raw_name)
             if self.group_colors and raw_name in self.group_colors:
-                colors = self.group_colors[raw_name]
+                color = self.group_colors[raw_name]
             else:
-                colors = self.default_group_colors[i % len(self.default_group_colors)]
+                color = self.default_group_colors[i % len(self.default_group_colors)]
             datasets.append(
                 {
                     "label": str(display_name),
                     "data": list(date_counts.values()),
-                    "backgroundColor": colors["bg"],
-                    "hoverBackgroundColor": colors["hover"],
+                    "backgroundColor": color,
                     "categoryPercentage": 0.9,
                     "barPercentage": 1.0,
                 }

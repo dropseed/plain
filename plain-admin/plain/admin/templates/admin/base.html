@@ -1,6 +1,6 @@
 {% use_elements %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="plain-admin">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,8 +23,9 @@
         document.documentElement.dataset.themeResolved = dark ? "dark" : "light";
     })();
     </script>
-    {# Basecoat (vendored) and admin.css are imported into the Tailwind build
-       via plain/admin/tailwind.css — no separate <link> tag needed here. #}
+    {# Component CSS is compiled into the Tailwind build via
+       plain/admin/tailwind.css (auto-discovered by plain-tailwind). No
+       separate <link> for component styles is needed here. #}
     {% tailwind_css %}
     {% htmx_js %}
     <style nonce="{{ request.csp_nonce }}">
@@ -42,16 +43,13 @@
     <script src="{{ asset('admin/theme.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/datetime-tooltips.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/menu.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/vendor/popper.min.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <link href="{{ asset('admin/vendor/tippy.css') }}" rel="stylesheet">
-    <script src="{{ asset('admin/vendor/tippy.umd.min.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    {# Basecoat component JS (vanilla, registers via MutationObserver). #}
-    <script src="{{ asset('admin/basecoat/js/basecoat.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/basecoat/js/dropdown-menu.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/basecoat/js/popover.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/basecoat/js/select.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/basecoat/js/tabs.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/basecoat/js/toast.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    {# Component JS modules (vanilla, register themselves via MutationObserver). #}
+    <script src="{{ asset('admin/components/basecoat.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/components/dropdown-menu.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/components/popover.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/components/select.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/components/tabs.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/components/toast.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     {% block header_scripts %}{% endblock %}
 </head>
 <body
@@ -59,7 +57,6 @@
     {% if is_package_installed('plaintoolbar') %}data-toolbar-installed{% endif %}
     >
 
-    <div class="plain-admin flex flex-col flex-1">
     {% include "admin/_header.html" %}
 
     <div class="flex flex-1 min-h-[calc(100vh-5.5rem)]"> <!-- h-11 + h-11 = 5.5rem -->
@@ -94,50 +91,57 @@
                         {% endblock %}
                         <h1 class="font-semibold text-2xl truncate">{% block title %}{{ title }}{% endblock %}</h1>
                     </div>
-                    {# Desktop actions: links as buttons, extra_links in dropdown #}
-                    {% macro link_dropdown_items(items) %}
-                    <div class="py-1">
-                        {% for link, url in items %}
-                        <a href="{{ url }}" class="block px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
-                            {{ link }}
-                        </a>
-                        {% endfor %}
-                    </div>
-                    {% endmacro %}
+                    {# Desktop actions: visible link buttons + an extras dropdown. #}
                     <div class="hidden sm:flex items-center space-x-2 text-sm flex-shrink-0">
                         {% block actions %}{% endblock %}
                         {% for link, url in links.items() %}
                         <a href="{{ url }}" class="btn-outline">{{ link }}</a>
                         {% endfor %}
                         {% if extra_links %}
-                        <button type="button" data-dropdown class="btn-outline">
-                            <admin.Icon name="three-dots" />
-                            <template>
-                                {{ link_dropdown_items(extra_links.items()) }}
-                            </template>
-                        </button>
-                        {% endif %}
-                    </div>
-                    {# Mobile actions dropdown #}
-                    {% if links or extra_links %}
-                    <div class="sm:hidden flex-shrink-0">
-                        <button type="button" data-dropdown class="flex items-center justify-center w-8 h-8 rounded hover:bg-accent">
-                            <admin.Icon name="three-dots" class="text-muted-foreground" />
-                            <template>
-                                <div class="py-1">
-                                    {% for link, url in links.items() %}
-                                    <a href="{{ url }}" class="block px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
-                                        {{ link }}
-                                    </a>
-                                    {% endfor %}
+                        <div class="dropdown-menu">
+                            <button
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded="false"
+                                aria-controls="header-extra-links-popover"
+                                class="btn-icon-outline"
+                            >
+                                <admin.Icon name="three-dots" />
+                            </button>
+                            <div id="header-extra-links-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                                <div role="menu">
                                     {% for link, url in extra_links.items() %}
-                                    <a href="{{ url }}" class="block px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
-                                        {{ link }}
-                                    </a>
+                                    <a role="menuitem" href="{{ url }}">{{ link }}</a>
                                     {% endfor %}
                                 </div>
-                            </template>
-                        </button>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {# Mobile actions: collapse links + extras into one dropdown. #}
+                    {% if links or extra_links %}
+                    <div class="sm:hidden flex-shrink-0">
+                        <div class="dropdown-menu">
+                            <button
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded="false"
+                                aria-controls="header-mobile-actions-popover"
+                                class="flex items-center justify-center w-8 h-8 rounded hover:bg-accent"
+                            >
+                                <admin.Icon name="three-dots" class="text-muted-foreground" />
+                            </button>
+                            <div id="header-mobile-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                                <div role="menu">
+                                    {% for link, url in links.items() %}
+                                    <a role="menuitem" href="{{ url }}">{{ link }}</a>
+                                    {% endfor %}
+                                    {% for link, url in extra_links.items() %}
+                                    <a role="menuitem" href="{{ url }}">{{ link }}</a>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     {% endif %}
                 </div>
@@ -162,8 +166,6 @@
         </div>
 
     </div>
-
-    </div><!-- /.plain-admin -->
 
     {% include "toolbar/inject.html" ignore missing %}
 </body>
