@@ -1,0 +1,14 @@
+/*
+ * Plain admin — Tailwind entry.
+ *
+ * Auto-discovered by plain-tailwind: any package shipping a `tailwind.css`
+ * next to its `__init__.py` gets imported into the user's Tailwind build.
+ * That's how the admin's `@theme` tokens, `@custom-variant dark`, and the
+ * `@apply`-based component rules in basecoat.css end up compiled.
+ *
+ * This file is build-time only — it does not get served as an asset.
+ * Plain-specific overrides live in admin.css; basecoat is vendored verbatim.
+ */
+
+@import "./assets/admin/basecoat/basecoat.css";
+@import "./assets/admin/admin.css";

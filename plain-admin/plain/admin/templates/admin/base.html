@@ -23,10 +23,10 @@
         document.documentElement.dataset.themeResolved = dark ? "dark" : "light";
     })();
     </script>
+    {# Basecoat (vendored) and admin.css are imported into the Tailwind build
+       via plain/admin/tailwind.css — no separate <link> tag needed here. #}
     {% tailwind_css %}
     {% htmx_js %}
-    <link href="{{ asset('admin/basecoat/basecoat.css') }}" rel="stylesheet">
-    <link href="{{ asset('admin/admin.css') }}" rel="stylesheet">
     <style nonce="{{ request.csp_nonce }}">
     @font-face {
       font-family: "bootstrap-icons";

@@ -29,6 +29,23 @@ Plain's brand palette, and provides the dark-mode variants. The rules in this
 directory should not be edited directly — change `admin.css` instead so the
 upstream diff stays small and updates remain mechanical.
 
+## How it gets compiled
+
+`basecoat.css` and `../admin.css` are **build-time inputs to the user's
+Tailwind compilation**, not stylesheets the browser loads directly. The chain:
+
+1. `plain/admin/tailwind.css` (the package's Tailwind entry, auto-discovered
+   by `plain-tailwind`) `@import`s these two files.
+2. `plain-tailwind` adds an `@import` line for the entry into the
+   auto-generated `.plain/tailwind.css`.
+3. The standalone `tailwindcss` CLI compiles everything into the user's
+   `tailwind.min.css`, expanding `@apply`, registering `@theme` tokens,
+   and enabling `@custom-variant dark`.
+
+That's why the files here can use `@apply bg-primary …` even though browsers
+don't understand `@apply`: the directives are gone by the time the CSS reaches
+the browser.
+
 ## Updating
 
 ```sh

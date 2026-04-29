@@ -148,6 +148,41 @@ The `@import "./.plain/tailwind.css"` line includes styles from all your install
 
 [Read the Tailwind docs for more about using custom styles.](https://tailwindcss.com/docs/adding-custom-styles)
 
+## Package CSS contributions
+
+Plain packages can contribute CSS to your Tailwind build by shipping a
+`tailwind.css` file next to their `__init__.py`. If the file exists, an
+`@import` for it is automatically added to `.plain/tailwind.css` — no user
+configuration required.
+
+Use it for design tokens (`@theme`), component layers (`@apply`-based rules
+inside `@layer components`), `@custom-variant`s, or anything else that needs
+to be part of the Tailwind compilation rather than a separate `<link>`.
+
+```css
+/* my-package/plain/my_package/tailwind.css */
+@theme {
+    --color-brand: oklch(0.5 0.15 250);
+}
+
+@layer components {
+    .my-callout {
+        @apply rounded-md border border-brand bg-brand/10 p-4;
+    }
+}
+```
+
+The file path is relative to the package's Python directory. To split content
+across multiple files, use `@import` inside `tailwind.css`:
+
+```css
+@import "./assets/components.css";
+@import "./assets/tokens.css";
+```
+
+`plain-admin` uses this pattern to integrate its vendored Basecoat UI
+components — see [plain.admin's component system](../../plain-admin/plain/admin/README.md#components).
+
 ## Deployment
 
 For production deployments:
