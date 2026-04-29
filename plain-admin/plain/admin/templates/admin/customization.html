@@ -779,31 +779,40 @@ document.addEventListener("DOMContentLoaded", () => {
 {% call section("hovercards", "Hovercards",
    "Hover-triggered version of popover. Trigger can be any element (no `<button>` requirement); panel positions fixed via JS so it escapes table-cell clipping. Use for preview/info that doesn't want a click commitment — user mention previews, FK row previews, the datetime hover details on every `<time>` in the admin.") %}
 
-{% call example("Inline trigger") %}
-<p class="text-sm">
-    Last seen
+{% call example("Inline trigger — user preview") %}
+{# Wrapper is <div> not <p> so the HTML parser doesn't hoist the
+   inner block-level <div data-hovercard> out of <span class="hovercard">
+   when it implicitly closes the <p>. #}
+<div class="text-sm">
+    Pinged by
     <span class="hovercard">
-        <span class="text-link cursor-help underline decoration-dotted">2 days ago</span>
-        <div data-hovercard aria-hidden="true" class="min-w-48 flex flex-col">
-            <div class="flex justify-between gap-4 px-2 py-1">
-                <span class="text-muted-foreground text-xs">Local</span>
-                <span class="tabular-nums">2026-04-27 09:14</span>
-            </div>
-            <div class="flex justify-between gap-4 px-2 py-1">
-                <span class="text-muted-foreground text-xs">UTC</span>
-                <span class="tabular-nums">2026-04-27 14:14</span>
+        <span class="text-link cursor-help underline decoration-dotted">alice</span>
+        <div data-hovercard aria-hidden="true" class="w-64 flex gap-3 p-3">
+            <div class="w-10 h-10 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-medium shrink-0" aria-hidden="true">A</div>
+            <div class="flex flex-col gap-0.5 min-w-0">
+                <span class="font-medium truncate">Alice Sanchez</span>
+                <span class="text-muted-foreground text-xs truncate">alice@example.com</span>
+                <span class="badge-success mt-1 self-start">Admin</span>
             </div>
         </div>
     </span>
-    by alice@example.com.
-</p>
+    in #releases.
+</div>
 {% endcall %}
 
 <p class="text-sm text-muted-foreground mt-3">
-    Every <code>&lt;time datetime="…"&gt;</code> rendered by the admin is
-    auto-wrapped in a hovercard with local/UTC/relative/Unix/ISO rows. Click any
-    row to copy the value via the <code>data-copy-value</code> behavior.
+    Hovercards are a generic primitive — wrap anything in <code>&lt;span class="hovercard"&gt;</code>
+    with a sibling <code>&lt;div data-hovercard&gt;</code> panel. The admin uses them for FK row
+    previews, status details, and one built-in case: every
+    <code>&lt;time datetime="…"&gt;</code> is auto-wrapped at runtime with local/UTC/relative/Unix/ISO
+    rows, each clickable to copy via the <code>data-copy-value</code> behavior.
 </p>
+
+{% call example("Auto-wrapped <time> element") %}
+<div class="text-sm">
+    Last seen <time datetime="2026-04-27T14:14:00Z">2 days ago</time> by alice.
+</div>
+{% endcall %}
 {% endcall %}
 
 
@@ -846,25 +855,29 @@ document.addEventListener("DOMContentLoaded", () => {
 {% call section("behaviors", "Behaviors",
    "Declarative `data-*` attributes you sprinkle on existing elements. Behaviors are delegated event handlers in `assets/admin/behaviors.js` — no markup pattern, no CSS. They piggyback on whatever element you stick them on.") %}
 
-<table class="table">
+{# Cells use `whitespace-normal` so the prose descriptions wrap inside
+   the content column. The default `.table` cell style is
+   `whitespace-nowrap`, which is correct for list views (IDs,
+   timestamps) but wrong for doc-prose tables like this. #}
+<table class="table [&_td]:whitespace-normal [&_td]:align-top">
     <thead>
         <tr><th>Attribute</th><th>What it does</th></tr>
     </thead>
     <tbody>
         <tr>
-            <td><code>data-copy-value="…"</code></td>
+            <td class="whitespace-nowrap!"><code>data-copy-value="…"</code></td>
             <td>Click to write the value to the clipboard. A descendant marked <code>data-copy-feedback</code> (or the trigger's last child) gets a brief "Copied!" text swap.</td>
         </tr>
         <tr>
-            <td><code>data-autosubmit</code></td>
+            <td class="whitespace-nowrap!"><code>data-autosubmit</code></td>
             <td>On a form field — submit the enclosing form on <code>change</code>. Used for list filters and pagination dropdowns.</td>
         </tr>
         <tr>
-            <td><code>data-column-autolink="<em>url</em>"</code></td>
+            <td class="whitespace-nowrap!"><code>data-column-autolink="<em>url</em>"</code></td>
             <td>Wrap a table cell's content in an <code>&lt;a href&gt;</code> link to <em>url</em>. No-op if the cell already contains an anchor.</td>
         </tr>
         <tr>
-            <td><code>data-encrypted="<em>value</em>"</code></td>
+            <td class="whitespace-nowrap!"><code>data-encrypted="<em>value</em>"</code></td>
             <td>Click to reveal/hide an encrypted value (used for API keys and similar). Clicking inside the revealed <code>&lt;code&gt;</code> doesn't re-toggle, so the user can select to copy.</td>
         </tr>
     </tbody>
