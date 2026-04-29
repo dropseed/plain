@@ -120,6 +120,7 @@
     ("buttons", "Buttons"),
     ("badges", "Badges"),
     ("alerts", "Alerts"),
+    ("progress", "Progress"),
     ("cards", "Cards"),
     ("admin-cards", "Admin card classes"),
     ("tables", "Tables"),
@@ -130,7 +131,9 @@
     ("tabs", "Tabs"),
     ("collapsible", "Collapsible"),
     ("tooltips", "Tooltips"),
-    ("icons", "Icons")
+    ("hovercards", "Hovercards"),
+    ("icons", "Icons"),
+    ("behaviors", "Behaviors")
 ] %}
 
 
@@ -450,6 +453,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {# ====================================================================== #}
+{% call section("progress", "Progress",
+   "Native <progress> element. Set value/max (default 0–100); status follows data-status: ok (default success), warning, error.") %}
+
+{% call example("Default — success") %}
+<progress class="progress" value="72" max="100"></progress>
+{% endcall %}
+
+{% call example("Warning") %}
+<progress class="progress" data-status="warning" value="48" max="100"></progress>
+{% endcall %}
+
+{% call example("Error") %}
+<progress class="progress" data-status="error" value="20" max="100"></progress>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
 {% call section("cards", "Cards",
    "Padded, rounded wrapper for grouped content. Use <header>, <section>, <footer> children for built-in spacing. Override gap/padding utilities (e.g. `card gap-2 py-4`) for denser layouts.") %}
 
@@ -602,13 +623,6 @@ document.addEventListener("DOMContentLoaded", () => {
     <input class="input" type="checkbox" role="switch" checked /> Enable notifications
 </label>
 {% endcall %}
-
-{% call example("Range") %}
-<div class="space-y-1 w-72">
-    <label for="example-range" class="label">Volume</label>
-    <input id="example-range" class="input" type="range" min="0" max="100" value="40" />
-</div>
-{% endcall %}
 {% endcall %}
 
 
@@ -644,10 +658,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 {# ====================================================================== #}
 {% call section("dialogs", "Dialogs",
-   "Native <dialog> with the .dialog class. Open with .showModal() and close by setting return-value or calling .close().") %}
+   "Native <dialog> with the `.dialog` class. Open and close via the HTML Invoker Commands API (`command` + `commandfor`) — no JS, no inline `onclick`, CSP-safe.") %}
 
 {% call example() %}
-<button type="button" class="btn-outline" data-dialog-open="example-dialog">Open dialog</button>
+<button type="button" class="btn-outline" command="show-modal" commandfor="example-dialog">Open dialog</button>
 <dialog id="example-dialog" class="dialog max-w-sm m-auto">
     <article class="p-6">
         <header>
@@ -658,15 +672,15 @@ document.addEventListener("DOMContentLoaded", () => {
             Press Escape or click the close button to dismiss.
         </section>
         <footer class="mt-6 flex justify-end gap-2">
-            <button type="button" class="btn-outline" data-dialog-close="example-dialog">Cancel</button>
-            <button type="button" class="btn-primary" data-dialog-close="example-dialog">OK</button>
+            <button type="button" class="btn-outline" command="close" commandfor="example-dialog">Cancel</button>
+            <button type="button" class="btn-primary" command="close" commandfor="example-dialog">OK</button>
         </footer>
     </article>
 </dialog>
 {% endcall %}
 <p class="text-xs text-muted-foreground -mt-2">
-    The CSP-safe <code>data-dialog-open</code> / <code>data-dialog-close</code> handlers
-    are wired in <code>admin.js</code> — no inline <code>onclick</code> needed.
+    Closing from inside without an id also works via <code>&lt;form method="dialog"&gt;&lt;button&gt;…&lt;/button&gt;&lt;/form&gt;</code> —
+    submitting that form closes the enclosing dialog and returns the button's <code>value</code>.
 </p>
 {% endcall %}
 
@@ -761,6 +775,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {# ====================================================================== #}
+{% call section("hovercards", "Hovercards",
+   "Hover-triggered version of popover. Trigger can be any element (no `<button>` requirement); panel positions fixed via JS so it escapes table-cell clipping. Use for preview/info that doesn't want a click commitment — user mention previews, FK row previews, the datetime hover details on every `<time>` in the admin.") %}
+
+{% call example("Inline trigger") %}
+<p class="text-sm">
+    Last seen
+    <span class="hovercard">
+        <span class="text-link cursor-help underline decoration-dotted">2 days ago</span>
+        <div data-hovercard aria-hidden="true" class="min-w-48 flex flex-col">
+            <div class="flex justify-between gap-4 px-2 py-1">
+                <span class="text-muted-foreground text-xs">Local</span>
+                <span class="tabular-nums">2026-04-27 09:14</span>
+            </div>
+            <div class="flex justify-between gap-4 px-2 py-1">
+                <span class="text-muted-foreground text-xs">UTC</span>
+                <span class="tabular-nums">2026-04-27 14:14</span>
+            </div>
+        </div>
+    </span>
+    by alice@example.com.
+</p>
+{% endcall %}
+
+<p class="text-sm text-muted-foreground mt-3">
+    Every <code>&lt;time datetime="…"&gt;</code> rendered by the admin is
+    auto-wrapped in a hovercard with local/UTC/relative/Unix/ISO rows. Click any
+    row to copy the value via the <code>data-copy-value</code> behavior.
+</p>
+{% endcall %}
+
+
+{# ====================================================================== #}
 {% call section("icons", "Icons",
    "Bootstrap Icons are vendored. Use the admin.Icon element with a name.") %}
 
@@ -779,6 +825,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <p class="text-xs text-muted-foreground">
     Browse the full set at <a href="https://icons.getbootstrap.com/" class="text-link hover:text-link-hover underline" target="_blank" rel="noopener">icons.getbootstrap.com</a>.
+</p>
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("behaviors", "Behaviors",
+   "Declarative `data-*` attributes you sprinkle on existing elements. Behaviors are delegated event handlers in `assets/admin/behaviors/` — no markup pattern, no CSS. They piggyback on whatever element you stick them on.") %}
+
+<table class="table">
+    <thead>
+        <tr><th>Attribute</th><th>What it does</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>data-copy-value="…"</code></td>
+            <td>Click to write the value to the clipboard. A descendant marked <code>data-copy-feedback</code> (or the trigger's last child) gets a brief "Copied!" text swap.</td>
+        </tr>
+        <tr>
+            <td><code>data-autosubmit</code></td>
+            <td>On a form field — submit the enclosing form on <code>change</code>. Used for list filters and pagination dropdowns.</td>
+        </tr>
+        <tr>
+            <td><code>data-column-autolink="<em>url</em>"</code></td>
+            <td>Wrap a table cell's content in an <code>&lt;a href&gt;</code> link to <em>url</em>. No-op if the cell already contains an anchor.</td>
+        </tr>
+        <tr>
+            <td><code>data-encrypted="<em>value</em>"</code></td>
+            <td>Click to reveal/hide an encrypted value (used for API keys and similar). Clicking inside the revealed <code>&lt;code&gt;</code> doesn't re-toggle, so the user can select to copy.</td>
+        </tr>
+    </tbody>
+</table>
+
+<p class="text-sm text-muted-foreground mt-3">
+    GET-form submissions are also intercepted globally to drop empty params from the URL — keeps list views from accumulating <code>?q=&amp;filter=</code> cruft when filters are cleared. No attribute needed; applies to every <code>&lt;form method="GET"&gt;</code>.
 </p>
 {% endcall %}
 

@@ -30,14 +30,12 @@
                 {% endif %}
             </div>
         </div>
-        <div class="h-1.5 bg-muted rounded-full overflow-hidden">
-            {# Bar color tracks worst severity: errors > warnings > all-clear. #}
-            <div
-                data-status="{{ 'error' if error_count else ('warning' if warning_count else 'ok') }}"
-                class="h-full rounded-full data-[status=error]:bg-danger data-[status=warning]:bg-warning data-[status=ok]:bg-success"
-                style="width: {{ pass_percent }}%"
-            ></div>
-        </div>
+        <progress
+            class="progress"
+            data-status="{{ 'error' if error_count else ('warning' if warning_count else 'ok') }}"
+            value="{{ pass_percent }}"
+            max="100"
+        ></progress>
     </div>
 
     <!-- Check cards -->

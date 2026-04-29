@@ -561,7 +561,7 @@ you'll inherit both light/dark theming and the user's brand overrides.
 | Alerts            | `.alert`, `.alert-success`, `.alert-warning`, `.alert-danger`, `.alert-info`           |
 | Cards             | `.card` — pad with utilities (e.g. `class="card gap-2 py-4"` for dense layouts)        |
 | Form inputs       | `.input`, `.textarea`, `.select` — opt in via class; pair with `-sm` for compact rows  |
-| Dialogs           | `<dialog class="dialog">` + `data-dialog-open="…"` / `data-dialog-close`               |
+| Dialogs           | `<dialog class="dialog">` opened via `<button command="show-modal" commandfor="…">`    |
 | Tabs              | `.tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                             |
 | Dropdowns         | `.dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` with `[role="menu"]` |
 

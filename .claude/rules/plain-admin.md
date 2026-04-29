@@ -33,12 +33,18 @@ plain-admin/plain/admin/
 │   │   └── nav.css
 │   └── ATTRIBUTIONS.md                   ← MIT credit for Basecoat-derived code
 └── assets/admin/
-    ├── components/                       ← vanilla JS (registers via MutationObserver)
+    ├── components/                       ← stateful UI primitives (register via MutationObserver)
     │   ├── basecoat.js                   ← registry; exposes window.basecoat
     │   ├── dropdown-menu.js
+    │   ├── hovercard.js                  ← Plain admin extension
     │   ├── popover.js
     │   └── tabs.js
-    ├── admin.js                          ← jQuery glue, HTMX hooks, dialog handlers
+    ├── behaviors/                        ← declarative data-* handlers (delegated on document)
+    │   ├── autolink.js                   ← data-column-autolink
+    │   ├── autosubmit.js                 ← data-autosubmit + GET-form param cleanup
+    │   ├── copy.js                       ← data-copy-value (+ data-copy-feedback)
+    │   └── encrypted.js                  ← data-encrypted reveal/hide
+    ├── admin.js                          ← admin chrome (HTMX errors, "/" search shortcut)
     ├── theme.js                          ← dark-mode toggle + persistence
     └── …
 ```
@@ -59,14 +65,29 @@ Use the component classes for UI primitives:
 | Badges         | `badge`, `badge-secondary`, `badge-outline`                                        |
 | Status badges  | `badge-success`, `badge-warning`, `badge-danger`, `badge-info` (translucent)       |
 | Alerts         | `alert`, `alert-success`, `alert-warning`, `alert-danger`, `alert-info`            |
+| Progress       | `<progress class="progress">` — `data-status="warning"` / `"error"` for fill color |
 | Cards          | `card` — pad with utilities (e.g. `card gap-2 py-4` for dense layouts)             |
 | Form fields    | `input`, `textarea`, `select` — opt in via class; pair with `-sm` for compact rows |
-| Dialogs        | `<dialog class="dialog">` + `data-dialog-open="..."` / `data-dialog-close`         |
+| Dialogs        | `<dialog class="dialog">` + `<button command="show-modal" commandfor="<id>">`      |
 | Dropdowns      | `.dropdown-menu` wrapping a `<button>` + `[data-popover]` w/ `[role="menu"]`       |
 | Tabs           | `.tabs > [role="tablist"] > [role="tab"]` (uses tabs.js)                           |
+| Hovercards     | `<span class="hovercard">` + trigger + `<div data-hovercard aria-hidden="true">`   |
 
 The live catalog is at `/admin/customization/` — copy-pasteable markup
 for every primitive plus the design tokens and customization guide.
+
+## Behaviors
+
+Declarative `data-*` attributes you sprinkle on existing elements. No CSS, no markup pattern — delegated handlers live in `assets/admin/behaviors/`.
+
+| Attribute                      | What it does                                                                |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `data-copy-value="…"`          | Click writes value to clipboard; optional `[data-copy-feedback]` text swap. |
+| `data-autosubmit`              | On a form field — submit the enclosing form on `change`.                    |
+| `data-column-autolink="<url>"` | Wrap a table cell's content in an `<a href>` link.                          |
+| `data-encrypted="<value>"`     | Click to reveal/hide an encrypted value (API keys, etc.).                   |
+
+GET-form submissions are also globally intercepted to drop empty params from the URL — applies to every `<form method="GET">`, no attribute needed.
 
 ## Tokens (don't hardcode colors)
 
@@ -95,22 +116,28 @@ opacity modifier on the same token: `bg-success/10`, `bg-warning/10`.
 
 Same rules as the rest of the admin: no inline `style=`, no inline `<script>`
 without a `nonce`, no inline event handlers (`onclick=`, ...). Wire JS via
-`data-*` attributes and listeners in `admin.js`.
+delegated handlers in `assets/admin/behaviors/` (or native HTML where it
+exists — see dialogs).
 
-For dialogs, use the existing helper — never write `onclick="dialog.showModal()"`:
+For dialogs, use the native HTML Invoker Commands API — never write
+`onclick="dialog.showModal()"`:
 
 ```html
-<button type="button" data-dialog-open="my-dialog" class="btn-primary">Open</button>
+<button type="button" command="show-modal" commandfor="my-dialog" class="btn-primary">Open</button>
 <dialog id="my-dialog" class="dialog">
   <article>
     <header><h2>Title</h2></header>
     <section>Body</section>
     <footer>
-      <button data-dialog-close="my-dialog" class="btn-outline">Close</button>
+      <button command="close" commandfor="my-dialog" class="btn-outline">Close</button>
     </footer>
   </article>
 </dialog>
 ```
+
+Closing from inside without an id also works via
+`<form method="dialog"><button>…</button></form>` — submitting that form
+closes the enclosing dialog and returns the button's `value`.
 
 ## Adding a new component
 

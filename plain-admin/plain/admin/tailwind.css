@@ -40,12 +40,13 @@
   @import "./styles/components/dialog.css";
   @import "./styles/components/dropdown-menu.css";
   @import "./styles/components/field.css";
+  @import "./styles/components/hovercard.css";
   @import "./styles/components/input.css";
   @import "./styles/components/kbd.css";
   @import "./styles/components/label.css";
   @import "./styles/components/popover.css";
+  @import "./styles/components/progress.css";
   @import "./styles/components/radio.css";
-  @import "./styles/components/range.css";
   @import "./styles/components/select.css";
   @import "./styles/components/switch.css";
   @import "./styles/components/table.css";
