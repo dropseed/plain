@@ -1,15 +1,3 @@
-/*
- * Wraps every <time datetime="..."> in a .hovercard with a panel of
- * label/value rows (local timezone, UTC, relative, Unix, ISO). Each row
- * carries data-copy-value so the generic click-to-copy handler in
- * behaviors.js writes its value to the clipboard on click.
- *
- * Show/hide and positioning live in components.js — this file is just
- * the row constructor. We register a DOMContentLoaded listener BEFORE
- * components.js loads so our wrapping runs first; components.js then
- * picks up the freshly created .hovercard nodes during its own
- * DOMContentLoaded init pass.
- */
 (() => {
   const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
   const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;

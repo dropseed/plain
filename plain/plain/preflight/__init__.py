@@ -1,7 +1,6 @@
 from .checks import PreflightCheck
 from .registry import (
     get_check_counts,
-    iter_check_summaries,
     register_check,
     run_checks,
     set_check_counts,
@@ -19,7 +18,6 @@ __all__ = [
     "PreflightCheck",
     "PreflightResult",
     "get_check_counts",
-    "iter_check_summaries",
     "register_check",
     "run_checks",
     "set_check_counts",

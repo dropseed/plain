@@ -14,16 +14,17 @@
    scrolls. #}
 
 {% macro example(caption='') %}
+{% set markup = caller() %}
 <figure class="my-3 rounded-lg border border-border bg-card text-card-foreground">
     <div class="p-6 flex flex-wrap items-center gap-3 border-b border-border">
-        {{ caller() }}
+        {{ markup }}
     </div>
     <details class="group">
         <summary class="cursor-pointer select-none px-4 py-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-2">
             <admin.Icon name="code-slash" />
             <span>Show markup{% if caption %} — {{ caption }}{% endif %}</span>
         </summary>
-        <pre class="m-0! rounded-none! border-none! text-xs"><code>{{ caller()|forceescape }}</code></pre>
+        <pre class="m-0! rounded-none! border-none! text-xs"><code>{{ markup|forceescape }}</code></pre>
     </details>
 </figure>
 {% endmacro %}

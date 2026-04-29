@@ -15,16 +15,18 @@ const resolveCSSValue = (value, rootEl) => {
   return resolved || (fallback ? fallback.trim() : value);
 };
 
-const resolveDatasetColors = (data, rootEl) => {
+const resolveDatasetColors = (data, rootEl, rawColors) => {
   const datasets = data?.data?.datasets;
   if (!Array.isArray(datasets)) return;
-  for (const ds of datasets) {
+  datasets.forEach((ds, i) => {
+    const source = rawColors ? rawColors[i] : ds;
+    if (!source) return;
     for (const field of COLOR_FIELDS) {
-      if (ds[field] !== undefined) {
-        ds[field] = resolveCSSValue(ds[field], rootEl);
+      if (source[field] !== undefined) {
+        ds[field] = resolveCSSValue(source[field], rootEl);
       }
     }
-  }
+  });
 };
 
 const HOVER_GUIDE = {
@@ -262,14 +264,7 @@ const startChart = ({ ctx, statsRoot, data }) => {
   });
 
   state.refreshColors = () => {
-    const datasets = state.chart.data.datasets;
-    state.rawColors.forEach((raw, i) => {
-      for (const field of COLOR_FIELDS) {
-        if (raw[field] !== undefined) {
-          datasets[i][field] = resolveCSSValue(raw[field], document.documentElement);
-        }
-      }
-    });
+    resolveDatasetColors(state.chart, document.documentElement, state.rawColors);
     state.chart.update("none");
     if (state.statsRoot) {
       renderStats(state.statsRoot, state, state.lastHoveredIndex ?? null, { force: true });

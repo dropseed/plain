@@ -79,6 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Drag and drop for nav bar tabs (pinned items only)
   let draggedTab = null;
+  let dragOverTab = null;
 
   document.addEventListener("dragstart", (e) => {
     const tab = e.target.closest(".nav-tab[data-slug]");
@@ -94,9 +95,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!tab) return;
     tab.classList.remove("dragging");
     draggedTab = null;
-    document.querySelectorAll(".nav-tab").forEach((el) => {
-      el.classList.remove("drag-over");
-    });
+    if (dragOverTab) {
+      dragOverTab.classList.remove("drag-over");
+      dragOverTab = null;
+    }
   });
 
   document.addEventListener("dragover", (e) => {
@@ -104,10 +106,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!tab || tab === draggedTab) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    document.querySelectorAll(".nav-tab").forEach((el) => {
-      el.classList.remove("drag-over");
-    });
+    if (dragOverTab === tab) return;
+    if (dragOverTab) dragOverTab.classList.remove("drag-over");
     tab.classList.add("drag-over");
+    dragOverTab = tab;
   });
 
   document.addEventListener("drop", (e) => {
@@ -116,6 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     targetTab.before(draggedTab);
     targetTab.classList.remove("drag-over");
+    if (dragOverTab === targetTab) dragOverTab = null;
 
     const container = document.getElementById("nav-tabs-container");
     const newOrder = Array.from(container.querySelectorAll(".nav-tab[data-slug]")).map(

@@ -41,10 +41,15 @@
     <!-- Check cards -->
     <div class="space-y-2">
         {% for check in checks %}
-        {% if check.issues %}
+        {% if check.status == "passed" %}
+        <div class="flex items-center gap-3 px-4 py-3 border border-border rounded-lg">
+            <admin.Icon name="check-circle-fill" class="text-success shrink-0" />
+            <span class="text-sm font-medium text-foreground/90">{{ check.name }}</span>
+        </div>
+        {% else %}
         <details class="group border border-border rounded-lg">
             <summary class="flex items-center gap-3 px-4 py-3 cursor-pointer select-none hover:bg-muted/40 rounded-lg">
-                {% if check.has_errors %}
+                {% if check.status == "error" %}
                     <admin.Icon name="x-circle-fill" class="text-danger shrink-0" />
                 {% else %}
                     <admin.Icon name="exclamation-triangle-fill" class="text-warning shrink-0" />
@@ -68,11 +73,6 @@
                 {% endfor %}
             </div>
         </details>
-        {% else %}
-        <div class="flex items-center gap-3 px-4 py-3 border border-border rounded-lg">
-            <admin.Icon name="check-circle-fill" class="text-success shrink-0" />
-            <span class="text-sm font-medium text-foreground/90">{{ check.name }}</span>
-        </div>
         {% endif %}
         {% endfor %}
     </div>

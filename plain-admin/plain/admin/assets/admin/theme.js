@@ -27,7 +27,10 @@
   const refreshButtons = () => {
     const choice = getChoice();
     document.querySelectorAll("[data-theme-set]").forEach((item) => {
-      item.setAttribute("aria-checked", item.dataset.themeSet === choice ? "true" : "false");
+      const expected = item.dataset.themeSet === choice ? "true" : "false";
+      if (item.getAttribute("aria-checked") === expected) return;
+      item.setAttribute("aria-checked", expected);
+      item.dispatchEvent(new CustomEvent("segmented:refresh", { bubbles: true }));
     });
   };
 

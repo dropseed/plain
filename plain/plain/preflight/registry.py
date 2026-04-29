@@ -55,17 +55,6 @@ class CheckRegistry:
             results = check.run()
             yield check_class, name, results
 
-    def get_checks(
-        self, include_deploy_checks: bool = False
-    ) -> list[tuple[type[Any], str]]:
-        """Get list of (check_class, name) tuples."""
-        result: list[tuple[type[Any], str]] = []
-        for name, (check_class, deploy) in self.checks.items():
-            if deploy and not include_deploy_checks:
-                continue
-            result.append((check_class, name))
-        return result
-
 
 checks_registry = CheckRegistry()
 
@@ -98,22 +87,6 @@ run_checks = checks_registry.run_checks
 _check_counts: dict[str, int] | None = None
 
 
-def iter_check_summaries(
-    *, include_deploy_checks: bool
-) -> Generator[tuple[str, list[PreflightResult], bool]]:
-    """Yield ``(name, visible_issues, has_errors)`` per registered check.
-
-    Filters silenced results and pre-computes the error-vs-warning split so
-    callers don't each reimplement that logic.
-    """
-    for _check_class, name, results in run_checks(
-        include_deploy_checks=include_deploy_checks
-    ):
-        visible = [r for r in results if not r.is_silenced()]
-        has_errors = any(not r.warning for r in visible)
-        yield name, visible, has_errors
-
-
 def get_check_counts() -> dict[str, int]:
     """Return ``{"errors": N, "warnings": N}``, caching for the process lifetime."""
     global _check_counts
@@ -128,12 +101,13 @@ def get_check_counts() -> dict[str, int]:
     warning_count = 0
     error_count = 0
 
-    for _name, issues, has_errors in iter_check_summaries(
+    for _check_class, _name, results in run_checks(
         include_deploy_checks=not settings.DEBUG
     ):
-        if not issues:
+        visible = [r for r in results if not r.is_silenced()]
+        if not visible:
             continue
-        if has_errors:
+        if any(not r.warning for r in visible):
             error_count += 1
         else:
             warning_count += 1

@@ -1,15 +1,3 @@
-/*
- * Plain admin — declarative data-* behaviors.
- *
- * Each section registers a delegated handler on `document` keyed off a
- * `data-*` attribute. Stateless, no per-element initialization, so HTMX
- * swaps need no special handling — except autolink, which mutates the
- * DOM and re-runs after htmx:afterSwap.
- */
-
-// ---------- data-column-autolink ----------
-// Wrap a table cell's content in an <a href> link. Skips cells that
-// already contain an <a> so explicit links aren't double-wrapped.
 function autolinkColumns(target) {
   const root = target instanceof Element || target instanceof Document ? target : document;
   root.querySelectorAll("[data-column-autolink]").forEach((cell) => {
@@ -25,12 +13,8 @@ function autolinkColumns(target) {
 }
 
 autolinkColumns(document);
-htmx.on("htmx:afterSwap", (evt) => autolinkColumns(evt.detail.target));
+document.addEventListener("htmx:afterSwap", (evt) => autolinkColumns(evt.detail.target));
 
-// ---------- data-autosubmit + GET-form param cleanup ----------
-// Submit the enclosing form on `change`. Also intercepts every
-// <form method="GET"> submission to strip empty params from the URL —
-// keeps list views from accumulating `?q=&filter=` cruft.
 function submitFormClean(form) {
   const formData = new FormData(form);
   const params = new URLSearchParams();
@@ -58,10 +42,6 @@ document.addEventListener("submit", (e) => {
   submitFormClean(form);
 });
 
-// ---------- data-copy-value ----------
-// Click writes the attribute value to the clipboard with a brief
-// "Copied!" confirmation. Text-swap target is a [data-copy-feedback]
-// descendant; falls back to lastElementChild.
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-copy-value]");
   if (!el) return;
@@ -77,30 +57,9 @@ document.addEventListener("click", (e) => {
   });
 });
 
-// ---------- data-encrypted ----------
-// Toggle reveal of an encrypted value (API keys, etc.). Clicks on the
-// revealed <code> are ignored so the user can select text without
-// re-toggling.
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-encrypted]");
   if (!el) return;
   if (e.target.closest("code")) return;
-  const revealed = el.dataset.revealed === "true";
-  if (revealed) {
-    el.dataset.revealed = "false";
-    el.innerHTML = '<i class="bi bi-lock text-xs"></i> ••••••';
-    el.classList.add("text-muted-foreground/80", "hover:text-muted-foreground");
-    el.classList.remove("text-warning");
-  } else {
-    const code = document.createElement("code");
-    code.className = "text-sm break-all bg-warning/10 rounded px-1 py-0.5 select-all";
-    code.textContent = String(el.dataset.encrypted);
-    el.dataset.revealed = "true";
-    el.replaceChildren();
-    const icon = document.createElement("i");
-    icon.className = "bi bi-unlock text-xs";
-    el.append(icon, " ", code);
-    el.classList.remove("text-muted-foreground/80", "hover:text-muted-foreground");
-    el.classList.add("text-warning");
-  }
+  el.dataset.revealed = el.dataset.revealed === "true" ? "false" : "true";
 });

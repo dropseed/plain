@@ -1,14 +1,4 @@
 /*
- * Plain admin — interactive UI components.
- *
- * Forked from Basecoat UI (MIT — see styles/ATTRIBUTIONS.md). Consolidated
- * into one file with a Plain-shaped lifecycle: init runs on DOMContentLoaded
- * and after every htmx:afterSwap, idempotent via per-instance data-* flags.
- *
- * Outside-click and cross-popover-close are dispatched by TWO global
- * document listeners (not per-instance) so HTMX swaps that destroy and
- * recreate popovers don't leak listeners.
- *
  * `panel.style.{top,left}` mutations in initHovercard are a known CSP
  * carve-out — fluid positioning relative to a trigger's bounding rect
  * has no static-CSS equivalent until anchor-positioning ships in
@@ -19,7 +9,16 @@
   const POPOVER_SELECTOR = ".popover, .dropdown-menu";
 
   const registry = [];
-  const register = (selector, init) => registry.push({ selector, init });
+  const register = (key, selector, init) => {
+    const flag = `${key}Initialized`;
+    const guardedSelector = `${selector}:not([data-${key.replace(/([A-Z])/g, "-$1").toLowerCase()}-initialized])`;
+    const wrapped = (component) => {
+      if (component.dataset[flag]) return;
+      component.dataset[flag] = "true";
+      init(component);
+    };
+    registry.push({ selector: guardedSelector, init: wrapped });
+  };
 
   const initAll = (root) => {
     for (const { selector, init } of registry) {
@@ -59,9 +58,6 @@
     return { trigger, content };
   };
 
-  // Global delegated listeners — attached once, never per instance.
-  // Set iteration is safe under in-place delete: closePopover removes the
-  // current entry before the loop advances to the next.
   document.addEventListener("click", (event) => {
     if (!openComponents.size) return;
     const inside = event.target.closest(POPOVER_SELECTOR);
@@ -79,7 +75,6 @@
   // ---------- Popover ----------
 
   const initPopover = (component) => {
-    if (component.dataset.popoverInitialized) return;
     const trigger = component.querySelector(":scope > button");
     const content = component.querySelector(":scope > [data-popover]");
     if (!trigger || !content) {
@@ -102,15 +97,12 @@
     component.addEventListener("keydown", (event) => {
       if (event.key === "Escape") closePopover(component);
     });
-
-    component.dataset.popoverInitialized = "true";
   };
-  register(".popover:not([data-popover-initialized])", initPopover);
+  register("popover", ".popover", initPopover);
 
   // ---------- Dropdown menu (popover + keyboard menuitem nav) ----------
 
   const initDropdownMenu = (component) => {
-    if (component.dataset.dropdownMenuInitialized) return;
     const trigger = component.querySelector(":scope > button");
     const popover = component.querySelector(":scope > [data-popover]");
     const menu = popover?.querySelector('[role="menu"]');
@@ -220,15 +212,12 @@
     menu.addEventListener("click", (event) => {
       if (event.target.closest('[role^="menuitem"]')) close();
     });
-
-    component.dataset.dropdownMenuInitialized = "true";
   };
-  register(".dropdown-menu:not([data-dropdown-menu-initialized])", initDropdownMenu);
+  register("dropdownMenu", ".dropdown-menu", initDropdownMenu);
 
   // ---------- Tabs ----------
 
   const initTabs = (component) => {
-    if (component.dataset.tabsInitialized) return;
     const tablist = component.querySelector('[role="tablist"]');
     if (!tablist) return;
 
@@ -279,20 +268,15 @@
       selectTab(next);
       next.focus();
     });
-
-    component.dataset.tabsInitialized = "true";
   };
-  register(".tabs:not([data-tabs-initialized])", initTabs);
+  register("tabs", ".tabs", initTabs);
 
   // ---------- Segmented control (radiogroup of role=radio buttons) ----------
 
   const initSegmented = (component) => {
-    if (component.dataset.segmentedInitialized) return;
     const items = Array.from(component.querySelectorAll(':scope > [role="radio"]'));
     if (items.length === 0) return;
 
-    // Roving tabindex: only the checked radio is tabbable. The consumer
-    // sets aria-checked (e.g., theme.js); we mirror that to tabindex.
     const refreshTabindex = () => {
       const checked = items.find((i) => i.getAttribute("aria-checked") === "true");
       for (const item of items) {
@@ -301,23 +285,20 @@
     };
     refreshTabindex();
 
-    const observer = new MutationObserver(refreshTabindex);
-    for (const item of items) {
-      observer.observe(item, { attributes: true, attributeFilter: ["aria-checked"] });
-    }
-
-    // Selection on click: toggle aria-checked for the clicked radio. A
-    // consumer (e.g., theme.js) may also write aria-checked from its own
-    // state — the redundant write is harmless and keeps both paths working.
     component.addEventListener("click", (event) => {
       const target = event.target.closest('[role="radio"]');
       if (!target || !items.includes(target)) return;
       for (const item of items) {
-        item.setAttribute("aria-checked", item === target ? "true" : "false");
+        const expected = item === target ? "true" : "false";
+        if (item.getAttribute("aria-checked") !== expected) {
+          item.setAttribute("aria-checked", expected);
+        }
       }
+      refreshTabindex();
     });
 
-    // Arrow keys move focus and activate (per WAI-ARIA radiogroup pattern).
+    component.addEventListener("segmented:refresh", refreshTabindex);
+
     component.addEventListener("keydown", (event) => {
       const i = items.indexOf(event.target);
       if (i === -1) return;
@@ -344,15 +325,12 @@
       next.focus();
       next.click();
     });
-
-    component.dataset.segmentedInitialized = "true";
   };
-  register(".segmented:not([data-segmented-initialized])", initSegmented);
+  register("segmented", ".segmented", initSegmented);
 
   // ---------- Hovercard (Plain extension) ----------
 
   const initHovercard = (hovercard) => {
-    if (hovercard.dataset.hovercardInitialized) return;
     const panel = hovercard.querySelector(":scope > [data-hovercard]");
     const trigger = Array.from(hovercard.children).find((c) => c !== panel);
     if (!trigger || !panel) {
@@ -377,8 +355,6 @@
     trigger.addEventListener("mouseleave", hide);
     panel.addEventListener("mouseenter", show);
     panel.addEventListener("mouseleave", hide);
-
-    hovercard.dataset.hovercardInitialized = "true";
   };
-  register(".hovercard:not([data-hovercard-initialized])", initHovercard);
+  register("hovercard", ".hovercard", initHovercard);
 })();

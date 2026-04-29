@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import datetime
 import json
-from typing import Any
+from typing import Any, Literal
 
 from plain.http import NotFoundError404, RedirectResponse, Response
 from plain.packages import packages_registry
 from plain.postgres import QuerySet
-from plain.preflight import iter_check_summaries, set_check_counts
+from plain.preflight import run_checks, set_check_counts
 from plain.runtime import settings as plain_settings
 
 from .cards import Card, KeyValueCard, TableCard, TrendCard
@@ -27,8 +27,6 @@ class AdminIndexView(AdminView):
     title = "Dashboard"
 
     def get(self) -> Response:
-        # Slight hack to redirect to the first view that doesn't
-        # require any url params...
         if views := registry.get_list_views(user=self.user):
             return RedirectResponse(list(views)[0].get_view_url())
 
@@ -58,7 +56,6 @@ class PinNavView(AdminView):
         if not view_slug:
             return Response("view_slug is required", status_code=400)
 
-        # Check if user has reached max pinned items
         current_count = PinnedNavItem.query.filter(user=self.user).count()
         if current_count >= MAX_PINNED_ITEMS:
             return Response(
@@ -66,7 +63,6 @@ class PinNavView(AdminView):
                 status_code=400,
             )
 
-        # Verify the view slug exists
         if not registry.get_view_by_slug(view_slug):
             return Response("Invalid view_slug", status_code=400)
 
@@ -84,7 +80,6 @@ class PinNavView(AdminView):
             defaults={"order": next_order},
         )
 
-        # Redirect back to current page (or referer)
         referer = self.request.headers.get("Referer", "/admin/")
         return RedirectResponse(referer, allow_external=True)
 
@@ -105,7 +100,6 @@ class UnpinNavView(AdminView):
             view_slug=view_slug,
         ).delete()
 
-        # Redirect back to current page (or referer)
         referer = self.request.headers.get("Referer", "/admin/")
         return RedirectResponse(referer, allow_external=True)
 
@@ -126,7 +120,6 @@ class ReorderPinnedView(AdminView):
         except json.JSONDecodeError:
             return Response("Invalid slugs JSON", status_code=400)
 
-        # Only update slugs that exist and belong to this user
         user_pinned = set(
             PinnedNavItem.query.filter(user=self.user).values_list(
                 "view_slug", flat=True
@@ -138,7 +131,6 @@ class ReorderPinnedView(AdminView):
                     order=i
                 )
 
-        # No redirect needed for drag-and-drop reorder (called via fetch)
         return Response("OK")
 
 
@@ -233,28 +225,31 @@ class PreflightView(AdminView):
         warning_count = 0
         error_count = 0
 
-        for name, visible, has_errors in iter_check_summaries(
+        for _check_class, name, results in run_checks(
             include_deploy_checks=not plain_settings.DEBUG
         ):
+            visible = [r for r in results if not r.is_silenced()]
             issues = [{"fix": r.fix, "id": r.id, "warning": r.warning} for r in visible]
-            if issues:
-                if has_errors:
-                    error_count += 1
-                else:
-                    warning_count += 1
-            else:
+
+            status: Literal["passed", "warning", "error"]
+            if not issues:
+                status = "passed"
                 passed_count += 1
+            elif any(not r.warning for r in visible):
+                status = "error"
+                error_count += 1
+            else:
+                status = "warning"
+                warning_count += 1
 
             checks.append(
                 {
                     "name": name,
-                    "passed": not issues,
-                    "has_errors": has_errors,
+                    "status": status,
                     "issues": issues,
                 }
             )
 
-        # Refresh the shared cache so badge counts stay current.
         set_check_counts(errors=error_count, warnings=warning_count)
 
         return checks, passed_count, warning_count, error_count
