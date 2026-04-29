@@ -38,21 +38,34 @@ class Tailwind:
         return settings.TAILWIND_DIST_PATH
 
     def update_plain_sources(self) -> None:
-        paths = set()
+        source_paths: list[str] = []
+        import_paths: list[str] = []
+        abs_app_path = APP_PATH.absolute()
 
-        # Add paths from installed packages
+        def rel_to_target(p: Path) -> str:
+            # CSS uses forward slashes regardless of platform, and backslashes
+            # in CSS strings are escape sequences — so normalize to POSIX.
+            return Path(os.path.relpath(p, self.target_directory)).as_posix()
+
         for package_config in packages_registry.get_package_configs():
-            abs_package_path = os.path.abspath(package_config.path)
-            abs_app_path = os.path.abspath(APP_PATH)
-            if os.path.commonpath([abs_app_path, abs_package_path]) != abs_app_path:
-                paths.add(os.path.relpath(abs_package_path, self.target_directory))
+            abs_package_path = Path(package_config.path).absolute()
 
-        # Sort the paths so that the order is consistent
-        paths = sorted(paths)
+            # App-local packages are already covered by Tailwind's default
+            # scan of the project root, so we skip @source for them — but
+            # still pick up any tailwind.css they contribute.
+            if not abs_package_path.is_relative_to(abs_app_path):
+                source_paths.append(rel_to_target(abs_package_path))
+
+            tailwind_css = abs_package_path / "tailwind.css"
+            if tailwind_css.is_file():
+                import_paths.append(rel_to_target(tailwind_css))
 
         plain_sources_path = os.path.join(self.target_directory, "tailwind.css")
         with open(plain_sources_path, "w") as f:
-            for path in paths:
+            # @import rules must come before any other rules per the CSS spec.
+            for path in import_paths:
+                f.write(f'@import "{path}";\n')
+            for path in source_paths:
                 f.write(f'@source "{path}";\n')
 
     def invoke(self, *args: Any, cwd: str | None = None) -> None:
