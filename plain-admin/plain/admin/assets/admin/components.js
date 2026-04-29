@@ -284,6 +284,71 @@
   };
   register(".tabs:not([data-tabs-initialized])", initTabs);
 
+  // ---------- Segmented control (radiogroup of role=radio buttons) ----------
+
+  const initSegmented = (component) => {
+    if (component.dataset.segmentedInitialized) return;
+    const items = Array.from(component.querySelectorAll(':scope > [role="radio"]'));
+    if (items.length === 0) return;
+
+    // Roving tabindex: only the checked radio is tabbable. The consumer
+    // sets aria-checked (e.g., theme.js); we mirror that to tabindex.
+    const refreshTabindex = () => {
+      const checked = items.find((i) => i.getAttribute("aria-checked") === "true");
+      for (const item of items) {
+        item.setAttribute("tabindex", item === checked ? "0" : "-1");
+      }
+    };
+    refreshTabindex();
+
+    const observer = new MutationObserver(refreshTabindex);
+    for (const item of items) {
+      observer.observe(item, { attributes: true, attributeFilter: ["aria-checked"] });
+    }
+
+    // Selection on click: toggle aria-checked for the clicked radio. A
+    // consumer (e.g., theme.js) may also write aria-checked from its own
+    // state — the redundant write is harmless and keeps both paths working.
+    component.addEventListener("click", (event) => {
+      const target = event.target.closest('[role="radio"]');
+      if (!target || !items.includes(target)) return;
+      for (const item of items) {
+        item.setAttribute("aria-checked", item === target ? "true" : "false");
+      }
+    });
+
+    // Arrow keys move focus and activate (per WAI-ARIA radiogroup pattern).
+    component.addEventListener("keydown", (event) => {
+      const i = items.indexOf(event.target);
+      if (i === -1) return;
+      let next;
+      switch (event.key) {
+        case "ArrowRight":
+        case "ArrowDown":
+          next = items[(i + 1) % items.length];
+          break;
+        case "ArrowLeft":
+        case "ArrowUp":
+          next = items[(i - 1 + items.length) % items.length];
+          break;
+        case "Home":
+          next = items[0];
+          break;
+        case "End":
+          next = items[items.length - 1];
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+      next.focus();
+      next.click();
+    });
+
+    component.dataset.segmentedInitialized = "true";
+  };
+  register(".segmented:not([data-segmented-initialized])", initSegmented);
+
   // ---------- Hovercard (Plain extension) ----------
 
   const initHovercard = (hovercard) => {

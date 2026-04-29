@@ -33,6 +33,34 @@
            url("{{ asset('admin/vendor/fonts/bootstrap-icons.woff') }}") format("woff");
     }
     </style>
+    {# Default text fonts. Override `{% block admin_fonts %}` to swap or
+       drop these — pair with `--font-sans` / `--font-mono` overrides on
+       `.plain-admin` so the cascade actually picks up the new family. #}
+    {% block admin_fonts %}
+    <style nonce="{{ request.csp_nonce }}">
+    @font-face {
+      font-family: "Inter";
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("{{ asset('admin/fonts/InterVariable.woff2') }}") format("woff2");
+    }
+    @font-face {
+      font-family: "Inter";
+      font-style: italic;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("{{ asset('admin/fonts/InterVariable-Italic.woff2') }}") format("woff2");
+    }
+    @font-face {
+      font-family: "JetBrains Mono";
+      font-style: normal;
+      font-weight: 100 800;
+      font-display: swap;
+      src: url("{{ asset('admin/fonts/JetBrainsMono.woff2') }}") format("woff2");
+    }
+    </style>
+    {% endblock %}
     <link href="{{ asset('admin/vendor/bootstrap-icons.min.css') }}" rel="stylesheet">
     <script src="{{ asset('admin/vendor/chart.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/charts.js') }}" defer nonce="{{ request.csp_nonce }}"></script>

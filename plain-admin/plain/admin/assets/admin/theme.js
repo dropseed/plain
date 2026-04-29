@@ -5,6 +5,9 @@
  * "plain-admin-theme"; <html> gets a `dark` class when resolved dark.
  * No-flash init runs as an inline script in <head> (see base.html);
  * this file wires the toggle buttons and OS-preference listener.
+ *
+ * The buttons live inside a `.segmented` (see components.js), which
+ * handles roving tabindex and arrow-key navigation off `aria-checked`.
  */
 (() => {
   const STORAGE_KEY = "plain-admin-theme";

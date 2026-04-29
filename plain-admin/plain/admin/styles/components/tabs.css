@@ -1,21 +1,30 @@
-/* Tabs */
+/* Tabs — content-panel switching with an underline indicator.
+
+   For a "pick one of these values" control (theme, density, view mode),
+   reach for the segmented control instead — that's a different role
+   (radiogroup vs tablist) with a different visual. */
 @layer components {
   .tabs {
-    @apply flex flex-col gap-2;
-    
+    @apply flex flex-col gap-3;
+
     [role='tablist'] {
-      @apply bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px];
+      @apply flex items-center gap-1 border-b border-border;
+    }
 
-      [role='tab'] {
-        @apply focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-foreground dark:text-muted-foreground inline-flex h-[calc(100%_-_1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4;
+    [role='tab'] {
+      @apply -mb-px inline-flex items-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap text-muted-foreground border-b-2 border-transparent transition-colors cursor-pointer;
+      @apply hover:text-foreground hover:border-border;
+      @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:rounded-sm;
+      @apply disabled:pointer-events-none disabled:opacity-50;
+      @apply [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4;
 
-        &[aria-selected='true'] {
-          @apply bg-background dark:text-foreground dark:border-input dark:bg-input/30 shadow-sm;
-        }
+      &[aria-selected='true'] {
+        @apply text-foreground font-medium border-primary hover:border-primary;
       }
     }
+
     [role='tabpanel'] {
-      @apply flex-1 outline-none;
+      @apply outline-none;
     }
   }
 }

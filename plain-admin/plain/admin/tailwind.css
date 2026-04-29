@@ -47,6 +47,7 @@
   @import "./styles/components/popover.css";
   @import "./styles/components/progress.css";
   @import "./styles/components/radio.css";
+  @import "./styles/components/segmented.css";
   @import "./styles/components/select.css";
   @import "./styles/components/switch.css";
   @import "./styles/components/table.css";

@@ -31,46 +31,6 @@
                 <admin.Icon name="search" />
             </a>
 
-            <!-- Theme menu (light / dark / system) -->
-            <div class="dropdown-menu">
-                <button
-                    type="button"
-                    aria-haspopup="menu"
-                    aria-expanded="false"
-                    aria-controls="theme-menu-popover"
-                    title="Theme"
-                    aria-label="Theme"
-                    class="btn-sm-icon-ghost text-muted-foreground"
-                >
-                    <admin.Icon name="sun" class="block dark:hidden" />
-                    <admin.Icon name="moon-stars" class="hidden dark:block" />
-                </button>
-                <div id="theme-menu-popover" data-popover data-align="end" aria-hidden="true" class="w-44">
-                    <div role="menu">
-                        <button role="menuitemradio" type="button" data-theme-set="light" aria-checked="false" class="group">
-                            <admin.Icon name="sun" />
-                            Light
-                            <admin.Icon name="check" class="ml-auto opacity-0 group-aria-checked:opacity-100" />
-                        </button>
-                        <button role="menuitemradio" type="button" data-theme-set="dark" aria-checked="false" class="group">
-                            <admin.Icon name="moon-stars" />
-                            Dark
-                            <admin.Icon name="check" class="ml-auto opacity-0 group-aria-checked:opacity-100" />
-                        </button>
-                        <button role="menuitemradio" type="button" data-theme-set="system" aria-checked="false" class="group">
-                            <admin.Icon name="display" />
-                            System
-                            <admin.Icon name="check" class="ml-auto opacity-0 group-aria-checked:opacity-100" />
-                        </button>
-                        <div role="separator"></div>
-                        <a role="menuitem" href="{{ url('admin:customization') }}">
-                            <admin.Icon name="palette" />
-                            Customization
-                        </a>
-                    </div>
-                </div>
-            </div>
-
             <!-- Preflight -->
             {% set preflight_total = preflight_counts.errors + preflight_counts.warnings %}
             <a
@@ -109,6 +69,24 @@
                     {% endif %}
                 </button>
                 <div id="user-menu-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                    {# Theme switcher. Sits outside [role=menu] so the
+                       dropdown-menu's keyboard nav skips it; the segmented
+                       control owns its own roving tabindex + arrow keys. #}
+                    <div class="segmented mx-1 mt-1" role="radiogroup" aria-label="Theme">
+                        {% for slug, icon, label in [("light", "sun", "Light"), ("dark", "moon-stars", "Dark"), ("system", "display", "System")] %}
+                        <button
+                            type="button"
+                            role="radio"
+                            data-theme-set="{{ slug }}"
+                            aria-checked="false"
+                            class="flex flex-col items-center gap-0.5 py-1.5 text-[11px]"
+                        >
+                            <admin.Icon name={icon} />
+                            {{ label }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <div role="separator"></div>
                     <div role="menu">
                         {% include "admin/user_menu_items.html" ignore missing %}
                         <a role="menuitem" href="{{ url('admin:settings') }}">

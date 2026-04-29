@@ -1,0 +1,28 @@
+/* Segmented control — pick one mutually-exclusive value.
+
+   Use for "set this to X" choices (theme, density, view mode). For
+   switching content panels, reach for tabs instead.
+
+   Surface notes: the rail and the active segment both use translucent
+   foreground overlays so they read on any parent surface (page bg,
+   card, popover, …) — picking a fixed token like `bg-muted` or
+   `bg-card` collides with whichever surface uses that token in dark
+   mode and the rail vanishes. */
+@layer components {
+  .segmented {
+    @apply flex items-stretch gap-0.5 p-0.5 rounded-lg bg-foreground/[0.04];
+
+    [role='radio'] {
+      @apply flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-md border border-transparent text-sm whitespace-nowrap text-muted-foreground transition-[color,background-color,box-shadow,border-color] cursor-pointer;
+      @apply hover:text-foreground;
+      @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50;
+      @apply disabled:pointer-events-none disabled:opacity-50;
+      @apply [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4;
+
+      &[aria-checked='true'] {
+        @apply text-foreground font-medium shadow-sm;
+        @apply bg-background dark:bg-input/30 dark:border-input;
+      }
+    }
+  }
+}

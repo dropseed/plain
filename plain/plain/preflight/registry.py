@@ -98,7 +98,9 @@ run_checks = checks_registry.run_checks
 _check_counts: dict[str, int] | None = None
 
 
-def iter_check_summaries(*, include_deploy_checks: bool):
+def iter_check_summaries(
+    *, include_deploy_checks: bool
+) -> Generator[tuple[str, list[PreflightResult], bool]]:
     """Yield ``(name, visible_issues, has_errors)`` per registered check.
 
     Filters silenced results and pre-computes the error-vs-warning split so

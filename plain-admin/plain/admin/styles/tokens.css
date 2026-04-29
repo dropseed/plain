@@ -25,13 +25,15 @@
 
   /* Fonts. Tailwind v4 wires the `font-sans` / `font-mono` utilities to
      these names automatically — overriding either retheme the admin's
-     typography without touching templates. */
+     typography without touching templates. Inter and JetBrains Mono are
+     vendored under `assets/admin/fonts/` and declared in
+     `templates/admin/base.html`; the system stacks remain as fallbacks. */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   --font-mono:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
-    monospace;
+    "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -41,13 +43,13 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: #4d5246;
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.97 0.004 80);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
+  --muted: oklch(0.97 0.004 80);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --accent: oklch(0.97 0.004 80);
   --accent-foreground: oklch(0.205 0 0);
-  --danger: oklch(0.577 0.245 27.325);
+  --danger: oklch(0.55 0.14 35);
   --danger-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
@@ -85,12 +87,12 @@
      (button, alert) variants. */
   --success: oklch(0.55 0.13 145);
   --success-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.62 0.15 75);
+  --warning: oklch(0.72 0.14 80);
   --warning-foreground: oklch(0.205 0 0);
   --info: oklch(0.55 0.13 230);
   --info-foreground: oklch(0.985 0 0);
-  --link: oklch(0.5 0.13 235);
-  --link-hover: oklch(0.4 0.13 235);
+  --link: oklch(0.5 0.13 230);
+  --link-hover: oklch(0.4 0.13 230);
 
   /* Prose tokens — surfaces that prose content uses, broken out from
      the chrome tokens so they can be themed independently. (E.g.
@@ -122,7 +124,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.269 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: #a8b09a;
+  --primary: oklch(0.7 0.018 130);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -130,7 +132,7 @@
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.371 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --danger: oklch(0.704 0.191 22.216);
+  --danger: oklch(0.74 0.14 35);
   --danger-foreground: oklch(0.205 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
@@ -150,14 +152,14 @@
      lightness for contrast on dark surfaces. The status backgrounds
      are now light enough that `*-foreground` flips to a dark text
      color (the inverse of light mode). */
-  --success: oklch(0.78 0.14 145);
+  --success: oklch(0.78 0.13 145);
   --success-foreground: oklch(0.205 0 0);
-  --warning: oklch(0.8 0.14 78);
+  --warning: oklch(0.8 0.14 80);
   --warning-foreground: oklch(0.205 0 0);
   --info: oklch(0.78 0.13 230);
   --info-foreground: oklch(0.205 0 0);
-  --link: oklch(0.78 0.12 230);
-  --link-hover: oklch(0.85 0.1 230);
+  --link: oklch(0.78 0.13 230);
+  --link-hover: oklch(0.85 0.13 230);
 
   --scrollbar-thumb: rgba(255, 255, 255, 0.3);
   --chevron-down-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.708 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');

@@ -137,12 +137,12 @@
                             type="button"
                             aria-haspopup="menu"
                             aria-expanded="false"
-                            aria-controls="row-actions-{{ get_object_id(object) }}"
+                            aria-controls="row-actions-{{ loop.index }}"
                             class="btn-icon-ghost"
                         >
                             <admin.Icon name="three-dots" />
                         </button>
-                        <div id="row-actions-{{ get_object_id(object) }}" data-popover data-align="end" aria-hidden="true" class="w-48">
+                        <div id="row-actions-{{ loop.index }}" data-popover data-align="end" aria-hidden="true" class="w-48">
                             <div role="menu">
                                 {% for text, url in object_links.items() %}
                                 <a role="menuitem" href="{{ url }}">{{ text }}</a>

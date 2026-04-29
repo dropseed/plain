@@ -56,3 +56,43 @@ after `tailwind.min.css`. For example, to change the primary action color:
 
 Every `.btn-primary`, focus ring, and link color in the admin will pick
 that up — no template changes required.
+
+## Fonts
+
+The admin ships **Inter** (sans) and **JetBrains Mono** (mono), vendored
+under `../assets/admin/fonts/` and licensed under the SIL Open Font
+License 1.1 (see `ATTRIBUTIONS.md`). Their `@font-face` declarations live
+in the `admin_fonts` block of `../templates/admin/base.html`; the
+defaults of `--font-sans` and `--font-mono` lead with these families and
+fall back to the system stack.
+
+Three override patterns:
+
+```css
+/* 1. Use the bundled fonts but lean on the system stack as the
+      primary — Inter / JetBrains Mono still load. */
+.plain-admin {
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+}
+```
+
+```jinja
+{# 2. Replace the bundled fonts with your own. #}
+{% extends "admin/base.html" %}
+{% block admin_fonts %}
+<style nonce="{{ request.csp_nonce }}">
+@font-face {
+  font-family: "Geist";
+  src: url("{{ asset('fonts/Geist.woff2') }}") format("woff2");
+}
+</style>
+{% endblock %}
+```
+
+```jinja
+{# 3. Drop the bundled fonts entirely and use the system stack. #}
+{% block admin_fonts %}{% endblock %}
+```
+
+Pair (2) and (3) with a `--font-sans` / `--font-mono` override so the
+cascade actually picks up the new family.

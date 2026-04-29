@@ -28,11 +28,15 @@
 </figure>
 {% endmacro %}
 
+{% macro group(title) %}
+<h2 class="text-2xl font-bold text-foreground mt-16 mb-1">{{ title }}</h2>
+{% endmacro %}
+
 {% macro section(id, title, blurb='') %}
-<section id="{{ id }}" data-customization-section class="scroll-mt-28 mt-12">
-    <h2 class="text-xl font-semibold text-foreground border-b border-border pb-2 mb-2">
+<section id="{{ id }}" data-customization-section class="scroll-mt-28 mt-10">
+    <h3 class="text-lg font-semibold text-foreground border-b border-border pb-2 mb-2">
         <a href="#{{ id }}" class="no-underline hover:underline">{{ title }}</a>
-    </h2>
+    </h3>
     {% if blurb %}<p class="text-sm text-muted-foreground mb-4">{{ blurb }}</p>{% endif %}
     {{ caller() }}
 </section>
@@ -43,7 +47,10 @@
     {% for name, cls in swatches %}
     <div class="rounded-md border border-border p-2 flex items-center gap-3">
         <span class="{{ cls }} w-8 h-8 rounded border border-border shrink-0" aria-hidden="true"></span>
-        <code class="text-xs text-muted-foreground flex-1 truncate">--{{ name }}</code>
+        <div class="min-w-0 flex-1">
+            <code class="text-xs text-muted-foreground block truncate">--{{ name }}</code>
+            <code data-token-current="--{{ name }}" class="text-[10px] text-foreground/60 block truncate"></code>
+        </div>
     </div>
     {% endfor %}
 </div>
@@ -107,34 +114,59 @@
     ("chart-4", "bg-chart-4"),
     ("chart-5", "bg-chart-5")
 ] %}
-{% set _toc = [
-    ("customizing", "Customizing"),
-    ("tokens-surface", "Surface tokens"),
-    ("tokens-action", "Action tokens"),
-    ("tokens-status", "Status tokens"),
-    ("tokens-header", "Header tokens"),
-    ("tokens-sizing", "Sizing tokens"),
-    ("dark-mode", "Dark mode"),
-    ("typography", "Typography"),
-    ("prose", "Prose"),
-    ("buttons", "Buttons"),
-    ("badges", "Badges"),
-    ("alerts", "Alerts"),
-    ("progress", "Progress"),
-    ("cards", "Cards"),
-    ("admin-cards", "Admin card classes"),
-    ("tables", "Tables"),
-    ("forms", "Form fields"),
-    ("field-wrapper", "Field wrapper"),
-    ("dialogs", "Dialogs"),
-    ("dropdowns", "Dropdowns"),
-    ("tabs", "Tabs"),
-    ("collapsible", "Collapsible"),
-    ("tooltips", "Tooltips"),
-    ("hovercards", "Hovercards"),
-    ("icons", "Icons"),
-    ("kbd", "Keyboard hints"),
-    ("behaviors", "Behaviors")
+
+{# Grouped TOC. Each group is (group_title, [(section_id, link_label), ...]).
+   Group titles also render as <h2> dividers in the body. #}
+{% set _toc_groups = [
+    ("Theme", [
+        ("customizing", "Customizing"),
+        ("dark-mode", "Dark mode"),
+        ("typography", "Typography"),
+    ]),
+    ("Tokens", [
+        ("tokens-surface", "Surface tokens"),
+        ("tokens-action", "Action tokens"),
+        ("tokens-status", "Status tokens"),
+        ("tokens-header", "Header tokens"),
+        ("tokens-sizing", "Sizing tokens"),
+    ]),
+    ("Content", [
+        ("prose", "Prose"),
+        ("icons", "Icons"),
+        ("kbd", "Keyboard hints"),
+    ]),
+    ("Actions", [
+        ("buttons", "Buttons"),
+        ("badges", "Badges"),
+    ]),
+    ("Feedback", [
+        ("alerts", "Alerts"),
+        ("progress", "Progress"),
+    ]),
+    ("Containers", [
+        ("cards", "Cards"),
+        ("admin-cards", "Admin card classes"),
+        ("tables", "Tables"),
+    ]),
+    ("Forms", [
+        ("forms", "Form fields"),
+        ("field-wrapper", "Field wrapper"),
+    ]),
+    ("Overlays", [
+        ("dialogs", "Dialogs"),
+        ("popovers", "Popovers"),
+        ("dropdowns", "Dropdowns"),
+        ("tooltips", "Tooltips"),
+        ("hovercards", "Hovercards"),
+    ]),
+    ("Disclosure", [
+        ("tabs", "Tabs"),
+        ("segmented", "Segmented control"),
+        ("collapsible", "Collapsible"),
+    ]),
+    ("Behaviors", [
+        ("behaviors", "Data attributes"),
+    ]),
 ] %}
 
 
@@ -166,6 +198,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.querySelectorAll("[data-customization-section]").forEach((s) => observer.observe(s));
 });
+
+/* Resolve every [data-token-current="--name"] to its currently computed
+   value, so the page reflects what the admin is actually using right
+   now (defaults out of the box, user overrides if any). Length tokens
+   defined as calc(...) are resolved by applying them to a hidden probe's
+   `height` and reading back the computed pixel value. Re-runs on theme
+   switches via a MutationObserver on <html>'s class. */
+document.addEventListener("DOMContentLoaded", () => {
+    const adminRoot = document.querySelector(".plain-admin") || document.documentElement;
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;visibility:hidden;left:-9999px;top:0;";
+    document.body.appendChild(probe);
+
+    const resolve = () => {
+        const cs = getComputedStyle(adminRoot);
+        const csRoot = getComputedStyle(document.documentElement);
+        document.querySelectorAll("[data-token-current]").forEach((el) => {
+            const name = el.dataset.tokenCurrent;
+            let val = (cs.getPropertyValue(name) || csRoot.getPropertyValue(name)).trim();
+            if (val.startsWith("calc(") || val.includes("var(")) {
+                probe.style.height = `var(${name})`;
+                val = getComputedStyle(probe).height || val;
+            }
+            el.textContent = val;
+        });
+    };
+
+    resolve();
+    new MutationObserver(resolve).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+    });
+});
 </script>
 {% endblock %}
 
@@ -185,16 +250,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     {# Compact TOC for small screens (large screens get the sticky side nav on the right). #}
     <nav class="lg:hidden rounded-lg border border-border bg-muted/30 p-4 mb-8">
-        <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">On this page</p>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm [&>a]:text-link [&>a:hover]:text-link-hover">
-            {% for id, title in _toc %}
-            <a href="#{{ id }}">{{ title }}</a>
+        <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">On this page</p>
+        <div class="space-y-3 text-sm">
+            {% for group_title, items in _toc_groups %}
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">{{ group_title }}</p>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-0.5 [&>a]:text-link [&>a:hover]:text-link-hover">
+                    {% for id, title in items %}
+                    <a href="#{{ id }}">{{ title }}</a>
+                    {% endfor %}
+                </div>
+            </div>
             {% endfor %}
         </div>
     </nav>
 
 
 {# ====================================================================== #}
+{# Theme                                                                  #}
+{# ====================================================================== #}
+{{ group("Theme") }}
+
 {% call section("customizing", "Customizing the admin",
    "Plain's admin is themeable through CSS variables. Override tokens in your own stylesheet — no need to fork templates.") %}
 
@@ -228,55 +304,6 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
-{# ====================================================================== #}
-{% call section("tokens-surface", "Surface tokens",
-   "The neutral palette: page backgrounds, muted/accent surfaces, borders. Component-scoped surfaces (`--card`, `--popover`, chart) live in their respective component sections below.") %}
-{{ swatch_grid(_surface) }}
-{% endcall %}
-
-
-{# ====================================================================== #}
-{% call section("tokens-action", "Action tokens",
-   "Colors for buttons and focus rings. `--primary` and `--ring` drive `.btn-primary`, focus outlines, and the active-tab indicator. (Danger actions like `.btn-danger` pull from the `--danger` status token below.)") %}
-{{ swatch_grid(_action) }}
-{% endcall %}
-
-
-{# ====================================================================== #}
-{% call section("tokens-status", "Status tokens",
-   "Status colors exposed as Tailwind utilities (`text-success`, `bg-warning/10`, `border-info`). Used by alerts, badges, preflight, and form validation.") %}
-{{ swatch_grid(_status) }}
-{% endcall %}
-
-
-{# ====================================================================== #}
-{% call section("tokens-header", "Header tokens",
-   "The admin's sticky top header. Plain ships a faint warm tint that's a hair off the page background — `#f6f3f2` (slightly darker than white) in light mode, and a subtly lighter shade in dark mode. Override `--header-bg` to match your own brand. For full contrast inversion (light page, dark header), add `class=\"dark\"` to the `<header>` element instead — that flips every token via the dark variant.") %}
-{{ swatch_grid(_header_tokens) }}
-{% endcall %}
-
-
-{# ====================================================================== #}
-{% call section("tokens-sizing", "Sizing tokens") %}
-
-<table class="table">
-    <thead>
-        <tr><th>Token</th><th>Value</th></tr>
-    </thead>
-    <tbody>
-        <tr><td><code>--radius</code></td><td>0.625rem</td></tr>
-        <tr><td><code>--radius-sm</code></td><td>calc(var(--radius) - 4px)</td></tr>
-        <tr><td><code>--radius-md</code></td><td>calc(var(--radius) - 2px)</td></tr>
-        <tr><td><code>--radius-lg</code></td><td>var(--radius)</td></tr>
-        <tr><td><code>--radius-xl</code></td><td>calc(var(--radius) + 4px)</td></tr>
-        <tr><td><code>--scrollbar-width</code></td><td>6px</td></tr>
-        <tr><td><code>--scrollbar-radius</code></td><td>6px</td></tr>
-    </tbody>
-</table>
-{% endcall %}
-
-
-{# ====================================================================== #}
 {% call section("dark-mode", "Dark mode",
    "The admin ships with a built-in theme menu in the top-right with Light, Dark, and System options. The choice is stored in localStorage; `.dark` is set on `<html>`; the no-flash init in base.html resolves before paint. Wire your own picker by adding `data-theme-set=\"light|dark|system\"` to any element.") %}
 <div class="flex gap-2">
@@ -293,18 +320,23 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
-{# ====================================================================== #}
 {% call section("typography", "Typography",
-   "Override `--font-sans` / `--font-mono` on `.plain-admin` to retheme the admin's fonts. Tailwind's `font-sans` / `font-mono` utilities pick those up automatically.") %}
+   "Defaults: Inter (sans) and JetBrains Mono (mono), both vendored under `assets/admin/fonts/`. Override `--font-sans` / `--font-mono` on `.plain-admin` to retheme — Tailwind's `font-sans` / `font-mono` utilities pick those up automatically. To swap or drop the bundled `@font-face` declarations, override the `admin_fonts` block in `admin/base.html`.") %}
 
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
     <div class="rounded-md border border-border p-2 flex items-center gap-3">
-        <span class="font-sans text-lg shrink-0 px-2">Aa</span>
-        <code class="text-xs text-muted-foreground flex-1 truncate">--font-sans</code>
+        <span class="font-sans text-base shrink-0 px-2">Sans Mlw 0Oo</span>
+        <div class="min-w-0 flex-1">
+            <code class="text-xs text-muted-foreground block truncate">--font-sans</code>
+            <code data-token-current="--font-sans" class="text-[10px] text-foreground/60 block truncate"></code>
+        </div>
     </div>
     <div class="rounded-md border border-border p-2 flex items-center gap-3">
-        <span class="font-mono text-lg shrink-0 px-2">Aa</span>
-        <code class="text-xs text-muted-foreground flex-1 truncate">--font-mono</code>
+        <span class="font-mono text-base shrink-0 px-2">Mono Mlw 0Oo</span>
+        <div class="min-w-0 flex-1">
+            <code class="text-xs text-muted-foreground block truncate">--font-mono</code>
+            <code data-token-current="--font-mono" class="text-[10px] text-foreground/60 block truncate"></code>
+        </div>
     </div>
 </div>
 
@@ -320,18 +352,78 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {# ====================================================================== #}
+{# Tokens                                                                 #}
+{# ====================================================================== #}
+{{ group("Tokens") }}
+
+{% call section("tokens-surface", "Surface tokens",
+   "The neutral palette: page backgrounds, muted/accent surfaces, borders. Component-scoped surfaces (`--card`, `--popover`, chart) live in their respective component sections below.") %}
+{{ swatch_grid(_surface) }}
+{% endcall %}
+
+
+{% call section("tokens-action", "Action tokens",
+   "Colors for buttons and focus rings. `--primary` and `--ring` drive `.btn-primary`, focus outlines, and the active-tab indicator. (Danger actions like `.btn-danger` pull from the `--danger` status token below.)") %}
+{{ swatch_grid(_action) }}
+{% endcall %}
+
+
+{% call section("tokens-status", "Status tokens",
+   "Status colors exposed as Tailwind utilities (`text-success`, `bg-warning/10`, `border-info`). Used by alerts, badges, preflight, and form validation.") %}
+{{ swatch_grid(_status) }}
+{% endcall %}
+
+
+{% call section("tokens-header", "Header tokens",
+   "The admin's sticky top header. Plain ships a faint warm tint that's a hair off the page background — `#f6f3f2` (slightly darker than white) in light mode, and a subtly lighter shade in dark mode. Override `--header-bg` to match your own brand. For full contrast inversion (light page, dark header), add `class=\"dark\"` to the `<header>` element instead — that flips every token via the dark variant.") %}
+{{ swatch_grid(_header_tokens) }}
+{% endcall %}
+
+
+{% call section("tokens-sizing", "Sizing tokens",
+   "Default column shows what Plain ships in `tokens.css`. Current column shows the resolved value as the page is currently loaded — overrides on `.plain-admin` flow through.") %}
+
+<table class="table">
+    <thead>
+        <tr><th>Token</th><th>Default</th><th>Current</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><code>--radius</code></td><td><code>0.375rem</code></td><td><code data-token-current="--radius"></code></td></tr>
+        <tr><td><code>--radius-sm</code></td><td><code>calc(var(--radius) - 4px)</code></td><td><code data-token-current="--radius-sm"></code></td></tr>
+        <tr><td><code>--radius-md</code></td><td><code>calc(var(--radius) - 2px)</code></td><td><code data-token-current="--radius-md"></code></td></tr>
+        <tr><td><code>--radius-lg</code></td><td><code>var(--radius)</code></td><td><code data-token-current="--radius-lg"></code></td></tr>
+        <tr><td><code>--radius-xl</code></td><td><code>calc(var(--radius) + 4px)</code></td><td><code data-token-current="--radius-xl"></code></td></tr>
+        <tr><td><code>--scrollbar-width</code></td><td><code>6px</code></td><td><code data-token-current="--scrollbar-width"></code></td></tr>
+        <tr><td><code>--scrollbar-radius</code></td><td><code>6px</code></td><td><code data-token-current="--scrollbar-radius"></code></td></tr>
+    </tbody>
+</table>
+
+<p class="text-sm text-muted-foreground mt-3">
+    Add <code>class="scrollbar"</code> to any scrollable element to opt in to the slim
+    themed scrollbar — uses <code>--scrollbar-width</code>, <code>--scrollbar-radius</code>,
+    <code>--scrollbar-thumb</code>, <code>--scrollbar-track</code>. The default browser
+    scrollbar is left alone elsewhere.
+</p>
+{% endcall %}
+
+
+{# ====================================================================== #}
+{# Content                                                                #}
+{# ====================================================================== #}
+{{ group("Content") }}
+
 {% call section("prose", "Prose",
    "Element-level defaults for raw HTML inside admin views — prose links, description lists, code blocks. Plain ships these because the admin renders content (Basecoat alone doesn't address them). Form chrome stays opt-in via component classes.") %}
 
 <p class="text-sm text-muted-foreground mb-3">Plain-only prose tokens:</p>
 {{ swatch_grid(_prose_tokens) }}
 
-<h3 class="text-sm font-semibold text-foreground mt-6 mb-2">Prose links</h3>
+<h4 class="text-sm font-semibold text-foreground mt-6 mb-2">Prose links</h4>
 <div class="border border-border rounded-lg p-4 text-sm">
     <p>This paragraph contains a <a href="#prose">prose link</a> styled with <code>--link</code> and underlined by default. Hover for <code>--link-hover</code>.</p>
 </div>
 
-<h3 class="text-sm font-semibold text-foreground mt-6 mb-2">Description list</h3>
+<h4 class="text-sm font-semibold text-foreground mt-6 mb-2">Description list</h4>
 <div class="border border-border rounded-lg p-4">
     <dl>
         <dt>Package</dt>
@@ -343,7 +435,7 @@ document.addEventListener("DOMContentLoaded", () => {
     </dl>
 </div>
 
-<h3 class="text-sm font-semibold text-foreground mt-6 mb-2">Code</h3>
+<h4 class="text-sm font-semibold text-foreground mt-6 mb-2">Code</h4>
 {% call example("Inline") %}
 <p class="text-sm">Run <code>uv run plain check</code> to lint, type-check, and run tests.</p>
 {% endcall %}
@@ -354,7 +446,44 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
+{% call section("icons", "Icons",
+   "Bootstrap Icons are vendored. Use the admin.Icon element with a name.") %}
+
+{% call example() %}
+<admin.Icon name="check-circle-fill" class="text-success" />
+<admin.Icon name="exclamation-triangle-fill" class="text-warning" />
+<admin.Icon name="x-circle-fill" class="text-danger" />
+<admin.Icon name="info-circle-fill" class="text-info" />
+<admin.Icon name="gear" />
+<admin.Icon name="search" />
+<admin.Icon name="chevron-down" />
+<admin.Icon name="three-dots-vertical" />
+<admin.Icon name="palette" />
+<admin.Icon name="moon-stars" />
+{% endcall %}
+
+<p class="text-xs text-muted-foreground">
+    Browse the full set at <a href="https://icons.getbootstrap.com/" class="text-link hover:text-link-hover underline" target="_blank" rel="noopener">icons.getbootstrap.com</a>.
+</p>
+{% endcall %}
+
+
+{% call section("kbd", "Keyboard hints",
+   "Small inline labels for key names — useful inline in help text or alongside menu items that have a keyboard shortcut. Wrap the key in `<kbd class=\"kbd\">`.") %}
+
+{% call example() %}
+<p class="text-sm">
+    Press <kbd class="kbd">Esc</kbd> to dismiss, or <kbd class="kbd">⌘</kbd> + <kbd class="kbd">K</kbd> to open the search.
+</p>
+{% endcall %}
+{% endcall %}
+
+
 {# ====================================================================== #}
+{# Actions                                                                #}
+{# ====================================================================== #}
+{{ group("Actions") }}
+
 {% call section("buttons", "Buttons",
    "Neutral variants (primary, secondary, outline, ghost, link) plus the status family (success, warning, danger, info) for actions that match an alert tone. Sizes: default, -sm, -lg. Add -icon for square icon-only.") %}
 
@@ -388,7 +517,6 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
-{# ====================================================================== #}
 {% call section("badges", "Badges",
    "Semantic badges for status indicators. Neutral variants (primary/secondary/outline) and Plain's translucent status family (success/warning/danger/info) — the latter use a 10% fill of the matching token so they read in dense table contexts.") %}
 
@@ -408,6 +536,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {# ====================================================================== #}
+{# Feedback                                                               #}
+{# ====================================================================== #}
+{{ group("Feedback") }}
+
 {% call section("alerts", "Alerts",
    "Inline status panels. Wrap the title in an h2-h6 or [data-title] and put body content in a <section>.") %}
 
@@ -453,7 +585,6 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
-{# ====================================================================== #}
 {% call section("progress", "Progress",
    "Native <progress> element. Set value/max (default 0–100); status follows data-status: ok (default success), warning, error.") %}
 
@@ -472,6 +603,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {# ====================================================================== #}
+{# Containers                                                             #}
+{# ====================================================================== #}
+{{ group("Containers") }}
+
 {% call section("cards", "Cards",
    "Padded, rounded wrapper for grouped content. Use <header>, <section>, <footer> children for built-in spacing. Override gap/padding utilities (e.g. `card gap-2 py-4`) for denser layouts.") %}
 
@@ -506,7 +641,6 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
-{# ====================================================================== #}
 {% call section("admin-cards", "Admin card classes",
    "Live previews of the four card subclasses shipped from `plain.admin.cards`. Subclass these and register them on a view's `cards = [...]` to surface them on dashboards.") %}
 
@@ -526,7 +660,6 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
-{# ====================================================================== #}
 {% call section("tables", "Tables",
    "Add `class=\"table\"` for header/row/hover styling.") %}
 
@@ -562,6 +695,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {# ====================================================================== #}
+{# Forms                                                                  #}
+{# ====================================================================== #}
+{{ group("Forms") }}
+
 {% call section("forms", "Form fields",
    "Use the .input/.textarea classes (or the matching admin element templates), Plain's brand color drives the focus ring.") %}
 
@@ -624,10 +761,36 @@ document.addEventListener("DOMContentLoaded", () => {
     <input class="input" type="checkbox" role="switch" checked /> Enable notifications
 </label>
 {% endcall %}
+
+{% call example("Compact size — pair `input-sm` / `select-sm` for dense rows") %}
+<div class="flex items-end gap-2">
+    <input class="input input-sm w-40" type="text" placeholder="Filter…" />
+    <select class="select select-sm">
+        <option>All</option>
+        <option>Active</option>
+        <option>Archived</option>
+    </select>
+    <button type="button" class="btn-sm-primary">Apply</button>
+</div>
+{% endcall %}
+
+{% call example("Search input — admin element") %}
+<div class="w-72">
+    <admin.SearchInput name="q" placeholder="Search packages…" />
+</div>
+{% endcall %}
+
+<p class="text-xs text-muted-foreground mt-3">
+    Plain ships matching element templates that wrap these classes:
+    <code>&lt;admin.Input&gt;</code>, <code>&lt;admin.Textarea&gt;</code>,
+    <code>&lt;admin.Select&gt;</code>, <code>&lt;admin.Checkbox&gt;</code>,
+    plus <code>&lt;admin.InputField&gt;</code> / <code>&lt;admin.SelectField&gt;</code> /
+    <code>&lt;admin.CheckboxField&gt;</code> for the full label + control + errors stack
+    when rendering a Plain form field.
+</p>
 {% endcall %}
 
 
-{# ====================================================================== #}
 {% call section("field-wrapper", "Field wrapper",
    "Wrap a label, control, and helper/error text in a `.field` for consistent vertical rhythm. Group several fields under a `.fieldset` with a legend. Set `data-orientation=\"horizontal\"` on a `.field` to lay the label and control side-by-side (handy for switches and checkboxes). Mark a field as invalid with `data-invalid=\"true\"` to flip its label/helper to the danger color.") %}
 
@@ -658,6 +821,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {# ====================================================================== #}
+{# Overlays                                                               #}
+{# ====================================================================== #}
+{{ group("Overlays") }}
+
 {% call section("dialogs", "Dialogs",
    "Native <dialog> with the `.dialog` class. Open and close via the HTML Invoker Commands API (`command` + `commandfor`) — no JS, no inline `onclick`, CSP-safe.") %}
 
@@ -686,14 +853,43 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
-{# ====================================================================== #}
-{% call section("dropdowns", "Dropdowns",
-   "Wrap a trigger button + a [data-popover] menu in a .dropdown-menu element. Items use role=\"menuitem\" and pick up styling from the dropdown-menu component. JS in components/dropdown-menu.js handles open/close, outside-click, and keyboard navigation.") %}
+{% call section("popovers", "Popovers",
+   "Generic click-to-open panel. Wrap a trigger `<button>` and a `[data-popover]` panel in a `.popover` element — the panel can hold anything (form fields, descriptive content, multi-step UI). Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). JS in `components.js` shares open/close, outside-click, and Esc handling with `.dropdown-menu`.") %}
 
-<p class="text-sm text-muted-foreground mb-2">Popover surface tokens (used by dropdowns and popovers):</p>
+<p class="text-sm text-muted-foreground mb-2">Popover surface tokens (shared with dropdowns and hovercards):</p>
 {{ swatch_grid(_popover_tokens) }}
 
 <div class="mt-4"></div>
+
+{% call example() %}
+<div class="popover">
+    <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded="false"
+        aria-controls="example-popover-panel"
+        class="btn-outline"
+    >
+        Filter <admin.Icon name="chevron-down" />
+    </button>
+    <div id="example-popover-panel" data-popover data-align="end" aria-hidden="true" class="w-64">
+        <div class="space-y-2">
+            <label class="flex items-center gap-2 text-sm">
+                <input class="input" type="checkbox" /> Active
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+                <input class="input" type="checkbox" checked /> Archived
+            </label>
+            <button type="button" class="btn-sm-primary w-full mt-2">Apply</button>
+        </div>
+    </div>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("dropdowns", "Dropdowns",
+   "Wrap a trigger button + a [data-popover] menu in a .dropdown-menu element. Items use role=\"menuitem\" and pick up styling from the dropdown-menu component. JS in components.js handles open/close, outside-click, and keyboard navigation (arrow keys, Home/End, Enter/Esc).") %}
 
 {% call example() %}
 <div class="dropdown-menu">
@@ -719,42 +915,6 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
-{# ====================================================================== #}
-{% call section("tabs", "Tabs",
-   "Tab list backed by basecoat's tabs.js — handles ARIA roles and keyboard nav automatically.") %}
-
-{% call example() %}
-<div class="tabs w-96">
-    <div role="tablist" aria-label="Settings">
-        <button role="tab" aria-controls="tab-general" aria-selected="true">General</button>
-        <button role="tab" aria-controls="tab-advanced" aria-selected="false">Advanced</button>
-    </div>
-    <div role="tabpanel" id="tab-general" class="text-sm py-2">General tab content.</div>
-    <div role="tabpanel" id="tab-advanced" class="text-sm py-2" hidden>Advanced tab content.</div>
-</div>
-{% endcall %}
-{% endcall %}
-
-
-{# ====================================================================== #}
-{% call section("collapsible", "Collapsible",
-   "Native `<details>` / `<summary>` get a smooth expand/collapse transition (via the new `::details-content` pseudo-element) and the default disclosure triangle is hidden so you can ship your own affordance. Used implicitly by the \"Show markup\" disclosures on this page.") %}
-
-{% call example() %}
-<details class="rounded-md border border-border p-3 w-96">
-    <summary class="gap-2 text-sm font-medium">
-        <admin.Icon name="chevron-right" class="transition-transform group-open:rotate-90" />
-        Advanced options
-    </summary>
-    <div class="text-sm text-muted-foreground mt-2">
-        Tucked-away configuration the everyday user shouldn't have to think about.
-    </div>
-</details>
-{% endcall %}
-{% endcall %}
-
-
-{# ====================================================================== #}
 {% call section("tooltips", "Tooltips",
    "Pure-CSS tooltip via the `data-tooltip=\"…\"` attribute. Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). Hover or focus the trigger to reveal — no JS, no popper.") %}
 
@@ -775,7 +935,6 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 
-{# ====================================================================== #}
 {% call section("hovercards", "Hovercards",
    "Hover-triggered version of popover. Trigger can be any element (no `<button>` requirement); panel positions fixed via JS so it escapes table-cell clipping. Use for preview/info that doesn't want a click commitment — user mention previews, FK row previews, the datetime hover details on every `<time>` in the admin.") %}
 
@@ -817,42 +976,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 {# ====================================================================== #}
-{% call section("icons", "Icons",
-   "Bootstrap Icons are vendored. Use the admin.Icon element with a name.") %}
+{# Disclosure                                                             #}
+{# ====================================================================== #}
+{{ group("Disclosure") }}
+
+{% call section("tabs", "Tabs",
+   "Switch between content panels. Underline indicator on the active tab; arrow-key navigation and panel show/hide are wired in components.js. For \"set this value to X\" choices, reach for the segmented control instead.") %}
 
 {% call example() %}
-<admin.Icon name="check-circle-fill" class="text-success" />
-<admin.Icon name="exclamation-triangle-fill" class="text-warning" />
-<admin.Icon name="x-circle-fill" class="text-danger" />
-<admin.Icon name="info-circle-fill" class="text-info" />
-<admin.Icon name="gear" />
-<admin.Icon name="search" />
-<admin.Icon name="chevron-down" />
-<admin.Icon name="three-dots-vertical" />
-<admin.Icon name="palette" />
-<admin.Icon name="moon-stars" />
+<div class="tabs w-96">
+    <div role="tablist" aria-label="Settings">
+        <button role="tab" aria-controls="tab-general" aria-selected="true">General</button>
+        <button role="tab" aria-controls="tab-advanced" aria-selected="false">Advanced</button>
+    </div>
+    <div role="tabpanel" id="tab-general" class="text-sm py-2">General tab content.</div>
+    <div role="tabpanel" id="tab-advanced" class="text-sm py-2" hidden>Advanced tab content.</div>
+</div>
+{% endcall %}
 {% endcall %}
 
-<p class="text-xs text-muted-foreground">
-    Browse the full set at <a href="https://icons.getbootstrap.com/" class="text-link hover:text-link-hover underline" target="_blank" rel="noopener">icons.getbootstrap.com</a>.
-</p>
+
+{% call section("segmented", "Segmented control",
+   "Pick one of a small set of mutually-exclusive values — theme, density, view mode. Roving tabindex and arrow-key navigation are wired in components.js; the consumer toggles `aria-checked` in response to clicks. For switching content panels, reach for tabs.") %}
+
+{% call example() %}
+<div class="segmented w-72" role="radiogroup" aria-label="View mode">
+    <button role="radio" aria-checked="true" class="px-3 py-1.5">List</button>
+    <button role="radio" aria-checked="false" class="px-3 py-1.5">Grid</button>
+    <button role="radio" aria-checked="false" class="px-3 py-1.5">Cards</button>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("collapsible", "Collapsible",
+   "Native `<details>` / `<summary>` get a smooth expand/collapse transition (via the new `::details-content` pseudo-element) and the default disclosure triangle is hidden so you can ship your own affordance. Used implicitly by the \"Show markup\" disclosures on this page.") %}
+
+{% call example() %}
+<details class="rounded-md border border-border p-3 w-96">
+    <summary class="gap-2 text-sm font-medium">
+        <admin.Icon name="chevron-right" class="transition-transform group-open:rotate-90" />
+        Advanced options
+    </summary>
+    <div class="text-sm text-muted-foreground mt-2">
+        Tucked-away configuration the everyday user shouldn't have to think about.
+    </div>
+</details>
+{% endcall %}
 {% endcall %}
 
 
 {# ====================================================================== #}
-{% call section("kbd", "Keyboard hints",
-   "Small inline labels for key names — useful inline in help text or alongside menu items that have a keyboard shortcut. Wrap the key in `<kbd class=\"kbd\">`.") %}
-
-{% call example() %}
-<p class="text-sm">
-    Press <kbd class="kbd">Esc</kbd> to dismiss, or <kbd class="kbd">⌘</kbd> + <kbd class="kbd">K</kbd> to open the search.
-</p>
-{% endcall %}
-{% endcall %}
-
-
+{# Behaviors                                                              #}
 {# ====================================================================== #}
-{% call section("behaviors", "Behaviors",
+{{ group("Behaviors") }}
+
+{% call section("behaviors", "Data attributes",
    "Declarative `data-*` attributes you sprinkle on existing elements. Behaviors are delegated event handlers in `assets/admin/behaviors.js` — no markup pattern, no CSS. They piggyback on whatever element you stick them on.") %}
 
 {# Cells use `whitespace-normal` so the prose descriptions wrap inside
@@ -893,10 +1072,15 @@ document.addEventListener("DOMContentLoaded", () => {
     {# Side nav (sticky on lg+, hidden on mobile where the top TOC takes over) #}
     <nav
         data-customization-toc
-        class="hidden lg:block lg:sticky lg:top-28 self-start text-sm border-l border-border pl-3 max-h-[calc(100vh-8rem)] overflow-y-auto [&_a]:block [&_a]:py-1 [&_a]:text-muted-foreground [&_a:hover]:text-foreground [&_a[data-active=true]]:text-foreground [&_a[data-active=true]]:font-medium"
+        class="hidden lg:block lg:sticky lg:top-28 self-start text-xs leading-snug border-l border-border pl-3 max-h-[calc(100vh-8rem)] overflow-y-auto [&_a]:block [&_a]:py-px [&_a]:text-muted-foreground [&_a:hover]:text-foreground [&_a[data-active=true]]:text-foreground [&_a[data-active=true]]:font-medium"
     >
-        {% for id, title in _toc %}
-        <a href="#{{ id }}">{{ title }}</a>
+        {% for group_title, items in _toc_groups %}
+        <div class="mt-2 first:mt-0">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-0.5">{{ group_title }}</p>
+            {% for id, title in items %}
+            <a href="#{{ id }}">{{ title }}</a>
+            {% endfor %}
+        </div>
         {% endfor %}
     </nav>
 
