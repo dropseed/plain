@@ -44,7 +44,7 @@ plain-admin/plain/admin/
     │   ├── autosubmit.js                 ← data-autosubmit + GET-form param cleanup
     │   ├── copy.js                       ← data-copy-value (+ data-copy-feedback)
     │   └── encrypted.js                  ← data-encrypted reveal/hide
-    ├── admin.js                          ← admin chrome (HTMX errors, "/" search shortcut)
+    ├── htmx.js                           ← HTMX network-error alerts
     ├── theme.js                          ← dark-mode toggle + persistence
     └── …
 ```

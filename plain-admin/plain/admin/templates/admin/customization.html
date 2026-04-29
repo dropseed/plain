@@ -133,6 +133,7 @@
     ("tooltips", "Tooltips"),
     ("hovercards", "Hovercards"),
     ("icons", "Icons"),
+    ("kbd", "Keyboard hints"),
     ("behaviors", "Behaviors")
 ] %}
 
@@ -826,6 +827,18 @@ document.addEventListener("DOMContentLoaded", () => {
 <p class="text-xs text-muted-foreground">
     Browse the full set at <a href="https://icons.getbootstrap.com/" class="text-link hover:text-link-hover underline" target="_blank" rel="noopener">icons.getbootstrap.com</a>.
 </p>
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("kbd", "Keyboard hints",
+   "Small inline labels for key names — useful inline in help text or alongside menu items that have a keyboard shortcut. Wrap the key in `<kbd class=\"kbd\">`.") %}
+
+{% call example() %}
+<p class="text-sm">
+    Press <kbd class="kbd">Esc</kbd> to dismiss, or <kbd class="kbd">⌘</kbd> + <kbd class="kbd">K</kbd> to open the search.
+</p>
+{% endcall %}
 {% endcall %}
 
 
