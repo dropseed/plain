@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.137.1](https://github.com/dropseed/plain/releases/plain@0.137.1) (2026-04-28)
+
+### What's changed
+
+- **`plain docs --search` now matches inside fenced code blocks.** API names like `CheckConstraint` mostly appear in code examples, so skipping fenced blocks meant exact-symbol queries returned nothing. The search now matches both prose and code, while still preferring a prose line for the section preview when one exists. ([83af8fb1ac66](https://github.com/dropseed/plain/commit/83af8fb1ac66))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.137.0](https://github.com/dropseed/plain/releases/plain@0.137.0) (2026-04-27)
 
 ### What's changed
