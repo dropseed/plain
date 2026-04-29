@@ -4,12 +4,12 @@ from plain.urls import Router, include, path
 from .builtin_views import (
     AdminIndexView,
     AdminSearchView,
+    ComponentsView,
     PinNavView,
     PreflightView,
     ReorderPinnedView,
     SettingDetailView,
     SettingsView,
-    StyleGuideView,
     UnpinNavView,
 )
 from .impersonate.urls import ImpersonateRouter
@@ -22,7 +22,7 @@ class AdminRouter(Router):
     namespace = "admin"
     urls = [
         path("search/", AdminSearchView, name="search"),
-        path("style/", StyleGuideView, name="style"),
+        path("components/", ComponentsView, name="components"),
         path("settings/", SettingsView, name="settings"),
         path("settings/<name>/", SettingDetailView, name="setting_detail"),
         path("preflight/", PreflightView, name="preflight"),

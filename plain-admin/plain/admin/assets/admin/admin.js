@@ -41,12 +41,11 @@ jQuery(($) => {
           arrow: false,
           appendTo: () => document.body,
           onCreate: (instance) => {
-            instance.popper.classList.add("*:bg-white");
+            // Layout-only utilities; colors come from .tippy-box rules in
+            // admin.css so they track the active theme.
             instance.popper.classList.add("*:w-48");
             instance.popper.classList.add("*:rounded-md");
             instance.popper.classList.add("*:shadow-lg");
-            instance.popper.classList.add("*:ring-1");
-            instance.popper.classList.add("*:ring-stone-200");
           },
         });
       });
@@ -68,7 +67,7 @@ jQuery(($) => {
         }
         const $link = $(document.createElement("a"));
         $link.attr("href", autolinkUrl);
-        $link.addClass("flex p-2 -m-2 text-black/90 hover:no-underline");
+        $link.addClass("flex p-2 -m-2 text-foreground hover:no-underline");
         $(this).wrapInner($link);
       });
   }
@@ -179,5 +178,17 @@ jQuery(($) => {
       e.preventDefault();
       $("#topbar-search").trigger("focus");
     }
+  });
+
+  // CSP-safe dialog open/close. Wires up [data-dialog-open] and
+  // [data-dialog-close] buttons so we don't need inline onclick handlers.
+  $(document).on("click", "[data-dialog-open]", function () {
+    const dialog = document.getElementById(this.dataset.dialogOpen);
+    if (dialog && typeof dialog.showModal === "function") dialog.showModal();
+  });
+  $(document).on("click", "[data-dialog-close]", function () {
+    const id = this.dataset.dialogClose;
+    const dialog = id ? document.getElementById(id) : this.closest("dialog");
+    if (dialog && typeof dialog.close === "function") dialog.close();
   });
 });

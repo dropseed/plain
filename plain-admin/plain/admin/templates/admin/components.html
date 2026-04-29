@@ -1,0 +1,473 @@
+{% extends "admin/base.html" %}
+
+{% use_elements %}
+
+{# -----------------------------------------------------------------------
+   Component catalog. Lives at /admin/components/.
+
+   Each section follows the same shape:
+       ## Heading (h2)
+       Short description.
+       Live render of the component(s).
+       <details>Markup</details>
+
+   A `{% call example("...") %}{% endcall %}` macro encapsulates the
+   render + collapsible-source pattern so the whole page stays compact
+   and consistent. See `_example` macro near the top of the file.
+   ----------------------------------------------------------------------- #}
+
+{% macro example(caption='') %}
+<figure class="my-3 rounded-lg border border-border bg-card text-card-foreground">
+    <div class="p-6 flex flex-wrap items-center gap-3 border-b border-border">
+        {{ caller() }}
+    </div>
+    <details class="group">
+        <summary class="cursor-pointer select-none px-4 py-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-2">
+            <admin.Icon name="code-slash" />
+            <span>Show markup{% if caption %} — {{ caption }}{% endif %}</span>
+        </summary>
+        <pre class="m-0! rounded-none! border-none! text-xs"><code>{% filter escape %}{{ caller() }}{% endfilter %}</code></pre>
+    </details>
+</figure>
+{% endmacro %}
+
+{% macro section(id, title, blurb='') %}
+<section id="{{ id }}" class="scroll-mt-20 mt-12">
+    <h2 class="text-xl font-semibold text-foreground border-b border-border pb-2 mb-2">
+        <a href="#{{ id }}" class="no-underline hover:underline">{{ title }}</a>
+    </h2>
+    {% if blurb %}<p class="text-sm text-muted-foreground mb-4">{{ blurb }}</p>{% endif %}
+    {{ caller() }}
+</section>
+{% endmacro %}
+
+
+{% block content %}
+<div class="max-w-4xl pb-24">
+
+<p class="text-sm text-muted-foreground mb-6">
+    Every UI primitive shipped with the admin, with the exact markup needed to use it.
+    Components are built on a <a href="https://basecoatui.com" class="plain-link underline" target="_blank" rel="noopener">Basecoat UI</a>
+    foundation (vendored under <code>plain/admin/assets/admin/basecoat/</code>) plus a
+    Plain-specific palette and a few admin-only patterns.
+</p>
+
+{# Table of contents ----------------------------------------------------- #}
+<nav class="rounded-lg border border-border bg-muted/30 p-4 mb-8">
+    <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">On this page</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-sm">
+        <a href="#customizing" class="plain-link">Customizing</a>
+        <a href="#tokens" class="plain-link">Design tokens</a>
+        <a href="#dark-mode" class="plain-link">Dark mode</a>
+        <a href="#typography" class="plain-link">Typography</a>
+        <a href="#buttons" class="plain-link">Buttons</a>
+        <a href="#badges" class="plain-link">Badges</a>
+        <a href="#alerts" class="plain-link">Alerts</a>
+        <a href="#cards" class="plain-link">Cards</a>
+        <a href="#admin-cards" class="plain-link">Admin cards</a>
+        <a href="#tables" class="plain-link">Tables</a>
+        <a href="#forms" class="plain-link">Form fields</a>
+        <a href="#dialogs" class="plain-link">Dialogs</a>
+        <a href="#dropdowns" class="plain-link">Dropdowns</a>
+        <a href="#tabs" class="plain-link">Tabs</a>
+        <a href="#code" class="plain-link">Code</a>
+        <a href="#icons" class="plain-link">Icons</a>
+    </div>
+</nav>
+
+
+{# ====================================================================== #}
+{% call section("customizing", "Customizing the admin",
+   "Plain's admin is themeable through CSS variables. You don't need to fork the templates — override the tokens and your colors propagate everywhere.") %}
+
+<p class="text-sm mb-3">
+    The design system has three layers, loaded in order:
+</p>
+<ol class="list-decimal list-inside text-sm space-y-1 mb-4">
+    <li><strong>Tailwind v4</strong> — utility classes</li>
+    <li><strong><code>basecoat.css</code></strong> — neutral component primitives (buttons, cards, inputs, &hellip;)</li>
+    <li><strong><code>admin.css</code></strong> — Plain's brand palette and admin-only chrome</li>
+</ol>
+<p class="text-sm mb-3">
+    To re-skin the admin, add your own stylesheet <em>after</em> these and override the tokens.
+    Here's a minimal example that swaps the primary action color to indigo:
+</p>
+<pre><code>/* app/static/admin-overrides.css */
+:root {
+  --primary: #4f46e5;        /* indigo-600 */
+  --primary-foreground: white;
+  --ring: #4f46e5;
+}
+.dark {
+  --primary: #818cf8;        /* indigo-400 */
+  --primary-foreground: #1e1b4b;
+}</code></pre>
+<p class="text-sm mt-3">
+    Then load it in your <code>admin/base.html</code> override after the admin's own CSS.
+    Every <code>.btn-primary</code>, focus ring, and link-color in the admin will update.
+</p>
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("tokens", "Design tokens",
+   "Both palettes live as CSS custom properties on :root (light) and .dark. The semantic tokens drive everything in the admin.") %}
+
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    {% for name in [
+        "background", "foreground",
+        "card", "card-foreground",
+        "popover", "popover-foreground",
+        "primary", "primary-foreground",
+        "secondary", "secondary-foreground",
+        "muted", "muted-foreground",
+        "accent", "accent-foreground",
+        "destructive", "border",
+        "input", "ring"
+    ] %}
+    <div class="rounded-md border border-border p-3 flex items-center gap-3">
+        <div class="w-8 h-8 rounded border border-border" style="background: var(--{{ name }})"></div>
+        <code class="text-xs">--{{ name }}</code>
+    </div>
+    {% endfor %}
+</div>
+
+<p class="text-sm mt-4">Plain-specific brand tokens (light/dark variants in <code>admin.css</code>):</p>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+    {% for name in [
+        "plain-olive", "plain-steel",
+        "plain-success", "plain-warning",
+        "plain-danger", "plain-info"
+    ] %}
+    <div class="rounded-md border border-border p-3 flex items-center gap-3">
+        <div class="w-8 h-8 rounded border border-border" style="background: var(--{{ name }})"></div>
+        <code class="text-xs">--{{ name }}</code>
+    </div>
+    {% endfor %}
+</div>
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("dark-mode", "Dark mode",
+   "The admin ships with a built-in toggle in the top-right corner. It cycles through Light → Dark → System.") %}
+
+<p class="text-sm mb-3">
+    The toggle stores the user's choice in <code>localStorage</code> under
+    <code>plain-admin-theme</code>. Resolution happens before paint via an
+    inline init script in <code>base.html</code>, so there's no flash on
+    page load. Custom CSS only needs the standard Tailwind <code>dark:</code>
+    variant — the <code>.dark</code> class is on the <code>&lt;html&gt;</code>
+    element when dark mode is active.
+</p>
+<button type="button" data-theme-toggle class="btn-outline gap-2">
+    <admin.Icon name="sun" class="block dark:hidden" />
+    <admin.Icon name="moon-stars" class="hidden dark:block" />
+    Cycle theme
+</button>
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("typography", "Typography") %}
+
+<div class="space-y-2">
+    <h1 class="text-3xl font-bold">Heading 1 — page title</h1>
+    <h2 class="text-2xl font-semibold">Heading 2 — section</h2>
+    <h3 class="text-lg font-semibold">Heading 3 — subsection</h3>
+    <p class="text-base">Body text. The quick brown fox jumps over the lazy dog.</p>
+    <p class="text-sm text-muted-foreground">Muted helper text — used for secondary information.</p>
+    <p class="text-xs text-muted-foreground">Tiny text — labels, metadata, timestamps.</p>
+</div>
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("buttons", "Buttons",
+   "Variants: primary, secondary, outline, ghost, link, destructive. Sizes: default, -sm, -lg. Add -icon for square icon-only.") %}
+
+{% call example("Variants") %}
+<button class="btn-primary">Primary</button>
+<button class="btn-secondary">Secondary</button>
+<button class="btn-outline">Outline</button>
+<button class="btn-ghost">Ghost</button>
+<button class="btn-link">Link</button>
+<button class="btn-destructive">Destructive</button>
+{% endcall %}
+
+{% call example("Sizes") %}
+<button class="btn-sm-primary">Small</button>
+<button class="btn-primary">Default</button>
+<button class="btn-lg-primary">Large</button>
+{% endcall %}
+
+{% call example("With icon") %}
+<button class="btn-primary"><admin.Icon name="plus-lg" />Create</button>
+<button class="btn-outline"><admin.Icon name="download" />Export</button>
+<button class="btn-icon-outline" title="Refresh"><admin.Icon name="arrow-clockwise" /></button>
+<button class="btn-destructive" disabled>Disabled</button>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("badges", "Badges",
+   "Semantic badges for status indicators. The colored variants (-success/-warning/-danger/-info) are Plain additions on top of basecoat's primary/secondary/destructive/outline.") %}
+
+{% call example("Basecoat variants") %}
+<span class="badge">Primary</span>
+<span class="badge-secondary">Secondary</span>
+<span class="badge-destructive">Destructive</span>
+<span class="badge-outline">Outline</span>
+{% endcall %}
+
+{% call example("Plain semantic variants") %}
+<span class="badge-success">Stable</span>
+<span class="badge-warning">Beta</span>
+<span class="badge-danger">Deprecated</span>
+<span class="badge-info">New</span>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("alerts", "Alerts",
+   "Inline status panels. Wrap the title in an h2-h6 or [data-title] and put body content in a <section>.") %}
+
+{% call example() %}
+<div class="alert w-full">
+    <admin.Icon name="info-circle" />
+    <h4>Heads up</h4>
+    <section>This is a default alert. Use it for neutral status messages.</section>
+</div>
+{% endcall %}
+
+{% call example() %}
+<div class="alert-destructive w-full">
+    <admin.Icon name="exclamation-triangle" />
+    <h4>Something went wrong</h4>
+    <section>The destructive variant is for errors and failed actions.</section>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("cards", "Cards",
+   "Basecoat's general-purpose card. Use for grouped content with optional header/footer.") %}
+
+{% call example() %}
+<div class="card w-80">
+    <div class="grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6">
+        <h4 class="leading-none font-semibold">Card title</h4>
+        <p class="text-muted-foreground text-sm">Optional description goes here.</p>
+    </div>
+    <div class="px-6">
+        <p class="text-sm">Body content sits in a div with <code>px-6</code>.</p>
+    </div>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("admin-cards", "Admin cards",
+   ".admin-card is Plain's denser metric card used on the dashboard. It supports header + section + automatic typography for big numbers.") %}
+
+{% call example() %}
+<div class="admin-card w-64">
+    <header><h2>Active users</h2></header>
+    <section>
+        <div>1,284</div>
+        <a href="#">View all</a>
+    </section>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("tables", "Tables",
+   "Bare <table> inside .plain-admin gets header/row/hover styling automatically.") %}
+
+{% call example() %}
+<table class="w-full">
+    <thead>
+        <tr>
+            <th>Package</th>
+            <th>Status</th>
+            <th>Version</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>plain</td>
+            <td><span class="badge-success">Stable</span></td>
+            <td>0.137.1</td>
+        </tr>
+        <tr>
+            <td>plain-admin</td>
+            <td><span class="badge-success">Stable</span></td>
+            <td>0.50.0</td>
+        </tr>
+        <tr>
+            <td>plain-htmx</td>
+            <td><span class="badge-warning">Beta</span></td>
+            <td>0.19.0</td>
+        </tr>
+    </tbody>
+</table>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("forms", "Form fields",
+   "Use the .input/.textarea classes (or the matching admin element templates), Plain's brand color drives the focus ring.") %}
+
+{% call example("Text input") %}
+<div class="space-y-1 w-72">
+    <label for="example-input" class="text-sm font-medium">Email</label>
+    <input id="example-input" class="input" type="email" placeholder="you@example.com" />
+    <p class="text-xs text-muted-foreground">We'll never share your email.</p>
+</div>
+{% endcall %}
+
+{% call example("Invalid input") %}
+<div class="space-y-1 w-72">
+    <label for="example-input-invalid" class="text-sm font-medium">Email</label>
+    <input id="example-input-invalid" class="input" type="email" value="not an email" aria-invalid="true" />
+    <p class="text-xs text-destructive">Enter a valid email address.</p>
+</div>
+{% endcall %}
+
+{% call example("Textarea") %}
+<div class="space-y-1 w-72">
+    <label for="example-textarea" class="text-sm font-medium">Notes</label>
+    <textarea id="example-textarea" class="textarea" rows="3" placeholder="Anything to add?"></textarea>
+</div>
+{% endcall %}
+
+{% call example("Native select") %}
+<div class="space-y-1 w-72">
+    <label for="example-select" class="text-sm font-medium">Role</label>
+    <select id="example-select">
+        <option>Reader</option>
+        <option>Editor</option>
+        <option>Admin</option>
+    </select>
+</div>
+{% endcall %}
+
+{% call example("Checkbox") %}
+<label class="flex items-center gap-2 text-sm">
+    <input class="input" type="checkbox" checked /> Send me email updates
+</label>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("dialogs", "Dialogs",
+   "Native <dialog> with the .dialog class. Open with .showModal() and close by setting return-value or calling .close().") %}
+
+{% call example() %}
+<button type="button" class="btn-outline" data-dialog-open="example-dialog">Open dialog</button>
+<dialog id="example-dialog" class="dialog max-w-sm m-auto">
+    <article class="p-6">
+        <header>
+            <h2 class="text-lg font-semibold">Example dialog</h2>
+            <p class="text-sm text-muted-foreground">Native &lt;dialog&gt; styled with .dialog.</p>
+        </header>
+        <section class="mt-4 text-sm">
+            Press Escape or click the close button to dismiss.
+        </section>
+        <footer class="mt-6 flex justify-end gap-2">
+            <button type="button" class="btn-outline" data-dialog-close="example-dialog">Cancel</button>
+            <button type="button" class="btn-primary" data-dialog-close="example-dialog">OK</button>
+        </footer>
+    </article>
+</dialog>
+{% endcall %}
+<p class="text-xs text-muted-foreground -mt-2">
+    The CSP-safe <code>data-dialog-open</code> / <code>data-dialog-close</code> handlers
+    are wired in <code>admin.js</code> — no inline <code>onclick</code> needed.
+</p>
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("dropdowns", "Dropdowns",
+   "Two patterns: the legacy admin pattern (<button data-dropdown> + <template>) backed by Tippy, and basecoat's native dropdown-menu. Prefer the legacy pattern for now — that's what the rest of the admin uses.") %}
+
+{% call example("Admin pattern (Tippy-backed)") %}
+<button type="button" data-dropdown class="btn-outline">
+    Actions <admin.Icon name="chevron-down" />
+    <template>
+        <div class="py-1">
+            <a href="#" class="block px-4 py-2 text-sm hover:bg-accent rounded">Edit</a>
+            <a href="#" class="block px-4 py-2 text-sm hover:bg-accent rounded">Duplicate</a>
+            <a href="#" class="block px-4 py-2 text-sm text-destructive hover:bg-accent rounded">Delete</a>
+        </div>
+    </template>
+</button>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("tabs", "Tabs",
+   "Tab list backed by basecoat's tabs.js — handles ARIA roles and keyboard nav automatically.") %}
+
+{% call example() %}
+<div class="tabs w-96">
+    <div role="tablist" aria-label="Settings">
+        <button role="tab" aria-controls="tab-general" aria-selected="true">General</button>
+        <button role="tab" aria-controls="tab-advanced" aria-selected="false">Advanced</button>
+    </div>
+    <div role="tabpanel" id="tab-general" class="text-sm py-2">General tab content.</div>
+    <div role="tabpanel" id="tab-advanced" class="text-sm py-2" hidden>Advanced tab content.</div>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("code", "Code",
+   "Inline <code> and block <pre><code> are styled in admin.css.") %}
+
+{% call example("Inline") %}
+<p class="text-sm">Run <code>uv run plain check</code> to lint, type-check, and run tests.</p>
+{% endcall %}
+
+{% call example("Block") %}
+<pre><code>def hello(name: str) -> str:
+    return f"Hello, {name}!"</code></pre>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{% call section("icons", "Icons",
+   "Bootstrap Icons are vendored. Use &lt;admin.Icon name=&quot;icon-name&quot; />.") %}
+
+{% call example() %}
+<admin.Icon name="check-circle-fill" class="text-success" />
+<admin.Icon name="exclamation-triangle-fill" class="text-warning" />
+<admin.Icon name="x-circle-fill" class="text-destructive" />
+<admin.Icon name="info-circle-fill" class="text-info" />
+<admin.Icon name="gear" />
+<admin.Icon name="search" />
+<admin.Icon name="chevron-down" />
+<admin.Icon name="three-dots-vertical" />
+<admin.Icon name="palette" />
+<admin.Icon name="moon-stars" />
+{% endcall %}
+
+<p class="text-xs text-muted-foreground">
+    Browse the full set at <a href="https://icons.getbootstrap.com/" class="plain-link underline" target="_blank" rel="noopener">icons.getbootstrap.com</a>.
+</p>
+{% endcall %}
+
+</div>
+{% endblock %}

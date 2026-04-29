@@ -13,9 +13,9 @@
 <header class="flex items-center justify-between">
     <div>
         {% if table_style == "preview" %}
-            <div class="text-sm font-medium text-black/70 mb-2">{{ title }}</div>
+            <div class="text-sm font-medium text-foreground/80 mb-2">{{ title }}</div>
         {% else %}
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-stone-500">{{ page.paginator.count }} result{{ page.paginator.count|pluralize }}</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{{ page.paginator.count }} result{{ page.paginator.count|pluralize }}</h3>
         {% endif %}
     </div>
     <div class="flex space-x-2">
@@ -56,7 +56,7 @@
                     value="{{ search_query|default('') }}"
                     >
                 <div class="absolute top-1/2 -translate-y-1/2 left-2 flex items-center pointer-events-none">
-                    <admin.Icon name="search" class="text-sm text-black/50" />
+                    <admin.Icon name="search" class="text-sm text-muted-foreground" />
                 </div>
             </div>
             {% endif %}
@@ -74,7 +74,7 @@
                 <th class="p-0 pl-1">
                     <input
                         data-action-checkbox-all
-                        class="rounded bg-white border-stone-300"
+                        class="rounded bg-background border-input"
                         type="checkbox"
                     />
                 </th>
@@ -90,7 +90,7 @@
                         {% else %}
                         <a
                             data-merge-params
-                            class="text-xs font-normal flex items-center gap-1 hover:text-black group"
+                            class="text-xs font-normal flex items-center gap-1 hover:text-foreground group"
                             href="?page=1&order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
                             <span>{{ get_field_label(field) }}</span>
                             {% if field == order_by_field %}
@@ -100,13 +100,13 @@
                                 <span class="text-[10px]">▲</span>
                                 {% endif %}
                             {% else %}
-                            <span class="text-[10px] text-black/30 opacity-0 group-hover:opacity-100">▼</span>
+                            <span class="text-[10px] text-muted-foreground/60 opacity-0 group-hover:opacity-100">▼</span>
                             {% endif %}
                         </a>
                         {% endif %}
                     </th>
                     {% else %}
-                    <th class="text-xs font-normal text-black/40">{{ get_field_label(field) }}</th>
+                    <th class="text-xs font-normal text-muted-foreground">{{ get_field_label(field) }}</th>
                     {% endif %}
                 {% endfor %}
 
@@ -122,7 +122,7 @@
 
                 {% if table_style != "preview" and actions %}
                 <td class="p-0 pl-1">
-                    <input data-action-checkbox class="rounded bg-white border-stone-300" type="checkbox" name="{{ get_object_id(object) }}" />
+                    <input data-action-checkbox class="rounded bg-background border-input" type="checkbox" name="{{ get_object_id(object) }}" />
                 </td>
                 {% endif %}
 
@@ -140,14 +140,14 @@
                 {% set object_links = get_object_links(object) %}
                 {% if object_links %}
                 <td class="py-0">
-                    <button data-dropdown class="bg-transparent inline-flex rounded-md border border-transparent hover:bg-stone-100 hover:border-stone-200 px-3 py-1 text-sm font-medium text-black/70 focus:outline-none">
+                    <button data-dropdown class="bg-transparent inline-flex rounded-md border border-transparent hover:bg-accent hover:border-border px-3 py-1 text-sm font-medium text-foreground/80 focus:outline-none">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
                             <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3"/>
                         </svg>
                         <template>
                             <div class="py-1">
                                 {% for text, url in object_links.items() %}
-                                <a href="{{ url }}" class="block px-4 py-2 text-sm text-black/70 hover:bg-stone-100 rounded">
+                                <a href="{{ url }}" class="block px-4 py-2 text-sm text-foreground/80 hover:bg-accent rounded">
                                     {{ text }}
                                 </a>
                                 {% endfor %}
@@ -162,8 +162,8 @@
     </table>
 </div>
 {% else %}
-<div class="mt-2 border-t border-stone-200 py-10 text-center">
-    <p class="text-sm text-stone-400">
+<div class="mt-2 border-t border-border py-10 text-center">
+    <p class="text-sm text-muted-foreground/80">
         {% if search_query %}
         No results for "{{ search_query }}"
         {% else %}
@@ -174,26 +174,26 @@
 {% endif %}
 
 {% if table_style != "preview" and page.has_other_pages() %}
-<footer class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-white/95 backdrop-blur-sm border-t border-stone-200 pt-4 pb-3">
+<footer class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-background/95 backdrop-blur-sm border-t border-border pt-4 pb-3">
     <div class="flex items-center justify-between text-sm">
-        <span class="text-stone-500">
+        <span class="text-muted-foreground">
             Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results, {{ page.paginator.per_page }} per page)
         </span>
         <div class="flex items-center gap-2">
             {% if page.has_previous() %}
-            <a data-merge-params href="?page={{ page.previous_page_number() }}" class="px-2 py-1 text-xs border border-stone-200 rounded hover:bg-stone-50">&lt;</a>
+            <a data-merge-params href="?page={{ page.previous_page_number() }}" class="px-2 py-1 text-xs border border-border rounded hover:bg-muted">&lt;</a>
             {% endif %}
             <form data-autosubmit method="GET">
                 {% if search_fields and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
                 {% if filter_names and current_filter %}<input type="hidden" name="filter" value="{{ current_filter }}" />{% endif %}
-                <select name="page" class="w-auto text-xs py-1 pl-2 pr-6 border-stone-200 rounded">
+                <select name="page" class="w-auto text-xs py-1 pl-2 pr-6 border-border rounded">
                 {% for page_num in page.paginator.page_range %}
                     <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>
                 {% endfor %}
                 </select>
             </form>
             {% if page.has_next() %}
-            <a data-merge-params href="?page={{ page.next_page_number() }}" class="px-2 py-1 text-xs border border-stone-200 rounded hover:bg-stone-50">&gt;</a>
+            <a data-merge-params href="?page={{ page.next_page_number() }}" class="px-2 py-1 text-xs border border-border rounded hover:bg-muted">&gt;</a>
             {% endif %}
         </div>
     </div>

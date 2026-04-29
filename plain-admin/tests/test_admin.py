@@ -74,6 +74,22 @@ def test_has_permission_setting(db):
         settings.ADMIN_HAS_PERMISSION = original
 
 
+def test_components_view_renders(db):
+    """The components catalog page renders for an admin user."""
+    user = User.query.create(username="admin", is_admin=True)
+    client = Client()
+    client.force_login(user)
+
+    resp = client.get("/admin/components/")
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    # Sanity-check a few markers from each major section
+    assert "Customizing the admin" in body
+    assert "btn-primary" in body
+    assert "badge-success" in body
+    assert "data-theme-toggle" in body
+
+
 def test_nav_sections_exclude_denied_views(db):
     """Nav sections should not include views the user is denied from."""
 

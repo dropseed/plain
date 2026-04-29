@@ -11,8 +11,21 @@
             {{ app_name }} Admin
         {%- endif -%}
     </title>
+    {# Resolve theme choice before paint to avoid a flash of light/dark mismatch. #}
+    <script nonce="{{ request.csp_nonce }}">
+    (() => {
+        const stored = localStorage.getItem("plain-admin-theme");
+        const choice = stored === "light" || stored === "dark" ? stored : "system";
+        const dark = choice === "dark"
+            || (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.dataset.themeChoice = choice;
+        document.documentElement.dataset.themeResolved = dark ? "dark" : "light";
+    })();
+    </script>
     {% tailwind_css %}
     {% htmx_js %}
+    <link href="{{ asset('admin/basecoat/basecoat.css') }}" rel="stylesheet">
     <link href="{{ asset('admin/admin.css') }}" rel="stylesheet">
     <style nonce="{{ request.csp_nonce }}">
     @font-face {
@@ -26,15 +39,23 @@
     <script src="{{ asset('admin/vendor/chart.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/charts.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/admin.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/theme.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/datetime-tooltips.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/menu.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/vendor/popper.min.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <link href="{{ asset('admin/vendor/tippy.css') }}" rel="stylesheet">
     <script src="{{ asset('admin/vendor/tippy.umd.min.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    {# Basecoat component JS (vanilla, registers via MutationObserver). #}
+    <script src="{{ asset('admin/basecoat/js/basecoat.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/basecoat/js/dropdown-menu.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/basecoat/js/popover.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/basecoat/js/select.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/basecoat/js/tabs.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/basecoat/js/toast.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     {% block header_scripts %}{% endblock %}
 </head>
 <body
-    class="flex flex-col min-h-screen bg-white pb-12"
+    class="flex flex-col min-h-screen bg-background text-foreground pb-12"
     {% if is_package_installed('plaintoolbar') %}data-toolbar-installed{% endif %}
     >
 
@@ -42,23 +63,23 @@
     {% include "admin/_header.html" %}
 
     <div class="flex flex-1 min-h-[calc(100vh-5.5rem)]"> <!-- h-11 + h-11 = 5.5rem -->
-        <div id="plain-admin-content" class="w-full min-w-0 bg-white text-black/90 flex-grow">
+        <div id="plain-admin-content" class="w-full min-w-0 bg-background text-foreground flex-grow">
             <header class="px-4 lg:px-8 inset-x-0 pt-6 pb-4">
                 {% block header %}
                 {# Breadcrumbs - small, above title #}
                 {% if parent_view_classes %}
-                <nav class="flex items-center space-x-1.5 mb-1 text-xs text-black/50" aria-label="Breadcrumb">
+                <nav class="flex items-center space-x-1.5 mb-1 text-xs text-muted-foreground" aria-label="Breadcrumb">
                     {% for parent_view in parent_view_classes|reverse %}
                         {% if not loop.first %}
-                            <span class="text-black/30">/</span>
+                            <span class="text-muted-foreground/60">/</span>
                         {% endif %}
-                        <a href="{{ parent_view.get_view_url(object if object is defined else None) }}" class="hover:text-black/70 hover:underline">
+                        <a href="{{ parent_view.get_view_url(object if object is defined else None) }}" class="hover:text-foreground hover:underline">
                             {{ parent_view.get_nav_title() }}
                         </a>
                     {% endfor %}
                     {% if object is defined %}
-                        <span class="text-black/30">/</span>
-                        <span class="text-black/60 truncate max-w-48">{{ object.__repr__() }}</span>
+                        <span class="text-muted-foreground/60">/</span>
+                        <span class="text-foreground/80 truncate max-w-48">{{ object.__repr__() }}</span>
                     {% endif %}
                 </nav>
                 {% endif %}
@@ -77,7 +98,7 @@
                     {% macro link_dropdown_items(items) %}
                     <div class="py-1">
                         {% for link, url in items %}
-                        <a href="{{ url }}" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
+                        <a href="{{ url }}" class="block px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
                             {{ link }}
                         </a>
                         {% endfor %}
@@ -86,10 +107,10 @@
                     <div class="hidden sm:flex items-center space-x-2 text-sm flex-shrink-0">
                         {% block actions %}{% endblock %}
                         {% for link, url in links.items() %}
-                        <a href="{{ url }}" class="plain-btn">{{ link }}</a>
+                        <a href="{{ url }}" class="btn-outline">{{ link }}</a>
                         {% endfor %}
                         {% if extra_links %}
-                        <button type="button" data-dropdown class="plain-btn">
+                        <button type="button" data-dropdown class="btn-outline">
                             <admin.Icon name="three-dots" />
                             <template>
                                 {{ link_dropdown_items(extra_links.items()) }}
@@ -100,17 +121,17 @@
                     {# Mobile actions dropdown #}
                     {% if links or extra_links %}
                     <div class="sm:hidden flex-shrink-0">
-                        <button type="button" data-dropdown class="flex items-center justify-center w-8 h-8 rounded hover:bg-stone-100">
-                            <admin.Icon name="three-dots" class="text-stone-600" />
+                        <button type="button" data-dropdown class="flex items-center justify-center w-8 h-8 rounded hover:bg-accent">
+                            <admin.Icon name="three-dots" class="text-muted-foreground" />
                             <template>
                                 <div class="py-1">
                                     {% for link, url in links.items() %}
-                                    <a href="{{ url }}" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
+                                    <a href="{{ url }}" class="block px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
                                         {{ link }}
                                     </a>
                                     {% endfor %}
                                     {% for link, url in extra_links.items() %}
-                                    <a href="{{ url }}" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
+                                    <a href="{{ url }}" class="block px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
                                         {{ link }}
                                     </a>
                                     {% endfor %}
@@ -122,7 +143,7 @@
                 </div>
                 {# Description - shown below title #}
                 {% if description %}
-                <p class="mt-1 text-sm text-black/50">{{ description }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ description }}</p>
                 {% endif %}
                 {% endblock %}
             </header>
@@ -137,7 +158,7 @@
             </div>
             {% endif %}
 
-            <main class="px-4 pt-6 pb-6 lg:px-8 text-black/70">{% block content %}{% endblock %}</main>
+            <main class="px-4 pt-6 pb-6 lg:px-8 text-foreground/80">{% block content %}{% endblock %}</main>
         </div>
 
     </div>

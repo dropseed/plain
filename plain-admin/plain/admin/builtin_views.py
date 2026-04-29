@@ -288,10 +288,13 @@ class PreflightView(AdminView):
         return context
 
 
-class StyleGuideView(AdminView):
-    """Style guide showing available components and patterns."""
+class ComponentsView(AdminView):
+    """Component catalog: customization guide + live examples of every built-in
+    UI primitive (buttons, badges, cards, forms, dialogs, dropdowns, ...).
+    Shipped with the admin so users can copy markup straight from the page
+    they see rendered."""
 
     is_builtin = True
-    template_name = "admin/style.html"
-    title = "Style Guide"
+    template_name = "admin/components.html"
+    title = "Components"
     nav_section = None

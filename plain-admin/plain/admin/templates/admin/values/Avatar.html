@@ -1,7 +1,7 @@
 {% if value is none %}
-<span class="text-stone-400 font-mono text-sm">None</span>
+<span class="text-muted-foreground/80 font-mono text-sm">None</span>
 {% elif value == "" %}
-<span class="text-stone-300">—</span>
+<span class="text-muted-foreground/50">—</span>
 {% elif value is string %}
 <img
     src="{{ value }}"

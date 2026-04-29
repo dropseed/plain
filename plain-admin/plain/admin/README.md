@@ -19,9 +19,12 @@
 - [Toolbar](#toolbar)
 - [Impersonate](#impersonate)
 - [Customization](#customization)
+    - [Theming](#theming)
+    - [Components](#components)
     - [Header branding](#header-branding)
     - [User avatar](#user-avatar)
     - [User menu items](#user-menu-items)
+    - [Field value templates](#field-value-templates)
 - [Access control](#access-control)
     - [Per-view restriction](#per-view-restriction)
     - [Global restriction](#global-restriction)
@@ -475,6 +478,78 @@ def my_view(request):
 
 ## Customization
 
+### Theming
+
+The admin's UI is built on a vendored copy of [Basecoat UI](https://basecoatui.com)
+(MIT licensed) plus a Plain-specific brand palette. Both palettes are exposed
+as CSS custom properties on `:root` (light) and `.dark`, so you can re-skin
+the admin without forking templates.
+
+```css
+/* app/static/admin-overrides.css */
+:root {
+  --primary: #4f46e5;        /* swap olive for indigo */
+  --primary-foreground: white;
+  --ring: #4f46e5;
+}
+.dark {
+  --primary: #818cf8;
+  --primary-foreground: #1e1b4b;
+}
+```
+
+Load the override stylesheet after the admin's own CSS in your
+`admin/base.html` block. Every `.btn-primary`, focus ring, and brand-colored
+link in the admin will pick up the new color.
+
+The full list of tokens (and side-by-side swatches) lives at
+[`/admin/components/`](#components) under "Design tokens".
+
+The admin ships with light and dark mode out of the box. A toggle in the top
+bar cycles **Light → Dark → System**, persisted in `localStorage`. The dark
+class is applied to `<html>` before paint via an inline init script, so there
+is no flash of the wrong theme on page load.
+
+### Components
+
+The admin includes a live component catalog at `/admin/components/`. Each
+section shows the rendered component with copy-pasteable markup — buttons,
+badges, alerts, cards, form fields, dialogs, dropdowns, tabs, tables, and
+icons. Use these classes when building admin views and you'll inherit
+both light/dark theming and the user's brand overrides.
+
+| Pattern               | Class(es)                                                                |
+| --------------------- | ------------------------------------------------------------------------ |
+| Buttons               | `.btn`, `.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-destructive` |
+| Sizes / icon-only     | prefix `.btn-sm-…`, `.btn-lg-…`, `.btn-icon-…`                           |
+| Badges                | `.badge`, `.badge-secondary`, `.badge-destructive`, `.badge-outline`     |
+| Plain semantic badges | `.badge-success`, `.badge-warning`, `.badge-danger`, `.badge-info`       |
+| Cards                 | `.card` (basecoat) or `.admin-card` (Plain's denser metric card)         |
+| Form inputs           | `.input`, `.textarea` — and `<select>` is auto-styled                    |
+| Dialogs               | `<dialog class="dialog">` + `data-dialog-open="…"` / `data-dialog-close` |
+| Tabs                  | `.tabs > [role="tablist"] > [role="tab"]`                                |
+| Dropdowns             | legacy `data-dropdown` + `<template>` (Tippy-backed)                     |
+
+When writing custom admin templates, prefer the design tokens over hardcoded
+colors so dark mode and theme overrides work automatically:
+
+| Use             | Class / token                                              |
+| --------------- | ---------------------------------------------------------- |
+| Page background | `bg-background`, `text-foreground`                         |
+| Cards / panels  | `bg-card text-card-foreground`                             |
+| Subtle surfaces | `bg-muted`, `bg-muted/40`                                  |
+| Hover surface   | `hover:bg-accent hover:text-accent-foreground`             |
+| Borders         | `border-border` (general), `border-input` (form fields)    |
+| Muted text      | `text-muted-foreground`                                    |
+| Status colors   | `text-success`, `text-warning`, `text-danger`, `text-info` |
+| Focus ring      | `ring-ring`                                                |
+
+The vendored Basecoat source is in
+[`plain/admin/assets/admin/basecoat/`](./assets/admin/basecoat/) along with
+its `LICENSE.md` and a `README.md` documenting how to update it. Plain's
+overrides and admin-only chrome live in
+[`plain/admin/assets/admin/admin.css`](./assets/admin/admin.css).
+
 ### Header branding
 
 The top-left corner of the admin header shows your app name and an "Admin" link by default. To replace it with your own logo or branding, create an `admin/header_branding.html` template:
@@ -519,7 +594,7 @@ To add items to the user dropdown menu (e.g., a profile page), create an `admin/
 <!-- app/templates/admin/user_menu_items.html -->
 <a
     href="{{ admin_url('profile') }}"
-    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded"
+    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded"
 >
     Profile
 </a>

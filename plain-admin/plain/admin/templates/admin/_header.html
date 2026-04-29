@@ -2,7 +2,7 @@
 {# Admin header partial - includes nav tabs and menu dialog #}
 {# Context: app_name, user, nav_tabs, slug, parent_view_classes, pinned_slugs, admin_registry #}
 
-<header id="admin-header" class="sticky top-0 z-50 border-b border-stone-200 pt-2 bg-[#f6f3f2]">
+<header id="admin-header" class="sticky top-0 z-50 border-b border-border pt-2 bg-muted/40">
     <!-- Top row -->
     <div class="flex items-center justify-between px-4 lg:px-8 h-11">
         <div class="flex items-center gap-1.5">
@@ -18,15 +18,15 @@
                         type="text"
                         name="query"
                         id="topbar-search"
-                        class="w-52 pr-10 pl-8 text-sm bg-stone-100/60 border border-transparent py-1.5 rounded-md transition-all duration-150 placeholder:text-stone-400 focus:outline-none focus:bg-white focus:border-stone-300 focus:ring-1 focus:ring-stone-300 focus:w-64"
+                        class="w-52 pr-10 pl-8 text-sm bg-muted/60 border border-transparent py-1.5 rounded-md transition-all duration-150 placeholder:text-muted-foreground focus:outline-none focus:bg-background focus:border-input focus:ring-1 focus:ring-ring focus:w-64"
                         placeholder="Search..."
                         value="{{ global_search_query|default('') }}"
                     >
                     <div class="absolute inset-y-0 left-2.5 flex items-center pointer-events-none">
-                        <admin.Icon name="search" class="text-sm text-stone-400" />
+                        <admin.Icon name="search" class="text-sm text-muted-foreground" />
                     </div>
                     <div class="absolute inset-y-0 right-2 flex items-center pointer-events-none">
-                        <kbd class="text-[10px] font-sans text-stone-400 bg-stone-200/80 px-1.5 py-0.5 rounded">/</kbd>
+                        <kbd class="text-[10px] font-sans text-muted-foreground bg-muted px-1.5 py-0.5 rounded">/</kbd>
                     </div>
                 </div>
             </form>
@@ -34,16 +34,28 @@
             <!-- Search (mobile) -->
             <a
                 href="{{ url('admin:search') }}"
-                class="sm:hidden flex items-center justify-center w-7 h-7 text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100"
+                class="sm:hidden flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded hover:bg-accent"
             >
                 <admin.Icon name="search" />
             </a>
+
+            <!-- Theme toggle (cycles light → dark → system) -->
+            <button
+                type="button"
+                data-theme-toggle
+                title="Toggle theme"
+                aria-label="Toggle theme"
+                class="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded hover:bg-accent"
+            >
+                <admin.Icon name="sun" class="block dark:hidden" />
+                <admin.Icon name="moon-stars" class="hidden dark:block" />
+            </button>
 
             <!-- Preflight -->
             {% set preflight_total = preflight_counts.errors + preflight_counts.warnings %}
             <a
                 href="{{ url('admin:preflight') }}"
-                class="relative flex items-center justify-center w-7 h-7 text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100"
+                class="relative flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded hover:bg-accent"
                 title="Preflight checks"
             >
                 <admin.Icon name="shield-check" />
@@ -63,8 +75,8 @@
                         class="w-7 h-7 rounded-full"
                     />
                 {% else %}
-                    <div class="w-7 h-7 rounded-full bg-stone-200 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 text-stone-500" viewBox="0 0 16 16">
+                    <div class="w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-4 h-4 text-muted-foreground" viewBox="0 0 16 16">
                             <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
                             <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
                         </svg>
@@ -73,12 +85,16 @@
                 <template>
                     <div class="py-1">
                         {% include "admin/user_menu_items.html" ignore missing %}
-                        <a href="{{ url('admin:settings') }}" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
+                        <a href="{{ url('admin:settings') }}" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
                             <admin.Icon name="gear" />
                             App Settings
                         </a>
+                        <a href="{{ url('admin:components') }}" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
+                            <admin.Icon name="palette" />
+                            Components
+                        </a>
                         <form method="POST" action="{{ url('admin:logout') }}">
-                            <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
+                            <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded">
                                 <admin.Icon name="box-arrow-right" />
                                 Log out
                             </button>
@@ -90,7 +106,7 @@
             <!-- Menu button (mobile) -->
             <button
                 type="button"
-                class="menu-toggle sm:hidden flex items-center justify-center w-7 h-7 text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100"
+                class="menu-toggle sm:hidden flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded hover:bg-accent"
             >
                 <admin.Icon name="grid-3x3-gap" />
             </button>
@@ -108,7 +124,7 @@
                 href="{{ nav_url }}"
                 {% if is_current %}data-active{% endif %}
                 {% if tab.pinned %}draggable="true" data-slug="{{ view_slug }}"{% else %}data-recent{% endif %}
-                class="nav-tab flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap text-stone-600 hover:text-stone-900 border-b-2 hover:border-stone-300 data-[active]:text-stone-900 data-[active]:font-medium data-[recent]:text-stone-500 data-[recent]:font-normal data-[recent]:italic {% if is_current %}border-[var(--plain-olive)]{% else %}border-transparent{% endif %}"
+                class="nav-tab flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap text-muted-foreground hover:text-foreground border-b-2 hover:border-border data-[active]:text-foreground data-[active]:font-medium data-[recent]:text-muted-foreground/80 data-[recent]:font-normal data-[recent]:italic {% if is_current %}border-[var(--plain-olive)]{% else %}border-transparent{% endif %}"
             >{% if tab.view.nav_icon %}<admin.Icon name={tab.view.nav_icon} class="opacity-60" />{% endif %}{{ tab.view.get_nav_title() }}</a>
             {% endfor %}
         </div>
@@ -116,7 +132,7 @@
         <!-- Menu button (desktop) -->
         <button
             type="button"
-            class="menu-toggle hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-stone-500 hover:text-stone-700 rounded hover:bg-stone-100 ml-auto"
+            class="menu-toggle hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded hover:bg-accent ml-auto"
         >
             <admin.Icon name="grid-3x3-gap" />
             <span>Menu</span>
@@ -128,22 +144,22 @@
         <div class="fixed inset-0 flex justify-end pt-14 sm:pt-16 px-4 sm:px-6">
             {# Backdrop - clicking closes the menu #}
             <div class="menu-toggle absolute inset-0 bg-black/20 backdrop-blur-sm -z-10 cursor-default"></div>
-            <div class="w-full sm:w-80 max-h-[75vh] overflow-hidden flex flex-col bg-white rounded-xl shadow-2xl ring-1 ring-stone-200/80">
+            <div class="w-full sm:w-80 max-h-[75vh] overflow-hidden flex flex-col bg-popover text-popover-foreground rounded-xl shadow-2xl ring-1 ring-border">
                 {# Filter input #}
-                <div class="p-3 bg-gradient-to-b from-stone-50 to-stone-50/80 border-b border-stone-200/60">
+                <div class="p-3 bg-muted/40 border-b border-border">
                     <div class="flex items-center gap-2">
                         <div class="relative flex-1">
-                            <admin.Icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-stone-400 pointer-events-none" />
+                            <admin.Icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none" />
                             <input
                                 type="text"
                                 id="menu-filter-input"
                                 placeholder="Filter pages..."
-                                class="w-full pl-8 pr-3 py-2 text-base sm:text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-300 placeholder:text-stone-400 transition-shadow"
+                                class="w-full pl-8 pr-3 py-2 text-base sm:text-sm bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring placeholder:text-muted-foreground transition-shadow"
                             />
                         </div>
                         <button
                             type="button"
-                            class="menu-toggle flex items-center justify-center w-8 h-8 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                            class="menu-toggle flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
                             aria-label="Close menu"
                         >
                             <admin.Icon name="x-lg" />

@@ -17,10 +17,10 @@
         </div>
 
         <form method="post" class="mt-6 flex items-center justify-end space-x-3">
-            <a href="{{ request.headers.get('Referer', '..') }}" class="plain-btn no-underline">
+            <a href="{{ request.headers.get('Referer', '..') }}" class="btn-outline no-underline">
                 Cancel
             </a>
-            <button type="submit" class="plain-btn plain-btn-danger">
+            <button type="submit" class="btn-destructive">
                 Yes, delete
             </button>
         </form>

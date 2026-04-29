@@ -1,7 +1,9 @@
 <textarea
     id="{{ field.html_id }}"
+    class="textarea"
     name="{{ field.html_name }}"
     rows="{{ rows|default(3) }}"
     spellcheck="{{ spellcheck|default('default') }}"
     {% if field.field.required %}required{% endif %}
+    {% if field.errors %}aria-invalid="true"{% endif %}
     >{{ field.value() or "" }}</textarea>
