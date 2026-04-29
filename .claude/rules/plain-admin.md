@@ -72,6 +72,7 @@ Use the component classes for UI primitives:
 | Dropdowns      | `.dropdown-menu` wrapping a `<button>` + `[data-popover]` w/ `[role="menu"]`       |
 | Tabs           | `.tabs > [role="tablist"] > [role="tab"]` (uses tabs.js)                           |
 | Hovercards     | `<span class="hovercard">` + trigger + `<div data-hovercard aria-hidden="true">`   |
+| Kbd            | `<kbd class="kbd">Esc</kbd>` — inline key-name pill                                |
 
 The live catalog is at `/admin/customization/` — copy-pasteable markup
 for every primitive plus the design tokens and customization guide.
