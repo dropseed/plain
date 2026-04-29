@@ -15,10 +15,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Reset and focus the filter every time the menu popover opens.
-  // basecoat:popover fires from popover.js when a popover starts opening
-  // (before aria-hidden is flipped, so defer the focus by a frame).
+  // plain-admin:popover-open fires from components.js when a popover starts
+  // opening (before aria-hidden is flipped, so defer the focus by a frame).
   if (filterInput && menuPopover) {
-    document.addEventListener("basecoat:popover", (e) => {
+    document.addEventListener("plain-admin:popover-open", (e) => {
       if (!e.detail.source.contains(menuPopover)) return;
       setTimeout(() => {
         filterInput.value = "";

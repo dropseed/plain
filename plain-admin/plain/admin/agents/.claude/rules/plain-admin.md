@@ -33,17 +33,11 @@ plain-admin/plain/admin/
 │   │   └── nav.css
 │   └── ATTRIBUTIONS.md                   ← MIT credit for Basecoat-derived code
 └── assets/admin/
-    ├── components/                       ← stateful UI primitives (register via MutationObserver)
-    │   ├── basecoat.js                   ← registry; exposes window.basecoat
-    │   ├── dropdown-menu.js
-    │   ├── hovercard.js                  ← Plain admin extension
-    │   ├── popover.js
-    │   └── tabs.js
-    ├── behaviors/                        ← declarative data-* handlers (delegated on document)
-    │   ├── autolink.js                   ← data-column-autolink
-    │   ├── autosubmit.js                 ← data-autosubmit + GET-form param cleanup
-    │   ├── copy.js                       ← data-copy-value (+ data-copy-feedback)
-    │   └── encrypted.js                  ← data-encrypted reveal/hide
+    ├── components.js                     ← popover, dropdown-menu, hovercard, tabs
+    │                                       (init on DOMContentLoaded + htmx:afterSwap)
+    ├── behaviors.js                      ← declarative data-* handlers
+    │                                       (data-column-autolink, data-autosubmit,
+    │                                       data-copy-value, data-encrypted)
     ├── htmx.js                           ← HTMX network-error alerts
     ├── theme.js                          ← dark-mode toggle + persistence
     └── …

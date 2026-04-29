@@ -44,16 +44,10 @@
     <script src="{{ asset('admin/datetime-hovercard.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/menu.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     {# Declarative data-* behaviors (delegated handlers on document). #}
-    <script src="{{ asset('admin/behaviors/autolink.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/behaviors/autosubmit.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/behaviors/copy.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/behaviors/encrypted.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    {# Component JS modules (vanilla, register themselves via MutationObserver). #}
-    <script src="{{ asset('admin/components/basecoat.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/components/dropdown-menu.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/components/hovercard.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/components/popover.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/components/tabs.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/behaviors.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    {# Stateful UI components — popover, dropdown-menu, hovercard. Init runs
+       on DOMContentLoaded + htmx:afterSwap; idempotent via data-* flags. #}
+    <script src="{{ asset('admin/components.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     {% block header_scripts %}{% endblock %}
 </head>
 <body
