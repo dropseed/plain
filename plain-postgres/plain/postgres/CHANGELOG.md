@@ -1,5 +1,21 @@
 # plain-postgres changelog
 
+## [0.100.0](https://github.com/dropseed/plain/releases/plain-postgres@0.100.0) (2026-04-28)
+
+### What's changed
+
+- **Replaced the `violation_error_message` / `violation_error_code` triad on `CheckConstraint` and `UniqueConstraint` with a single `violation_error` kwarg.** The new kwarg accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, a list, or a fully-formed `ValidationError` — so message text, error code, and field routing all live on one object. ([8650edc22c09](https://github.com/dropseed/plain/commit/8650edc22c09))
+- **Single-field `UniqueConstraint` now auto-routes flat errors to its field.** A `violation_error="That email is taken."` on `UniqueConstraint(fields=["email"])` lands on the `email` form field instead of `NON_FIELD_ERRORS`. A caller-built `ValidationError({"other_field": ...})` is preserved as-is. ([8650edc22c09](https://github.com/dropseed/plain/commit/8650edc22c09))
+- **Dropped the hardcoded `code == "unique"` routing in `validate_constraints()`.** Routing is now uniform across constraint types: dict-form errors land on fields, flat errors go to `NON_FIELD_ERRORS`. ([8650edc22c09](https://github.com/dropseed/plain/commit/8650edc22c09))
+- **Removed the `%(name)s` interpolation magic** on `BaseConstraint.default_violation_error_message`. The default message still includes the constraint name; users wanting runtime interpolation can pass `ValidationError(..., params={"name": ...})`. ([8650edc22c09](https://github.com/dropseed/plain/commit/8650edc22c09))
+- Documented that `save()` runs `full_clean()` by default (`clean_and_validate=True`); fixed the README's Validation example which previously implied users had to override `save()` to call `full_clean()` manually. ([8650edc22c09](https://github.com/dropseed/plain/commit/8650edc22c09))
+
+### Upgrade instructions
+
+- Replace `violation_error_message="..."` and `violation_error_code="..."` on `CheckConstraint` / `UniqueConstraint` with a single `violation_error=ValidationError("...", code="...")` (or a string if you only need the message).
+- If you relied on the implicit single-field-unique routing for a constraint with a custom `violation_error_code`, no change needed — single-field `UniqueConstraint` still auto-routes by default.
+- If you used `%(name)s` in `violation_error_message`, switch to `ValidationError("...", params={"name": "your_constraint_name"})` or hardcode the name.
+
 ## [0.99.1](https://github.com/dropseed/plain/releases/plain-postgres@0.99.1) (2026-04-26)
 
 ### What's changed
