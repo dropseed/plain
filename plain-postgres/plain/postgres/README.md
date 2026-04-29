@@ -1003,7 +1003,7 @@ author.books.query.published()
 
 ### Validation
 
-You can validate models before saving:
+`save()` runs `full_clean()` by default — field validators, model `clean()`, and any constraints with a `validate()` method are all checked, raising `ValidationError` on violation. Pass `clean_and_validate=False` to skip it (e.g. for trusted bulk loads).
 
 ```python
 @postgres.register_model
@@ -1020,10 +1020,6 @@ class User(postgres.Model):
     def clean(self):
         if self.age < 18:
             raise ValidationError("User must be 18 or older")
-
-    def save(self, *args, **kwargs):
-        self.full_clean()  # Runs validation
-        super().save(*args, **kwargs)
 ```
 
 Field-level validation happens automatically based on field types and constraints.
@@ -1049,6 +1045,38 @@ class User(postgres.Model):
         ],
     )
 ```
+
+Constraints are also checked during `full_clean()` (which `save()` runs by default — see [Validation](#validation)). Pass `violation_error` to customize the resulting `ValidationError`. It accepts anything `ValidationError(...)` accepts — a string, a `{field: message}` dict, or a fully-formed `ValidationError`:
+
+```python
+# Simple message — lands on NON_FIELD_ERRORS
+postgres.CheckConstraint(
+    check=postgres.Q(age__gte=0),
+    name="age_positive",
+    violation_error="Age must be zero or greater.",
+)
+
+# Dict form — routes to a specific field
+postgres.CheckConstraint(
+    check=postgres.Q(age__gte=0),
+    name="age_positive",
+    violation_error={"age": "Age must be zero or greater."},
+)
+
+# Full ValidationError — for code, params, multiple fields
+postgres.CheckConstraint(
+    check=postgres.Q(age__gte=0),
+    name="age_positive",
+    violation_error=ValidationError(
+        {"age": "Age must be zero or greater."},
+        code="age_negative",
+    ),
+)
+```
+
+A `code` becomes `ValidationError.code` — useful for test assertions, error tracking buckets, and code that branches on specific error types without string-matching.
+
+`UniqueConstraint` accepts the same `violation_error`. With a single-field unique constraint, a string `violation_error="That email is taken."` auto-routes to that field; otherwise (multi-field, expressions, or a CheckConstraint) errors land on `NON_FIELD_ERRORS` unless you pass the dict form. See [BaseConstraint](./constraints.py#BaseConstraint) for the full signature.
 
 ### Schema design
 

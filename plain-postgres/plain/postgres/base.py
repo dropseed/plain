@@ -812,19 +812,13 @@ class Model(metaclass=ModelBase):
     def validate_constraints(self, exclude: set[str] | None = None) -> None:
         constraints = self.get_constraints()
 
-        errors = {}
+        errors: dict[str, list[ValidationError]] = {}
         for model_class, model_constraints in constraints:
             for constraint in model_constraints:
                 try:
                     constraint.validate(model_class, self, exclude=exclude)
                 except ValidationError as e:
-                    if (
-                        getattr(e, "code", None) == "unique"
-                        and len(constraint.fields) == 1
-                    ):
-                        errors.setdefault(constraint.fields[0], []).append(e)
-                    else:
-                        errors = e.update_error_dict(errors)
+                    errors = e.update_error_dict(errors)
         if errors:
             raise ValidationError(errors)
 

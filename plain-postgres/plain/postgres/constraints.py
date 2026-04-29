@@ -28,25 +28,20 @@ if TYPE_CHECKING:
 __all__ = ["BaseConstraint", "CheckConstraint", "Deferrable", "UniqueConstraint"]
 
 
+ViolationError = str | dict[str, Any] | list[Any] | ValidationError
+
+
 class BaseConstraint:
-    default_violation_error_message = 'Constraint "%(name)s" is violated.'
-    violation_error_code: str | None = None
-    violation_error_message: str | None = None
+    violation_error: ViolationError | None = None
 
     def __init__(
         self,
         *,
         name: str,
-        violation_error_code: str | None = None,
-        violation_error_message: str | None = None,
+        violation_error: ViolationError | None = None,
     ) -> None:
         self.name = name
-        if violation_error_code is not None:
-            self.violation_error_code = violation_error_code
-        if violation_error_message is not None:
-            self.violation_error_message = violation_error_message
-        else:
-            self.violation_error_message = self.default_violation_error_message
+        self.violation_error = violation_error
 
     @property
     def contains_expressions(self) -> bool:
@@ -64,21 +59,19 @@ class BaseConstraint:
             "subclasses of BaseConstraint must provide a validate() method"
         )
 
-    def get_violation_error_message(self) -> str:
-        assert self.violation_error_message is not None
-        return self.violation_error_message % {"name": self.name}
+    def _build_violation_error(self) -> ValidationError:
+        if self.violation_error is None:
+            return ValidationError(f'Constraint "{self.name}" is violated.')
+        if isinstance(self.violation_error, ValidationError):
+            return self.violation_error
+        return ValidationError(self.violation_error)
 
     def deconstruct(self) -> tuple[str, tuple[Any, ...], dict[str, Any]]:
         path = f"{self.__class__.__module__}.{self.__class__.__name__}"
         path = path.replace("plain.postgres.constraints", "plain.postgres")
         kwargs: dict[str, Any] = {"name": self.name}
-        if (
-            self.violation_error_message is not None
-            and self.violation_error_message != self.default_violation_error_message
-        ):
-            kwargs["violation_error_message"] = self.violation_error_message
-        if self.violation_error_code is not None:
-            kwargs["violation_error_code"] = self.violation_error_code
+        if self.violation_error is not None:
+            kwargs["violation_error"] = self.violation_error
         return (path, (), kwargs)
 
     def clone(self) -> BaseConstraint:
@@ -92,19 +85,14 @@ class CheckConstraint(BaseConstraint):
         *,
         check: Q,
         name: str,
-        violation_error_code: str | None = None,
-        violation_error_message: str | None = None,
+        violation_error: ViolationError | None = None,
     ) -> None:
         self.check = check
         if not getattr(check, "conditional", False):
             raise TypeError(
                 "CheckConstraint.check must be a Q instance or boolean expression."
             )
-        super().__init__(
-            name=name,
-            violation_error_code=violation_error_code,
-            violation_error_message=violation_error_message,
-        )
+        super().__init__(name=name, violation_error=violation_error)
 
     def to_sql(self, model: type[Model], *, not_valid: bool = False) -> str:
         """Generate ALTER TABLE ADD CONSTRAINT CHECK SQL as a plain string."""
@@ -122,27 +110,19 @@ class CheckConstraint(BaseConstraint):
         against = instance._get_field_value_map(meta=model._model_meta, exclude=exclude)
         try:
             if not Q(self.check).check(against):
-                raise ValidationError(
-                    self.get_violation_error_message(), code=self.violation_error_code
-                )
+                raise self._build_violation_error()
         except FieldError:
             pass
 
     def __repr__(self) -> str:
-        return "<{}: check={} name={}{}{}>".format(
+        return "<{}: check={} name={}{}>".format(
             self.__class__.__qualname__,
             self.check,
             repr(self.name),
             (
                 ""
-                if self.violation_error_code is None
-                else f" violation_error_code={self.violation_error_code!r}"
-            ),
-            (
-                ""
-                if self.violation_error_message is None
-                or self.violation_error_message == self.default_violation_error_message
-                else f" violation_error_message={self.violation_error_message!r}"
+                if self.violation_error is None
+                else f" violation_error={self.violation_error!r}"
             ),
         )
 
@@ -151,8 +131,7 @@ class CheckConstraint(BaseConstraint):
             return (
                 self.name == other.name
                 and self.check == other.check
-                and self.violation_error_code == other.violation_error_code
-                and self.violation_error_message == other.violation_error_message
+                and self.violation_error == other.violation_error
             )
         return super().__eq__(other)
 
@@ -183,8 +162,7 @@ class UniqueConstraint(BaseConstraint):
         deferrable: Deferrable | None = None,
         include: tuple[str, ...] | list[str] | None = None,
         opclasses: tuple[str, ...] | list[str] = (),
-        violation_error_code: str | None = None,
-        violation_error_message: str | None = None,
+        violation_error: ViolationError | None = None,
     ) -> None:
         if not name:
             raise ValueError("A unique constraint must be named.")
@@ -234,11 +212,7 @@ class UniqueConstraint(BaseConstraint):
             F(expression) if isinstance(expression, str) else expression
             for expression in expressions
         )
-        super().__init__(
-            name=name,
-            violation_error_code=violation_error_code,
-            violation_error_message=violation_error_message,
-        )
+        super().__init__(name=name, violation_error=violation_error)
 
     @property
     def contains_expressions(self) -> bool:
@@ -299,7 +273,7 @@ class UniqueConstraint(BaseConstraint):
         return sql
 
     def __repr__(self) -> str:
-        return "<{}:{}{}{}{}{}{}{}{}{}>".format(
+        return "<{}:{}{}{}{}{}{}{}{}>".format(
             self.__class__.__qualname__,
             "" if not self.fields else f" fields={repr(self.fields)}",
             "" if not self.expressions else f" expressions={repr(self.expressions)}",
@@ -310,14 +284,8 @@ class UniqueConstraint(BaseConstraint):
             "" if not self.opclasses else f" opclasses={repr(self.opclasses)}",
             (
                 ""
-                if self.violation_error_code is None
-                else f" violation_error_code={self.violation_error_code!r}"
-            ),
-            (
-                ""
-                if self.violation_error_message is None
-                or self.violation_error_message == self.default_violation_error_message
-                else f" violation_error_message={self.violation_error_message!r}"
+                if self.violation_error is None
+                else f" violation_error={self.violation_error!r}"
             ),
         )
 
@@ -331,8 +299,7 @@ class UniqueConstraint(BaseConstraint):
                 and self.include == other.include
                 and self.opclasses == other.opclasses
                 and self.expressions == other.expressions
-                and self.violation_error_code == other.violation_error_code
-                and self.violation_error_message == other.violation_error_message
+                and self.violation_error == other.violation_error
             )
         return super().__eq__(other)
 
@@ -395,22 +362,7 @@ class UniqueConstraint(BaseConstraint):
             queryset = queryset.exclude(id=model_class_id)
         if not self.condition:
             if queryset.exists():
-                if self.expressions:
-                    raise ValidationError(
-                        self.get_violation_error_message(),
-                        code=self.violation_error_code,
-                    )
-                # When fields are defined, use the unique_error_message() for
-                # backward compatibility.
-                for constraint_model, constraints in instance.get_constraints():
-                    for constraint in constraints:
-                        if constraint is self:
-                            raise ValidationError(
-                                instance.unique_error_message(
-                                    constraint_model,
-                                    self.fields,
-                                ),
-                            )
+                raise self._build_unique_violation(instance, model)
         else:
             against = instance._get_field_value_map(
                 meta=model._model_meta, exclude=exclude
@@ -419,9 +371,32 @@ class UniqueConstraint(BaseConstraint):
                 if (self.condition & Exists(queryset.filter(self.condition))).check(
                     against
                 ):
-                    raise ValidationError(
-                        self.get_violation_error_message(),
-                        code=self.violation_error_code,
-                    )
+                    raise self._build_unique_violation(instance, model)
             except FieldError:
                 pass
+
+    def _build_unique_violation(
+        self, instance: Model, model: type[Model]
+    ) -> ValidationError:
+        """Build the ValidationError for a unique violation.
+
+        Single-field unique constraints route the error to that field via the
+        dict form so it surfaces under the field rather than NON_FIELD_ERRORS.
+        """
+        single_field = self.fields[0] if len(self.fields) == 1 else None
+
+        if self.violation_error is not None:
+            err = self._build_violation_error()
+            # Only auto-route flat errors. A ValidationError that already has
+            # an error_dict (from dict-form input or a caller-built instance)
+            # already declares its own field routing — don't override it.
+            if single_field and not hasattr(err, "error_dict"):
+                return ValidationError({single_field: [err]})
+            return err
+
+        if self.fields:
+            err = instance.unique_error_message(model, self.fields)
+            if single_field:
+                return ValidationError({single_field: [err]})
+            return err
+        return ValidationError(f'Constraint "{self.name}" is violated.')
