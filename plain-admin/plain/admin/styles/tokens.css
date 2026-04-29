@@ -21,7 +21,7 @@
  * Light mode tokens (Basecoat defaults)
  * ------------------------------------------------------------------------- */
 .plain-admin {
-  --radius: 0.625rem;
+  --radius: 0.375rem;
 
   /* Fonts. Tailwind v4 wires the `font-sans` / `font-mono` utilities to
      these names automatically — overriding either retheme the admin's
