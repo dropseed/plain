@@ -590,6 +590,13 @@ buttons, badges, alerts, cards, form fields, dialogs, dropdowns, tabs,
 tables, and icons. Use these classes when building admin views and
 you'll inherit both light/dark theming and the user's brand overrides.
 
+The catalog page is rendered from
+[`templates/admin/ui.html`](./templates/admin/ui.html) — read that file
+directly for copy-pasteable markup if you can't open the running admin
+(e.g. when an agent is generating templates). The canonical class list
+lives one file per primitive in
+[`styles/components/`](./styles/components/).
+
 | Pattern           | Class(es)                                                                                                                  |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | Buttons           | Compose `.btn` with one of `.btn-primary` / `.btn-secondary` / `.btn-outline` / `.btn-ghost` / `.btn-link`                 |
