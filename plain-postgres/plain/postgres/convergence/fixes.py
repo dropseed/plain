@@ -196,7 +196,10 @@ class CreateIndexFix(Fix):
 class AddConstraintFix(Fix):
     """Add a missing constraint.
 
-    Check constraints use NOT VALID to avoid a table scan.
+    Check constraints use ADD CONSTRAINT ... NOT VALID + VALIDATE CONSTRAINT
+    in a single apply() — the add is catalog-only (brief lock) and the
+    validate uses SHARE UPDATE EXCLUSIVE which doesn't block writes, so
+    there's no benefit to deferring validation to a later run.
     Unique constraints use CREATE UNIQUE INDEX CONCURRENTLY + USING INDEX
     to avoid blocking writes.
     """
@@ -208,8 +211,6 @@ class AddConstraintFix(Fix):
     model: type[Model]
 
     def describe(self) -> str:
-        if isinstance(self.constraint, CheckConstraint):
-            return f"{self.table}: add constraint {self.constraint.name} (NOT VALID)"
         return f"{self.table}: add constraint {self.constraint.name}"
 
     def apply(self) -> str:
@@ -244,9 +245,18 @@ class AddConstraintFix(Fix):
 
     def _apply_other(self) -> str:
         if isinstance(self.constraint, CheckConstraint):
-            sql = self.constraint.to_sql(self.model, not_valid=True)
-        else:
-            sql = self.constraint.to_sql(self.model)
+            add_sql = self.constraint.to_sql(self.model, not_valid=True)
+            _execute_and_commit(add_sql)
+
+            validate_sql = (
+                f"ALTER TABLE {quote_name(self.table)}"
+                f" VALIDATE CONSTRAINT {quote_name(self.constraint.name)}"
+            )
+            _execute_and_commit(validate_sql, blocking=False)
+
+            return f"{add_sql}; {validate_sql}"
+
+        sql = self.constraint.to_sql(self.model)
         _execute_and_commit(sql)
         return sql
 

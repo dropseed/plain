@@ -173,13 +173,16 @@ def test_add_constraint_unique_mixes_autocommit_and_blocking_commit(spy: _Spy):
     assert spy.commit_calls[0][1] is True
 
 
-def test_add_constraint_check_is_blocking(spy: _Spy):
+def test_add_constraint_check_blocking_add_then_nonblocking_validate(spy: _Spy):
     cc = CheckConstraint(check=Q(id__gte=0), name="check_widget_id")
     fix = AddConstraintFix(table="examples_widget", constraint=cc, model=Widget)
     fix.apply()
     assert spy.autocommit_calls == []
-    assert len(spy.commit_calls) == 1
+    assert len(spy.commit_calls) == 2
+    # Step 1: ADD CONSTRAINT ... NOT VALID — blocking
     assert spy.commit_calls[0][1] is True
+    # Step 2: VALIDATE CONSTRAINT — non-blocking
+    assert spy.commit_calls[1][1] is False
 
 
 def test_add_foreign_key_fix_blocking_add_then_nonblocking_validate(spy: _Spy):

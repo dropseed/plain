@@ -338,8 +338,8 @@ class TestDetectConstraintFixes:
 
 
 class TestApplyConstraintFixes:
-    def test_add_check_constraint_uses_not_valid(self, isolated_db):
-        """AddConstraintFix for check constraints creates NOT VALID."""
+    def test_add_check_constraint_validates_immediately(self, isolated_db):
+        """AddConstraintFix for check constraints adds NOT VALID and validates in one apply."""
         check = CheckConstraint(
             check=Q(id__gte=0),
             name="examples_constraintexample_id_nonneg",
@@ -356,10 +356,11 @@ class TestApplyConstraintFixes:
             sql = fix.apply()
 
             assert "NOT VALID" in sql
+            assert "VALIDATE CONSTRAINT" in sql
             assert constraint_exists(
                 "examples_constraintexample", "examples_constraintexample_id_nonneg"
             )
-            assert not constraint_is_valid(
+            assert constraint_is_valid(
                 "examples_constraintexample", "examples_constraintexample_id_nonneg"
             )
         finally:
@@ -385,7 +386,7 @@ class TestApplyConstraintFixes:
         )
 
     def test_full_check_constraint_lifecycle(self, isolated_db):
-        """Add NOT VALID -> validate -> fully valid constraint."""
+        """A single converge pass adds and validates a check constraint."""
         check = CheckConstraint(
             check=Q(id__gte=0),
             name="examples_constraintexample_id_nonneg",
@@ -394,7 +395,6 @@ class TestApplyConstraintFixes:
         ConstraintExample.model_options.constraints = [*original_constraints, check]
 
         try:
-            # First converge pass: adds NOT VALID
             conn = get_connection()
             with conn.cursor() as cursor:
                 items = plan_model_convergence(
@@ -404,24 +404,11 @@ class TestApplyConstraintFixes:
             assert isinstance(items[0].fix, AddConstraintFix)
 
             items[0].fix.apply()
-            assert not constraint_is_valid(
-                "examples_constraintexample", "examples_constraintexample_id_nonneg"
-            )
-
-            # Second converge pass: detects NOT VALID, validates
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(
-                    conn, cursor, ConstraintExample
-                ).executable()
-            assert len(items) == 1
-            assert isinstance(items[0].fix, ValidateConstraintFix)
-
-            items[0].fix.apply()
             assert constraint_is_valid(
                 "examples_constraintexample", "examples_constraintexample_id_nonneg"
             )
 
-            # Third pass: fully converged
+            # Second pass: fully converged
             with conn.cursor() as cursor:
                 items = plan_model_convergence(
                     conn, cursor, ConstraintExample
