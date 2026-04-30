@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.49.1](https://github.com/dropseed/plain/releases/plain-jobs@0.49.1) (2026-04-30)
+
+### What's changed
+
+- **Job-result detail "Retry job" button uses the namespaced `admin-btn admin-btn-primary` classes** so it renders as a primary button under plain-admin 0.81.0's namespaced classes. ([5f86c86fb7e9](https://github.com/dropseed/plain/commit/5f86c86fb7e9))
+
+### Upgrade instructions
+
+- If you use `plain.admin`, upgrade it to `>=0.81.0` alongside this release for the namespaced `admin-` CSS classes referenced by the job-result template.
+
 ## [0.49.0](https://github.com/dropseed/plain/releases/plain-jobs@0.49.0) (2026-04-30)
 
 ### What's changed
