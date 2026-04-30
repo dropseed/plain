@@ -1,5 +1,21 @@
 # plain-admin changelog
 
+## [0.81.0](https://github.com/dropseed/plain/releases/plain-admin@0.81.0) (2026-04-30)
+
+### What's changed
+
+- **Namespaced every admin-owned CSS class and Tailwind theme token with an `admin-` prefix.** `.btn` → `.admin-btn`, `.card` → `.admin-card`, `--color-primary` → `--color-admin-primary`, `bg-foreground` → `bg-admin-foreground`, etc. `@scope (.plain-admin)` only blocks outbound leakage; user-app styles could still bleed _into_ admin chrome through shared class names, and `@theme` tokens always emit to `:root` regardless of scoping. The `@scope` wrapper is retained as belt-and-suspenders. Local tokens on `.plain-admin` (`--primary`, `--background`, …) keep short names since they're specificity-scoped. The audit also documented all 14 admin Plain elements (`<admin.Submit>`, `<admin.InputField>`, `<admin.Icon>`, …) in the README, fixed a forms README example that referenced the non-existent `{{ form.as_p }}`, made `.admin-btn-outline` truly transparent, and lifted dark-mode `--primary` from olive-gray to near-white. ([5f86c86fb7e9](https://github.com/dropseed/plain/commit/5f86c86fb7e9))
+- **Added `ADMIN_FORCE_THEME` setting** to lock the admin to `"light"` or `"dark"` (default `None` keeps the toggle). When forced, the theme cycle button is hidden and the inline init script applies the theme class without touching `localStorage`. ([36c3d7d2619d](https://github.com/dropseed/plain/commit/36c3d7d2619d))
+- **Each admin component has its own `--radius-admin-*` token** (`--radius-admin-button`, `--radius-admin-card`, `--radius-admin-input`, `--radius-admin-dialog`, etc.) so projects can retune one primitive's curvature without redefining the entire scale. The base `--radius-admin-{xs..xl}` ramp still drives the per-component defaults. ([eaa0cc80bbdb](https://github.com/dropseed/plain/commit/eaa0cc80bbdb))
+- **`admin-card` is now a visual shell only** — bg + border + radius. The opinionated grid/gap/padding rules are removed; consumers compose layout (`flex flex-col`, `p-6`, …) inline. The detail page is now a `<details class="admin-card" open>` so the DB-fields section can be folded away. ([c867207711341](https://github.com/dropseed/plain/commit/c867207711341))
+- **Components docs pointed at `templates/admin/ui.html` and `styles/components/`** for agent-friendly copy-pasteable markup and per-primitive CSS access. ([5cf6bc0dddff](https://github.com/dropseed/plain/commit/5cf6bc0dddff))
+
+### Upgrade instructions
+
+- **If you've extended admin templates or written custom admin views with the old class names, rename to the `admin-` prefixed versions:** `.btn` → `.admin-btn`, `.btn-primary` → `.admin-btn-primary`, `.card` → `.admin-card`, `.badge` → `.admin-badge`, `.alert` → `.admin-alert`, `.input` → `.admin-input`, `.dialog` → `.admin-dialog`, `.dropdown-menu` → `.admin-dropdown-menu`, etc. Same for Tailwind utilities backed by admin theme tokens — `bg-foreground` → `bg-admin-foreground`, `text-muted-foreground` → `text-admin-muted-foreground`, `--color-primary` → `--color-admin-primary`, `--radius-md` → `--radius-admin-md`. Local tokens on `.plain-admin` (`--primary`, `--background`, `--card`, …) are unchanged. The full mapping is in the README's `Components` section.
+- **If you've subclassed `.admin-card` and relied on its old grid/padding,** add `flex flex-col p-6 gap-6` (or whatever layout you want) to your card markup — the component no longer applies that itself.
+- Requires `plain>=0.139.0` so `PLAIN_ADMIN_FORCE_THEME=dark` parses without JSON quoting.
+
 ## [0.80.0](https://github.com/dropseed/plain/releases/plain-admin@0.80.0) (2026-04-30)
 
 ### What's changed
