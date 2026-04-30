@@ -10,10 +10,12 @@
    mode and the rail vanishes. */
 @layer components {
   .admin-segmented {
-    @apply flex items-stretch gap-0.5 p-0.5 rounded-admin-lg bg-admin-foreground/[0.04];
+    @apply flex items-stretch gap-0.5 p-0.5 bg-admin-foreground/[0.04];
+    border-radius: var(--radius-segmented);
 
     [role='radio'] {
-      @apply flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-admin-md border border-transparent text-sm whitespace-nowrap text-admin-muted-foreground transition-[color,background-color,box-shadow,border-color] cursor-pointer;
+      @apply flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1 border border-transparent text-sm whitespace-nowrap text-admin-muted-foreground transition-[color,background-color,box-shadow,border-color] cursor-pointer;
+      border-radius: var(--radius-segmented-item);
       @apply hover:text-admin-foreground;
       @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-ring/50;
       @apply disabled:pointer-events-none disabled:opacity-50;

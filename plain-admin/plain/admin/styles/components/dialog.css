@@ -28,7 +28,8 @@
       @apply bg-black/50 opacity-0 transition-all transition-discrete;
     }
     > * {
-      @apply bg-admin-background fixed top-[50%] left-[50%] z-50 flex flex-col w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-admin-lg border p-6 shadow-lg sm:max-w-lg max-h-[calc(100%_-_2rem)];
+      @apply bg-admin-background fixed top-[50%] left-[50%] z-50 flex flex-col w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 border p-6 shadow-lg sm:max-w-lg max-h-[calc(100%_-_2rem)];
+      border-radius: var(--radius-dialog);
       @apply transition-all scale-95;
 
       > header {

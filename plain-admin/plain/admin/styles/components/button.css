@@ -25,7 +25,8 @@
  */
 @layer components {
   .admin-btn {
-    @apply focus-control inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none cursor-pointer rounded-admin-md;
+    @apply focus-control inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none cursor-pointer;
+    border-radius: var(--radius-button);
     /* default size */
     @apply gap-2 h-9 px-4 py-2;
     &:has(>svg) { @apply px-3; }

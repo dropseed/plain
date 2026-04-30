@@ -557,8 +557,11 @@ The most commonly retuned tokens:
   `.admin-alert-warning`, etc.).
 - **Chart palette** — `--chart-1` through `--chart-5`, used by `TrendCard` and
   any other chart in the admin.
-- **Radius scale** — override `--radius` once to retighten or loosen every
-  component's corners (Tailwind exposes this as `rounded-admin-sm`/`-md`/`-lg`/`-xl`).
+- **Radius** — every component has its own `--radius-*` token (`--radius-card`,
+  `--radius-button`, `--radius-input`, `--radius-dialog`, …). Override one to
+  retune just that component, or override `--radius` (the master) to shift
+  every default proportionally. Generic `rounded-admin-sm`/`-md`/`-lg`
+  utilities remain for ad-hoc template use.
 - **Surfaces** — `--background`, `--card`, `--muted`, `--accent`, `--popover`,
   plus their `*-foreground` pairs.
 

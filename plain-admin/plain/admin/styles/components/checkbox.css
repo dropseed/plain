@@ -2,7 +2,8 @@
 @layer components {
   :is(.form, .admin-field) input[type='checkbox']:not([role='switch']),
   .admin-input[type='checkbox']:not([role='switch']) {
-    @apply focus-control appearance-none border-admin-input dark:bg-admin-input/30 checked:bg-admin-primary dark:checked:bg-admin-primary checked:border-admin-primary size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none disabled:cursor-not-allowed disabled:opacity-50;
+    @apply focus-control appearance-none border-admin-input dark:bg-admin-input/30 checked:bg-admin-primary dark:checked:bg-admin-primary checked:border-admin-primary size-4 shrink-0 border shadow-xs transition-shadow outline-none disabled:cursor-not-allowed disabled:opacity-50;
+    border-radius: var(--radius-checkbox);
     
     &:checked:after {
       @apply content-[''] block size-3.5 bg-admin-primary-foreground;

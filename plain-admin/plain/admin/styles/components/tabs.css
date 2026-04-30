@@ -14,7 +14,10 @@
     [role='tab'] {
       @apply -mb-px inline-flex items-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap text-admin-muted-foreground border-b-2 border-transparent transition-colors cursor-pointer;
       @apply hover:text-admin-foreground hover:border-admin-border;
-      @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-ring/50 focus-visible:rounded-admin-sm;
+      @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-ring/50;
+      &:focus-visible {
+        border-radius: var(--radius-tabs-focus);
+      }
       @apply disabled:pointer-events-none disabled:opacity-50;
       @apply [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4;
 

@@ -21,7 +21,31 @@
  * Light mode tokens (Basecoat defaults)
  * ------------------------------------------------------------------------- */
 .plain-admin {
+  /* Master radius. Bumping this shifts every per-component radius
+     below proportionally — the shadcn-style single-knob retune. For
+     surgical changes, override the individual `--radius-*` token for
+     just that component. */
   --radius: 0.5rem;
+
+  /* Per-component radii. Each component reads its own variable, so
+     `--radius-card: 4px` retunes only cards (no ripple to dialogs,
+     alerts, etc.). Defaults derive from `--radius` so the master
+     knob still works. */
+  --radius-card: var(--radius);
+  --radius-button: var(--radius);
+  --radius-input: var(--radius);
+  --radius-select: var(--radius);
+  --radius-textarea: var(--radius);
+  --radius-dialog: calc(var(--radius) + 2px);
+  --radius-alert: var(--radius);
+  --radius-popover: calc(var(--radius) - 2px);
+  --radius-tooltip: calc(var(--radius) - 2px);
+  --radius-segmented: var(--radius);
+  --radius-segmented-item: calc(var(--radius) - 2px);
+  --radius-dropdown-item: calc(var(--radius) - 4px);
+  --radius-kbd: calc(var(--radius) - 4px);
+  --radius-checkbox: calc(var(--radius) - 4px);
+  --radius-tabs-focus: calc(var(--radius) - 4px);
 
   /* Fonts. Tailwind v4 wires the `font-sans` / `font-mono` utilities to
      these names automatically — overriding either retheme the admin's
@@ -176,10 +200,13 @@
  * here are what `bg-X`, `text-X`, `border-X` etc. resolve to.
  * ------------------------------------------------------------------------- */
 @theme {
+  /* Generic rounded-admin-{sm,md,lg} utilities for ad-hoc template use
+     (menu items, preflight rows, chart legend swatches, etc.).
+     Component CSS no longer references these — each component owns its
+     own `--radius-*` token in `.plain-admin` above. */
   --radius-admin-sm: calc(var(--radius) - 4px);
   --radius-admin-md: calc(var(--radius) - 2px);
   --radius-admin-lg: var(--radius);
-  --radius-admin-xl: calc(var(--radius) + 4px);
 
   --color-admin-background: var(--background);
   --color-admin-foreground: var(--foreground);

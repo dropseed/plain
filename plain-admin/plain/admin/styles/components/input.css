@@ -26,7 +26,8 @@
   .admin-input[type='month'],
   .admin-input[type='week'],
   .admin-input[type='time'] {
-    @apply focus-control appearance-none file:text-admin-foreground placeholder:text-admin-muted-foreground selection:bg-admin-primary selection:text-admin-primary-foreground dark:bg-admin-input/30 border-admin-input flex h-9 w-full min-w-0 rounded-admin-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm;
+    @apply focus-control appearance-none file:text-admin-foreground placeholder:text-admin-muted-foreground selection:bg-admin-primary selection:text-admin-primary-foreground dark:bg-admin-input/30 border-admin-input flex h-9 w-full min-w-0 border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm;
+    border-radius: var(--radius-input);
   }
 
   /* Small variant. Pair with `.admin-input`: `class="input input-sm"`.

@@ -5,7 +5,8 @@
      affects all of them in one place. */
   [data-popover],
   [data-hovercard] {
-    @apply bg-admin-popover text-admin-popover-foreground border shadow-md rounded-admin-md;
+    @apply bg-admin-popover text-admin-popover-foreground border shadow-md;
+    border-radius: var(--radius-popover);
   }
 
   [data-popover] {

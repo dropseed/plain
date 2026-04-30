@@ -381,20 +381,42 @@ document.addEventListener("DOMContentLoaded", () => {
 {% call section("tokens-sizing", "Sizing tokens",
    "Default column shows what Plain ships in `tokens.css`. Current column shows the resolved value as the page is currently loaded — overrides on `.plain-admin` flow through.") %}
 
+<p class="text-sm mb-3">
+    Each component owns its own <code>--radius-*</code> token. Override one to retune just that
+    component, or override <code>--radius</code> (the master) to shift every default proportionally.
+</p>
+
 <table class="admin-table">
     <thead>
         <tr><th>Token</th><th>Default</th><th>Current</th></tr>
     </thead>
     <tbody>
         <tr><td><code>--radius</code></td><td><code>0.5rem</code></td><td><code data-token-current="--radius"></code></td></tr>
-        <tr><td><code>--radius-sm</code></td><td><code>calc(var(--radius) - 4px)</code></td><td><code data-token-current="--radius-sm"></code></td></tr>
-        <tr><td><code>--radius-md</code></td><td><code>calc(var(--radius) - 2px)</code></td><td><code data-token-current="--radius-md"></code></td></tr>
-        <tr><td><code>--radius-lg</code></td><td><code>var(--radius)</code></td><td><code data-token-current="--radius-lg"></code></td></tr>
-        <tr><td><code>--radius-xl</code></td><td><code>calc(var(--radius) + 4px)</code></td><td><code data-token-current="--radius-xl"></code></td></tr>
+        <tr><td><code>--radius-card</code></td><td><code>var(--radius)</code></td><td><code data-token-current="--radius-card"></code></td></tr>
+        <tr><td><code>--radius-button</code></td><td><code>var(--radius)</code></td><td><code data-token-current="--radius-button"></code></td></tr>
+        <tr><td><code>--radius-input</code></td><td><code>var(--radius)</code></td><td><code data-token-current="--radius-input"></code></td></tr>
+        <tr><td><code>--radius-select</code></td><td><code>var(--radius)</code></td><td><code data-token-current="--radius-select"></code></td></tr>
+        <tr><td><code>--radius-textarea</code></td><td><code>var(--radius)</code></td><td><code data-token-current="--radius-textarea"></code></td></tr>
+        <tr><td><code>--radius-dialog</code></td><td><code>calc(var(--radius) + 2px)</code></td><td><code data-token-current="--radius-dialog"></code></td></tr>
+        <tr><td><code>--radius-alert</code></td><td><code>var(--radius)</code></td><td><code data-token-current="--radius-alert"></code></td></tr>
+        <tr><td><code>--radius-popover</code></td><td><code>calc(var(--radius) - 2px)</code></td><td><code data-token-current="--radius-popover"></code></td></tr>
+        <tr><td><code>--radius-tooltip</code></td><td><code>calc(var(--radius) - 2px)</code></td><td><code data-token-current="--radius-tooltip"></code></td></tr>
+        <tr><td><code>--radius-segmented</code></td><td><code>var(--radius)</code></td><td><code data-token-current="--radius-segmented"></code></td></tr>
+        <tr><td><code>--radius-segmented-item</code></td><td><code>calc(var(--radius) - 2px)</code></td><td><code data-token-current="--radius-segmented-item"></code></td></tr>
+        <tr><td><code>--radius-dropdown-item</code></td><td><code>calc(var(--radius) - 4px)</code></td><td><code data-token-current="--radius-dropdown-item"></code></td></tr>
+        <tr><td><code>--radius-kbd</code></td><td><code>calc(var(--radius) - 4px)</code></td><td><code data-token-current="--radius-kbd"></code></td></tr>
+        <tr><td><code>--radius-checkbox</code></td><td><code>calc(var(--radius) - 4px)</code></td><td><code data-token-current="--radius-checkbox"></code></td></tr>
+        <tr><td><code>--radius-tabs-focus</code></td><td><code>calc(var(--radius) - 4px)</code></td><td><code data-token-current="--radius-tabs-focus"></code></td></tr>
         <tr><td><code>--scrollbar-width</code></td><td><code>6px</code></td><td><code data-token-current="--scrollbar-width"></code></td></tr>
         <tr><td><code>--scrollbar-radius</code></td><td><code>6px</code></td><td><code data-token-current="--scrollbar-radius"></code></td></tr>
     </tbody>
 </table>
+
+<p class="text-sm text-admin-muted-foreground mt-3">
+    Generic <code>rounded-admin-sm</code> / <code>-md</code> / <code>-lg</code> Tailwind utilities
+    are also available for ad-hoc rounding in templates (menu items, preflight rows, chart legends).
+    Component CSS doesn't use them — each component has its own token above.
+</p>
 
 <p class="text-sm text-admin-muted-foreground mt-3">
     Add <code>class="admin-scrollbar"</code> to any scrollable element to opt in to the slim

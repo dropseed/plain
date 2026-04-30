@@ -5,7 +5,8 @@
 @layer components {
   :is(.form, .admin-field) select,
   select.admin-select {
-    @apply focus-control appearance-none border-admin-input dark:bg-admin-input/30 dark:hover:bg-admin-input/50 flex w-fit items-center justify-between gap-2 rounded-admin-md border bg-transparent pl-3 pr-9 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 h-9;
+    @apply focus-control appearance-none border-admin-input dark:bg-admin-input/30 dark:hover:bg-admin-input/50 flex w-fit items-center justify-between gap-2 border bg-transparent pl-3 pr-9 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 h-9;
+    border-radius: var(--radius-select);
     @apply bg-[image:var(--chevron-down-icon-50)] bg-no-repeat bg-position-[center_right_0.75rem] bg-size-[1rem];
 
     option,
