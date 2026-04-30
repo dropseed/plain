@@ -1,5 +1,18 @@
 # plain changelog
 
+## [0.138.0](https://github.com/dropseed/plain/releases/plain@0.138.0) (2026-04-30)
+
+### What's changed
+
+- **Dropped `--section` and `--outline` from `plain docs`.** Both flags are removed from the CLI surface. `--search` covers the same ground (it returns full matching sections, scoped to a module if you give one), and a plain `plain docs <name>` is short enough to read top to bottom. The internal `_extract_section` helper is simplified to ## sections only, and the agent-rules / skill prompts that referenced the old flags are updated. ([e03c3bd8b6d3](https://github.com/dropseed/plain/commit/e03c3bd8b6d3))
+- Tidied the preflight count loop in `get_check_counts()` and the unused `CheckRegistry.get_checks()` helper was removed. Preflight imports are also reformatted onto multiple lines for readability. No behavior change. ([687d2f53a036](https://github.com/dropseed/plain/commit/687d2f53a036))
+
+### Upgrade instructions
+
+- Replace any `plain docs <module> --section <name>` invocations with `plain docs <module> --search <term>` (which prints all sections matching `<term>`), or just `plain docs <module>` and read the section directly.
+- Replace any `plain docs --outline` / `plain docs <module> --outline` invocations with `plain docs --search <term>` to find headings, or `plain docs <module>` for the full doc.
+- If you import `get_checks` from `plain.preflight.registry`, switch to iterating `run_checks(...)` directly — `get_checks()` was unused and has been removed.
+
 ## [0.137.1](https://github.com/dropseed/plain/releases/plain@0.137.1) (2026-04-28)
 
 ### What's changed
