@@ -123,22 +123,17 @@ class MyJob(Job):
 
 ## Scheduled jobs
 
-You can schedule jobs to run at specific times using the [`Schedule`](./scheduling.py#Schedule) class:
+Schedules are configured via the `JOBS_SCHEDULE` setting as a list of `(job, schedule)` tuples. The job can be a dotted path to a `Job` subclass (or a `"cmd:<shell command>"` string), and the schedule can be a cron expression string or a [`Schedule`](./scheduling.py#Schedule) instance:
 
 ```python
-from plain.jobs import Job, register_job
-from plain.jobs.scheduling import Schedule
-
-@register_job
-class DailyReportJob(Job):
-    schedule = Schedule.from_cron("0 9 * * *")  # Every day at 9 AM
-
-    def run(self):
-        # Generate daily report
-        pass
+# app/settings.py
+JOBS_SCHEDULE = [
+    ("app.reports.jobs.DailyReportJob", "0 9 * * *"),  # Every day at 9 AM
+    ("cmd:./scripts/cleanup", "@daily"),
+]
 ```
 
-The `Schedule` class supports standard cron syntax and special strings:
+Cron expressions support standard syntax and special strings:
 
 - `@yearly` or `@annually` - Run once a year
 - `@monthly` - Run once a month
