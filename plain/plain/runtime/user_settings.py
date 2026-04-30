@@ -273,7 +273,7 @@ def _get_annotation(module: types.ModuleType, setting: str) -> type | None:
 
 
 def _parse_env_value(
-    value: str, annotation: type | None, setting_name: str
+    value: str, annotation: typing.Any, setting_name: str
 ) -> typing.Any:
     if not annotation:
         raise ImproperlyConfigured(
@@ -284,6 +284,15 @@ def _parse_env_value(
     if typing.get_origin(annotation) is Secret:
         if args := typing.get_args(annotation):
             annotation = args[0]
+
+    # Unwrap `T | None` — empty env string maps to None, otherwise parse as T.
+    # Only the single-arm union case is unwrapped; richer unions fall through.
+    if typing.get_origin(annotation) in (typing.Union, types.UnionType):
+        non_none = tuple(a for a in typing.get_args(annotation) if a is not type(None))
+        if len(non_none) == 1:
+            if value == "":
+                return None
+            annotation = non_none[0]
 
     if annotation is bool:
         # Special case for bools

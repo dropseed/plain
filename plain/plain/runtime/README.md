@@ -89,6 +89,13 @@ Boolean settings accept `true`, `1`, `yes` (case-insensitive) as truthy values:
 PLAIN_DEBUG=true
 ```
 
+For nullable settings (`T | None`), an empty string clears the value to `None`; any other value is parsed as `T`. With `ADMIN_FORCE_THEME: str | None = None`:
+
+```bash
+PLAIN_ADMIN_FORCE_THEME=dark   # → "dark"
+PLAIN_ADMIN_FORCE_THEME=       # → None
+```
+
 ### .env files
 
 Plain does not load `.env` files automatically. If you use [`plain.dev`](/plain-dev/README.md), it loads `.env` files for you during development. For production, you need to load them yourself or rely on your deployment platform to inject environment variables.
