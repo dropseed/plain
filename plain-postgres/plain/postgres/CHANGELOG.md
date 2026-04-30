@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.101.0](https://github.com/dropseed/plain/releases/plain-postgres@0.101.0) (2026-04-30)
+
+### What's changed
+
+- **Validate CHECK constraints in the same converge run that adds them.** `AddConstraintFix` now runs `ALTER TABLE ... ADD CONSTRAINT ... NOT VALID` followed by `ALTER TABLE ... VALIDATE CONSTRAINT` in a single `apply()`. The add is catalog-only (brief lock) and validate uses `SHARE UPDATE EXCLUSIVE` (doesn't block writes), so there's no benefit to deferring validation to a later run. Existing rows are checked before convergence reports success — previously, a CHECK constraint could be added in `NOT VALID` state and the validation step was its own follow-up fix. ([dc7eb8d3c2b7](https://github.com/dropseed/plain/commit/dc7eb8d3c2b7))
+- `plain-postgres` rule references updated for the simpler `plain docs` CLI (no more `--section`). ([e03c3bd8b6d3](https://github.com/dropseed/plain/commit/e03c3bd8b6d3))
+
+### Upgrade instructions
+
+- No changes required. The next `plain postgres sync` (or scheduled converge run) on a database with pending CHECK constraints will now both add and validate them in one step instead of two.
+
 ## [0.100.0](https://github.com/dropseed/plain/releases/plain-postgres@0.100.0) (2026-04-28)
 
 ### What's changed

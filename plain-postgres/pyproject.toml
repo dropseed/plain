@@ -1,6 +1,6 @@
 [project]
 name = "plain.postgres"
-version = "0.100.0"
+version = "0.101.0"
 description = "Model your data and store it in a database."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
