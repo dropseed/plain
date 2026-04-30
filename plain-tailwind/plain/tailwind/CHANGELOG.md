@@ -1,5 +1,19 @@
 # plain-tailwind changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.21.0) (2026-04-30)
+
+### What's changed
+
+- **Auto-import package `tailwind.css` files into the Tailwind build.** If an installed package ships a `tailwind.css` file next to its `__init__.py`, an `@import` for it is automatically added to `.plain/tailwind.css` — no user configuration required. Use it for design tokens (`@theme`), component layers, `@custom-variant`s, or anything else that needs to be part of the Tailwind compilation. `plain-admin` 0.80.0 uses this mechanism to ship its component CSS layer. ([6a49f35a84bd](https://github.com/dropseed/plain/commit/6a49f35a84bd))
+- App-local packages (those inside the project root) are no longer redundantly emitted as `@source` entries in `.plain/tailwind.css`, since Tailwind already scans the project root by default. ([6a49f35a84bd](https://github.com/dropseed/plain/commit/6a49f35a84bd))
+- `.plain/tailwind.css` is now generated with `@import` rules first and `@source` rules after, per the CSS spec requirement that `@import` precede other rules. ([6a49f35a84bd](https://github.com/dropseed/plain/commit/6a49f35a84bd))
+- Path separators in the generated `.plain/tailwind.css` are normalized to POSIX forward slashes regardless of platform, since backslashes in CSS strings are escape sequences. ([6a49f35a84bd](https://github.com/dropseed/plain/commit/6a49f35a84bd))
+
+### Upgrade instructions
+
+- No changes required for project authors. After upgrading, your next Tailwind build will regenerate `.plain/tailwind.css`; expect new `@import "..."` lines if any of your installed packages ship a `tailwind.css`.
+- Package authors: if you want to contribute design tokens, components, or custom variants to user Tailwind builds, add a `tailwind.css` file next to your package's `__init__.py`.
+
 ## [0.20.5](https://github.com/dropseed/plain/releases/plain-tailwind@0.20.5) (2026-02-26)
 
 ### What's changed
