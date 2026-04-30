@@ -17,12 +17,12 @@ Use the Agent tool with a prompt like:
 >
 > Start by discovering where the answer lives:
 >
-> - `uv run plain docs --search <term>` — find relevant packages/sections
-> - `uv run plain docs <name> --outline` — see section headings for a package
+> - `uv run plain docs --search <term>` — find which packages mention the term
 >
 > Then read the relevant content:
 >
-> - `uv run plain docs <name> --section <section>` — specific section
+> - `uv run plain docs <name>` — full docs for a package
+> - `uv run plain docs <name> --search <term>` — just the matching sections
 > - `uv run plain docs <name> --api` — public API surface
 > - Use Grep/Read to examine source code when docs are insufficient
 >

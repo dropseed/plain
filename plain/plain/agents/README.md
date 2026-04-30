@@ -129,7 +129,7 @@ Put rules in `<your-package>/agents/.claude/rules/<name>.md`. Keep them short (~
 
 - Use bullet points, not paragraphs
 - Show brief good/bad code examples for common mistakes
-- Point to docs for full details: `Run \`uv run plain docs <pkg> --section X\` for full patterns`
+- Point to docs for full details: `Run \`uv run plain docs <pkg>\` for full patterns`
 - Use `paths:` frontmatter to scope rules to relevant file patterns (e.g., `"**/models.py"`)
 - Prefix the filename with `plain-` or `plainx-` so `plain agent install` can manage it
 

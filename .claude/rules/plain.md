@@ -42,25 +42,22 @@ When in doubt, run `uv run plain docs <package> --api` to check the actual API.
 - **No f-strings or % formatting** in log messages — pass variable data via `context={}` instead
 - Use `context={}` for `app_logger`, `extra={"context": {...}}` for standard loggers (`logging.getLogger("plain.xxx")`)
 
-Run `uv run plain docs logs --section message-format` for full examples and anti-patterns.
+Run `uv run plain docs logs` for full examples and anti-patterns.
 
 ## Documentation
 
 **Discovery** — find what's available and where things are:
 
 - `uv run plain docs --list` — all packages and core modules with descriptions
-- `uv run plain docs --outline` — section headings for all installed docs
-- `uv run plain docs <name> --outline` — section headings (with `###` subsections) for one module
 - `uv run plain docs --search <term>` — find which modules/sections mention a term (compact, one line per section)
 
 **Reading** — get full content:
 
 - `uv run plain docs <name>` — full markdown docs
-- `uv run plain docs <name> --section <name>` — one specific `##` section
 - `uv run plain docs <name> --search <term>` — full content of all matching sections in that module
 - `uv run plain docs <name> --api` — public API surface (classes, functions, signatures)
 
-**Workflow**: Use `--search <term>` to find which module has what you need, then `<name> --search <term>` to get the full sections, or `<name> --section <name>` for a specific one.
+**Workflow**: Use `--search <term>` to find which module has what you need, then read the full doc, or run `<name> --search <term>` to print just the matching sections.
 
 Packages: plain, plain-admin, plain-api, plain-auth, plain-cache, plain-code, plain-dev, plain-elements, plain-email, plain-esbuild, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-portal, plain-postgres, plain-oauth, plain-observer, plain-pages, plain-pageviews, plain-passwords, plain-pytest, plain-redirection, plain-scan, plain-sessions, plain-start, plain-support, plain-tailwind, plain-toolbar, plain-tunnel, plain-vendor
 

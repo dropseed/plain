@@ -118,8 +118,8 @@ Predictable APIs, typed signatures, and on-demand docs happen to be what both pe
 
 ```
 plain docs models                      # full docs
-plain docs models --section querying   # one section
 plain docs models --api                # typed signatures only
+plain docs models --search "queryset"  # just the sections matching a term
 plain docs --search "queryset"         # search across all packages
 ```
 

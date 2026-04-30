@@ -13,8 +13,7 @@ Admin styles are a per-component CSS layer with Plain's brand palette. Component
 **Where to look when customizing:**
 
 - **`/admin/ui/`** — live catalog: copy-pasteable markup for every primitive, every design token rendered as a swatch with its current value, and the theming guide. Open this first.
-- `uv run plain docs admin --section customization` — written theming guide
-- `uv run plain docs admin --section components` — full component reference
+- `uv run plain docs admin` — full theming and component reference
 - `plain-admin/plain/admin/styles/` — source of truth (`tokens.css`, `components/*.css`)
 
 ## Use tokens, not hardcoded colors

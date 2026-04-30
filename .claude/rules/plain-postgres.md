@@ -42,7 +42,7 @@ This means: when you add an `Index` or `UniqueConstraint` to a model, no migrati
 
 For custom data migrations, use `uv run plain migrations create --empty --name <name>` to scaffold the file.
 
-Run `uv run plain docs postgres --section migrations` for full workflow details.
+Run `uv run plain docs postgres` for full workflow details.
 
 ## Querying
 
@@ -57,7 +57,7 @@ Use `Model.query` to build querysets (e.g., `User.query.filter(is_active=True)`)
 - Wrap multi-step writes in `transaction.atomic()`
 - Always paginate list queries — unbounded querysets get slower as data grows
 
-Run `uv run plain docs postgres --section querying` for full patterns with code examples.
+Run `uv run plain docs postgres` for full patterns with code examples.
 
 ## Schema Design
 
@@ -68,13 +68,13 @@ Run `uv run plain docs postgres --section querying` for full patterns with code 
 - Choose `on_delete` deliberately: CASCADE for owned children, RESTRICT for referenced data, SET_NULL for optional references
 - No `allow_null` on string fields — use `default=""`
 
-Run `uv run plain docs postgres --section constraints` for full patterns with code examples.
+Run `uv run plain docs postgres` for full patterns with code examples.
 
 ## Database Doctor
 
 Use the `/plain-postgres-doctor` skill to check overall database health — migration sync, schema correctness, and operational health.
 
-Run `uv run plain docs postgres --section diagnostics` for check details, thresholds, and production usage.
+Run `uv run plain docs postgres` for check details, thresholds, and production usage.
 
 ## Differences from Django
 

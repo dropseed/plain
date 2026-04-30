@@ -108,63 +108,22 @@ def _extract_preamble(content: str) -> str | None:
     return text if text else None
 
 
-def _extract_heading_section(
-    lines: list[str],
-    prefix: str,
-    target_slug: str,
-    stop_prefixes: list[str],
-) -> str | None:
-    """Extract a section starting with a heading that matches target_slug.
-
-    Captures lines from the matching heading until a line starting with any
-    of the stop_prefixes is encountered.
-    """
+def _extract_section(content: str, target_slug: str) -> str | None:
+    """Extract a ## section by slug; section runs until the next ## heading."""
     capturing = False
     captured: list[str] = []
-
-    for line in lines:
-        is_stop = any(line.startswith(p) for p in stop_prefixes)
-        if is_stop:
+    for line in content.split("\n"):
+        if line.startswith("## "):
             if capturing:
                 break
-            if (
-                line.startswith(prefix)
-                and _slugify(line[len(prefix) :].strip()) == target_slug
-            ):
+            if _slugify(line[3:].strip()) == target_slug:
                 capturing = True
                 captured.append(line)
         elif capturing:
             captured.append(line)
-
     if captured:
         return "\n".join(captured).rstrip()
-
     return None
-
-
-def _extract_section(content: str, target_slug: str) -> str | None:
-    """Extract a ## or ### section from markdown content by its slugified heading.
-
-    First tries to match a ## heading. If no match, tries ### headings.
-    A ## section runs until the next ## heading.
-    A ### section runs until the next ## or ### heading.
-    """
-    lines = content.split("\n")
-
-    return _extract_heading_section(
-        lines, "## ", target_slug, ["## "]
-    ) or _extract_heading_section(lines, "### ", target_slug, ["## ", "### "])
-
-
-def _get_section_slugs(content: str) -> list[str]:
-    """Get slugified names of all ## and ### sections in markdown content."""
-    slugs = []
-    for line in content.split("\n"):
-        for prefix in ("## ", "### "):
-            if line.startswith(prefix):
-                slugs.append(_slugify(line[len(prefix) :].strip()))
-                break
-    return slugs
 
 
 def _find_namespace_readme(spec: importlib.machinery.ModuleSpec) -> Path | None:
@@ -330,16 +289,6 @@ def _resolve_module_paths(module: str) -> list[Path]:
     raise _module_not_found_error(module)
 
 
-def _print_outline(doc_paths: list[Path]) -> None:
-    """Print ## and ### headings from doc files."""
-    for doc_path in doc_paths:
-        for line in doc_path.read_text().split("\n"):
-            if line.startswith("### "):
-                click.echo(f"  {click.style(line, fg='cyan')}")
-            elif line.startswith("## "):
-                click.secho(line, bold=True)
-
-
 def _find_section_content(doc_paths: list[Path], section_heading: str) -> str | None:
     """Find and return the content of a section by heading text across multiple docs."""
     if not section_heading:
@@ -360,13 +309,9 @@ def _find_section_content(doc_paths: list[Path], section_heading: str) -> str | 
 @click.command()
 @click.option("--api", is_flag=True, help="Show public API surface only")
 @click.option("--list", "show_list", is_flag=True, help="List available packages")
-@click.option("--outline", is_flag=True, help="Show section headings only")
 @click.option("--search", default="", help="Search docs for a term")
-@click.option("--section", default="", help="Show only a specific ## section by name")
 @click.argument("module", default="")
-def docs(
-    module: str, api: bool, show_list: bool, outline: bool, search: str, section: str
-) -> None:
+def docs(module: str, api: bool, show_list: bool, search: str) -> None:
     """Show documentation for a package"""
     if show_list:
         click.secho("Packages:", bold=True)
@@ -419,23 +364,6 @@ def docs(
             click.echo(f"No results for '{search}'.")
         return
 
-    # --outline without module: outline all installed docs
-    if outline and not module:
-        all_docs = _collect_all_doc_paths()
-        for name, doc_paths in sorted(all_docs.items()):
-            headings = []
-            for doc_path in doc_paths:
-                for line in doc_path.read_text().split("\n"):
-                    if line.startswith("### "):
-                        headings.append(f"    {click.style(line, fg='cyan')}")
-                    elif line.startswith("## "):
-                        headings.append(f"  {click.style(line, bold=True)}")
-            if headings:
-                click.secho(f"{name}:", fg="cyan", bold=True)
-                for heading in headings:
-                    click.echo(heading)
-        return
-
     if not module:
         raise click.UsageError(
             "You must specify a module. Use --list to see available packages."
@@ -446,10 +374,6 @@ def docs(
 
     llm_docs = LLMDocs(module_paths)
     llm_docs.load()
-
-    if outline:
-        _print_outline(llm_docs.docs)
-        return
 
     if search:
         pattern = re.compile(search, re.IGNORECASE)
@@ -472,22 +396,6 @@ def docs(
             click.echo(symbolicated)
             click.secho(f"</Source: {display}>", fg="yellow")
         return
-
-    if section:
-        target_slug = _slugify(section)
-        available: list[str] = []
-        for doc in llm_docs.docs:
-            content = doc.read_text()
-            section_content = _extract_section(content, target_slug)
-            if section_content is not None:
-                click.echo(section_content)
-                return
-            available.extend(_get_section_slugs(content))
-
-        raise click.UsageError(
-            f"No section matching '{section}'."
-            + (f" Available: {', '.join(available)}" if available else "")
-        )
 
     # For regular packages, show paths relative to the package parent dir.
     # For namespace packages (where module_paths[0] is a file), skip relative paths.
