@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.139.0](https://github.com/dropseed/plain/releases/plain@0.139.0) (2026-04-30)
+
+### What's changed
+
+- **`T | None` settings now unwrap from env vars without JSON quoting.** A setting annotated `str | None` (or any single-arm union with `None`) accepts `PLAIN_X=value` directly — empty string maps to `None`, anything else parses as `T`. Previously you had to JSON-encode the value (`PLAIN_X='"value"'`) for nullable types. Richer unions still fall through to JSON. ([602ce084b017](https://github.com/dropseed/plain/commit/602ce084b017))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.138.0](https://github.com/dropseed/plain/releases/plain@0.138.0) (2026-04-30)
 
 ### What's changed
