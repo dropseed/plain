@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.49.0](https://github.com/dropseed/plain/releases/plain-jobs@0.49.0) (2026-04-30)
+
+### What's changed
+
+- **Documented `JOBS_SCHEDULE`** as the canonical way to configure scheduled jobs. The README's "Scheduled jobs" section now leads with the settings-based pattern — a list of `(job, schedule)` tuples where the job is a dotted path (or `"cmd:<shell command>"`) and the schedule is a cron expression or `Schedule` instance — instead of the older class-attribute pattern. ([b0cd10e71613](https://github.com/dropseed/plain/commit/b0cd10e71613))
+- **Job admin chart colors switched to CSS tokens.** The `JobResultsTrendCard` group colors now use `var(--success)`, `var(--danger)`, `var(--muted-foreground)`, `var(--info)`, and `var(--warning)` instead of hardcoded RGBA tuples, so the chart retheme automatically with `plain-admin` 0.80.0's new theming system (light/dark mode + brand overrides). ([3e4d76259e42](https://github.com/dropseed/plain/commit/3e4d76259e42))
+
+### Upgrade instructions
+
+- If you use `plain.admin`, upgrade it to `>=0.80.0` alongside this release. The jobs admin chart now references the CSS tokens (`--success`, `--danger`, etc.) that ship with the new admin component layer; on older admin releases the tokens won't resolve.
+
 ## [0.48.1](https://github.com/dropseed/plain/releases/plain-jobs@0.48.1) (2026-04-27)
 
 ### What's changed
