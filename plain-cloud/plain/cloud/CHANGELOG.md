@@ -1,5 +1,15 @@
 # plain-cloud changelog
 
+## [0.3.2](https://github.com/dropseed/plain/releases/plain-cloud@0.3.2) (2026-04-30)
+
+### What's changed
+
+- **Suppressed Sentry capture for OTLP exporter batch failures.** The OpenTelemetry SDK's exporters log `"Failed to export X batch"` at ERROR after retries are exhausted, which Sentry's `LoggingIntegration` would otherwise turn into an issue per app per incident — noise the app owner can't act on (network/edge timeouts, ingest backend hiccups). The records still flow to console/file/etc.; only the Sentry capture is suppressed. Mirrors the Sentry SDK's own self-protection for `sentry_sdk.errors` and `urllib3.connectionpool`. ([eb771d82d2de](https://github.com/dropseed/plain/commit/eb771d82d2de))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.3.1](https://github.com/dropseed/plain/releases/plain-cloud@0.3.1) (2026-04-28)
 
 ### What's changed
