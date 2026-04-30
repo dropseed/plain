@@ -1,0 +1,27 @@
+/*
+ * Progress
+ *
+ * Native <progress> with cross-browser pseudo-element theming.
+ * Fill color follows `data-status="warning"` / `data-status="error"`;
+ * default is success.
+ */
+
+@layer components {
+  .progress {
+    @apply h-1.5 w-full bg-muted rounded-full overflow-hidden border-0 appearance-none;
+  }
+  .progress::-webkit-progress-bar {
+    @apply bg-muted rounded-full;
+  }
+  .progress::-webkit-progress-value {
+    @apply bg-success rounded-full;
+  }
+  .progress::-moz-progress-bar {
+    @apply bg-success rounded-full;
+  }
+
+  .progress[data-status="warning"]::-webkit-progress-value { @apply bg-warning; }
+  .progress[data-status="warning"]::-moz-progress-bar { @apply bg-warning; }
+  .progress[data-status="error"]::-webkit-progress-value { @apply bg-danger; }
+  .progress[data-status="error"]::-moz-progress-bar { @apply bg-danger; }
+}

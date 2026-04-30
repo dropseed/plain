@@ -52,14 +52,11 @@ class JobResultsTrendCard(TrendCard):
         "LOST": "Lost",
     }
     group_colors = {
-        "SUCCESSFUL": {"bg": "rgba(34, 197, 94, 0.7)", "hover": "rgba(34, 197, 94, 1)"},
-        "ERRORED": {"bg": "rgba(239, 68, 68, 0.7)", "hover": "rgba(239, 68, 68, 1)"},
-        "CANCELLED": {
-            "bg": "rgba(168, 162, 158, 0.7)",
-            "hover": "rgba(168, 162, 158, 1)",
-        },
-        "DEFERRED": {"bg": "rgba(59, 130, 246, 0.7)", "hover": "rgba(59, 130, 246, 1)"},
-        "LOST": {"bg": "rgba(245, 158, 11, 0.7)", "hover": "rgba(245, 158, 11, 1)"},
+        "SUCCESSFUL": "var(--success)",
+        "ERRORED": "var(--danger)",
+        "CANCELLED": "var(--muted-foreground)",
+        "DEFERRED": "var(--info)",
+        "LOST": "var(--warning)",
     }
 
 

@@ -1,0 +1,43 @@
+/*
+ * Base layer.
+ *
+ * Resets and admin-chrome painting. Element-level defaults for prose
+ * content (`<dl>`, `<a>` in paragraphs, `<code>`, native `<select>`,
+ * etc.) live in `admin/prose.css`.
+ *
+ * Everything is scoped to `.plain-admin` (or its descendants) so we
+ * don't change how user pages render.
+ */
+
+/* Shared focus / aria-invalid treatment for form controls. Used by
+   button.css, input.css, textarea.css, select.css, checkbox.css, and
+   radio.css so the keyboard-focus and validation rings are themed in
+   one place. (Switch opts out of aria-invalid — see switch.css.) */
+@utility focus-control {
+  @apply focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px];
+  @apply aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40 aria-invalid:border-danger;
+}
+
+@layer base {
+  /* Default border color and focus outline for admin descendants. */
+  .plain-admin * {
+    @apply border-border outline-ring/50;
+  }
+
+  /* Smooth scroll is harmless globally. */
+  html {
+    @apply scroll-smooth;
+  }
+
+  /* Paint the admin chrome. (Basecoat upstream applies this to `body`;
+     we apply it to `.plain-admin` so user pages keep their own bg.) */
+  .plain-admin {
+    @apply bg-background text-foreground overscroll-none antialiased font-sans;
+  }
+
+  /* Mono-family elements use the admin's `--font-mono` stack. Scoped so
+     we don't change how `<code>` / `<pre>` look on user pages. */
+  .plain-admin :is(code, kbd, samp, pre) {
+    font-family: var(--font-mono);
+  }
+}

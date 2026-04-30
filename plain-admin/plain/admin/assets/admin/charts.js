@@ -2,6 +2,33 @@
  * Admin Charts - handles Chart.js rendering with HTMX integration
  */
 
+const COLOR_FIELDS = ["backgroundColor", "hoverBackgroundColor", "borderColor"];
+
+// Resolve a CSS `var(--name[, fallback])` string against the live computed
+// styles. Anything else is returned as-is so plain RGBAs/hex still work.
+const resolveCSSValue = (value, rootEl) => {
+  if (typeof value !== "string") return value;
+  const match = value.match(/^\s*var\(\s*(--[\w-]+)\s*(?:,\s*([^)]+))?\)\s*$/);
+  if (!match) return value;
+  const [, name, fallback] = match;
+  const resolved = getComputedStyle(rootEl).getPropertyValue(name).trim();
+  return resolved || (fallback ? fallback.trim() : value);
+};
+
+const resolveDatasetColors = (data, rootEl, rawColors) => {
+  const datasets = data?.data?.datasets;
+  if (!Array.isArray(datasets)) return;
+  datasets.forEach((ds, i) => {
+    const source = rawColors ? rawColors[i] : ds;
+    if (!source) return;
+    for (const field of COLOR_FIELDS) {
+      if (source[field] !== undefined) {
+        ds[field] = resolveCSSValue(source[field], rootEl);
+      }
+    }
+  });
+};
+
 const HOVER_GUIDE = {
   id: "hoverGuide",
   afterDatasetsDraw(chart) {
@@ -9,12 +36,15 @@ const HOVER_GUIDE = {
     if (!active.length) return;
     const { ctx, chartArea } = chart;
     const x = active[0].element.x;
+    // `--foreground` adapts to light/dark; the alpha keeps the line subtle.
+    const stroke = getComputedStyle(chart.canvas).getPropertyValue("--foreground").trim() || "#000";
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(x, chartArea.top);
     ctx.lineTo(x, chartArea.bottom);
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.18)";
+    ctx.globalAlpha = 0.18;
+    ctx.strokeStyle = stroke;
     ctx.stroke();
     ctx.restore();
   },
@@ -85,13 +115,19 @@ const bucketTotals = (visibleDatasets, length) => {
   return totals;
 };
 
-const seriesColor = (dataset) =>
-  dataset.hoverBackgroundColor || dataset.backgroundColor || "rgba(0,0,0,0.4)";
+// Dataset colors are pre-resolved by `resolveDatasetColors` before Chart.js
+// sees them, so chips can paste them straight into the SVG `fill=` attribute
+// (which doesn't accept `var(...)`). The fallback only kicks in for datasets
+// that never declared a color — emit a resolved CSS color, not a token.
+const seriesColor = (dataset, rootEl) =>
+  dataset.hoverBackgroundColor ||
+  dataset.backgroundColor ||
+  resolveCSSValue("var(--muted-foreground)", rootEl);
 
 const AGG_CLS = "inline-flex items-baseline gap-1.5";
 const PILL_BASE =
-  "inline-flex items-baseline gap-1.5 rounded-full border border-black/10 px-2 py-0.5";
-const PILL_BTN = `${PILL_BASE} hover:bg-black/5 transition-colors cursor-pointer`;
+  "inline-flex items-baseline gap-1.5 rounded-full border border-border px-2 py-0.5";
+const PILL_BTN = `${PILL_BASE} hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer`;
 
 const renderChip = ({ ds, index, value, dimCls, clickable }) => {
   const tag = clickable ? "button" : "span";
@@ -100,10 +136,10 @@ const renderChip = ({ ds, index, value, dimCls, clickable }) => {
   return `
     <${tag} ${attrs} class="${cls} ${dimCls}">
       <svg class="self-center w-2 h-2 rounded-sm" viewBox="0 0 8 8">
-        <rect width="8" height="8" rx="1.5" fill="${escapeHTML(seriesColor(ds))}"></rect>
+        <rect width="8" height="8" rx="1.5" fill="${escapeHTML(seriesColor(ds, document.documentElement))}"></rect>
       </svg>
-      <span class="text-black/60">${escapeHTML(ds.label || "")}</span>
-      <span class="font-semibold text-black/80 tabular-nums">${formatNumber(value)}</span>
+      <span class="text-muted-foreground">${escapeHTML(ds.label || "")}</span>
+      <span class="font-semibold text-foreground tabular-nums">${formatNumber(value)}</span>
     </${tag}>
   `;
 };
@@ -144,8 +180,8 @@ const renderStats = (root, state, hoveredIndex, { force = false } = {}) => {
         const value = summarizeSeries(totals, mode);
         return `
           <span class="${AGG_CLS}">
-            <span class="text-black/50">${aggregateLabel(mode)}</span>
-            <span class="font-semibold text-black/80 tabular-nums">${formatNumber(value)}</span>
+            <span class="text-muted-foreground">${aggregateLabel(mode)}</span>
+            <span class="font-semibold text-foreground tabular-nums">${formatNumber(value)}</span>
           </span>
         `;
       })
@@ -185,12 +221,33 @@ const renderAxis = (root, labels) => {
   if (end) end.textContent = formatDate(labels[labels.length - 1]);
 };
 
+// Capture the raw (unresolved) color strings for each dataset so we can
+// re-resolve them later when the user toggles dark mode.
+const captureRawColors = (data) => {
+  const datasets = data?.data?.datasets;
+  if (!Array.isArray(datasets)) return [];
+  return datasets.map((ds) => {
+    const raw = {};
+    for (const field of COLOR_FIELDS) {
+      if (ds[field] !== undefined) raw[field] = ds[field];
+    }
+    return raw;
+  });
+};
+
+const liveStates = new Set();
+
 const startChart = ({ ctx, statsRoot, data }) => {
   data.options = data.options || {};
+
+  const rawColors = captureRawColors(data);
+  resolveDatasetColors(data, document.documentElement);
 
   const state = {
     chart: null,
     meta: data.plain || {},
+    statsRoot,
+    rawColors,
     emptyFlags: data.data.datasets.map((ds) => summarizeSeries(ds.data, "sum") === 0),
     lastHoveredIndex: undefined,
     cleanup: () => {},
@@ -205,6 +262,16 @@ const startChart = ({ ctx, statsRoot, data }) => {
     ...data,
     plugins: [HOVER_GUIDE, ...(data.plugins || [])],
   });
+
+  state.refreshColors = () => {
+    resolveDatasetColors(state.chart, document.documentElement, state.rawColors);
+    state.chart.update("none");
+    if (state.statsRoot) {
+      renderStats(state.statsRoot, state, state.lastHoveredIndex ?? null, { force: true });
+    }
+  };
+
+  liveStates.add(state);
 
   const onMouseLeave = () => {
     if (statsRoot) renderStats(statsRoot, state, null);
@@ -226,12 +293,28 @@ const startChart = ({ ctx, statsRoot, data }) => {
   }
 
   state.cleanup = () => {
+    liveStates.delete(state);
     state.chart.destroy();
     ctx.removeEventListener("mouseleave", onMouseLeave);
     if (onClick) statsRoot.removeEventListener("click", onClick);
   };
   return state;
 };
+
+// Re-resolve chart colors when the theme toggles (light <-> dark).
+// HTMX flips an `htmx-request` class on <html> during in-flight requests,
+// which would otherwise re-trigger this on every request — gate on the
+// resolved dark state so we only redraw when the theme actually changes.
+let lastIsDark = document.documentElement.classList.contains("dark");
+new MutationObserver(() => {
+  const isDark = document.documentElement.classList.contains("dark");
+  if (isDark === lastIsDark) return;
+  lastIsDark = isDark;
+  for (const state of liveStates) state.refreshColors();
+}).observe(document.documentElement, {
+  attributes: true,
+  attributeFilter: ["class"],
+});
 
 window.AdminCharts = {
   render: (slug) => {

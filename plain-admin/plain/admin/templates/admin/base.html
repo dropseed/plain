@@ -1,6 +1,6 @@
 {% use_elements %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="plain-admin">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,9 +11,21 @@
             {{ app_name }} Admin
         {%- endif -%}
     </title>
+    {# Resolve theme choice before paint to avoid a flash of light/dark
+       mismatch. Storage key + resolver shape must match theme.js. #}
+    <script nonce="{{ request.csp_nonce }}">
+    (() => {
+        const stored = localStorage.getItem("plain-admin-theme");
+        const dark = stored === "dark"
+            || (stored !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+    })();
+    </script>
+    {# Component CSS is compiled into the Tailwind build via
+       plain/admin/tailwind.css (auto-discovered by plain-tailwind). No
+       separate <link> for component styles is needed here. #}
     {% tailwind_css %}
     {% htmx_js %}
-    <link href="{{ asset('admin/admin.css') }}" rel="stylesheet">
     <style nonce="{{ request.csp_nonce }}">
     @font-face {
       font-family: "bootstrap-icons";
@@ -21,44 +33,73 @@
            url("{{ asset('admin/vendor/fonts/bootstrap-icons.woff') }}") format("woff");
     }
     </style>
+    {# Default text fonts. Override `{% block admin_fonts %}` to swap or
+       drop these — pair with `--font-sans` / `--font-mono` overrides on
+       `.plain-admin` so the cascade actually picks up the new family. #}
+    {% block admin_fonts %}
+    <style nonce="{{ request.csp_nonce }}">
+    @font-face {
+      font-family: "Inter";
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("{{ asset('admin/fonts/InterVariable.woff2') }}") format("woff2");
+    }
+    @font-face {
+      font-family: "Inter";
+      font-style: italic;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("{{ asset('admin/fonts/InterVariable-Italic.woff2') }}") format("woff2");
+    }
+    @font-face {
+      font-family: "JetBrains Mono";
+      font-style: normal;
+      font-weight: 100 800;
+      font-display: swap;
+      src: url("{{ asset('admin/fonts/JetBrainsMono.woff2') }}") format("woff2");
+    }
+    </style>
+    {% endblock %}
     <link href="{{ asset('admin/vendor/bootstrap-icons.min.css') }}" rel="stylesheet">
-    <script src="{{ asset('admin/vendor/jquery-4.0.0.min.js') }}" nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/vendor/chart.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/charts.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/admin.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/datetime-tooltips.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/htmx.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/theme.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    <script src="{{ asset('admin/datetime-hovercard.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     <script src="{{ asset('admin/menu.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <script src="{{ asset('admin/vendor/popper.min.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
-    <link href="{{ asset('admin/vendor/tippy.css') }}" rel="stylesheet">
-    <script src="{{ asset('admin/vendor/tippy.umd.min.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    {# Declarative data-* behaviors (delegated handlers on document). #}
+    <script src="{{ asset('admin/behaviors.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
+    {# Stateful UI components — popover, dropdown-menu, hovercard. Init runs
+       on DOMContentLoaded + htmx:afterSwap; idempotent via data-* flags. #}
+    <script src="{{ asset('admin/components.js') }}" defer nonce="{{ request.csp_nonce }}"></script>
     {% block header_scripts %}{% endblock %}
 </head>
 <body
-    class="flex flex-col min-h-screen bg-white pb-12"
+    class="flex flex-col min-h-screen pb-12"
     {% if is_package_installed('plaintoolbar') %}data-toolbar-installed{% endif %}
     >
 
-    <div class="plain-admin flex flex-col flex-1">
     {% include "admin/_header.html" %}
 
     <div class="flex flex-1 min-h-[calc(100vh-5.5rem)]"> <!-- h-11 + h-11 = 5.5rem -->
-        <div id="plain-admin-content" class="w-full min-w-0 bg-white text-black/90 flex-grow">
+        <div id="plain-admin-content" class="w-full min-w-0 flex-grow">
             <header class="px-4 lg:px-8 inset-x-0 pt-6 pb-4">
                 {% block header %}
                 {# Breadcrumbs - small, above title #}
                 {% if parent_view_classes %}
-                <nav class="flex items-center space-x-1.5 mb-1 text-xs text-black/50" aria-label="Breadcrumb">
+                <nav class="flex items-center space-x-1.5 mb-1 text-xs text-muted-foreground" aria-label="Breadcrumb">
                     {% for parent_view in parent_view_classes|reverse %}
                         {% if not loop.first %}
-                            <span class="text-black/30">/</span>
+                            <span class="text-muted-foreground/60">/</span>
                         {% endif %}
-                        <a href="{{ parent_view.get_view_url(object if object is defined else None) }}" class="hover:text-black/70 hover:underline">
+                        <a href="{{ parent_view.get_view_url(object if object is defined else None) }}" class="hover:text-foreground hover:underline">
                             {{ parent_view.get_nav_title() }}
                         </a>
                     {% endfor %}
                     {% if object is defined %}
-                        <span class="text-black/30">/</span>
-                        <span class="text-black/60 truncate max-w-48">{{ object.__repr__() }}</span>
+                        <span class="text-muted-foreground/60">/</span>
+                        <span class="text-foreground/80 truncate max-w-48">{{ object.__repr__() }}</span>
                     {% endif %}
                 </nav>
                 {% endif %}
@@ -73,56 +114,63 @@
                         {% endblock %}
                         <h1 class="font-semibold text-2xl truncate">{% block title %}{{ title }}{% endblock %}</h1>
                     </div>
-                    {# Desktop actions: links as buttons, extra_links in dropdown #}
-                    {% macro link_dropdown_items(items) %}
-                    <div class="py-1">
-                        {% for link, url in items %}
-                        <a href="{{ url }}" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
-                            {{ link }}
-                        </a>
-                        {% endfor %}
-                    </div>
-                    {% endmacro %}
+                    {# Desktop actions: visible link buttons + an extras dropdown. #}
                     <div class="hidden sm:flex items-center space-x-2 text-sm flex-shrink-0">
                         {% block actions %}{% endblock %}
                         {% for link, url in links.items() %}
-                        <a href="{{ url }}" class="plain-btn">{{ link }}</a>
+                        <a href="{{ url }}" class="btn btn-outline">{{ link }}</a>
                         {% endfor %}
                         {% if extra_links %}
-                        <button type="button" data-dropdown class="plain-btn">
-                            <admin.Icon name="three-dots" />
-                            <template>
-                                {{ link_dropdown_items(extra_links.items()) }}
-                            </template>
-                        </button>
-                        {% endif %}
-                    </div>
-                    {# Mobile actions dropdown #}
-                    {% if links or extra_links %}
-                    <div class="sm:hidden flex-shrink-0">
-                        <button type="button" data-dropdown class="flex items-center justify-center w-8 h-8 rounded hover:bg-stone-100">
-                            <admin.Icon name="three-dots" class="text-stone-600" />
-                            <template>
-                                <div class="py-1">
-                                    {% for link, url in links.items() %}
-                                    <a href="{{ url }}" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
-                                        {{ link }}
-                                    </a>
-                                    {% endfor %}
+                        <div class="dropdown-menu">
+                            <button
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded="false"
+                                aria-controls="header-extra-links-popover"
+                                class="btn btn-icon btn-outline"
+                            >
+                                <admin.Icon name="three-dots" />
+                            </button>
+                            <div id="header-extra-links-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                                <div role="menu">
                                     {% for link, url in extra_links.items() %}
-                                    <a href="{{ url }}" class="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded">
-                                        {{ link }}
-                                    </a>
+                                    <a role="menuitem" href="{{ url }}">{{ link }}</a>
                                     {% endfor %}
                                 </div>
-                            </template>
-                        </button>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {# Mobile actions: collapse links + extras into one dropdown. #}
+                    {% if links or extra_links %}
+                    <div class="sm:hidden flex-shrink-0">
+                        <div class="dropdown-menu">
+                            <button
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded="false"
+                                aria-controls="header-mobile-actions-popover"
+                                class="flex items-center justify-center w-8 h-8 rounded hover:bg-accent"
+                            >
+                                <admin.Icon name="three-dots" class="text-muted-foreground" />
+                            </button>
+                            <div id="header-mobile-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                                <div role="menu">
+                                    {% for link, url in links.items() %}
+                                    <a role="menuitem" href="{{ url }}">{{ link }}</a>
+                                    {% endfor %}
+                                    {% for link, url in extra_links.items() %}
+                                    <a role="menuitem" href="{{ url }}">{{ link }}</a>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     {% endif %}
                 </div>
                 {# Description - shown below title #}
                 {% if description %}
-                <p class="mt-1 text-sm text-black/50">{{ description }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ description }}</p>
                 {% endif %}
                 {% endblock %}
             </header>
@@ -137,12 +185,10 @@
             </div>
             {% endif %}
 
-            <main class="px-4 pt-6 pb-6 lg:px-8 text-black/70">{% block content %}{% endblock %}</main>
+            <main class="px-4 pt-6 pb-6 lg:px-8 text-foreground/80">{% block content %}{% endblock %}</main>
         </div>
 
     </div>
-
-    </div><!-- /.plain-admin -->
 
     {% include "toolbar/inject.html" ignore missing %}
 </body>

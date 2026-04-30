@@ -1,0 +1,77 @@
+/*
+ * Prose layer.
+ *
+ * Element-level defaults for raw HTML content inside the admin chrome.
+ * Things people *write* in templates — `<a>` in a paragraph, `<dl>` in
+ * a detail view, `<code>` in a docs panel, native `<select>` in a
+ * filter — get sensible, theme-aware styling here.
+ *
+ * Everything is scoped to `.plain-admin` so user pages keep their own
+ * defaults. This is the Plain counterpart to Basecoat's `@layer base`,
+ * which only ships chrome resets — Plain extends it because the admin
+ * actually renders prose content.
+ */
+
+@layer base {
+  .plain-admin {
+    /* Prose links — `<a>` inside paragraphs / list items / dd. UI links
+       (pagination, headers, table cells) inherit so they don't pick up
+       an underline by default. */
+    main :is(p, li, dd) a {
+      color: var(--link);
+      text-decoration: underline;
+    }
+    main :is(p, li, dd) a:hover {
+      color: var(--link-hover);
+    }
+
+    /* Inside `.table`, links inherit color and only underline on hover. */
+    .table th a,
+    .table td a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .table td a:hover {
+      text-decoration: underline;
+    }
+    .table img {
+      height: 1.2rem;
+      border-radius: 2px;
+    }
+
+    /* Description lists — used heavily in detail / setting views. */
+    dl {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+    dt {
+      color: var(--muted-foreground);
+    }
+
+    /* Inline `<code>` and block `<pre><code>`. Font-family is set on
+       `<code>` / `<pre>` etc. by base.css's mono rule. */
+    code {
+      padding: 0.125rem 0.375rem;
+      font-size: 0.875rem;
+      background-color: var(--code-bg);
+      color: var(--foreground);
+      border-radius: 0.25rem;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-x: auto;
+      max-width: 100%;
+    }
+    pre code {
+      display: block;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      background-color: var(--code-bg);
+      padding: 0.75rem 1rem;
+      border-radius: 0.375rem;
+      border: 1px solid var(--border);
+    }
+
+  }
+}

@@ -1,0 +1,224 @@
+/*
+ * Design tokens.
+ *
+ * Derived from Basecoat UI's defaults — see ATTRIBUTIONS.md. Scoped to
+ * `.plain-admin` so admin styles don't leak onto the user's own pages.
+ *
+ * The base palette is shadcn-style Basecoat values with Plain's olive
+ * primary on top. Plain semantic slots (`--success`, `--warning`,
+ * `--danger`, `--info`, `--link`) are real values, not aliases, with
+ * earthy hues tuned to harmonize with the olive. `--danger` replaces
+ * Basecoat's `--destructive` — same role, single name.
+ *
+ * Customizing: re-declare any token in your own stylesheet loaded
+ * after this one to retheme the admin without forking templates.
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+
+/* -------------------------------------------------------------------------
+ * Light mode tokens (Basecoat defaults)
+ * ------------------------------------------------------------------------- */
+.plain-admin {
+  --radius: 0.5rem;
+
+  /* Fonts. Tailwind v4 wires the `font-sans` / `font-mono` utilities to
+     these names automatically — overriding either retheme the admin's
+     typography without touching templates. Inter and JetBrains Mono are
+     vendored under `assets/admin/fonts/` and declared in
+     `templates/admin/base.html`; the system stacks remain as fallbacks. */
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #4d5246;
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0.004 80);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0.004 80);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0.004 80);
+  --accent-foreground: oklch(0.205 0 0);
+  --danger: oklch(0.55 0.14 35);
+  --danger-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* Chart palette: earthy, brand-coordinated hues (Sage / Steel /
+     Terracotta / Teal / Plum). Chroma kept modest (0.08–0.13) so the
+     series feel like cousins of the olive primary, not a vibrant
+     rainbow. Lightnesses cluster around 0.5–0.6 so no series visually
+     outweighs another in stacked / grouped charts. */
+  --chart-1: oklch(0.55 0.09 140);     /* Sage */
+  --chart-2: oklch(0.55 0.08 225);     /* Steel */
+  --chart-3: oklch(0.58 0.13 35);      /* Terracotta */
+  --chart-4: oklch(0.6 0.11 195);      /* Teal */
+  --chart-5: oklch(0.5 0.11 340);      /* Plum */
+
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.3);
+  --scrollbar-width: 6px;
+  --scrollbar-radius: 6px;
+  /* Chevron used as background-image on <select>, so the stroke color
+     is the actual rendered color and must be redeclared in dark mode.
+     Check is used as a CSS mask on checkboxes — mask uses the alpha
+     channel only, so a single declaration suffices for both modes. */
+  --chevron-down-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.556 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');
+  --chevron-down-icon-50: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.556 0 0 / 0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');
+  --check-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-icon lucide-check"><path d="M20 6 9 17l-5-5"/></svg>');
+
+  /* Plain-only semantic slots. Earthy, brand-coordinated hues — sage
+     green / warm amber / steel blue — desaturated enough to read
+     alongside the olive primary without fighting it. Used directly
+     (`text-success`) and at 10% opacity for badge/alert backgrounds.
+     `--danger` is declared above with the rest of the Basecoat-style
+     tokens since it underpins both status (badge) and emphasis
+     (button, alert) variants. */
+  --success: oklch(0.55 0.13 145);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.72 0.14 80);
+  --warning-foreground: oklch(0.205 0 0);
+  --info: oklch(0.55 0.13 230);
+  --info-foreground: oklch(0.985 0 0);
+  --link: oklch(0.5 0.13 230);
+  --link-hover: oklch(0.4 0.13 230);
+
+  /* Prose tokens — surfaces that prose content uses, broken out from
+     the chrome tokens so they can be themed independently. (E.g.
+     making code blocks distinctive without affecting `--muted`-driven
+     hover surfaces.) */
+  --code-bg: var(--muted);
+
+  /* Header surface. Plain ships a warm off-white chrome bar in light
+     mode; override this token to match your own brand. (For full
+     contrast inversion — light page, dark header — add `class="dark"`
+     to the `<header>` element instead, which flips every token via
+     the dark variant.) */
+  --header-bg: #f6f3f2;
+}
+
+
+/* -------------------------------------------------------------------------
+ * Dark mode tokens (Basecoat defaults)
+ *
+ * Two selectors so this works whether `.dark` and `.plain-admin` are on
+ * the same element (current default — both on <html>) or `.plain-admin`
+ * is on a descendant of `.dark`.
+ * ------------------------------------------------------------------------- */
+.dark.plain-admin,
+.dark .plain-admin {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.269 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.7 0.018 130);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.371 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --danger: oklch(0.74 0.14 35);
+  --danger-foreground: oklch(0.205 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+
+  /* Chart palette: same hues as light mode, lightness raised so the
+     series read on the dark page bg. Chroma unchanged. */
+  --chart-1: oklch(0.7 0.09 140);      /* Sage */
+  --chart-2: oklch(0.7 0.08 225);      /* Steel */
+  --chart-3: oklch(0.72 0.13 35);      /* Terracotta */
+  --chart-4: oklch(0.72 0.11 195);     /* Teal */
+  --chart-5: oklch(0.65 0.11 340);     /* Plum */
+
+  --header-bg: oklch(0.18 0.004 50);
+
+  /* Plain-only semantic slots — same hues as light mode, lighter
+     lightness for contrast on dark surfaces. The status backgrounds
+     are now light enough that `*-foreground` flips to a dark text
+     color (the inverse of light mode). */
+  --success: oklch(0.78 0.13 145);
+  --success-foreground: oklch(0.205 0 0);
+  --warning: oklch(0.8 0.14 80);
+  --warning-foreground: oklch(0.205 0 0);
+  --info: oklch(0.78 0.13 230);
+  --info-foreground: oklch(0.205 0 0);
+  --link: oklch(0.78 0.13 230);
+  --link-hover: oklch(0.85 0.13 230);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.3);
+  --chevron-down-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.708 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');
+  --chevron-down-icon-50: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.708 0 0 / 0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>');
+  --check-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.708 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-icon lucide-check"><path d="M20 6 9 17l-5-5"/></svg>');
+  color-scheme: dark;
+}
+
+
+/* -------------------------------------------------------------------------
+ * Tailwind theme bindings
+ *
+ * Expose every `--token` above as a Tailwind v4 utility class. The names
+ * here are what `bg-X`, `text-X`, `border-X` etc. resolve to.
+ * ------------------------------------------------------------------------- */
+@theme {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Plain semantic Tailwind utilities so `text-success` / `bg-warning/10`
+     / `border-danger` / `text-link` resolve to the corresponding tokens
+     above. `--danger` doubles as the Basecoat-style emphasis color used
+     by `btn-danger` / `alert-danger`. The `*-foreground` pairings carry
+     the legible text color for solid status backgrounds (buttons). */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-code-bg: var(--code-bg);
+  --color-header-bg: var(--header-bg);
+}

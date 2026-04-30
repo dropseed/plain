@@ -3,9 +3,9 @@
 {% block content %}
 <dl class="text-sm">
     {% for label, value in items.items() %}
-    <div class="flex justify-between items-baseline gap-4 py-1 border-b border-stone-100 last:border-0">
-        <dt class="text-stone-500">{{ label }}</dt>
-        <dd class="font-mono text-stone-900 truncate">{{ value }}</dd>
+    <div class="flex justify-between items-baseline gap-4 py-1 border-b border-border/60 last:border-0">
+        <dt class="text-muted-foreground">{{ label }}</dt>
+        <dd class="font-mono text-foreground truncate">{{ value }}</dd>
     </div>
     {% endfor %}
 </dl>

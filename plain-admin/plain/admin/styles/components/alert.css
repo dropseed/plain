@@ -1,0 +1,79 @@
+/*
+ * Alert — multi-class API
+ *
+ *   <div class="alert alert-success">…</div>
+ *   <div class="alert alert-warning">…</div>
+ *
+ * Always pair `.alert` (structure) with a tone modifier when you want
+ * a status look: `.alert-{success,warning,danger,info}`. Plain `.alert`
+ * is the neutral surface (card background + foreground).
+ *
+ * The icon column is reserved when either a `<svg>` (raw SVG icon)
+ * or `<i>` (Bootstrap Icons font glyph via admin.Icon) is the first
+ * child. Authors can use either.
+ */
+@layer components {
+  .alert {
+    @apply relative w-full rounded-lg border px-4 py-3 text-sm grid grid-cols-[0_1fr] gap-y-0.5 items-start;
+    @apply bg-card text-card-foreground;
+
+    &:has(> svg),
+    &:has(> i) {
+      grid-template-columns: calc(var(--spacing) * 4) 1fr;
+      column-gap: calc(var(--spacing) * 3);
+    }
+
+    > svg {
+      @apply size-4 translate-y-0.5 text-current;
+    }
+    > i {
+      @apply translate-y-0.5 text-current;
+    }
+
+    > h2,
+    > h3,
+    > h4,
+    > h5,
+    > h6,
+    > strong,
+    > [data-title] {
+      @apply col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight;
+    }
+    > section {
+      @apply text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed;
+
+      ul {
+        @apply list-inside list-disc text-sm;
+      }
+    }
+  }
+
+  .alert-success {
+    @apply text-success;
+
+    > section {
+      @apply text-success;
+    }
+  }
+  .alert-warning {
+    @apply text-warning;
+
+    > section {
+      @apply text-warning;
+    }
+  }
+  .alert-danger {
+    @apply text-danger;
+
+    > section {
+      @apply text-danger;
+    }
+  }
+  .alert-info {
+    @apply text-info;
+
+    > section {
+      @apply text-info;
+    }
+  }
+}

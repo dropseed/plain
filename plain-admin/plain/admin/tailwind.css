@@ -1,0 +1,75 @@
+/*
+ * Plain admin — Tailwind entry.
+ *
+ * Auto-discovered by plain-tailwind: any package shipping a `tailwind.css`
+ * next to its `__init__.py` is auto-`@import`-ed into the user's Tailwind
+ * build. That's how the admin's `@theme` tokens, component rules, and
+ * dark-mode variant end up compiled.
+ *
+ * Build-time only — this file is not served to the browser.
+ *
+ * Layout:
+ *   styles/tokens.css         design tokens (light + dark) + @theme
+ *   styles/base.css           @layer base resets
+ *   styles/components/*.css   one file per UI primitive, wrapped in
+ *                             @scope (.plain-admin) below so
+ *                             `class="card"` etc. on user pages don't
+ *                             pick up admin styling. To add one, drop
+ *                             a new file in components/ with a single
+ *                             @layer components { … } block, then add
+ *                             an @import in the @scope block below.
+ *   styles/admin/prose.css     element-level defaults for raw HTML
+ *                              content inside the admin (dl/dt, prose
+ *                              links, table link inheritance, code/pre,
+ *                              native select). Self-scoped via inner
+ *                              `.plain-admin { … }` selector.
+ *   styles/admin/nav.css       pinned-nav drag-and-drop states
+ *   styles/admin/scrollbar.css opt-in `.scrollbar` / `.scrollbar-hide`
+ *                              utilities themed via `--scrollbar-*`
+ *
+ * See ATTRIBUTIONS.md for credit / MIT license preservation.
+ */
+
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+
+/* Safelist classes Tailwind can't see statically. Card sizes are an
+   Enum (Card.Sizes 1-4) interpolated into templates as
+   `col-span-{{ size.value }}`, which is invisible to the content scanner. */
+@source inline("col-span-{1,2,3,4}");
+
+/* Wrapped in @scope (.plain-admin) so generic class names — `.card`,
+   `.btn`, `.nav-tab`, `.scrollbar` — only style descendants of the
+   admin chrome. A user page with `class="card"` keeps its own look. */
+@scope (.plain-admin) {
+  @import "./styles/components/alert.css";
+  @import "./styles/components/badge.css";
+  @import "./styles/components/button.css";
+  @import "./styles/components/card.css";
+  @import "./styles/components/checkbox.css";
+  @import "./styles/components/collapsible.css";
+  @import "./styles/components/dialog.css";
+  @import "./styles/components/dropdown-menu.css";
+  @import "./styles/components/field.css";
+  @import "./styles/components/hovercard.css";
+  @import "./styles/components/input.css";
+  @import "./styles/components/kbd.css";
+  @import "./styles/components/label.css";
+  @import "./styles/components/popover.css";
+  @import "./styles/components/progress.css";
+  @import "./styles/components/radio.css";
+  @import "./styles/components/segmented.css";
+  @import "./styles/components/select.css";
+  @import "./styles/components/switch.css";
+  @import "./styles/components/table.css";
+  @import "./styles/components/tabs.css";
+  @import "./styles/components/textarea.css";
+  @import "./styles/components/tooltip.css";
+
+  @import "./styles/admin/nav.css";
+  @import "./styles/admin/scrollbar.css";
+}
+
+/* prose.css self-scopes via an inner `.plain-admin { … }` selector, so
+   it sits outside @scope to keep its element-level rules readable. */
+@import "./styles/admin/prose.css";

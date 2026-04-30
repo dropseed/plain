@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import datetime
 import json
-from typing import Any
+from typing import Any, Literal
 
 from plain.http import NotFoundError404, RedirectResponse, Response
 from plain.packages import packages_registry
@@ -11,6 +12,7 @@ from plain.postgres import QuerySet
 from plain.preflight import run_checks, set_check_counts
 from plain.runtime import settings as plain_settings
 
+from .cards import Card, KeyValueCard, TableCard, TrendCard
 from .models import PinnedNavItem
 from .views.base import AdminView
 from .views.objects import AdminListView
@@ -25,8 +27,6 @@ class AdminIndexView(AdminView):
     title = "Dashboard"
 
     def get(self) -> Response:
-        # Slight hack to redirect to the first view that doesn't
-        # require any url params...
         if views := registry.get_list_views(user=self.user):
             return RedirectResponse(list(views)[0].get_view_url())
 
@@ -56,7 +56,6 @@ class PinNavView(AdminView):
         if not view_slug:
             return Response("view_slug is required", status_code=400)
 
-        # Check if user has reached max pinned items
         current_count = PinnedNavItem.query.filter(user=self.user).count()
         if current_count >= MAX_PINNED_ITEMS:
             return Response(
@@ -64,7 +63,6 @@ class PinNavView(AdminView):
                 status_code=400,
             )
 
-        # Verify the view slug exists
         if not registry.get_view_by_slug(view_slug):
             return Response("Invalid view_slug", status_code=400)
 
@@ -82,7 +80,6 @@ class PinNavView(AdminView):
             defaults={"order": next_order},
         )
 
-        # Redirect back to current page (or referer)
         referer = self.request.headers.get("Referer", "/admin/")
         return RedirectResponse(referer, allow_external=True)
 
@@ -103,7 +100,6 @@ class UnpinNavView(AdminView):
             view_slug=view_slug,
         ).delete()
 
-        # Redirect back to current page (or referer)
         referer = self.request.headers.get("Referer", "/admin/")
         return RedirectResponse(referer, allow_external=True)
 
@@ -124,7 +120,6 @@ class ReorderPinnedView(AdminView):
         except json.JSONDecodeError:
             return Response("Invalid slugs JSON", status_code=400)
 
-        # Only update slugs that exist and belong to this user
         user_pinned = set(
             PinnedNavItem.query.filter(user=self.user).values_list(
                 "view_slug", flat=True
@@ -136,7 +131,6 @@ class ReorderPinnedView(AdminView):
                     order=i
                 )
 
-        # No redirect needed for drag-and-drop reorder (called via fetch)
         return Response("OK")
 
 
@@ -226,47 +220,36 @@ class PreflightView(AdminView):
         """Run all preflight checks and return (checks, passed, warnings, errors)."""
         packages_registry.autodiscover_modules("preflight", include_app=True)
 
-        include_deploy = not plain_settings.DEBUG
-
         checks = []
         passed_count = 0
         warning_count = 0
         error_count = 0
 
-        for check_class, name, results in run_checks(
-            include_deploy_checks=include_deploy
+        for _check_class, name, results in run_checks(
+            include_deploy_checks=not plain_settings.DEBUG
         ):
-            issues = []
-            for result in results:
-                if result.is_silenced():
-                    continue
-                issues.append(
-                    {
-                        "fix": result.fix,
-                        "id": result.id,
-                        "warning": result.warning,
-                    }
-                )
+            visible = [r for r in results if not r.is_silenced()]
+            issues = [{"fix": r.fix, "id": r.id, "warning": r.warning} for r in visible]
 
-            has_errors = any(not issue["warning"] for issue in issues)
-            if issues:
-                if has_errors:
-                    error_count += 1
-                else:
-                    warning_count += 1
-            else:
+            status: Literal["passed", "warning", "error"]
+            if not issues:
+                status = "passed"
                 passed_count += 1
+            elif any(not r.warning for r in visible):
+                status = "error"
+                error_count += 1
+            else:
+                status = "warning"
+                warning_count += 1
 
             checks.append(
                 {
                     "name": name,
-                    "passed": not issues,
-                    "has_errors": has_errors,
+                    "status": status,
                     "issues": issues,
                 }
             )
 
-        # Refresh the shared cache so badge counts stay current.
         set_check_counts(errors=error_count, warnings=warning_count)
 
         return checks, passed_count, warning_count, error_count
@@ -288,10 +271,93 @@ class PreflightView(AdminView):
         return context
 
 
-class StyleGuideView(AdminView):
-    """Style guide showing available components and patterns."""
+class _DemoMetricCard(Card):
+    title = "Active users"
+    description = "Last 30 days"
+    metric = 1284
+    text = "View all"
+    link = "#"
+
+
+class _DemoKeyValueCard(KeyValueCard):
+    title = "Latest deploy"
+    size = Card.Sizes.MEDIUM
+    items = {
+        "Branch": "main",
+        "Commit": "4bc9003d",
+        "Status": "Succeeded",
+        "Author": "dave",
+    }
+
+
+class _DemoTableCard(TableCard):
+    title = "Recent jobs"
+    headers = ["Job", "Result", "Duration"]
+    rows = [
+        ["send_welcome_email", "Successful", "1.2s"],
+        ["rebuild_search_index", "Successful", "12.4s"],
+        ["expire_sessions", "Errored", "0.3s"],
+    ]
+
+
+class _DemoTrendCard(TrendCard):
+    title = "Sample trend"
+    description = "Synthetic 14-day stack across all five chart tokens"
+    size = Card.Sizes.FULL
+    aggregates = ("sum", "avg")
+
+    _SERIES: list[tuple[str, str, list[int]]] = [
+        ("Sage", "var(--chart-1)", [4, 5, 6, 5, 7, 8, 6, 5, 6, 7, 8, 9, 7, 6]),
+        ("Steel", "var(--chart-2)", [3, 2, 4, 3, 4, 5, 4, 3, 4, 5, 4, 5, 6, 4]),
+        ("Terracotta", "var(--chart-3)", [2, 3, 2, 3, 4, 3, 4, 5, 3, 4, 3, 4, 5, 3]),
+        ("Teal", "var(--chart-4)", [1, 2, 2, 3, 2, 3, 4, 2, 3, 4, 3, 4, 3, 5]),
+        ("Plum", "var(--chart-5)", [2, 1, 2, 1, 2, 2, 3, 2, 1, 2, 3, 2, 3, 2]),
+    ]
+
+    def get_filters(self) -> Any:
+        return None
+
+    def get_chart_data(self) -> dict[str, Any]:
+        today = datetime.date.today()
+        days = len(self._SERIES[0][2])
+        labels = [
+            (today - datetime.timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
+            for i in range(days)
+        ]
+        datasets = [
+            {
+                "label": label,
+                "data": data,
+                "backgroundColor": color,
+                "categoryPercentage": 0.9,
+                "barPercentage": 1.0,
+            }
+            for label, color, data in self._SERIES
+        ]
+        return {
+            "type": "bar",
+            "data": {"labels": labels, "datasets": datasets},
+            **self._chart_options(stacked=True),
+            "plain": self._plain_meta(),
+        }
+
+
+class UIView(AdminView):
+    """Live admin UI catalog: every CSS token rendered as a swatch, every
+    component primitive rendered with copy-pasteable markup, and a written
+    customization guide. Lives at /admin/ui/."""
 
     is_builtin = True
-    template_name = "admin/style.html"
-    title = "Style Guide"
+    template_name = "admin/ui.html"
+    title = "UI"
     nav_section = None
+
+    def get_template_context(self) -> dict[str, Any]:
+        context = super().get_template_context()
+        context["demo_cards"] = [
+            _DemoMetricCard,
+            _DemoKeyValueCard,
+            _DemoTrendCard,
+            _DemoTableCard,
+        ]
+        return context

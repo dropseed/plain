@@ -1,0 +1,27 @@
+/* Hovercard — hover-triggered version of popover. Trigger can be any
+   element (no <button> requirement); panel is positioned `fixed` via
+   JS using `getBoundingClientRect()` so it escapes container clipping.
+
+   Markup:
+     <span class="hovercard">
+       <some-trigger />
+       <div data-hovercard aria-hidden="true">…panel content…</div>
+     </span>
+
+   Surface treatment (bg, border, shadow, radius) is shared with
+   [data-popover] in popover.css. */
+@layer components {
+  .hovercard {
+    @apply relative inline-flex;
+  }
+
+  [data-hovercard] {
+    @apply fixed p-1 text-sm whitespace-nowrap z-50 transition-opacity duration-100;
+  }
+  [data-hovercard][aria-hidden='true'] {
+    @apply opacity-0 invisible pointer-events-none;
+  }
+  [data-hovercard][aria-hidden='false'] {
+    @apply opacity-100 visible pointer-events-auto;
+  }
+}

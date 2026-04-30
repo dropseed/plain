@@ -2,18 +2,19 @@
 
 {% block content %}
 
-{# Metric: linked when link is provided, plain div otherwise #}
+{# Metric: oversize tabular-num typography. Linked when a link is provided. #}
+{% set metric_classes = "block text-3xl font-semibold leading-tight tracking-tight tabular-nums text-foreground" %}
 {% if metric is not none and link %}
-<a href="{{ link }}">{{ metric }}</a>
+<a href="{{ link }}" class="{{ metric_classes }} hover:underline">{{ metric }}</a>
 {% elif metric is not none %}
-<div>{{ metric }}</div>
+<div class="{{ metric_classes }}">{{ metric }}</div>
 {% endif %}
 
-{# Text: linked only when there's no metric to carry the link #}
+{# Text: small caption, linked only when there's no metric to carry the link. #}
 {% if text and link and metric is none %}
-<a href="{{ link }}">{{ text }}</a>
+<a href="{{ link }}" class="text-sm text-link hover:text-link-hover hover:underline">{{ text }}</a>
 {% elif text and not link %}
-<div>{{ text }}</div>
+<div class="mt-1 text-xs text-muted-foreground">{{ text }}</div>
 {% endif %}
 
 {% endblock %}

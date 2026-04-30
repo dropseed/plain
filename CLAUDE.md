@@ -48,6 +48,7 @@ This is an internal stance for code we ship in Plain itself — packages, the ad
 - **No `el.style.x = ...` mutations in our JS.** Toggle classes (`classList.add/remove`) instead. Tailwind v4's `!` suffix (`hidden!`) provides `!important` when needed to defeat library-internal inline styles.
 - **Inline `<style>` and `<script>` tags must carry `nonce="{{ request.csp_nonce }}"`.**
 - **No inline event handlers** (`onclick=`, `onload=`, etc.). Wire behavior in the relevant JS file.
+- For dialogs, use the native HTML Invoker Commands API: `<button command="show-modal" commandfor="my-dialog">` — never `onclick="dialog.showModal()"`.
 - For dynamic SVG colors, use the `fill=`/`stroke=` presentation attributes — those aren't covered by `style-src`.
 
 The `example/` app runs the strict CSP — exercise admin/toolbar/template changes there before shipping. Library-internal violations from third-party deps (e.g. Chart.js setting canvas inline styles) are a known cost; don't add to them on our side.

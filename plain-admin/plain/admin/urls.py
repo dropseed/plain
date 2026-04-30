@@ -9,7 +9,7 @@ from .builtin_views import (
     ReorderPinnedView,
     SettingDetailView,
     SettingsView,
-    StyleGuideView,
+    UIView,
     UnpinNavView,
 )
 from .impersonate.urls import ImpersonateRouter
@@ -22,7 +22,7 @@ class AdminRouter(Router):
     namespace = "admin"
     urls = [
         path("search/", AdminSearchView, name="search"),
-        path("style/", StyleGuideView, name="style"),
+        path("ui/", UIView, name="ui"),
         path("settings/", SettingsView, name="settings"),
         path("settings/<name>/", SettingDetailView, name="setting_detail"),
         path("preflight/", PreflightView, name="preflight"),

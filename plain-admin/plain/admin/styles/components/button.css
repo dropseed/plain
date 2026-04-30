@@ -1,0 +1,134 @@
+/* Button — multi-class API
+ *
+ * Compose:
+ *   <button class="btn btn-primary">           default size, primary
+ *   <button class="btn btn-sm btn-outline">    small outline
+ *   <button class="btn btn-icon btn-ghost">    square icon-only ghost
+ *   <button class="btn btn-lg btn-icon btn-danger">
+ *
+ * Axes are orthogonal:
+ *   • size:  default | btn-sm | btn-lg
+ *   • shape: (rect)  | btn-icon (square)
+ *   • color: btn-{primary,secondary,outline,ghost,link,success,warning,danger,info}
+ *
+ * Sizes/shapes are nested under `.btn` so compound selectors win the
+ * specificity battle against the base rule's `:has(>svg)` adjustment
+ * — that's why size/icon overrides live inside the .btn block.
+ *
+ * Color variants live as standalone rules so they're orthogonal to
+ * size and trivially extended.
+ *
+ * Status buttons (success/warning/danger/info) render at 70% bg in dark
+ * mode so the saturated hue mixes into a softer tone — the foreground
+ * tokens already give plenty of contrast at full opacity. Tweak the
+ * `/70` and `/60` modifiers to taste.
+ */
+@layer components {
+  .btn {
+    @apply focus-control inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none cursor-pointer rounded-md;
+    /* default size */
+    @apply gap-2 h-9 px-4 py-2;
+    &:has(>svg) { @apply px-3; }
+
+    &.btn-sm {
+      @apply gap-1.5 h-8 px-3 py-0;
+      &:has(>svg) { @apply px-2.5; }
+    }
+    &.btn-lg {
+      @apply h-10 px-6 py-2;
+      &:has(>svg) { @apply px-4; }
+    }
+
+    &.btn-icon       { @apply size-9 p-0; }
+    &.btn-sm.btn-icon { @apply size-8; }
+    &.btn-lg.btn-icon { @apply size-10; }
+  }
+
+  .btn-primary {
+    @apply bg-primary text-primary-foreground shadow-xs hover:bg-primary/90;
+    &[aria-pressed='true'] { @apply bg-primary/90; }
+  }
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground shadow-xs;
+    &:hover,
+    &[aria-pressed='true'] { @apply bg-secondary/80; }
+  }
+  .btn-outline {
+    @apply border bg-background shadow-xs dark:bg-input/30 dark:border-input;
+    &:hover,
+    &[aria-pressed='true'] { @apply bg-accent text-accent-foreground dark:bg-accent/50; }
+  }
+  .btn-ghost {
+    &:hover,
+    &[aria-pressed='true'] { @apply bg-accent text-accent-foreground dark:bg-accent/50; }
+  }
+  .btn-link {
+    @apply text-primary underline-offset-4;
+    &:hover,
+    &[aria-pressed='true'] { @apply hover:underline; }
+  }
+  .btn-success {
+    @apply bg-success text-success-foreground shadow-xs focus-visible:ring-success/20 dark:focus-visible:ring-success/40 dark:bg-success/70;
+    &:hover,
+    &[aria-pressed='true'] { @apply bg-success/90 dark:bg-success/60; }
+  }
+  .btn-warning {
+    @apply bg-warning text-warning-foreground shadow-xs focus-visible:ring-warning/20 dark:focus-visible:ring-warning/40 dark:bg-warning/70;
+    &:hover,
+    &[aria-pressed='true'] { @apply bg-warning/90 dark:bg-warning/60; }
+  }
+  .btn-danger {
+    @apply bg-danger text-danger-foreground shadow-xs focus-visible:ring-danger/20 dark:focus-visible:ring-danger/40 dark:bg-danger/70;
+    &:hover,
+    &[aria-pressed='true'] { @apply bg-danger/90 dark:bg-danger/60; }
+  }
+  .btn-info {
+    @apply bg-info text-info-foreground shadow-xs focus-visible:ring-info/20 dark:focus-visible:ring-info/40 dark:bg-info/70;
+    &:hover,
+    &[aria-pressed='true'] { @apply bg-info/90 dark:bg-info/60; }
+  }
+}
+
+/* Button Group */
+@layer components {
+  .button-group {
+    @apply inline-flex w-fit items-stretch;
+    /* isolate */
+
+    > *:focus-visible,
+    > :is(.dropdown-menu, .popover, .select) > button:focus-visible {
+      @apply relative z-10;
+    }
+
+    > hr[role='separator'] {
+      @apply w-0 h-auto self-stretch border border-input shrink-0 m-0;
+    }
+
+    &:not([data-orientation='vertical']) {
+      > *:not(:first-child),
+      > :is(.dropdown-menu, .popover, .select):not(:first-child) > button {
+        @apply rounded-l-none border-l-0;
+      }
+      > *:not(:last-child),
+      > :is(.dropdown-menu, .popover, .select):not(:last-child) > button {
+        @apply rounded-r-none;
+      }
+    }
+    &[data-orientation='vertical'] {
+      @apply flex-col;
+
+      > hr[role='separator'] {
+        @apply w-auto h-px;
+      }
+
+      > *:not(:first-child),
+      > :is(.dropdown-menu, .popover, .select):not(:first-child) > button {
+        @apply rounded-t-none border-t-0;
+      }
+      > *:not(:last-child),
+      > :is(.dropdown-menu, .popover, .select):not(:last-child) > button {
+        @apply rounded-b-none;
+      }
+    }
+  }
+}

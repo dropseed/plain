@@ -1,0 +1,18 @@
+/*
+ * Pinned-nav tab strip drag-and-drop states.
+ *
+ * The tabs themselves are styled with utility classes in `_header.html`;
+ * these rules cover the visual states during dragging.
+ */
+
+.nav-tab[draggable="true"] {
+  cursor: pointer;
+}
+
+.nav-tab.dragging {
+  opacity: 0.5;
+}
+
+.nav-tab.drag-over {
+  border-left: 2px solid var(--warning);
+}

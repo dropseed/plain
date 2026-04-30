@@ -1,0 +1,30 @@
+/* Tabs — content-panel switching with an underline indicator.
+
+   For a "pick one of these values" control (theme, density, view mode),
+   reach for the segmented control instead — that's a different role
+   (radiogroup vs tablist) with a different visual. */
+@layer components {
+  .tabs {
+    @apply flex flex-col gap-3;
+
+    [role='tablist'] {
+      @apply flex items-center gap-1 border-b border-border;
+    }
+
+    [role='tab'] {
+      @apply -mb-px inline-flex items-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap text-muted-foreground border-b-2 border-transparent transition-colors cursor-pointer;
+      @apply hover:text-foreground hover:border-border;
+      @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:rounded-sm;
+      @apply disabled:pointer-events-none disabled:opacity-50;
+      @apply [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4;
+
+      &[aria-selected='true'] {
+        @apply text-foreground font-medium border-primary hover:border-primary;
+      }
+    }
+
+    [role='tabpanel'] {
+      @apply outline-none;
+    }
+  }
+}

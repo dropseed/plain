@@ -1,8 +1,8 @@
 {% extends "admin/cards/base.html" %}
 
 {% block content %}
-<div class="flex-grow w-full">
-  <table>
+<div class="overflow-x-auto -mx-6">
+  <table class="table w-full [&_th]:px-6 [&_td]:px-6 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
     {% if headers %}
     <thead>
       <tr>

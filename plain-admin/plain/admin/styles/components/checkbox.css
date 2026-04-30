@@ -1,0 +1,12 @@
+/* Checkbox */
+@layer components {
+  :is(.form, .field) input[type='checkbox']:not([role='switch']),
+  .input[type='checkbox']:not([role='switch']) {
+    @apply focus-control appearance-none border-input dark:bg-input/30 checked:bg-primary dark:checked:bg-primary checked:border-primary size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none disabled:cursor-not-allowed disabled:opacity-50;
+    
+    &:checked:after {
+      @apply content-[''] block size-3.5 bg-primary-foreground;
+      @apply mask-[image:var(--check-icon)] mask-size-[0.875rem] mask-no-repeat mask-center;
+    }
+  }
+}

@@ -19,9 +19,12 @@
 - [Toolbar](#toolbar)
 - [Impersonate](#impersonate)
 - [Customization](#customization)
+    - [Theming](#theming)
+    - [Components](#components)
     - [Header branding](#header-branding)
     - [User avatar](#user-avatar)
     - [User menu items](#user-menu-items)
+    - [Field value templates](#field-value-templates)
 - [Access control](#access-control)
     - [Per-view restriction](#per-view-restriction)
     - [Global restriction](#global-restriction)
@@ -475,6 +478,158 @@ def my_view(request):
 
 ## Customization
 
+### Theming
+
+The admin's UI is built on a per-component CSS layer with Plain's brand
+palette layered on top. Every color, radius, and chrome surface is a CSS
+custom property declared on `.plain-admin` (light) and
+`.dark.plain-admin, .dark .plain-admin` (dark) — redeclare any token in
+your own stylesheet to retheme the admin without forking templates.
+
+The cleanest place for overrides is your project's Tailwind input file
+(typically `tailwind.css` at the repo root), since `plain.tailwind`
+auto-discovers `plain.admin`'s `tailwind.css` and compiles its tokens
+into the same bundle. Anything you add after that import wins:
+
+```css
+/* tailwind.css */
+@import "tailwindcss";
+@import "./.plain/tailwind.css";
+
+.plain-admin {
+  --primary: #4f46e5;             /* drives .btn-primary, focus rings, active tab */
+  --primary-foreground: white;
+  --ring: #4f46e5;
+  --header-bg: #eef2ff;           /* sticky top header surface */
+  --link: #4f46e5;
+  --link-hover: #3730a3;
+}
+.dark.plain-admin,
+.dark .plain-admin {
+  --primary: #818cf8;
+  --primary-foreground: #1e1b4b;
+  --ring: #818cf8;
+  --header-bg: oklch(0.22 0.05 270);
+  --link: #c7d2fe;
+  --link-hover: #e0e7ff;
+}
+```
+
+Match the source selectors so specificity ties — a bare `:root { --primary: ... }`
+will be beaten by the admin's own `.plain-admin` declarations and won't take
+effect.
+
+The most commonly retuned tokens:
+
+- **Brand palette** — `--primary`, `--primary-foreground`, `--ring`, `--link`,
+  `--link-hover`, `--header-bg`.
+- **Status family** — `--success`, `--warning`, `--danger`, `--info`, each with
+  a `*-foreground` for legible text on solid fills (used by `.btn-danger`,
+  `.alert-warning`, etc.).
+- **Chart palette** — `--chart-1` through `--chart-5`, used by `TrendCard` and
+  any other chart in the admin.
+- **Radius scale** — override `--radius` once to retighten or loosen every
+  component's corners (Tailwind exposes this as `rounded-sm`/`-md`/`-lg`/`-xl`).
+- **Surfaces** — `--background`, `--card`, `--muted`, `--accent`, `--popover`,
+  plus their `*-foreground` pairs.
+
+The full list of tokens with side-by-side swatches is rendered live at
+[`/admin/ui/`](#components) — visit it in your own running admin
+to see every token, every component variant, and copy-pasteable markup.
+
+The admin ships with light and dark mode out of the box. A toggle in the top
+bar cycles **Light → Dark → System**, persisted in `localStorage`. The dark
+class is applied to `<html>` before paint via an inline init script, so there
+is no flash of the wrong theme on page load.
+
+### Fonts
+
+The admin ships [Inter](https://github.com/rsms/inter) (sans) and
+[JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (mono), vendored
+under `plain.admin`'s assets and licensed under the SIL Open Font License 1.1.
+Their `@font-face` declarations live in an overridable `admin_fonts` block
+of `admin/base.html`; the defaults of `--font-sans` and `--font-mono` lead
+with these families and fall back to the system stack.
+
+Three override patterns:
+
+```css
+/* 1. Use the bundled fonts but lean on the system stack as the
+      primary — Inter / JetBrains Mono still load. */
+.plain-admin {
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+}
+```
+
+```jinja
+{# 2. Replace the bundled fonts with your own. #}
+{% extends "admin/base.html" %}
+{% block admin_fonts %}
+<style nonce="{{ request.csp_nonce }}">
+@font-face {
+  font-family: "Geist";
+  src: url("{{ asset('fonts/Geist.woff2') }}") format("woff2");
+}
+</style>
+{% endblock %}
+```
+
+```jinja
+{# 3. Drop the bundled fonts entirely and use the system stack. #}
+{% block admin_fonts %}{% endblock %}
+```
+
+Pair (2) and (3) with a `--font-sans` / `--font-mono` override on `.plain-admin`
+so the cascade actually picks up the new family.
+
+### Components
+
+The admin includes a live component catalog at `/admin/ui/`.
+Each section shows the rendered component with copy-pasteable markup —
+buttons, badges, alerts, cards, form fields, dialogs, dropdowns, tabs,
+tables, and icons. Use these classes when building admin views and
+you'll inherit both light/dark theming and the user's brand overrides.
+
+| Pattern           | Class(es)                                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Buttons           | Compose `.btn` with one of `.btn-primary` / `.btn-secondary` / `.btn-outline` / `.btn-ghost` / `.btn-link`                 |
+| Sizes / icon-only | Stack `.btn-sm` or `.btn-lg`; add `.btn-icon` for a square icon-only button (e.g. `class="btn btn-sm btn-icon btn-ghost"`) |
+| Status buttons    | `.btn-success`, `.btn-warning`, `.btn-danger`, `.btn-info` (solid fill + paired fg)                                        |
+| Badges            | Compose `.badge` with one of `.badge-primary` / `.badge-secondary` / `.badge-outline`                                      |
+| Status badges     | Stack `.badge-success`, `.badge-warning`, `.badge-danger`, `.badge-info` (translucent fill + saturated text)               |
+| Alerts            | Compose `.alert` (neutral surface) with `.alert-success` / `.alert-warning` / `.alert-danger` / `.alert-info` for tone     |
+| Cards             | `.card` — pad with utilities (e.g. `class="card gap-2 py-4"` for dense layouts)                                            |
+| Form inputs       | `.input`, `.textarea`, `.select` — opt in via class; pair with `-sm` for compact rows                                      |
+| Dialogs           | `<dialog class="dialog">` opened via `<button command="show-modal" commandfor="…">`                                        |
+| Tabs              | `.tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                                                                 |
+| Dropdowns         | `.dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` with `[role="menu"]`                                     |
+
+When writing custom admin templates, prefer the design tokens over hardcoded
+colors so dark mode and theme overrides work automatically:
+
+| Use                 | Class / token                                                                                             |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| Page background     | `bg-background`, `text-foreground`                                                                        |
+| Cards / panels      | `bg-card text-card-foreground`                                                                            |
+| Subtle surfaces     | `bg-muted`, `bg-muted/40`                                                                                 |
+| Hover surface       | `hover:bg-accent hover:text-accent-foreground`                                                            |
+| Borders             | `border-border` (general), `border-input` (form fields)                                                   |
+| Muted text          | `text-muted-foreground`                                                                                   |
+| Primary action      | `bg-primary` / `text-primary-foreground`                                                                  |
+| Link                | `text-link hover:text-link-hover`                                                                         |
+| Status text         | `text-success`, `text-warning`, `text-danger`, `text-info`                                                |
+| Status backgrounds  | `bg-success/10`, `bg-warning/10`, `bg-danger/10`, `bg-info/10` (translucent fills, used by status badges) |
+| Status solid action | `bg-{success,warning,danger,info}` / `text-{name}-foreground`                                             |
+| Focus ring          | `ring-ring`                                                                                               |
+| Header surface      | `bg-header-bg`                                                                                            |
+
+The component CSS source lives in
+[`plain/admin/styles/`](./styles/): `tokens.css` declares every design
+token (light + dark) and the `@theme` bindings, `components/*.css` holds
+one file per UI primitive, and `tailwind.css` (next to the package's
+`__init__.py`) is the entry that `plain.tailwind` auto-imports into the
+user's build.
+
 ### Header branding
 
 The top-left corner of the admin header shows your app name and an "Admin" link by default. To replace it with your own logo or branding, create an `admin/header_branding.html` template:
@@ -519,7 +674,7 @@ To add items to the user dropdown menu (e.g., a profile page), create an `admin/
 <!-- app/templates/admin/user_menu_items.html -->
 <a
     href="{{ admin_url('profile') }}"
-    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded"
+    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded"
 >
     Profile
 </a>

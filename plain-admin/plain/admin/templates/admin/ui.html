@@ -1,0 +1,1115 @@
+{% extends "admin/base.html" %}
+
+{% use_elements %}
+
+{# Customization page: design-token reference + component catalog.
+
+   Pure reference doc — every token shown as a swatch, every component
+   shown with copyable markup. To preview in dark mode, use the theme
+   menu in the top-right header.
+
+   On lg+ a sticky side nav rides the right margin; on smaller screens
+   that collapses and a flat TOC sits at the top. IntersectionObserver
+   in the inline init script highlights the current section as the user
+   scrolls. #}
+
+{% macro example(caption='') %}
+{% set markup = caller() %}
+<figure class="my-3 rounded-lg border border-border bg-card text-card-foreground">
+    <div class="p-6 flex flex-wrap items-center gap-3 border-b border-border">
+        {{ markup }}
+    </div>
+    <details class="group">
+        <summary class="cursor-pointer select-none px-4 py-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-2">
+            <admin.Icon name="code-slash" />
+            <span>Show markup{% if caption %} — {{ caption }}{% endif %}</span>
+        </summary>
+        <pre class="m-0! rounded-none! border-none! text-xs"><code>{{ markup|forceescape }}</code></pre>
+    </details>
+</figure>
+{% endmacro %}
+
+{% macro group(title) %}
+<h2 class="text-2xl font-bold text-foreground mt-16 mb-1">{{ title }}</h2>
+{% endmacro %}
+
+{% macro section(id, title, blurb='') %}
+<section id="{{ id }}" data-ui-section class="scroll-mt-28 mt-10">
+    <h3 class="text-lg font-semibold text-foreground border-b border-border pb-2 mb-2">
+        <a href="#{{ id }}" class="no-underline hover:underline">{{ title }}</a>
+    </h3>
+    {% if blurb %}<p class="text-sm text-muted-foreground mb-4">{{ blurb }}</p>{% endif %}
+    {{ caller() }}
+</section>
+{% endmacro %}
+
+{% macro swatch_grid(swatches) %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+    {% for name, cls in swatches %}
+    <div class="rounded-md border border-border p-2 flex items-center gap-3">
+        <span class="{{ cls }} w-8 h-8 rounded border border-border shrink-0" aria-hidden="true"></span>
+        <div class="min-w-0 flex-1">
+            <code class="text-xs text-muted-foreground block truncate">--{{ name }}</code>
+            <code data-token-current="--{{ name }}" class="text-[10px] text-foreground/60 block truncate"></code>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+
+{# Token swatch lists. Each is a (display-name, bg-utility) pair. The
+   bg-utility classes must be literal in the template so Tailwind picks
+   them up in its @source scan. #}
+
+{% set _surface = [
+    ("background", "bg-background"),
+    ("foreground", "bg-foreground"),
+    ("secondary", "bg-secondary"),
+    ("secondary-foreground", "bg-secondary-foreground"),
+    ("muted", "bg-muted"),
+    ("muted-foreground", "bg-muted-foreground"),
+    ("accent", "bg-accent"),
+    ("accent-foreground", "bg-accent-foreground"),
+    ("border", "bg-border"),
+    ("input", "bg-input"),
+    ("scrollbar-thumb", "bg-[var(--scrollbar-thumb)]")
+] %}
+{% set _action = [
+    ("primary", "bg-primary"),
+    ("primary-foreground", "bg-primary-foreground"),
+    ("ring", "bg-ring")
+] %}
+{% set _status = [
+    ("success", "bg-success"),
+    ("success-foreground", "bg-success-foreground"),
+    ("warning", "bg-warning"),
+    ("warning-foreground", "bg-warning-foreground"),
+    ("danger", "bg-danger"),
+    ("danger-foreground", "bg-danger-foreground"),
+    ("info", "bg-info"),
+    ("info-foreground", "bg-info-foreground")
+] %}
+{# Component-scoped tokens — rendered alongside their component sections
+   below rather than in the top-level token reference. #}
+{% set _prose_tokens = [
+    ("link", "bg-link"),
+    ("link-hover", "bg-link-hover"),
+    ("code-bg", "bg-code-bg")
+] %}
+{% set _card_tokens = [
+    ("card", "bg-card"),
+    ("card-foreground", "bg-card-foreground")
+] %}
+{% set _popover_tokens = [
+    ("popover", "bg-popover"),
+    ("popover-foreground", "bg-popover-foreground")
+] %}
+{% set _header_tokens = [
+    ("header-bg", "bg-header-bg")
+] %}
+{% set _chart_tokens = [
+    ("chart-1", "bg-chart-1"),
+    ("chart-2", "bg-chart-2"),
+    ("chart-3", "bg-chart-3"),
+    ("chart-4", "bg-chart-4"),
+    ("chart-5", "bg-chart-5")
+] %}
+
+{# Grouped TOC. Each group is (group_title, [(section_id, link_label), ...]).
+   Group titles also render as <h2> dividers in the body. #}
+{% set _toc_groups = [
+    ("Theme", [
+        ("customizing", "Customizing"),
+        ("dark-mode", "Dark mode"),
+        ("typography", "Typography"),
+    ]),
+    ("Tokens", [
+        ("tokens-surface", "Surface tokens"),
+        ("tokens-action", "Action tokens"),
+        ("tokens-status", "Status tokens"),
+        ("tokens-header", "Header tokens"),
+        ("tokens-sizing", "Sizing tokens"),
+    ]),
+    ("Content", [
+        ("prose", "Prose"),
+        ("icons", "Icons"),
+        ("kbd", "Keyboard hints"),
+    ]),
+    ("Actions", [
+        ("buttons", "Buttons"),
+        ("badges", "Badges"),
+    ]),
+    ("Feedback", [
+        ("alerts", "Alerts"),
+        ("progress", "Progress"),
+    ]),
+    ("Containers", [
+        ("cards", "Cards"),
+        ("admin-cards", "Admin card classes"),
+        ("tables", "Tables"),
+    ]),
+    ("Forms", [
+        ("forms", "Form fields"),
+        ("field-wrapper", "Field wrapper"),
+    ]),
+    ("Overlays", [
+        ("dialogs", "Dialogs"),
+        ("popovers", "Popovers"),
+        ("dropdowns", "Dropdowns"),
+        ("tooltips", "Tooltips"),
+        ("hovercards", "Hovercards"),
+    ]),
+    ("Disclosure", [
+        ("tabs", "Tabs"),
+        ("segmented", "Segmented control"),
+        ("collapsible", "Collapsible"),
+    ]),
+    ("Behaviors", [
+        ("behaviors", "Data attributes"),
+    ]),
+] %}
+
+
+{% block header_scripts %}
+<script nonce="{{ request.csp_nonce }}">
+/* Sticky side-nav active-section highlight: as the user scrolls, mark the
+   TOC link for the section currently in view. Pure navigation aid — no
+   styling state lives in JS. */
+document.addEventListener("DOMContentLoaded", () => {
+    const links = new Map();
+    document.querySelectorAll("[data-ui-toc] a").forEach((a) => {
+        const id = a.getAttribute("href").slice(1);
+        if (id) links.set(id, a);
+    });
+    if (!links.size) return;
+
+    const setActive = (id) => {
+        links.forEach((a) => a.removeAttribute("data-active"));
+        const a = links.get(id);
+        if (a) a.setAttribute("data-active", "true");
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        const visible = entries
+            .filter((e) => e.isIntersecting)
+            .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length) setActive(visible[0].target.id);
+    }, { rootMargin: "-10% 0px -70% 0px", threshold: 0 });
+
+    document.querySelectorAll("[data-ui-section]").forEach((s) => observer.observe(s));
+});
+
+/* Resolve every [data-token-current="--name"] to its currently computed
+   value, so the page reflects what the admin is actually using right
+   now (defaults out of the box, user overrides if any). Length tokens
+   defined as calc(...) are resolved by applying them to a hidden probe's
+   `height` and reading back the computed pixel value. Re-runs on theme
+   switches via a MutationObserver on <html>'s class. */
+document.addEventListener("DOMContentLoaded", () => {
+    const adminRoot = document.querySelector(".plain-admin") || document.documentElement;
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;visibility:hidden;left:-9999px;top:0;";
+    document.body.appendChild(probe);
+
+    const resolve = () => {
+        const cs = getComputedStyle(adminRoot);
+        const csRoot = getComputedStyle(document.documentElement);
+        document.querySelectorAll("[data-token-current]").forEach((el) => {
+            const name = el.dataset.tokenCurrent;
+            let val = (cs.getPropertyValue(name) || csRoot.getPropertyValue(name)).trim();
+            if (val.startsWith("calc(") || val.includes("var(")) {
+                probe.style.height = `var(${name})`;
+                val = getComputedStyle(probe).height || val;
+            }
+            el.textContent = val;
+        });
+    };
+
+    resolve();
+    new MutationObserver(resolve).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+    });
+});
+</script>
+{% endblock %}
+
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-x-8">
+
+    <div class="min-w-0 max-w-3xl pb-24">
+
+    <p class="text-sm text-muted-foreground mb-6">
+        Reference for the design tokens shipped with the admin and
+        copy-pasteable markup for every UI primitive.
+    </p>
+
+    {# Compact TOC for small screens (large screens get the sticky side nav on the right). #}
+    <nav class="lg:hidden rounded-lg border border-border bg-muted/30 p-4 mb-8">
+        <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">On this page</p>
+        <div class="space-y-3 text-sm">
+            {% for group_title, items in _toc_groups %}
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">{{ group_title }}</p>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-0.5 [&>a]:text-link [&>a:hover]:text-link-hover">
+                    {% for id, title in items %}
+                    <a href="#{{ id }}">{{ title }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </nav>
+
+
+{# ====================================================================== #}
+{# Theme                                                                  #}
+{# ====================================================================== #}
+{{ group("Theme") }}
+
+{% call section("customizing", "Customizing the admin",
+   "Plain's admin is themeable through CSS variables. Override tokens in your own stylesheet — no need to fork templates.") %}
+
+<p class="text-sm mb-3">
+    The design system has three layers, loaded in order:
+</p>
+<ol class="list-decimal list-inside text-sm space-y-1 mb-4">
+    <li><strong>Tailwind v4</strong> — utility classes</li>
+    <li><strong><code>styles/tokens.css</code></strong> — design tokens, scoped to <code>.plain-admin</code></li>
+    <li><strong><code>styles/components/*.css</code></strong> — component primitives, wrapped in <code>@scope&nbsp;(.plain-admin)</code></li>
+</ol>
+<p class="text-sm mb-3">
+    Override any token in your own stylesheet, loaded after the admin's
+    Tailwind output. Example — swap the primary action color to indigo:
+</p>
+<pre><code>/* app/static/admin-overrides.css */
+.plain-admin {
+  --primary: #4f46e5;        /* indigo-600 */
+  --primary-foreground: white;
+  --ring: #4f46e5;
+}
+.dark.plain-admin,
+.dark .plain-admin {
+  --primary: #818cf8;        /* indigo-400 */
+  --primary-foreground: #1e1b4b;
+}</code></pre>
+<p class="text-sm mt-3">
+    Every <code>.btn-primary</code> and focus ring in the admin will pick
+    that up — no template changes required.
+</p>
+{% endcall %}
+
+
+{% call section("dark-mode", "Dark mode",
+   "The admin ships with a built-in theme menu in the top-right with Light, Dark, and System options. The choice is stored in localStorage; `.dark` is set on `<html>`; the no-flash init in base.html resolves before paint. Wire your own picker by adding `data-theme-set=\"light|dark|system\"` to any element.") %}
+<div class="flex gap-2">
+    <button type="button" data-theme-set="light" class="btn btn-outline gap-2">
+        <admin.Icon name="sun" /> Light
+    </button>
+    <button type="button" data-theme-set="dark" class="btn btn-outline gap-2">
+        <admin.Icon name="moon-stars" /> Dark
+    </button>
+    <button type="button" data-theme-set="system" class="btn btn-outline gap-2">
+        <admin.Icon name="display" /> System
+    </button>
+</div>
+{% endcall %}
+
+
+{% call section("typography", "Typography",
+   "Defaults: Inter (sans) and JetBrains Mono (mono), both vendored under `assets/admin/fonts/`. Override `--font-sans` / `--font-mono` on `.plain-admin` to retheme — Tailwind's `font-sans` / `font-mono` utilities pick those up automatically. To swap or drop the bundled `@font-face` declarations, override the `admin_fonts` block in `admin/base.html`.") %}
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+    <div class="rounded-md border border-border p-2 flex items-center gap-3">
+        <span class="font-sans text-base shrink-0 px-2">Sans Mlw 0Oo</span>
+        <div class="min-w-0 flex-1">
+            <code class="text-xs text-muted-foreground block truncate">--font-sans</code>
+            <code data-token-current="--font-sans" class="text-[10px] text-foreground/60 block truncate"></code>
+        </div>
+    </div>
+    <div class="rounded-md border border-border p-2 flex items-center gap-3">
+        <span class="font-mono text-base shrink-0 px-2">Mono Mlw 0Oo</span>
+        <div class="min-w-0 flex-1">
+            <code class="text-xs text-muted-foreground block truncate">--font-mono</code>
+            <code data-token-current="--font-mono" class="text-[10px] text-foreground/60 block truncate"></code>
+        </div>
+    </div>
+</div>
+
+<div class="space-y-2">
+    <h1 class="text-3xl font-bold">Heading 1 — page title</h1>
+    <h2 class="text-2xl font-semibold">Heading 2 — section</h2>
+    <h3 class="text-lg font-semibold">Heading 3 — subsection</h3>
+    <p class="text-base">Body text. The quick brown fox jumps over the lazy dog.</p>
+    <p class="text-sm text-muted-foreground">Muted helper text — used for secondary information.</p>
+    <p class="text-xs text-muted-foreground">Tiny text — labels, metadata, timestamps.</p>
+</div>
+{% endcall %}
+
+
+{# ====================================================================== #}
+{# Tokens                                                                 #}
+{# ====================================================================== #}
+{{ group("Tokens") }}
+
+{% call section("tokens-surface", "Surface tokens",
+   "The neutral palette: page backgrounds, muted/accent surfaces, borders. Component-scoped surfaces (`--card`, `--popover`, chart) live in their respective component sections below.") %}
+{{ swatch_grid(_surface) }}
+{% endcall %}
+
+
+{% call section("tokens-action", "Action tokens",
+   "Colors for buttons and focus rings. `--primary` and `--ring` drive `.btn-primary`, focus outlines, and the active-tab indicator. (Danger actions like `.btn-danger` pull from the `--danger` status token below.)") %}
+{{ swatch_grid(_action) }}
+{% endcall %}
+
+
+{% call section("tokens-status", "Status tokens",
+   "Status colors exposed as Tailwind utilities (`text-success`, `bg-warning/10`, `border-info`). Used by alerts, badges, preflight, and form validation.") %}
+{{ swatch_grid(_status) }}
+{% endcall %}
+
+
+{% call section("tokens-header", "Header tokens",
+   "The admin's sticky top header. Plain ships a faint warm tint that's a hair off the page background — `#f6f3f2` (slightly darker than white) in light mode, and a subtly lighter shade in dark mode. Override `--header-bg` to match your own brand. For full contrast inversion (light page, dark header), add `class=\"dark\"` to the `<header>` element instead — that flips every token via the dark variant.") %}
+{{ swatch_grid(_header_tokens) }}
+{% endcall %}
+
+
+{% call section("tokens-sizing", "Sizing tokens",
+   "Default column shows what Plain ships in `tokens.css`. Current column shows the resolved value as the page is currently loaded — overrides on `.plain-admin` flow through.") %}
+
+<table class="table">
+    <thead>
+        <tr><th>Token</th><th>Default</th><th>Current</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><code>--radius</code></td><td><code>0.5rem</code></td><td><code data-token-current="--radius"></code></td></tr>
+        <tr><td><code>--radius-sm</code></td><td><code>calc(var(--radius) - 4px)</code></td><td><code data-token-current="--radius-sm"></code></td></tr>
+        <tr><td><code>--radius-md</code></td><td><code>calc(var(--radius) - 2px)</code></td><td><code data-token-current="--radius-md"></code></td></tr>
+        <tr><td><code>--radius-lg</code></td><td><code>var(--radius)</code></td><td><code data-token-current="--radius-lg"></code></td></tr>
+        <tr><td><code>--radius-xl</code></td><td><code>calc(var(--radius) + 4px)</code></td><td><code data-token-current="--radius-xl"></code></td></tr>
+        <tr><td><code>--scrollbar-width</code></td><td><code>6px</code></td><td><code data-token-current="--scrollbar-width"></code></td></tr>
+        <tr><td><code>--scrollbar-radius</code></td><td><code>6px</code></td><td><code data-token-current="--scrollbar-radius"></code></td></tr>
+    </tbody>
+</table>
+
+<p class="text-sm text-muted-foreground mt-3">
+    Add <code>class="scrollbar"</code> to any scrollable element to opt in to the slim
+    themed scrollbar — uses <code>--scrollbar-width</code>, <code>--scrollbar-radius</code>,
+    <code>--scrollbar-thumb</code>, <code>--scrollbar-track</code>. The default browser
+    scrollbar is left alone elsewhere.
+</p>
+{% endcall %}
+
+
+{# ====================================================================== #}
+{# Content                                                                #}
+{# ====================================================================== #}
+{{ group("Content") }}
+
+{% call section("prose", "Prose",
+   "Element-level defaults for raw HTML inside admin views — prose links, description lists, code blocks. Form chrome stays opt-in via component classes.") %}
+
+<p class="text-sm text-muted-foreground mb-3">Plain-only prose tokens:</p>
+{{ swatch_grid(_prose_tokens) }}
+
+<h4 class="text-sm font-semibold text-foreground mt-6 mb-2">Prose links</h4>
+<div class="border border-border rounded-lg p-4 text-sm">
+    <p>This paragraph contains a <a href="#prose">prose link</a> styled with <code>--link</code> and underlined by default. Hover for <code>--link-hover</code>.</p>
+</div>
+
+<h4 class="text-sm font-semibold text-foreground mt-6 mb-2">Description list</h4>
+<div class="border border-border rounded-lg p-4">
+    <dl>
+        <dt>Package</dt>
+        <dd>plain-admin</dd>
+        <dt class="mt-2">Status</dt>
+        <dd>Stable</dd>
+        <dt class="mt-2">Maintainer</dt>
+        <dd>Dropseed</dd>
+    </dl>
+</div>
+
+<h4 class="text-sm font-semibold text-foreground mt-6 mb-2">Code</h4>
+{% call example("Inline") %}
+<p class="text-sm">Run <code>uv run plain check</code> to lint, type-check, and run tests.</p>
+{% endcall %}
+{% call example("Block") %}
+<pre><code>def hello(name: str) -> str:
+    return f"Hello, {name}!"</code></pre>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("icons", "Icons",
+   "Bootstrap Icons are vendored. Use the admin.Icon element with a name.") %}
+
+{% call example() %}
+<admin.Icon name="check-circle-fill" class="text-success" />
+<admin.Icon name="exclamation-triangle-fill" class="text-warning" />
+<admin.Icon name="x-circle-fill" class="text-danger" />
+<admin.Icon name="info-circle-fill" class="text-info" />
+<admin.Icon name="gear" />
+<admin.Icon name="search" />
+<admin.Icon name="chevron-down" />
+<admin.Icon name="three-dots-vertical" />
+<admin.Icon name="palette" />
+<admin.Icon name="moon-stars" />
+{% endcall %}
+
+<p class="text-xs text-muted-foreground">
+    Browse the full set at <a href="https://icons.getbootstrap.com/" class="text-link hover:text-link-hover underline" target="_blank" rel="noopener">icons.getbootstrap.com</a>.
+</p>
+{% endcall %}
+
+
+{% call section("kbd", "Keyboard hints",
+   "Small inline labels for key names — useful inline in help text or alongside menu items that have a keyboard shortcut. Wrap the key in `<kbd class=\"kbd\">`.") %}
+
+{% call example() %}
+<p class="text-sm">
+    Press <kbd class="kbd">Esc</kbd> to dismiss, or <kbd class="kbd">⌘</kbd> + <kbd class="kbd">K</kbd> to open the search.
+</p>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{# Actions                                                                #}
+{# ====================================================================== #}
+{{ group("Actions") }}
+
+{% call section("buttons", "Buttons",
+   "Compose a button by stacking a base `.btn` with size, shape, and color modifiers. Neutral variants (primary, secondary, outline, ghost, link) plus the status family (success, warning, danger, info) for actions that match an alert tone. Sizes: default, `.btn-sm`, `.btn-lg`. Add `.btn-icon` for square icon-only.") %}
+
+{% call example("Neutral variants") %}
+<button class="btn btn-primary">Primary</button>
+<button class="btn btn-secondary">Secondary</button>
+<button class="btn btn-outline">Outline</button>
+<button class="btn btn-ghost">Ghost</button>
+<button class="btn btn-link">Link</button>
+{% endcall %}
+
+{% call example("Status variants") %}
+<button class="btn btn-success">Success</button>
+<button class="btn btn-warning">Warning</button>
+<button class="btn btn-danger">Danger</button>
+<button class="btn btn-info">Info</button>
+{% endcall %}
+
+{% call example("Sizes") %}
+<button class="btn btn-sm btn-primary">Small</button>
+<button class="btn btn-primary">Default</button>
+<button class="btn btn-lg btn-primary">Large</button>
+{% endcall %}
+
+{% call example("With icon") %}
+<button class="btn btn-primary"><admin.Icon name="plus-lg" />Create</button>
+<button class="btn btn-outline"><admin.Icon name="download" />Export</button>
+<button class="btn btn-icon btn-outline" title="Refresh"><admin.Icon name="arrow-clockwise" /></button>
+<button class="btn btn-danger" disabled>Disabled</button>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("button-groups", "Button groups",
+   "Wrap related buttons in `.button-group` to fuse them visually — the wrapper joins corners and collapses inner borders. Set `data-orientation='vertical'` to stack instead. Insert `<hr role='separator'>` for a divider.") %}
+
+{% call example("Horizontal") %}
+<div class="button-group">
+    <button class="btn btn-outline">List</button>
+    <button class="btn btn-outline" aria-pressed="true">Grid</button>
+    <button class="btn btn-outline">Chart</button>
+</div>
+{% endcall %}
+
+{% call example("With separator") %}
+<div class="button-group">
+    <button class="btn btn-outline">Save</button>
+    <hr role="separator" />
+    <button class="btn btn-outline">Cancel</button>
+</div>
+{% endcall %}
+
+{% call example("Vertical") %}
+<div class="button-group" data-orientation="vertical">
+    <button class="btn btn-outline">Option A</button>
+    <button class="btn btn-outline">Option B</button>
+    <button class="btn btn-outline">Option C</button>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("badges", "Badges",
+   "Semantic badges for status indicators. Neutral variants (primary/secondary/outline) and Plain's translucent status family (success/warning/danger/info) — the latter use a 10% fill of the matching token so they read in dense table contexts.") %}
+
+{% call example("Neutral variants") %}
+<span class="badge badge-primary">Primary</span>
+<span class="badge badge-secondary">Secondary</span>
+<span class="badge badge-outline">Outline</span>
+{% endcall %}
+
+{% call example("Plain semantic variants") %}
+<span class="badge badge-success">Stable</span>
+<span class="badge badge-warning">Beta</span>
+<span class="badge badge-danger">Deprecated</span>
+<span class="badge badge-info">New</span>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{# Feedback                                                               #}
+{# ====================================================================== #}
+{{ group("Feedback") }}
+
+{% call section("alerts", "Alerts",
+   "Inline status panels. Wrap the title in an h2-h6 or [data-title] and put body content in a <section>.") %}
+
+{% call example() %}
+<div class="alert w-full">
+    <admin.Icon name="info-circle" />
+    <h4>Heads up</h4>
+    <section>This is a default alert. Use it for neutral status messages.</section>
+</div>
+{% endcall %}
+
+{% call example() %}
+<div class="alert alert-success w-full">
+    <admin.Icon name="check-circle" />
+    <h4>All checks passed</h4>
+    <section>The success variant confirms a positive outcome.</section>
+</div>
+{% endcall %}
+
+{% call example() %}
+<div class="alert alert-warning w-full">
+    <admin.Icon name="exclamation-triangle" />
+    <h4>Heads up</h4>
+    <section>The warning variant is for non-fatal issues that need attention.</section>
+</div>
+{% endcall %}
+
+{% call example() %}
+<div class="alert alert-danger w-full">
+    <admin.Icon name="x-circle" />
+    <h4>Something went wrong</h4>
+    <section>The danger variant is for errors and failed actions.</section>
+</div>
+{% endcall %}
+
+{% call example() %}
+<div class="alert alert-info w-full">
+    <admin.Icon name="info-circle" />
+    <h4>Just so you know</h4>
+    <section>The info variant is for incidental notes and pointers.</section>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("progress", "Progress",
+   "Native <progress> element. Set value/max (default 0–100); status follows data-status: ok (default success), warning, error.") %}
+
+{% call example("Default — success") %}
+<progress class="progress" value="72" max="100"></progress>
+{% endcall %}
+
+{% call example("Warning") %}
+<progress class="progress" data-status="warning" value="48" max="100"></progress>
+{% endcall %}
+
+{% call example("Error") %}
+<progress class="progress" data-status="error" value="20" max="100"></progress>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{# Containers                                                             #}
+{# ====================================================================== #}
+{{ group("Containers") }}
+
+{% call section("cards", "Cards",
+   "Padded, rounded wrapper for grouped content. Use <header>, <section>, <footer> children for built-in spacing. Override gap/padding utilities (e.g. `card gap-2 py-4`) for denser layouts.") %}
+
+<p class="text-sm text-muted-foreground mb-2">Card surface tokens:</p>
+{{ swatch_grid(_card_tokens) }}
+
+<div class="mt-4"></div>
+
+{% call example("Default") %}
+<div class="card w-80">
+    <header>
+        <h2>Active users</h2>
+        <p>Last 30 days</p>
+    </header>
+    <section>
+        <p class="text-sm">Body content sits in a section.</p>
+    </section>
+</div>
+{% endcall %}
+
+{% call example("Dense + metric typography (dashboard pattern)") %}
+<div class="card gap-2 py-4 w-64">
+    <header>
+        <h2 class="text-xs font-medium text-muted-foreground">Active users</h2>
+    </header>
+    <section>
+        <div class="text-3xl font-semibold leading-tight tracking-tight tabular-nums text-foreground">1,284</div>
+        <a href="#" class="text-xs text-link hover:underline">View all</a>
+    </section>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("admin-cards", "Admin card classes",
+   "Live previews of the four card subclasses shipped from `plain.admin.cards`. Subclass these and register them on a view's `cards = [...]` to surface them on dashboards.") %}
+
+<p class="text-sm text-muted-foreground mb-2">Chart palette (used by <code>TrendCard</code>):</p>
+{{ swatch_grid(_chart_tokens) }}
+
+<div class="grid grid-cols-2 gap-4 mt-6 lg:grid-cols-4 [&>aside]:col-span-1 [&>aside.col-span-2]:col-span-2 [&>aside.col-span-3]:col-span-2 lg:[&>aside.col-span-3]:col-span-3 [&>aside.col-span-4]:col-span-2 lg:[&>aside.col-span-4]:col-span-4">
+    {% for card in demo_cards %}{{ render_card(card)|safe }}{% endfor %}
+</div>
+
+<p class="text-xs text-muted-foreground mt-3">
+    <code>Card</code> (small, with metric and link),
+    <code>KeyValueCard</code> (medium, key/value pairs),
+    <code>TrendCard</code> (full-width, exercises <code>--chart-1..5</code>),
+    and <code>TableCard</code> (full-width, header + rows).
+</p>
+{% endcall %}
+
+
+{% call section("tables", "Tables",
+   "Add `class=\"table\"` for header/row/hover styling.") %}
+
+{% call example() %}
+<table class="table w-full">
+    <thead>
+        <tr>
+            <th>Package</th>
+            <th>Status</th>
+            <th>Version</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>plain</td>
+            <td><span class="badge badge-success">Stable</span></td>
+            <td>0.137.1</td>
+        </tr>
+        <tr>
+            <td>plain-admin</td>
+            <td><span class="badge badge-success">Stable</span></td>
+            <td>0.50.0</td>
+        </tr>
+        <tr>
+            <td>plain-htmx</td>
+            <td><span class="badge badge-warning">Beta</span></td>
+            <td>0.19.0</td>
+        </tr>
+    </tbody>
+</table>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{# Forms                                                                  #}
+{# ====================================================================== #}
+{{ group("Forms") }}
+
+{% call section("forms", "Form fields",
+   "Use the .input/.textarea classes (or the matching admin element templates), Plain's brand color drives the focus ring.") %}
+
+{% call example("Text input") %}
+<div class="space-y-1 w-72">
+    <label for="example-input" class="label">Email</label>
+    <input id="example-input" class="input" type="email" placeholder="you@example.com" />
+    <p class="text-xs text-muted-foreground">We'll never share your email.</p>
+</div>
+{% endcall %}
+
+{% call example("Invalid input") %}
+<div class="space-y-1 w-72">
+    <label for="example-input-invalid" class="label">Email</label>
+    <input id="example-input-invalid" class="input" type="email" value="not an email" aria-invalid="true" />
+    <p class="text-xs text-danger">Enter a valid email address.</p>
+</div>
+{% endcall %}
+
+{% call example("Textarea") %}
+<div class="space-y-1 w-72">
+    <label for="example-textarea" class="label">Notes</label>
+    <textarea id="example-textarea" class="textarea" rows="3" placeholder="Anything to add?"></textarea>
+</div>
+{% endcall %}
+
+{% call example("Select") %}
+<div class="space-y-1 w-72">
+    <label for="example-select" class="label">Role</label>
+    <select id="example-select" class="select">
+        <option>Reader</option>
+        <option>Editor</option>
+        <option>Admin</option>
+    </select>
+</div>
+{% endcall %}
+
+{% call example("Checkbox") %}
+<label class="flex items-center gap-2 text-sm">
+    <input class="input" type="checkbox" checked /> Send me email updates
+</label>
+{% endcall %}
+
+{% call example("Radio group") %}
+<div class="space-y-2 text-sm">
+    <label class="flex items-center gap-2">
+        <input class="input" type="radio" name="example-role" value="reader" checked /> Reader
+    </label>
+    <label class="flex items-center gap-2">
+        <input class="input" type="radio" name="example-role" value="editor" /> Editor
+    </label>
+    <label class="flex items-center gap-2">
+        <input class="input" type="radio" name="example-role" value="admin" /> Admin
+    </label>
+</div>
+{% endcall %}
+
+{% call example("Switch") %}
+<label class="flex items-center gap-2 text-sm">
+    <input class="input" type="checkbox" role="switch" checked /> Enable notifications
+</label>
+{% endcall %}
+
+{% call example("Compact size — pair `input-sm` / `select-sm` for dense rows") %}
+<div class="flex items-end gap-2">
+    <input class="input input-sm w-40" type="text" placeholder="Filter…" />
+    <select class="select select-sm">
+        <option>All</option>
+        <option>Active</option>
+        <option>Archived</option>
+    </select>
+    <button type="button" class="btn btn-sm btn-primary">Apply</button>
+</div>
+{% endcall %}
+
+{% call example("Search input — admin element") %}
+<div class="w-72">
+    <admin.SearchInput name="q" placeholder="Search packages…" />
+</div>
+{% endcall %}
+
+<p class="text-xs text-muted-foreground mt-3">
+    Plain ships matching element templates that wrap these classes:
+    <code>&lt;admin.Input&gt;</code>, <code>&lt;admin.Textarea&gt;</code>,
+    <code>&lt;admin.Select&gt;</code>, <code>&lt;admin.Checkbox&gt;</code>,
+    plus <code>&lt;admin.InputField&gt;</code> / <code>&lt;admin.SelectField&gt;</code> /
+    <code>&lt;admin.CheckboxField&gt;</code> for the full label + control + errors stack
+    when rendering a Plain form field.
+</p>
+{% endcall %}
+
+
+{% call section("field-wrapper", "Field wrapper",
+   "Wrap a label, control, and helper/error text in a `.field` for consistent vertical rhythm. Group several fields under a `.fieldset` with a legend. Set `data-orientation=\"horizontal\"` on a `.field` to lay the label and control side-by-side (handy for switches and checkboxes). Mark a field as invalid with `data-invalid=\"true\"` to flip its label/helper to the danger color.") %}
+
+{% call example("Vertical fieldset") %}
+<fieldset class="fieldset w-72">
+    <legend>Profile</legend>
+    <p>Public information shown on your account page.</p>
+
+    <div class="field">
+        <label for="field-name" class="label">Display name</label>
+        <input id="field-name" class="input" type="text" value="Ada" />
+        <p>Visible to other admins.</p>
+    </div>
+
+    <div class="field" data-orientation="horizontal">
+        <label for="field-notify" class="label">Email notifications</label>
+        <input id="field-notify" class="input" type="checkbox" role="switch" checked />
+    </div>
+
+    <div class="field" data-invalid="true">
+        <label for="field-email" class="label">Email</label>
+        <input id="field-email" class="input" type="email" value="not an email" aria-invalid="true" />
+        <div role="alert">Enter a valid email address.</div>
+    </div>
+</fieldset>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{# Overlays                                                               #}
+{# ====================================================================== #}
+{{ group("Overlays") }}
+
+{% call section("dialogs", "Dialogs",
+   "Native <dialog> with the `.dialog` class. Open and close via the HTML Invoker Commands API (`command` + `commandfor`) — no JS, no inline `onclick`, CSP-safe.") %}
+
+{% call example() %}
+<button type="button" class="btn btn-outline" command="show-modal" commandfor="example-dialog">Open dialog</button>
+<dialog id="example-dialog" class="dialog max-w-sm m-auto">
+    <article class="p-6">
+        <header>
+            <h2 class="text-lg font-semibold">Example dialog</h2>
+            <p class="text-sm text-muted-foreground">Native &lt;dialog&gt; styled with .dialog.</p>
+        </header>
+        <section class="mt-4 text-sm">
+            Press Escape or click the close button to dismiss.
+        </section>
+        <footer class="mt-6 flex justify-end gap-2">
+            <button type="button" class="btn btn-outline" command="close" commandfor="example-dialog">Cancel</button>
+            <button type="button" class="btn btn-primary" command="close" commandfor="example-dialog">OK</button>
+        </footer>
+    </article>
+</dialog>
+{% endcall %}
+<p class="text-xs text-muted-foreground -mt-2">
+    Closing from inside without an id also works via <code>&lt;form method="dialog"&gt;&lt;button&gt;…&lt;/button&gt;&lt;/form&gt;</code> —
+    submitting that form closes the enclosing dialog and returns the button's <code>value</code>.
+</p>
+{% endcall %}
+
+
+{% call section("popovers", "Popovers",
+   "Generic click-to-open panel. Wrap a trigger `<button>` and a `[data-popover]` panel in a `.popover` element — the panel can hold anything (form fields, descriptive content, multi-step UI). Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). JS in `components.js` shares open/close, outside-click, and Esc handling with `.dropdown-menu`.") %}
+
+<p class="text-sm text-muted-foreground mb-2">Popover surface tokens (shared with dropdowns and hovercards):</p>
+{{ swatch_grid(_popover_tokens) }}
+
+<div class="mt-4"></div>
+
+{% call example() %}
+<div class="popover">
+    <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded="false"
+        aria-controls="example-popover-panel"
+        class="btn btn-outline"
+    >
+        Filter <admin.Icon name="chevron-down" />
+    </button>
+    <div id="example-popover-panel" data-popover data-align="end" aria-hidden="true" class="w-64">
+        <div class="space-y-2">
+            <label class="flex items-center gap-2 text-sm">
+                <input class="input" type="checkbox" /> Active
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+                <input class="input" type="checkbox" checked /> Archived
+            </label>
+            <button type="button" class="btn btn-sm btn-primary w-full mt-2">Apply</button>
+        </div>
+    </div>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("dropdowns", "Dropdowns",
+   "Wrap a trigger button + a [data-popover] menu in a .dropdown-menu element. Items use role=\"menuitem\" and pick up styling from the dropdown-menu component. JS in components.js handles open/close, outside-click, and keyboard navigation (arrow keys, Home/End, Enter/Esc).") %}
+
+{% call example() %}
+<div class="dropdown-menu">
+    <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        aria-controls="example-actions-popover"
+        class="btn btn-outline"
+    >
+        Actions <admin.Icon name="chevron-down" />
+    </button>
+    <div id="example-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-40">
+        <div role="menu">
+            <a role="menuitem" href="#">Edit</a>
+            <a role="menuitem" href="#">Duplicate</a>
+            <hr role="separator">
+            <a role="menuitem" href="#" class="text-danger">Delete</a>
+        </div>
+    </div>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("tooltips", "Tooltips",
+   "Pure-CSS tooltip via the `data-tooltip=\"…\"` attribute. Position with `data-side` (top/bottom/left/right) and `data-align` (start/center/end). Hover or focus the trigger to reveal — no JS, no popper.") %}
+
+{% call example("Sides") %}
+<div class="flex flex-wrap gap-3">
+    <button type="button" class="btn btn-outline" data-tooltip="Top tooltip" data-side="top">Top</button>
+    <button type="button" class="btn btn-outline" data-tooltip="Bottom tooltip" data-side="bottom">Bottom</button>
+    <button type="button" class="btn btn-outline" data-tooltip="Left tooltip" data-side="left">Left</button>
+    <button type="button" class="btn btn-outline" data-tooltip="Right tooltip" data-side="right">Right</button>
+</div>
+{% endcall %}
+
+{% call example("On an icon button") %}
+<button type="button" class="btn btn-icon btn-ghost" data-tooltip="Refresh" aria-label="Refresh">
+    <admin.Icon name="arrow-clockwise" />
+</button>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("hovercards", "Hovercards",
+   "Hover-triggered version of popover. Trigger can be any element (no `<button>` requirement); panel positions fixed via JS so it escapes table-cell clipping. Use for preview/info that doesn't want a click commitment — user mention previews, FK row previews, the datetime hover details on every `<time>` in the admin.") %}
+
+{% call example("Inline trigger — user preview") %}
+{# Wrapper is <div> not <p> so the HTML parser doesn't hoist the
+   inner block-level <div data-hovercard> out of <span class="hovercard">
+   when it implicitly closes the <p>. #}
+<div class="text-sm">
+    Pinged by
+    <span class="hovercard">
+        <span class="text-link cursor-help underline decoration-dotted">alice</span>
+        <div data-hovercard aria-hidden="true" class="w-64 flex gap-3 p-3">
+            <div class="w-10 h-10 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-medium shrink-0" aria-hidden="true">A</div>
+            <div class="flex flex-col gap-0.5 min-w-0">
+                <span class="font-medium truncate">Alice Sanchez</span>
+                <span class="text-muted-foreground text-xs truncate">alice@example.com</span>
+                <span class="badge badge-success mt-1 self-start">Admin</span>
+            </div>
+        </div>
+    </span>
+    in #releases.
+</div>
+{% endcall %}
+
+<p class="text-sm text-muted-foreground mt-3">
+    Hovercards are a generic primitive — wrap anything in <code>&lt;span class="hovercard"&gt;</code>
+    with a sibling <code>&lt;div data-hovercard&gt;</code> panel. The admin uses them for FK row
+    previews, status details, and one built-in case: every
+    <code>&lt;time datetime="…"&gt;</code> is auto-wrapped at runtime with local/UTC/relative/Unix/ISO
+    rows, each clickable to copy via the <code>data-copy-value</code> behavior.
+</p>
+
+{% call example("Auto-wrapped <time> element") %}
+<div class="text-sm">
+    Last seen <time datetime="2026-04-27T14:14:00Z">2 days ago</time> by alice.
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{# Disclosure                                                             #}
+{# ====================================================================== #}
+{{ group("Disclosure") }}
+
+{% call section("tabs", "Tabs",
+   "Switch between content panels. Underline indicator on the active tab; arrow-key navigation and panel show/hide are wired in components.js. For \"set this value to X\" choices, reach for the segmented control instead.") %}
+
+{% call example() %}
+<div class="tabs w-96">
+    <div role="tablist" aria-label="Settings">
+        <button role="tab" aria-controls="tab-general" aria-selected="true">General</button>
+        <button role="tab" aria-controls="tab-advanced" aria-selected="false">Advanced</button>
+    </div>
+    <div role="tabpanel" id="tab-general" class="text-sm py-2">General tab content.</div>
+    <div role="tabpanel" id="tab-advanced" class="text-sm py-2" hidden>Advanced tab content.</div>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("segmented", "Segmented control",
+   "Pick one of a small set of mutually-exclusive values — theme, density, view mode. Roving tabindex and arrow-key navigation are wired in components.js; the consumer toggles `aria-checked` in response to clicks. For switching content panels, reach for tabs.") %}
+
+{% call example() %}
+<div class="segmented w-72" role="radiogroup" aria-label="View mode">
+    <button role="radio" aria-checked="true" class="px-3 py-1.5">List</button>
+    <button role="radio" aria-checked="false" class="px-3 py-1.5">Grid</button>
+    <button role="radio" aria-checked="false" class="px-3 py-1.5">Cards</button>
+</div>
+{% endcall %}
+{% endcall %}
+
+
+{% call section("collapsible", "Collapsible",
+   "Native `<details>` / `<summary>` get a smooth expand/collapse transition (via the new `::details-content` pseudo-element) and the default disclosure triangle is hidden so you can ship your own affordance. Used implicitly by the \"Show markup\" disclosures on this page.") %}
+
+{% call example() %}
+<details class="rounded-md border border-border p-3 w-96">
+    <summary class="gap-2 text-sm font-medium">
+        <admin.Icon name="chevron-right" class="transition-transform group-open:rotate-90" />
+        Advanced options
+    </summary>
+    <div class="text-sm text-muted-foreground mt-2">
+        Tucked-away configuration the everyday user shouldn't have to think about.
+    </div>
+</details>
+{% endcall %}
+{% endcall %}
+
+
+{# ====================================================================== #}
+{# Behaviors                                                              #}
+{# ====================================================================== #}
+{{ group("Behaviors") }}
+
+{% call section("behaviors", "Data attributes",
+   "Declarative `data-*` attributes you sprinkle on existing elements. Behaviors are delegated event handlers in `assets/admin/behaviors.js` — no markup pattern, no CSS. They piggyback on whatever element you stick them on.") %}
+
+{# Cells use `whitespace-normal` so the prose descriptions wrap inside
+   the content column. The default `.table` cell style is
+   `whitespace-nowrap`, which is correct for list views (IDs,
+   timestamps) but wrong for doc-prose tables like this. #}
+<table class="table [&_td]:whitespace-normal [&_td]:align-top">
+    <thead>
+        <tr><th>Attribute</th><th>What it does</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="whitespace-nowrap!"><code>data-copy-value="…"</code></td>
+            <td>Click to write the value to the clipboard. A descendant marked <code>data-copy-feedback</code> (or the trigger's last child) gets a brief "Copied!" text swap.</td>
+        </tr>
+        <tr>
+            <td class="whitespace-nowrap!"><code>data-autosubmit</code></td>
+            <td>On a form field — submit the enclosing form on <code>change</code>. Used for list filters and pagination dropdowns.</td>
+        </tr>
+        <tr>
+            <td class="whitespace-nowrap!"><code>data-column-autolink="<em>url</em>"</code></td>
+            <td>Wrap a table cell's content in an <code>&lt;a href&gt;</code> link to <em>url</em>. No-op if the cell already contains an anchor.</td>
+        </tr>
+        <tr>
+            <td class="whitespace-nowrap!"><code>data-encrypted="<em>value</em>"</code></td>
+            <td>Click to reveal/hide an encrypted value (used for API keys and similar). Clicking inside the revealed <code>&lt;code&gt;</code> doesn't re-toggle, so the user can select to copy.</td>
+        </tr>
+    </tbody>
+</table>
+
+<p class="text-sm text-muted-foreground mt-3">
+    GET-form submissions are also intercepted globally to drop empty params from the URL — keeps list views from accumulating <code>?q=&amp;filter=</code> cruft when filters are cleared. No attribute needed; applies to every <code>&lt;form method="GET"&gt;</code>.
+</p>
+{% endcall %}
+
+    </div>
+
+    {# Side nav (sticky on lg+, hidden on mobile where the top TOC takes over) #}
+    <nav
+        data-ui-toc
+        class="hidden lg:block lg:sticky lg:top-28 self-start text-xs leading-snug border-l border-border pl-3 max-h-[calc(100vh-8rem)] overflow-y-auto [&_a]:block [&_a]:py-px [&_a]:text-muted-foreground [&_a:hover]:text-foreground [&_a[data-active=true]]:text-foreground [&_a[data-active=true]]:font-medium"
+    >
+        {% for group_title, items in _toc_groups %}
+        <div class="mt-2 first:mt-0">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-0.5">{{ group_title }}</p>
+            {% for id, title in items %}
+            <a href="#{{ id }}">{{ title }}</a>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </nav>
+
+</div>
+{% endblock %}
