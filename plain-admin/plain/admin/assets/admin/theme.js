@@ -10,6 +10,11 @@
  * handles roving tabindex and arrow-key navigation off `aria-checked`.
  */
 (() => {
+  // ADMIN_FORCE_THEME omits the segmented control entirely. Without
+  // buttons there is nothing to wire and no toggle UX, so skip the
+  // OS-preference listener that would otherwise override the forced class.
+  if (!document.querySelector("[data-theme-set]")) return;
+
   const STORAGE_KEY = "plain-admin-theme";
   const root = document.documentElement;
   const media = window.matchMedia("(prefers-color-scheme: dark)");

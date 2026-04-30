@@ -1,6 +1,6 @@
 {% use_elements %}
 <!DOCTYPE html>
-<html lang="en" class="plain-admin">
+<html lang="en" class="plain-admin{% if admin_force_theme == 'dark' %} dark{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +11,7 @@
             {{ app_name }} Admin
         {%- endif -%}
     </title>
+    {% if not admin_force_theme %}
     {# Resolve theme choice before paint to avoid a flash of light/dark
        mismatch. Storage key + resolver shape must match theme.js. #}
     <script nonce="{{ request.csp_nonce }}">
@@ -21,6 +22,7 @@
         document.documentElement.classList.toggle("dark", dark);
     })();
     </script>
+    {% endif %}
     {# Component CSS is compiled into the Tailwind build via
        plain/admin/tailwind.css (auto-discovered by plain-tailwind). No
        separate <link> for component styles is needed here. #}

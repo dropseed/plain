@@ -571,6 +571,19 @@ bar cycles **Light → Dark → System**, persisted in `localStorage`. The dark
 class is applied to `<html>` before paint via an inline init script, so there
 is no flash of the wrong theme on page load.
 
+To force the admin to a single appearance, set `ADMIN_FORCE_THEME` to
+`"light"` or `"dark"` (default `None` keeps the per-user toggle). Useful
+when you've only customized tokens for one mode, or want every screenshot
+and shared link to look the same. When forced, the toggle is hidden and
+the `<html>` class is rendered server-side.
+
+```python
+# app/settings.py
+ADMIN_FORCE_THEME = "dark"
+```
+
+You can also set it via the `PLAIN_ADMIN_FORCE_THEME` environment variable.
+
 ### Fonts
 
 The admin ships [Inter](https://github.com/rsms/inter) (sans) and

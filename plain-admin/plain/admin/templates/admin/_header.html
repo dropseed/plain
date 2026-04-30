@@ -69,6 +69,7 @@
                     {% endif %}
                 </button>
                 <div id="user-menu-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
+                    {% if not admin_force_theme %}
                     {# Theme switcher. Sits outside [role=menu] so the
                        dropdown-menu's keyboard nav skips it; the segmented
                        control owns its own roving tabindex + arrow keys. #}
@@ -87,6 +88,7 @@
                         {% endfor %}
                     </div>
                     <div role="separator"></div>
+                    {% endif %}
                     <div role="menu">
                         {% include "admin/user_menu_items.html" ignore missing %}
                         <a role="menuitem" href="{{ url('admin:settings') }}">

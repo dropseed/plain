@@ -100,6 +100,7 @@ class AdminView(AuthView, TemplateView):
         context["time_zone"] = timezone.get_current_timezone_name()
         context["view_class"] = self.__class__
         context["app_name"] = settings.NAME
+        context["admin_force_theme"] = settings.ADMIN_FORCE_THEME
 
         context["nav_tabs"] = registry.get_nav_tabs(self.request)
         context["pinned_slugs"] = set(
