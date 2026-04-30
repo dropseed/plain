@@ -1,11 +1,14 @@
 {% extends "admin/base.html" %}
+{% use_elements %}
 
 {% block content %}
 
-<h3 class="text-lg font-semibold text-admin-foreground mb-1">{{ object.__class__.__name__ }} Details</h3>
-<p class="text-sm text-admin-muted-foreground mb-4">Data stored in the database for this {{ object.__class__.__name__|lower }}.</p>
-<div class="admin-card">
-    <section>
+<details class="admin-card group" open>
+    <summary class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4">
+        <h3 class="text-lg font-semibold">{{ object.__class__.__name__ }} Details</h3>
+        <admin.Icon name="chevron-right" class="text-admin-muted-foreground transition-transform group-open:rotate-90" />
+    </summary>
+    <section class="px-6 pb-6">
         <dl class="grid grid-cols-[auto_1fr] gap-x-8">
             {% for field in fields %}
             <dt class="whitespace-nowrap py-1.5">{{ get_field_label(field) }}</dt>
@@ -17,6 +20,6 @@
             {% endfor %}
         </dl>
     </section>
-</div>
+</details>
 
 {% endblock %}

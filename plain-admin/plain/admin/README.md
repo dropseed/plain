@@ -650,7 +650,7 @@ lives one file per primitive in
 | Badges            | Compose `.admin-badge` with one of `.admin-badge-primary` / `.admin-badge-secondary` / `.admin-badge-outline`                                                        |
 | Status badges     | Stack `.admin-badge-success`, `.admin-badge-warning`, `.admin-badge-danger`, `.admin-badge-info` (translucent fill + saturated text)                                 |
 | Alerts            | Compose `.admin-alert` (neutral surface) with `.admin-alert-success` / `.admin-alert-warning` / `.admin-alert-danger` / `.admin-alert-info` for tone                 |
-| Cards             | `.admin-card` — pad with utilities (e.g. `class="admin-card gap-2 py-4"` for dense layouts)                                                                          |
+| Cards             | `.admin-card` — visual shell only (bg + border + radius); compose layout/padding inline (e.g. `class="admin-card flex flex-col gap-6 p-6"`)                          |
 | Form inputs       | `.admin-input`, `.admin-textarea`, `.admin-select` — opt in via class; pair with `-sm` for compact rows                                                              |
 | Dialogs           | `<dialog class="admin-dialog">` opened via `<button command="show-modal" commandfor="…">`                                                                            |
 | Tabs              | `.admin-tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                                                                                                     |

@@ -657,7 +657,7 @@ document.addEventListener("DOMContentLoaded", () => {
 {{ group("Containers") }}
 
 {% call section("cards", "Cards",
-   "Padded, rounded wrapper for grouped content. Use <header>, <section>, <footer> children for built-in spacing. Override gap/padding utilities (e.g. `card gap-2 py-4`) for denser layouts.") %}
+   "Visual shell only — themed surface, border, and rounded corners. Layout and padding are yours to compose with utility classes (e.g. `flex flex-col gap-6 p-6`).") %}
 
 <p class="text-sm text-admin-muted-foreground mb-2">Card surface tokens:</p>
 {{ swatch_grid(_card_tokens) }}
@@ -665,10 +665,10 @@ document.addEventListener("DOMContentLoaded", () => {
 <div class="mt-4"></div>
 
 {% call example("Default") %}
-<div class="admin-card w-80">
+<div class="admin-card flex flex-col gap-6 p-6 w-80">
     <header>
-        <h2>Active users</h2>
-        <p>Last 30 days</p>
+        <h2 class="font-semibold leading-none">Active users</h2>
+        <p class="text-sm text-admin-muted-foreground">Last 30 days</p>
     </header>
     <section>
         <p class="text-sm">Body content sits in a section.</p>
@@ -677,7 +677,7 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endcall %}
 
 {% call example("Dense + metric typography (dashboard pattern)") %}
-<div class="admin-card gap-2 py-4 w-64">
+<div class="admin-card flex flex-col gap-2 px-6 py-4 w-64">
     <header>
         <h2 class="text-xs font-medium text-admin-muted-foreground">Active users</h2>
     </header>
@@ -1070,6 +1070,18 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="text-sm text-admin-muted-foreground mt-2">
         Tucked-away configuration the everyday user shouldn't have to think about.
     </div>
+</details>
+{% endcall %}
+
+{% call example("Collapsible card") %}
+<details class="admin-card group w-96" open>
+    <summary class="flex items-center justify-between gap-2 cursor-pointer select-none px-6 py-4">
+        <h3 class="font-semibold">Object Details</h3>
+        <admin.Icon name="chevron-right" class="text-admin-muted-foreground transition-transform group-open:rotate-90" />
+    </summary>
+    <section class="px-6 pb-6 text-sm text-admin-muted-foreground">
+        Body content of the card, revealed when expanded.
+    </section>
 </details>
 {% endcall %}
 {% endcall %}

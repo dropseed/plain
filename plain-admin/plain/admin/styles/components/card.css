@@ -1,35 +1,15 @@
 /*
  * Card
  *
- * Padded wrapper for grouped content with optional <header> / <section> /
- * <footer> children. Plain's default is flat (no shadow) — the border
- * carries the separation. Corner radius is owned by `--radius-card`;
- * override that token (or `--radius` for a global retune).
- *
- * Dashboard cards in `templates/admin/cards/base.html` use
- * `class="card gap-2 py-4"` to tighten the vertical rhythm.
+ * Visual shell only — themed surface (bg / foreground / border) with the
+ * `--radius-card` corner. No layout, padding, or opinion about what goes
+ * inside. Consumers compose their own spacing (`p-6`, `flex flex-col`,
+ * `<details>`, etc.) so the card stays usable for any content shape.
  */
 
 @layer components {
   .admin-card {
-    @apply bg-admin-card text-admin-card-foreground flex flex-col gap-6 border py-6;
+    @apply bg-admin-card text-admin-card-foreground border;
     border-radius: var(--radius-card);
-
-    > header {
-      @apply @container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6;
-
-      h2 {
-        @apply leading-none font-semibold;
-      }
-      p {
-        @apply text-admin-muted-foreground text-sm;
-      }
-    }
-    > section {
-      @apply px-6;
-    }
-    > footer {
-      @apply flex items-center px-6 [.border-t]:pt-6;
-    }
   }
 }
