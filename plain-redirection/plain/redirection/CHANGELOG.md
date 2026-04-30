@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.35.4](https://github.com/dropseed/plain/releases/plain-redirection@0.35.4) (2026-04-30)
+
+### What's changed
+
+- **Switched the redirect admin form to use `<admin.Submit>`** so the Save button picks up the new `admin-btn admin-btn-primary` styling under plain-admin 0.81.0's namespaced classes. ([5f86c86fb7e9](https://github.com/dropseed/plain/commit/5f86c86fb7e9))
+
+### Upgrade instructions
+
+- If you use `plain.admin`, upgrade it to `>=0.81.0` alongside this release for the namespaced `admin-` CSS classes referenced by the redirect template.
+
 ## [0.35.3](https://github.com/dropseed/plain/releases/plain-redirection@0.35.3) (2026-04-17)
 
 ### What's changed
