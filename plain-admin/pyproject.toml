@@ -1,6 +1,6 @@
 [project]
 name = "plain.admin"
-version = "0.79.0"
+version = "0.80.0"
 description = "Manage your app with a backend interface."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
@@ -11,7 +11,7 @@ dependencies = [
   "plain.auth>=0.29.0,<1.0.0",
   "plain.elements<1.0.0",
   "plain.htmx<1.0.0",
-  "plain.tailwind<1.0.0",
+  "plain.tailwind>=0.21.0,<1.0.0",
 ]
 
 [dependency-groups]
