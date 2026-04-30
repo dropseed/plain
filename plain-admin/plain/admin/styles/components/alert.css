@@ -4,8 +4,8 @@
  *   <div class="alert alert-success">…</div>
  *   <div class="alert alert-warning">…</div>
  *
- * Always pair `.alert` (structure) with a tone modifier when you want
- * a status look: `.alert-{success,warning,danger,info}`. Plain `.alert`
+ * Always pair `.admin-alert` (structure) with a tone modifier when you want
+ * a status look: `.alert-{success,warning,danger,info}`. Plain `.admin-alert`
  * is the neutral surface (card background + foreground).
  *
  * The icon column is reserved when either a `<svg>` (raw SVG icon)
@@ -13,9 +13,9 @@
  * child. Authors can use either.
  */
 @layer components {
-  .alert {
-    @apply relative w-full rounded-lg border px-4 py-3 text-sm grid grid-cols-[0_1fr] gap-y-0.5 items-start;
-    @apply bg-card text-card-foreground;
+  .admin-alert {
+    @apply relative w-full rounded-admin-lg border px-4 py-3 text-sm grid grid-cols-[0_1fr] gap-y-0.5 items-start;
+    @apply bg-admin-card text-admin-card-foreground;
 
     &:has(> svg),
     &:has(> i) {
@@ -40,7 +40,7 @@
       @apply col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight;
     }
     > section {
-      @apply text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed;
+      @apply text-admin-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed;
 
       ul {
         @apply list-inside list-disc text-sm;
@@ -48,32 +48,32 @@
     }
   }
 
-  .alert-success {
-    @apply text-success;
+  .admin-alert-success {
+    @apply text-admin-success;
 
     > section {
-      @apply text-success;
+      @apply text-admin-success;
     }
   }
-  .alert-warning {
-    @apply text-warning;
+  .admin-alert-warning {
+    @apply text-admin-warning;
 
     > section {
-      @apply text-warning;
+      @apply text-admin-warning;
     }
   }
-  .alert-danger {
-    @apply text-danger;
+  .admin-alert-danger {
+    @apply text-admin-danger;
 
     > section {
-      @apply text-danger;
+      @apply text-admin-danger;
     }
   }
-  .alert-info {
-    @apply text-info;
+  .admin-alert-info {
+    @apply text-admin-info;
 
     > section {
-      @apply text-info;
+      @apply text-admin-info;
     }
   }
 }

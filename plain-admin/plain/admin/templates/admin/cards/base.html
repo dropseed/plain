@@ -3,13 +3,13 @@
     hx-target="this"
     hx-select="#card-{{ slug }}"
     hx-swap="outerHTML"
-    class="card col-span-{{ size.value }} gap-2 py-4"
+    class="admin-card col-span-{{ size.value }} gap-2 py-4"
     >
     {% block header %}
     <header class="flex justify-between items-center">
         <div>
-            <h2 class="text-xs font-medium text-muted-foreground">{{ title }}</h2>
-            {% if description %}<p class="mt-0.5 text-xs text-muted-foreground/80">{{ description }}</p>{% endif %}
+            <h2 class="text-xs font-medium text-admin-muted-foreground">{{ title }}</h2>
+            {% if description %}<p class="mt-0.5 text-xs text-admin-muted-foreground/80">{{ description }}</p>{% endif %}
         </div>
 
         {% if filters %}
@@ -17,7 +17,7 @@
             <select
                 hx-get
                 name="{{ slug }}.filter"
-                class="select select-sm w-auto text-xs!">
+                class="admin-select admin-select-sm w-auto text-xs!">
                 <option value="">(Reset to default)</option>
                 {% for filter in filters %}
                 <option value="{{ filter.value }}" {% if filter.value == current_filter %}selected{% endif %}>{{ filter }}</option>

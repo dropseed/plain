@@ -3,19 +3,19 @@
    with select.js but never wired up; we standardize on the browser's
    own select for everything in the admin. */
 @layer components {
-  :is(.form, .field) select,
-  select.select {
-    @apply focus-control appearance-none border-input dark:bg-input/30 dark:hover:bg-input/50 flex w-fit items-center justify-between gap-2 rounded-md border bg-transparent pl-3 pr-9 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 h-9;
+  :is(.form, .admin-field) select,
+  select.admin-select {
+    @apply focus-control appearance-none border-admin-input dark:bg-admin-input/30 dark:hover:bg-admin-input/50 flex w-fit items-center justify-between gap-2 rounded-admin-md border bg-transparent pl-3 pr-9 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 h-9;
     @apply bg-[image:var(--chevron-down-icon-50)] bg-no-repeat bg-position-[center_right_0.75rem] bg-size-[1rem];
 
     option,
     optgroup {
-      @apply bg-popover text-popover-foreground;
+      @apply bg-admin-popover text-admin-popover-foreground;
     }
   }
 
-  /* Small variant. Pair with `.select`: `class="select select-sm"`. */
-  select.select-sm {
+  /* Small variant. Pair with `.admin-select`: `class="select select-sm"`. */
+  select.admin-select-sm {
     @apply h-8 py-0 pr-7;
     @apply bg-position-[center_right_0.5rem];
   }

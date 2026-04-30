@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let dragOverTab = null;
 
   document.addEventListener("dragstart", (e) => {
-    const tab = e.target.closest(".nav-tab[data-slug]");
+    const tab = e.target.closest(".admin-nav-tab[data-slug]");
     if (!tab) return;
     draggedTab = tab;
     tab.classList.add("dragging");
@@ -91,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener("dragend", (e) => {
-    const tab = e.target.closest(".nav-tab[data-slug]");
+    const tab = e.target.closest(".admin-nav-tab[data-slug]");
     if (!tab) return;
     tab.classList.remove("dragging");
     draggedTab = null;
@@ -102,7 +102,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener("dragover", (e) => {
-    const tab = e.target.closest(".nav-tab[data-slug]");
+    const tab = e.target.closest(".admin-nav-tab[data-slug]");
     if (!tab || tab === draggedTab) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -113,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener("drop", (e) => {
-    const targetTab = e.target.closest(".nav-tab[data-slug]");
+    const targetTab = e.target.closest(".admin-nav-tab[data-slug]");
     if (!targetTab || !draggedTab || targetTab === draggedTab) return;
     e.preventDefault();
     targetTab.before(draggedTab);
@@ -121,7 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (dragOverTab === targetTab) dragOverTab = null;
 
     const container = document.getElementById("nav-tabs-container");
-    const newOrder = Array.from(container.querySelectorAll(".nav-tab[data-slug]")).map(
+    const newOrder = Array.from(container.querySelectorAll(".admin-nav-tab[data-slug]")).map(
       (t) => t.dataset.slug,
     );
     const reorderUrl = container.dataset.reorderUrl;

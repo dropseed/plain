@@ -1,7 +1,7 @@
 /* Textarea */
 @layer components {
-  :is(.form, .field) textarea,
-  .textarea {
-    @apply focus-control border-input placeholder:text-muted-foreground dark:bg-input/30 flex field-sizing-content min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm;
+  :is(.form, .admin-field) textarea,
+  .admin-textarea {
+    @apply focus-control border-admin-input placeholder:text-admin-muted-foreground dark:bg-admin-input/30 flex field-sizing-content min-h-16 w-full rounded-admin-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm;
   }
 }

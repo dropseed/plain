@@ -12,9 +12,9 @@
 
 {# Text: small caption, linked only when there's no metric to carry the link. #}
 {% if text and link and metric is none %}
-<a href="{{ link }}" class="text-sm text-link hover:text-link-hover hover:underline">{{ text }}</a>
+<a href="{{ link }}" class="text-sm text-admin-link hover:text-admin-link-hover hover:underline">{{ text }}</a>
 {% elif text and not link %}
-<div class="mt-1 text-xs text-muted-foreground">{{ text }}</div>
+<div class="mt-1 text-xs text-admin-muted-foreground">{{ text }}</div>
 {% endif %}
 
 {% endblock %}

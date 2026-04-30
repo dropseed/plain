@@ -6,7 +6,7 @@ function autolinkColumns(target) {
     if (!url) return;
     const link = document.createElement("a");
     link.href = url;
-    link.className = "flex p-2 -m-2 text-foreground hover:no-underline";
+    link.className = "flex p-2 -m-2 text-admin-foreground hover:no-underline";
     while (cell.firstChild) link.appendChild(cell.firstChild);
     cell.appendChild(link);
   });

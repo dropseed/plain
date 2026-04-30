@@ -6,7 +6,7 @@
  */
 (() => {
   const POPOVER_OPEN_EVENT = "plain-admin:popover-open";
-  const POPOVER_SELECTOR = ".popover, .dropdown-menu";
+  const POPOVER_SELECTOR = ".admin-popover, .admin-dropdown-menu";
 
   const registry = [];
   const register = (key, selector, init) => {
@@ -98,7 +98,7 @@
       if (event.key === "Escape") closePopover(component);
     });
   };
-  register("popover", ".popover", initPopover);
+  register("popover", ".admin-popover", initPopover);
 
   // ---------- Dropdown menu (popover + keyboard menuitem nav) ----------
 
@@ -213,7 +213,7 @@
       if (event.target.closest('[role^="menuitem"]')) close();
     });
   };
-  register("dropdownMenu", ".dropdown-menu", initDropdownMenu);
+  register("dropdownMenu", ".admin-dropdown-menu", initDropdownMenu);
 
   // ---------- Tabs ----------
 
@@ -269,7 +269,7 @@
       next.focus();
     });
   };
-  register("tabs", ".tabs", initTabs);
+  register("tabs", ".admin-tabs", initTabs);
 
   // ---------- Segmented control (radiogroup of role=radio buttons) ----------
 
@@ -326,7 +326,7 @@
       next.click();
     });
   };
-  register("segmented", ".segmented", initSegmented);
+  register("segmented", ".admin-segmented", initSegmented);
 
   // ---------- Hovercard (Plain extension) ----------
 
@@ -356,5 +356,5 @@
     panel.addEventListener("mouseenter", show);
     panel.addEventListener("mouseleave", hide);
   };
-  register("hovercard", ".hovercard", initHovercard);
+  register("hovercard", ".admin-hovercard", initHovercard);
 })();

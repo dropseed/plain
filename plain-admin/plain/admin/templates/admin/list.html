@@ -13,9 +13,9 @@
 <header class="flex items-center justify-between">
     <div>
         {% if table_style == "preview" %}
-            <div class="text-sm font-medium text-foreground/80 mb-2">{{ title }}</div>
+            <div class="text-sm font-medium text-admin-foreground/80 mb-2">{{ title }}</div>
         {% else %}
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{{ page.paginator.count }} result{{ page.paginator.count|pluralize }}</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-admin-muted-foreground">{{ page.paginator.count }} result{{ page.paginator.count|pluralize }}</h3>
         {% endif %}
     </div>
     <div class="flex space-x-2">
@@ -24,7 +24,7 @@
         {% else %}
         {% if actions %}
         <form method="POST" data-actions-form>
-            <select name="action_name" class="select select-sm w-auto">
+            <select name="action_name" class="admin-select admin-select-sm w-auto">
                 <option value="">Actions...</option>
                 {% for action in actions %}
                 <option>{{ action }}</option>
@@ -36,7 +36,7 @@
 
         <form method="GET" class="inline-flex space-x-2">
             {% if filter_names %}
-            <select data-autosubmit name="filter" class="select select-sm w-auto">
+            <select data-autosubmit name="filter" class="admin-select admin-select-sm w-auto">
                 <option value="">Filter...</option>
                 {% for filter in filter_names %}
                 <option {% if filter == current_filter %}selected{% endif %}>{{ filter }}</option>
@@ -49,7 +49,7 @@
                 name="search"
                 id="search"
                 value={search_query|default('')}
-                class="input input-sm w-auto pl-8!"
+                class="admin-input input-sm w-auto pl-8!"
                 />
             {% endif %}
         </form>
@@ -59,14 +59,14 @@
 
 {% if objects %}
 <div class="w-full overflow-auto mt-2">
-    <table class="table table-auto">
+    <table class="admin-table table-auto">
         <thead>
-            <tr class="[&>:first-child]:rounded-l-md [&>:last-child]:rounded-r-md">
+            <tr class="[&>:first-child]:rounded-l-admin-md [&>:last-child]:rounded-r-admin-md">
                 {% if table_style != "preview" and actions %}
                 <th class="p-0 pl-1">
                     <input
                         data-action-checkbox-all
-                        class="input"
+                        class="admin-input"
                         type="checkbox"
                     />
                 </th>
@@ -82,7 +82,7 @@
                         {% else %}
                         <a
                             data-merge-params
-                            class="text-xs font-normal flex items-center gap-1 hover:text-foreground group"
+                            class="text-xs font-normal flex items-center gap-1 hover:text-admin-foreground group"
                             href="?page=1&order_by={{ '-' if not order_by_direction else '' }}{{ field }}">
                             <span>{{ get_field_label(field) }}</span>
                             {% if field == order_by_field %}
@@ -92,13 +92,13 @@
                                 <span class="text-[10px]">▲</span>
                                 {% endif %}
                             {% else %}
-                            <span class="text-[10px] text-muted-foreground/60 opacity-0 group-hover:opacity-100">▼</span>
+                            <span class="text-[10px] text-admin-muted-foreground/60 opacity-0 group-hover:opacity-100">▼</span>
                             {% endif %}
                         </a>
                         {% endif %}
                     </th>
                     {% else %}
-                    <th class="text-xs font-normal text-muted-foreground">{{ get_field_label(field) }}</th>
+                    <th class="text-xs font-normal text-admin-muted-foreground">{{ get_field_label(field) }}</th>
                     {% endif %}
                 {% endfor %}
 
@@ -114,7 +114,7 @@
 
                 {% if table_style != "preview" and actions %}
                 <td class="p-0 pl-1">
-                    <input data-action-checkbox class="input" type="checkbox" name="{{ get_object_id(object) }}" />
+                    <input data-action-checkbox class="admin-input" type="checkbox" name="{{ get_object_id(object) }}" />
                 </td>
                 {% endif %}
 
@@ -132,13 +132,13 @@
                 {% set object_links = get_object_links(object) %}
                 {% if object_links %}
                 <td class="py-0">
-                    <div class="dropdown-menu">
+                    <div class="admin-dropdown-menu">
                         <button
                             type="button"
                             aria-haspopup="menu"
                             aria-expanded="false"
                             aria-controls="row-actions-{{ loop.index }}"
-                            class="btn btn-icon btn-ghost"
+                            class="admin-btn admin-btn-icon admin-btn-ghost"
                         >
                             <admin.Icon name="three-dots" />
                         </button>
@@ -158,8 +158,8 @@
     </table>
 </div>
 {% else %}
-<div class="mt-2 border-t border-border py-10 text-center">
-    <p class="text-sm text-muted-foreground/80">
+<div class="mt-2 border-t border-admin-border py-10 text-center">
+    <p class="text-sm text-admin-muted-foreground/80">
         {% if search_query %}
         No results for "{{ search_query }}"
         {% else %}
@@ -170,26 +170,26 @@
 {% endif %}
 
 {% if table_style != "preview" and page.has_other_pages() %}
-<footer class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-background/95 backdrop-blur-sm border-t border-border pt-4 pb-3">
+<footer class="mt-4 sticky bottom-0 [body[data-toolbar-installed]_&]:pb-12 bg-admin-background/95 backdrop-blur-sm border-t border-admin-border pt-4 pb-3">
     <div class="flex items-center justify-between text-sm">
-        <span class="text-muted-foreground">
+        <span class="text-admin-muted-foreground">
             Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} results, {{ page.paginator.per_page }} per page)
         </span>
         <div class="flex items-center gap-2">
             {% if page.has_previous() %}
-            <a data-merge-params href="?page={{ page.previous_page_number() }}" class="btn btn-sm btn-outline">&lt;</a>
+            <a data-merge-params href="?page={{ page.previous_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&lt;</a>
             {% endif %}
             <form data-autosubmit method="GET">
                 {% if search_fields and search_query %}<input type="hidden" name="search" value="{{ search_query }}" />{% endif %}
                 {% if filter_names and current_filter %}<input type="hidden" name="filter" value="{{ current_filter }}" />{% endif %}
-                <select name="page" class="select select-sm w-auto">
+                <select name="page" class="admin-select admin-select-sm w-auto">
                 {% for page_num in page.paginator.page_range %}
                     <option value="{{ page_num }}" {% if page_num == page.number %}selected{% endif %}>Page {{ page_num }}</option>
                 {% endfor %}
                 </select>
             </form>
             {% if page.has_next() %}
-            <a data-merge-params href="?page={{ page.next_page_number() }}" class="btn btn-sm btn-outline">&gt;</a>
+            <a data-merge-params href="?page={{ page.next_page_number() }}" class="admin-btn admin-btn-sm admin-btn-outline">&gt;</a>
             {% endif %}
         </div>
     </div>

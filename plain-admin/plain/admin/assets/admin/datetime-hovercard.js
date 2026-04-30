@@ -37,7 +37,7 @@
     row.dataset.copyValue = value;
 
     const labelEl = document.createElement("span");
-    labelEl.className = "text-muted-foreground text-xs shrink-0";
+    labelEl.className = "text-admin-muted-foreground text-xs shrink-0";
     labelEl.textContent = label;
 
     const valueEl = document.createElement("span");
@@ -53,7 +53,7 @@
   function wrap(target) {
     target.querySelectorAll("time[datetime]").forEach((timeEl) => {
       // Idempotent: skip if already wrapped (e.g., HTMX swap re-runs).
-      if (timeEl.closest(".hovercard")) return;
+      if (timeEl.closest(".admin-hovercard")) return;
 
       const panel = document.createElement("div");
       panel.dataset.hovercard = "";
@@ -61,7 +61,7 @@
       panel.className = "min-w-56 flex flex-col";
 
       const wrapper = document.createElement("span");
-      wrapper.className = "hovercard";
+      wrapper.className = "admin-hovercard";
       timeEl.parentNode.insertBefore(wrapper, timeEl);
       wrapper.appendChild(timeEl);
       wrapper.appendChild(panel);

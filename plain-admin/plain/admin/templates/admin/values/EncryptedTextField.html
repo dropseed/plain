@@ -1,8 +1,8 @@
 {% if value %}<span
     data-encrypted
     data-revealed="false"
-    class="group cursor-pointer data-[revealed=false]:text-muted-foreground/80 hover:data-[revealed=false]:text-muted-foreground data-[revealed=true]:text-warning"
+    class="group cursor-pointer data-[revealed=false]:text-admin-muted-foreground/80 hover:data-[revealed=false]:text-admin-muted-foreground data-[revealed=true]:text-admin-warning"
 >
     <span class="group-data-[revealed=true]:hidden"><i class="bi bi-lock text-xs"></i> ••••••</span>
-    <span class="group-data-[revealed=false]:hidden"><i class="bi bi-unlock text-xs"></i> <code class="text-sm break-all bg-warning/10 rounded px-1 py-0.5 select-all">{{ value }}</code></span>
+    <span class="group-data-[revealed=false]:hidden"><i class="bi bi-unlock text-xs"></i> <code class="text-sm break-all bg-admin-warning/10 rounded px-1 py-0.5 select-all">{{ value }}</code></span>
 </span>{% endif %}

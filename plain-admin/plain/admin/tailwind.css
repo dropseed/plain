@@ -24,7 +24,7 @@
  *                              native select). Self-scoped via inner
  *                              `.plain-admin { … }` selector.
  *   styles/admin/nav.css       pinned-nav drag-and-drop states
- *   styles/admin/scrollbar.css opt-in `.scrollbar` / `.scrollbar-hide`
+ *   styles/admin/scrollbar.css opt-in `.admin-scrollbar` / `.admin-scrollbar-hide`
  *                              utilities themed via `--scrollbar-*`
  *
  * See ATTRIBUTIONS.md for credit / MIT license preservation.
@@ -38,8 +38,8 @@
    `col-span-{{ size.value }}`, which is invisible to the content scanner. */
 @source inline("col-span-{1,2,3,4}");
 
-/* Wrapped in @scope (.plain-admin) so generic class names — `.card`,
-   `.btn`, `.nav-tab`, `.scrollbar` — only style descendants of the
+/* Wrapped in @scope (.plain-admin) so generic class names — `.admin-card`,
+   `.admin-btn`, `.admin-nav-tab`, `.admin-scrollbar` — only style descendants of the
    admin chrome. A user page with `class="card"` keeps its own look. */
 @scope (.plain-admin) {
   @import "./styles/components/alert.css";

@@ -11,10 +11,6 @@
     <admin.InputField label="Order" field={form.order} />
     <admin.CheckboxField label="Enabled" field={form.enabled} />
 
-    <div class="flex justify-end">
-        <button class="mt-5" type="submit">
-            Save
-        </button>
-    </div>
+    <admin.Submit>Save</admin.Submit>
 </form>
 {% endblock %}

@@ -1,6 +1,6 @@
 /* Tables */
 @layer components {
-  .table {
+  .admin-table {
     @apply w-full caption-bottom text-sm;
     thead {
       @apply [&_tr]:border-b;
@@ -9,19 +9,19 @@
       @apply [&_tr:last-child]:border-0;
     }
     tfoot {
-      @apply bg-muted/50 border-t font-medium [&>tr]:last:border-b-0;
+      @apply bg-admin-muted/50 border-t font-medium [&>tr]:last:border-b-0;
     }
     tr {
-      @apply hover:bg-muted/50 border-b transition-colors;
+      @apply hover:bg-admin-muted/50 border-b transition-colors;
     }
     th {
-      @apply text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px];
+      @apply text-admin-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px];
     }
     td {
       @apply p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px];
     }
     caption {
-      @apply text-muted-foreground mt-4 text-sm;
+      @apply text-admin-muted-foreground mt-4 text-sm;
     }
   }
 }

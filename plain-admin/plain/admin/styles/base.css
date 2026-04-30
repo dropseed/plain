@@ -14,14 +14,14 @@
    radio.css so the keyboard-focus and validation rings are themed in
    one place. (Switch opts out of aria-invalid — see switch.css.) */
 @utility focus-control {
-  @apply focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px];
-  @apply aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40 aria-invalid:border-danger;
+  @apply focus-visible:border-admin-ring focus-visible:ring-admin-ring/50 focus-visible:ring-[3px];
+  @apply aria-invalid:ring-admin-danger/20 dark:aria-invalid:ring-admin-danger/40 aria-invalid:border-admin-danger;
 }
 
 @layer base {
   /* Default border color and focus outline for admin descendants. */
   .plain-admin * {
-    @apply border-border outline-ring/50;
+    @apply border-admin-border outline-admin-ring/50;
   }
 
   /* Smooth scroll is harmless globally. */
@@ -32,7 +32,7 @@
   /* Paint the admin chrome. (Basecoat upstream applies this to `body`;
      we apply it to `.plain-admin` so user pages keep their own bg.) */
   .plain-admin {
-    @apply bg-background text-foreground overscroll-none antialiased font-sans;
+    @apply bg-admin-background text-admin-foreground overscroll-none antialiased font-sans;
   }
 
   /* Mono-family elements use the admin's `--font-mono` stack. Scoped so

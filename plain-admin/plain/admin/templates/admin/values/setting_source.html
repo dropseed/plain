@@ -1,7 +1,7 @@
 {% if object.source == 'env' %}
-<span class="badge badge-warning font-mono">{{ value }}</span>
+<span class="admin-badge admin-badge-warning font-mono">{{ value }}</span>
 {% elif object.source == 'explicit' %}
-<span class="badge badge-outline">{{ value }}</span>
+<span class="admin-badge admin-badge-outline">{{ value }}</span>
 {% else %}
-<span class="badge badge-secondary">{{ value }}</span>
+<span class="admin-badge admin-badge-secondary">{{ value }}</span>
 {% endif %}

@@ -88,18 +88,18 @@
                 {% block header %}
                 {# Breadcrumbs - small, above title #}
                 {% if parent_view_classes %}
-                <nav class="flex items-center space-x-1.5 mb-1 text-xs text-muted-foreground" aria-label="Breadcrumb">
+                <nav class="flex items-center space-x-1.5 mb-1 text-xs text-admin-muted-foreground" aria-label="Breadcrumb">
                     {% for parent_view in parent_view_classes|reverse %}
                         {% if not loop.first %}
-                            <span class="text-muted-foreground/60">/</span>
+                            <span class="text-admin-muted-foreground/60">/</span>
                         {% endif %}
-                        <a href="{{ parent_view.get_view_url(object if object is defined else None) }}" class="hover:text-foreground hover:underline">
+                        <a href="{{ parent_view.get_view_url(object if object is defined else None) }}" class="hover:text-admin-foreground hover:underline">
                             {{ parent_view.get_nav_title() }}
                         </a>
                     {% endfor %}
                     {% if object is defined %}
-                        <span class="text-muted-foreground/60">/</span>
-                        <span class="text-foreground/80 truncate max-w-48">{{ object.__repr__() }}</span>
+                        <span class="text-admin-muted-foreground/60">/</span>
+                        <span class="text-admin-foreground/80 truncate max-w-48">{{ object.__repr__() }}</span>
                     {% endif %}
                 </nav>
                 {% endif %}
@@ -118,16 +118,16 @@
                     <div class="hidden sm:flex items-center space-x-2 text-sm flex-shrink-0">
                         {% block actions %}{% endblock %}
                         {% for link, url in links.items() %}
-                        <a href="{{ url }}" class="btn btn-outline">{{ link }}</a>
+                        <a href="{{ url }}" class="admin-btn admin-btn-outline">{{ link }}</a>
                         {% endfor %}
                         {% if extra_links %}
-                        <div class="dropdown-menu">
+                        <div class="admin-dropdown-menu">
                             <button
                                 type="button"
                                 aria-haspopup="menu"
                                 aria-expanded="false"
                                 aria-controls="header-extra-links-popover"
-                                class="btn btn-icon btn-outline"
+                                class="admin-btn admin-btn-icon admin-btn-outline"
                             >
                                 <admin.Icon name="three-dots" />
                             </button>
@@ -144,15 +144,15 @@
                     {# Mobile actions: collapse links + extras into one dropdown. #}
                     {% if links or extra_links %}
                     <div class="sm:hidden flex-shrink-0">
-                        <div class="dropdown-menu">
+                        <div class="admin-dropdown-menu">
                             <button
                                 type="button"
                                 aria-haspopup="menu"
                                 aria-expanded="false"
                                 aria-controls="header-mobile-actions-popover"
-                                class="flex items-center justify-center w-8 h-8 rounded hover:bg-accent"
+                                class="flex items-center justify-center w-8 h-8 rounded hover:bg-admin-accent"
                             >
-                                <admin.Icon name="three-dots" class="text-muted-foreground" />
+                                <admin.Icon name="three-dots" class="text-admin-muted-foreground" />
                             </button>
                             <div id="header-mobile-actions-popover" data-popover data-align="end" aria-hidden="true" class="w-48">
                                 <div role="menu">
@@ -170,7 +170,7 @@
                 </div>
                 {# Description - shown below title #}
                 {% if description %}
-                <p class="mt-1 text-sm text-muted-foreground">{{ description }}</p>
+                <p class="mt-1 text-sm text-admin-muted-foreground">{{ description }}</p>
                 {% endif %}
                 {% endblock %}
             </header>
@@ -185,7 +185,7 @@
             </div>
             {% endif %}
 
-            <main class="px-4 pt-6 pb-6 lg:px-8 text-foreground/80">{% block content %}{% endblock %}</main>
+            <main class="px-4 pt-6 pb-6 lg:px-8 text-admin-foreground/80">{% block content %}{% endblock %}</main>
         </div>
 
     </div>

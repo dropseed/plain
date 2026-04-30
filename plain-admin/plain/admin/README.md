@@ -329,19 +329,48 @@ class UpdateView(AdminModelUpdateView):
     template_name = "admin/users/user_form.html"  # Optional custom template
 ```
 
-The form template should extend the admin base and use the form rendering helpers.
+The form template extends the admin base and renders fields with the admin's [Plain elements](/plain/plain/elements/README.md):
 
 ```html
 {% extends "admin/base.html" %}
+{% use_elements %}
 
 {% block content %}
-<form method="post">
-    {{ csrf_input }}
-    {{ form.as_p }}
-    <button type="submit">Save</button>
+<form method="post" class="space-y-4">
+    <admin.InputField label="Email" field={form.email} />
+    <admin.InputField label="First name" field={form.first_name} />
+    <admin.InputField label="Last name" field={form.last_name} />
+    <admin.CheckboxField label="Active" field={form.is_active} />
+
+    <admin.Submit>Save</admin.Submit>
 </form>
 {% endblock %}
 ```
+
+CSRF is automatic (no `{{ csrf_input }}` needed). Plain forms are headless — there's no `as_p()` / `as_table()`; you compose the markup yourself with the elements above.
+
+### Elements
+
+The admin ships these [Plain elements](/plain/plain/elements/README.md) for building admin templates. Paired field elements (label + input + help + errors) cover the common case; unwrapped primitives are there when you need custom layouts.
+
+| Element                 | Renders                                                                                                                |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `<admin.Submit>`        | Right-aligned `<button>` with `admin-btn admin-btn-primary` styling                                                    |
+| `<admin.InputField>`    | `<admin.Label>` + `<admin.Input>` + `<admin.Help>` + `<admin.FieldErrors>`                                             |
+| `<admin.CheckboxField>` | `<admin.Checkbox>` + `<admin.Label>` + `<admin.Help>` + `<admin.FieldErrors>`                                          |
+| `<admin.SelectField>`   | `<admin.Label>` + `<admin.Select>` + `<admin.Help>` + `<admin.FieldErrors>`                                            |
+| `<admin.TextareaField>` | `<admin.Label>` + `<admin.Textarea>` + `<admin.Help>` + `<admin.FieldErrors>`                                          |
+| `<admin.Input>`         | `<input class="admin-input">`; pass `type="email"` etc. via the `type` prop                                            |
+| `<admin.Checkbox>`      | `<input type="checkbox" class="admin-input">`                                                                          |
+| `<admin.Select>`        | `<select class="admin-select">` with `<option>`s from `field.field.choices`                                            |
+| `<admin.Textarea>`      | `<textarea class="admin-textarea">` (set `rows` via prop)                                                              |
+| `<admin.Label>`         | `<label class="admin-label">` with required `*` indicator                                                              |
+| `<admin.Help>`          | `<p class="text-admin-muted-foreground">` of help text                                                                 |
+| `<admin.FieldErrors>`   | Error messages with danger icon                                                                                        |
+| `<admin.SearchInput>`   | `<input class="admin-input pl-8">` with a leading search-icon overlay (used in list filters / topbar)                  |
+| `<admin.Icon>`          | `<i class="bi bi-{name}">` — pass `name="plus-lg"` etc. (full set: [bootstrap-icons](https://icons.getbootstrap.com/)) |
+
+Source: [`templates/elements/admin/`](./templates/elements/admin/) — read the file directly to see exactly what each element accepts.
 
 ## List filters
 
@@ -497,7 +526,7 @@ into the same bundle. Anything you add after that import wins:
 @import "./.plain/tailwind.css";
 
 .plain-admin {
-  --primary: #4f46e5;             /* drives .btn-primary, focus rings, active tab */
+  --primary: #4f46e5;             /* drives .admin-btn-primary, focus rings, active tab */
   --primary-foreground: white;
   --ring: #4f46e5;
   --header-bg: #eef2ff;           /* sticky top header surface */
@@ -524,12 +553,12 @@ The most commonly retuned tokens:
 - **Brand palette** — `--primary`, `--primary-foreground`, `--ring`, `--link`,
   `--link-hover`, `--header-bg`.
 - **Status family** — `--success`, `--warning`, `--danger`, `--info`, each with
-  a `*-foreground` for legible text on solid fills (used by `.btn-danger`,
-  `.alert-warning`, etc.).
+  a `*-foreground` for legible text on solid fills (used by `.admin-btn-danger`,
+  `.admin-alert-warning`, etc.).
 - **Chart palette** — `--chart-1` through `--chart-5`, used by `TrendCard` and
   any other chart in the admin.
 - **Radius scale** — override `--radius` once to retighten or loosen every
-  component's corners (Tailwind exposes this as `rounded-sm`/`-md`/`-lg`/`-xl`).
+  component's corners (Tailwind exposes this as `rounded-admin-sm`/`-md`/`-lg`/`-xl`).
 - **Surfaces** — `--background`, `--card`, `--muted`, `--accent`, `--popover`,
   plus their `*-foreground` pairs.
 
@@ -597,38 +626,38 @@ directly for copy-pasteable markup if you can't open the running admin
 lives one file per primitive in
 [`styles/components/`](./styles/components/).
 
-| Pattern           | Class(es)                                                                                                                  |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Buttons           | Compose `.btn` with one of `.btn-primary` / `.btn-secondary` / `.btn-outline` / `.btn-ghost` / `.btn-link`                 |
-| Sizes / icon-only | Stack `.btn-sm` or `.btn-lg`; add `.btn-icon` for a square icon-only button (e.g. `class="btn btn-sm btn-icon btn-ghost"`) |
-| Status buttons    | `.btn-success`, `.btn-warning`, `.btn-danger`, `.btn-info` (solid fill + paired fg)                                        |
-| Badges            | Compose `.badge` with one of `.badge-primary` / `.badge-secondary` / `.badge-outline`                                      |
-| Status badges     | Stack `.badge-success`, `.badge-warning`, `.badge-danger`, `.badge-info` (translucent fill + saturated text)               |
-| Alerts            | Compose `.alert` (neutral surface) with `.alert-success` / `.alert-warning` / `.alert-danger` / `.alert-info` for tone     |
-| Cards             | `.card` — pad with utilities (e.g. `class="card gap-2 py-4"` for dense layouts)                                            |
-| Form inputs       | `.input`, `.textarea`, `.select` — opt in via class; pair with `-sm` for compact rows                                      |
-| Dialogs           | `<dialog class="dialog">` opened via `<button command="show-modal" commandfor="…">`                                        |
-| Tabs              | `.tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                                                                 |
-| Dropdowns         | `.dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` with `[role="menu"]`                                     |
+| Pattern           | Class(es)                                                                                                                                                            |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Buttons           | Compose `.admin-btn` with one of `.admin-btn-primary` / `.admin-btn-secondary` / `.admin-btn-outline` / `.admin-btn-ghost` / `.admin-btn-link`                       |
+| Sizes / icon-only | Stack `.admin-btn-sm` or `.admin-btn-lg`; add `.admin-btn-icon` for a square icon-only button (e.g. `class="admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost"`) |
+| Status buttons    | `.admin-btn-success`, `.admin-btn-warning`, `.admin-btn-danger`, `.admin-btn-info` (solid fill + paired fg)                                                          |
+| Badges            | Compose `.admin-badge` with one of `.admin-badge-primary` / `.admin-badge-secondary` / `.admin-badge-outline`                                                        |
+| Status badges     | Stack `.admin-badge-success`, `.admin-badge-warning`, `.admin-badge-danger`, `.admin-badge-info` (translucent fill + saturated text)                                 |
+| Alerts            | Compose `.admin-alert` (neutral surface) with `.admin-alert-success` / `.admin-alert-warning` / `.admin-alert-danger` / `.admin-alert-info` for tone                 |
+| Cards             | `.admin-card` — pad with utilities (e.g. `class="admin-card gap-2 py-4"` for dense layouts)                                                                          |
+| Form inputs       | `.admin-input`, `.admin-textarea`, `.admin-select` — opt in via class; pair with `-sm` for compact rows                                                              |
+| Dialogs           | `<dialog class="admin-dialog">` opened via `<button command="show-modal" commandfor="…">`                                                                            |
+| Tabs              | `.admin-tabs > [role="tablist"] > [role="tab"]` (uses `tabs.js`)                                                                                                     |
+| Dropdowns         | `.admin-dropdown-menu` wrapping a `<button>` + sibling `[data-popover]` with `[role="menu"]`                                                                         |
 
 When writing custom admin templates, prefer the design tokens over hardcoded
 colors so dark mode and theme overrides work automatically:
 
-| Use                 | Class / token                                                                                             |
-| ------------------- | --------------------------------------------------------------------------------------------------------- |
-| Page background     | `bg-background`, `text-foreground`                                                                        |
-| Cards / panels      | `bg-card text-card-foreground`                                                                            |
-| Subtle surfaces     | `bg-muted`, `bg-muted/40`                                                                                 |
-| Hover surface       | `hover:bg-accent hover:text-accent-foreground`                                                            |
-| Borders             | `border-border` (general), `border-input` (form fields)                                                   |
-| Muted text          | `text-muted-foreground`                                                                                   |
-| Primary action      | `bg-primary` / `text-primary-foreground`                                                                  |
-| Link                | `text-link hover:text-link-hover`                                                                         |
-| Status text         | `text-success`, `text-warning`, `text-danger`, `text-info`                                                |
-| Status backgrounds  | `bg-success/10`, `bg-warning/10`, `bg-danger/10`, `bg-info/10` (translucent fills, used by status badges) |
-| Status solid action | `bg-{success,warning,danger,info}` / `text-{name}-foreground`                                             |
-| Focus ring          | `ring-ring`                                                                                               |
-| Header surface      | `bg-header-bg`                                                                                            |
+| Use                 | Class / token                                                                                                                     |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Page background     | `bg-admin-background`, `text-admin-foreground`                                                                                    |
+| Cards / panels      | `bg-admin-card text-admin-card-foreground`                                                                                        |
+| Subtle surfaces     | `bg-admin-muted`, `bg-admin-muted/40`                                                                                             |
+| Hover surface       | `hover:bg-admin-accent hover:text-admin-accent-foreground`                                                                        |
+| Borders             | `border-admin-border` (general), `border-admin-input` (form fields)                                                               |
+| Muted text          | `text-admin-muted-foreground`                                                                                                     |
+| Primary action      | `bg-admin-primary` / `text-admin-primary-foreground`                                                                              |
+| Link                | `text-admin-link hover:text-admin-link-hover`                                                                                     |
+| Status text         | `text-admin-success`, `text-admin-warning`, `text-admin-danger`, `text-admin-info`                                                |
+| Status backgrounds  | `bg-admin-success/10`, `bg-admin-warning/10`, `bg-admin-danger/10`, `bg-admin-info/10` (translucent fills, used by status badges) |
+| Status solid action | `bg-{success,warning,danger,info}` / `text-{name}-foreground`                                                                     |
+| Focus ring          | `ring-admin-ring`                                                                                                                 |
+| Header surface      | `bg-admin-header-bg`                                                                                                              |
 
 The component CSS source lives in
 [`plain/admin/styles/`](./styles/): `tokens.css` declares every design
@@ -681,7 +710,7 @@ To add items to the user dropdown menu (e.g., a profile page), create an `admin/
 <!-- app/templates/admin/user_menu_items.html -->
 <a
     href="{{ admin_url('profile') }}"
-    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground rounded"
+    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-admin-popover-foreground hover:bg-admin-accent hover:text-admin-accent-foreground rounded"
 >
     Profile
 </a>

@@ -4,33 +4,33 @@
 
 {% block content %}
 
-<div class="card">
+<div class="admin-card">
     <section>
         <dl>
             <div class="flex gap-8 py-1.5">
-                <dt class="w-40 flex-shrink-0 text-muted-foreground">Name</dt>
+                <dt class="w-40 flex-shrink-0 text-admin-muted-foreground">Name</dt>
                 <dd class="min-w-0">
                     <span class="font-mono text-sm">{{ setting.name }}</span>
                 </dd>
             </div>
             <div class="flex gap-8 py-1.5">
-                <dt class="w-40 flex-shrink-0 text-muted-foreground">Source</dt>
+                <dt class="w-40 flex-shrink-0 text-admin-muted-foreground">Source</dt>
                 <dd class="min-w-0">
                     {% if setting.source == 'env' %}
-                    <span class="badge badge-warning font-mono">{{ setting.env_var_name }}</span>
+                    <span class="admin-badge admin-badge-warning font-mono">{{ setting.env_var_name }}</span>
                     {% elif setting.source == 'explicit' %}
-                    <span class="badge badge-outline">{{ setting.source }}</span>
+                    <span class="admin-badge admin-badge-outline">{{ setting.source }}</span>
                     {% else %}
-                    <span class="badge badge-secondary">{{ setting.source }}</span>
+                    <span class="admin-badge admin-badge-secondary">{{ setting.source }}</span>
                     {% endif %}
                 </dd>
             </div>
             <div class="flex gap-8 py-1.5">
-                <dt class="w-40 flex-shrink-0 text-muted-foreground">Value</dt>
+                <dt class="w-40 flex-shrink-0 text-admin-muted-foreground">Value</dt>
                 <dd class="min-w-0">
                     <span
                         data-secret="{{ setting.is_secret }}"
-                        class="font-mono text-sm break-all whitespace-pre-wrap data-[secret=True]:text-muted-foreground/80 data-[secret=True]:italic"
+                        class="font-mono text-sm break-all whitespace-pre-wrap data-[secret=True]:text-admin-muted-foreground/80 data-[secret=True]:italic"
                     >{{ setting.value }}</span>
                 </dd>
             </div>

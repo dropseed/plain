@@ -1,5 +1,5 @@
 {% use_elements %}
-{# Text input with a leading search-icon overlay. Default `class="input pl-8"`
+{# Text input with a leading search-icon overlay. Default `class="admin-input pl-8"`
    pairs with the icon's `left-2.5`; pass `class` to override input styling.
    `wrapper_class` adds utilities to the relative wrapper. #}
 {% if id is defined %}
@@ -17,6 +17,6 @@
         >
     <admin.Icon
         name="search"
-        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none"
+        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-admin-muted-foreground pointer-events-none"
         />
 </div>

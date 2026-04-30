@@ -4,7 +4,7 @@
    containing the full app/packages nav with a filter input. #}
 {# Context: app_name, user, nav_tabs, slug, parent_view_classes, pinned_slugs, admin_registry #}
 
-<header id="admin-header" class="sticky top-0 z-50 pt-2 bg-header-bg/95 supports-[backdrop-filter]:bg-header-bg/75 backdrop-blur">
+<header id="admin-header" class="sticky top-0 z-50 pt-2 bg-admin-header-bg/95 supports-[backdrop-filter]:bg-admin-header-bg/75 backdrop-blur">
     <!-- Top row -->
     <div class="flex items-center justify-between px-4 lg:px-8 h-11">
         <div class="flex items-center gap-1.5">
@@ -19,14 +19,14 @@
                     id="topbar-search"
                     value={global_search_query|default('')}
                     placeholder="Search..."
-                    class="w-52 pr-10 pl-8 text-sm bg-muted/60 border border-transparent py-1.5 rounded-md transition-all duration-150 placeholder:text-muted-foreground focus:outline-none focus:bg-background focus:border-input focus:ring-1 focus:ring-ring focus:w-64"
+                    class="w-52 pr-10 pl-8 text-sm bg-admin-muted/60 border border-transparent py-1.5 rounded-admin-md transition-all duration-150 placeholder:text-admin-muted-foreground focus:outline-none focus:bg-admin-background focus:border-admin-input focus:ring-1 focus:ring-admin-ring focus:w-64"
                     />
             </form>
 
             <!-- Search (mobile) -->
             <a
                 href="{{ url('admin:search') }}"
-                class="sm:hidden btn btn-sm btn-icon btn-ghost text-muted-foreground"
+                class="sm:hidden admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost text-admin-muted-foreground"
             >
                 <admin.Icon name="search" />
             </a>
@@ -35,19 +35,19 @@
             {% set preflight_total = preflight_counts.errors + preflight_counts.warnings %}
             <a
                 href="{{ url('admin:preflight') }}"
-                class="relative btn btn-sm btn-icon btn-ghost text-muted-foreground"
+                class="relative admin-btn admin-btn-sm admin-btn-icon admin-btn-ghost text-admin-muted-foreground"
                 title="Preflight checks"
             >
                 <admin.Icon name="shield-check" />
                 {% if preflight_total > 0 %}
                 <span
                     data-status="{{ 'error' if preflight_counts.errors else 'warning' }}"
-                    class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 text-[10px] font-bold leading-4 text-center text-white rounded-full data-[status=error]:bg-danger data-[status=warning]:bg-warning"
+                    class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 text-[10px] font-bold leading-4 text-center text-white rounded-full data-[status=error]:bg-admin-danger data-[status=warning]:bg-admin-warning"
                 >{{ preflight_total }}</span>
                 {% endif %}
             </a>
 
-            <div class="dropdown-menu">
+            <div class="admin-dropdown-menu">
                 <button
                     type="button"
                     aria-haspopup="menu"
@@ -63,8 +63,8 @@
                             class="w-7 h-7 rounded-full"
                         />
                     {% else %}
-                        <div class="w-7 h-7 rounded-full bg-muted flex items-center justify-center">
-                            <admin.Icon name="person-circle" class="text-muted-foreground" />
+                        <div class="w-7 h-7 rounded-full bg-admin-muted flex items-center justify-center">
+                            <admin.Icon name="person-circle" class="text-admin-muted-foreground" />
                         </div>
                     {% endif %}
                 </button>
@@ -72,7 +72,7 @@
                     {# Theme switcher. Sits outside [role=menu] so the
                        dropdown-menu's keyboard nav skips it; the segmented
                        control owns its own roving tabindex + arrow keys. #}
-                    <div class="segmented mx-1 mt-1" role="radiogroup" aria-label="Theme">
+                    <div class="admin-segmented mx-1 mt-1" role="radiogroup" aria-label="Theme">
                         {% for slug, icon, label in [("light", "sun", "Light"), ("dark", "moon-stars", "Dark"), ("system", "display", "System")] %}
                         <button
                             type="button"
@@ -111,8 +111,8 @@
         <!-- Bottom baseline. Sits behind the tabs so the active tab's
              border-b can paint over the bottom 1px of its underline,
              merging visually with the line. -->
-        <div class="absolute inset-x-0 bottom-0 h-px bg-border z-0"></div>
-        <div id="nav-tabs-container" class="relative z-10 flex items-center -ml-3 overflow-x-auto scrollbar-hide" data-reorder-url="{{ url('admin:reorder') }}">
+        <div class="absolute inset-x-0 bottom-0 h-px bg-admin-border z-0"></div>
+        <div id="nav-tabs-container" class="relative z-10 flex items-center -ml-3 overflow-x-auto admin-scrollbar-hide" data-reorder-url="{{ url('admin:reorder') }}">
             {% for tab in nav_tabs %}
             {% set nav_url = tab.view.get_view_url() %}
             {% set view_slug = tab.view.get_slug() %}
@@ -121,20 +121,20 @@
                 href="{{ nav_url }}"
                 {% if is_current %}data-active{% endif %}
                 {% if tab.pinned %}draggable="true" data-slug="{{ view_slug }}"{% else %}data-recent{% endif %}
-                class="nav-tab flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-border data-[active]:text-foreground data-[active]:font-medium data-[active]:border-primary data-[recent]:text-muted-foreground/80 data-[recent]:font-normal data-[recent]:italic"
+                class="admin-nav-tab flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap text-admin-muted-foreground hover:text-admin-foreground border-b-2 border-transparent hover:border-admin-border data-[active]:text-admin-foreground data-[active]:font-medium data-[active]:border-admin-primary data-[recent]:text-admin-muted-foreground/80 data-[recent]:font-normal data-[recent]:italic"
             >{% if tab.view.nav_icon %}<admin.Icon name={tab.view.nav_icon} class="opacity-60" />{% endif %}{{ tab.view.get_nav_title() }}</a>
             {% endfor %}
         </div>
 
         <!-- Menu (Basecoat popover): full app/packages nav with a filter
              input. popover.js handles open/close, click-outside, ESC. -->
-        <div class="popover relative z-10 ml-auto">
+        <div class="admin-popover relative z-10 ml-auto">
             <button
                 type="button"
                 aria-haspopup="dialog"
                 aria-expanded="false"
                 aria-controls="admin-menu-popover"
-                class="btn btn-sm btn-ghost text-muted-foreground"
+                class="admin-btn admin-btn-sm admin-btn-ghost text-admin-muted-foreground"
             >
                 <admin.Icon name="grid-3x3-gap" />
                 <span class="hidden sm:inline">Menu</span>
@@ -146,11 +146,11 @@
                 aria-hidden="true"
                 class="w-80 max-h-[75vh] flex flex-col p-0! overflow-hidden!"
             >
-                <div class="p-3 bg-muted/40 border-b border-border">
+                <div class="p-3 bg-admin-muted/40 border-b border-admin-border">
                     <admin.SearchInput
                         id="menu-filter-input"
                         placeholder="Filter pages..."
-                        class="w-full pl-8 pr-3 py-2 text-base sm:text-sm bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring placeholder:text-muted-foreground transition-shadow"
+                        class="w-full pl-8 pr-3 py-2 text-base sm:text-sm bg-admin-background border border-admin-input rounded-admin-lg focus:outline-none focus:ring-2 focus:ring-admin-ring/30 focus:border-admin-ring placeholder:text-admin-muted-foreground transition-shadow"
                         />
                 </div>
 

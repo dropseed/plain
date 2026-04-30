@@ -2,17 +2,17 @@
  * Scrollbar utilities. Opt-in classes — the browser's default scrollbar
  * is left alone elsewhere.
  *
- *   .scrollbar       Slim themed scrollbar driven by --scrollbar-* tokens.
+ *   .admin-scrollbar       Slim themed scrollbar driven by --scrollbar-* tokens.
  *                    Add to any scrollable element to swap the native
  *                    chrome for the admin's themed one.
  *
- *   .scrollbar-hide  Suppress the scrollbar entirely (still scrollable).
+ *   .admin-scrollbar-hide  Suppress the scrollbar entirely (still scrollable).
  *                    Used by the admin's pinned-nav tab strip in
  *                    _header.html.
  */
 
 @layer base {
-  .scrollbar {
+  .admin-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 
@@ -28,7 +28,7 @@
     }
   }
 
-  .scrollbar-hide {
+  .admin-scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
 

@@ -4,7 +4,7 @@
  * Padded wrapper for grouped content with optional <header> / <section> /
  * <footer> children. Plain's default is flat (no shadow) — the border
  * carries the separation. Corner radius follows the system-wide
- * `--radius` token via `rounded-xl`; tighten or loosen the entire scale
+ * `--radius` token via `rounded-admin-xl`; tighten or loosen the entire scale
  * by overriding `--radius` rather than this class.
  *
  * Dashboard cards in `templates/admin/cards/base.html` use
@@ -12,8 +12,8 @@
  */
 
 @layer components {
-  .card {
-    @apply bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6;
+  .admin-card {
+    @apply bg-admin-card text-admin-card-foreground flex flex-col gap-6 rounded-admin-xl border py-6;
 
     > header {
       @apply @container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6;
@@ -22,7 +22,7 @@
         @apply leading-none font-semibold;
       }
       p {
-        @apply text-muted-foreground text-sm;
+        @apply text-admin-muted-foreground text-sm;
       }
     }
     > section {

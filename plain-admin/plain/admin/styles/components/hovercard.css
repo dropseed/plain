@@ -11,7 +11,7 @@
    Surface treatment (bg, border, shadow, radius) is shared with
    [data-popover] in popover.css. */
 @layer components {
-  .hovercard {
+  .admin-hovercard {
     @apply relative inline-flex;
   }
 

@@ -25,16 +25,16 @@
       color: var(--link-hover);
     }
 
-    /* Inside `.table`, links inherit color and only underline on hover. */
-    .table th a,
-    .table td a {
+    /* Inside `.admin-table`, links inherit color and only underline on hover. */
+    .admin-table th a,
+    .admin-table td a {
       color: inherit;
       text-decoration: none;
     }
-    .table td a:hover {
+    .admin-table td a:hover {
       text-decoration: underline;
     }
-    .table img {
+    .admin-table img {
       height: 1.2rem;
       border-radius: 2px;
     }

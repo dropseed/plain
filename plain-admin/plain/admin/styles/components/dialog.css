@@ -1,6 +1,6 @@
 /* Dialog */
 @layer components {
-  .dialog {
+  .admin-dialog {
     @apply inset-y-0 opacity-0 transition-all transition-discrete;
 
     &:is([open],:popover-open) {
@@ -28,7 +28,7 @@
       @apply bg-black/50 opacity-0 transition-all transition-discrete;
     }
     > * {
-      @apply bg-background fixed top-[50%] left-[50%] z-50 flex flex-col w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg max-h-[calc(100%_-_2rem)];
+      @apply bg-admin-background fixed top-[50%] left-[50%] z-50 flex flex-col w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-admin-lg border p-6 shadow-lg sm:max-w-lg max-h-[calc(100%_-_2rem)];
       @apply transition-all scale-95;
 
       > header {
@@ -38,7 +38,7 @@
           @apply text-lg leading-none font-semibold;
         }
         > p {
-          @apply text-muted-foreground text-sm;
+          @apply text-admin-muted-foreground text-sm;
         }
       }
       > section {
@@ -53,7 +53,7 @@
       }
       > button,
       > form[method='dialog'] > button {
-        @apply ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground  rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4;
+        @apply ring-offset-admin-background focus:ring-admin-ring data-[state=open]:bg-admin-accent data-[state=open]:text-admin-muted-foreground  rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4;
       }
     }
   }

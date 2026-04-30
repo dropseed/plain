@@ -126,8 +126,8 @@ const seriesColor = (dataset, rootEl) =>
 
 const AGG_CLS = "inline-flex items-baseline gap-1.5";
 const PILL_BASE =
-  "inline-flex items-baseline gap-1.5 rounded-full border border-border px-2 py-0.5";
-const PILL_BTN = `${PILL_BASE} hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer`;
+  "inline-flex items-baseline gap-1.5 rounded-full border border-admin-border px-2 py-0.5";
+const PILL_BTN = `${PILL_BASE} hover:bg-admin-accent hover:text-admin-accent-foreground transition-colors cursor-pointer`;
 
 const renderChip = ({ ds, index, value, dimCls, clickable }) => {
   const tag = clickable ? "button" : "span";
@@ -135,11 +135,11 @@ const renderChip = ({ ds, index, value, dimCls, clickable }) => {
   const cls = clickable ? PILL_BTN : PILL_BASE;
   return `
     <${tag} ${attrs} class="${cls} ${dimCls}">
-      <svg class="self-center w-2 h-2 rounded-sm" viewBox="0 0 8 8">
+      <svg class="self-center w-2 h-2 rounded-admin-sm" viewBox="0 0 8 8">
         <rect width="8" height="8" rx="1.5" fill="${escapeHTML(seriesColor(ds, document.documentElement))}"></rect>
       </svg>
-      <span class="text-muted-foreground">${escapeHTML(ds.label || "")}</span>
-      <span class="font-semibold text-foreground tabular-nums">${formatNumber(value)}</span>
+      <span class="text-admin-muted-foreground">${escapeHTML(ds.label || "")}</span>
+      <span class="font-semibold text-admin-foreground tabular-nums">${formatNumber(value)}</span>
     </${tag}>
   `;
 };
@@ -180,8 +180,8 @@ const renderStats = (root, state, hoveredIndex, { force = false } = {}) => {
         const value = summarizeSeries(totals, mode);
         return `
           <span class="${AGG_CLS}">
-            <span class="text-muted-foreground">${aggregateLabel(mode)}</span>
-            <span class="font-semibold text-foreground tabular-nums">${formatNumber(value)}</span>
+            <span class="text-admin-muted-foreground">${aggregateLabel(mode)}</span>
+            <span class="font-semibold text-admin-foreground tabular-nums">${formatNumber(value)}</span>
           </span>
         `;
       })

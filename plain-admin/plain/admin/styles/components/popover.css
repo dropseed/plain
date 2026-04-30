@@ -5,7 +5,7 @@
      affects all of them in one place. */
   [data-popover],
   [data-hovercard] {
-    @apply bg-popover text-popover-foreground border shadow-md rounded-md;
+    @apply bg-admin-popover text-admin-popover-foreground border shadow-md rounded-admin-md;
   }
 
   [data-popover] {
@@ -69,7 +69,7 @@
       }
     }
   }
-  .popover {
+  .admin-popover {
     @apply relative inline-flex;
 
     [data-popover] {

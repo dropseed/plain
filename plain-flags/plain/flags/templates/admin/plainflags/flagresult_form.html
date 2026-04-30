@@ -7,11 +7,7 @@
 <form method="post" class="space-y-4">
     <admin.InputField label="Key" field={form.key} />
     <admin.InputField label="Value" field={form.value} />
-    <div class="flex justify-end">
-        <button class="mt-5" type="submit">
-            Save
-        </button>
-    </div>
+    <admin.Submit>Save</admin.Submit>
 </form>
 
 {% endblock %}

@@ -5,14 +5,14 @@
  * these rules cover the visual states during dragging.
  */
 
-.nav-tab[draggable="true"] {
+.admin-nav-tab[draggable="true"] {
   cursor: pointer;
 }
 
-.nav-tab.dragging {
+.admin-nav-tab.dragging {
   opacity: 0.5;
 }
 
-.nav-tab.drag-over {
+.admin-nav-tab.drag-over {
   border-left: 2px solid var(--warning);
 }
