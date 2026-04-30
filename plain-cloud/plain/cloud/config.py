@@ -62,6 +62,29 @@ class Config(PackageConfig):
         if not settings.CLOUD_EXPORT_ENABLED or not settings.CLOUD_EXPORT_TOKEN:
             return
 
+        # Don't capture per-batch OTLP export failures as Sentry events. The OTel
+        # SDK's exporters log "Failed to export X batch" at ERROR after retries
+        # are exhausted, which Sentry's LoggingIntegration would otherwise turn
+        # into an issue per app per incident — noise the app owner can't act on
+        # (network/edge timeouts, ingest backend hiccups). The records still
+        # flow to console/file/etc. — only the Sentry capture is suppressed.
+        # Mirrors Sentry SDK's own self-protection for `sentry_sdk.errors` and
+        # `urllib3.connectionpool` in sentry_sdk/integrations/logging.py.
+        try:
+            import sentry_sdk.integrations.logging as _sentry_log  # ty: ignore[unresolved-import]
+        except ImportError:
+            pass
+        else:
+            for name in (
+                "opentelemetry.exporter.otlp.proto.http.trace_exporter",
+                "opentelemetry.exporter.otlp.proto.http.metric_exporter",
+                "opentelemetry.exporter.otlp.proto.http._log_exporter",
+                "opentelemetry.sdk._shared_internal",
+                "opentelemetry.sdk._logs._internal.export",
+                "opentelemetry.sdk.metrics._internal.export",
+            ):
+                _sentry_log.ignore_logger(name)
+
         resource = Resource.create(
             {
                 service_attributes.SERVICE_NAME: settings.NAME,
