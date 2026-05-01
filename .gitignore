@@ -4,6 +4,8 @@
 *.py[co]
 __pycache__
 *.DS_Store
+*.swp
+*.swo
 
 /*.code-workspace
 
