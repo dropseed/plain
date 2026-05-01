@@ -357,6 +357,13 @@ def process_job(job_process_uuid: str) -> None:
         duration = job_result.ended_at - job_result.started_at
         duration = duration.total_seconds()
 
+        if job_result.requested_at and job_result.started_at:
+            queue_time = (
+                job_result.started_at - job_result.requested_at
+            ).total_seconds()
+        else:
+            queue_time = None
+
         logger.info(
             "Completed job",
             extra={
@@ -369,6 +376,7 @@ def process_job(job_process_uuid: str) -> None:
                 "job_source": job_result.source,
                 "job_queue": job_result.queue,
                 "job_duration": duration,
+                "job_queue_time": queue_time,
             },
         )
     except Exception as e:

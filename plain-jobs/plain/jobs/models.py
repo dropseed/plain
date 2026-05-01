@@ -125,6 +125,7 @@ class JobRequest(postgres.Model):
         with transaction.atomic():
             result = JobProcess.query.create(
                 job_request_uuid=self.uuid,
+                requested_at=self.created_at,
                 job_class=self.job_class,
                 parameters=self.parameters,
                 priority=self.priority,
@@ -181,6 +182,9 @@ class JobProcess(postgres.Model):
 
     # From the JobRequest
     job_request_uuid: UUID = types.UUIDField()
+    requested_at: datetime.datetime | None = types.DateTimeField(
+        required=False, allow_null=True
+    )
     job_class: str = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority: int = types.SmallIntegerField(default=0)
@@ -367,6 +371,7 @@ class JobProcess(postgres.Model):
             saved_id = self.id
             job_process_uuid = self.uuid
             job_request_uuid = self.job_request_uuid
+            requested_at = self.requested_at
             started_at = self.started_at
             self.delete()
 
@@ -400,6 +405,7 @@ class JobProcess(postgres.Model):
                 started_at=started_at,
                 # From the JobRequest
                 job_request_uuid=job_request_uuid,
+                requested_at=requested_at,
                 job_class=self.job_class,
                 parameters=self.parameters,
                 priority=self.priority,
@@ -428,6 +434,7 @@ class JobProcess(postgres.Model):
                 started_at=self.started_at,
                 # From the JobRequest
                 job_request_uuid=self.job_request_uuid,
+                requested_at=self.requested_at,
                 job_class=self.job_class,
                 parameters=self.parameters,
                 priority=self.priority,
@@ -552,6 +559,9 @@ class JobResult(postgres.Model):
 
     # From the JobRequest
     job_request_uuid: UUID = types.UUIDField()
+    requested_at: datetime.datetime | None = types.DateTimeField(
+        required=False, allow_null=True
+    )
     job_class: str = types.TextField(max_length=255)
     parameters: dict[str, Any] | None = types.JSONField(required=False, allow_null=True)
     priority: int = types.SmallIntegerField(default=0)
