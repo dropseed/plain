@@ -24,6 +24,11 @@ meter = metrics.get_meter("plain.jobs", version=_package_version)
 sent_messages_counter = create_messaging_client_sent_messages(meter)
 consumed_messages_counter = create_messaging_client_consumed_messages(meter)
 operation_duration_histogram = create_messaging_client_operation_duration(meter)
+queue_wait_duration_histogram = meter.create_histogram(
+    name="plain.jobs.queue.wait.duration",
+    unit="s",
+    description="Time a job spent waiting in the queue before a worker picked it up.",
+)
 
 
 def record_span_error(

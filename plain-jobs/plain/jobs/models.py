@@ -31,6 +31,7 @@ from .exceptions import DeferError, DeferJob
 from .otel import (
     consumed_messages_counter,
     operation_duration_histogram,
+    queue_wait_duration_histogram,
     record_span_error,
     tracer,
 )
@@ -300,6 +301,10 @@ class JobProcess(postgres.Model):
                 # This is how we know it has been picked up
                 self.started_at = timezone.now()
                 self.save(update_fields=["started_at"])
+
+                if self.requested_at:
+                    queue_wait = (self.started_at - self.requested_at).total_seconds()
+                    queue_wait_duration_histogram.record(queue_wait, metric_attributes)
 
                 try:
                     job = jobs_registry.load_job(self.job_class, self.parameters or {})
