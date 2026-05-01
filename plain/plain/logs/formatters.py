@@ -37,11 +37,15 @@ class KeyValueFormatter(logging.Formatter):
             formatted_value = self._format_value(value)
             kv_pairs.append(f"{key}={formatted_value}")
 
-        # Add the keyvalue attribute to the record for %(keyvalue)s substitution
+        # %(keyvalue)s substitution requires the value on the record, but
+        # other handlers (notably the OTel LoggingHandler) read vars(record)
+        # and would ship `keyvalue` as a redundant log attribute. Set it,
+        # format, then delete so the mutation doesn't outlive this call.
         record.keyvalue = " ".join(kv_pairs)
-
-        # Let the parent formatter handle the format string with %(keyvalue)s
-        return super().format(record)
+        try:
+            return super().format(record)
+        finally:
+            record.__dict__.pop("keyvalue", None)
 
     @staticmethod
     def _format_value(value: Any) -> str:
@@ -83,8 +87,10 @@ class JSONFormatter(logging.Formatter):
         if record.exc_info:
             log_obj["exception"] = self.formatException(record.exc_info)
 
-        # Add the json attribute to the record for %(json)s substitution
+        # Same shape as KeyValueFormatter — set, format, delete so this
+        # mutation doesn't bleed into other handlers reading vars(record).
         record.json = json.dumps(log_obj, default=str, ensure_ascii=False)
-
-        # Let the parent formatter handle the format string with %(json)s
-        return super().format(record)
+        try:
+            return super().format(record)
+        finally:
+            record.__dict__.pop("json", None)
