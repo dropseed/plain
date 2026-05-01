@@ -115,7 +115,7 @@ class Index:
     def deconstruct(self) -> tuple[str, tuple[Expression, ...], dict[str, Any]]:
         path = f"{self.__class__.__module__}.{self.__class__.__name__}"
         path = path.replace("plain.postgres.indexes", "plain.postgres")
-        kwargs = {"name": self.name}
+        kwargs: dict[str, Any] = {"name": self.name}
         if self.fields:
             kwargs["fields"] = self.fields
         if self.opclasses:

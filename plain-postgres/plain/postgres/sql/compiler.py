@@ -1074,7 +1074,7 @@ class SQLCompiler:
             if not select_related_descend(f, restricted, requested, select_mask):
                 continue
             related_select_mask = select_mask.get(f) or {}
-            klass_info = {
+            klass_info: dict[str, Any] = {
                 "model": f.remote_field.model,
                 "field": f,
                 "reverse": False,
@@ -1134,7 +1134,7 @@ class SQLCompiler:
                     [related_field_name], opts, root_alias
                 )
                 alias = join_info.joins[-1]
-                klass_info = {
+                klass_info: dict[str, Any] = {
                     "model": model,
                     "field": related_field,
                     "reverse": True,
@@ -1188,7 +1188,7 @@ class SQLCompiler:
                     )
                     model = join_opts.model
                     alias = joins[-1]
-                    klass_info = {
+                    klass_info: dict[str, Any] = {
                         "model": model,
                         "field": final_field,
                         "reverse": True,
@@ -1670,7 +1670,7 @@ class SQLDeleteCompiler(SQLCompiler):
         innerq.clear_select_clause()
         assert self.query.model is not None, "DELETE requires a model"
         id_field = self.query.model._model_meta.get_forward_field("id")
-        innerq.select = [id_field.get_col(self.query.get_initial_alias())]
+        innerq.select = (id_field.get_col(self.query.get_initial_alias()),)
         outerq = Query(self.query.model)
         outerq.add_filter("id__in", innerq)
         return self._as_sql(outerq)
@@ -1769,7 +1769,7 @@ class SQLUpdateCompiler(SQLCompiler):
         query.select_related = False
         query.clear_ordering(force=True)
         query.extra = {}
-        query.select = []
+        query.select = ()
         query.add_fields(["id"])
         super().pre_sql_setup()
 

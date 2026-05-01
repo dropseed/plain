@@ -68,16 +68,6 @@ class ModelBase(type):
         return super().__new__(cls, name, bases, attrs, **kwargs)
 
 
-class ModelStateFieldsCacheDescriptor:
-    def __get__(
-        self, instance: ModelState | None, cls: type | None = None
-    ) -> ModelStateFieldsCacheDescriptor | dict[str, Any]:
-        if instance is None:
-            return self
-        res = instance.fields_cache = {}
-        return res
-
-
 class ModelState:
     """Store model instance state."""
 
@@ -86,7 +76,9 @@ class ModelState:
     # explicit (non-auto) PKs. This impacts validation only; it has no effect
     # on the actual save.
     adding = True
-    fields_cache = ModelStateFieldsCacheDescriptor()
+
+    def __init__(self) -> None:
+        self.fields_cache: dict[str, Any] = {}
 
 
 class Model(metaclass=ModelBase):

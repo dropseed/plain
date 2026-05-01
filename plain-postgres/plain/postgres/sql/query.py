@@ -225,7 +225,7 @@ class Query(BaseExpression):
     # clause of the query. The select is used for cases where we want to set up
     # the select clause to contain other than default fields (values(),
     # subqueries...). Note that annotations go to annotations dictionary.
-    select = ()
+    select: tuple[BaseExpression, ...] = ()
     # The group_by attribute can have one of the following forms:
     #  - None: no group by at all in the query
     #  - A tuple of expressions: group by (at least) those expressions.
@@ -237,11 +237,11 @@ class Query(BaseExpression):
     low_mark = 0  # Used for offset/limit.
     high_mark = None  # Used for offset/limit.
     distinct = False
-    distinct_fields = ()
+    distinct_fields: tuple[str, ...] = ()
     select_for_update = False
     select_for_update_nowait = False
     select_for_update_skip_locked = False
-    select_for_update_of = ()
+    select_for_update_of: tuple[str, ...] = ()
     select_for_no_key_update = False
     select_related: bool | dict[str, Any] = False
     has_select_fields = False
@@ -249,7 +249,7 @@ class Query(BaseExpression):
     max_depth = 5
     # Holds the selects defined by a call to values() or values_list()
     # excluding annotation_select and extra_select.
-    values_select = ()
+    values_select: tuple[str, ...] = ()
 
     # SQL annotation-related attributes.
     annotation_select_mask = None
@@ -260,8 +260,8 @@ class Query(BaseExpression):
     extra_select_mask = None
     _extra_select_cache = None
 
-    extra_tables = ()
-    extra_order_by = ()
+    extra_tables: tuple[str, ...] = ()
+    extra_order_by: tuple[str, ...] = ()
 
     # A tuple that is a set of model field names and either True, if these are
     # the fields to defer, or False if these are the only fields to load.
@@ -2041,7 +2041,10 @@ class Query(BaseExpression):
         # the subquery.
         trimmed_prefix, contains_louter = query.trim_start(names_with_path)
 
+        # trim_start() seeds query.select with Col instances built from the
+        # join field, so .target/.alias access below is sound.
         col = query.select[0]
+        assert isinstance(col, Col)
         select_field = col.target
         alias = col.alias
         if alias in can_reuse:
@@ -2052,8 +2055,10 @@ class Query(BaseExpression):
             lookup_class = select_field.get_lookup("exact")
             # Note that the query.select[0].alias is different from alias
             # due to bump_prefix above.
+            bumped_col = query.select[0]
+            assert isinstance(bumped_col, Col)
             lookup = lookup_class(
-                id_field.get_col(query.select[0].alias), id_field.get_col(alias)
+                id_field.get_col(bumped_col.alias), id_field.get_col(alias)
             )
             query.where.add(lookup, AND)
             query.external_aliases[alias] = True
@@ -2148,7 +2153,9 @@ class Query(BaseExpression):
         self.select += (col,)
         self.values_select += (name,)
 
-    def set_select(self, cols: list[Col] | tuple[Col, ...]) -> None:
+    def set_select(
+        self, cols: list[BaseExpression] | tuple[BaseExpression, ...]
+    ) -> None:
         self.default_cols = False
         self.select = tuple(cols)
 

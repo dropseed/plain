@@ -380,7 +380,7 @@ class QuerySet[T: "Model"]:
         self.__dict__.update(state)
 
     def __repr__(self) -> str:
-        data = list(self[: REPR_OUTPUT_SIZE + 1])
+        data: list[Any] = list(self[: REPR_OUTPUT_SIZE + 1])
         if len(data) > REPR_OUTPUT_SIZE:
             data[-1] = "...(remaining elements truncated)..."
         return f"<{self.__class__.__name__} {data!r}>"
@@ -2141,7 +2141,7 @@ def prefetch_one_level(
                 # No to_attr has been given for this prefetch operation and the
                 # cache_name does not point to a descriptor. Store the value of
                 # the field in the object's field cache.
-                obj._state.fields_cache[cache_name] = val  # ty: ignore[invalid-assignment]
+                obj._state.fields_cache[cache_name] = val
         else:
             if as_attr:
                 setattr(obj, to_attr, vals)

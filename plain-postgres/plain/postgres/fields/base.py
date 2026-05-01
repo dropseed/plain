@@ -707,6 +707,11 @@ class ChoicesField[T](DefaultableField[T]):
 
     non_migration_attrs = (*DefaultableField.non_migration_attrs, "choices")
 
+    # An iterable of (value, display) tuples — possibly nested for optgroups —
+    # or None. Stored loosely typed because the framework accepts enums,
+    # lazy iterables, and other shapes that are normalized at init time.
+    choices: Any
+
     def __init__(
         self,
         *,

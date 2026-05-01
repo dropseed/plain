@@ -32,8 +32,9 @@ class Operation:
     # Can this migration be represented as SQL? (things like RunPython cannot)
     reduces_to_sql = True
 
-    # Should this operation be forced as atomic (i.e., does it have no DDL, like RunPython)
-    atomic = False
+    # Should this operation be forced as atomic (i.e., does it have no DDL, like RunPython).
+    # None means "no preference" — RunPython uses this to defer to migration.atomic.
+    atomic: bool | None = False
 
     # Should this operation be considered safe to elide and optimize across?
     elidable = False

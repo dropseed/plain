@@ -91,7 +91,8 @@ def create_request(
         path_info=path_info,
     )
 
-    # Body stream
+    # Body stream — set by the message parser before this point.
+    assert req.body is not None
     request._stream = req.body
     request._read_started = False
 

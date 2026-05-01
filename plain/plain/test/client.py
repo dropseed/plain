@@ -126,7 +126,7 @@ class FakePayload(IOBase):
     def __len__(self) -> int:
         return self.__len
 
-    def read(self, size: int = -1, /) -> bytes:
+    def read(self, size: int | None = -1, /) -> bytes:
         if not self.read_started:
             self.__content.seek(0)
             self.read_started = True

@@ -9,7 +9,7 @@ from collections.abc import Iterator
 from functools import cached_property
 from io import BytesIO
 from itertools import chain
-from typing import TYPE_CHECKING, Any, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, overload
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 if TYPE_CHECKING:
@@ -34,6 +34,17 @@ from .exceptions import (
 _T = TypeVar("_T")
 
 
+class RequestStream(Protocol):
+    """A bytes reader bound to ``Request._stream`` by the request creator
+    (server, test client, etc.). Anything providing ``read``, ``readline``,
+    and ``close`` over bytes will work.
+    """
+
+    def read(self, size: int | None = ..., /) -> bytes: ...
+    def readline(self, size: int | None = ..., /) -> bytes: ...
+    def close(self) -> None: ...
+
+
 class UnreadablePostError(OSError):
     pass
 
@@ -52,6 +63,9 @@ class Request:
     """A basic HTTP request."""
 
     non_picklable_attrs = frozenset(["resolver_match", "_stream"])
+
+    # Set by the request creator (server, test client) before the view runs.
+    _stream: RequestStream
 
     def __init__(
         self,

@@ -116,8 +116,8 @@ class APIKeyView(View):
                 )
 
             try:
-                api_key = APIKey.query.get(token=header_token)  # ty: ignore[unresolved-attribute]
-            except APIKey.DoesNotExist:  # ty: ignore[unresolved-attribute]
+                api_key = APIKey.query.get(token=header_token)
+            except APIKey.DoesNotExist:
                 raise ResponseException(
                     _error_response(
                         error_id="invalid_api_token",
