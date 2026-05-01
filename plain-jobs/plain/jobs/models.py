@@ -45,6 +45,18 @@ __all__ = ["JobRequest", "JobProcess", "JobResult", "JobResultStatuses"]
 logger = get_framework_logger()
 
 
+class JobRequestQuerySet(postgres.QuerySet["JobRequest"]):
+    def ready_to_run(self) -> Self:
+        """JobRequests with no scheduling constraint or whose `start_at` is past."""
+        return self.filter(
+            postgres.Q(start_at__isnull=True) | postgres.Q(start_at__lte=timezone.now())
+        )
+
+    def scheduled(self) -> Self:
+        """JobRequests scheduled to start in the future."""
+        return self.filter(start_at__gt=timezone.now())
+
+
 @postgres.register_model
 class JobRequest(postgres.Model):
     """
@@ -79,7 +91,7 @@ class JobRequest(postgres.Model):
 
     # expires_at = postgres.DateTimeField(required=False, allow_null=True)
 
-    query: postgres.QuerySet[JobRequest] = postgres.QuerySet()
+    query: JobRequestQuerySet = JobRequestQuerySet()
 
     model_options = postgres.Options(
         ordering=["-priority", "-created_at"],

@@ -82,11 +82,9 @@ def test_worker_ordering_priority_then_created_at(db):
     )
 
     # Simulate the worker's query (without select_for_update for test simplicity)
-    from plain import postgres
-
     jobs = list(
         JobRequest.query.filter(queue__in=["default"])
-        .filter(postgres.Q(start_at__isnull=True) | postgres.Q(start_at__lte=now))
+        .ready_to_run()
         .order_by("-priority", "-start_at", "-created_at")
     )
 

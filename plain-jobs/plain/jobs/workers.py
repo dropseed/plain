@@ -9,15 +9,14 @@ from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from plain import postgres
 from plain.logs import get_framework_logger
 from plain.postgres import transaction
 from plain.postgres.db import return_database_connection
 from plain.runtime import settings
-from plain.utils import timezone
 from plain.utils.module_loading import import_string
 from plain.utils.os import get_cpu_count
 
+from .otel import WorkerMetrics
 from .registry import jobs_registry
 
 if TYPE_CHECKING:
@@ -95,6 +94,8 @@ class Worker:
 
         self._is_shutting_down = False
 
+        self.metrics = WorkerMetrics(self)
+
     def run(self) -> None:
         # Lazy import - see _worker_process_initializer() comment for why
         from .models import JobRequest
@@ -134,14 +135,9 @@ class Worker:
 
             with transaction.atomic():
                 job_request = (
-                    JobRequest.query.select_for_update(skip_locked=True)
-                    .filter(
-                        queue__in=self.queues,
-                    )
-                    .filter(
-                        postgres.Q(start_at__isnull=True)
-                        | postgres.Q(start_at__lte=timezone.now())
-                    )
+                    JobRequest.query.ready_to_run()
+                    .filter(queue__in=self.queues)
+                    .select_for_update(skip_locked=True)
                     .order_by("-priority", "-start_at", "-created_at")
                     .first()
                 )
