@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.12.5](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.5) (2026-05-01)
+
+### What's changed
+
+- **Backed off tunnel reconnects so two clients can't duel over the same subdomain.** The reconnect backoff now only resets to 1s after a connection has stayed up for at least 5 seconds; short-lived connections (e.g. another client claiming the same subdomain and immediately closing this one) keep escalating up to 30s instead of looping tightly at 1s. Also stopped forwarding the `host` header to proxied targets, which was bypassing the local server's host validation. ([85383178e43e](https://github.com/dropseed/plain/commit/85383178e43e))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.4](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.4) (2026-03-22)
 
 ### What's changed
