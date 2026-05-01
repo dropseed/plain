@@ -4,6 +4,7 @@ from typing import NoReturn
 
 from app.mcp import NotesMCP
 from app.notes.urls import NotesRouter
+from app.views.jobs import RunExampleJobView
 from app.views.sse import ClockView, StockTickerView
 from plain.admin.urls import AdminRouter
 from plain.assets.urls import AssetsRouter
@@ -50,5 +51,6 @@ class AppRouter(Router):
         path("sse/", SSEDemoView, name="sse_demo"),
         path("sse/clock/", ClockView, name="sse_clock"),
         path("sse/ticker/", StockTickerView, name="sse_ticker"),
+        path("jobs/run/", RunExampleJobView, name="run_example_job"),
         path("", IndexView, name="index"),
     ]

@@ -8,6 +8,13 @@
         you are exploring the plain example app — every url below is wired up and live
     </div>
 
+    {% if request.query_params.get('queued') %}
+    <div class="h-8 flex items-center justify-center text-xs font-medium bg-emerald-200/60 text-emerald-900">
+        queued <span class="font-mono ml-1">{{ request.query_params['queued'] }}</span> — watch <span class="font-mono ml-1">plain dev logs</span> or check
+        <a href="/admin/" class="ml-1 underline decoration-emerald-600/40 underline-offset-2 hover:text-emerald-950">/admin/</a>
+    </div>
+    {% endif %}
+
     <header class="h-12 flex items-end bg-stone-50/95 border-b border-stone-200/60">
         <div class="flex items-center w-full max-w-6xl mx-auto px-5 pb-2">
             <a href="/" class="text-sm font-medium tracking-tight text-stone-900 no-underline">
@@ -103,6 +110,30 @@
                     <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
                 </div>
             </a>
+        </div>
+    </section>
+
+    <section class="max-w-6xl mx-auto px-5 pt-8">
+        <h2 class="font-medium text-lg tracking-tight text-stone-900 mb-1">background jobs</h2>
+        <p class="text-sm text-stone-500 mb-4">
+            <span class="font-mono text-stone-600">plain dev</span> runs a worker — enqueue an
+            <span class="font-mono text-stone-600">ExampleJob</span> from <span class="font-mono text-stone-600">app/jobs.py</span>.
+        </p>
+        <div class="border border-stone-200 rounded-lg bg-white overflow-hidden">
+            <form method="post" action="{{ url('run_example_job') }}" class="grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3">
+                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
+                    <span class="text-stone-400 font-normal">/</span>jobs<span class="text-stone-400 font-normal">/</span>run<span class="text-stone-400 font-normal">/</span>
+                </div>
+                <div class="text-sm text-stone-600">enqueue an <span class="font-mono text-stone-700">ExampleJob</span> — the worker logs its progress.</div>
+                <div class="flex items-center gap-3">
+                    <button
+                        type="submit"
+                        class="inline-flex items-center text-xs font-medium px-3 py-1 rounded-full bg-stone-900 text-white hover:bg-stone-700 transition-colors cursor-pointer"
+                    >
+                        queue job →
+                    </button>
+                </div>
+            </form>
         </div>
     </section>
 
