@@ -1,5 +1,18 @@
 # plain-jobs changelog
 
+## [0.50.0](https://github.com/dropseed/plain/releases/plain-jobs@0.50.0) (2026-05-01)
+
+### What's changed
+
+- **Added `plain.jobs.queue.wait.duration` histogram.** Each time a worker picks up a job, the time it spent waiting in the queue (between enqueue and execution start) is recorded as a histogram in seconds, with the same messaging-semconv attributes as the other plain.jobs metrics. ([9ab6298fa9ae](https://github.com/dropseed/plain/commit/9ab6298fa9ae))
+- **Added per-Worker observable gauges via `WorkerMetrics`.** Each running worker now exports `plain.jobs.worker.processes`, `plain.jobs.queue.depth`, `plain.jobs.queue.oldest.age`, `plain.jobs.queue.scheduled`, and `plain.jobs.running` as observable gauges, queryable per `messaging.destination.name`. Empty queues report zero so dashboards using `last_value` don't show stale readings; when multiple workers cover the same queue, aggregate with `last_value`/`max` (never `sum`). ([e08b25d38015](https://github.com/dropseed/plain/commit/e08b25d38015))
+- **Track job queue latency with a new `requested_at` field on `JobProcess` and `JobResult`.** The field is copied from the originating `JobRequest.created_at`, used to compute queue-wait duration when a worker starts the job, and included in the "Completed job" log line as `job_queue_time` (seconds). New migration `0011_jobprocess_requested_at_jobresult_requested_at` adds the columns (nullable, so existing in-flight jobs continue to work). ([bccb8e835400](https://github.com/dropseed/plain/commit/bccb8e835400))
+- Added `JobRequestQuerySet` with `ready_to_run()` and `scheduled()` helpers; the worker's job-pickup query now uses `ready_to_run()` so the same filter is reused by the queue-depth and queue-age gauges.
+
+### Upgrade instructions
+
+- Run `plain migrate` to apply the new `requested_at` columns on `JobProcess` and `JobResult`.
+
 ## [0.49.1](https://github.com/dropseed/plain/releases/plain-jobs@0.49.1) (2026-04-30)
 
 ### What's changed
