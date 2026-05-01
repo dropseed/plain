@@ -1,87 +1,99 @@
 {% extends "admin/page.html" %}
+{% use_elements %}
+
+{# Split a dotted identifier into a muted package prefix and a
+   full-strength local part, so the local identifier reads as the
+   focal point. Outputs only the inner spans — call sites wrap with
+   their own font/color/weight class. #}
+{% macro tiered_split(text) -%}
+{%- set _parts = text.split('.', 1) -%}
+{%- if _parts|length == 2 -%}
+<span class="text-admin-muted-foreground">{{ _parts[0] }}.</span>{{ _parts[1] }}
+{%- else -%}
+{{ text }}
+{%- endif -%}
+{%- endmacro %}
 
 {% block content %}
-<div class="max-w-3xl">
 
-    {% if checks %}
+{% if checks %}
 
-    <!-- Summary card -->
-    <div class="admin-card flex flex-col p-4 gap-3 mb-6">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                {% if error_count %}
-                    <admin.Icon name="x-circle-fill" class="text-admin-danger" />
-                {% elif warning_count %}
-                    <admin.Icon name="exclamation-triangle-fill" class="text-admin-warning" />
-                {% else %}
-                    <admin.Icon name="check-circle-fill" class="text-admin-success" />
-                {% endif %}
-                <span class="font-medium text-admin-foreground">{{ passed_count }}/{{ total_count }} checks passed</span>
-            </div>
-            <div class="flex items-center gap-3 text-xs text-admin-muted-foreground/80">
-                {% if warning_count %}
-                    <span>{{ warning_count }} warning{{ "s" if warning_count != 1 else "" }}</span>
-                {% endif %}
-                {% if error_count %}
-                    <span>{{ error_count }} error{{ "s" if error_count != 1 else "" }}</span>
-                {% endif %}
-                {% if include_deploy %}
-                    <span>including deploy checks</span>
-                {% endif %}
-            </div>
-        </div>
-        <progress
-            class="admin-progress"
-            data-status="{{ 'error' if error_count else ('warning' if warning_count else 'ok') }}"
-            value="{{ pass_percent }}"
-            max="100"
-        ></progress>
-    </div>
-
-    <!-- Check cards -->
-    <div class="space-y-2">
-        {% for check in checks %}
-        {% if check.status == "passed" %}
-        <div class="flex items-center gap-3 px-4 py-3 border border-admin-border rounded-admin-lg">
-            <admin.Icon name="check-circle-fill" class="text-admin-success shrink-0" />
-            <span class="text-sm font-medium text-admin-foreground/90">{{ check.name }}</span>
-        </div>
-        {% else %}
-        <details class="group border border-admin-border rounded-admin-lg">
-            <summary class="flex items-center gap-3 px-4 py-3 cursor-pointer select-none hover:bg-admin-muted/40 rounded-admin-lg">
-                {% if check.status == "error" %}
-                    <admin.Icon name="x-circle-fill" class="text-admin-danger shrink-0" />
-                {% else %}
-                    <admin.Icon name="exclamation-triangle-fill" class="text-admin-warning shrink-0" />
-                {% endif %}
-                <span class="text-sm font-medium text-admin-foreground/90 flex-1">{{ check.name }}</span>
-                <span class="text-xs text-admin-muted-foreground/80">{{ check.issues|length }} issue{{ "s" if check.issues|length != 1 else "" }}</span>
-                <admin.Icon name="chevron-down" class="text-admin-muted-foreground/80 text-xs transition-transform group-open:rotate-180" />
-            </summary>
-            {# `divide-y` puts a border between adjacent children but not at
-               the bottom — replaces the per-row `{% if not loop.last %}`. #}
-            <div class="px-4 pb-3 pt-1 border-t border-admin-border/60 divide-y divide-admin-border/40">
-                {% for issue in check.issues %}
-                <div class="flex items-start gap-2 py-2 text-sm">
-                    {% if issue.warning %}
-                        <span class="admin-badge admin-badge-warning shrink-0">{{ issue.id }}</span>
-                    {% else %}
-                        <span class="admin-badge admin-badge-danger shrink-0">{{ issue.id }}</span>
-                    {% endif %}
-                    <span class="text-admin-muted-foreground">{{ issue.fix }}</span>
-                </div>
-                {% endfor %}
-            </div>
-        </details>
-        {% endif %}
-        {% endfor %}
-    </div>
-
-    {% else %}
-    <div class="border-t border-admin-border py-10 text-center">
-        <p class="text-sm text-admin-muted-foreground/80">No preflight checks registered</p>
-    </div>
+{# Summary — count + noun pairs. Number gets the visual weight; noun
+   is muted when the count is "fine," shares a status color when it
+   isn't. Zero counts read as ambient. #}
+<div class="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 mb-7 font-mono text-xs tabular-nums">
+    <span class="flex items-baseline gap-1">
+        <span class="text-admin-foreground">{{ passed_count }}</span>
+        <span class="text-admin-muted-foreground">passed</span>
+    </span>
+    <span class="text-admin-muted-foreground">·</span>
+    <span
+        data-empty="{{ warning_count == 0 }}"
+        class="flex items-baseline gap-1 data-[empty=True]:text-admin-muted-foreground data-[empty=False]:text-admin-warning"
+    >
+        <span>{{ warning_count }}</span>
+        <span>warning{{ "s" if warning_count != 1 else "" }}</span>
+    </span>
+    <span class="text-admin-muted-foreground">·</span>
+    <span
+        data-empty="{{ error_count == 0 }}"
+        class="flex items-baseline gap-1 data-[empty=True]:text-admin-muted-foreground data-[empty=False]:text-admin-danger"
+    >
+        <span>{{ error_count }}</span>
+        <span>error{{ "s" if error_count != 1 else "" }}</span>
+    </span>
+    {% if include_deploy %}
+    <span class="text-admin-muted-foreground">·</span>
+    <span class="text-admin-muted-foreground">including deploy</span>
     {% endif %}
-
 </div>
+
+{# Column header — only structural rule on the page. #}
+<div class="grid grid-cols-[1fr_6rem] items-baseline gap-3 pb-2 mb-px border-b border-admin-border font-mono text-xs uppercase tracking-widest text-admin-foreground font-semibold">
+    <span>Check</span>
+    <span class="text-right">Status</span>
+</div>
+
+{# Audit rows. Issues are rare; when present they're always visible —
+   no expand/collapse. Continuation marked by indent + left rule. #}
+<ul role="list" class="divide-y divide-admin-border">
+    {% for check in checks %}
+    {% if check.status == "passed" %}
+    <li class="grid grid-cols-[1fr_6rem] items-baseline gap-3 py-2.5">
+        <span class="font-mono text-sm text-admin-foreground truncate min-w-0">{{ tiered_split(check.name) }}</span>
+        <span class="font-mono text-xs text-admin-success tabular-nums text-right">ok</span>
+    </li>
+    {% else %}
+    <li>
+        <div class="grid grid-cols-[1fr_6rem] items-baseline gap-3 py-2.5">
+            <span class="font-mono text-sm font-medium text-admin-foreground truncate min-w-0">{{ tiered_split(check.name) }}</span>
+            <span
+                data-status="{{ check.status }}"
+                class="font-mono text-xs tabular-nums text-right data-[status=error]:text-admin-danger data-[status=warning]:text-admin-warning"
+            >
+                {{ check.issues|length }} {{ "error" if check.status == "error" else "warning" }}{{ "s" if check.issues|length != 1 else "" }}
+            </span>
+        </div>
+        <dl class="pt-1 pb-3 pl-4 space-y-2.5 text-sm">
+            {% for issue in check.issues %}
+            <div class="space-y-1">
+                <dt
+                    data-warning="{{ issue.warning }}"
+                    class="font-mono text-xs tabular-nums data-[warning=True]:text-admin-warning data-[warning=False]:text-admin-danger"
+                >{{ tiered_split(issue.id) }}</dt>
+                <dd class="max-w-prose text-admin-foreground leading-relaxed">{{ issue.fix }}</dd>
+            </div>
+            {% endfor %}
+        </dl>
+    </li>
+    {% endif %}
+    {% endfor %}
+</ul>
+
+{% else %}
+<div class="border-t border-admin-border py-10 text-center">
+    <p class="text-sm text-admin-muted-foreground">No preflight checks registered</p>
+</div>
+{% endif %}
+
 {% endblock %}
