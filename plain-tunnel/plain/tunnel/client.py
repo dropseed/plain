@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import struct
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -55,7 +56,13 @@ class TunnelClient:
     async def connect(self) -> None:
         retry_delay = 1.0
         max_retry_delay = 30.0
+        # Connection must stay up at least this long to be considered healthy
+        # and reset the backoff. Otherwise we keep escalating, which prevents
+        # tight reconnect loops when something else (e.g. another client
+        # claiming the same subdomain) keeps closing us right after connect.
+        healthy_connection_seconds = 5.0
         while not self.stop_event.is_set():
+            connection_duration: float | None = None
             try:
                 self.logger.debug(
                     f"Connecting to WebSocket URL: {self.tunnel_websocket_url}"
@@ -67,11 +74,15 @@ class TunnelClient:
                     click.secho(
                         f"Connected to tunnel {self.tunnel_http_url}", fg="green"
                     )
-                    retry_delay = 1.0
+                    connected_at = time.monotonic()
                     try:
                         await self.handle_messages(websocket)
                     finally:
+                        connection_duration = time.monotonic() - connected_at
                         await self._cleanup_proxied_websockets()
+                if self.stop_event.is_set():
+                    break
+                disconnect_message = "Tunnel disconnected by server."
             except asyncio.CancelledError:
                 self.logger.debug("Connection cancelled")
                 break
@@ -88,22 +99,24 @@ class TunnelClient:
                 if self.stop_event.is_set():
                     self.logger.debug("Stopping reconnect attempts due to shutdown")
                     break
-                click.secho(
-                    f"Connection lost: {e}. Retrying in {retry_delay:.0f}s...",
-                    fg="yellow",
-                )
-                await asyncio.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, max_retry_delay)
+                disconnect_message = f"Connection lost: {e}."
             except Exception as e:
                 if self.stop_event.is_set():
                     self.logger.debug("Stopping reconnect attempts due to shutdown")
                     break
-                click.secho(
-                    f"Unexpected error: {e}. Retrying in {retry_delay:.0f}s...",
-                    fg="yellow",
-                )
-                await asyncio.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, max_retry_delay)
+                disconnect_message = f"Unexpected error: {e}."
+
+            if (
+                connection_duration is not None
+                and connection_duration >= healthy_connection_seconds
+            ):
+                retry_delay = 1.0
+            click.secho(
+                f"{disconnect_message} Retrying in {retry_delay:.0f}s...",
+                fg="yellow",
+            )
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, max_retry_delay)
 
     async def handle_messages(self, websocket: Any) -> None:
         try:
@@ -434,7 +447,6 @@ class TunnelClient:
                 "sec-websocket-version",
                 "sec-websocket-extensions",
                 "sec-websocket-protocol",
-                "host",
             }
         )
         forward_headers = {}
