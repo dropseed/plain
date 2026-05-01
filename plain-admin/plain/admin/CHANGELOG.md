@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.81.1](https://github.com/dropseed/plain/releases/plain-admin@0.81.1) (2026-05-01)
+
+### What's changed
+
+- **Redesigned the admin preflight page as a datasheet-style audit.** Replaced the summary card + collapsible per-check rows with a compact count line (`N passed · M warnings · K errors`), a single column header (`Check / Status`), and an always-visible row per check. Issues for failing checks render inline as a definition list rather than hidden behind a `<details>` toggle. Check and issue identifiers use a tiered split (`plain.foo` → muted `plain.` + full-strength `foo`) for at-a-glance scanning. ([3548907047a7](https://github.com/dropseed/plain/commit/3548907047a7))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.81.0](https://github.com/dropseed/plain/releases/plain-admin@0.81.0) (2026-04-30)
 
 ### What's changed
