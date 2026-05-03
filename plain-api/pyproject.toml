@@ -9,7 +9,7 @@ requires-python = ">=3.13"
 dependencies = ["plain>=0.136.0,<1.0.0"]
 
 [dependency-groups]
-dev = ["plain.pytest<1.0.0"]
+dev = ["plain.pytest<1.0.0", "openapi-spec-validator>=0.7.1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

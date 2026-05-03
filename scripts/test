@@ -126,6 +126,13 @@ else
     bold "Skipping h2spec (not installed — brew install h2spec)"
   fi
 
+  # OpenAPI conformance (Schemathesis) — exercises the example /api against
+  # its generated spec. See scripts/server-test for the rationale behind
+  # excluding content_type_conformance.
+  echo
+  bold "Running openapi-conformance"
+  tools/openapi-conformance --exclude-checks content_type_conformance
+
   # MCP conformance suite (requires Node.js/npx, spins up a live server)
   if printf '%s\n' $packages | grep -qx "plain-mcp"; then
     echo

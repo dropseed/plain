@@ -394,11 +394,19 @@ class TeamAccountSchema(TypedDict):
         )
 ```
 
-To generate the OpenAPI JSON, run the following command (including swagger.io validation):
+To generate the OpenAPI JSON, run the following command:
 
 ```bash
 plain api generate-openapi --validate
 ```
+
+`--validate` runs the generated schema through [`openapi-spec-validator`](https://pypi.org/project/openapi-spec-validator/) locally — no network calls. Install it alongside `plain.api` if you want to use the flag:
+
+```bash
+pip install openapi-spec-validator
+```
+
+For full conformance testing of the live API against its spec (status codes, response schemas, content types, headers, etc.), the `tools/openapi-conformance` script in the Plain repo runs [Schemathesis](https://schemathesis.readthedocs.io/) against the example server.
 
 ### Deploying
 

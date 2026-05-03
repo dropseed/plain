@@ -1,0 +1,77 @@
+#!/bin/bash -e
+
+# Run OpenAPI conformance tests against the Plain server.
+#
+# Generates the OpenAPI document for the example app, starts the example
+# server, and runs Schemathesis to verify that the live API conforms to its
+# generated spec (status codes, response schemas, content types, etc.).
+#
+# Usage:
+#   ./tools/openapi-conformance                    # starts example server automatically
+#   ./tools/openapi-conformance host:port          # test against an already-running server
+#   ./tools/openapi-conformance --base-path /api   # override base path (default: /api)
+#
+# Extra args are forwarded to `schemathesis run`.
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SCHEMATHESIS="schemathesis>=3.36,<4"
+
+TARGET=""
+BASE_PATH="/api"
+SCHEMATHESIS_ARGS=()
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --base-path)
+            BASE_PATH="$2"
+            shift 2
+            ;;
+        --base-path=*)
+            BASE_PATH="${1#*=}"
+            shift
+            ;;
+        *)
+            if [ -z "$TARGET" ] && [[ "$1" == *:* ]] && [[ "$1" != -* ]]; then
+                TARGET="$1"
+            else
+                SCHEMATHESIS_ARGS+=("$1")
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Always generate a fresh spec from the example app — this is the artifact
+# the live server is being checked against.
+SPEC_FILE=$(mktemp -t openapi.XXXXXX.json)
+trap 'rm -f "$SPEC_FILE"' EXIT
+
+cd "$REPO_ROOT/example"
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+uv run plain api generate-openapi --validate >"$SPEC_FILE"
+cd "$REPO_ROOT"
+
+if [ -n "$TARGET" ]; then
+    HOST="${TARGET%%:*}"
+    PORT="${TARGET##*:}"
+    BASE_URL="http://${HOST}:${PORT}${BASE_PATH}"
+else
+    # Disable the HTTPS redirect so Schemathesis can talk to the plain HTTP
+    # listener. The redirect behavior is exercised by other tests; here we
+    # care about API <-> spec conformance.
+    export PLAIN_HTTPS_REDIRECT_ENABLED=false
+    source "$(dirname "$0")/start-example-server"
+    BASE_URL="http://127.0.0.1:${PORT}${BASE_PATH}"
+fi
+
+# `--checks all` runs every conformance check Schemathesis ships with:
+# status code coverage, response schema, content-type, header schema, etc.
+uvx --from "$SCHEMATHESIS" schemathesis run \
+    --checks all \
+    --base-url "$BASE_URL" \
+    "${SCHEMATHESIS_ARGS[@]}" \
+    "$SPEC_FILE"

@@ -61,3 +61,5 @@ MIDDLEWARE = [
 ]
 
 AUTH_LOGIN_URL = "login"
+
+API_OPENAPI_ROUTER = "app.views.api.APIRouter"

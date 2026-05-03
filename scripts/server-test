@@ -46,6 +46,20 @@ if command -v h2spec &>/dev/null; then
 else
     skip "H2 conformance (h2spec)" h2spec "brew install h2spec"
 fi
+# OpenAPI conformance: requires the example DB to be migrated. Skip if no
+# Postgres URL is configured rather than failing the whole suite.
+if [ -n "$DATABASE_URL" ] || [ -n "$PLAIN_POSTGRES_URL" ]; then
+    # `content_type_conformance` is excluded because Plain's default 404 page
+    # for unmatched URL paths returns HTML, which Schemathesis reports as
+    # "undocumented Content-Type" when its negative path data falls outside
+    # the route's URL converter pattern. That's a framework concern, not an
+    # API conformance bug.
+    run "OpenAPI conformance (schemathesis)" \
+        "$REPO_ROOT/tools/openapi-conformance" \
+        --exclude-checks content_type_conformance
+else
+    skip "OpenAPI conformance (schemathesis)" schemathesis "set DATABASE_URL"
+fi
 
 # Worker behavior
 run "H1 worker behavior"            "$REPO_ROOT/tools/server-worker-test"

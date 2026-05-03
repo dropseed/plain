@@ -1,5 +1,6 @@
 from plain.api import openapi
 from plain.api.openapi.generator import OpenAPISchemaGenerator
+from plain.api.openapi.validation import validate_openapi_schema
 from plain.api.views import APIView
 from plain.test import Client
 from plain.urls import Router, path
@@ -53,3 +54,48 @@ def test_openapi_only_emits_operations_for_implemented_methods():
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     operations = schema["paths"]["/only-get"]
     assert set(operations) == {"get"}
+
+
+def test_generated_schema_validates_against_openapi_spec():
+    """Generated specs must validate against the OpenAPI 3 JSON Schema."""
+
+    @openapi.schema(
+        {
+            "openapi": "3.0.3",
+            "info": {"title": "Test API", "version": "1.0.0"},
+        }
+    )
+    class APIRouter(Router):
+        namespace = ""
+        urls = [
+            path(
+                "items/<int:id>",
+                _decorated_item_view(),
+                name="item",
+            ),
+        ]
+
+    schema = OpenAPISchemaGenerator(APIRouter()).schema
+    validate_openapi_schema(schema)
+
+
+def _decorated_item_view():
+    @openapi.schema(
+        {
+            "responses": {
+                "200": {
+                    "description": "An item",
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object"},
+                        }
+                    },
+                }
+            }
+        }
+    )
+    class ItemView(APIView):
+        def get(self):
+            return {"id": self.url_kwargs["id"]}
+
+    return ItemView
