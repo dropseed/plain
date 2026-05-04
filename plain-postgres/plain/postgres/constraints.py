@@ -5,6 +5,7 @@ from types import NoneType
 from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ValidationError
+from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.ddl import (
     build_include_sql,
     compile_expression_sql,
@@ -104,10 +105,41 @@ class CheckConstraint(BaseConstraint):
             sql += " NOT VALID"
         return sql
 
+    def referenced_fields(self) -> set[str]:
+        """Top-level model field names referenced by `self.check`.
+
+        Walks lookup keys (`field__regex` → `field`), nested Q nodes, and
+        F-expressions in values or other source expressions.
+        """
+        fields: set[str] = set()
+
+        def visit(node: Any) -> None:
+            if isinstance(node, Q):
+                for child in node.children:
+                    visit(child)
+            elif isinstance(node, tuple) and len(node) == 2:
+                lookup, value = node
+                fields.add(lookup.split(LOOKUP_SEP, 1)[0])
+                visit(value)
+            elif isinstance(node, F):
+                fields.add(node.name.split(LOOKUP_SEP, 1)[0])
+            elif hasattr(node, "get_source_expressions"):
+                for sub in node.get_source_expressions():
+                    visit(sub)
+
+        visit(self.check)
+        return fields
+
     def validate(
         self, model: type[Model], instance: Model, exclude: set[str] | None = None
     ) -> None:
         against = instance._get_field_value_map(meta=model._model_meta, exclude=exclude)
+        # Skip the check entirely when any field referenced by `self.check` was
+        # excluded — the in-Python pipeline can't resolve a missing field's
+        # annotation, and surfacing a constraint violation here would just
+        # duplicate the field-level error that caused the exclusion.
+        if not self.referenced_fields().issubset(against):
+            return
         try:
             if not Q(self.check).check(against):
                 raise self._build_violation_error()

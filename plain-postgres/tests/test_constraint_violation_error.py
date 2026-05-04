@@ -9,6 +9,7 @@ from app.examples.models.constraints import ConstraintExample
 
 from plain.exceptions import ValidationError
 from plain.postgres import CheckConstraint, Q, UniqueConstraint
+from plain.postgres.expressions import F
 from plain.postgres.forms import ModelForm
 from plain.test import RequestFactory
 
@@ -69,6 +70,27 @@ def test_validate_passes_when_check_satisfied(db: None) -> None:
     constraint.validate(ConstraintExample, instance)
 
 
+@pytest.mark.parametrize(
+    "check",
+    [
+        Q(name__regex=r"^ok-"),
+        Q(name__in=["ok-1", "ok-2"]),
+        Q(name="ok-1") | Q(name="ok-2"),
+        Q(name__startswith="ok-"),
+        Q(name=F("description")),
+    ],
+)
+def test_validate_skips_when_referenced_field_excluded(db: None, check: Q) -> None:
+    """If a field referenced by the check expression was excluded (because
+    its own field-level validation already failed in full_clean), the
+    constraint check is skipped — its annotation isn't in the in-memory
+    value map, and surfacing a violation here would just duplicate the
+    earlier field error."""
+    constraint = CheckConstraint(check=check, name="c")
+    instance = ConstraintExample(name="bad", description="d")
+    constraint.validate(ConstraintExample, instance, exclude={"name"})
+
+
 def test_full_clean_runs_constraint_validation(
     db: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -77,6 +99,27 @@ def test_full_clean_runs_constraint_validation(
     with pytest.raises(ValidationError) as exc_info:
         instance.full_clean()
     assert any("Name must start" in m for m in exc_info.value.messages)
+
+
+def test_full_clean_with_choices_and_check_constraint(
+    db: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression for #68: a CheckConstraint that references a field with
+    `choices=` shouldn't crash full_clean when the value fails the choices
+    validator. The choice-validator error excludes the field, then the
+    constraint check would previously hit `assert self.model is not None`
+    in solve_lookup_type."""
+    _add_check_constraint(monkeypatch)
+
+    name_field = ConstraintExample._model_meta.get_field("name")
+    monkeypatch.setattr(name_field, "choices", [("ok-one", "One"), ("ok-two", "Two")])
+
+    instance = ConstraintExample(name="bogus", description="d")
+    with pytest.raises(ValidationError) as exc_info:
+        instance.full_clean()
+    # Choice validator surfaces the field-level error; constraint check is
+    # skipped (don't double-report).
+    assert "name" in exc_info.value.error_dict
 
 
 def test_save_runs_full_clean_by_default(
