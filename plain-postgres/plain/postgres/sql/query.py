@@ -1221,7 +1221,8 @@ class Query(BaseExpression):
                 if summarize:
                     expression = Ref(annotation, expression)
                 return expression_lookups, (), expression
-        assert self.model is not None, "Field lookups require a model"
+        if self.model is None:
+            raise FieldError("Field lookups require a model")
         meta = self.model._model_meta
         _, field, _, lookup_parts = self.names_to_path(lookup_splitted, meta)
         field_parts = lookup_splitted[0 : len(lookup_splitted) - len(lookup_parts)]
