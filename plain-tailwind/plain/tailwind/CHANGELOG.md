@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.21.1](https://github.com/dropseed/plain/releases/plain-tailwind@0.21.1) (2026-05-05)
+
+### What's changed
+
+- Exposes `__version__` from `importlib.metadata` on `plain.tailwind` for version probes that don't want to scrape pip metadata. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.21.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.21.0) (2026-04-30)
 
 ### What's changed
