@@ -1,5 +1,15 @@
 # plain-portal changelog
 
+## [0.2.7](https://github.com/dropseed/plain/releases/plain-portal@0.2.7) (2026-05-05)
+
+### What's changed
+
+- Exposes `__version__` from `importlib.metadata` on `plain.portal` for version probes that don't want to scrape pip metadata. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.2.6](https://github.com/dropseed/plain/releases/plain-portal@0.2.6) (2026-04-22)
 
 ### What's changed
