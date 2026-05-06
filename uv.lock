@@ -861,7 +861,7 @@ dev = [
 
 [[package]]
 name = "plain-loginlink"
-version = "0.21.2"
+version = "0.21.3"
 source = { editable = "plain-loginlink" }
 dependencies = [
     { name = "plain" },
