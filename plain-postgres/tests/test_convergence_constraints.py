@@ -417,6 +417,280 @@ class TestApplyConstraintFixes:
         finally:
             ConstraintExample.model_options.constraints = original_constraints
 
+    @pytest.mark.parametrize(
+        "check",
+        [
+            Q(name__in=["a", "b"]),
+            Q(name="a") | Q(name="b"),
+        ],
+        ids=["__in lookup", "OR of equals"],
+    )
+    def test_membership_check_constraint_no_drift_on_resync(self, isolated_db, check):
+        """Regression for #67: a CheckConstraint using `__in` (or its
+        `Q | Q` equivalent) shouldn't be flagged as drifted on subsequent
+        sync runs. PG stores `IN (...)` as `= ANY (ARRAY[...])` and the
+        per-disjunct grouping in `OR` adds extra parens — both must
+        normalize to the same form as the ORM-generated SQL."""
+        constraint = CheckConstraint(
+            check=check, name="examples_constraintexample_name_membership"
+        )
+        original_constraints = list(ConstraintExample.model_options.constraints)
+        ConstraintExample.model_options.constraints = [
+            *original_constraints,
+            constraint,
+        ]
+
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                items = plan_model_convergence(
+                    conn, cursor, ConstraintExample
+                ).executable()
+            assert len(items) == 1
+            assert isinstance(items[0].fix, AddConstraintFix)
+            items[0].fix.apply()
+
+            # Second pass: must report no drift, neither executable nor
+            # blocked. PG stores `IN (...)` as `= ANY (ARRAY[...])` and adds
+            # per-disjunct parens around `OR` operands; the round-trip lets
+            # PG canonicalize both sides through the same deparser.
+            with conn.cursor() as cursor:
+                plan = plan_model_convergence(conn, cursor, ConstraintExample)
+            assert plan.executable() == []
+            assert plan.blocked == []
+        finally:
+            ConstraintExample.model_options.constraints = original_constraints
+
+    def test_canonicalization_falls_back_when_live_shape_incompatible(self, db):
+        """When the model declares a CheckConstraint that's incompatible
+        with the live table shape (e.g. references a column that doesn't
+        exist on the live table), the round-trip ALTER raises in PG. The
+        helper must catch and return a sentinel so convergence still
+        reports drift instead of crashing — a real concern for `analyze`
+        / doctor on a half-migrated DB."""
+        from plain.postgres.convergence.analysis import (
+            _canonicalize_constraint_def,
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            # Reference a column that doesn't exist on the live table.
+            result = _canonicalize_constraint_def(
+                cursor,
+                ConstraintExample,
+                "CHECK (nonexistent_col > 0)",
+            )
+            assert result == ""
+            # Cursor must remain usable after the failed canonicalization —
+            # the savepoint inside _canon_table must roll back cleanly.
+            cursor.execute("SELECT 1")
+            assert cursor.fetchone() == (1,)
+            # And a subsequent valid canonicalization on the same cursor must
+            # still succeed — proves the rollback is complete, not just that
+            # the cursor accepts trivial follow-up queries.
+            valid = _canonicalize_constraint_def(
+                cursor,
+                ConstraintExample,
+                "CHECK (length(name) > 0)",
+            )
+            assert valid.startswith("CHECK ")
+
+    def test_canonicalization_falls_back_on_data_error(self, db):
+        """`SET DEFAULT 'abc'` on an int column raises DataError, not
+        ProgrammingError — the catch must include DataError so analyze
+        on a half-migrated DB doesn't crash on type mismatches."""
+        from plain.postgres.convergence.analysis import (
+            _canonicalize_default_expr,
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            # ConstraintExample has `id` as integer; setting a text literal
+            # default on it raises psycopg.errors.InvalidTextRepresentation
+            # (DataError subclass).
+            result = _canonicalize_default_expr(
+                cursor, ConstraintExample, "id", "'abc'"
+            )
+            assert result == ""
+            cursor.execute("SELECT 1")
+            assert cursor.fetchone() == (1,)
+
+    def test_canonicalization_propagates_privilege_errors(self, db):
+        """`InsufficientPrivilege` (raised when the role lacks CREATE TEMP)
+        must NOT be swallowed into the empty-sentinel fallback. Otherwise
+        analyze on a privilege-restricted role floods the user with false
+        "definition differs: DB has ..." reports for every index/constraint
+        instead of surfacing the configuration problem. Regression for the
+        broad-`ProgrammingError` catch the rewrite started with.
+
+        Patches `_canon_table` to raise the privilege error so the test
+        doesn't depend on a separately provisioned restricted role."""
+        from contextlib import contextmanager
+        from unittest.mock import patch
+
+        import psycopg
+
+        from plain.postgres.convergence.analysis import (
+            _canonicalize_constraint_def,
+            _canonicalize_default_expr,
+            _canonicalize_index_def,
+        )
+
+        @contextmanager
+        def _raising_canon_table(*args, **kwargs):
+            raise psycopg.errors.InsufficientPrivilege(
+                "permission denied for schema pg_temp"
+            )
+            yield  # pragma: no cover — never reached
+
+        conn = get_connection()
+
+        # Patch every helper's `_canon_table` and verify the privilege
+        # error propagates instead of returning the empty sentinel.
+        with patch(
+            "plain.postgres.convergence.analysis._canon_table",
+            _raising_canon_table,
+        ):
+            with conn.cursor() as cursor:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    _canonicalize_constraint_def(
+                        cursor, ConstraintExample, "CHECK (length(name) > 0)"
+                    )
+                with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    _canonicalize_default_expr(cursor, ConstraintExample, "name", "'x'")
+                with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    _canonicalize_index_def(
+                        cursor,
+                        ConstraintExample,
+                        fields_orders=[("name", "")],
+                    )
+
+    def test_canonicalization_does_not_drop_real_user_table(self, isolated_db):
+        """The round-trip helper uses a fixed temp-table name `_plain_canon`.
+        It must never resolve via `search_path` to a real user table that
+        happens to share the name — qualifying every cleanup DROP with the
+        `pg_temp` schema keeps the canonicalization isolated to the session's
+        own temp namespace."""
+        execute('CREATE TABLE "_plain_canon" (id integer)')
+        execute('INSERT INTO "_plain_canon" (id) VALUES (1)')
+
+        constraint = CheckConstraint(
+            check=Q(name__in=["a", "b"]),
+            name="examples_constraintexample_canon_safe",
+        )
+        original_constraints = list(ConstraintExample.model_options.constraints)
+        ConstraintExample.model_options.constraints = [
+            *original_constraints,
+            constraint,
+        ]
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                # Triggers the round-trip helpers via _compare_check_constraints.
+                plan_model_convergence(conn, cursor, ConstraintExample)
+
+            # The real public._plain_canon must still be there with its row.
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT id FROM "_plain_canon"')
+                rows = cursor.fetchall()
+            assert rows == [(1,)]
+        finally:
+            ConstraintExample.model_options.constraints = original_constraints
+            execute('DROP TABLE IF EXISTS "_plain_canon"')
+
+    def test_check_drift_diagnostic_when_canonicalization_fails(self, isolated_db):
+        """When `_canonicalize_constraint_def` returns "" (e.g. half-migrated
+        DB where the model SQL is incompatible with the live shape), the
+        higher-level constraint compare must still emit a CHANGED status
+        with the abridged "definition differs: DB has ..." message — no
+        "model expects ..." half, since the canonical model text is
+        unavailable. Patches the canonicalizer to force the empty-sentinel
+        path without needing a live type mismatch."""
+        from unittest.mock import patch
+
+        original_constraints = list(ConstraintExample.model_options.constraints)
+        check = CheckConstraint(
+            check=Q(id__gte=0),
+            name="examples_constraintexample_id_check",
+        )
+        ConstraintExample.model_options.constraints = [*original_constraints, check]
+        # DB has the matching name but a different definition.
+        execute(
+            'ALTER TABLE "examples_constraintexample" '
+            'ADD CONSTRAINT "examples_constraintexample_id_check" '
+            'CHECK ("id" >= 1)'
+        )
+
+        try:
+            with patch(
+                "plain.postgres.convergence.analysis._canonicalize_constraint_def",
+                return_value="",
+            ):
+                conn = get_connection()
+                with conn.cursor() as cursor:
+                    analysis = analyze_model(conn, cursor, ConstraintExample)
+
+            status = next(
+                c
+                for c in analysis.constraints
+                if c.name == "examples_constraintexample_id_check"
+            )
+            assert isinstance(status.drift, ConstraintDrift)
+            assert status.drift.kind == DriftKind.CHANGED
+            # Abridged diagnostic: DB text shown, model side omitted.
+            assert status.issue is not None
+            assert "DB has" in status.issue
+            assert "CHECK" in status.issue
+            assert "model expects" not in status.issue
+        finally:
+            ConstraintExample.model_options.constraints = original_constraints
+
+    def test_unique_drift_diagnostic_when_canonicalization_fails(self, isolated_db):
+        """Same fallback path as the check-constraint case but for unique
+        constraints. The model-text-omitted form of the diagnostic must
+        also fire here so analyze on a half-migrated DB never crashes."""
+        from unittest.mock import patch
+
+        original_constraints = list(ConstraintExample.model_options.constraints)
+        # Model declares UNIQUE on (name) — column-based, deparse path.
+        constraint = UniqueConstraint(
+            fields=["name"],
+            name="examples_constraintexample_unique_canon",
+        )
+        ConstraintExample.model_options.constraints = [
+            *original_constraints,
+            constraint,
+        ]
+        # DB has the matching name but UNIQUE on (description) — different.
+        execute(
+            'ALTER TABLE "examples_constraintexample" '
+            'ADD CONSTRAINT "examples_constraintexample_unique_canon" '
+            'UNIQUE ("description")'
+        )
+
+        try:
+            with patch(
+                "plain.postgres.convergence.analysis._canonicalize_constraint_def",
+                return_value="",
+            ):
+                conn = get_connection()
+                with conn.cursor() as cursor:
+                    analysis = analyze_model(conn, cursor, ConstraintExample)
+
+            status = next(
+                c
+                for c in analysis.constraints
+                if c.name == "examples_constraintexample_unique_canon"
+            )
+            assert isinstance(status.drift, ConstraintDrift)
+            assert status.drift.kind == DriftKind.CHANGED
+            assert status.issue is not None
+            assert "DB has" in status.issue
+            assert "UNIQUE" in status.issue
+            assert "model expects" not in status.issue
+        finally:
+            ConstraintExample.model_options.constraints = original_constraints
+
     def test_check_definition_change_is_blocked(self, isolated_db):
         """Changed check definition is blocked — no auto-fix available."""
         original_constraints = list(ConstraintExample.model_options.constraints)

@@ -17,11 +17,6 @@ from .schema import (
     TableState,
     get_unknown_tables,
     introspect_table,
-    normalize_check_definition,
-    normalize_default_sql,
-    normalize_expression,
-    normalize_index_definition,
-    normalize_unique_definition,
 )
 
 __all__ = [
@@ -40,10 +35,5 @@ __all__ = [
     "build_table_owners",
     "get_unknown_tables",
     "introspect_table",
-    "normalize_check_definition",
-    "normalize_default_sql",
-    "normalize_expression",
-    "normalize_index_definition",
-    "normalize_unique_definition",
     "run_all_checks",
 ]

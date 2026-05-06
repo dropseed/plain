@@ -15,7 +15,6 @@ from plain.logs import get_framework_logger
 from plain.postgres import utils
 from plain.postgres.dialect import quote_name
 from plain.postgres.fields import GenericIPAddressField, TimeField, UUIDField
-from plain.postgres.indexes import Index
 from plain.postgres.schema import DatabaseSchemaEditor
 from plain.postgres.sources import ConnectionSource
 from plain.postgres.transaction import TransactionManagementError
@@ -63,7 +62,6 @@ class DatabaseConnection:
 
     queries_limit: int = 9000
 
-    index_default_access_method = "btree"
     ignored_tables: list[str] = []
 
     def __init__(self, source: ConnectionSource):
@@ -607,7 +605,6 @@ class DatabaseConnection:
                 FROM pg_attribute AS fka
                 JOIN pg_class AS fkc ON fka.attrelid = fkc.oid
                 WHERE fka.attrelid = c.confrelid AND fka.attnum = c.confkey[1]),
-                cl.reloptions,
                 c.convalidated,
                 pg_get_constraintdef(c.oid),
                 c.confdeltype
@@ -622,54 +619,42 @@ class DatabaseConnection:
             columns,
             kind,
             used_cols,
-            options,
             validated,
             constraintdef,
             confdeltype,
         ) in cursor.fetchall():
             constraints[constraint] = {
                 "columns": columns,
-                "primary_key": kind == "p",
-                "unique": kind in ["p", "u"],
                 "foreign_key": tuple(used_cols.split(".", 1)) if kind == "f" else None,
-                "check": kind == "c",
                 "contype": kind,
                 "index": False,
                 "definition": constraintdef,
-                "options": options,
                 "validated": validated,
                 "on_delete_action": confdeltype if kind == "f" else None,
             }
-        # Now get indexes
+        # Now get indexes. Sort order, opclasses, INCLUDE, and predicates all
+        # ride along inside `pg_get_indexdef` and are compared via the
+        # canonical-tail round-trip in convergence — no need to introspect
+        # them here as separate columns.
         cursor.execute(
             """
             SELECT
                 indexname,
                 array_agg(attname ORDER BY arridx),
                 indisunique,
-                indisprimary,
-                array_agg(ordering ORDER BY arridx),
                 amname,
                 exprdef,
-                s2.attoptions,
-                s2.indisvalid
+                indisvalid
             FROM (
                 SELECT
                     c2.relname as indexname, idx.*, attr.attname, am.amname,
-                    pg_get_indexdef(idx.indexrelid) AS exprdef,
-                    CASE am.amname
-                        WHEN %s THEN
-                            CASE (option & 1)
-                                WHEN 1 THEN 'DESC' ELSE 'ASC'
-                            END
-                    END as ordering,
-                    c2.reloptions as attoptions
+                    pg_get_indexdef(idx.indexrelid) AS exprdef
                 FROM (
                     SELECT *
                     FROM
                         pg_index i,
-                        unnest(i.indkey, i.indoption)
-                            WITH ORDINALITY koi(key, option, arridx)
+                        unnest(i.indkey)
+                            WITH ORDINALITY koi(key, arridx)
                 ) idx
                 LEFT JOIN pg_class c ON idx.indrelid = c.oid
                 LEFT JOIN pg_class c2 ON idx.indexrelid = c2.oid
@@ -678,36 +663,26 @@ class DatabaseConnection:
                     pg_attribute attr ON attr.attrelid = c.oid AND attr.attnum = idx.key
                 WHERE c.relname = %s AND pg_catalog.pg_table_is_visible(c.oid)
             ) s2
-            GROUP BY indexname, indisunique, indisprimary, amname, exprdef, attoptions, indisvalid;
+            GROUP BY
+                indexname, indisunique, amname, exprdef, indisvalid;
         """,
-            [self.index_default_access_method, table_name],
+            [table_name],
         )
         for (
             index,
             columns,
             unique,
-            primary,
-            orders,
             type_,
             definition,
-            options,
             valid,
         ) in cursor.fetchall():
             if index not in constraints:
-                basic_index = (
-                    type_ == self.index_default_access_method and options is None
-                )
                 constraints[index] = {
                     "columns": columns if columns != [None] else [],
-                    "orders": orders if orders != [None] else [],
-                    "primary_key": primary,
                     "unique": unique,
-                    "foreign_key": None,
-                    "check": False,
                     "index": True,
-                    "type": Index.suffix if basic_index else type_,
+                    "type": type_,
                     "definition": definition,
-                    "options": options,
                     "valid": valid,
                 }
         return constraints

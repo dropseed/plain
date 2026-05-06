@@ -929,6 +929,7 @@ dependencies = [
     { name = "plain" },
     { name = "plain-admin" },
     { name = "plain-postgres" },
+    { name = "sqlparse" },
 ]
 
 [package.dev-dependencies]
@@ -942,6 +943,7 @@ requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "plain-admin", editable = "plain-admin" },
     { name = "plain-postgres", editable = "plain-postgres" },
+    { name = "sqlparse", specifier = ">=0.3.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -1027,7 +1029,6 @@ dependencies = [
     { name = "plain" },
     { name = "psycopg" },
     { name = "psycopg-pool" },
-    { name = "sqlparse" },
 ]
 
 [package.dev-dependencies]
@@ -1041,7 +1042,6 @@ requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "psycopg", specifier = ">=3.2" },
     { name = "psycopg-pool", specifier = ">=3.2" },
-    { name = "sqlparse", specifier = ">=0.3.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -1569,11 +1569,11 @@ wheels = [
 
 [[package]]
 name = "sqlparse"
-version = "0.5.3"
+version = "0.5.5"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e5/40/edede8dd6977b0d3da179a342c198ed100dd2aba4be081861ee5911e4da4/sqlparse-0.5.3.tar.gz", hash = "sha256:09f67787f56a0b16ecdbde1bfc7f5d9c3371ca683cfeaa8e6ff60b4807ec9272", size = 84999, upload-time = "2024-12-10T12:05:30.728Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/90/76/437d71068094df0726366574cf3432a4ed754217b436eb7429415cf2d480/sqlparse-0.5.5.tar.gz", hash = "sha256:e20d4a9b0b8585fdf63b10d30066c7c94c5d7a7ec47c889a2d83a3caa93ff28e", size = 120815, upload-time = "2025-12-19T07:17:45.073Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/5c/bfd6bd0bf979426d405cc6e71eceb8701b148b16c21d2dc3c261efc61c7b/sqlparse-0.5.3-py3-none-any.whl", hash = "sha256:cf2196ed3418f3ba5de6af7e82c694a9fbdbfecccdfc72e281548517081f16ca", size = 44415, upload-time = "2024-12-10T12:05:27.824Z" },
+    { url = "https://files.pythonhosted.org/packages/49/4b/359f28a903c13438ef59ebeee215fb25da53066db67b305c125f1c6d2a25/sqlparse-0.5.5-py3-none-any.whl", hash = "sha256:12a08b3bf3eec877c519589833aed092e2444e68240a3577e8e26148acc7b1ba", size = 46138, upload-time = "2025-12-19T07:17:46.573Z" },
 ]
 
 [[package]]

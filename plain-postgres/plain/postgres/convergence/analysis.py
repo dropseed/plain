@@ -2,17 +2,23 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
+import psycopg
+
 from ..constraints import CheckConstraint, UniqueConstraint
 from ..ddl import (
+    build_include_sql,
     compile_database_default_sql,
     compile_expression_sql,
     compile_index_expressions_sql,
     compile_literal_default_sql,
+    deferrable_sql,
 )
 from ..deletion import sql_on_delete
 from ..dialect import quote_name
@@ -27,11 +33,6 @@ from ..introspection import (
     ConType,
     TableState,
     introspect_table,
-    normalize_check_definition,
-    normalize_default_sql,
-    normalize_expression,
-    normalize_index_definition,
-    normalize_unique_definition,
 )
 
 if TYPE_CHECKING:
@@ -325,8 +326,8 @@ def analyze_model(
         label=model.model_options.label,
         table=table_name,
         columns=_compare_columns(model, db, table_name, cursor),
-        indexes=_compare_indexes(model, db, table_name),
-        constraints=_compare_constraints(model, db, table_name),
+        indexes=_compare_indexes(cursor, model, db, table_name),
+        constraints=_compare_constraints(cursor, model, db, table_name),
     )
 
 
@@ -389,7 +390,7 @@ def _compare_columns(
                     )
                 )
 
-            if default_drift := _compare_column_default(f, actual, table):
+            if default_drift := _compare_column_default(cursor, f, actual, table):
                 drifts.append(default_drift)
                 if issue is None:
                     issue = default_drift.describe()
@@ -439,23 +440,39 @@ def _extract_jsonb_literal(sql: str) -> str | None:
     return m.group(1).replace("''", "'")
 
 
-def _defaults_equivalent(model_sql: str, db_sql: str) -> bool:
-    if normalize_default_sql(model_sql) == normalize_default_sql(db_sql):
-        return True
-    # Semantic compare for jsonb — PG canonicalizes keys (length then lex),
-    # which won't match Python's dict-insertion order in the model dump.
-    m_json = _extract_jsonb_literal(model_sql)
-    d_json = _extract_jsonb_literal(db_sql)
-    if m_json is not None and d_json is not None:
-        try:
-            return json.loads(m_json) == json.loads(d_json)
-        except json.JSONDecodeError:
-            return False
-    return False
+def _canonicalize_default_expr(
+    cursor: CursorWrapper, model: type[Model], column: str, default_sql: str
+) -> str:
+    """Round-trip a column DEFAULT through Postgres so both sides of the
+    comparison go through pg_get_expr — the live default comes from
+    `pg_attrdef.adbin` during introspection, and the expected side is set on
+    the temp table column then read the same way.
+
+    Returns "" if the model SQL is incompatible with the live column shape;
+    comparison then sees inequality and reports drift.
+    """
+    try:
+        with _canon_table(cursor, model):
+            cursor.execute(
+                f"ALTER TABLE {_CANON_TABLE} ALTER COLUMN {quote_name(column)} "
+                f"SET DEFAULT {default_sql}"
+            )
+            cursor.execute(
+                "SELECT pg_get_expr(ad.adbin, ad.adrelid) FROM pg_attrdef ad "
+                "JOIN pg_attribute a ON a.attnum = ad.adnum AND a.attrelid = ad.adrelid "
+                "WHERE a.attrelid = (SELECT oid FROM pg_class WHERE relname = %s "
+                "AND relnamespace = pg_my_temp_schema()) "
+                "AND a.attname = %s",
+                [_CANON_TABLE, column],
+            )
+            row = cursor.fetchone()
+            return row[0] if row else ""
+    except _CANON_FALLBACK_ERRORS:
+        return ""
 
 
 def _compare_column_default(
-    field: Field, actual: ColumnState, table: str
+    cursor: CursorWrapper, field: Field, actual: ColumnState, table: str
 ) -> ColumnDefaultDrift | None:
     expected_sql: str | None = None
     db_default_expr = field.get_db_default_expression()
@@ -474,8 +491,21 @@ def _compare_column_default(
                 model_default_sql=expected_sql,
             )
 
-        if _defaults_equivalent(expected_sql, actual.default_sql):
+        canonical_expected = _canonicalize_default_expr(
+            cursor, field.model, field.column, expected_sql
+        )
+        if canonical_expected == actual.default_sql:
             return None
+        # Semantic compare for jsonb — PG canonicalizes object keys, which
+        # won't match Python's dict-insertion order even after a round-trip.
+        m_json = _extract_jsonb_literal(canonical_expected)
+        d_json = _extract_jsonb_literal(actual.default_sql)
+        if m_json is not None and d_json is not None:
+            try:
+                if json.loads(m_json) == json.loads(d_json):
+                    return None
+            except json.JSONDecodeError:
+                pass
 
         return ColumnDefaultDrift(
             kind=DriftKind.CHANGED,
@@ -501,7 +531,7 @@ def _compare_column_default(
 
 
 def _compare_indexes(
-    model: type[Model], db: TableState, table: str
+    cursor: CursorWrapper, model: type[Model], db: TableState, table: str
 ) -> list[IndexStatus]:
     statuses: list[IndexStatus] = []
     missing: list[Index] = []
@@ -529,7 +559,7 @@ def _compare_indexes(
             statuses.append(
                 IndexStatus(
                     name=index.name,
-                    fields=list(index.fields) if index.fields else [],
+                    fields=list(index.fields),
                     issue=f"name conflict with {db_idx.access_method} index — rename one to resolve",
                 )
             )
@@ -539,7 +569,7 @@ def _compare_indexes(
             statuses.append(
                 IndexStatus(
                     name=index.name,
-                    fields=list(index.fields) if index.fields else [],
+                    fields=list(index.fields),
                     issue="INVALID — needs drop and recreate",
                     drift=IndexDrift(
                         kind=DriftKind.INVALID,
@@ -553,12 +583,21 @@ def _compare_indexes(
 
         # Check if definition matches
         if db_idx.definition:
-            issue = _compare_index_definition(model, index, db_idx.definition)
+            issue = _compare_canonical_index(
+                cursor=cursor,
+                model=model,
+                expressions=index.expressions,
+                fields_orders=list(index.fields_orders),
+                opclasses=list(index.opclasses),
+                condition=index.condition,
+                include=index.include,
+                actual_def=db_idx.definition,
+            )
             if issue:
                 statuses.append(
                     IndexStatus(
                         name=index.name,
-                        fields=list(index.fields) if index.fields else [],
+                        fields=list(index.fields),
                         issue=issue,
                         drift=IndexDrift(
                             kind=DriftKind.CHANGED,
@@ -574,7 +613,7 @@ def _compare_indexes(
         statuses.append(
             IndexStatus(
                 name=index.name,
-                fields=list(index.fields) if index.fields else [],
+                fields=list(index.fields),
             )
         )
 
@@ -588,31 +627,46 @@ def _compare_indexes(
         if non_unique_indexes[n].access_method in MANAGED_INDEX_ACCESS_METHODS
     ]
 
-    # Detect renames: match missing and extra by normalized definition
+    # Detect renames by canonical (round-tripped) index body. Build the cheap
+    # already-introspected side first so we can skip the per-missing
+    # canonicalization loop on the steady-state path.
     renamed_missing: set[str] = set()
     renamed_extra: set[str] = set()
-
-    missing_by_def: dict[str, list[Index]] = {}
-    for index in missing:
-        norm = normalize_index_definition(index.to_sql(model))
-        missing_by_def.setdefault(norm, []).append(index)
 
     extra_by_def: dict[str, list[str]] = {}
     for name in managed_extra:
         defn = non_unique_indexes[name].definition
         if defn:
-            norm = normalize_index_definition(defn)
-            extra_by_def.setdefault(norm, []).append(name)
+            extra_by_def.setdefault(_index_def_tail(defn), []).append(name)
 
-    for norm, m_list in missing_by_def.items():
-        e_list = extra_by_def.get(norm)
+    missing_by_def: dict[str, list[Index]] = {}
+    if extra_by_def:
+        for index in missing:
+            expected_tail = _canonicalize_index_def(
+                cursor,
+                model,
+                expressions=index.expressions,
+                fields_orders=list(index.fields_orders),
+                opclasses=list(index.opclasses),
+                condition=index.condition,
+                include=index.include,
+            )
+            if not expected_tail:
+                # Canonicalization failed; bucketing under "" would conflate
+                # multiple sentinel-failing indexes and disable rename
+                # detection for the rest.
+                continue
+            missing_by_def.setdefault(expected_tail, []).append(index)
+
+    for tail, m_list in missing_by_def.items():
+        e_list = extra_by_def.get(tail)
         if e_list and len(m_list) == 1 and len(e_list) == 1:
             index = m_list[0]
             old_name = e_list[0]
             statuses.append(
                 IndexStatus(
                     name=index.name,
-                    fields=list(index.fields) if index.fields else [],
+                    fields=list(index.fields),
                     issue=f"rename from {old_name}",
                     drift=IndexDrift(
                         kind=DriftKind.RENAMED,
@@ -631,7 +685,7 @@ def _compare_indexes(
             statuses.append(
                 IndexStatus(
                     name=index.name,
-                    fields=list(index.fields) if index.fields else [],
+                    fields=list(index.fields),
                     issue="missing from database",
                     drift=IndexDrift(
                         kind=DriftKind.MISSING,
@@ -673,32 +727,15 @@ def _compare_indexes(
     return statuses
 
 
-def _compare_index_definition(
-    model: type[Model], index: Index, actual_def: str
-) -> str | None:
-    """Compare a model index against its pg_get_indexdef output.
-
-    Returns an issue string if definitions differ, None if they match.
-    """
-    return _compare_parsed_index(
-        model=model,
-        expressions=index.expressions,
-        fields=[name for name, _ in index.fields_orders],
-        opclasses=list(index.opclasses) if index.opclasses else [],
-        condition=index.condition,
-        actual_def=actual_def,
-    )
-
-
 # Constraint comparison
 
 
 def _compare_constraints(
-    model: type[Model], db: TableState, table: str
+    cursor: CursorWrapper, model: type[Model], db: TableState, table: str
 ) -> list[ConstraintStatus]:
     statuses: list[ConstraintStatus] = []
-    statuses.extend(_compare_unique_constraints(model, db, table))
-    statuses.extend(_compare_check_constraints(model, db, table))
+    statuses.extend(_compare_unique_constraints(cursor, model, db, table))
+    statuses.extend(_compare_check_constraints(cursor, model, db, table))
     statuses.extend(_compare_foreign_keys(model, db, table))
 
     # Unmanaged constraint types — informational only, no drift.
@@ -720,7 +757,7 @@ def _compare_constraints(
 
 
 def _compare_unique_constraints(
-    model: type[Model], db: TableState, table: str
+    cursor: CursorWrapper, model: type[Model], db: TableState, table: str
 ) -> list[ConstraintStatus]:
     statuses: list[ConstraintStatus] = []
     # Unique constraints from pg_constraint (contype='u')
@@ -764,14 +801,18 @@ def _compare_unique_constraints(
             )
         elif constraint.index_only:
             issue, drift = _compare_index_only_unique(
-                model, constraint, actual[constraint.name], table
+                cursor, model, constraint, actual[constraint.name], table
             )
         elif actual_def := actual[constraint.name].definition:
-            expected_def = _get_expected_unique_definition(model, constraint)
-            if normalize_unique_definition(actual_def) != normalize_unique_definition(
-                expected_def
-            ):
-                issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
+            expected_def = _get_expected_unique_definition(cursor, model, constraint)
+            # Both sides are deparsed by pg_get_constraintdef → string equality.
+            if actual_def != expected_def:
+                if expected_def:
+                    issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
+                else:
+                    # Round-trip canonicalization couldn't complete; canonical
+                    # model text is unavailable for the diagnostic.
+                    issue = f"definition differs: DB has {actual_def!r}"
                 drift = ConstraintDrift(
                     kind=DriftKind.CHANGED,
                     table=table,
@@ -791,7 +832,7 @@ def _compare_unique_constraints(
 
     # Detect renames by columns
     rename_statuses, renamed_missing, renamed_extra = _detect_unique_renames(
-        missing, extra_names, actual, model, table
+        cursor, missing, extra_names, actual, model, table
     )
     statuses.extend(rename_statuses)
 
@@ -839,7 +880,7 @@ def _compare_unique_constraints(
 
 
 def _compare_check_constraints(
-    model: type[Model], db: TableState, table: str
+    cursor: CursorWrapper, model: type[Model], db: TableState, table: str
 ) -> list[ConstraintStatus]:
     statuses: list[ConstraintStatus] = []
     actual = {
@@ -868,11 +909,15 @@ def _compare_check_constraints(
                 name=constraint.name,
             )
         elif actual_def := actual[constraint.name].definition:
-            expected_def = _get_expected_check_definition(model, constraint)
-            if normalize_check_definition(actual_def) != normalize_check_definition(
-                expected_def
-            ):
-                issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
+            expected_def = _get_expected_check_definition(cursor, model, constraint)
+            # Both sides are deparsed by pg_get_constraintdef → string equality.
+            if actual_def != expected_def:
+                if expected_def:
+                    issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
+                else:
+                    # Round-trip canonicalization couldn't complete; canonical
+                    # model text is unavailable for the diagnostic.
+                    issue = f"definition differs: DB has {actual_def!r}"
                 drift = ConstraintDrift(
                     kind=DriftKind.CHANGED,
                     table=table,
@@ -892,7 +937,7 @@ def _compare_check_constraints(
 
     # Detect renames by definition
     rename_statuses, renamed_missing, renamed_extra = _detect_check_renames(
-        missing, extra_names, actual, model, table
+        cursor, missing, extra_names, actual, model, table
     )
     statuses.extend(rename_statuses)
 
@@ -1098,6 +1143,7 @@ def generate_fk_constraint_name(
 
 
 def _detect_unique_renames(
+    cursor: CursorWrapper,
     missing: list[UniqueConstraint],
     extra_names: list[str],
     actual_dict: dict[str, ConstraintState],
@@ -1107,9 +1153,9 @@ def _detect_unique_renames(
     """Match missing and extra unique constraints by structure.
 
     Constraint-backed (not index_only): matched by resolved column tuple.
-    Index-only (condition/expression/opclass): matched by normalized index
-    definition, which captures the full semantics including WHERE clauses,
-    opclasses, and expressions.
+    Index-only (condition/expression/opclass): matched by canonical
+    (round-tripped) index definition, which captures the full semantics
+    including WHERE clauses, opclasses, and expressions.
     """
     statuses: list[ConstraintStatus] = []
     renamed_missing: set[str] = set()
@@ -1144,9 +1190,21 @@ def _detect_unique_renames(
             # let both sides fall through as separate missing + undeclared.
             if constraint.index_only:
                 old_def = actual_dict[old_name].definition
-                if not old_def or normalize_index_definition(
-                    old_def
-                ) != normalize_index_definition(constraint.to_sql(model)):
+                if not old_def:
+                    continue
+                expected_tail = _canonicalize_index_def(
+                    cursor,
+                    model,
+                    expressions=constraint.expressions,
+                    fields_orders=[(f, "") for f in constraint.fields],
+                    opclasses=list(constraint.opclasses)
+                    if constraint.opclasses
+                    else [],
+                    condition=constraint.condition,
+                    include=constraint.include,
+                    unique=True,
+                )
+                if _index_def_tail(old_def) != expected_tail:
                     continue
             DriftType = IndexDrift if constraint.index_only else ConstraintDrift
             statuses.append(
@@ -1166,25 +1224,40 @@ def _detect_unique_renames(
             renamed_missing.add(constraint.name)
             renamed_extra.add(old_name)
 
-    # Phase 2: Expression-based — match by normalized index definition.
-    missing_by_def: dict[str, list[UniqueConstraint]] = {}
-    for constraint in missing:
-        if constraint.fields or constraint.name in renamed_missing:
-            continue
-        norm = normalize_index_definition(constraint.to_sql(model))
-        missing_by_def.setdefault(norm, []).append(constraint)
-
+    # Phase 2: Expression-based — match by canonical (round-tripped) index
+    # body. Build the cheap already-introspected extras side first so we can
+    # skip the per-missing round-trip on the steady-state path.
     extra_by_def: dict[str, list[str]] = {}
     for name in extra_names:
         if name in renamed_extra:
             continue
         defn = actual_dict[name].definition
         if defn:
-            norm = normalize_index_definition(defn)
-            extra_by_def.setdefault(norm, []).append(name)
+            extra_by_def.setdefault(_index_def_tail(defn), []).append(name)
 
-    for norm, m_list in missing_by_def.items():
-        e_list = extra_by_def.get(norm)
+    missing_by_def: dict[str, list[UniqueConstraint]] = {}
+    if extra_by_def:
+        for constraint in missing:
+            if constraint.fields or constraint.name in renamed_missing:
+                continue
+            # constraint.fields is empty here (filtered above), so this is
+            # the expression-based path — fields_orders is unused.
+            expected_tail = _canonicalize_index_def(
+                cursor,
+                model,
+                expressions=constraint.expressions,
+                opclasses=list(constraint.opclasses),
+                condition=constraint.condition,
+                include=constraint.include,
+                unique=True,
+            )
+            if not expected_tail:
+                # See _compare_indexes for why we skip the sentinel.
+                continue
+            missing_by_def.setdefault(expected_tail, []).append(constraint)
+
+    for tail, m_list in missing_by_def.items():
+        e_list = extra_by_def.get(tail)
         if e_list and len(m_list) == 1 and len(e_list) == 1:
             constraint = m_list[0]
             old_name = e_list[0]
@@ -1211,31 +1284,38 @@ def _detect_unique_renames(
 
 
 def _detect_check_renames(
+    cursor: CursorWrapper,
     missing: list[CheckConstraint],
     extra_names: list[str],
     actual_dict: dict[str, ConstraintState],
     model: type[Model],
     table: str,
 ) -> tuple[list[ConstraintStatus], set[str], set[str]]:
-    """Match missing and extra check constraints by normalized definition."""
+    """Match missing and extra check constraints by canonical definition."""
     statuses: list[ConstraintStatus] = []
     renamed_missing: set[str] = set()
     renamed_extra: set[str] = set()
 
-    missing_by_def: dict[str, list[CheckConstraint]] = {}
-    for constraint in missing:
-        expected_def = _get_expected_check_definition(model, constraint)
-        norm = normalize_check_definition(expected_def)
-        missing_by_def.setdefault(norm, []).append(constraint)
-
+    # Skip the round-trip canonicalization loop if there are no extras to
+    # potentially match — the steady-state path with no drift.
     extra_by_def: dict[str, list[str]] = {}
     for name in extra_names:
         if definition := actual_dict[name].definition:
-            norm = normalize_check_definition(definition)
-            extra_by_def.setdefault(norm, []).append(name)
+            extra_by_def.setdefault(definition, []).append(name)
 
-    for norm_def, m_list in missing_by_def.items():
-        e_list = extra_by_def.get(norm_def)
+    missing_by_def: dict[str, list[CheckConstraint]] = {}
+    if extra_by_def:
+        for constraint in missing:
+            expected_def = _get_expected_check_definition(cursor, model, constraint)
+            if not expected_def:
+                # Canonicalization failed; bucketing under "" would conflate
+                # multiple sentinel-failing constraints and disable rename
+                # detection for the rest.
+                continue
+            missing_by_def.setdefault(expected_def, []).append(constraint)
+
+    for definition, m_list in missing_by_def.items():
+        e_list = extra_by_def.get(definition)
         if e_list and len(m_list) == 1 and len(e_list) == 1:
             constraint = m_list[0]
             old_name = e_list[0]
@@ -1260,6 +1340,7 @@ def _detect_check_renames(
 
 
 def _compare_index_only_unique(
+    cursor: CursorWrapper,
     model: type[Model],
     constraint: UniqueConstraint,
     actual_state: ConstraintState,
@@ -1275,13 +1356,16 @@ def _compare_index_only_unique(
     if not actual_def:
         return None, None
 
-    issue = _compare_parsed_index(
+    issue = _compare_canonical_index(
+        cursor=cursor,
         model=model,
         expressions=constraint.expressions,
-        fields=list(constraint.fields),
-        opclasses=list(constraint.opclasses) if constraint.opclasses else [],
+        fields_orders=[(f, "") for f in constraint.fields],
+        opclasses=list(constraint.opclasses),
         condition=constraint.condition,
+        include=constraint.include,
         actual_def=actual_def,
+        unique=True,
     )
     if issue:
         changed = ConstraintDrift(
@@ -1292,170 +1376,248 @@ def _compare_index_only_unique(
     return None, None
 
 
-def _compare_parsed_index(
+def _compare_canonical_index(
     *,
+    cursor: CursorWrapper,
     model: type[Model],
     expressions: tuple[Expression | ReplaceableExpression, ...],
-    fields: list[str],
+    fields_orders: list[tuple[str, str]],
     opclasses: list[str],
     condition: Q | None,
+    include: tuple[str, ...] | None,
     actual_def: str,
+    unique: bool = False,
 ) -> str | None:
-    """Structured comparison of a model index/constraint against pg_get_indexdef.
+    """Compare a model index/constraint against pg_get_indexdef text.
 
-    Parses the DB definition into components (expression text, columns,
-    opclasses, WHERE clause) and compares each independently, avoiding
-    fragile full-SQL normalization between the ORM and PostgreSQL.
+    Round-trips the model side through Postgres so both sides come from
+    pg_get_indexdef, then string-compares the canonical `USING ...` bodies.
 
     Returns an issue string if definitions differ, None if they match.
     """
-    db_parts = _parse_index_definition(actual_def)
+    expected_tail = _canonicalize_index_def(
+        cursor,
+        model,
+        expressions=expressions,
+        fields_orders=fields_orders,
+        opclasses=opclasses,
+        condition=condition,
+        include=include,
+        unique=unique,
+    )
+    actual_tail = _index_def_tail(actual_def)
+    if not expected_tail:
+        # Round-trip canonicalization couldn't complete (model SQL
+        # incompatible with live shape). Report drift with the actual text;
+        # the canonical model text is unavailable for the diagnostic.
+        return f"definition differs: DB has {actual_tail!r}"
 
-    if expressions:
-        expected_expr = normalize_expression(
-            compile_index_expressions_sql(model, expressions)
+    if actual_tail != expected_tail:
+        return (
+            f"definition differs: DB has {actual_tail!r}, "
+            f"model expects {expected_tail!r}"
         )
-        actual_expr = normalize_expression(db_parts.expression_text)
-        if actual_expr != expected_expr:
-            return f"definition differs: DB has {actual_def!r}"
-    else:
-        expected_columns = [
-            model._model_meta.get_forward_field(f).column for f in fields
-        ]
-        if db_parts.columns != expected_columns:
-            return f"columns differ: DB has {db_parts.columns}, model expects {expected_columns}"
-
-        if db_parts.opclasses != opclasses:
-            return f"opclasses differ: DB has {db_parts.opclasses}, model expects {opclasses}"
-
-    # Compare WHERE clause
-    has_condition = condition is not None
-    if has_condition != db_parts.has_where:
-        where_desc = "has WHERE" if db_parts.has_where else "no WHERE"
-        return f"condition differs: DB {where_desc}, model {'has' if has_condition else 'no'} condition"
-    if has_condition and db_parts.where_clause:
-        assert condition is not None
-        expected_where = compile_expression_sql(model, condition)
-        if normalize_check_definition(
-            db_parts.where_clause
-        ) != normalize_check_definition(expected_where):
-            return f"condition differs: DB has WHERE ({db_parts.where_clause})"
-
     return None
 
 
-@dataclass
-class _IndexParts:
-    """Structured components parsed from pg_get_indexdef output."""
+# Round-trip canonicalization: feed model-side SQL to Postgres on a
+# session-private temp table, read back via pg_get_*.
+_CANON_TABLE = "_plain_canon"
+_CANON_CONSTRAINT = "_c"
+_CANON_INDEX = "_canon_ix"
 
-    columns: list[str]
-    opclasses: list[str]
-    has_where: bool
-    where_clause: str | None
-    expression_text: str  # raw text between the column-list parens
+# Errors raised by Postgres when the model SQL is incompatible with the live
+# table shape (unmigrated column types, references to dropped columns, etc.).
+# Helpers catch these and return "" so drift is still reported via inequality.
+# DataError covers literal-cast mismatches (e.g. text default on int column);
+# NotSupportedError covers the rare PG-side "this combination isn't allowed"
+# rejection. Both are narrow enough that catching the parent class is fine.
+# ProgrammingError is intentionally narrowed to specific 42xxx subclasses —
+# privilege failures (InsufficientPrivilege, also a ProgrammingError) and
+# plain-side syntax bugs must propagate so users get a clear diagnostic
+# instead of silent drift noise.
+_CANON_FALLBACK_ERRORS: tuple[type[Exception], ...] = (
+    psycopg.errors.UndefinedColumn,
+    psycopg.errors.UndefinedFunction,
+    psycopg.errors.UndefinedObject,
+    psycopg.errors.UndefinedTable,
+    psycopg.errors.InvalidColumnReference,
+    psycopg.errors.InvalidObjectDefinition,
+    psycopg.errors.InvalidTableDefinition,
+    psycopg.errors.DatatypeMismatch,
+    psycopg.errors.WrongObjectType,
+    psycopg.errors.AmbiguousColumn,
+    psycopg.errors.DataError,
+    psycopg.errors.NotSupportedError,
+)
 
 
-def _parse_index_definition(definition: str) -> _IndexParts:
-    """Parse pg_get_indexdef output into structured components.
+class ReadOnlyConnectionError(RuntimeError):
+    """Raised when convergence analysis runs on a read-only connection.
 
-    Extracts columns, opclasses, and WHERE clause from definitions like:
-      CREATE UNIQUE INDEX name ON schema.table USING btree (col1, col2 opclass) WHERE (condition)
+    Analysis canonicalizes the model side of each comparison by round-tripping
+    SQL through a session-private temp table. That requires DDL, which is
+    rejected on standby connections and inside `read_only()` blocks.
     """
-    s = definition.lower().replace('"', "")
 
-    # Extract WHERE clause (everything after WHERE keyword)
-    where_clause = None
-    has_where = False
-    where_match = re.search(r"\bwhere\s*\(", s)
-    if where_match:
-        has_where = True
-        # Extract the balanced WHERE expression
-        start = where_match.end() - 1  # include the opening paren
-        depth = 0
-        for i in range(start, len(s)):
-            if s[i] == "(":
-                depth += 1
-            elif s[i] == ")":
-                depth -= 1
-                if depth == 0:
-                    where_clause = s[start + 1 : i].strip()
-                    s = s[: where_match.start()].strip()
-                    break
 
-    # Find the column list: content between parens after USING method
-    columns: list[str] = []
-    opclasses: list[str] = []
-    expression_text = ""
-    using_match = re.search(r"\busing\s+\w+\s*\(", s)
-    if using_match:
-        start = using_match.end()
-        depth = 1
-        for i in range(start, len(s)):
-            if s[i] == "(":
-                depth += 1
-            elif s[i] == ")":
-                depth -= 1
-                if depth == 0:
-                    expression_text = s[start:i].strip()
-                    for part in expression_text.split(","):
-                        part = part.strip()
-                        tokens = part.split()
-                        if not tokens:
-                            continue
-                        columns.append(tokens[0])
-                        # Strip sort modifiers from the right: ASC/DESC
-                        # (stored in pg_index.indoption) and NULLS FIRST/LAST
-                        # are column-level sort options, not opclasses. What's
-                        # left after stripping is the opclass, if any.
-                        rest = tokens[1:]
-                        if (
-                            len(rest) >= 2
-                            and rest[-2] == "nulls"
-                            and rest[-1] in ("first", "last")
-                        ):
-                            rest = rest[:-2]
-                        if rest and rest[-1] in ("asc", "desc"):
-                            rest = rest[:-1]
-                        opclasses.append(rest[0] if rest else "")
-                    break
+@contextmanager
+def _canon_table(cursor: CursorWrapper, model: type[Model]) -> Iterator[None]:
+    """Set up a session-private temp table mirroring the model's real table.
 
-    # Strip empty opclasses if none are set
-    if all(oc == "" for oc in opclasses):
-        opclasses = []
+    `cursor.connection.transaction()` issues a SAVEPOINT when nested (or BEGIN
+    when run in autocommit). Either way, a model SQL statement incompatible
+    with the live column shape (e.g. a CHECK referencing a column whose live
+    type differs from what the model now declares) rolls back to this scope
+    rather than poisoning the surrounding analyze transaction. Helpers catch
+    psycopg errors and fall back to a sentinel — drift still gets reported,
+    just without the canonical model text.
 
-    return _IndexParts(
-        columns=columns,
-        opclasses=opclasses,
-        has_where=has_where,
-        where_clause=where_clause,
-        expression_text=expression_text,
-    )
+    The trailing DROP is schema-qualified to `pg_temp` so a stray real table
+    sharing the name (in the user's own schema) can't be hit by mistake. A
+    single connection is always single-threaded, so reusing the name across
+    helpers is safe.
+    """
+    table = quote_name(model.model_options.db_table)
+    try:
+        with cursor.connection.transaction():
+            cursor.execute(f"CREATE TEMP TABLE {_CANON_TABLE} (LIKE {table})")
+            yield
+            cursor.execute(f"DROP TABLE pg_temp.{_CANON_TABLE}")
+    except psycopg.errors.ReadOnlySqlTransaction as exc:
+        raise ReadOnlyConnectionError(
+            "Convergence analysis requires write access — it canonicalizes "
+            "model SQL by creating a session-private temp table. The current "
+            "connection rejected DDL (read-only transaction or standby). Run "
+            "analysis against a primary/writable connection."
+        ) from exc
+
+
+def _canonicalize_constraint_def(
+    cursor: CursorWrapper, model: type[Model], constraint_clause: str
+) -> str:
+    """Round-trip a constraint clause through Postgres so both sides of the
+    comparison are deparsed by pg_get_constraintdef — string equality then
+    covers `IN` vs `= ANY (ARRAY[...])`, redundant parens, type cast drift,
+    INCLUDE column ordering, etc.
+
+    Returns "" if the model SQL is incompatible with the live table shape
+    (e.g. unmigrated column-type drift). Drift still gets reported via the
+    inequality with the actual live definition; only the canonical model
+    text is omitted from the diagnostic.
+    """
+    try:
+        with _canon_table(cursor, model):
+            # Add as validated: the temp table is empty so the implicit scan is
+            # instant. NOT VALID would leave a trailing " NOT VALID" suffix in
+            # pg_get_constraintdef that the live constraint won't have.
+            cursor.execute(
+                f"ALTER TABLE {_CANON_TABLE} "
+                f"ADD CONSTRAINT {_CANON_CONSTRAINT} {constraint_clause}"
+            )
+            cursor.execute(
+                "SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c "
+                "WHERE c.conname = %s "
+                "AND c.conrelid = (SELECT oid FROM pg_class WHERE relname = %s "
+                "AND relnamespace = pg_my_temp_schema())",
+                [_CANON_CONSTRAINT, _CANON_TABLE],
+            )
+            row = cursor.fetchone()
+            return row[0] if row else ""
+    except _CANON_FALLBACK_ERRORS:
+        return ""
 
 
 def _get_expected_check_definition(
-    model: type[Model], constraint: CheckConstraint
+    cursor: CursorWrapper, model: type[Model], constraint: CheckConstraint
 ) -> str:
-    """Generate the CHECK expression that the model would produce."""
     check_sql = compile_expression_sql(model, constraint.check)
-    return f"CHECK ({check_sql})"
+    return _canonicalize_constraint_def(cursor, model, f"CHECK ({check_sql})")
+
+
+def _canonicalize_index_def(
+    cursor: CursorWrapper,
+    model: type[Model],
+    *,
+    expressions: tuple[Expression | ReplaceableExpression, ...] = (),
+    fields_orders: list[tuple[str, str]] | None = None,
+    opclasses: list[str] | None = None,
+    condition: Q | None = None,
+    include: tuple[str, ...] | None = None,
+    unique: bool = False,
+) -> str:
+    """Round-trip an index through Postgres and return its canonical body.
+
+    Returns the `USING ... [INCLUDE (...)] [WHERE (...)]` tail of pg_get_indexdef,
+    safe to compare directly against `_index_def_tail(actual_def)` from the
+    DB side. The `CREATE [UNIQUE] INDEX <name> ON <table>` prefix is stripped
+    here so callers don't have to.
+
+    Returns "" if the model SQL is incompatible with the live table shape;
+    comparison sites then see inequality and report drift without the
+    canonical model text.
+    """
+    if expressions:
+        columns_sql = compile_index_expressions_sql(model, expressions)
+    else:
+        col_parts: list[str] = []
+        for i, (field_name, suffix) in enumerate(fields_orders or []):
+            field = model._model_meta.get_forward_field(field_name)
+            col = quote_name(field.column)
+            if opclasses:
+                col = f"{col} {opclasses[i]}"
+            if suffix:
+                col = f"{col} {suffix}"
+            col_parts.append(col)
+        columns_sql = ", ".join(col_parts)
+
+    where_sql = ""
+    if condition is not None:
+        where_sql = f" WHERE ({compile_expression_sql(model, condition)})"
+    include_sql = build_include_sql(model, include or ())
+    create_kw = "CREATE UNIQUE INDEX" if unique else "CREATE INDEX"
+
+    try:
+        with _canon_table(cursor, model):
+            cursor.execute(
+                f"{create_kw} {_CANON_INDEX} ON {_CANON_TABLE} "
+                f"({columns_sql}){include_sql}{where_sql}"
+            )
+            cursor.execute(
+                "SELECT pg_get_indexdef(c.oid) FROM pg_class c "
+                "WHERE c.relname = %s AND c.relnamespace = pg_my_temp_schema()",
+                [_CANON_INDEX],
+            )
+            row = cursor.fetchone()
+            return _index_def_tail(row[0]) if row else ""
+    except _CANON_FALLBACK_ERRORS:
+        return ""
+
+
+def _index_def_tail(definition: str) -> str:
+    """Strip the `CREATE [UNIQUE] INDEX <name> ON <schema>.<table>` prefix
+    from a pg_get_indexdef output, leaving the canonical body that's safe to
+    compare across different index names/tables."""
+    using_pos = definition.find("USING ")
+    return definition[using_pos:] if using_pos >= 0 else definition
 
 
 def _get_expected_unique_definition(
-    model: type[Model], constraint: UniqueConstraint
+    cursor: CursorWrapper, model: type[Model], constraint: UniqueConstraint
 ) -> str:
-    """Generate the UNIQUE definition in pg_get_constraintdef format.
+    """Canonical UNIQUE definition for the model's constraint, as Postgres
+    prints it.
 
     PostgreSQL only stores field-based unique constraints (with optional
     INCLUDE and DEFERRABLE) in pg_constraint. Expression-based, conditional,
-    and opclass constraints cannot be attached as constraints — they remain
-    as indexes only.
+    and opclass constraints remain as indexes only — those are compared via
+    the index-definition path.
     """
-    from ..ddl import build_include_sql, deferrable_sql
-
     columns_sql = ", ".join(
         quote_name(model._model_meta.get_forward_field(f).column)
         for f in constraint.fields
     )
     include_sql = build_include_sql(model, constraint.include)
     defer_sql = deferrable_sql(constraint.deferrable)
-    return f"UNIQUE ({columns_sql}){include_sql}{defer_sql}"
+    clause = f"UNIQUE ({columns_sql}){include_sql}{defer_sql}"
+    return _canonicalize_constraint_def(cursor, model, clause)

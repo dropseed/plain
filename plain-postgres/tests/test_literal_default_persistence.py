@@ -127,51 +127,32 @@ def test_has_persistent_literal_default_predicate():
     assert not plain_fields.DateTimeField().has_persistent_literal_default()
 
 
-def test_compile_literal_default_sql_handles_jsonfield(db):
-    """JSONField with a literal default compiles to ``'<json>'::jsonb`` and
-    round-trips cleanly through the convergence normalization."""
+def test_compile_literal_default_sql_handles_jsonfield():
+    """JSONField with a literal default compiles to ``'<json>'::jsonb`` —
+    different values produce different SQL so drift is detectable."""
     from plain.postgres import JSONField
     from plain.postgres.ddl import compile_literal_default_sql
-    from plain.postgres.introspection import normalize_default_sql
 
     field = JSONField(default={"x": 1})
     field.set_attributes_from_name("settings")
 
     sql = compile_literal_default_sql(field)
     assert "jsonb" in sql.lower()
-    # Changing the value changes the normalized form — drift is detectable.
+
     other = JSONField(default={"x": 2})
     other.set_attributes_from_name("settings")
     other_sql = compile_literal_default_sql(other)
-    assert normalize_default_sql(sql) != normalize_default_sql(other_sql)
-
-
-def test_jsonb_defaults_equivalent_despite_key_reorder(db):
-    """PG canonicalizes jsonb keys (length then lex), which reorders Python's
-    insertion-order dump. A plain string compare would flag CHANGED every
-    sync; _compare_column_default must use semantic JSON equality for
-    jsonb defaults."""
-    from plain.postgres.convergence.analysis import _defaults_equivalent
-
-    # Same dict, PG-canonicalized vs Python insertion-order.
-    model = '\'{"b": 1, "a": 2}\'::jsonb'
-    db = '\'{"a": 2, "b": 1}\'::jsonb'
-    assert _defaults_equivalent(model, db)
-
-    # Genuinely different JSON still detected as CHANGED.
-    model = "'{\"a\": 1}'::jsonb"
-    db = "'{\"a\": 2}'::jsonb"
-    assert not _defaults_equivalent(model, db)
+    assert sql != other_sql
 
 
 def test_special_char_string_default_round_trip(isolated_db):
     """Literal string defaults with quotes, newlines, and other typical
     non-ASCII punctuation must survive the round trip: compile → SET DEFAULT
-    → pg_get_expr → compare without drift. Otherwise every sync would flag
-    CHANGED for safe-but-ugly inputs."""
+    → pg_get_expr → canonicalize the model side → compare. Otherwise every
+    sync would flag CHANGED for safe-but-ugly inputs."""
     from conftest_convergence import column_default_sql, execute
 
-    from plain.postgres.convergence.analysis import _defaults_equivalent
+    from plain.postgres.convergence.analysis import _canonicalize_default_expr
     from plain.postgres.ddl import compile_literal_default_sql
 
     cases = [
@@ -195,10 +176,122 @@ def test_special_char_string_default_round_trip(isolated_db):
 
         actual_sql = column_default_sql("examples_defaultsexample", "status")
         assert actual_sql is not None
-        assert _defaults_equivalent(expected_sql, actual_sql), (
+        connection = get_connection()
+        with connection.cursor() as cursor:
+            canonical_expected = _canonicalize_default_expr(
+                cursor, DefaultsExample, "status", expected_sql
+            )
+        assert canonical_expected == actual_sql, (
             f"round-trip drift for default={value!r}: "
-            f"compiled={expected_sql!r} catalog={actual_sql!r}"
+            f"compiled={expected_sql!r} canonical={canonical_expected!r} "
+            f"catalog={actual_sql!r}"
         )
+
+
+def test_jsonb_default_no_drift_when_keys_reordered(isolated_db):
+    """A JSONField default whose Python source key order differs from the
+    DB-stored literal must not flag drift. pg_get_expr deparses literal
+    nodes verbatim, so source-order changes in the model leak straight
+    through the round-trip — only the JSON-semantic fallback in
+    `_compare_column_default` keeps these in sync. Without that fallback,
+    every sync of a JSONField default whose author rearranged keys would
+    report spurious CHANGED."""
+    from conftest_convergence import execute
+
+    from plain.postgres import JSONField
+    from plain.postgres.convergence.analysis import _compare_column_default
+    from plain.postgres.introspection import ColumnState, introspect_table
+
+    table = "_test_jsonb_default_table"
+    # DB stores the default with one key order.
+    execute(
+        f'CREATE TABLE "{table}" '
+        "(id integer PRIMARY KEY, "
+        "settings jsonb NOT NULL "
+        'DEFAULT \'{"b": 1, "a": 2}\'::jsonb)'
+    )
+    try:
+
+        class FakeModel:
+            class model_options:
+                db_table = table
+
+        # Same JSON values, different Python source key order than the DB.
+        field = JSONField(default={"a": 2, "b": 1})
+        field.set_attributes_from_name("settings")
+        field.model = FakeModel  # ty: ignore[invalid-assignment]
+
+        connection = get_connection()
+        with connection.cursor() as cursor:
+            actual_default = (
+                introspect_table(connection, cursor, table)
+                .columns["settings"]
+                .default_sql
+            )
+        assert actual_default is not None
+        actual = ColumnState(type="jsonb", not_null=True, default_sql=actual_default)
+
+        with connection.cursor() as cursor:
+            result = _compare_column_default(cursor, field, actual, table)
+
+        assert result is None, (
+            f"Spurious drift for semantically equal jsonb defaults: "
+            f"model={{'a': 2, 'b': 1}}, db default_sql={actual_default!r}"
+        )
+    finally:
+        execute(f'DROP TABLE IF EXISTS "{table}"')
+
+
+def test_jsonb_default_drift_when_values_differ(isolated_db):
+    """The JSON-semantic fallback resolves *key order*, not value drift —
+    a JSONField whose default value really differs from the DB literal
+    must still report CHANGED. Pins the negative case so the fallback
+    can't drift into a "never reports JSONField drift" bug."""
+    from conftest_convergence import execute
+
+    from plain.postgres import JSONField
+    from plain.postgres.convergence.analysis import (
+        ColumnDefaultDrift,
+        DriftKind,
+        _compare_column_default,
+    )
+    from plain.postgres.introspection import ColumnState, introspect_table
+
+    table = "_test_jsonb_default_drift_table"
+    execute(
+        f'CREATE TABLE "{table}" '
+        "(id integer PRIMARY KEY, "
+        "settings jsonb NOT NULL "
+        "DEFAULT '{\"a\": 1}'::jsonb)"
+    )
+    try:
+
+        class FakeModel:
+            class model_options:
+                db_table = table
+
+        # Genuinely different value — `a: 2` vs DB's `a: 1`.
+        field = JSONField(default={"a": 2})
+        field.set_attributes_from_name("settings")
+        field.model = FakeModel  # ty: ignore[invalid-assignment]
+
+        connection = get_connection()
+        with connection.cursor() as cursor:
+            actual_default = (
+                introspect_table(connection, cursor, table)
+                .columns["settings"]
+                .default_sql
+            )
+        assert actual_default is not None
+        actual = ColumnState(type="jsonb", not_null=True, default_sql=actual_default)
+
+        with connection.cursor() as cursor:
+            result = _compare_column_default(cursor, field, actual, table)
+
+        assert isinstance(result, ColumnDefaultDrift)
+        assert result.kind == DriftKind.CHANGED
+    finally:
+        execute(f'DROP TABLE IF EXISTS "{table}"')
 
 
 def test_backslash_in_string_default_rejected():

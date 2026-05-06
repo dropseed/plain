@@ -11,6 +11,7 @@ from .analysis import (
     IndexStatus,
     ModelAnalysis,
     NullabilityDrift,
+    ReadOnlyConnectionError,
     analyze_model,
 )
 from .fixes import (
@@ -65,6 +66,7 @@ __all__ = [
     "ModelAnalysis",
     "NullabilityDrift",
     "PlanItem",
+    "ReadOnlyConnectionError",
     "RebuildIndexFix",
     "RenameConstraintFix",
     "RenameIndexFix",
