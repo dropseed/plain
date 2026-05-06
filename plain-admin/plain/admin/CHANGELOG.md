@@ -1,5 +1,15 @@
 # plain-admin changelog
 
+## [0.81.2](https://github.com/dropseed/plain/releases/plain-admin@0.81.2) (2026-05-05)
+
+### What's changed
+
+- Exposes `__version__` from `importlib.metadata` on `plain.admin` for version probes that don't want to scrape pip metadata. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.81.1](https://github.com/dropseed/plain/releases/plain-admin@0.81.1) (2026-05-01)
 
 ### What's changed
