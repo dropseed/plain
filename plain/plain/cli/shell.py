@@ -34,6 +34,18 @@ def shell(interface: str | None, command: str | None) -> None:
             sys.exit(result.returncode)
         return
 
+    if not sys.stdin.isatty():
+        # Piped/redirected stdin: PYTHONSTARTUP is only honored for interactive
+        # sessions, so call plain.runtime.setup() ourselves before exec'ing the
+        # script piped on stdin. The subprocess inherits stdin from us.
+        wrapper = (
+            "import plain.runtime, sys; plain.runtime.setup(); exec(sys.stdin.read())"
+        )
+        result = subprocess.run(["python", "-c", wrapper])
+        if result.returncode:
+            sys.exit(result.returncode)
+        return
+
     interface_list: list[str]
     if interface:
         interface_list = [interface]
