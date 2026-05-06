@@ -40,7 +40,13 @@ from .registry import jobs_registry
 if TYPE_CHECKING:
     from .jobs import Job
 
-__all__ = ["JobRequest", "JobProcess", "JobResult", "JobResultStatuses"]
+__all__ = [
+    "JobRequest",
+    "JobProcess",
+    "JobResult",
+    "JobResultStatuses",
+    "WorkerHeartbeat",
+]
 
 logger = get_framework_logger()
 
@@ -130,10 +136,16 @@ class JobRequest(postgres.Model):
     def __str__(self) -> str:
         return f"{self.job_class} [{self.uuid}]"
 
-    def convert_to_job_process(self) -> JobProcess:
+    def convert_to_job_process(self, *, worker_id: UUID) -> JobProcess:
         """
         JobRequests are the pending jobs that are waiting to be executed.
         We immediately convert them to JobProcess when they are picked up.
+
+        worker_id stamps ownership: rescue_stale_workers uses it to find
+        which jobs belonged to a worker whose heartbeat went stale. Required —
+        every JobProcess has an owning worker, and the NOT NULL column
+        constraint is what stops pre-heartbeat workers from inserting
+        unrescuable rows during a rolling upgrade.
         """
         with transaction.atomic():
             result = JobProcess.query.create(
@@ -149,6 +161,7 @@ class JobRequest(postgres.Model):
                 concurrency_key=self.concurrency_key,
                 trace_id=self.trace_id,
                 span_id=self.span_id,
+                worker_id=worker_id,
             )
 
             # Delete the pending JobRequest now
@@ -163,22 +176,6 @@ class JobQuerySet(postgres.QuerySet["JobProcess"]):
 
     def waiting(self) -> Self:
         return self.filter(started_at__isnull=True)
-
-    def mark_lost_jobs(self) -> None:
-        # Lost jobs are jobs that have been pending for too long,
-        # and probably never going to get picked up by a worker process.
-        # In theory we could save a timeout per-job and mark them timed-out more quickly,
-        # but if they're still running, we can't actually send a signal to cancel it...
-        now = timezone.now()
-        cutoff = now - datetime.timedelta(seconds=settings.JOBS_TIMEOUT)
-        lost_jobs = self.filter(
-            created_at__lt=cutoff
-        )  # Doesn't matter whether it started or not -- it shouldn't take this long.
-
-        # Note that this will save it in the results,
-        # but lost jobs are only retried if they have a retry!
-        for job in lost_jobs:
-            job.convert_to_result(status=JobResultStatuses.LOST)
 
 
 @postgres.register_model
@@ -215,6 +212,8 @@ class JobProcess(postgres.Model):
         max_length=18, required=False, allow_null=True
     )
 
+    worker_id: UUID = types.UUIDField()
+
     query: JobQuerySet = JobQuerySet()
 
     model_options = postgres.Options(
@@ -239,6 +238,9 @@ class JobProcess(postgres.Model):
                 name="plainjobs_jobprocess_trace_id_idx", fields=["trace_id"]
             ),
             postgres.Index(name="plainjobs_jobprocess_uuid_idx", fields=["uuid"]),
+            postgres.Index(
+                name="plainjobs_jobprocess_worker_id_idx", fields=["worker_id"]
+            ),
             # Used for job grouping queries
             postgres.Index(
                 name="job_concurrency_key",
@@ -319,7 +321,7 @@ class JobProcess(postgres.Model):
                     queue_wait_duration_histogram.record(queue_wait, metric_attributes)
 
                 try:
-                    job = jobs_registry.load_job(self.job_class, self.parameters or {})
+                    job = jobs_registry.load_job(self.job_class, self.parameters)
                     job.job_process = self
 
                     try:
@@ -354,6 +356,12 @@ class JobProcess(postgres.Model):
                     )
 
                 except Exception as e:
+                    # Note: if a rescuer already wrote JobResult(LOST) for this
+                    # row (heartbeat went stale during a long job, then the job
+                    # actually finished), the convert_to_result below trips the
+                    # unique constraint on job_process_uuid and produces a
+                    # second log line. Rare; correct outcome; not worth
+                    # pre-checking on every successful job.
                     logger.exception(e)
                     record_span_error(span, e, metric_attributes)
                     return self.convert_to_result(
@@ -437,9 +445,17 @@ class JobProcess(postgres.Model):
 
             return result
 
-    def convert_to_result(self, *, status: str, error: str = "") -> JobResult:
+    def convert_to_result(
+        self, *, status: str, error: str = "", fire_hook: bool = True
+    ) -> JobResult:
         """
         Convert this JobProcess to a JobResult.
+
+        fire_hook controls whether on_aborted dispatches synchronously. The
+        rescue path passes fire_hook=False so it can dispatch hooks AFTER its
+        outer transaction commits — otherwise a hook DB error would mark the
+        connection for rollback even though dispatch_aborted_hook catches the
+        exception, poisoning the rescue commit.
         """
         with transaction.atomic():
             result = JobResult.query.create(
@@ -466,6 +482,15 @@ class JobProcess(postgres.Model):
 
             # Delete the JobProcess now
             self.delete()
+
+        # Fire Job.on_aborted outside the atomic block so a raise in user code
+        # can't roll back the framework's bookkeeping. Only for terminal
+        # statuses run() couldn't observe.
+        if fire_hook and status in (
+            JobResultStatuses.LOST,
+            JobResultStatuses.CANCELLED,
+        ):
+            result.dispatch_aborted_hook()
 
         return result
 
@@ -637,12 +662,49 @@ class JobResult(postgres.Model):
             postgres.UniqueConstraint(
                 fields=["uuid"], name="plainjobs_jobresult_unique_uuid"
             ),
+            # One JobProcess produces exactly one JobResult. Guards the
+            # rescue-vs-late-finish race: if our heartbeat goes stale during a
+            # DB outage, a peer rescuer creates JobResult(LOST) for our
+            # JobProcess. When our subprocess eventually finishes and calls
+            # convert_to_result on the now-deleted JobProcess, the second
+            # insert hits this constraint and is swallowed by process_job's
+            # outer except — instead of silently producing two divergent
+            # results for the same run.
+            postgres.UniqueConstraint(
+                fields=["job_process_uuid"],
+                name="plainjobs_jobresult_unique_job_process_uuid",
+            ),
         ],
     )
 
+    def dispatch_aborted_hook(self) -> None:
+        """
+        Load the Job class and call its on_aborted hook with this result.
+
+        Errors loading the class or running the hook are logged but suppressed
+        so JobProcess → JobResult bookkeeping is never blocked by user code or
+        stale registrations.
+        """
+        try:
+            job = jobs_registry.load_job(self.job_class, self.parameters)
+        except Exception:
+            logger.exception(
+                "Failed to load job for on_aborted hook",
+                extra={"job_class": self.job_class},
+            )
+            return
+
+        try:
+            job.on_aborted(self)
+        except Exception:
+            logger.exception(
+                "Job.on_aborted raised",
+                extra={"job_class": self.job_class},
+            )
+
     def retry_job(self, delay: int | None = None) -> JobRequest | None:
         retry_attempt = self.retry_attempt + 1
-        job = jobs_registry.load_job(self.job_class, self.parameters or {})
+        job = jobs_registry.load_job(self.job_class, self.parameters)
 
         if delay is None:
             retry_delay = job.calculate_retry_delay(retry_attempt)
@@ -665,3 +727,113 @@ class JobResult(postgres.Model):
                 return result
 
         return None
+
+
+@postgres.register_model
+class WorkerHeartbeat(postgres.Model):
+    """
+    A live registration row written by each worker process while it's running.
+
+    Workers create a row at startup, bump `last_heartbeat_at` periodically, and
+    delete it on clean shutdown. `rescue_stale_workers` finds rows whose
+    heartbeat is older than `JOBS_HEARTBEAT_TIMEOUT` and rescues their
+    in-flight jobs.
+    """
+
+    worker_id: UUID = types.UUIDField()
+    hostname: str = types.TextField(max_length=255)
+    pid: int = types.IntegerField()
+    queues: list[str] = types.JSONField()
+    started_at: datetime.datetime = types.DateTimeField(create_now=True)
+    last_heartbeat_at: datetime.datetime = types.DateTimeField()
+
+    model_options = postgres.Options(
+        ordering=["-last_heartbeat_at"],
+        indexes=[
+            postgres.Index(
+                name="plainjobs_workerheartbeat_last_heartbeat_at_idx",
+                fields=["last_heartbeat_at"],
+            ),
+        ],
+        constraints=[
+            # The unique constraint provides the worker_id lookup index.
+            postgres.UniqueConstraint(
+                fields=["worker_id"],
+                name="plainjobs_workerheartbeat_unique_worker_id",
+            ),
+        ],
+    )
+
+    def __str__(self) -> str:
+        return f"WorkerHeartbeat({self.worker_id} on {self.hostname}:{self.pid})"
+
+
+def rescue_stale_workers() -> list[JobResult]:
+    """
+    Convert in-flight JobProcess rows from dead workers to JobResult(LOST).
+
+    A worker is dead when its WorkerHeartbeat is older than
+    JOBS_HEARTBEAT_TIMEOUT. Detection is heartbeat-based, not time-based, so
+    a long-running legitimate job is safe as long as its worker keeps
+    heartbeating.
+
+    Returns the JobResults whose on_aborted hook still needs to fire. The
+    caller dispatches them, interleaving heartbeat ticks if needed — a slow
+    or large batch of hooks would otherwise starve the calling worker's
+    heartbeat and trigger false-positive rescue from a peer.
+
+    This is a free function (not a queryset method) because rescue is
+    inherently global: filtering would let one rescuer claim a dead heartbeat
+    without converting all of that worker's jobs, stranding the rest forever.
+    """
+    cutoff = timezone.now() - datetime.timedelta(
+        seconds=settings.JOBS_HEARTBEAT_TIMEOUT
+    )
+    dead_workers = WorkerHeartbeat.query.filter(last_heartbeat_at__lt=cutoff)
+
+    pending_hooks: list[JobResult] = []
+    for worker in dead_workers:
+        # Per-worker rescue is atomic: the heartbeat delete (claim) and every
+        # JobProcess→JobResult conversion either all commit, or all roll
+        # back. Without this, a mid-loop failure would leave the heartbeat
+        # deleted but some JobProcesses still stamped with the dead worker_id
+        # — stranded forever with no heartbeat to match.
+        #
+        # on_aborted hooks are deferred: dispatching them inside the atomic
+        # block would let a hook's DB error mark the connection for rollback
+        # (even though dispatch_aborted_hook swallows the exception),
+        # aborting the rescue commit.
+        worker_hooks: list[JobResult] = []
+        try:
+            with transaction.atomic():
+                # Atomic claim. If another rescuer also saw this dead
+                # heartbeat, only one of us deletes a row. The loser sees 0
+                # affected and skips.
+                claimed = WorkerHeartbeat.query.filter(
+                    worker_id=worker.worker_id,
+                    last_heartbeat_at__lt=cutoff,
+                ).delete()
+                if not claimed:
+                    continue
+
+                # list() materializes the queryset before the loop body
+                # starts deleting rows, so iteration can't skip entries.
+                for job in list(JobProcess.query.filter(worker_id=worker.worker_id)):
+                    result = job.convert_to_result(
+                        status=JobResultStatuses.LOST, fire_hook=False
+                    )
+                    worker_hooks.append(result)
+        except Exception:
+            # One dead worker's failure shouldn't abort rescue of others. The
+            # next rescue tick will retry this worker (heartbeat was rolled
+            # back, so it's still discoverable).
+            logger.exception(
+                "Failed to rescue jobs for dead worker",
+                extra={"worker_id": str(worker.worker_id)},
+            )
+            continue
+
+        # Rescue committed. Hand hooks back for the caller to dispatch.
+        pending_hooks.extend(worker_hooks)
+
+    return pending_hooks

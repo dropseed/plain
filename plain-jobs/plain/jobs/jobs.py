@@ -34,7 +34,7 @@ from .otel import operation_duration_histogram, sent_messages_counter, tracer
 from .registry import JobParameters, jobs_registry
 
 if TYPE_CHECKING:
-    from .models import JobProcess, JobRequest
+    from .models import JobProcess, JobRequest, JobResult
 
 
 class JobType(ABCMeta):
@@ -349,6 +349,14 @@ class Job(metaclass=JobType):
         On the first retry, attempt will be 1.
         """
         return 0
+
+    def on_aborted(self, result: JobResult) -> None:
+        """
+        Called when this job's process was terminated externally before run()
+        could complete (status LOST or CANCELLED). Default no-op.
+
+        See README "Worker resilience" for the full contract.
+        """
 
     def get_enqueue_lock(
         self, concurrency_key: str

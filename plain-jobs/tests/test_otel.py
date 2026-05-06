@@ -8,6 +8,8 @@ hottest user-facing path.
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from opentelemetry.metrics import CallbackOptions
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
@@ -240,7 +242,7 @@ def test_running_counts_started_jobprocess_rows_by_queue(metrics) -> None:
 
     request = _NoopJob().run_in_worker()
     assert request is not None
-    process = request.convert_to_job_process()
+    process = request.convert_to_job_process(worker_id=uuid.uuid4())
 
     metrics(_WorkerStub(queues=["default"]))
 

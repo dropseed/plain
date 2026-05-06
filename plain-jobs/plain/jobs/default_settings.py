@@ -1,5 +1,8 @@
 JOBS_RESULTS_RETENTION: int = 60 * 60 * 24 * 7  # One week
-JOBS_TIMEOUT: int = 60 * 60 * 24  # One day
+JOBS_HEARTBEAT_INTERVAL: int = 60  # Seconds between worker heartbeat writes
+JOBS_HEARTBEAT_TIMEOUT: int = (
+    60 * 5
+)  # Seconds without a heartbeat before a worker is considered dead and its in-flight jobs marked LOST
 JOBS_MIDDLEWARE: list[str] = [
     "plain.jobs.middleware.AppLoggerMiddleware",
 ]

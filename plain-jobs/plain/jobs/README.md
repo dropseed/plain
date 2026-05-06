@@ -9,6 +9,7 @@
 - [Scheduled jobs](#scheduled-jobs)
 - [Admin interface](#admin-interface)
 - [Job history](#job-history)
+- [Worker resilience](#worker-resilience)
 - [Monitoring](#monitoring)
 - [Settings](#settings)
 - [FAQs](#faqs)
@@ -119,6 +120,13 @@ class MyJob(Job):
         # Called before enqueueing - return False to skip
         # Use for concurrency limits, rate limits, etc.
         return True
+
+    def on_aborted(self, result: JobResult) -> None:
+        # Called when this job's process was terminated externally before
+        # run() could complete (status=LOST or status=CANCELLED).
+        # Use this to reconcile domain state that run()'s try/finally would
+        # have released, since try/finally did not execute.
+        pass
 ```
 
 ## Scheduled jobs
@@ -165,6 +173,44 @@ Job execution history is stored in the [`JobResult`](./models.py#JobResult) mode
 
 See [Settings](#settings) for configuring job retention and timeouts.
 
+## Worker resilience
+
+Each worker process registers itself in a [`WorkerHeartbeat`](./models.py#WorkerHeartbeat) row at startup, bumps `last_heartbeat_at` every `JOBS_HEARTBEAT_INTERVAL` seconds while running, and deletes the row on clean shutdown. Every `JobProcess` is stamped with the picking worker's `worker_id`, so when a heartbeat goes stale (older than `JOBS_HEARTBEAT_TIMEOUT`), the next worker's rescue tick can find the dead worker's in-flight jobs and convert them to `JobResult(status=LOST)`.
+
+This means a worker killed mid-run (Heroku deploy SIGKILL, OOM, host crash) gets detected within a few minutes — independent of how long any individual job legitimately runs. A long-running job is safe as long as its worker keeps heartbeating.
+
+### Reacting to abortions
+
+Override [`Job.on_aborted(result)`](./jobs.py#Job.on_aborted) to react when a job's process is terminated externally:
+
+```python
+@register_job
+class GenerateReportJob(Job):
+    def __init__(self, report_id):
+        self.report_id = report_id
+
+    def run(self):
+        report = Report.query.get(id=self.report_id)
+        report.status = "running"
+        report.save()
+        # ...do the work...
+        report.status = "done"
+        report.save()
+
+    def on_aborted(self, result):
+        # The worker was killed mid-run; run()'s cleanup never executed.
+        # Flip the report out of the limbo state.
+        Report.query.filter(id=self.report_id).update(
+            status="failed", error="worker terminated"
+        )
+```
+
+The hook fires for terminal statuses that `run()` itself could not observe — `LOST` (process killed) and `CANCELLED` (future cancelled before execution). It does **not** fire for `SUCCESSFUL` or `ERRORED`, which `run()` can handle directly via normal control flow.
+
+The Job instance is reconstructed from stored parameters; no in-memory state from the original run is preserved. Exceptions raised by the hook are caught and logged so they cannot block the result from being recorded.
+
+If your job has retries configured, `on_aborted` fires when the JobProcess transitions to LOST/CANCELLED — _before_ any retry runs. Apps that only want to react after retries are exhausted should check `result.retries == result.retry_attempt`.
+
 ## Monitoring
 
 Workers report statistics and can be monitored using the `--stats-every` option:
@@ -197,7 +243,8 @@ Two contract details to be aware of:
 | Setting                               | Default           |
 | ------------------------------------- | ----------------- |
 | `JOBS_RESULTS_RETENTION`              | `604800` (7 days) |
-| `JOBS_TIMEOUT`                        | `86400` (1 day)   |
+| `JOBS_HEARTBEAT_INTERVAL`             | `60` (1 minute)   |
+| `JOBS_HEARTBEAT_TIMEOUT`              | `300` (5 minutes) |
 | `JOBS_MIDDLEWARE`                     | `[...]`           |
 | `JOBS_SCHEDULE`                       | `[]`              |
 | `JOBS_WORKER_MAX_PROCESSES`           | `None`            |

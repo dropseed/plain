@@ -27,12 +27,14 @@ class JobsRegistry:
     def get_job_class(self, name: str) -> type[Job]:
         return self.jobs[name]
 
-    def load_job(self, job_class_name: str, parameters: dict[str, Any]) -> Job:
+    def load_job(
+        self, job_class_name: str, parameters: dict[str, Any] | None = None
+    ) -> Job:
         if not self.ready:
             raise RuntimeError("Jobs registry is not ready yet")
 
         job_class = self.get_job_class(job_class_name)
-        args, kwargs = JobParameters.from_json(parameters)
+        args, kwargs = JobParameters.from_json(parameters or {})
         return job_class(*args, **kwargs)
 
 

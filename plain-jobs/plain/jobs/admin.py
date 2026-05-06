@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from datetime import timedelta
 
 from plain import postgres
@@ -13,8 +14,15 @@ from plain.admin.views import (
 from plain.http import RedirectResponse
 from plain.postgres.expressions import Case, When
 from plain.runtime import settings
+from plain.utils import timezone
 
-from .models import JobProcess, JobRequest, JobResult, JobResultQuerySet
+from .models import (
+    JobProcess,
+    JobRequest,
+    JobResult,
+    JobResultQuerySet,
+    WorkerHeartbeat,
+)
 
 
 def _td_format(td_object: timedelta) -> str:
@@ -87,8 +95,11 @@ class LostJobsCard(Card):
     text = "View"  # TODO make not required - just an icon?
 
     def get_description(self) -> str:
-        delta = timedelta(seconds=settings.JOBS_TIMEOUT)
-        return f"Jobs are considered lost after {_td_format(delta)}"
+        delta = timedelta(seconds=settings.JOBS_HEARTBEAT_TIMEOUT)
+        return (
+            f"Jobs are considered lost when their worker stops heartbeating "
+            f"for more than {_td_format(delta)}"
+        )
 
     def get_metric(self) -> int:
         return JobResult.query.lost().count()
@@ -120,6 +131,47 @@ class RunningJobsCard(Card):
 
     def get_metric(self) -> int:
         return JobProcess.query.running().count()
+
+
+def _heartbeat_cutoff() -> datetime.datetime:
+    return timezone.now() - timedelta(seconds=settings.JOBS_HEARTBEAT_TIMEOUT)
+
+
+class ActiveWorkersCard(Card):
+    title = "Active workers"
+    text = "View"
+
+    def get_description(self) -> str:
+        delta = timedelta(seconds=settings.JOBS_HEARTBEAT_TIMEOUT)
+        return f"Workers whose heartbeat is within the last {_td_format(delta)}."
+
+    def get_metric(self) -> int:
+        return WorkerHeartbeat.query.filter(
+            last_heartbeat_at__gte=_heartbeat_cutoff()
+        ).count()
+
+    def get_link(self) -> str:
+        return WorkerHeartbeatViewset.ListView.get_view_url()
+
+
+class StaleWorkersCard(Card):
+    title = "Stale workers"
+    text = "View"
+
+    def get_description(self) -> str:
+        delta = timedelta(seconds=settings.JOBS_HEARTBEAT_TIMEOUT)
+        return (
+            f"Workers whose heartbeat is older than {_td_format(delta)}. "
+            f"Their in-flight jobs are about to be rescued as Lost."
+        )
+
+    def get_metric(self) -> int:
+        return WorkerHeartbeat.query.filter(
+            last_heartbeat_at__lt=_heartbeat_cutoff()
+        ).count()
+
+    def get_link(self) -> str:
+        return WorkerHeartbeatViewset.ListView.get_view_url() + "?display=Stale"
 
 
 @register_viewset
@@ -170,6 +222,8 @@ class JobProcessViewset(AdminViewset):
         cards = [
             WaitingJobsCard,
             RunningJobsCard,
+            ActiveWorkersCard,
+            StaleWorkersCard,
         ]
 
         def perform_action(self, action: str, target_ids: list[int]) -> None:
@@ -274,3 +328,58 @@ class JobResultViewset(AdminViewset):
         def post(self) -> RedirectResponse:
             self.object.retry_job(delay=0)
             return RedirectResponse(".")
+
+
+@register_viewset
+class WorkerHeartbeatViewset(AdminViewset):
+    class ListView(AdminModelListView):
+        nav_section = "Jobs"
+        nav_icon = "heart-pulse"
+        model = WorkerHeartbeat
+        title = "Workers"
+        description = (
+            "Live worker processes. Each row is refreshed while its worker is "
+            "running and deleted on clean shutdown."
+        )
+        fields = [
+            "worker_id",
+            "hostname",
+            "pid",
+            "queues",
+            "started_at",
+            "last_heartbeat_at",
+            "stale",
+        ]
+        search_fields = [
+            "worker_id",
+            "hostname",
+        ]
+        filters = [
+            "Active",
+            "Stale",
+        ]
+        queryset_order = ["-last_heartbeat_at"]
+
+        def get_initial_queryset(self) -> postgres.QuerySet[WorkerHeartbeat]:
+            queryset = super().get_initial_queryset()
+            return queryset.annotate(
+                stale=Case(
+                    When(last_heartbeat_at__lt=_heartbeat_cutoff(), then=True),
+                    default=False,
+                    output_field=postgres.BooleanField(),
+                ),
+            )
+
+        def filter_queryset(
+            self, queryset: postgres.QuerySet[WorkerHeartbeat]
+        ) -> postgres.QuerySet[WorkerHeartbeat]:
+            cutoff = _heartbeat_cutoff()
+            if self.filter == "Active":
+                return queryset.filter(last_heartbeat_at__gte=cutoff)
+            if self.filter == "Stale":
+                return queryset.filter(last_heartbeat_at__lt=cutoff)
+            return queryset
+
+    class DetailView(AdminModelDetailView):
+        model = WorkerHeartbeat
+        title = "Worker"
