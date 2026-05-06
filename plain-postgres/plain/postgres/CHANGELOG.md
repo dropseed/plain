@@ -1,5 +1,19 @@
 # plain-postgres changelog
 
+## [0.102.0](https://github.com/dropseed/plain/releases/plain-postgres@0.102.0) (2026-05-05)
+
+### What's changed
+
+- **`Model.query` is now bound to `Self` (PEP 673), so subclasses specialize automatically.** `User.query` types as `QuerySet[User]` and `User.query.first()` as `User | None` without per-model annotations. Custom `QuerySet` subclasses (e.g. `TaskQuerySet`) are still preserved by the existing `Self`-returning descriptor. Now-redundant `cast(T, ...)` wrappers in the FK/M2M related managers are gone — `self.model.query.create(...)` already types as `T`. ([0f5b2f66](https://github.com/dropseed/plain/commit/0f5b2f66))
+- **Convergence diffs are now canonicalized through Postgres `pg_get_*` round-trips on a session-private temp table** instead of sqlparse-based text normalization. Both sides of every index/constraint/default comparison are deparsed by Postgres itself, eliminating false-positive drift from formatting differences. Adds `ReadOnlyConnectionError` when the round-trip can't get DDL. The `normalize_check_definition`, `normalize_default_sql`, `normalize_expression`, `normalize_index_definition`, and `normalize_unique_definition` helpers are removed from `plain.postgres.introspection`, and `sqlparse` is no longer a dependency. ([4b42b4d1](https://github.com/dropseed/plain/commit/4b42b4d1))
+- **`CheckConstraint.validate()` now exits early when a referenced field is missing from the value map**, deferring to the field-level error that excluded it. Calling `full_clean()` on a model with both `choices=` and a `CheckConstraint` referencing the same field used to crash with `AssertionError: Field lookups require a model` — the choice error excluded the field, then constraint validation tried to resolve the missing annotation. The walker is exposed as the public `CheckConstraint.referenced_fields()` method. ([d13f47d1](https://github.com/dropseed/plain/commit/d13f47d1))
+- Tightened class-level annotations on `Query.select` and friends, `Operation.atomic`, and `ChoicesField.choices` for ty 0.0.33; replaced the `ModelState` `fields_cache` descriptor with a plain `__init__`. ([4b9d1db1](https://github.com/dropseed/plain/commit/4b9d1db1))
+- Exposes `__version__` from `importlib.metadata` on `plain.postgres`. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- If you imported any of `normalize_check_definition`, `normalize_default_sql`, `normalize_expression`, `normalize_index_definition`, or `normalize_unique_definition` from `plain.postgres.introspection`, those helpers are gone — use `pg_get_indexdef` / `pg_get_constraintdef` directly or rely on the new convergence round-trip path.
+
 ## [0.101.0](https://github.com/dropseed/plain/releases/plain-postgres@0.101.0) (2026-04-30)
 
 ### What's changed
