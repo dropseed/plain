@@ -1,5 +1,16 @@
 # plain-passwords changelog
 
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-passwords@0.26.0) (2026-05-05)
+
+### What's changed
+
+- The `PasswordField` admin display now uses admin-muted color tokens (so it adapts to dark mode) and renders an explicit "Not set" indicator for empty values instead of a blank cell. ([feabbe4a](https://github.com/dropseed/plain/commit/feabbe4a))
+- Exposes `__version__` from `importlib.metadata` on `plain.passwords`. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.25.2](https://github.com/dropseed/plain/releases/plain-passwords@0.25.2) (2026-04-13)
 
 ### What's changed
