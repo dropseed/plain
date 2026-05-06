@@ -1,5 +1,16 @@
 # plain-jobs changelog
 
+## [0.52.0](https://github.com/dropseed/plain/releases/plain-jobs@0.52.0) (2026-05-06)
+
+### What's changed
+
+- **`messaging.client.consumed.messages` now carries a `plain.jobs.outcome` attribute** (`successful`, `errored`, `lost`, `cancelled`, `deferred`) so dashboards can split throughput by terminal status. `error.type` is also forwarded for `errored` jobs caught by the live path. The `deferred` path now ticks the counter too — previously it bypassed the increment because `defer()` skips `convert_to_result`. ([49fa1952](https://github.com/dropseed/plain/commit/49fa1952))
+- **New `plain.jobs.workers` observable gauge** reporting `WorkerHeartbeat` row count split by a `plain.jobs.worker.state` attribute (`active` within `JOBS_HEARTBEAT_TIMEOUT`, `stale` past it). Global gauge with no per-queue dimension — aggregate with `last_value`/`max`, never `sum`. ([49fa1952](https://github.com/dropseed/plain/commit/49fa1952))
+
+### Upgrade instructions
+
+- If you have dashboards aggregating `messaging.client.consumed.messages`, sum across the new `plain.jobs.outcome` dimension to keep the existing total — or split by outcome to get the new view.
+
 ## [0.51.0](https://github.com/dropseed/plain/releases/plain-jobs@0.51.0) (2026-05-06)
 
 ### What's changed
