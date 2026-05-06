@@ -1,5 +1,24 @@
 # plain-jobs changelog
 
+## [0.51.0](https://github.com/dropseed/plain/releases/plain-jobs@0.51.0) (2026-05-06)
+
+### What's changed
+
+- **Worker liveness is now heartbeat-based, not time-based.** A new `WorkerHeartbeat` table tracks each running worker; rescue triggers when a worker stops refreshing its heartbeat for `JOBS_HEARTBEAT_TIMEOUT` (default 5 min). Replaces the old `JOBS_TIMEOUT` design, which was unsound for jobs whose runtime might exceed the timeout — a legitimately slow job past the cutoff would get marked LOST while still running, producing duplicate `JobResult` rows and phantom retries. Heartbeats let the framework distinguish "still running" from "worker died" with no false positives. Detection is now minutes instead of up to a day. ([8709e9a5b5](https://github.com/dropseed/plain/commit/8709e9a5b5))
+- **New `Job.on_aborted(self, result)` lifecycle hook.** Called for `LOST` and `CANCELLED` terminal statuses, giving apps a clean seam to reconcile domain state that `run()`'s `try/finally` would have released (release locks, flip user-visible status flags, send notifications, etc.). Fires after the rescue commit, with a fully-committed `JobResult` argument. Hooks that raise are logged and swallowed — they can't poison framework bookkeeping. Default implementation is a no-op.
+- **`JobProcess.worker_id` is `NOT NULL`.** Every in-flight row has a guaranteed owner; rescue logic doesn't need NULL-handling. Old workers attempting to claim a `JobRequest` after the migration runs fail loudly on the constraint instead of silently inserting unrescuable rows — the work stays queued for a new worker.
+- **Killed-mid-run subprocesses (OOM/segfault) are now classified `LOST` instead of `ERRORED`** when `started_at` was already set, so `on_aborted` fires for cleanup. Subprocess failures _before_ `run()` started (e.g. import errors) remain `ERRORED`, since there's no in-flight user state.
+- **Self-rescue:** workers periodically reconcile their own in-flight futures against DB rows. Anything stamped to this worker that isn't tracked by a live future and is older than `JOBS_HEARTBEAT_TIMEOUT` gets converted to `LOST`. Catches the rare case where a done-callback raises during conversion.
+- **`on_aborted` dispatch interleaves heartbeats** so a slow batch of hooks can't starve this worker's heartbeat and trigger a false-positive `LOST` from a peer rescuer.
+- **New settings:** `JOBS_HEARTBEAT_INTERVAL` (default 60s) and `JOBS_HEARTBEAT_TIMEOUT` (default 300s). Removed: `JOBS_TIMEOUT`.
+- **New admin view:** `WorkerHeartbeat` listing with Active / Stale filters, surfacing live workers and their queue assignments.
+
+### Upgrade instructions
+
+- Run `plain migrate` to apply migration `0012_workerheartbeat_jobprocess_worker_id` (creates `WorkerHeartbeat`, adds `worker_id` to `JobProcess`, backfills pre-existing rows under a 24h grace heartbeat). **Drain workers before deploying.** Old workers running pre-heartbeat code can't claim new work after the migration runs (the new `NOT NULL` constraint trips), so any unclaimed `JobRequest`s wait in queue for a new worker — strictly safe, but the deploy goes smoother if old workers have finished first.
+- If you previously set `PLAIN_JOBS_TIMEOUT`, replace it with `PLAIN_JOBS_HEARTBEAT_TIMEOUT` (the analogous "how long until a stuck worker's jobs are marked LOST" knob). Default is now 5 minutes vs the old 1 day — most apps will want to leave it at the default.
+- If any of your `Job` subclasses relied on a crashed-worker job ending up as `ERRORED`, update to handle `LOST` and consider implementing `on_aborted` for cleanup.
+
 ## [0.50.1](https://github.com/dropseed/plain/releases/plain-jobs@0.50.1) (2026-05-05)
 
 ### What's changed
