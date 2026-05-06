@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.52.1](https://github.com/dropseed/plain/releases/plain-jobs@0.52.1) (2026-05-06)
+
+### What's changed
+
+- **Failed-enqueue (PRODUCER) and failed-job (CONSUMER) span exceptions now carry `exception.escaped=True`.** The OTel SDK's auto-record path stamps `escaped=False`, which made the attribute useless for distinguishing workflow-level failures from internal child-span exceptions. The PRODUCER path now passes `record_exception=False` to suppress the SDK auto-record and routes through `record_span_error` so the failed send carries a single, correctly-marked event with `error.type` on the span (matching CONSUMER). ([e9c35b855f](https://github.com/dropseed/plain/commit/e9c35b855f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.52.0](https://github.com/dropseed/plain/releases/plain-jobs@0.52.0) (2026-05-06)
 
 ### What's changed
