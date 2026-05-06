@@ -1,5 +1,17 @@
 # plain changelog
 
+## [0.140.0](https://github.com/dropseed/plain/releases/plain@0.140.0) (2026-05-05)
+
+### What's changed
+
+- **`plain shell` now runs piped/heredoc stdin through `plain.runtime.setup()`** instead of relying on `PYTHONSTARTUP`. Previously `echo "User.query.count()" | plain shell` raised `PackageRegistryNotReady` because `PYTHONSTARTUP` is only honored for interactive sessions. Non-TTY stdin is now detected and exec'd after setup, matching the `-c` and `plain run` paths. Fixes #66. ([8777eb40](https://github.com/dropseed/plain/commit/8777eb40))
+- **Log formatter no longer pollutes records for downstream handlers.** The keyvalue/JSON formatters were setting working attrs on `vars(record)` for the lifetime of the process, so any other handler reading the record afterwards would ship those as `extra` fields. Mutations are now scoped to the `format()` call. ([c793ed71](https://github.com/dropseed/plain/commit/c793ed71))
+- Tightened type annotations across `plain.http.request`, `plain.server.http.request`, `plain.test.client`, and `plain.utils.inspect` for ty 0.0.33 — introduces a `RequestStream` Protocol for `Request._stream`. ([4b9d1db1](https://github.com/dropseed/plain/commit/4b9d1db1))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.139.0](https://github.com/dropseed/plain/releases/plain@0.139.0) (2026-04-30)
 
 ### What's changed
