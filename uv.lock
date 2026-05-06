@@ -1149,7 +1149,7 @@ requires-dist = [{ name = "click", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "plain-support"
-version = "0.34.5"
+version = "0.34.6"
 source = { editable = "plain-support" }
 dependencies = [
     { name = "plain" },
