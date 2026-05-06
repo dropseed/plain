@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.140.1](https://github.com/dropseed/plain/releases/plain@0.140.1) (2026-05-06)
+
+### What's changed
+
+- **5xx response span exceptions now carry `exception.escaped=True`.** The OTel SDK's auto-record path stamps `escaped=False`, which made the attribute useless for distinguishing workflow-level failures (a request that 500'd) from internal child-span exceptions. The SERVER span now records via the explicit `escaped=True` path so downstream tooling can filter on it. ([e9c35b855f](https://github.com/dropseed/plain/commit/e9c35b855f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.140.0](https://github.com/dropseed/plain/releases/plain@0.140.0) (2026-05-05)
 
 ### What's changed
