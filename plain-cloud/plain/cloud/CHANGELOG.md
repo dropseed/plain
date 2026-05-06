@@ -1,5 +1,15 @@
 # plain-cloud changelog
 
+## [0.3.3](https://github.com/dropseed/plain/releases/plain-cloud@0.3.3) (2026-05-05)
+
+### What's changed
+
+- Exposes `__version__` from `importlib.metadata` on `plain.cloud` for version probes that don't want to scrape pip metadata. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.3.2](https://github.com/dropseed/plain/releases/plain-cloud@0.3.2) (2026-04-30)
 
 ### What's changed
