@@ -1,5 +1,16 @@
 # plain-observer changelog
 
+## [0.34.9](https://github.com/dropseed/plain/releases/plain-observer@0.34.9) (2026-05-05)
+
+### What's changed
+
+- Added a direct `sqlparse` dependency now that `plain-postgres` 0.102.0 no longer pulls it in transitively. ([4b42b4d1](https://github.com/dropseed/plain/commit/4b42b4d1))
+- Exposes `__version__` from `importlib.metadata` on `plain.observer`. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.34.8](https://github.com/dropseed/plain/releases/plain-observer@0.34.8) (2026-04-24)
 
 ### What's changed
