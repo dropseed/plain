@@ -1,5 +1,15 @@
 # plain-esbuild changelog
 
+## [0.8.2](https://github.com/dropseed/plain/releases/plain-esbuild@0.8.2) (2026-05-05)
+
+### What's changed
+
+- Exposes `__version__` from `importlib.metadata` on `plain.esbuild` for version probes that don't want to scrape pip metadata. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.8.1](https://github.com/dropseed/plain/releases/plain-esbuild@0.8.1) (2026-02-26)
 
 ### What's changed
