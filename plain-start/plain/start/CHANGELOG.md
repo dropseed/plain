@@ -1,5 +1,15 @@
 # plain-start changelog
 
+## [0.3.1](https://github.com/dropseed/plain/releases/plain-start@0.3.1) (2026-05-05)
+
+### What's changed
+
+- Exposes `__version__` from `importlib.metadata` on `plain.start` for version probes that don't want to scrape pip metadata. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.3.0](https://github.com/dropseed/plain/releases/plain-start@0.3.0) (2026-02-28)
 
 ### What's changed
