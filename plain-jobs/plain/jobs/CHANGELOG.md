@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.50.1](https://github.com/dropseed/plain/releases/plain-jobs@0.50.1) (2026-05-05)
+
+### What's changed
+
+- Exposes `__version__` from `importlib.metadata` on `plain.jobs` for version probes that don't want to scrape pip metadata. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.50.0](https://github.com/dropseed/plain/releases/plain-jobs@0.50.0) (2026-05-01)
 
 ### What's changed
