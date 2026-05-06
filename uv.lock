@@ -1183,7 +1183,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-toolbar"
-version = "0.12.4"
+version = "0.12.5"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },
