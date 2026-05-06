@@ -1,5 +1,15 @@
 # plain-redirection changelog
 
+## [0.35.5](https://github.com/dropseed/plain/releases/plain-redirection@0.35.5) (2026-05-05)
+
+### What's changed
+
+- Exposes `__version__` from `importlib.metadata` on `plain.redirection` for version probes that don't want to scrape pip metadata. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.35.4](https://github.com/dropseed/plain/releases/plain-redirection@0.35.4) (2026-04-30)
 
 ### What's changed
