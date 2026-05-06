@@ -212,17 +212,17 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
     def create(self, **kwargs: Any) -> T:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return cast(T, self.model.query.create(**kwargs))
+        return self.model.query.create(**kwargs)
 
     def get_or_create(self, **kwargs: Any) -> tuple[T, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return cast(tuple[T, bool], self.model.query.get_or_create(**kwargs))
+        return self.model.query.get_or_create(**kwargs)
 
     def update_or_create(self, **kwargs: Any) -> tuple[T, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return cast(tuple[T, bool], self.model.query.update_or_create(**kwargs))
+        return self.model.query.update_or_create(**kwargs)
 
     def remove(self, *objs: T, bulk: bool = True) -> None:
         # remove() is only provided if the ForeignKeyField can have a value of null
@@ -494,7 +494,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
     ) -> T:
         new_obj = self.model.query.create(**kwargs)
         self.add(new_obj, through_defaults=through_defaults)
-        return cast(T, new_obj)
+        return new_obj
 
     def get_or_create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
@@ -504,7 +504,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         # from get() then the relationship already exists.
         if created:
             self.add(obj, through_defaults=through_defaults)
-        return cast(T, obj), created
+        return obj, created
 
     def update_or_create(
         self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
@@ -514,7 +514,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         # from get() then the relationship already exists.
         if created:
             self.add(obj, through_defaults=through_defaults)
-        return cast(T, obj), created
+        return obj, created
 
     def _get_target_ids(self, target_field_name: str, objs: Any) -> builtins.set[Any]:
         """Return the set of ids of `objs` that the target field references."""

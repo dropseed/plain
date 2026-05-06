@@ -4,7 +4,7 @@ import copy
 import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import chain
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 if TYPE_CHECKING:
     from plain.postgres.meta import Meta
@@ -86,7 +86,7 @@ class Model(metaclass=ModelBase):
     id: int = types.PrimaryKeyField()
 
     # Descriptors for other model behavior
-    query: QuerySet[Model] = QuerySet()
+    query: QuerySet[Self] = QuerySet()
     model_options: Options = Options()
     _model_meta: Meta = Meta()
     DoesNotExist = DoesNotExistDescriptor()
