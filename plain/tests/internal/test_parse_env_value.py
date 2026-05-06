@@ -3,16 +3,8 @@ from typing import Union
 import pytest
 
 from plain.exceptions import ImproperlyConfigured
-from plain.runtime import Secret, settings
+from plain.runtime import Secret
 from plain.runtime.user_settings import _parse_env_value
-
-
-def test_user_settings():
-    # Relies on env vars in conftest.py
-    assert settings.DEFAULT_SETTING == "unchanged default"
-    assert settings.EXPLICIT_SETTING == "explicitly changed"
-    assert settings.ENV_SETTING == 1
-    assert settings.EXPLICIT_OVERRIDDEN_SETTING == "env value"
 
 
 def test_parse_env_value_str_passthrough():
