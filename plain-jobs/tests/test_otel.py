@@ -19,12 +19,22 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 from opentelemetry.trace import SpanKind
 
 from plain.jobs import Job, otel
+from plain.jobs.registry import register_job
 from plain.jobs.workers import Worker
 
 
 class _NoopJob(Job):
     def run(self) -> None:
         pass
+
+
+@register_job
+class _BoomJob(Job):
+    """Job that always raises — for testing the live ERRORED path end to end.
+    Registered so `jobs_registry.load_job` can find it inside JobProcess.run()."""
+
+    def run(self) -> None:
+        raise RuntimeError("boom")
 
 
 class _ExclusiveJob(Job):
@@ -85,16 +95,7 @@ def test_enqueue_failure_records_error_type_on_metric(
     with pytest.raises(RuntimeError):
         _NoopJob().run_in_worker()
 
-    data = otel_metrics.get_metrics_data()
-    assert data is not None
-    sent_points = [
-        p
-        for rm in data.resource_metrics
-        for sm in rm.scope_metrics
-        for m in sm.metrics
-        if m.name == "messaging.client.sent.messages"
-        for p in m.data.data_points
-    ]
+    sent_points = _metric_points(otel_metrics, "messaging.client.sent.messages")
     assert sent_points, "expected sent_messages counter point on failure"
     assert all(p.attributes.get("error.type") == "RuntimeError" for p in sent_points)
     assert all(
@@ -230,6 +231,184 @@ def test_metrics_swap_routes_callbacks_to_current_instance(metrics) -> None:
 
     metrics(_WorkerStub(queues=["queue-b"]))
     assert set(_by_queue(otel.WorkerMetrics._gauge_queue_depth)) == {"queue-b"}
+
+
+def _metric_points(otel_metrics: InMemoryMetricReader, name: str) -> list:
+    """Return all data points for a named metric across the export."""
+    data = otel_metrics.get_metrics_data()
+    if data is None:
+        return []
+    return [
+        p
+        for rm in data.resource_metrics
+        for sm in rm.scope_metrics
+        for m in sm.metrics
+        if m.name == name
+        for p in m.data.data_points
+    ]
+
+
+def _trigger_outcome(status: str) -> None:
+    """Take a JobRequest through to a terminal JobResult with the given status."""
+    request = _NoopJob().run_in_worker()
+    assert request is not None
+    process = request.convert_to_job_process(worker_id=uuid.uuid4())
+    process.convert_to_result(status=status)
+
+
+@pytest.mark.usefixtures("db")
+def test_consumed_counter_records_outcome_for_lost(
+    otel_metrics: InMemoryMetricReader,
+) -> None:
+    """Rescue-path LOST conversions show up in the consumed counter with
+    plain.jobs.outcome=lost. Without this, dashboards counting throughput
+    via the semconv counter would silently miss every rescued job."""
+    from plain.jobs.models import JobResultStatuses
+
+    _trigger_outcome(JobResultStatuses.LOST)
+
+    points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+    lost_points = [
+        p for p in points if p.attributes.get("plain.jobs.outcome") == "lost"
+    ]
+    assert lost_points, "expected a consumed counter point with outcome=lost"
+    assert all(
+        p.attributes.get("messaging.system") == "plain.jobs" for p in lost_points
+    )
+    assert all(
+        p.attributes.get("messaging.destination.name") == "default" for p in lost_points
+    )
+
+
+@pytest.mark.usefixtures("db")
+def test_consumed_counter_records_outcome_for_cancelled(
+    otel_metrics: InMemoryMetricReader,
+) -> None:
+    from plain.jobs.models import JobResultStatuses
+
+    _trigger_outcome(JobResultStatuses.CANCELLED)
+
+    points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+    cancelled = [
+        p for p in points if p.attributes.get("plain.jobs.outcome") == "cancelled"
+    ]
+    assert cancelled, "expected a consumed counter point with outcome=cancelled"
+
+
+@pytest.mark.usefixtures("db")
+def test_consumed_counter_records_outcome_for_successful(
+    otel_metrics: InMemoryMetricReader,
+) -> None:
+    """SUCCESSFUL conversions tick the consumed counter — covers the live
+    convert_to_result path that the counter call now lives in."""
+    from plain.jobs.models import JobResultStatuses
+
+    _trigger_outcome(JobResultStatuses.SUCCESSFUL)
+
+    points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+    successful = [
+        p for p in points if p.attributes.get("plain.jobs.outcome") == "successful"
+    ]
+    assert successful, "expected a consumed counter point with outcome=successful"
+
+
+@pytest.mark.usefixtures("db")
+def test_consumed_counter_records_outcome_for_errored(
+    otel_metrics: InMemoryMetricReader,
+) -> None:
+    from plain.jobs.models import JobResultStatuses
+
+    _trigger_outcome(JobResultStatuses.ERRORED)
+
+    points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+    errored = [p for p in points if p.attributes.get("plain.jobs.outcome") == "errored"]
+    assert errored, "expected a consumed counter point with outcome=errored"
+
+
+@pytest.mark.usefixtures("db")
+def test_consumed_counter_includes_error_type_when_job_raises(
+    otel_metrics: InMemoryMetricReader,
+) -> None:
+    """When the live path catches an exception, the resulting consumed
+    counter point carries error.type alongside outcome=errored — same
+    semconv pattern the operation_duration histogram already follows."""
+    request = _BoomJob().run_in_worker()
+    assert request is not None
+    process = request.convert_to_job_process(worker_id=uuid.uuid4())
+    process.run()
+
+    # Counters are cumulative across tests in a process and the SDK splits
+    # by attribute set, so other tests may have produced errored points
+    # without `error.type`. Look for a point that carries both attributes.
+    points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+    matching = [
+        p
+        for p in points
+        if p.attributes.get("plain.jobs.outcome") == "errored"
+        and p.attributes.get("error.type") == "RuntimeError"
+    ]
+    assert matching, (
+        "expected a consumed counter point with outcome=errored and error.type=RuntimeError"
+    )
+
+
+@pytest.mark.usefixtures("db")
+def test_consumed_counter_records_outcome_for_deferred(
+    otel_metrics: InMemoryMetricReader,
+) -> None:
+    """DEFERRED bypasses convert_to_result — defer() builds the JobResult
+    directly, so this test pins the explicit record_consumed call in defer()."""
+    from plain.jobs.exceptions import DeferJob
+
+    request = _NoopJob().run_in_worker()
+    assert request is not None
+    process = request.convert_to_job_process(worker_id=uuid.uuid4())
+    process.defer(job=_NoopJob(), defer_exception=DeferJob(delay=60))
+
+    points = _metric_points(otel_metrics, "messaging.client.consumed.messages")
+    deferred = [
+        p for p in points if p.attributes.get("plain.jobs.outcome") == "deferred"
+    ]
+    assert deferred, "expected a consumed counter point with outcome=deferred"
+
+
+@pytest.mark.usefixtures("db")
+def test_workers_gauge_splits_by_state_attribute(metrics, settings) -> None:
+    """One `plain.jobs.workers` gauge with `plain.jobs.worker.state` attribute
+    distinguishing active vs. stale rows. One snapshot of the cutoff means a
+    boundary row can't end up in both states."""
+    import datetime
+    import socket
+
+    from plain.jobs.models import WorkerHeartbeat
+    from plain.utils import timezone
+
+    settings.JOBS_HEARTBEAT_TIMEOUT = 60
+    metrics(_WorkerStub(queues=["default"]))
+
+    now = timezone.now()
+    # Two within the cutoff, one past it.
+    for age in (5, 30):
+        WorkerHeartbeat.query.create(
+            worker_id=uuid.uuid4(),
+            hostname=socket.gethostname(),
+            pid=12345,
+            queues=["default"],
+            last_heartbeat_at=now - datetime.timedelta(seconds=age),
+        )
+    WorkerHeartbeat.query.create(
+        worker_id=uuid.uuid4(),
+        hostname=socket.gethostname(),
+        pid=67890,
+        queues=["default"],
+        last_heartbeat_at=now - datetime.timedelta(seconds=86400),
+    )
+
+    by_state = {
+        (o.attributes or {})["plain.jobs.worker.state"]: o.value
+        for o in otel.WorkerMetrics._gauge_workers(CallbackOptions())
+    }
+    assert by_state == {"active": 2, "stale": 1}
 
 
 @pytest.mark.usefixtures("db")

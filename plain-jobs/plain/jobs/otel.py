@@ -6,8 +6,14 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from opentelemetry import metrics, trace
 from opentelemetry.metrics import CallbackOptions, Observation
+from opentelemetry.semconv._incubating.attributes.code_attributes import (
+    CODE_FUNCTION_NAME,
+)
 from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MESSAGING_DESTINATION_NAME,
+    MESSAGING_OPERATION_TYPE,
+    MESSAGING_SYSTEM,
+    MessagingOperationTypeValues,
 )
 from opentelemetry.semconv._incubating.metrics.messaging_metrics import (
     create_messaging_client_consumed_messages,
@@ -16,12 +22,20 @@ from opentelemetry.semconv._incubating.metrics.messaging_metrics import (
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 
+from plain.postgres import Q
 from plain.postgres.aggregates import Count, Min
 from plain.utils import timezone
 from plain.utils.otel import format_exception_type
 
 if TYPE_CHECKING:
+    from .models import JobResult
     from .workers import Worker
+
+# Attribute key for the terminal-status dimension on the consumed counter.
+PLAIN_JOBS_OUTCOME = "plain.jobs.outcome"
+
+# Attribute key for the worker-liveness dimension on plain.jobs.workers.
+PLAIN_JOBS_WORKER_STATE = "plain.jobs.worker.state"
 
 try:
     _package_version = importlib.metadata.version("plain.jobs")
@@ -46,12 +60,46 @@ def record_span_error(
     span: trace.Span,
     exc: BaseException,
     metric_attributes: dict[str, Any],
-) -> None:
+) -> str:
+    """Mark the span as failed, stamp error.type on it and on the per-call
+    metric attribute dict, and return the error.type string so the caller
+    can forward it to other instruments."""
     error_type = format_exception_type(exc)
     span.record_exception(exc)
     span.set_status(trace.StatusCode.ERROR)
     span.set_attribute(ERROR_TYPE, error_type)
     metric_attributes[ERROR_TYPE] = error_type
+    return error_type
+
+
+def process_metric_attributes(queue: str, job_class: str) -> dict[str, Any]:
+    """Base attribute dict for messaging.client.* process-side metrics.
+
+    Shared by JobProcess.run() (which adds error.type for failed jobs) and
+    record_consumed (which adds the outcome dimension). One builder so
+    keys/values stay in lockstep across the two call sites.
+    """
+    return {
+        MESSAGING_SYSTEM: "plain.jobs",
+        MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.PROCESS.value,
+        MESSAGING_DESTINATION_NAME: queue,
+        CODE_FUNCTION_NAME: f"{job_class}.run",
+    }
+
+
+def record_consumed(result: JobResult, *, error_type: str | None = None) -> None:
+    """Record one consumed-message metric point per terminal JobResult.
+
+    `plain.jobs.outcome` carries the terminal status (successful/errored/
+    lost/cancelled/deferred). `error.type` is included when known — i.e.,
+    when the live path caught an exception and forwarded it through. The
+    rescue path (LOST) and direct cancellations don't carry an error type
+    because there is no exception object to derive it from."""
+    attrs = process_metric_attributes(result.queue, result.job_class)
+    attrs[PLAIN_JOBS_OUTCOME] = result.status.lower()
+    if error_type is not None:
+        attrs[ERROR_TYPE] = error_type
+    consumed_messages_counter.add(1, attrs)
 
 
 class WorkerMetrics:
@@ -116,6 +164,15 @@ class WorkerMetrics:
             callbacks=[cls._gauge_running],
             unit="{job}",
             description="JobProcess rows currently running, per queue.",
+        )
+        meter.create_observable_gauge(
+            name="plain.jobs.workers",
+            callbacks=[cls._gauge_workers],
+            unit="{worker}",
+            description=(
+                "WorkerHeartbeat row count, split by liveness state "
+                "(active=within JOBS_HEARTBEAT_TIMEOUT, stale=past it)."
+            ),
         )
 
     # --- Callbacks ----------------------------------------------------------
@@ -190,6 +247,25 @@ class WorkerMetrics:
         from .models import JobProcess
 
         return _count_per_queue(JobProcess.query.running(), active.worker.queues)
+
+    # The worker-liveness gauge observes the global WorkerHeartbeat table and
+    # doesn't need a calling Worker — emit unconditionally so dashboards keep
+    # reporting even during a full worker drain. One snapshot of the cutoff
+    # is shared across both observations so a row landing exactly at the
+    # boundary can't be counted in both states (or neither).
+    @classmethod
+    def _gauge_workers(cls, options: CallbackOptions) -> Iterable[Observation]:
+        from .models import WorkerHeartbeat, heartbeat_cutoff
+
+        cutoff = heartbeat_cutoff()
+        counts = WorkerHeartbeat.query.aggregate(
+            active=Count("id", filter=Q(last_heartbeat_at__gte=cutoff)),
+            stale=Count("id", filter=Q(last_heartbeat_at__lt=cutoff)),
+        )
+        return [
+            Observation(counts["active"], {PLAIN_JOBS_WORKER_STATE: "active"}),
+            Observation(counts["stale"], {PLAIN_JOBS_WORKER_STATE: "stale"}),
+        ]
 
 
 def _count_per_queue(queryset: Any, queues: list[str]) -> list[Observation]:

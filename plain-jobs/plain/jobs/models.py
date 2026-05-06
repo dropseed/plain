@@ -8,15 +8,8 @@ from uuid import UUID
 
 from opentelemetry.semconv._incubating.attributes.messaging_attributes import (
     MESSAGING_CONSUMER_GROUP_NAME,
-    MESSAGING_DESTINATION_NAME,
     MESSAGING_MESSAGE_ID,
     MESSAGING_OPERATION_NAME,
-    MESSAGING_OPERATION_TYPE,
-    MESSAGING_SYSTEM,
-    MessagingOperationTypeValues,
-)
-from opentelemetry.semconv.attributes.code_attributes import (
-    CODE_FUNCTION_NAME,
 )
 from opentelemetry.trace import Link, SpanContext, SpanKind, TraceFlags
 
@@ -29,9 +22,10 @@ from plain.utils import timezone
 
 from .exceptions import DeferError, DeferJob
 from .otel import (
-    consumed_messages_counter,
     operation_duration_histogram,
+    process_metric_attributes,
     queue_wait_duration_histogram,
+    record_consumed,
     record_span_error,
     tracer,
 )
@@ -293,12 +287,9 @@ class JobProcess(postgres.Model):
                     extra={"job_uuid": self.uuid},
                 )
 
-        metric_attributes: dict[str, Any] = {
-            MESSAGING_SYSTEM: "plain.jobs",
-            MESSAGING_OPERATION_TYPE: MessagingOperationTypeValues.PROCESS.value,
-            MESSAGING_DESTINATION_NAME: self.queue,
-            CODE_FUNCTION_NAME: f"{self.job_class}.run",
-        }
+        metric_attributes: dict[str, Any] = process_metric_attributes(
+            self.queue, self.job_class
+        )
         start_time = time.perf_counter()
         try:
             with tracer.start_as_current_span(
@@ -349,10 +340,11 @@ class JobProcess(postgres.Model):
                         "Defer failed",
                         extra={"job_class": self.job_class, "error": str(e)},
                     )
-                    record_span_error(span, e, metric_attributes)
+                    error_type = record_span_error(span, e, metric_attributes)
                     return self.convert_to_result(
                         status=JobResultStatuses.ERRORED,
                         error=str(e),
+                        error_type=error_type,
                     )
 
                 except Exception as e:
@@ -363,14 +355,14 @@ class JobProcess(postgres.Model):
                     # second log line. Rare; correct outcome; not worth
                     # pre-checking on every successful job.
                     logger.exception(e)
-                    record_span_error(span, e, metric_attributes)
+                    error_type = record_span_error(span, e, metric_attributes)
                     return self.convert_to_result(
                         status=JobResultStatuses.ERRORED,
                         error="".join(traceback.format_tb(e.__traceback__)),
+                        error_type=error_type,
                     )
         finally:
             duration = time.perf_counter() - start_time
-            consumed_messages_counter.add(1, metric_attributes)
             operation_duration_histogram.record(duration, metric_attributes)
 
     def defer(self, *, job: Job, defer_exception: DeferJob) -> JobResult:
@@ -443,13 +435,28 @@ class JobProcess(postgres.Model):
                 span_id=self.span_id,
             )
 
-            return result
+        # Counter ticks for the DEFERRED outcome too — defer() bypasses
+        # convert_to_result, so without this the deferred path would not
+        # show up in the consumed counter.
+        record_consumed(result)
+        return result
 
     def convert_to_result(
-        self, *, status: str, error: str = "", fire_hook: bool = True
+        self,
+        *,
+        status: str,
+        error: str = "",
+        error_type: str | None = None,
+        fire_hook: bool = True,
     ) -> JobResult:
         """
         Convert this JobProcess to a JobResult.
+
+        error_type, when supplied, is the OTel-style exception name (matching
+        the spec's `error.type` attribute). It rides along to the consumed
+        counter so dashboards can group ERRORED jobs by exception class. Only
+        the live exception-driven paths supply it — rescue (LOST) and direct
+        cancellations have no exception object to derive it from.
 
         fire_hook controls whether on_aborted dispatches synchronously. The
         rescue path passes fire_hook=False so it can dispatch hooks AFTER its
@@ -482,6 +489,13 @@ class JobProcess(postgres.Model):
 
             # Delete the JobProcess now
             self.delete()
+
+        # Counter ticks for every terminal status — the live SUCCESSFUL/ERRORED
+        # paths plus the LOST/CANCELLED paths that don't flow through
+        # JobProcess.run()'s finally. The outcome attribute lets dashboards
+        # split throughput by final status; error_type is forwarded for ERRORED
+        # jobs caught by the live path.
+        record_consumed(result, error_type=error_type)
 
         # Fire Job.on_aborted outside the atomic block so a raise in user code
         # can't roll back the framework's bookkeeping. Only for terminal
@@ -768,6 +782,15 @@ class WorkerHeartbeat(postgres.Model):
         return f"WorkerHeartbeat({self.worker_id} on {self.hostname}:{self.pid})"
 
 
+def heartbeat_cutoff() -> datetime.datetime:
+    """The timestamp before which a WorkerHeartbeat is considered stale.
+
+    Single source of truth — rescue, admin display, and OTel gauges all
+    consult this so they agree on which workers are alive.
+    """
+    return timezone.now() - datetime.timedelta(seconds=settings.JOBS_HEARTBEAT_TIMEOUT)
+
+
 def rescue_stale_workers() -> list[JobResult]:
     """
     Convert in-flight JobProcess rows from dead workers to JobResult(LOST).
@@ -786,9 +809,7 @@ def rescue_stale_workers() -> list[JobResult]:
     inherently global: filtering would let one rescuer claim a dead heartbeat
     without converting all of that worker's jobs, stranding the rest forever.
     """
-    cutoff = timezone.now() - datetime.timedelta(
-        seconds=settings.JOBS_HEARTBEAT_TIMEOUT
-    )
+    cutoff = heartbeat_cutoff()
     dead_workers = WorkerHeartbeat.query.filter(last_heartbeat_at__lt=cutoff)
 
     pending_hooks: list[JobResult] = []

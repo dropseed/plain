@@ -228,15 +228,30 @@ The worker integrates with OpenTelemetry for distributed tracing. Spans are crea
 
 Jobs are linked to the originating trace context, allowing you to follow jobs initiated from web requests.
 
-Two messaging metrics are recorded:
+Messaging metrics:
 
 - `messaging.client.sent.messages` — counter incremented for each enqueue
+- `messaging.client.consumed.messages` — counter incremented for every terminal `JobResult`. Carries a `plain.jobs.outcome` attribute (`successful`, `errored`, `lost`, `cancelled`, `deferred`) so dashboards can split throughput by outcome.
 - `messaging.client.operation.duration` — histogram of enqueue/process durations
+- `plain.jobs.queue.wait.duration` — histogram of how long a job waited in queue before a worker picked it up
+
+Per-worker observable gauges (queryable per `messaging.destination.name` where applicable):
+
+- `plain.jobs.worker.processes` — OS processes spawned by this worker
+- `plain.jobs.queue.depth` — pending `JobRequest`s ready to run
+- `plain.jobs.queue.scheduled` — `JobRequest`s with `start_at` in the future
+- `plain.jobs.queue.oldest.age` — age in seconds of the oldest ready-to-run `JobRequest`
+- `plain.jobs.running` — `JobProcess` rows currently running
+
+Worker-liveness gauge (global, no per-queue dimension):
+
+- `plain.jobs.workers` — `WorkerHeartbeat` row count, split by a `plain.jobs.worker.state` attribute taking `active` (within `JOBS_HEARTBEAT_TIMEOUT`) or `stale` (past it, eligible for rescue on the next tick)
 
 Two contract details to be aware of:
 
 - **Successful enqueues record metrics on transaction commit.** If you call `run_in_worker` inside a transaction that later rolls back, the message was never actually persisted — so the counter and histogram do not fire. This matches the OTel semconv: "MUST NOT count messages that were created but haven't yet been sent." Failed enqueues record immediately so transient errors are still visible.
 - **Skipped enqueues are visible in spans, not in metrics.** When `should_enqueue` returns `False` (e.g., a concurrency-key collision), the span gets `job.enqueue.skipped=True` but no metric is recorded — there was no send to count.
+- **Observable gauges emit once per worker process.** When two workers cover the same queue, the per-queue gauges emit identical values from each. `plain.jobs.workers` is global (no per-queue dimension) and likewise emits the full table count from every worker. Aggregate these gauges with `last_value`/`max`, never `sum`.
 
 ## Settings
 

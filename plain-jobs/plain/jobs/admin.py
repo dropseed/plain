@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 from datetime import timedelta
 
 from plain import postgres
@@ -14,7 +13,6 @@ from plain.admin.views import (
 from plain.http import RedirectResponse
 from plain.postgres.expressions import Case, When
 from plain.runtime import settings
-from plain.utils import timezone
 
 from .models import (
     JobProcess,
@@ -22,6 +20,7 @@ from .models import (
     JobResult,
     JobResultQuerySet,
     WorkerHeartbeat,
+    heartbeat_cutoff,
 )
 
 
@@ -133,10 +132,6 @@ class RunningJobsCard(Card):
         return JobProcess.query.running().count()
 
 
-def _heartbeat_cutoff() -> datetime.datetime:
-    return timezone.now() - timedelta(seconds=settings.JOBS_HEARTBEAT_TIMEOUT)
-
-
 class ActiveWorkersCard(Card):
     title = "Active workers"
     text = "View"
@@ -147,7 +142,7 @@ class ActiveWorkersCard(Card):
 
     def get_metric(self) -> int:
         return WorkerHeartbeat.query.filter(
-            last_heartbeat_at__gte=_heartbeat_cutoff()
+            last_heartbeat_at__gte=heartbeat_cutoff()
         ).count()
 
     def get_link(self) -> str:
@@ -167,7 +162,7 @@ class StaleWorkersCard(Card):
 
     def get_metric(self) -> int:
         return WorkerHeartbeat.query.filter(
-            last_heartbeat_at__lt=_heartbeat_cutoff()
+            last_heartbeat_at__lt=heartbeat_cutoff()
         ).count()
 
     def get_link(self) -> str:
@@ -364,7 +359,7 @@ class WorkerHeartbeatViewset(AdminViewset):
             queryset = super().get_initial_queryset()
             return queryset.annotate(
                 stale=Case(
-                    When(last_heartbeat_at__lt=_heartbeat_cutoff(), then=True),
+                    When(last_heartbeat_at__lt=heartbeat_cutoff(), then=True),
                     default=False,
                     output_field=postgres.BooleanField(),
                 ),
@@ -373,7 +368,7 @@ class WorkerHeartbeatViewset(AdminViewset):
         def filter_queryset(
             self, queryset: postgres.QuerySet[WorkerHeartbeat]
         ) -> postgres.QuerySet[WorkerHeartbeat]:
-            cutoff = _heartbeat_cutoff()
+            cutoff = heartbeat_cutoff()
             if self.filter == "Active":
                 return queryset.filter(last_heartbeat_at__gte=cutoff)
             if self.filter == "Stale":
