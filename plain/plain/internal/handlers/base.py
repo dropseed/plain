@@ -178,7 +178,7 @@ class BaseHandler:
         if response.status_code >= 500:
             span.set_status(trace.StatusCode.ERROR)
             if response.exception:
-                span.record_exception(response.exception)
+                span.record_exception(response.exception, escaped=True)
                 span.set_attribute(
                     error_attributes.ERROR_TYPE,
                     format_exception_type(response.exception),

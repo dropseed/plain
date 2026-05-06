@@ -27,10 +27,14 @@ from opentelemetry.trace import SpanKind, format_span_id, format_trace_id
 from plain import postgres
 from plain.postgres import transaction
 from plain.utils import timezone
-from plain.utils.otel import format_exception_type
 
 from .locks import postgres_advisory_lock
-from .otel import operation_duration_histogram, sent_messages_counter, tracer
+from .otel import (
+    operation_duration_histogram,
+    record_span_error,
+    sent_messages_counter,
+    tracer,
+)
 from .registry import JobParameters, jobs_registry
 
 if TYPE_CHECKING:
@@ -89,12 +93,16 @@ class Job(metaclass=JobType):
         }
         start_time = time.perf_counter()
         skipped = False
-        try:
-            with tracer.start_as_current_span(
-                f"send {queue}",
-                kind=SpanKind.PRODUCER,
-                attributes={**metric_attributes, MESSAGING_OPERATION_NAME: "send"},
-            ) as span:
+        with tracer.start_as_current_span(
+            f"send {queue}",
+            kind=SpanKind.PRODUCER,
+            attributes={**metric_attributes, MESSAGING_OPERATION_NAME: "send"},
+            # We record manually via record_span_error (escaped=True) at the
+            # workflow boundary; suppress the SDK's escaped=False auto-record
+            # so failed sends carry a single, correctly-marked event.
+            record_exception=False,
+        ) as span:
+            try:
                 try:
                     frame = sys._getframe(1)
                     filename = frame.f_code.co_filename
@@ -176,30 +184,33 @@ class Job(metaclass=JobType):
                         )
 
                         return job_request
-        except Exception as e:
-            metric_attributes[ERROR_TYPE] = format_exception_type(e)
-            raise
-        finally:
-            # Skipped enqueues are visible on the span (`job.enqueue.skipped`)
-            # but do not fire the messaging counter — no message was sent, so
-            # there's nothing for `messaging.client.sent.messages` to count.
-            if not skipped:
-                duration = time.perf_counter() - start_time
-                if ERROR_TYPE in metric_attributes:
-                    # No commit is coming — record now so failed sends are visible.
-                    sent_messages_counter.add(1, metric_attributes)
-                    operation_duration_histogram.record(duration, metric_attributes)
-                else:
-                    # Defer to the outer commit so a caller-level rollback
-                    # doesn't leave a phantom send. Runs immediately if not
-                    # inside a transaction.
-                    attrs = metric_attributes
+            except Exception as e:
+                # Stamps escaped=True on the span event, ERROR_TYPE on both
+                # the span and `metric_attributes` (so the finally below
+                # picks up the failed-send branch).
+                record_span_error(span, e, metric_attributes)
+                raise
+            finally:
+                # Skipped enqueues are visible on the span (`job.enqueue.skipped`)
+                # but do not fire the messaging counter — no message was sent, so
+                # there's nothing for `messaging.client.sent.messages` to count.
+                if not skipped:
+                    duration = time.perf_counter() - start_time
+                    if ERROR_TYPE in metric_attributes:
+                        # No commit is coming — record now so failed sends are visible.
+                        sent_messages_counter.add(1, metric_attributes)
+                        operation_duration_histogram.record(duration, metric_attributes)
+                    else:
+                        # Defer to the outer commit so a caller-level rollback
+                        # doesn't leave a phantom send. Runs immediately if not
+                        # inside a transaction.
+                        attrs = metric_attributes
 
-                    def _emit() -> None:
-                        sent_messages_counter.add(1, attrs)
-                        operation_duration_histogram.record(duration, attrs)
+                        def _emit() -> None:
+                            sent_messages_counter.add(1, attrs)
+                            operation_duration_histogram.record(duration, attrs)
 
-                    transaction.on_commit(_emit)
+                        transaction.on_commit(_emit)
 
     def get_requested_jobs(
         self, *, concurrency_key: str | None = None, include_retries: bool = False

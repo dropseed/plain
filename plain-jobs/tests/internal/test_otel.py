@@ -77,6 +77,64 @@ def test_enqueue_skipped_marks_span(otel_spans: InMemorySpanExporter) -> None:
 
 
 @pytest.mark.usefixtures("db")
+def test_failed_enqueue_marks_producer_span_exception_as_escaped(
+    monkeypatch: pytest.MonkeyPatch,
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """A failing enqueue's PRODUCER span must record the exception event with
+    `exception.escaped=True` — caller-side workflow boundary, same signal as
+    SERVER/CONSUMER."""
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("save failed")
+
+    from plain.jobs.models import JobRequest
+
+    monkeypatch.setattr(JobRequest, "save", _boom)
+
+    with pytest.raises(RuntimeError):
+        _NoopJob().run_in_worker()
+
+    producer_spans = [
+        s for s in otel_spans.get_finished_spans() if s.kind == SpanKind.PRODUCER
+    ]
+    assert producer_spans, "expected PRODUCER span from run_in_worker()"
+    span = producer_spans[-1]
+    exception_events = [e for e in span.events if e.name == "exception"]
+    # Exactly one event — `record_exception=False` on start_as_current_span
+    # suppresses the SDK's escaped=False auto-record so the manual call is
+    # the sole event.
+    assert len(exception_events) == 1
+    attrs = exception_events[0].attributes
+    assert attrs is not None
+    assert attrs["exception.escaped"] == "True"
+
+
+@pytest.mark.usefixtures("db")
+def test_failing_job_marks_consumer_span_exception_as_escaped(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """A failing job's CONSUMER span must record the exception event with
+    `exception.escaped=True` — the workflow-level failure signal that
+    downstream tools filter on."""
+    request = _BoomJob().run_in_worker()
+    assert request is not None
+    process = request.convert_to_job_process(worker_id=uuid.uuid4())
+    process.run()
+
+    consumer_spans = [
+        s for s in otel_spans.get_finished_spans() if s.kind == SpanKind.CONSUMER
+    ]
+    assert consumer_spans, "expected CONSUMER span from JobProcess.run()"
+    span = consumer_spans[-1]
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert exception_events
+    attrs = exception_events[0].attributes
+    assert attrs is not None
+    assert attrs["exception.escaped"] == "True"
+
+
+@pytest.mark.usefixtures("db")
 def test_enqueue_failure_records_error_type_on_metric(
     monkeypatch: pytest.MonkeyPatch,
     otel_spans: InMemorySpanExporter,

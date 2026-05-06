@@ -66,6 +66,9 @@ def test_500_records_exception_and_error_status(error_client) -> None:
     assert span.attributes["error.type"] == "RuntimeError"
     exception_events = [e for e in span.events if e.name == "exception"]
     assert exception_events
+    attrs = exception_events[0].attributes
+    assert attrs is not None
+    assert attrs["exception.escaped"] == "True"
 
 
 def _invoke_handler(router_path: str) -> None:
