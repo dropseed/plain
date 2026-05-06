@@ -1,5 +1,15 @@
 # plain-sessions changelog
 
+## [0.45.5](https://github.com/dropseed/plain/releases/plain-sessions@0.45.5) (2026-05-05)
+
+### What's changed
+
+- Exposes `__version__` from `importlib.metadata` on `plain.sessions` for version probes that don't want to scrape pip metadata. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.45.4](https://github.com/dropseed/plain/releases/plain-sessions@0.45.4) (2026-04-17)
 
 ### What's changed
