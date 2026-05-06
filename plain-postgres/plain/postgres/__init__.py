@@ -1,3 +1,7 @@
+from importlib.metadata import version
+
+__version__ = version("plain.postgres")
+
 from .registry import models_registry, register_model  # noqa  Create the registry first
 from . import (
     preflight,  # noqa  Imported for side effects (registers preflight checks)

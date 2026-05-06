@@ -4,7 +4,10 @@ Tools for sending email.
 
 from __future__ import annotations
 
+from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
+
+__version__ = version("plain.email")
 
 from plain.runtime import settings
 from plain.utils.module_loading import import_string
