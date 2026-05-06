@@ -1,5 +1,15 @@
 # plain-dev changelog
 
+## [0.60.4](https://github.com/dropseed/plain/releases/plain-dev@0.60.4) (2026-05-05)
+
+### What's changed
+
+- Exposes `__version__` from `importlib.metadata` on `plain.dev` for version probes that don't want to scrape pip metadata. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.60.3](https://github.com/dropseed/plain/releases/plain-dev@0.60.3) (2026-04-23)
 
 ### What's changed
