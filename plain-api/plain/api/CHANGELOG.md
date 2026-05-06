@@ -1,5 +1,16 @@
 # plain-api changelog
 
+## [0.31.1](https://github.com/dropseed/plain/releases/plain-api@0.31.1) (2026-05-05)
+
+### What's changed
+
+- Tightened internal type annotations for ty 0.0.33. ([4b9d1db1](https://github.com/dropseed/plain/commit/4b9d1db1))
+- Exposes `__version__` from `importlib.metadata` on `plain.api`. ([c6cf6edb](https://github.com/dropseed/plain/commit/c6cf6edb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.31.0](https://github.com/dropseed/plain/releases/plain-api@0.31.0) (2026-04-24)
 
 ### What's changed
