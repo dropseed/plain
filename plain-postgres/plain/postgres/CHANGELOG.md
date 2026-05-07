@@ -1,5 +1,15 @@
 # plain-postgres changelog
 
+## [0.103.1](https://github.com/dropseed/plain/releases/plain-postgres@0.103.1) (2026-05-06)
+
+### What's changed
+
+- **`postgres.duplicate_indexes` now flags exact-column duplicates**, not just prefix-redundancy. Previously the check required the redundant index to be strictly shorter than the index covering it, so an `Index(fields=["x"])` declared next to a same-column `UniqueConstraint(fields=["x"])` slipped past — even though the unique-backed btree already covers the same lookups and enforces uniqueness. The check (and the matching preflight) now flag the non-unique side of a same-column pair. Two non-unique indexes on identical columns flag the alphabetically later name (deterministic). ([253513b9](https://github.com/dropseed/plain/commit/253513b9))
+
+### Upgrade instructions
+
+- No changes required. After upgrading, `plain postgres diagnose` and `plain preflight` may surface previously-undetected duplicate indexes — drop the redundant `Index(...)` declaration on the model and run `plain postgres sync`.
+
 ## [0.103.0](https://github.com/dropseed/plain/releases/plain-postgres@0.103.0) (2026-05-06)
 
 ### What's changed
