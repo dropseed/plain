@@ -1,5 +1,17 @@
 # plain-postgres changelog
 
+## [0.103.0](https://github.com/dropseed/plain/releases/plain-postgres@0.103.0) (2026-05-06)
+
+### What's changed
+
+- **New `storage_parameters` on `model_options`, managed by convergence.** Declare per-table Postgres storage parameters (`pg_class.reloptions`) on the model — autovacuum tuning, `fillfactor`, TOAST options, anything you'd otherwise set with `ALTER TABLE … SET (...)` — and `plain postgres sync` reconciles them via instant catalog-only `ALTER TABLE … SET / RESET (...)` statements. Models are the source of truth: parameters set on the live table that aren't declared on the model get reset, matching how indexes and constraints work. TOAST parameters use a `toast.` prefix (`toast.autovacuum_vacuum_scale_factor`) and are stored on the toast relation. Storage parameters are not serialized into migrations. New public API: `StorageParameterDrift`, `SetStorageParameterFix`, `ResetStorageParameterFix`. ([7fe40f72](https://github.com/dropseed/plain/commit/7fe40f72))
+- **New `table_bloat` health check.** Estimates per-table page-level bloat using the ioguix estimator (same heuristic as pghero). Complements `vacuum_health`: dead-tuple counts only show what autovacuum hasn't reclaimed yet, but a table that's been vacuumed regularly can still carry gigabytes of bloat because plain `VACUUM` marks pages reusable without returning space to the OS. Surfaces tables with both >100 MB wasted bytes AND >25% bloat ratio, with `pg_repack` / `pg_squeeze` / `VACUUM FULL` suggestions. Cross-check caveats now link `vacuum_health` and `table_bloat` findings on the same table. ([ee9dc1d5](https://github.com/dropseed/plain/commit/ee9dc1d5))
+- **Tightened `index_bloat` thresholds.** Now requires both >100 MB wasted bytes AND >30% bloat ratio (was 10 MB only). The previous floor surfaced too many small, healthy indexes; the higher percentage bar reflects that `REINDEX CONCURRENTLY` is cheap so it's only worth flagging genuinely degraded indexes. Results are also capped at 100 rows per check. ([ee9dc1d5](https://github.com/dropseed/plain/commit/ee9dc1d5))
+
+### Upgrade instructions
+
+- No changes required. To opt into the new `storage_parameters` API, declare them on `model_options = postgres.Options(storage_parameters={...})` and run `plain postgres sync`. After upgrading, expect previously-noisy `index_bloat` findings to disappear (now require ≥100 MB AND ≥30%) and the new `table_bloat` check to appear in `plain postgres diagnose`.
+
 ## [0.102.0](https://github.com/dropseed/plain/releases/plain-postgres@0.102.0) (2026-05-05)
 
 ### What's changed
