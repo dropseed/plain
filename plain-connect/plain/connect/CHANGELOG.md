@@ -1,6 +1,18 @@
 # plain-connect changelog
 
-## [0.3.3](https://github.com/dropseed/plain/releases/plain-cloud@0.3.3) (2026-05-05)
+## [0.3.4](https://github.com/dropseed/plain/releases/plain-connect@0.3.4) (2026-05-07)
+
+### What's changed
+
+- **Renamed `plain-cloud` to `plain-connect`.** The package, module path, and config label all change: `plain.cloud` → `plain.connect`, and the package label `plaincloud` → `plainconnect`. All settings move from the `CLOUD_*` prefix to `CONNECT_*` (e.g. `CLOUD_EXPORT_TOKEN` → `CONNECT_EXPORT_TOKEN`, `PLAIN_CLOUD_EXPORT_TOKEN` → `PLAIN_CONNECT_EXPORT_TOKEN`). The destination service is still Plain Cloud — `plain-connect` is the app integration package that ships telemetry to it. ([304fc185cc](https://github.com/dropseed/plain/commit/304fc185cc))
+
+### Upgrade instructions
+
+- Replace `plain-cloud` with `plain-connect` in your dependencies (e.g. `pyproject.toml`).
+- In `app/settings.py`, replace `"plain.cloud"` with `"plain.connect"` in `INSTALLED_PACKAGES`.
+- Rename any `CLOUD_*` settings to `CONNECT_*`, and any `PLAIN_CLOUD_*` env vars to `PLAIN_CONNECT_*`.
+
+## [0.3.3](https://github.com/dropseed/plain/releases/plain-connect@0.3.3) (2026-05-05)
 
 ### What's changed
 
@@ -10,7 +22,7 @@
 
 - No changes required.
 
-## [0.3.2](https://github.com/dropseed/plain/releases/plain-cloud@0.3.2) (2026-04-30)
+## [0.3.2](https://github.com/dropseed/plain/releases/plain-connect@0.3.2) (2026-04-30)
 
 ### What's changed
 
@@ -20,7 +32,7 @@
 
 - No changes required.
 
-## [0.3.1](https://github.com/dropseed/plain/releases/plain-cloud@0.3.1) (2026-04-28)
+## [0.3.1](https://github.com/dropseed/plain/releases/plain-connect@0.3.1) (2026-04-28)
 
 ### What's changed
 
@@ -30,7 +42,7 @@
 
 - No changes required.
 
-## [0.3.0](https://github.com/dropseed/plain/releases/plain-cloud@0.3.0) (2026-04-27)
+## [0.3.0](https://github.com/dropseed/plain/releases/plain-connect@0.3.0) (2026-04-27)
 
 ### What's changed
 
@@ -41,7 +53,7 @@
 
 - No changes required. To opt out of log export, set `CLOUD_EXPORT_LOGS=False` (or `PLAIN_CLOUD_EXPORT_LOGS=false`). To raise/lower the severity floor, set `CLOUD_LOG_LEVEL` (e.g. `"WARNING"`).
 
-## [0.2.0](https://github.com/dropseed/plain/releases/plain-cloud@0.2.0) (2026-04-27)
+## [0.2.0](https://github.com/dropseed/plain/releases/plain-connect@0.2.0) (2026-04-27)
 
 ### What's changed
 
@@ -51,7 +63,7 @@
 
 - If you were depending on the previous default, set `PLAIN_CLOUD_EXPORT_URL=https://plainframework.com/otel` (or assign `CLOUD_EXPORT_URL` in `app/settings.py`) to keep the old endpoint. Otherwise no changes required.
 
-## [0.1.5](https://github.com/dropseed/plain/releases/plain-cloud@0.1.5) (2026-04-13)
+## [0.1.5](https://github.com/dropseed/plain/releases/plain-connect@0.1.5) (2026-04-13)
 
 ### What's changed
 
@@ -61,7 +73,7 @@
 
 - No changes required.
 
-## [0.1.4](https://github.com/dropseed/plain/releases/plain-cloud@0.1.4) (2026-04-02)
+## [0.1.4](https://github.com/dropseed/plain/releases/plain-connect@0.1.4) (2026-04-02)
 
 ### What's changed
 
@@ -71,7 +83,7 @@
 
 - No changes required.
 
-## [0.1.3](https://github.com/dropseed/plain/releases/plain-cloud@0.1.3) (2026-04-01)
+## [0.1.3](https://github.com/dropseed/plain/releases/plain-connect@0.1.3) (2026-04-01)
 
 ### What's changed
 
@@ -82,7 +94,7 @@
 
 - No changes required.
 
-## [0.1.2](https://github.com/dropseed/plain/releases/plain-cloud@0.1.2) (2026-04-01)
+## [0.1.2](https://github.com/dropseed/plain/releases/plain-connect@0.1.2) (2026-04-01)
 
 ### What's changed
 
@@ -93,7 +105,7 @@
 - If you had `PLAIN_CLOUD_EXPORT_URL` set to `https://plainframework.com/otel`, you can remove it — that's now the default.
 - If you relied on leaving `CLOUD_EXPORT_URL` empty to disable export, set `CLOUD_EXPORT_TOKEN` to empty instead (or just don't set it).
 
-## [0.1.1](https://github.com/dropseed/plain/releases/plain-cloud@0.1.1) (2026-04-01)
+## [0.1.1](https://github.com/dropseed/plain/releases/plain-connect@0.1.1) (2026-04-01)
 
 ### What's changed
 
@@ -103,7 +115,7 @@
 
 - If you have `PLAIN_CLOUD_EXPORT_URL` set to `https://ingest.plaincloud.com`, update it to `https://plainframework.com/otel`.
 
-## [0.1.0](https://github.com/dropseed/plain/releases/plain-cloud@0.1.0) (2026-04-01)
+## [0.1.0](https://github.com/dropseed/plain/releases/plain-connect@0.1.0) (2026-04-01)
 
 ### What's changed
 

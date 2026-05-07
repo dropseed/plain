@@ -697,7 +697,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-connect"
-version = "0.3.3"
+version = "0.3.4"
 source = { editable = "plain-connect" }
 dependencies = [
     { name = "opentelemetry-exporter-otlp-proto-http" },
