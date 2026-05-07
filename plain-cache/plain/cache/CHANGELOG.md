@@ -1,5 +1,15 @@
 # plain-cache changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-cache@0.28.0) (2026-05-06)
+
+### What's changed
+
+- Tighter autovacuum on `plaincache_cacheditem` by default. The cache table is a high-churn workload — every `set()` rewrites a row, and TOAST'd values leave orphaned chunks behind — so Plain now declares per-table storage parameters via the new `plain-postgres` `storage_parameters` API: `autovacuum_vacuum_scale_factor=0.1` (heap) and `toast.autovacuum_vacuum_scale_factor=0.05` (TOAST), down from Postgres' default of `0.2`. Both are exposed as the new `CACHE_AUTOVACUUM_SCALE_FACTOR` and `CACHE_TOAST_AUTOVACUUM_SCALE_FACTOR` settings (overridable via `PLAIN_CACHE_*` env vars). Convergence applies them on the next `plain postgres sync`. ([7fe40f72](https://github.com/dropseed/plain/commit/7fe40f72))
+
+### Upgrade instructions
+
+- Requires `plain-postgres>=0.103.0`. Run `plain postgres sync` after upgrading to apply the new autovacuum storage parameters to `plaincache_cacheditem`.
+
 ## [0.27.5](https://github.com/dropseed/plain/releases/plain-cache@0.27.5) (2026-05-05)
 
 ### What's changed
