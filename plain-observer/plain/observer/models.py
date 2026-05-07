@@ -80,9 +80,6 @@ class Trace(postgres.Model):
         ],
         indexes=[
             postgres.Index(
-                name="plainobserver_trace_trace_id_idx", fields=["trace_id"]
-            ),
-            postgres.Index(
                 name="plainobserver_trace_start_time_idx", fields=["start_time"]
             ),
             postgres.Index(

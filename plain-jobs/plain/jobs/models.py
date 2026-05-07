@@ -113,7 +113,6 @@ class JobRequest(postgres.Model):
             postgres.Index(
                 name="plainjobs_jobrequest_trace_id_idx", fields=["trace_id"]
             ),
-            postgres.Index(name="plainjobs_jobrequest_uuid_idx", fields=["uuid"]),
             # Used for job grouping queries
             postgres.Index(
                 name="job_request_concurrency_key",
@@ -231,7 +230,6 @@ class JobProcess(postgres.Model):
             postgres.Index(
                 name="plainjobs_jobprocess_trace_id_idx", fields=["trace_id"]
             ),
-            postgres.Index(name="plainjobs_jobprocess_uuid_idx", fields=["uuid"]),
             postgres.Index(
                 name="plainjobs_jobprocess_worker_id_idx", fields=["worker_id"]
             ),
@@ -649,10 +647,6 @@ class JobResult(postgres.Model):
                 name="plainjobs_jobresult_created_at_idx", fields=["created_at"]
             ),
             postgres.Index(
-                name="plainjobs_jobresult_job_process_uuid_idx",
-                fields=["job_process_uuid"],
-            ),
-            postgres.Index(
                 name="plainjobs_jobresult_started_at_idx", fields=["started_at"]
             ),
             postgres.Index(
@@ -670,7 +664,6 @@ class JobResult(postgres.Model):
             postgres.Index(
                 name="plainjobs_jobresult_trace_id_idx", fields=["trace_id"]
             ),
-            postgres.Index(name="plainjobs_jobresult_uuid_idx", fields=["uuid"]),
         ],
         constraints=[
             postgres.UniqueConstraint(
