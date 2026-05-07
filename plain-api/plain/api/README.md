@@ -29,7 +29,7 @@ class HelloWorldView(APIView):
         return {"message": "Hello, world!"}
 ```
 
-More complex responses can use the [`JsonResponse`](/plain/plain/http/response.py#JsonResponse) class, and you can return different status codes by returning an int (ex. `404`) or a tuple of `(status_code, data)`.
+More complex responses can use the [`JsonResponse`](/plain/plain/http/response.py#JsonResponse) class, and you can return a status code with the response body by returning a tuple of `(status_code, data)` (ex. `return 201, {...}`).
 
 Here is a more complete example that shows how to build a custom API with authentication and authorization:
 
@@ -138,7 +138,7 @@ class BaseAPIView(APIView, APIKeyView):
             )
 ```
 
-When it comes to authorizing actions, typically you will factor this in to the queryset to only return objects that the user is allowed to see. If a response method (`get`, `post`, etc.) returns `None`, then the view will return a 404 response. Other status codes can be returned with an int (ex. `403`) or a `JsonResponse` object.
+When it comes to authorizing actions, typically you will factor this in to the queryset to only return objects that the user is allowed to see. If a response method (`get`, `post`, etc.) returns `None`, then the view will return a 404 response. Other status codes can be returned by raising an HTTP exception (ex. `raise ForbiddenError403`) or by returning a `Response`/`JsonResponse` directly.
 
 ```python
 class PullRequestView(BaseAPIView):
@@ -197,6 +197,9 @@ If you don't want to use Plain's forms, you could also use a third-party schema/
 Deletes can be handled in the `delete` method of the view. Most of the time this just means getting the object, deleting it, and returning a 204.
 
 ```python
+from plain.http import Response
+
+
 class PullRequestView(BaseAPIView):
     def delete(self):
         from plain.auth import get_request_user
@@ -212,7 +215,7 @@ class PullRequestView(BaseAPIView):
 
         pull.delete()
 
-        return 204
+        return Response(status_code=204)
 ```
 
 ## API keys
@@ -333,7 +336,45 @@ class CurrentUserAPIView(BaseAPIView):
         return schemas.UserSchema.from_user(user, self.request)
 ```
 
-While you can attach any raw schema you like, there are a couple helpers to generate schema for API input (`@openapi.request_form`) and output (`@openapi.response_typed_dict`). These are intentionally specific, leaving room for custom decorators to be written for the input/output types of your choice.
+### Helpers for the boilerplate parts
+
+Most of an OpenAPI dict is the same envelope repeated. `plain.api.openapi` ships small helpers so you can focus on the schemas:
+
+- `openapi.json_content(schema)` → wraps a schema in `application/json`
+- `openapi.json_body(schema, *, required=True)` → builds a full `application/json` requestBody
+- `openapi.link_to(view_class, *, parameters, method="get")` → builds an OpenAPI `link` to another view's operation, using the framework-default operationId
+
+```python
+@openapi.schema({
+    "requestBody": openapi.json_body({"$ref": "#/components/schemas/NoteInput"}),
+    "responses": {
+        "201": {
+            "description": "The created note.",
+            "content": openapi.json_content({"$ref": "#/components/schemas/Note"}),
+            "links": {
+                "GetById": openapi.link_to(
+                    NoteDetailAPIView, parameters={"id": "$response.body#/id"}
+                ),
+            },
+        },
+    },
+})
+def post(self):
+    ...
+```
+
+### What the generator emits for you
+
+Things you don't have to declare yourself:
+
+- **`operationId`** — defaults to `{ViewClassName}_{method}` (e.g. `NoteDetailAPIView_get`). Override per-operation via `@openapi.schema({"operationId": "..."})`.
+- **`components.schemas.ErrorSchema`** + the shared `BadRequest` / `Unauthorized` / `Forbidden` / `NotFound` / `ServerError` `responses` — every `APIView` operation auto-attaches the matching `$ref` for those status codes.
+- **`securitySchemes.BearerAuth`** + per-operation `security: [{BearerAuth: []}]` — auto-emitted whenever a view inherits from `APIKeyView`. Subclasses can override `openapi_security_schemes` to declare a different scheme.
+- **Native types for path converters** — `<int:>` becomes `type: integer`, `<uuid:>` becomes `type: string, format: uuid`.
+
+### Custom input/output schema
+
+For more involved schema generation, there are a couple of decorators (`@openapi.request_form`, `@openapi.response_typed_dict`). These are intentionally specific, leaving room for custom decorators to be written for the input/output types of your choice.
 
 ```python
 class TeamAccountAPIView(BaseAPIView):
@@ -394,10 +435,16 @@ class TeamAccountSchema(TypedDict):
         )
 ```
 
-To generate the OpenAPI JSON, run the following command (including swagger.io validation):
+To generate the OpenAPI JSON, run the following command:
 
 ```bash
 plain api generate-openapi --validate
+```
+
+`--validate` runs the generated schema through [`openapi-spec-validator`](https://pypi.org/project/openapi-spec-validator/) locally — no network calls. Install it as a dev dependency to use the flag:
+
+```bash
+uv add --dev openapi-spec-validator
 ```
 
 ### Deploying
@@ -436,6 +483,24 @@ See [`default_settings.py`](./default_settings.py) for more details.
 
 ## FAQs
 
+#### How do I return JSON 404s for unmatched paths under `/api/`?
+
+Plain's default 404 handler renders an HTML page. To return a JSON `ErrorSchema` body for unmatched paths under your API prefix, mount [`JsonNotFoundView`](./views.py#JsonNotFoundView) as a regex catch-all at the end of your API router:
+
+```python
+import re
+from plain.api.views import JsonNotFoundView
+from plain.urls import Router, path
+
+
+class APIRouter(Router):
+    namespace = "api"
+    urls = [
+        # ...your API routes
+        path(re.compile(r"^[\s\S]+$"), JsonNotFoundView, name="not_found"),
+    ]
+```
+
 #### How do I make an API key optional?
 
 You can set `api_key_required = False` on your view class to make API key authentication optional. The `self.api_key` will be `None` if no valid key is provided.
@@ -461,8 +526,9 @@ Yes. The `APIKey` model requires `plain.postgres`, but you can use `APIView` wit
 
 You can return status codes in several ways:
 
-- Return an int: `return 204` (for no content)
+- Return a tuple of `(status_code, data)`: `return 201, {"id": note.id}`
 - Return `None`: automatically returns 404
+- Return a `Response` with a custom status code: `return Response(status_code=204)` (for no content)
 - Return a `JsonResponse` with a custom status code: `return JsonResponse({"error": "Bad request"}, status_code=400)`
 - Raise an exception: `raise NotFoundError404` or `raise ForbiddenError403`
 
