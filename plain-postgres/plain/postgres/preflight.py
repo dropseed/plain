@@ -8,6 +8,7 @@ from typing import Any
 from plain.packages import packages_registry
 from plain.postgres.constraints import UniqueConstraint
 from plain.postgres.db import get_connection
+from plain.postgres.expressions import F, OrderBy
 from plain.postgres.fields.related import ForeignKeyField
 from plain.postgres.registry import ModelsRegistry, models_registry
 from plain.preflight import PreflightCheck, PreflightResult, register_check
@@ -39,6 +40,52 @@ def _collect_model_indexes(model: Any) -> list[tuple[str, list[str], bool]]:
             all_indexes.append((constraint.name, list(constraint.fields), True))
 
     return all_indexes
+
+
+def _bare_column_name(expr: Any) -> str | None:
+    """Return the column name if `expr` resolves to a bare column, else `None`.
+
+    Postgres can range-scan the leading column of an index for `WHERE col = ?`
+    only when that column is a real attribute, not an expression — so a
+    compound leading expression like `Lower("email")` returns `None` here.
+    Sort direction (`F("col").desc()` / `OrderBy(F)`) doesn't affect equality
+    lookups, so we unwrap one layer of `OrderBy` around a bare `F`.
+    """
+    if isinstance(expr, OrderBy):
+        expr = expr.expression
+    if isinstance(expr, F):
+        return expr.name
+    return None
+
+
+def _fk_covered_field_names(model: Any) -> set[str]:
+    """Field names that appear as the leading column of an index or unique
+    constraint — covering FK lookups via the index's leading column.
+
+    Includes expression-based indexes/constraints whose leading expression
+    is a bare `F(field_name)` — the catalog-level btree still leads with a
+    real column attribute even when later columns are expressions.
+    """
+    covered: set[str] = set()
+
+    def _record_leading(
+        fields: tuple[str, ...] | list[str], expressions: tuple
+    ) -> None:
+        if fields:
+            covered.add(fields[0].lstrip("-"))
+        elif expressions:
+            name = _bare_column_name(expressions[0])
+            if name is not None:
+                covered.add(name)
+
+    for index in model.model_options.indexes:
+        _record_leading(index.fields, index.expressions)
+
+    for constraint in model.model_options.constraints:
+        if isinstance(constraint, UniqueConstraint):
+            _record_leading(constraint.fields, constraint.expressions)
+
+    return covered
 
 
 @register_check("postgres.all_models")
@@ -386,10 +433,7 @@ class CheckMissingFKIndexes(PreflightCheck):
         results = []
 
         for model in _get_app_models():
-            # Leading field of each index/constraint covers FK lookups
-            covered_fields = {
-                fields[0] for _, fields, _ in _collect_model_indexes(model)
-            }
+            covered_fields = _fk_covered_field_names(model)
 
             for field in model._model_meta.local_fields:
                 if (
