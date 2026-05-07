@@ -56,10 +56,10 @@ class _ExporterLoopFilter(logging.Filter):
 
 @register_config
 class Config(PackageConfig):
-    package_label = "plaincloud"
+    package_label = "plainconnect"
 
     def ready(self) -> None:
-        if not settings.CLOUD_EXPORT_ENABLED or not settings.CLOUD_EXPORT_TOKEN:
+        if not settings.CONNECT_EXPORT_ENABLED or not settings.CONNECT_EXPORT_TOKEN:
             return
 
         # Don't capture per-batch OTLP export failures as Sentry events. The OTel
@@ -92,8 +92,8 @@ class Config(PackageConfig):
             }
         )
 
-        export_url = str(settings.CLOUD_EXPORT_URL).rstrip("/")
-        headers = {"Authorization": f"Bearer {settings.CLOUD_EXPORT_TOKEN}"}
+        export_url = str(settings.CONNECT_EXPORT_URL).rstrip("/")
+        headers = {"Authorization": f"Bearer {settings.CONNECT_EXPORT_TOKEN}"}
 
         # Traces
         current_provider = trace.get_tracer_provider()
@@ -102,7 +102,7 @@ class Config(PackageConfig):
         ):
             raise RuntimeError(
                 "A tracer provider already exists."
-                " plain.cloud must be listed before plain.observer in INSTALLED_PACKAGES."
+                " plain.connect must be listed before plain.observer in INSTALLED_PACKAGES."
             )
 
         span_exporter = OTLPSpanExporter(
@@ -111,7 +111,7 @@ class Config(PackageConfig):
             timeout=30,
             compression=Compression.Gzip,
         )
-        sampler = sampling.TraceIdRatioBased(settings.CLOUD_TRACE_SAMPLE_RATE)
+        sampler = sampling.TraceIdRatioBased(settings.CONNECT_TRACE_SAMPLE_RATE)
         tracer_provider = TracerProvider(sampler=sampler, resource=resource)
         tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
         trace.set_tracer_provider(tracer_provider)
@@ -135,23 +135,23 @@ class Config(PackageConfig):
         metrics.set_meter_provider(meter_provider)
 
         # Logs
-        if settings.CLOUD_EXPORT_LOGS:
+        if settings.CONNECT_EXPORT_LOGS:
             current_logger_provider = _logs.get_logger_provider()
             if current_logger_provider and not isinstance(
                 current_logger_provider, ProxyLoggerProvider
             ):
                 raise RuntimeError(
                     "A logger provider already exists."
-                    " plain.cloud must be listed before plain.observer in INSTALLED_PACKAGES."
+                    " plain.connect must be listed before plain.observer in INSTALLED_PACKAGES."
                 )
 
             # Accept either a level name ("INFO") or an int (20).
-            raw_level = settings.CLOUD_LOG_LEVEL
+            raw_level = settings.CONNECT_LOG_LEVEL
             if isinstance(raw_level, str):
                 log_level = logging.getLevelName(raw_level.upper())
                 if not isinstance(log_level, int):
                     raise ValueError(
-                        f"CLOUD_LOG_LEVEL={raw_level!r} is not a valid logging level."
+                        f"CONNECT_LOG_LEVEL={raw_level!r} is not a valid logging level."
                     )
             else:
                 log_level = int(raw_level)
@@ -186,7 +186,7 @@ class Config(PackageConfig):
             # `logging.getLogger(__name__)` without setting its own level
             # inherits root's effective level — so INFO/DEBUG records get
             # dropped before the OTLP handler runs. Widen root just enough
-            # to let CLOUD_LOG_LEVEL through; never narrow it.
+            # to let CONNECT_LOG_LEVEL through; never narrow it.
             # NOTSET (0) on root already means "all messages processed",
             # so leave it alone in that case.
             root = logging.getLogger()

@@ -4,7 +4,7 @@ HEALTHCHECK_PATH = "/up/"
 URLS_ROUTER = "app.urls.AppRouter"
 
 INSTALLED_PACKAGES = [
-    "plain.cloud",
+    "plain.connect",
     "plain.admin",
     "plain.api",
     "plain.auth",

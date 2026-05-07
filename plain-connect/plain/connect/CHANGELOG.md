@@ -1,4 +1,4 @@
-# plain-cloud changelog
+# plain-connect changelog
 
 ## [0.3.3](https://github.com/dropseed/plain/releases/plain-cloud@0.3.3) (2026-05-05)
 

@@ -1,7 +1,7 @@
 [project]
-name = "plain.cloud"
+name = "plain.connect"
 version = "0.3.3"
-description = "Production observability via OTLP export to Plain Cloud."
+description = "Connect your Plain app to Plain Cloud via OTLP export."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"

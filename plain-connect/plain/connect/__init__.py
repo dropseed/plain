@@ -1,3 +1,3 @@
 from importlib.metadata import version
 
-__version__ = version("plain.cloud")
+__version__ = version("plain.connect")

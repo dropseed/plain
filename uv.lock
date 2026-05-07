@@ -10,8 +10,8 @@ members = [
     "plain-api",
     "plain-auth",
     "plain-cache",
-    "plain-cloud",
     "plain-code",
+    "plain-connect",
     "plain-dev",
     "plain-elements",
     "plain-email",
@@ -197,8 +197,8 @@ dependencies = [
     { name = "plain-api" },
     { name = "plain-auth" },
     { name = "plain-cache" },
-    { name = "plain-cloud" },
     { name = "plain-code" },
+    { name = "plain-connect" },
     { name = "plain-dev" },
     { name = "plain-elements" },
     { name = "plain-email" },
@@ -233,8 +233,8 @@ requires-dist = [
     { name = "plain-api", editable = "plain-api" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-cache", editable = "plain-cache" },
-    { name = "plain-cloud", editable = "plain-cloud" },
     { name = "plain-code", editable = "plain-code" },
+    { name = "plain-connect", editable = "plain-connect" },
     { name = "plain-dev", editable = "plain-dev" },
     { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-email", editable = "plain-email" },
@@ -675,9 +675,30 @@ requires-dist = [
 ]
 
 [[package]]
-name = "plain-cloud"
+name = "plain-code"
+version = "0.21.7"
+source = { editable = "plain-code" }
+dependencies = [
+    { name = "plain" },
+    { name = "requests" },
+    { name = "ruff" },
+    { name = "tomlkit" },
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "plain", editable = "plain" },
+    { name = "requests", specifier = ">=2.0.0" },
+    { name = "ruff", specifier = ">=0.1.0" },
+    { name = "tomlkit", specifier = ">=0.11.0" },
+    { name = "ty", specifier = "<1.0.0" },
+]
+
+[[package]]
+name = "plain-connect"
 version = "0.3.3"
-source = { editable = "plain-cloud" }
+source = { editable = "plain-connect" }
 dependencies = [
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-sdk" },
@@ -698,27 +719,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
-
-[[package]]
-name = "plain-code"
-version = "0.21.7"
-source = { editable = "plain-code" }
-dependencies = [
-    { name = "plain" },
-    { name = "requests" },
-    { name = "ruff" },
-    { name = "tomlkit" },
-    { name = "ty" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "plain", editable = "plain" },
-    { name = "requests", specifier = ">=2.0.0" },
-    { name = "ruff", specifier = ">=0.1.0" },
-    { name = "tomlkit", specifier = ">=0.11.0" },
-    { name = "ty", specifier = "<1.0.0" },
-]
 
 [[package]]
 name = "plain-dev"
@@ -1242,8 +1242,8 @@ dev = [
     { name = "plain-api" },
     { name = "plain-auth" },
     { name = "plain-cache" },
-    { name = "plain-cloud" },
     { name = "plain-code" },
+    { name = "plain-connect" },
     { name = "plain-dev" },
     { name = "plain-elements" },
     { name = "plain-email" },
@@ -1282,8 +1282,8 @@ dev = [
     { name = "plain-api", editable = "plain-api" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-cache", editable = "plain-cache" },
-    { name = "plain-cloud", editable = "plain-cloud" },
     { name = "plain-code", editable = "plain-code" },
+    { name = "plain-connect", editable = "plain-connect" },
     { name = "plain-dev", editable = "plain-dev" },
     { name = "plain-elements", editable = "plain-elements" },
     { name = "plain-email", editable = "plain-email" },
