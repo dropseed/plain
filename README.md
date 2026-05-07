@@ -132,7 +132,7 @@ plain docs --search "queryset"         # search across all packages
 
 ## First-party ecosystem
 
-30 packages, one framework. All with built-in docs. Decisions that usually take a sprint are already made.
+32 packages, one framework. All with built-in docs. Decisions that usually take a sprint are already made.
 
 **Foundation:**
 
@@ -144,6 +144,7 @@ plain docs --search "queryset"         # search across all packages
 **Backend:**
 
 - [plain.api](https://plainframework.com/docs/plain-api/plain/api/) — REST APIs
+- [plain.mcp](https://plainframework.com/docs/plain-mcp/plain/mcp/) — MCP server for AI clients
 - [plain.jobs](https://plainframework.com/docs/plain-jobs/plain/jobs/) — background jobs
 - [plain.email](https://plainframework.com/docs/plain-email/plain/email/) — sending email
 - [plain.cache](https://plainframework.com/docs/plain-cache/plain/cache/) — caching layer
@@ -172,6 +173,7 @@ plain docs --search "queryset"         # search across all packages
 
 - [plain.admin](https://plainframework.com/docs/plain-admin/plain/admin/) — database admin
 - [plain.observer](https://plainframework.com/docs/plain-observer/plain/observer/) — request tracing
+- [plain.connect](https://plainframework.com/docs/plain-connect/plain/connect/) — OTLP export to Plain Cloud
 - [plain.flags](https://plainframework.com/docs/plain-flags/plain/flags/) — feature flags
 - [plain.scan](https://plainframework.com/docs/plain-scan/plain/scan/) — security scanning
 - [plain.pageviews](https://plainframework.com/docs/plain-pageviews/plain/pageviews/) — analytics

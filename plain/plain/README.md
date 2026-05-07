@@ -33,6 +33,7 @@ The `plain` package includes everything you need to start handling web requests 
 - [plain.sessions](/plain-sessions/plain/sessions/README.md) - User sessions and cookies.
 - [plain.jobs](/plain-jobs/plain/jobs/README.md) - Background jobs stored in the database.
 - [plain.api](/plain-api/plain/api/README.md) - Build APIs with Plain views.
+- [plain.mcp](/plain-mcp/plain/mcp/README.md) - Expose your app to AI clients as an MCP server.
 
 ## Auth Packages
 
@@ -49,6 +50,7 @@ The `plain` package includes everything you need to start handling web requests 
 - [plain.redirection](/plain-redirection/plain/redirection/README.md) - Redirects managed in the database.
 - [plain.pageviews](/plain-pageviews/plain/pageviews/README.md) - Basic self-hosted page view tracking and reporting.
 - [plain.observer](/plain-observer/plain/observer/README.md) - On-page telemetry reporting.
+- [plain.connect](/plain-connect/plain/connect/README.md) - Export traces, metrics, and logs to Plain Cloud via OTLP.
 
 ## Dev Packages
 
