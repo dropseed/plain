@@ -1,5 +1,6 @@
 from plain.api import openapi
 from plain.api.openapi.generator import OpenAPISchemaGenerator
+from plain.api.openapi.validation import validate_openapi_schema
 from plain.api.views import APIKeyView, APIView
 from plain.test import Client
 from plain.urls import Router, path
@@ -312,3 +313,34 @@ def test_api_key_view_auto_emits_security_scheme():
     }
     assert schema["paths"]["/secure/"]["get"]["security"] == [{"BearerAuth": []}]
     assert "security" not in schema["paths"]["/public/"]["get"]
+
+
+def test_generated_schema_validates_against_openapi_spec():
+    """Generated specs must validate against the OpenAPI 3 JSON Schema."""
+
+    @openapi.schema(
+        {
+            "responses": {
+                "200": {
+                    "description": "An item",
+                    "content": {"application/json": {"schema": {"type": "object"}}},
+                }
+            }
+        }
+    )
+    class ItemView(APIView):
+        def get(self):
+            return {"id": self.url_kwargs["id"]}
+
+    @openapi.schema(
+        {
+            "openapi": "3.0.3",
+            "info": {"title": "Test API", "version": "1.0.0"},
+        }
+    )
+    class APIRouter(Router):
+        namespace = ""
+        urls = [path("items/<int:id>", ItemView, name="item")]
+
+    schema = OpenAPISchemaGenerator(APIRouter()).schema
+    validate_openapi_schema(schema)
