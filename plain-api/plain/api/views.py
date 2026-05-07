@@ -16,7 +16,7 @@ from plain.views.base import View
 from plain.views.exceptions import ResponseException
 
 from . import openapi
-from .schemas import ErrorSchema
+from .schemas import ErrorSchema, FieldError
 
 # Allow plain.api to be used without plain.postgres
 try:
@@ -28,11 +28,11 @@ __all__ = [
     "APIKeyView",
     "APIResult",
     "APIView",
+    "JsonNotFoundView",
 ]
 
 type APIResult = (
     Response
-    | int
     | None
     | dict[str, Any]
     | list[Any]
@@ -40,11 +40,31 @@ type APIResult = (
 )
 
 
-def _error_response(*, error_id: str, message: str, status_code: int) -> JsonResponse:
-    return JsonResponse(
-        ErrorSchema(id=error_id, message=message, url=""),
-        status_code=status_code,
-    )
+def _error_response(
+    *,
+    error_id: str,
+    message: str,
+    status_code: int,
+    errors: list[FieldError] | None = None,
+) -> JsonResponse:
+    body: ErrorSchema = {"id": error_id, "message": message}
+    if errors is not None:
+        body["errors"] = errors
+    return JsonResponse(body, status_code=status_code)
+
+
+def _validation_field_errors(exc: ValidationError) -> list[FieldError] | None:
+    """Flatten a field-dict ValidationError into a list of `{field, message}`.
+
+    Returns None for string- or list-shaped errors that have no field context.
+    """
+    if not hasattr(exc, "error_dict"):
+        return None
+    return [
+        {"field": field, "message": message}
+        for field, messages in exc
+        for message in messages
+    ]
 
 
 # Snake-case ids are part of the public API surface — client libs key off them.
@@ -55,14 +75,25 @@ _STATUS_ERROR_IDS = {
     404: "not_found",
     405: "method_not_allowed",
     409: "conflict",
+    415: "unsupported_media_type",
     429: "rate_limited",
 }
 
 
 # @openapi.response_typed_dict(400, ErrorSchema)
 # @openapi.response_typed_dict(401, ErrorSchema)
-class APIKeyView(View):
+class APIKeyView(View[APIResult]):
     api_key_required = True
+
+    # Picked up by the OpenAPI generator: each entry is added to
+    # `components.securitySchemes` and required on every operation served by
+    # this view. Subclasses can override to declare a different scheme.
+    openapi_security_schemes: dict[str, dict[str, Any]] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+        }
+    }
 
     @cached_property
     def api_key(self) -> Any:
@@ -152,9 +183,6 @@ class APIView(View[APIResult]):
         if result is None:
             raise NotFoundError404
 
-        if isinstance(result, int):
-            return Response(status_code=result)
-
         status_code = 200
 
         if isinstance(result, tuple):
@@ -174,10 +202,17 @@ class APIView(View[APIResult]):
 
     def handle_exception(self, exc: Exception) -> Response:
         if isinstance(exc, ValidationError):
+            errors = _validation_field_errors(exc)
+            if errors is not None:
+                message = "Validation error"
+            else:
+                detail = "; ".join(exc.messages) if exc.messages else str(exc)
+                message = f"Validation error: {detail}"
             return _error_response(
                 error_id="validation_error",
-                message=f"Validation error: {exc.message}",
+                message=message,
                 status_code=400,
+                errors=errors,
             )
         if isinstance(exc, FormFieldMissingError):
             return _error_response(
@@ -198,3 +233,15 @@ class APIView(View[APIResult]):
             message="Internal server error",
             status_code=500,
         )
+
+
+class JsonNotFoundView(APIView):
+    """Catch-all view that always returns a JSON 404.
+
+    Mount as a regex catch-all at the end of an API router so unmatched
+    paths under your API prefix return a JSON `ErrorSchema` body instead of
+    the framework's HTML 404 page.
+    """
+
+    def before_request(self) -> None:
+        raise NotFoundError404

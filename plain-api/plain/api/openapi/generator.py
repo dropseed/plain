@@ -2,9 +2,35 @@ import json
 from typing import Any
 
 from plain.urls import Router, URLPattern, URLResolver
-from plain.urls.converters import _get_converters
+from plain.urls.converters import (
+    IntConverter,
+    UUIDConverter,
+    _get_converters,
+)
 
 from .utils import merge_data
+
+
+def _build_operation_id(view_class: type, method: str) -> str:
+    return f"{view_class.__name__}_{method}"
+
+
+def _schema_for_converter(converter: Any) -> dict[str, Any]:
+    if isinstance(converter, IntConverter):
+        return {"type": "integer"}
+    if isinstance(converter, UUIDConverter):
+        return {"type": "string", "format": "uuid"}
+    return {"type": "string", "pattern": converter.regex}
+
+
+def _security_schemes_for_view(view_class: type) -> dict[str, dict[str, Any]]:
+    """Collect `openapi_security_schemes` declared on a view's MRO."""
+    schemes: dict[str, dict[str, Any]] = {}
+    for cls in reversed(view_class.__mro__):
+        declared = cls.__dict__.get("openapi_security_schemes")
+        if declared:
+            schemes.update(declared)
+    return schemes
 
 
 class OpenAPISchemaGenerator:
@@ -34,7 +60,8 @@ class OpenAPISchemaGenerator:
         return yaml.safe_dump(cleaned, indent=indent, sort_keys=True)
 
     def get_paths(
-        self, urls: list[URLPattern | URLResolver]
+        self,
+        urls: list[URLPattern | URLResolver],
     ) -> dict[str, dict[str, Any]]:
         paths = {}
 
@@ -71,7 +98,10 @@ class OpenAPISchemaGenerator:
                 getattr(obj, "openapi_components", {}),
             )
 
-    def operations_for_url_pattern(self, url_pattern: URLPattern) -> dict[str, Any]:
+    def operations_for_url_pattern(
+        self,
+        url_pattern: URLPattern,
+    ) -> dict[str, Any]:
         operations = {}
 
         # `View` defines runtime stubs for every handler, so gating on
@@ -109,6 +139,20 @@ class OpenAPISchemaGenerator:
                     if parameters := self.parameters_from_url_patterns([url_pattern]):
                         operation["parameters"] = parameters
 
+                if operation and "operationId" not in operation:
+                    operation["operationId"] = _build_operation_id(
+                        url_pattern.view_class, method
+                    )
+
+                if operation and "security" not in operation:
+                    schemes = _security_schemes_for_view(url_pattern.view_class)
+                    if schemes:
+                        operation["security"] = [{name: []} for name in schemes]
+                        self.components = merge_data(
+                            self.components,
+                            {"securitySchemes": schemes},
+                        )
+
                 # If there are no responses in the 2XX or 3XX range, then don't return it at all.
                 # Most likely the developer didn't define any actual responses for their endpoint,
                 # and all we did was inherit the base error responses.
@@ -140,11 +184,7 @@ class OpenAPISchemaGenerator:
                         "name": name,
                         "in": "path",
                         "required": True,
-                        "schema": {
-                            "type": "string",
-                            "pattern": converter.regex,
-                            # "format": "uuid",
-                        },
+                        "schema": _schema_for_converter(converter),
                     }
                 )
 

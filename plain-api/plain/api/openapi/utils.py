@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, NotRequired, Required, get_args, get_origin
 from uuid import UUID
 
 
@@ -24,6 +24,12 @@ def schema_from_type(t: Any) -> dict[str, Any]:
     #     extra_fields = {"description": description}
     # else:
     extra_fields: dict[str, Any] = {}
+
+    # Unwrap NotRequired[X] / Required[X] — required-ness is captured on the
+    # TypedDict via __required_keys__ / __optional_keys__, the inner schema
+    # is just the wrapped type.
+    if get_origin(t) in (NotRequired, Required):
+        return schema_from_type(get_args(t)[0])
 
     if hasattr(t, "__annotations__") and t.__annotations__:
         # It's a TypedDict...

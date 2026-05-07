@@ -1,6 +1,6 @@
 from plain.api import openapi
 from plain.api.openapi.generator import OpenAPISchemaGenerator
-from plain.api.views import APIView
+from plain.api.views import APIKeyView, APIView
 from plain.test import Client
 from plain.urls import Router, path
 
@@ -31,6 +31,71 @@ def test_versioned_api_view():
     )
     assert response.status_code == 200
     assert response.json() == {"msg": "Hello, Dave!"}
+
+
+def test_validation_error_is_returned_as_400_json():
+    """ValidationError must convert to a JSON 400 regardless of error shape.
+
+    Single-string errors expose `.message`; field-dict and list errors only
+    expose `.messages`. The handler must cover both without crashing into a
+    500. Field-dict errors get a structured `errors` list so clients can
+    render per-field feedback.
+    """
+    client = Client()
+
+    response = client.post(
+        "/validation-error",
+        data={"shape": "string"},
+        content_type="application/json",
+    )
+    assert response.status_code == 400
+    body = response.json()
+    assert body["id"] == "validation_error"
+    assert body["message"].startswith("Validation error: ")
+    assert "errors" not in body
+
+    response = client.post(
+        "/validation-error",
+        data={"shape": "list"},
+        content_type="application/json",
+    )
+    assert response.status_code == 400
+    body = response.json()
+    assert body["id"] == "validation_error"
+    assert body["message"].startswith("Validation error: ")
+    assert "errors" not in body
+
+    response = client.post(
+        "/validation-error",
+        data={"shape": "dict"},
+        content_type="application/json",
+    )
+    assert response.status_code == 400
+    body = response.json()
+    assert body["id"] == "validation_error"
+    assert body["message"] == "Validation error"
+    assert body["errors"] == [
+        {"field": "password", "message": "This field is required."}
+    ]
+
+
+def test_unsupported_media_type_is_returned_as_415_json():
+    """A non-JSON Content-Type on a json_data view must surface as 415, not 500.
+
+    Before the change, `request.json_data` raised `ValueError`, which fell
+    through to the catch-all 500. Now `UnsupportedMediaTypeError415` flows
+    through `handle_exception` as a clean 415 with a stable error id.
+    """
+    client = Client()
+
+    response = client.post(
+        "/json-echo",
+        data="hello",
+        content_type="text/plain",
+    )
+    assert response.status_code == 415
+    body = response.json()
+    assert body["id"] == "unsupported_media_type"
 
 
 def test_openapi_only_emits_operations_for_implemented_methods():
@@ -78,3 +143,172 @@ def test_openapi_path_params_translated_for_both_url_forms():
         "/shorthand/{slug}/",
         "/mixed/{pk}/{slug}/",
     }
+
+
+def test_path_params_use_native_openapi_types():
+    """Built-in URL converters should emit their natural JSON Schema type.
+
+    Spec consumers (codegen, fuzzers like schemathesis) treat
+    `type: integer` differently from `type: string with pattern`. Plain's
+    built-in converters carry that information, so the generator should
+    surface it.
+    """
+
+    @openapi.schema({"responses": {"200": {"description": "ok"}}})
+    class TargetView(APIView):
+        def get(self):
+            return {"ok": True}
+
+    class LocalRouter(Router):
+        namespace = ""
+        urls = [
+            path("by-int/<int:pk>/", TargetView, name="by_int"),
+            path("by-uuid/<uuid:id>/", TargetView, name="by_uuid"),
+            path("by-slug/<slug:tag>/", TargetView, name="by_slug"),
+            path("by-str/<str:name>/", TargetView, name="by_str"),
+        ]
+
+    schema = OpenAPISchemaGenerator(LocalRouter()).schema
+    by_name = {
+        path: op["get"]["parameters"][0]["schema"]
+        for path, op in schema["paths"].items()
+    }
+    assert by_name["/by-int/{pk}/"] == {"type": "integer"}
+    assert by_name["/by-uuid/{id}/"] == {"type": "string", "format": "uuid"}
+    assert by_name["/by-slug/{tag}/"]["type"] == "string"
+    assert by_name["/by-slug/{tag}/"]["pattern"]
+    assert by_name["/by-str/{name}/"]["type"] == "string"
+
+
+def test_operation_id_defaults_from_view_class_and_method():
+    """Each operation gets a stable operationId so spec consumers can chain it.
+
+    OpenAPI links, generated client SDKs, and tools like schemathesis all key
+    off operationId. We default it from the view class name (rather than the
+    URL `name=`) because URL names exist for `reverse()` and get renamed
+    during refactors — view class names are far more stable.
+    """
+
+    @openapi.schema({"responses": {"200": {"description": "ok"}}})
+    class CrudView(APIView):
+        def get(self):
+            return {"ok": True}
+
+        def post(self):
+            return {"ok": True}
+
+    class LocalRouter(Router):
+        namespace = "api"
+        urls = [path("notes/", CrudView, name="notes_list")]
+
+    schema = OpenAPISchemaGenerator(LocalRouter()).schema
+    operations = schema["paths"]["/notes/"]
+    assert operations["get"]["operationId"] == "CrudView_get"
+    assert operations["post"]["operationId"] == "CrudView_post"
+
+
+def test_operation_id_can_be_overridden():
+    """User-supplied operationId in @openapi.schema wins over the default."""
+
+    class CustomView(APIView):
+        @openapi.schema(
+            {
+                "operationId": "fetchEverything",
+                "responses": {"200": {"description": "ok"}},
+            }
+        )
+        def get(self):
+            return {"ok": True}
+
+    class LocalRouter(Router):
+        namespace = ""
+        urls = [path("things/", CustomView, name="things_list")]
+
+    schema = OpenAPISchemaGenerator(LocalRouter()).schema
+    assert schema["paths"]["/things/"]["get"]["operationId"] == "fetchEverything"
+
+
+def test_openapi_helpers_build_content_and_body_envelopes():
+    """`openapi.json_content` and `openapi.json_body` produce the standard envelopes."""
+    schema_ref = {"$ref": "#/components/schemas/X"}
+    assert openapi.json_content(schema_ref) == {
+        "application/json": {"schema": schema_ref}
+    }
+    assert openapi.json_body(schema_ref) == {
+        "required": True,
+        "content": {"application/json": {"schema": schema_ref}},
+    }
+    assert openapi.json_body(schema_ref, required=False) == {
+        "required": False,
+        "content": {"application/json": {"schema": schema_ref}},
+    }
+
+
+def test_link_to_targets_default_operation_id():
+    """`openapi.link_to(view, ...)` matches the framework-default operationId."""
+
+    class TargetView(APIView):
+        def get(self):
+            return None
+
+    assert openapi.link_to(TargetView, parameters={"id": "$response.body#/id"}) == {
+        "operationId": "TargetView_get",
+        "parameters": {"id": "$response.body#/id"},
+    }
+    assert openapi.link_to(
+        TargetView, method="patch", parameters={"id": "$response.body#/id"}
+    ) == {
+        "operationId": "TargetView_patch",
+        "parameters": {"id": "$response.body#/id"},
+    }
+
+
+def test_json_not_found_view_returns_json_404_for_any_method():
+    """`JsonNotFoundView` is a catch-all that yields a JSON ErrorSchema 404."""
+    client = Client()
+
+    response = client.get("/missing-anything")
+    assert response.status_code == 404
+    assert response.headers["Content-Type"].startswith("application/json")
+    assert response.json()["id"] == "not_found"
+
+    response = client.post(
+        "/missing-anything", data="{}", content_type="application/json"
+    )
+    assert response.status_code == 404
+    assert response.json()["id"] == "not_found"
+
+
+def test_api_key_view_auto_emits_security_scheme():
+    """`APIKeyView` subclasses get `securitySchemes.BearerAuth` and per-op `security`."""
+
+    @openapi.schema({"responses": {"200": {"description": "ok"}}})
+    class SecureView(APIView, APIKeyView):
+        def get_api_key(self):
+            return None
+
+        def use_api_key(self):
+            pass
+
+        def get(self):
+            return {"ok": True}
+
+    @openapi.schema({"responses": {"200": {"description": "ok"}}})
+    class PublicView(APIView):
+        def get(self):
+            return {"ok": True}
+
+    class LocalRouter(Router):
+        namespace = ""
+        urls = [
+            path("secure/", SecureView, name="secure"),
+            path("public/", PublicView, name="public"),
+        ]
+
+    schema = OpenAPISchemaGenerator(LocalRouter()).schema
+    assert schema["components"]["securitySchemes"]["BearerAuth"] == {
+        "type": "http",
+        "scheme": "bearer",
+    }
+    assert schema["paths"]["/secure/"]["get"]["security"] == [{"BearerAuth": []}]
+    assert "security" not in schema["paths"]["/public/"]["get"]
