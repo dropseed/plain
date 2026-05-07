@@ -1,5 +1,15 @@
 # plain-observer changelog
 
+## [0.34.10](https://github.com/dropseed/plain/releases/plain-observer@0.34.10) (2026-05-06)
+
+### What's changed
+
+- **Removed redundant `plainobserver_trace_trace_id_idx`** — `Trace.trace_id` already has a `UniqueConstraint` whose underlying btree covers the same lookups. Convergence drops the redundant index on the next `plain postgres sync`. ([48d850ca](https://github.com/dropseed/plain/commit/48d850ca))
+
+### Upgrade instructions
+
+- No changes required. Run `plain postgres sync` after upgrading; existing trace-id lookups will use the unique-backed btree.
+
 ## [0.34.9](https://github.com/dropseed/plain/releases/plain-observer@0.34.9) (2026-05-05)
 
 ### What's changed
