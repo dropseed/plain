@@ -1277,11 +1277,12 @@ fix in their model code. (In JSON output each finding still carries
 it.) Each finding still carries the exact SQL in its suggestion for anyone
 who wants to act.
 
-| Finding             | What it reports                                                                  |
-| ------------------- | -------------------------------------------------------------------------------- |
-| **Stats freshness** | Tables whose planner statistics are missing (never analyzed) or stale            |
-| **Vacuum health**   | Tables with >10% dead tuples                                                     |
-| **Index bloat**     | btree indexes with significant estimated wasted space (≥10 MB, ioguix estimator) |
+| Finding             | What it reports                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------ |
+| **Stats freshness** | Tables whose planner statistics are missing (never analyzed) or stale                      |
+| **Vacuum health**   | Tables with >10% dead tuples                                                               |
+| **Table bloat**     | Tables with significant estimated wasted space (≥100 MB AND ≥25% bloat, ioguix estimator)  |
+| **Index bloat**     | btree indexes with significant estimated wasted space (≥100 MB AND ≥30%, ioguix estimator) |
 
 If a future release exposes per-table autovacuum / fillfactor parameters in
 `model_options` (see the `postgres-model-storage-parameters` arc), these
@@ -1335,7 +1336,7 @@ heroku run -a your-app "plain postgres diagnose --json"
 
 The `--json` flag must be quoted so Heroku passes it through to the command.
 
-Cumulative-stat checks (`stats_freshness`, `vacuum_health`, `unused_indexes`, `missing_index_candidates`, `index_bloat`) need cumulative stat history after the last reset to be reliable. Check the `stats_reset` informational to see how much history you have. (Note: this list spans both the warning and operational tiers — the common thread is that all five depend on counters that `pg_stat_reset()` wipes.)
+Cumulative-stat checks (`stats_freshness`, `vacuum_health`, `unused_indexes`, `missing_index_candidates`, `table_bloat`, `index_bloat`) need cumulative stat history after the last reset to be reliable. Check the `stats_reset` informational to see how much history you have. (Note: this list spans both the warning and operational tiers — the common thread is that all five depend on counters that `pg_stat_reset()` wipes.)
 
 ### Preflight checks
 

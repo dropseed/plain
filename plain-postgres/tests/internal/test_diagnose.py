@@ -71,6 +71,7 @@ class TestRunAllChecks:
             "sequence_exhaustion",
             "stats_freshness",
             "vacuum_health",
+            "table_bloat",
             "index_bloat",
             "unused_indexes",
             "missing_index_candidates",

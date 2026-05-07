@@ -6,6 +6,7 @@ from .checks_cumulative import (
     check_index_bloat,
     check_missing_index_candidates,
     check_stats_freshness,
+    check_table_bloat,
     check_unused_indexes,
     check_vacuum_health,
 )
@@ -47,6 +48,7 @@ ALL_CHECKS: list[CheckFn] = [
     check_stats_freshness,
     # Operational (depends on cumulative stats).
     check_vacuum_health,
+    check_table_bloat,
     check_index_bloat,
     check_unused_indexes,
     check_missing_index_candidates,
@@ -65,6 +67,7 @@ _OPERATIONAL_CHECKS: frozenset[CheckFn] = frozenset(
     {
         check_stats_freshness,
         check_vacuum_health,
+        check_table_bloat,
         check_index_bloat,
     }
 )
@@ -114,6 +117,22 @@ def _apply_cross_check_caveats(results: list[CheckResult]) -> None:
                 "this table's planner stats are absent or stale — the "
                 "sequential-scan evidence is still valid, but query plans "
                 "may shift after ANALYZE",
+            ),
+        ],
+        "vacuum_health": [
+            (
+                "table_bloat",
+                "this table also shows page-level bloat — VACUUM (ANALYZE) "
+                "reclaims dead tuples for reuse but does not shrink the "
+                "relation; see table_bloat for rewrite options",
+            ),
+        ],
+        "table_bloat": [
+            (
+                "vacuum_health",
+                "this table also has significant dead tuples — run "
+                "VACUUM (ANALYZE) first, then re-measure before deciding "
+                "whether a rewrite is still needed",
             ),
         ],
     }

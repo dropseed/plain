@@ -187,15 +187,16 @@ def check_index_bloat(cursor: Any, table_owners: dict[str, TableOwner]) -> Check
     from pg_stats (not filtered by the predicate), which tends to
     underreport actual bloat on highly selective partial indexes.
 
-    Threshold: 10 MB wasted bytes. pghero's default is 100 MB for
-    enterprise apps; we default lower because Plain targets apps across a
-    wider size range, and 10 MB of bloat on a small DB is usually worth
-    knowing about.
+    Thresholds: >30% bloat ratio AND >100 MB wasted bytes. Indexes get a
+    higher percentage bar than tables (25%) because REINDEX CONCURRENTLY
+    is cheap and routine, so it's only worth surfacing when the index is
+    genuinely degraded.
     """
-    min_bloat_bytes = 10 * 1024 * 1024  # 10 MB
+    min_bloat_bytes = 100 * 1024 * 1024  # 100 MB
+    min_bloat_pct = 30
 
     # Cheap pre-check: if no public-schema btree index is even large enough
-    # to plausibly contain 10 MB of bloat, skip the expensive estimator.
+    # to plausibly contain the minimum bloat, skip the expensive estimator.
     # Scope must match the estimator's WHERE nspname = 'public' or large
     # catalog/extension indexes would defeat the fast-exit.
     cursor.execute(
@@ -322,12 +323,16 @@ def check_index_bloat(cursor: Any, table_owners: dict[str, TableOwner]) -> Check
             i.indisprimary
         FROM raw_bloat rb
         JOIN pg_index i ON i.indexrelid = rb.indexrelid
-        WHERE wastedbytes >= %(min)s
+        WHERE wastedbytes >= %(min_bytes)s
+          AND realbloat >= %(min_pct)s
         ORDER BY wastedbytes DESC
+        LIMIT 100
     """
     try:
         with cursor.connection.transaction():
-            cursor.execute(bloat_sql, {"min": min_bloat_bytes})
+            cursor.execute(
+                bloat_sql, {"min_bytes": min_bloat_bytes, "min_pct": min_bloat_pct}
+            )
             rows = cursor.fetchall()
     except psycopg.errors.DatabaseError:
         return CheckResult(
@@ -342,7 +347,7 @@ def check_index_bloat(cursor: Any, table_owners: dict[str, TableOwner]) -> Check
     items: list[CheckItem] = []
     for table_name, index_name, wasted, total, pct, is_primary in rows:
         source, package, model_class, model_file = _table_info(table_name, table_owners)
-        pct_str = f"{float(pct):.0f}%" if pct is not None else "?%"
+        pct_str = f"{float(pct):.0f}%"
         primary_note = " (PRIMARY KEY)" if is_primary else ""
         if is_primary:
             fix = (
@@ -373,6 +378,197 @@ def check_index_bloat(cursor: Any, table_owners: dict[str, TableOwner]) -> Check
         label="Index bloat",
         status="warning" if items else "ok",
         summary=f"{len(items)} indexes bloated" if items else "none",
+        items=items,
+        message="",
+        tier="operational",
+    )
+
+
+def check_table_bloat(cursor: Any, table_owners: dict[str, TableOwner]) -> CheckResult:
+    """Tables with significant estimated wasted space (page-level bloat).
+
+    Complements `check_vacuum_health`. Dead-tuple counts only show what
+    autovacuum hasn't reclaimed yet — a table that autovacuum has been
+    running on regularly can still carry gigabytes of bloat because plain
+    VACUUM marks pages reusable but does not return space to the OS.
+    `n_dead_tup` is therefore blind to the "VACUUM ran but the table never
+    shrank" case, which is the common shape of bloat on high-churn tables
+    (caches, queues, soft-deleted history). A size-based estimator catches
+    it.
+
+    Uses the ioguix table-bloat estimator (same heuristic as pghero) to
+    estimate wasted bytes per table by comparing actual relation pages to
+    the number expected from `pg_stats` average column widths times row
+    count. Approximate — accuracy drops on tables with atypical
+    distributions or wide TOAST'd columns — but battle-tested.
+
+    Thresholds: >25% bloat ratio AND >100 MB wasted bytes. Both filters
+    required: percentage is the "is this table actually unhealthy" signal,
+    byte floor is the "is it worth fixing" filter. Tables get a lower
+    percentage bar than indexes (30%) because rewriting a table is more
+    disruptive (pg_repack/pg_squeeze or VACUUM FULL) than REINDEX
+    CONCURRENTLY.
+    """
+    min_bloat_bytes = 100 * 1024 * 1024  # 100 MB
+    min_bloat_pct = 25
+
+    # Cheap pre-check: if no public-schema table's main relation is large
+    # enough to plausibly carry the minimum bloat, skip the expensive
+    # estimator. Note: this counts only the heap (relpages), not TOAST —
+    # tables whose bloat is concentrated in a TOAST'd column (large
+    # text/jsonb) could be skipped here even though the full estimator
+    # would qualify them. Acceptable for a fast-exit; the alternative is
+    # joining pg_class twice for every DB.
+    cursor.execute(
+        """
+        SELECT 1
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
+        WHERE c.relkind = 'r'
+          AND c.relpages * current_setting('block_size')::bigint >= %(min_bytes)s
+        LIMIT 1
+        """,
+        {"min_bytes": min_bloat_bytes},
+    )
+    if not cursor.fetchone():
+        return CheckResult(
+            name="table_bloat",
+            label="Table bloat",
+            status="ok",
+            summary="none",
+            items=[],
+            message="",
+            tier="operational",
+        )
+
+    # Standard ioguix table-bloat estimator — joins pg_stats, so it can
+    # fail on never-analyzed tables. Probe inside a transaction so that
+    # failure rolls back cleanly without affecting later checks.
+    bloat_sql = """
+        WITH constants AS (
+            SELECT current_setting('block_size')::numeric AS bs,
+                   23 AS hdr,
+                   8 AS ma
+        ),
+        null_headers AS (
+            SELECT
+                hdr + 1 + (sum(CASE WHEN s.null_frac <> 0 THEN 1 ELSE 0 END) / 8) AS nullhdr,
+                SUM((1 - s.null_frac) * s.avg_width) AS datawidth,
+                MAX(s.null_frac) AS maxfracsum,
+                s.schemaname,
+                s.tablename,
+                hdr, ma, bs
+            FROM pg_stats s
+            CROSS JOIN constants
+            WHERE s.schemaname = 'public'
+            GROUP BY s.schemaname, s.tablename, hdr, ma, bs
+        ),
+        data_headers AS (
+            SELECT
+                ma, bs, hdr, schemaname, tablename,
+                (datawidth + (hdr + ma - (CASE WHEN hdr %% ma = 0 THEN ma ELSE hdr %% ma END)))::numeric AS datahdr,
+                (maxfracsum * (nullhdr + ma - (CASE WHEN nullhdr %% ma = 0 THEN ma ELSE nullhdr %% ma END))) AS nullhdr2
+            FROM null_headers
+        ),
+        table_estimates AS (
+            SELECT
+                nh.schemaname, nh.tablename, nh.bs,
+                c.reltuples::numeric AS est_rows,
+                c.relpages::bigint * nh.bs AS table_bytes,
+                CEIL((c.reltuples *
+                        (nh.datahdr + nh.nullhdr2 + 4 + nh.ma -
+                            (CASE WHEN nh.datahdr %% nh.ma = 0 THEN nh.ma ELSE nh.datahdr %% nh.ma END)
+                        )
+                    ) / (nh.bs - 20)) * nh.bs AS expected_bytes,
+                c.reltoastrelid
+            FROM data_headers nh
+            JOIN pg_namespace n ON n.nspname = nh.schemaname
+            JOIN pg_class c ON c.relnamespace = n.oid AND c.relname = nh.tablename
+            WHERE c.relkind = 'r'
+        ),
+        with_toast AS (
+            SELECT
+                te.schemaname,
+                te.tablename,
+                te.est_rows,
+                te.table_bytes + (COALESCE(t.relpages, 0) * te.bs)::bigint AS table_bytes,
+                te.expected_bytes + (CEIL(COALESCE(t.reltuples, 0) / 4) * te.bs)::bigint AS expected_bytes
+            FROM table_estimates te
+            LEFT JOIN pg_class t ON te.reltoastrelid = t.oid AND t.relkind = 't'
+        )
+        SELECT
+            tablename,
+            table_bytes,
+            (table_bytes - expected_bytes)::bigint AS wasted_bytes,
+            (100.0 * (table_bytes - expected_bytes) / NULLIF(table_bytes, 0)) AS bloat_pct,
+            est_rows
+        FROM with_toast
+        -- min_bytes filter establishes wasted_bytes > 0 by transitivity (it's a
+        -- positive byte count), so the percentage filter never sees a negative
+        -- numerator from over-estimated expected_bytes.
+        WHERE (table_bytes - expected_bytes) >= %(min_bytes)s
+          AND (100.0 * (table_bytes - expected_bytes) / NULLIF(table_bytes, 0)) >= %(min_pct)s
+        ORDER BY wasted_bytes DESC
+        LIMIT 100
+    """
+    try:
+        with cursor.connection.transaction():
+            cursor.execute(
+                bloat_sql, {"min_bytes": min_bloat_bytes, "min_pct": min_bloat_pct}
+            )
+            rows = cursor.fetchall()
+    except psycopg.errors.DatabaseError:
+        return CheckResult(
+            name="table_bloat",
+            label="Table bloat",
+            status="skipped",
+            summary="could not estimate",
+            items=[],
+            message="Bloat estimator query failed (may require ANALYZE on target tables).",
+            tier="operational",
+        )
+
+    items: list[CheckItem] = []
+    for table_name, total, wasted, pct, est_rows in rows:
+        source, package, model_class, model_file = _table_info(table_name, table_owners)
+        pct_str = f"{float(pct):.0f}%"
+        # Lead with online-rewrite tools — VACUUM FULL works but takes an
+        # ACCESS EXCLUSIVE lock for the duration, which is rarely
+        # acceptable on a hot table. pg_repack and pg_squeeze rewrite
+        # without blocking readers/writers; flag both since availability
+        # depends on the host (Heroku/RDS ship pg_repack; PlanetScale ships
+        # pg_squeeze).
+        suggestion = (
+            f'Reclaim with `pg_repack -t "{table_name}"` (extension) or '
+            f"`SELECT squeeze.squeeze_table('public', '{table_name}')` "
+            f"(pg_squeeze extension) for online rewrites. "
+            f'`VACUUM FULL "{table_name}"` works but takes ACCESS EXCLUSIVE '
+            f"on the table for the duration."
+        )
+        items.append(
+            CheckItem(
+                table=table_name,
+                name=table_name,
+                # reltuples is -1 on never-analyzed tables; clamp so we
+                # don't render "~-1 rows".
+                detail=(
+                    f"{_format_bytes(wasted)} wasted ({pct_str} of "
+                    f"{_format_bytes(total)}, ~{max(0, int(est_rows or 0)):,} rows)"
+                ),
+                source=source,
+                package=package,
+                model_class=model_class,
+                model_file=model_file,
+                suggestion=suggestion,
+                caveats=[],
+            )
+        )
+
+    return CheckResult(
+        name="table_bloat",
+        label="Table bloat",
+        status="warning" if items else "ok",
+        summary=f"{len(items)} tables bloated" if items else "none",
         items=items,
         message="",
         tier="operational",
