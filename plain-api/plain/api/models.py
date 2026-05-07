@@ -5,6 +5,7 @@ from uuid import UUID
 
 from plain import postgres
 from plain.postgres import types
+from plain.utils import timezone
 
 __all__ = ["APIKey"]
 
@@ -38,3 +39,8 @@ class APIKey(postgres.Model):
 
     def __str__(self) -> str:
         return self.name or str(self.uuid)
+
+    def is_expired(self) -> bool:
+        if self.expires_at is None:
+            return False
+        return self.expires_at < timezone.now()

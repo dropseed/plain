@@ -1,4 +1,3 @@
-import datetime
 from functools import cached_property
 from http.client import responses as http_status_phrases
 from typing import Any
@@ -126,7 +125,7 @@ class APIKeyView(View):
                     )
                 )
 
-            if api_key.expires_at and api_key.expires_at < datetime.datetime.now():
+            if api_key.is_expired():
                 raise ResponseException(
                     _error_response(
                         error_id="api_token_expired",
