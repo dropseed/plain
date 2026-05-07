@@ -126,6 +126,14 @@ else
     bold "Skipping h2spec (not installed — brew install h2spec)"
   fi
 
+  # OpenAPI conformance (Schemathesis) — runs against a dedicated fixture
+  # under plain-api/tests/conformance/.
+  if printf '%s\n' $packages | grep -qx "plain-api"; then
+    echo
+    bold "Running openapi-conformance"
+    plain-api/tests/conformance/run
+  fi
+
   # MCP conformance suite (requires Node.js/npx, spins up a live server)
   if printf '%s\n' $packages | grep -qx "plain-mcp"; then
     echo

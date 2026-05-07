@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# Run schemathesis against the plain-api conformance fixture.
+#
+# Usage: plain-api/tests/conformance/run [extra schemathesis args...]
+#
+# 1. Generates an OpenAPI spec from the fixture's `APIRouter`.
+# 2. Boots `plain server` against the fixture's settings.
+# 3. Waits for the server to respond.
+# 4. Runs `schemathesis run --checks all` against the live server.
+# 5. Tears the server down regardless of outcome and exits with the
+#    schemathesis exit code.
+
+set -e
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PORT="${PLAIN_API_CONFORMANCE_PORT:-18766}"
+BASE_URL="http://127.0.0.1:${PORT}/api"
+SPEC_FILE="/tmp/plain-api-conformance.json"
+LOG_FILE="/tmp/plain-api-conformance.log"
+SCHEMATHESIS_PIN="schemathesis>=3.36,<4"
+
+bold() { printf '\033[1m%s\033[0m\n' "$1"; }
+
+cd "${HERE}"
+
+bold "Generating OpenAPI spec from fixture"
+PLAIN_SETTINGS_MODULE=app.settings PYTHONPATH="${HERE}" \
+    uv run plain api generate-openapi >"${SPEC_FILE}"
+
+bold "Starting plain server on ${BASE_URL}"
+PLAIN_SETTINGS_MODULE=app.settings PYTHONPATH="${HERE}" \
+    uv run plain server \
+        -b "127.0.0.1:${PORT}" \
+        --workers 1 \
+        --no-access-log \
+    >"${LOG_FILE}" 2>&1 &
+SERVER_PID=$!
+
+cleanup() {
+    if kill -0 "${SERVER_PID}" 2>/dev/null; then
+        kill "${SERVER_PID}" 2>/dev/null || true
+        wait "${SERVER_PID}" 2>/dev/null || true
+    fi
+    rm -f "${SPEC_FILE}"
+}
+trap cleanup EXIT INT TERM
+
+# Wait for the server to start responding. Any HTTP status counts as ready —
+# we just need the listener to be up.
+for i in $(seq 1 40); do
+    if curl -sf -o /dev/null "${BASE_URL}/notes/" \
+        || curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/notes/" | grep -qE '^[1-5][0-9][0-9]$'; then
+        break
+    fi
+    if ! kill -0 "${SERVER_PID}" 2>/dev/null; then
+        bold "Server died before becoming ready. Last 40 log lines:"
+        tail -n 40 "${LOG_FILE}" || true
+        exit 1
+    fi
+    sleep 0.25
+done
+
+bold "Running schemathesis"
+set +e
+uvx --from "${SCHEMATHESIS_PIN}" schemathesis run \
+    --checks all \
+    --base-url "${BASE_URL}" \
+    --header "Authorization: Bearer conformance-key" \
+    "$@" \
+    "${SPEC_FILE}"
+STATUS=$?
+set -e
+
+exit "${STATUS}"

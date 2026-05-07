@@ -46,6 +46,8 @@ if command -v h2spec &>/dev/null; then
 else
     skip "H2 conformance (h2spec)" h2spec "brew install h2spec"
 fi
+run "OpenAPI conformance (schemathesis)" \
+    "$REPO_ROOT/plain-api/tests/conformance/run"
 
 # Worker behavior
 run "H1 worker behavior"            "$REPO_ROOT/tools/server-worker-test"
