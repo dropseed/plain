@@ -687,7 +687,7 @@ Or use `RunSQL` with explicit cascade if the relationship is large.
 
 ### Convergence
 
-Convergence compares the indexes, constraints, foreign keys, and nullability declared on your models against what actually exists in the database, then applies fixes to make them match. You don't need to create migrations for these — just declare them on your model and run `postgres sync`.
+Convergence compares the indexes, constraints, foreign keys, nullability, and [storage parameters](#storage-parameters) declared on your models against what actually exists in the database, then applies fixes to make them match. You don't need to create migrations for these — just declare them on your model and run `postgres sync`.
 
 ```python
 @postgres.register_model
@@ -1078,6 +1078,26 @@ A `code` becomes `ValidationError.code` — useful for test assertions, error tr
 
 `UniqueConstraint` accepts the same `violation_error`. With a single-field unique constraint, a string `violation_error="That email is taken."` auto-routes to that field; otherwise (multi-field, expressions, or a CheckConstraint) errors land on `NON_FIELD_ERRORS` unless you pass the dict form. See [BaseConstraint](./constraints.py#BaseConstraint) for the full signature.
 
+### Storage parameters
+
+Per-table Postgres [storage parameters](https://www.postgresql.org/docs/current/sql-createtable.html#SQL-CREATETABLE-STORAGE-PARAMETERS) (`pg_class.reloptions`) are declared on `model_options` and managed by [convergence](#convergence) — `postgres sync` issues the `ALTER TABLE … SET/RESET (...)` to make the live table match. They're not serialized into migrations.
+
+```python
+class CachedItem(postgres.Model):
+    ...
+
+    model_options = postgres.Options(
+        storage_parameters={
+            # Tighter autovacuum on a churn-heavy table
+            "autovacuum_vacuum_scale_factor": 0.1,
+            # TOAST has its own autovacuum schedule — prefix with `toast.`
+            "toast.autovacuum_vacuum_scale_factor": 0.05,
+        },
+    )
+```
+
+Models are the source of truth: undeclared parameters set on the live table are reset on the next sync. Use this for autovacuum tuning, `fillfactor`, TOAST options, etc. — anything you'd otherwise apply by hand with `ALTER TABLE … SET (...)`.
+
 ### Schema design
 
 #### Index fields used in filters and ordering
@@ -1284,10 +1304,10 @@ who wants to act.
 | **Table bloat**     | Tables with significant estimated wasted space (≥100 MB AND ≥25% bloat, ioguix estimator)  |
 | **Index bloat**     | btree indexes with significant estimated wasted space (≥100 MB AND ≥30%, ioguix estimator) |
 
-If a future release exposes per-table autovacuum / fillfactor parameters in
-`model_options` (see the `postgres-model-storage-parameters` arc), these
-findings can graduate back to the warning tier — because the remedy will be
-expressible in code.
+Now that per-table autovacuum / fillfactor knobs are expressible in
+[storage parameters](#storage-parameters) on `model_options`, these
+findings may graduate back to the warning tier in a future release — the
+remedy is now in code.
 
 ### Informational context
 

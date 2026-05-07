@@ -5,6 +5,7 @@ from typing import Any, Self
 
 from plain import postgres
 from plain.postgres import types
+from plain.runtime import settings
 from plain.utils import timezone
 
 __all__ = ["CachedItem", "CachedItemQuerySet"]
@@ -42,6 +43,10 @@ class CachedItem(postgres.Model):
                 fields=["key"], name="plaincache_cacheditem_unique_key"
             ),
         ],
+        storage_parameters={
+            "autovacuum_vacuum_scale_factor": settings.CACHE_AUTOVACUUM_SCALE_FACTOR,
+            "toast.autovacuum_vacuum_scale_factor": settings.CACHE_TOAST_AUTOVACUUM_SCALE_FACTOR,
+        },
     )
 
     def __str__(self) -> str:

@@ -14,6 +14,7 @@ from .analysis import (
     ForeignKeyDrift,
     IndexDrift,
     NullabilityDrift,
+    StorageParameterDrift,
     analyze_model,
 )
 from .fixes import (
@@ -29,8 +30,10 @@ from .fixes import (
     RenameConstraintFix,
     RenameIndexFix,
     ReplaceForeignKeyFix,
+    ResetStorageParameterFix,
     SetColumnDefaultFix,
     SetNotNullFix,
+    SetStorageParameterFix,
     ValidateConstraintFix,
 )
 
@@ -140,6 +143,16 @@ def _plan_drift(drift: Drift) -> PlanItem:
             return PlanItem(drift, SetColumnDefaultFix(t, col, default_sql))
         case ColumnDefaultDrift(kind=DriftKind.UNDECLARED, table=t, column=col):
             return PlanItem(drift, DropColumnDefaultFix(t, col))
+        case StorageParameterDrift(
+            kind=DriftKind.MISSING | DriftKind.CHANGED,
+            table=t,
+            key=k,
+            declared_value=v,
+        ):
+            assert v is not None
+            return PlanItem(drift, SetStorageParameterFix(t, k, v))
+        case StorageParameterDrift(kind=DriftKind.UNDECLARED, table=t, key=k):
+            return PlanItem(drift, ResetStorageParameterFix(t, k))
         case _:
             raise ValueError(f"Unhandled drift: {drift}")
 

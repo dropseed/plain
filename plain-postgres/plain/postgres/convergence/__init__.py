@@ -12,6 +12,7 @@ from .analysis import (
     ModelAnalysis,
     NullabilityDrift,
     ReadOnlyConnectionError,
+    StorageParameterDrift,
     analyze_model,
 )
 from .fixes import (
@@ -26,8 +27,10 @@ from .fixes import (
     RebuildIndexFix,
     RenameConstraintFix,
     RenameIndexFix,
+    ResetStorageParameterFix,
     SetColumnDefaultFix,
     SetNotNullFix,
+    SetStorageParameterFix,
     ValidateConstraintFix,
 )
 from .planning import (
@@ -70,8 +73,11 @@ __all__ = [
     "RebuildIndexFix",
     "RenameConstraintFix",
     "RenameIndexFix",
+    "ResetStorageParameterFix",
     "SetColumnDefaultFix",
     "SetNotNullFix",
+    "SetStorageParameterFix",
+    "StorageParameterDrift",
     "ValidateConstraintFix",
     "analyze_model",
     "can_auto_fix",

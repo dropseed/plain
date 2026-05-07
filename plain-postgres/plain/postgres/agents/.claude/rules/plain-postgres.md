@@ -36,7 +36,7 @@ Get approval before writing any model code or generating migrations.
 `uv run plain postgres sync` runs three steps: create migrations → apply migrations → converge schema.
 
 - **Migrations** handle tables and columns (CreateModel, AddField, AlterField, etc.)
-- **Convergence** handles indexes, constraints, and FK constraints — declared on the model but NOT serialized into migration files. (FK _columns_ like `team_id bigint` are created by migrations; the actual `FOREIGN KEY` constraint is added by convergence.)
+- **Convergence** handles indexes, constraints, FK constraints, and storage parameters — declared on the model but NOT serialized into migration files. (FK _columns_ like `team_id bigint` are created by migrations; the actual `FOREIGN KEY` constraint is added by convergence.)
 
 This means: when you add an `Index` or `UniqueConstraint` to a model, no migration is generated. The converge step reads the live model class and syncs the database directly. Don't worry about serializing constraint expressions (like `Lower()`) for migrations — they never go there.
 

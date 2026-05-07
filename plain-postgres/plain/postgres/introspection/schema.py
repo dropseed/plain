@@ -92,12 +92,15 @@ class TableState:
     - columns from pg_attribute
     - indexes from pg_index + pg_am
     - constraints from pg_constraint (all types in one dict)
+    - storage_parameters from pg_class.reloptions (heap + toast.* prefix
+      for the associated TOAST table's reloptions)
     """
 
     exists: bool = True
     columns: dict[str, ColumnState] = field(default_factory=dict)
     indexes: dict[str, IndexState] = field(default_factory=dict)
     constraints: dict[str, ConstraintState] = field(default_factory=dict)
+    storage_parameters: dict[str, str] = field(default_factory=dict)
 
 
 def introspect_table(
@@ -163,7 +166,59 @@ def introspect_table(
         columns=actual_columns,
         indexes=indexes,
         constraints=constraints,
+        storage_parameters=_get_storage_parameters(cursor, table_name),
     )
+
+
+def _parse_reloptions(reloptions: list[str] | None) -> dict[str, str]:
+    """Parse pg_class.reloptions (text[] of 'key=value' strings) into a dict."""
+    if not reloptions:
+        return {}
+    result: dict[str, str] = {}
+    for item in reloptions:
+        key, _, value = item.partition("=")
+        result[key] = value
+    return result
+
+
+def _get_storage_parameters(cursor: CursorWrapper, table_name: str) -> dict[str, str]:
+    """Return the table's reloptions, with TOAST options prefixed `toast.`.
+
+    Postgres stores heap reloptions on the table's pg_class row and TOAST
+    reloptions on the toast relation's pg_class row (with no prefix). The
+    `ALTER TABLE … SET (toast.X = Y)` form reads back as `X` on the toast
+    relation, so we re-prefix here for symmetry with how the params are
+    declared in `model_options.storage_parameters`.
+    """
+    heap_opts, toast_opts = _fetch_raw_reloptions(cursor, table_name)
+    params = _parse_reloptions(heap_opts)
+    for key, value in _parse_reloptions(toast_opts).items():
+        params[f"toast.{key}"] = value
+    return params
+
+
+def _fetch_raw_reloptions(
+    cursor: CursorWrapper, table_name: str
+) -> tuple[list[str] | None, list[str] | None]:
+    """Return (heap reloptions, toast reloptions) as raw `key=value` text arrays.
+
+    Both elements are ``None`` if the table doesn't exist or has no reloptions
+    set on the corresponding relation. Tests use this for direct catalog
+    assertions; production reads it via `_get_storage_parameters`.
+    """
+    cursor.execute(
+        """
+        SELECT c.reloptions, t.reloptions
+        FROM pg_class c
+        LEFT JOIN pg_class t ON t.oid = c.reltoastrelid
+        WHERE c.relname = %s AND pg_catalog.pg_table_is_visible(c.oid)
+        """,
+        [table_name],
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None, None
+    return row[0], row[1]
 
 
 def get_unknown_tables(conn: DatabaseConnection | None = None) -> list[str]:

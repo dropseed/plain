@@ -29,6 +29,7 @@ class Options:
     ordering: Sequence[str]
     indexes: Sequence[Index]
     constraints: Sequence[BaseConstraint]
+    storage_parameters: dict[str, str]
     _provided_options: set[str]
 
     def __init__(
@@ -38,6 +39,7 @@ class Options:
         ordering: Sequence[str] | None = None,
         indexes: Sequence[Index] | None = None,
         constraints: Sequence[BaseConstraint] | None = None,
+        storage_parameters: dict[str, str | int | float | bool] | None = None,
         package_label: str | None = None,
     ):
         """
@@ -47,11 +49,12 @@ class Options:
         a user explicitly sets model_options = Options(...) on their model.
         The descriptor then creates cached instances per model subclass.
         """
-        self._config = {
+        self._config: dict[str, Any] = {
             "db_table": db_table,
             "ordering": ordering,
             "indexes": indexes,
             "constraints": constraints,
+            "storage_parameters": storage_parameters,
             "package_label": package_label,
         }
         self._cache: dict[type[Model], Options] = {}
@@ -121,6 +124,9 @@ class Options:
         instance.ordering = self._config.get("ordering") or []
         instance.indexes = self._config.get("indexes") or []
         instance.constraints = self._config.get("constraints") or []
+        instance.storage_parameters = {
+            k: str(v) for k, v in (self._config.get("storage_parameters") or {}).items()
+        }
 
         # Format names with class interpolation
         instance.constraints = instance._format_names_with_class(instance.constraints)
@@ -166,12 +172,13 @@ class Options:
     def export_for_migrations(self) -> dict[str, Any]:
         """Export user-provided options for migrations.
 
-        Indexes and constraints are excluded — they're managed entirely by
-        convergence (``plain postgres sync``), not migrations.
+        Indexes, constraints, and storage parameters are excluded — they're
+        managed entirely by convergence (``plain postgres sync``), not
+        migrations.
         """
         options = {}
         for name in self._provided_options:
-            if name in ("indexes", "constraints"):
+            if name in ("indexes", "constraints", "storage_parameters"):
                 continue
             options[name] = getattr(self, name)
         return options

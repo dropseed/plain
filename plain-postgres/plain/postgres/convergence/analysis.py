@@ -191,8 +191,44 @@ class ColumnDefaultDrift:
                 )
 
 
+@dataclass
+class StorageParameterDrift:
+    """Mismatch between declared and live `pg_class.reloptions` for a table.
+
+    `key` carries a `toast.` prefix when the parameter belongs to the table's
+    TOAST relation; convergence emits and reads it accordingly.
+    """
+
+    kind: DriftKind
+    table: str
+    key: str
+    declared_value: str | None = None
+    actual_value: str | None = None
+
+    def describe(self) -> str:
+        match self.kind:
+            case DriftKind.MISSING:
+                return (
+                    f"{self.table}: storage parameter {self.key} missing "
+                    f"(expected {self.declared_value})"
+                )
+            case DriftKind.CHANGED:
+                return (
+                    f"{self.table}: storage parameter {self.key} mismatch — "
+                    f"db has {self.actual_value}, model declares "
+                    f"{self.declared_value}"
+                )
+            case _:
+                return (
+                    f"{self.table}: storage parameter {self.key} not declared "
+                    f"(db has {self.actual_value})"
+                )
+
+
 type ColumnDrift = NullabilityDrift | ColumnDefaultDrift
-type Drift = IndexDrift | ConstraintDrift | ForeignKeyDrift | ColumnDrift
+type Drift = (
+    IndexDrift | ConstraintDrift | ForeignKeyDrift | ColumnDrift | StorageParameterDrift
+)
 
 
 # Status objects — analysis results with optional drift
@@ -236,6 +272,7 @@ class ModelAnalysis:
     columns: list[ColumnStatus] = field(default_factory=list)
     indexes: list[IndexStatus] = field(default_factory=list)
     constraints: list[ConstraintStatus] = field(default_factory=list)
+    storage_parameter_drifts: list[StorageParameterDrift] = field(default_factory=list)
 
     @cached_property
     def drifts(self) -> list[Drift]:
@@ -249,15 +286,17 @@ class ModelAnalysis:
         for con in self.constraints:
             if con.drift:
                 result.append(con.drift)
+        result.extend(self.storage_parameter_drifts)
         return result
 
     @cached_property
     def issue_count(self) -> int:
-        """Total issues (table + columns + indexes + constraints)."""
+        """Total issues (table + columns + indexes + constraints + storage)."""
         count = len(self.table_issues)
         count += sum(1 for col in self.columns if col.issue)
         count += sum(1 for idx in self.indexes if idx.issue)
         count += sum(1 for con in self.constraints if con.issue)
+        count += len(self.storage_parameter_drifts)
         return count
 
     def to_dict(self) -> dict[str, Any]:
@@ -300,6 +339,15 @@ class ModelAnalysis:
                 }
                 for con in self.constraints
             ],
+            "storage_parameter_drifts": [
+                {
+                    "key": d.key,
+                    "kind": d.kind,
+                    "declared_value": d.declared_value,
+                    "actual_value": d.actual_value,
+                }
+                for d in self.storage_parameter_drifts
+            ],
         }
 
 
@@ -328,7 +376,57 @@ def analyze_model(
         columns=_compare_columns(model, db, table_name, cursor),
         indexes=_compare_indexes(cursor, model, db, table_name),
         constraints=_compare_constraints(cursor, model, db, table_name),
+        storage_parameter_drifts=_compare_storage_parameters(model, db, table_name),
     )
+
+
+def _compare_storage_parameters(
+    model: type[Model], db: TableState, table: str
+) -> list[StorageParameterDrift]:
+    """Diff declared `model_options.storage_parameters` against `pg_class.reloptions`.
+
+    Declared keys missing from the DB → MISSING. Mismatched values → CHANGED.
+    Live keys not declared → UNDECLARED (so convergence can RESET them, keeping
+    the model as the source of truth — matches how indexes/constraints work).
+    """
+    declared = model.model_options.storage_parameters
+    actual = db.storage_parameters
+    drifts: list[StorageParameterDrift] = []
+
+    for key, declared_value in declared.items():
+        actual_value = actual.get(key)
+        if actual_value is None:
+            drifts.append(
+                StorageParameterDrift(
+                    kind=DriftKind.MISSING,
+                    table=table,
+                    key=key,
+                    declared_value=declared_value,
+                )
+            )
+        elif actual_value != declared_value:
+            drifts.append(
+                StorageParameterDrift(
+                    kind=DriftKind.CHANGED,
+                    table=table,
+                    key=key,
+                    declared_value=declared_value,
+                    actual_value=actual_value,
+                )
+            )
+
+    for key, actual_value in actual.items():
+        if key not in declared:
+            drifts.append(
+                StorageParameterDrift(
+                    kind=DriftKind.UNDECLARED,
+                    table=table,
+                    key=key,
+                    actual_value=actual_value,
+                )
+            )
+
+    return drifts
 
 
 # Column comparison

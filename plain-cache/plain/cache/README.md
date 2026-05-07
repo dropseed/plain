@@ -9,6 +9,7 @@
 - [Automatic cleanup](#automatic-cleanup)
 - [CLI commands](#cli-commands)
 - [Admin integration](#admin-integration)
+- [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -116,6 +117,17 @@ The `plain cache` command group provides utilities for managing cached items:
 
 If you have [plain.admin](/plain-admin/plain/admin/README.md) installed, `plain.cache` automatically registers an admin viewset. You can browse cached items, see their keys, values, and expiration dates in the admin interface under the "Cache" section.
 
+## Settings
+
+| Setting                               | Default |
+| ------------------------------------- | ------- |
+| `CACHE_AUTOVACUUM_SCALE_FACTOR`       | `0.1`   |
+| `CACHE_TOAST_AUTOVACUUM_SCALE_FACTOR` | `0.05`  |
+
+The cache table is a high-churn workload — every `set()` rewrites a row, and large values get TOASTed (Postgres' out-of-line storage), where each rewrite leaves orphaned chunks. Postgres' default autovacuum scale factor (`0.2`) waits until 20% of tuples are dead, which is too lax here. Plain ships tighter defaults so autovacuum keeps the heap and TOAST tables healthy without manual intervention.
+
+These are applied as per-table storage parameters on `plaincache_cacheditem` by `plain postgres sync`. Override via `app/settings.py` or `PLAIN_CACHE_*` env vars. See [`default_settings.py`](./default_settings.py) for context.
+
 ## FAQs
 
 #### What types of values can I cache?
@@ -129,6 +141,10 @@ The `exists()` method returns `False` for expired items, and `value` returns `No
 #### Is there any observability built in?
 
 Yes. Cache operations (`exists`, `get`, `set`, `delete`) are instrumented with OpenTelemetry spans, so you can see cache hits and misses in your tracing backend.
+
+#### How big can cached values be?
+
+There's no hard limit. `plain.cache` works well for the typical mix — config, computed flags, tokens, short-lived results, occasional larger payloads. Once values get large enough to TOAST (Postgres' out-of-line storage, kicking in around a few KB), each rewrite produces orphaned TOAST chunks that autovacuum has to reclaim. The defaults in [Settings](#settings) are tuned for this; very high write rates on very large values may need additional tuning. If you're caching megabyte-sized blobs on every request, consider whether that data wants to live somewhere more permanent (a regular table, object storage) with the cache holding a reference instead.
 
 ## Installation
 

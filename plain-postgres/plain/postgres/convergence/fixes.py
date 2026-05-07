@@ -4,6 +4,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
+import psycopg
+import psycopg.sql
+
 from plain.logs import get_framework_logger
 from plain.runtime import settings as plain_settings
 
@@ -554,4 +557,43 @@ class DropIndexFix(Fix):
     def apply(self) -> str:
         sql = f"DROP INDEX CONCURRENTLY IF EXISTS {quote_name(self.name)}"
         _execute_autocommit(sql)
+        return sql
+
+
+@dataclass
+class SetStorageParameterFix(Fix):
+    """Set a single `pg_class.reloptions` parameter (catalog-only, instant)."""
+
+    pass_order = 2
+
+    table: str
+    key: str
+    value: str
+
+    def describe(self) -> str:
+        return f"{self.table}: set storage parameter {self.key} = {self.value}"
+
+    def apply(self) -> str:
+        conn = get_connection()
+        quoted = psycopg.sql.quote(self.value, conn.connection)
+        sql = f"ALTER TABLE {quote_name(self.table)} SET ({self.key} = {quoted})"
+        _execute_and_commit(sql)
+        return sql
+
+
+@dataclass
+class ResetStorageParameterFix(Fix):
+    """Reset a single `pg_class.reloptions` parameter (catalog-only, instant)."""
+
+    pass_order = 2
+
+    table: str
+    key: str
+
+    def describe(self) -> str:
+        return f"{self.table}: reset storage parameter {self.key}"
+
+    def apply(self) -> str:
+        sql = f"ALTER TABLE {quote_name(self.table)} RESET ({self.key})"
+        _execute_and_commit(sql)
         return sql
