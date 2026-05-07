@@ -10,6 +10,7 @@ from .exceptions import (
     SuspiciousOperationError400,
     TooManyFieldsSentError400,
     TooManyFilesSentError400,
+    UnsupportedMediaTypeError415,
 )
 from .middleware import HttpMiddleware
 from .request import (
@@ -63,4 +64,5 @@ __all__ = [
     "TooManyFieldsSentError400",
     "TooManyFilesSentError400",
     "RequestDataTooBigError400",
+    "UnsupportedMediaTypeError415",
 ]

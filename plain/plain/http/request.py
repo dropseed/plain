@@ -29,6 +29,7 @@ from .exceptions import (
     BadRequestError400,
     RequestDataTooBigError400,
     TooManyFieldsSentError400,
+    UnsupportedMediaTypeError415,
 )
 
 _T = TypeVar("_T")
@@ -389,14 +390,14 @@ class Request:
 
         Returns dict for JSON objects.
         Raises BadRequestError400 if JSON is invalid or not an object.
-        Raises ValueError if request content-type is not JSON.
+        Raises UnsupportedMediaTypeError415 if request content-type is not JSON.
 
         Use this when you expect JSON object data and want type-safe dict access.
         """
         if not self.content_type or not self.content_type.startswith(
             "application/json"
         ):
-            raise ValueError(
+            raise UnsupportedMediaTypeError415(
                 f"Request content-type is not JSON (got: {self.content_type})"
             )
         try:
@@ -418,7 +419,7 @@ class Request:
         Returns QueryDict for application/x-www-form-urlencoded or
         multipart/form-data content types.
         Returns empty QueryDict if Content-Type is missing (e.g., GET requests).
-        Raises ValueError if request has a different content-type with a body.
+        Raises UnsupportedMediaTypeError415 if request has a different content-type with a body.
 
         Use this when you expect form data and want type-safe QueryDict access.
         """
@@ -430,7 +431,7 @@ class Request:
             # No Content-Type (e.g., GET requests) - return empty QueryDict
             return QueryDict(b"", encoding=self.encoding)
         else:
-            raise ValueError(
+            raise UnsupportedMediaTypeError415(
                 f"Request content-type is not form data (got: {self.content_type})"
             )
 

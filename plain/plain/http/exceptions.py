@@ -37,6 +37,12 @@ class NotFoundError404(HTTPException):
     status_code = 404
 
 
+class UnsupportedMediaTypeError415(HTTPException):
+    """The request body is in a media type the server does not parse (HTTP 415)"""
+
+    status_code = 415
+
+
 class SuspiciousOperationError400(BadRequestError400):
     """The user did something suspicious (HTTP 400)"""
 
