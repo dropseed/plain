@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.52.2](https://github.com/dropseed/plain/releases/plain-jobs@0.52.2) (2026-05-06)
+
+### What's changed
+
+- **Removed four redundant single-column indexes shadowed by unique constraints.** `JobRequest.uuid`, `JobProcess.uuid`, `JobResult.uuid`, and `JobResult.job_process_uuid` each carried both a `UniqueConstraint` (which Postgres backs with an implicit btree) and a separately-declared `Index(fields=["..."])` on the same column. The non-unique index was pure write-side overhead — every insert paid a duplicate btree maintenance cost on indexes the planner could already satisfy from the unique-backed btree. Convergence drops the redundant indexes on the next `plain postgres sync`. ([48d850ca](https://github.com/dropseed/plain/commit/48d850ca))
+
+### Upgrade instructions
+
+- No changes required. Run `plain postgres sync` after upgrading; convergence will issue `DROP INDEX CONCURRENTLY` for the four redundant indexes (`plainjobs_jobrequest_uuid_idx`, `plainjobs_jobprocess_uuid_idx`, `plainjobs_jobresult_uuid_idx`, `plainjobs_jobresult_job_process_uuid_idx`) and existing UUID lookups will use the unique-backed btree instead.
+
 ## [0.52.1](https://github.com/dropseed/plain/releases/plain-jobs@0.52.1) (2026-05-06)
 
 ### What's changed
