@@ -17,7 +17,11 @@ def cli() -> None:
 
 
 @cli.command()
-@click.option("--validate", is_flag=True, help="Validate the OpenAPI schema.")
+@click.option(
+    "--validate",
+    is_flag=True,
+    help="Validate the OpenAPI schema (requires openapi-spec-validator).",
+)
 @click.option("--indent", default=2, help="Indentation level for JSON and YAML output.")
 @click.option(
     "--format",

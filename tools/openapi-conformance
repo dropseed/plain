@@ -52,7 +52,7 @@ if [ -f .env ]; then
     source .env
     set +a
 fi
-uv run plain api generate-openapi --validate >"$SPEC_FILE"
+uv run plain api generate-openapi >"$SPEC_FILE"
 cd "$REPO_ROOT"
 
 if [ -n "$TARGET" ]; then

@@ -61,35 +61,10 @@ def test_generated_schema_validates_against_openapi_spec():
 
     @openapi.schema(
         {
-            "openapi": "3.0.3",
-            "info": {"title": "Test API", "version": "1.0.0"},
-        }
-    )
-    class APIRouter(Router):
-        namespace = ""
-        urls = [
-            path(
-                "items/<int:id>",
-                _decorated_item_view(),
-                name="item",
-            ),
-        ]
-
-    schema = OpenAPISchemaGenerator(APIRouter()).schema
-    validate_openapi_schema(schema)
-
-
-def _decorated_item_view():
-    @openapi.schema(
-        {
             "responses": {
                 "200": {
                     "description": "An item",
-                    "content": {
-                        "application/json": {
-                            "schema": {"type": "object"},
-                        }
-                    },
+                    "content": {"application/json": {"schema": {"type": "object"}}},
                 }
             }
         }
@@ -98,4 +73,15 @@ def _decorated_item_view():
         def get(self):
             return {"id": self.url_kwargs["id"]}
 
-    return ItemView
+    @openapi.schema(
+        {
+            "openapi": "3.0.3",
+            "info": {"title": "Test API", "version": "1.0.0"},
+        }
+    )
+    class APIRouter(Router):
+        namespace = ""
+        urls = [path("items/<int:id>", ItemView, name="item")]
+
+    schema = OpenAPISchemaGenerator(APIRouter()).schema
+    validate_openapi_schema(schema)
