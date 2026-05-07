@@ -404,6 +404,34 @@ class TestStructuralScenarios:
         flagged = [i for i in result["items"] if i["table"] == "_diag_fk_child2"]
         assert flagged == [], f"indexed FK should not be flagged; got {flagged}"
 
+    def test_missing_fk_index_detected_when_only_partial_index_covers(self) -> None:
+        """A partial index on the FK column doesn't cover arbitrary FK
+        lookups — Postgres can only use it for queries whose predicate
+        implies the partial-index `WHERE`. The check must still flag the
+        FK as missing index coverage."""
+        _execute('CREATE TABLE "_diag_fk_parent3" ("id" serial PRIMARY KEY)')
+        _execute(
+            'CREATE TABLE "_diag_fk_child3" ('
+            '"id" serial PRIMARY KEY, '
+            '"parent_id" int REFERENCES "_diag_fk_parent3"("id"), '
+            '"deleted_at" timestamptz)'
+        )
+        _execute(
+            'CREATE INDEX "_diag_fk_child3_partial_parent_idx" '
+            'ON "_diag_fk_child3" ("parent_id") '
+            "WHERE deleted_at IS NULL"
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_missing_fk_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_fk_child3"]
+        assert len(flagged) == 1, (
+            f"partial index must not satisfy FK coverage; got {flagged}"
+        )
+        assert flagged[0]["name"] == "_diag_fk_child3.parent_id"
+
     def test_sequence_exhaustion_critical_above_90pct(self) -> None:
         _execute('CREATE TABLE "_diag_seq" ("id" serial PRIMARY KEY, "n" int)')
         # int4 sequence max is 2^31-1 = 2147483647; push past 90% to trip critical.

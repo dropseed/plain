@@ -187,7 +187,16 @@ def check_duplicate_indexes(
 def check_missing_fk_indexes(
     cursor: Any, table_owners: dict[str, TableOwner]
 ) -> CheckResult:
-    """Foreign key columns without a leading index — JOINs on these do sequential scans."""
+    """Foreign key columns without a leading index — JOINs on these do sequential scans.
+
+    Partial indexes (``WHERE`` clause set on ``pg_index.indpred``) don't
+    count: Postgres only uses them for queries that imply the partial
+    predicate, so FK lookups and cascade deletes outside that predicate
+    still sequential-scan. The narrow ``WHERE fk IS NOT NULL`` case —
+    which Postgres can match to ``WHERE fk = ?`` — is conservatively
+    treated as not covering; users wanting guaranteed FK coverage should
+    add a regular non-partial index. Match the preflight's coverage rule.
+    """
     cursor.execute("""
         SELECT
             ct.relname AS table_name,
@@ -207,6 +216,7 @@ def check_missing_fk_indexes(
               FROM pg_catalog.pg_index i
               WHERE i.indrelid = c.conrelid
                 AND i.indkey[0] = c.conkey[1]
+                AND i.indpred IS NULL
           )
         ORDER BY ct.relname, a.attname
     """)

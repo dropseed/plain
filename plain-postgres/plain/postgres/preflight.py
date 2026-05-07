@@ -59,12 +59,20 @@ def _bare_column_name(expr: Any) -> str | None:
 
 
 def _fk_covered_field_names(model: Any) -> set[str]:
-    """Field names that appear as the leading column of an index or unique
-    constraint — covering FK lookups via the index's leading column.
+    """Field names that appear as the leading column of a non-partial index
+    or unique constraint — covering arbitrary FK lookups via the index's
+    leading column.
 
-    Includes expression-based indexes/constraints whose leading expression
-    is a bare `F(field_name)` — the catalog-level btree still leads with a
-    real column attribute even when later columns are expressions.
+    Partial indexes/constraints (declared with ``condition=Q(...)``) are
+    excluded: Postgres can only use them for queries whose predicate
+    implies the partial-index predicate, so an FK lookup or cascade
+    delete that doesn't filter by that condition still does a sequential
+    scan. (The narrow ``WHERE fk IS NOT NULL`` case — which Postgres can
+    match to ``WHERE fk = ?`` — is conservatively treated as not
+    covering; users wanting guaranteed FK coverage should add a regular
+    non-partial ``Index(fields=[...])``.) Includes expression-based
+    indexes/constraints whose leading expression is a bare
+    ``F(field_name)``.
     """
     covered: set[str] = set()
 
@@ -79,10 +87,11 @@ def _fk_covered_field_names(model: Any) -> set[str]:
                 covered.add(name)
 
     for index in model.model_options.indexes:
-        _record_leading(index.fields, index.expressions)
+        if not index.is_partial:
+            _record_leading(index.fields, index.expressions)
 
     for constraint in model.model_options.constraints:
-        if isinstance(constraint, UniqueConstraint):
+        if isinstance(constraint, UniqueConstraint) and not constraint.is_partial:
             _record_leading(constraint.fields, constraint.expressions)
 
     return covered

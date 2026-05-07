@@ -83,6 +83,10 @@ class Index:
     def contains_expressions(self) -> bool:
         return bool(self.expressions)
 
+    @property
+    def is_partial(self) -> bool:
+        return self.condition is not None
+
     def to_sql(self, model: type[Model]) -> str:
         """Generate CREATE INDEX CONCURRENTLY SQL as a plain string."""
         table = model.model_options.db_table

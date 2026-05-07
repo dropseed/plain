@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from plain.postgres import Q
 from plain.postgres.constraints import UniqueConstraint
 from plain.postgres.expressions import F
 from plain.postgres.functions import Lower
@@ -106,3 +107,51 @@ def test_unions_indexes_and_constraints():
         ],
     )
     assert _fk_covered_field_names(model) == {"a", "b", "c"}
+
+
+def test_partial_index_does_not_cover():
+    """`Index(fields=["team"], condition=Q(...))` only satisfies queries
+    whose predicate implies the partial-index `WHERE`. An unfiltered FK
+    lookup or cascade delete still sequential-scans, so the partial index
+    must not count as covering."""
+    model = _model(
+        indexes=[
+            Index(
+                name="t_team_active_idx",
+                fields=["team"],
+                condition=Q(deleted_at__isnull=True),
+            )
+        ]
+    )
+    assert "team" not in _fk_covered_field_names(model)
+
+
+def test_partial_unique_constraint_does_not_cover():
+    """Same logic as the partial index — soft-delete-style partial unique
+    constraints don't guarantee FK lookup coverage."""
+    model = _model(
+        constraints=[
+            UniqueConstraint(
+                fields=["team"],
+                name="t_team_active_uniq",
+                condition=Q(deleted_at__isnull=True),
+            )
+        ]
+    )
+    assert "team" not in _fk_covered_field_names(model)
+
+
+def test_full_index_still_covers_when_partial_sibling_exists():
+    """A non-partial index on the same column wins — partial-ness is per
+    declaration, not per column."""
+    model = _model(
+        indexes=[
+            Index(
+                name="t_team_active_idx",
+                fields=["team"],
+                condition=Q(deleted_at__isnull=True),
+            ),
+            Index(name="t_team_idx", fields=["team"]),
+        ]
+    )
+    assert "team" in _fk_covered_field_names(model)

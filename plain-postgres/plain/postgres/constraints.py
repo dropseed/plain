@@ -251,6 +251,10 @@ class UniqueConstraint(BaseConstraint):
         return bool(self.expressions)
 
     @property
+    def is_partial(self) -> bool:
+        return self.condition is not None
+
+    @property
     def index_only(self) -> bool:
         """Whether PostgreSQL can only store this as a unique index, not a constraint.
 
