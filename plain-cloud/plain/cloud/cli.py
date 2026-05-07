@@ -61,11 +61,15 @@ def cli() -> None:
     "--api-url",
     default=DEFAULT_API_URL,
     show_default=True,
+    envvar="PLAIN_CLOUD_API_URL",
+    show_envvar=True,
     help="Base URL of the Plain Cloud API.",
 )
 @click.option(
     "--token",
     default=None,
+    envvar="PLAIN_CLOUD_TOKEN",
+    show_envvar=True,
     help="API token to save. If omitted, you'll be prompted.",
 )
 def login(api_url: str, token: str | None) -> None:
@@ -323,10 +327,19 @@ def _to_query_value(value: object) -> str:
 
 @cli.command("open")
 @click.argument("path", required=False, default="/dashboard/")
-def open_url(path: str) -> None:
+@click.option(
+    "--api-url",
+    default=None,
+    envvar="PLAIN_CLOUD_API_URL",
+    show_envvar=True,
+    help="Override the api_url (useful when not logged in).",
+)
+def open_url(path: str, api_url: str | None) -> None:
     """Open a Plain Cloud URL in your browser."""
-    creds = load()
-    base = (creds.api_url if creds else DEFAULT_API_URL).rstrip("/")
+    if api_url is None:
+        creds = load()
+        api_url = creds.api_url if creds else DEFAULT_API_URL
+    base = api_url.rstrip("/")
     if not path.startswith("/"):
         path = "/" + path
     url = base + path
@@ -343,6 +356,8 @@ def open_url(path: str) -> None:
 @click.option(
     "--api-url",
     default=None,
+    envvar="PLAIN_CLOUD_API_URL",
+    show_envvar=True,
     help="Override the api_url (useful when not logged in).",
 )
 def openapi(raw: bool, api_url: str | None) -> None:
