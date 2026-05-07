@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from app.notes.models import Note
 from plain.api import openapi
 from plain.api.views import APIView
@@ -81,6 +83,31 @@ class NoteDetailAPIView(APIView):
         return _serialize(note)
 
 
+class NotFoundAPIView(APIView):
+    """Catch-all for unmatched /api/ paths so we return JSON 404s.
+
+    URL resolution failures escape to the framework's global
+    `response_for_exception`, which renders `404.html`. Routing every
+    unmatched path through an `APIView` lets `handle_exception` emit JSON
+    instead.
+    """
+
+    def get(self):
+        raise NotFoundError404
+
+    def post(self):
+        raise NotFoundError404
+
+    def put(self):
+        raise NotFoundError404
+
+    def patch(self):
+        raise NotFoundError404
+
+    def delete(self):
+        raise NotFoundError404
+
+
 @openapi.schema(
     {
         "openapi": "3.0.3",
@@ -97,4 +124,7 @@ class APIRouter(Router):
     urls = [
         path("notes/", NoteListAPIView, name="notes_list"),
         path("notes/<int:id>/", NoteDetailAPIView, name="notes_detail"),
+        # `[\s\S]` (vs the `path` converter's `.+`) matches control
+        # characters too, so newline-bearing paths still hit an APIView.
+        path(re.compile(r"^[\s\S]+$"), NotFoundAPIView, name="not_found"),
     ]
