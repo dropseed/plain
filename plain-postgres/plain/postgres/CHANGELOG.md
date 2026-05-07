@@ -1,5 +1,17 @@
 # plain-postgres changelog
 
+## [0.103.2](https://github.com/dropseed/plain/releases/plain-postgres@0.103.2) (2026-05-06)
+
+### What's changed
+
+- **`postgres.missing_fk_indexes` preflight now recognizes bare-column leading expressions.** A `UniqueConstraint(F("team"), Lower("email"))` declared via the `expressions=` API previously slipped past the model-level check — the preflight only inspected `fields=`, so it warned about a missing FK index even though the underlying btree's leading column was the real `team` attribute and the live diagnose check correctly recognized coverage. The preflight now extracts the leading column from `F(...)` and `OrderBy(F(...))` expressions to match Postgres' actual coverage semantics. ([ae3880098f](https://github.com/dropseed/plain/commit/ae3880098f))
+- **Both FK-coverage checks now skip partial indexes.** A partial index like `Index(fields=["team"], condition=Q(deleted_at__isnull=True))` only satisfies queries whose predicate implies the partial-index `WHERE`, so an unfiltered FK lookup or cascade delete still sequential-scans. The preflight (`_fk_covered_field_names`) and the live diagnose check (`check_missing_fk_indexes`) both used to silently treat partial indexes as covering — now they don't, so the warning fires on the real coverage gap. The narrow `WHERE fk IS NOT NULL` case is conservatively also treated as not covering; users wanting guaranteed FK coverage should add a regular non-partial `Index(fields=[...])`. ([b1d13a6b42](https://github.com/dropseed/plain/commit/b1d13a6b42))
+- New `is_partial` property on `Index` and `UniqueConstraint` returning `condition is not None`, for callers that need the distinction. ([b1d13a6b42](https://github.com/dropseed/plain/commit/b1d13a6b42))
+
+### Upgrade instructions
+
+- No changes required. After upgrading, `postgres.missing_fk_indexes` may surface previously-undetected FK coverage gaps (where the only matching index was partial) and may suppress previously-warning false positives (where the only matching index used `expressions=`). Add a non-partial `Index(fields=["fk"])` to silence the warning in the partial-index case.
+
 ## [0.103.1](https://github.com/dropseed/plain/releases/plain-postgres@0.103.1) (2026-05-06)
 
 ### What's changed
