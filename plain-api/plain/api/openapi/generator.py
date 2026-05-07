@@ -56,7 +56,9 @@ class OpenAPISchemaGenerator:
 
         for name, converter in url_pattern.pattern.converters.items():
             key = self.url_converters[converter.__class__]
+            # Handle both `<type:name>` and the `<name>` shorthand for the default `str` converter.
             path = path.replace(f"<{key}:{name}>", f"{{{name}}}")
+            path = path.replace(f"<{name}>", f"{{{name}}}")
         return path
 
     def extract_components(self, obj: Any) -> None:

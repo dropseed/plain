@@ -53,3 +53,28 @@ def test_openapi_only_emits_operations_for_implemented_methods():
     schema = OpenAPISchemaGenerator(LocalRouter()).schema
     operations = schema["paths"]["/only-get"]
     assert set(operations) == {"get"}
+
+
+def test_openapi_path_params_translated_for_both_url_forms():
+    """Both `<type:name>` and shorthand `<name>` translate to OpenAPI's `{name}`."""
+
+    @openapi.schema({"responses": {"200": {"description": "ok"}}})
+    class IssueView(APIView):
+        def get(self):
+            return {"ok": True}
+
+    class LocalRouter(Router):
+        namespace = ""
+        urls = [
+            path("explicit/<int:pk>/", IssueView, name="explicit"),
+            path("shorthand/<slug>/", IssueView, name="shorthand"),
+            path("mixed/<int:pk>/<slug>/", IssueView, name="mixed"),
+        ]
+
+    schema = OpenAPISchemaGenerator(LocalRouter()).schema
+    paths = set(schema["paths"].keys())
+    assert paths == {
+        "/explicit/{pk}/",
+        "/shorthand/{slug}/",
+        "/mixed/{pk}/{slug}/",
+    }
