@@ -412,7 +412,12 @@ class CheckMissingFKIndexes(PreflightCheck):
 
 @register_check("postgres.duplicate_indexes")
 class CheckDuplicateIndexes(PreflightCheck):
-    """Warns about indexes that are prefix-redundant with other indexes or constraints."""
+    """Warns about indexes redundant with other indexes or constraints.
+
+    Catches both prefix-redundancy (a 1-column index shadowed by a wider
+    composite) and exact-column duplicates (an `Index(fields=["x"])` that
+    duplicates a same-column `UniqueConstraint`).
+    """
 
     def run(self) -> list[PreflightResult]:
         results = []
@@ -425,23 +430,52 @@ class CheckDuplicateIndexes(PreflightCheck):
                 for idx_b in all_indexes[i + 1 :]:
                     for shorter, longer in [(idx_a, idx_b), (idx_b, idx_a)]:
                         s_name, s_fields, s_unique = shorter
-                        l_name, l_fields, _ = longer
-                        if (
-                            s_name not in flagged
+                        l_name, l_fields, l_unique = longer
+
+                        if s_name in flagged:
+                            continue
+
+                        is_prefix_dup = (
+                            not s_unique
                             and len(s_fields) < len(l_fields)
                             and l_fields[: len(s_fields)] == s_fields
+                        )
+                        is_exact_dup = (
+                            s_fields == l_fields
                             and not s_unique
-                        ):
-                            results.append(
-                                PreflightResult(
-                                    fix=f"Index '{s_name}' on [{', '.join(s_fields)}] "
-                                    f"is redundant with '{l_name}' on [{', '.join(l_fields)}]. "
-                                    f"The longer index covers the same queries.",
-                                    obj=model.model_options.label,
-                                    id="postgres.duplicate_index",
-                                    warning=True,
-                                )
+                            and (l_unique or s_name > l_name)
+                        )
+
+                        if not (is_prefix_dup or is_exact_dup):
+                            continue
+
+                        if is_prefix_dup:
+                            fix = (
+                                f"Index '{s_name}' on [{', '.join(s_fields)}] "
+                                f"is redundant with '{l_name}' on [{', '.join(l_fields)}]. "
+                                f"The longer index covers the same queries."
                             )
-                            flagged.add(s_name)
+                        elif l_unique:
+                            fix = (
+                                f"Index '{s_name}' on [{', '.join(s_fields)}] "
+                                f"is redundant with '{l_name}' on the same columns. "
+                                f"The unique-backed index already covers these queries."
+                            )
+                        else:
+                            fix = (
+                                f"Index '{s_name}' on [{', '.join(s_fields)}] "
+                                f"is an exact duplicate of '{l_name}'. "
+                                f"Drop one of them."
+                            )
+
+                        results.append(
+                            PreflightResult(
+                                fix=fix,
+                                obj=model.model_options.label,
+                                id="postgres.duplicate_index",
+                                warning=True,
+                            )
+                        )
+                        flagged.add(s_name)
 
         return results

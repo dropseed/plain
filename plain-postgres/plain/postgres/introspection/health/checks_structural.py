@@ -66,7 +66,17 @@ def check_invalid_indexes(
 def check_duplicate_indexes(
     cursor: Any, table_owners: dict[str, TableOwner]
 ) -> CheckResult:
-    """Indexes where one is a column-prefix of another on the same table.
+    """Indexes redundant with another on the same table.
+
+    Two flavors are flagged:
+
+    - **Prefix duplicate** — a non-unique index whose columns are a strict
+      prefix of another index's. The longer index covers the same queries.
+    - **Exact duplicate** — same columns and access method as another index.
+      If the pair contains a unique-backed btree, the non-unique one is the
+      redundant one (the unique already covers the queries and enforces
+      uniqueness). If both are non-unique, the alphabetically later name
+      gets flagged (deterministic).
 
     Each index column's canonical definition comes from
     ``pg_get_indexdef(indexrelid, k, false)`` — that text includes the
@@ -112,46 +122,56 @@ def check_duplicate_indexes(
     for table_name, indexes in by_table.items():
         for i, idx_a in enumerate(indexes):
             for idx_b in indexes[i + 1 :]:
-                # Check both directions: is either a prefix of the other?
+                # Try both orderings — prefix-redundancy is asymmetric, and
+                # exact-duplicate flagging picks one side deterministically.
                 for shorter, longer in [(idx_a, idx_b), (idx_b, idx_a)]:
                     name_s, am_s, defs_s, unique_s, size_s = shorter
-                    name_l, am_l, defs_l, _, _ = longer
+                    name_l, am_l, defs_l, unique_l, _ = longer
                     # Different access methods serve different operators
-                    # (e.g. hash supports `=` only, btree supports ordering),
-                    # and unique indexes serve a constraint purpose.
-                    if (
-                        name_s not in flagged
-                        and am_s == am_l
-                        and not unique_s
+                    # (e.g. hash supports `=` only, btree supports ordering).
+                    if name_s in flagged or am_s != am_l:
+                        continue
+
+                    is_prefix_dup = (
+                        not unique_s
                         and len(defs_s) < len(defs_l)
                         and defs_l[: len(defs_s)] == defs_s
-                    ):
-                        source, package, model_class, model_file = _table_info(
-                            table_name, table_owners
-                        )
-                        app_suggestion = f'Remove "{name_s}" from model indexes/constraints, then run plain postgres sync'
+                    )
+                    is_exact_dup = (
+                        defs_s == defs_l
+                        and not unique_s
+                        and (unique_l or name_s > name_l)
+                    )
 
-                        items.append(
-                            CheckItem(
-                                table=table_name,
-                                name=name_s,
-                                detail=f"{size_s}, redundant with {name_l}",
+                    if not (is_prefix_dup or is_exact_dup):
+                        continue
+
+                    source, package, model_class, model_file = _table_info(
+                        table_name, table_owners
+                    )
+                    app_suggestion = f'Remove "{name_s}" from model indexes/constraints, then run plain postgres sync'
+
+                    items.append(
+                        CheckItem(
+                            table=table_name,
+                            name=name_s,
+                            detail=f"{size_s}, redundant with {name_l}",
+                            source=source,
+                            package=package,
+                            model_class=model_class,
+                            model_file=model_file,
+                            suggestion=_index_suggestion(
                                 source=source,
                                 package=package,
                                 model_class=model_class,
                                 model_file=model_file,
-                                suggestion=_index_suggestion(
-                                    source=source,
-                                    package=package,
-                                    model_class=model_class,
-                                    model_file=model_file,
-                                    app_suggestion=app_suggestion,
-                                    unmanaged_suggestion=f'DROP INDEX CONCURRENTLY "{name_s}";',
-                                ),
-                                caveats=[],
-                            )
+                                app_suggestion=app_suggestion,
+                                unmanaged_suggestion=f'DROP INDEX CONCURRENTLY "{name_s}";',
+                            ),
+                            caveats=[],
                         )
-                        flagged.add(name_s)
+                    )
+                    flagged.add(name_s)
 
     return CheckResult(
         name="duplicate_indexes",

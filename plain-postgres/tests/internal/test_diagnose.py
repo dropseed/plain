@@ -266,6 +266,75 @@ class TestStructuralScenarios:
             f"expected no duplicates flagged across access methods, got {flagged}"
         )
 
+    def test_duplicate_indexes_detected_when_non_unique_shadows_unique(self) -> None:
+        """A non-unique `Index(fields=["x"])` declared alongside a same-column
+        `UniqueConstraint(fields=["x"])` is pure overhead — the unique-backed
+        btree already covers the same queries. Flag the non-unique side."""
+        _execute(
+            'CREATE TABLE "_diag_dup_exact" ('
+            '"id" serial PRIMARY KEY, "uuid" uuid NOT NULL)'
+        )
+        _execute(
+            'CREATE UNIQUE INDEX "_diag_dup_exact_unique_uuid" '
+            'ON "_diag_dup_exact" ("uuid")'
+        )
+        _execute(
+            'CREATE INDEX "_diag_dup_exact_uuid_idx" ON "_diag_dup_exact" ("uuid")'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_duplicate_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_dup_exact"]
+        assert len(flagged) == 1, (
+            f"expected one duplicate on _diag_dup_exact, got {flagged}"
+        )
+        assert flagged[0]["name"] == "_diag_dup_exact_uuid_idx"
+        assert "_diag_dup_exact_unique_uuid" in flagged[0]["detail"]
+
+    def test_duplicate_indexes_detected_when_two_non_unique_match_exactly(
+        self,
+    ) -> None:
+        """Two non-unique indexes on identical columns — flag the alphabetically
+        later name (deterministic) so we don't double-report or oscillate."""
+        _execute('CREATE TABLE "_diag_dup_pair" ("id" serial PRIMARY KEY, "x" int)')
+        _execute('CREATE INDEX "_diag_dup_pair_a_idx" ON "_diag_dup_pair" ("x")')
+        _execute('CREATE INDEX "_diag_dup_pair_z_idx" ON "_diag_dup_pair" ("x")')
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_duplicate_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_dup_pair"]
+        assert len(flagged) == 1, (
+            f"expected one duplicate on _diag_dup_pair, got {flagged}"
+        )
+        assert flagged[0]["name"] == "_diag_dup_pair_z_idx"
+
+    def test_duplicate_indexes_not_flagged_for_two_unique_same_columns(self) -> None:
+        """Two unique indexes on identical columns is a Postgres-level redundancy
+        but neither is "the" overhead — both enforce uniqueness. Don't flag."""
+        _execute(
+            'CREATE TABLE "_diag_dup_two_uniq" ('
+            '"id" serial PRIMARY KEY, "x" int NOT NULL)'
+        )
+        _execute(
+            'CREATE UNIQUE INDEX "_diag_dup_two_uniq_a" ON "_diag_dup_two_uniq" ("x")'
+        )
+        _execute(
+            'CREATE UNIQUE INDEX "_diag_dup_two_uniq_b" ON "_diag_dup_two_uniq" ("x")'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            result = check_duplicate_indexes(cursor, {})
+
+        flagged = [i for i in result["items"] if i["table"] == "_diag_dup_two_uniq"]
+        assert flagged == [], (
+            f"expected no duplicates flagged for two unique same-column indexes, got {flagged}"
+        )
+
     def test_duplicate_indexes_not_flagged_when_longer_starts_with_expression(
         self,
     ) -> None:
