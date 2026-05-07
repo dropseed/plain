@@ -4,6 +4,7 @@ from typing import NoReturn
 
 from app.mcp import NotesMCP
 from app.notes.urls import NotesRouter
+from app.views.api import APIRouter
 from app.views.jobs import RunExampleJobView
 from app.views.sse import ClockView, StockTickerView
 from plain.admin.urls import AdminRouter
@@ -44,6 +45,7 @@ class AppRouter(Router):
         include("observer/", ObserverRouter),
         include("pageviews/", PageviewsRouter),
         include("notes/", NotesRouter),
+        include("api/", APIRouter),
         path("mcp/", NotesMCP, name="mcp"),
         path("login/", LoginView, name="login"),
         path("logout/", LogoutView, name="logout"),
