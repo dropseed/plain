@@ -334,6 +334,46 @@ def open_url(path: str) -> None:
     webbrowser.open(url)
 
 
+@cli.command("openapi")
+@click.option(
+    "--raw",
+    is_flag=True,
+    help="Print the response body verbatim, no JSON pretty-printing.",
+)
+@click.option(
+    "--api-url",
+    default=None,
+    help="Override the api_url (useful when not logged in).",
+)
+def openapi(raw: bool, api_url: str | None) -> None:
+    """Fetch the OpenAPI document for this Plain Cloud install.
+
+    The schema is metadata, so no token is required. When logged in, the
+    saved api_url is used; pass --api-url to point elsewhere or to fetch
+    without logging in.
+    """
+    if api_url is None:
+        creds = load()
+        api_url = creds.api_url if creds else DEFAULT_API_URL
+
+    url = api_url.rstrip("/") + "/api/openapi.json"
+    try:
+        response = httpx.get(url, timeout=httpx.Timeout(30.0))
+    except httpx.HTTPError as exc:
+        _die(f"Could not reach {url}: {exc}")
+
+    if response.status_code >= 400:
+        _die(f"{response.status_code} fetching {url}: {response.text[:200]}")
+
+    if raw:
+        _write_passthrough(response.text)
+        return
+    try:
+        click.echo(json.dumps(response.json(), indent=2, sort_keys=False))
+    except ValueError:
+        _write_passthrough(response.text)
+
+
 @cli.command()
 def config() -> None:
     """Show where credentials are stored."""

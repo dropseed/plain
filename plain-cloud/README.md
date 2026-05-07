@@ -34,6 +34,7 @@ plain-cloud api /api/apps/foo/exceptions/123/ -X PATCH -F resolved=true
 plain-cloud api /api/apps/ -X POST --input body.json -H "X-Trace: 1"
 ```
 
+- `plain-cloud openapi` — fetch the OpenAPI document. No token required (the schema is metadata). Pipe into `jq` or save with `> openapi.json` to feed to an agent.
 - `plain-cloud open [path]` — open a Plain Cloud URL in your browser. Defaults to `/dashboard/`.
 - `plain-cloud config` — show the active keyring backend and api_url.
 
