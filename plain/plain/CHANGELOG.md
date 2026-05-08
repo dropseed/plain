@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.141.0](https://github.com/dropseed/plain/releases/plain@0.141.0) (2026-05-07)
+
+### What's changed
+
+- **New `UnsupportedMediaTypeError415` exception in `plain.http`.** `request.json_data` and `request.form_data` previously raised plain `ValueError` when the Content-Type didn't match what they parse, which fell through to a generic 500. They now raise `UnsupportedMediaTypeError415` (an `HTTPException` subclass with `status_code=415`) so `APIView` and downstream handlers can render it as a clean 4xx without per-endpoint try/except. ([f30d2ef3f6cd](https://github.com/dropseed/plain/commit/f30d2ef3f6cd))
+
+### Upgrade instructions
+
+- If you were catching `ValueError` around `request.json_data` / `request.form_data` to handle bad Content-Type, you can drop the try/except — the new 415 will be rendered automatically by any view that handles `HTTPException` (including `APIView`).
+
 ## [0.140.1](https://github.com/dropseed/plain/releases/plain@0.140.1) (2026-05-06)
 
 ### What's changed
