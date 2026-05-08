@@ -215,3 +215,65 @@ def test_default_check_is_noop():
     result = S.validate({"a": "1"})
     assert isinstance(result, Valid)
     assert result.data.a == 1
+
+
+# ---------------------------------------------------------------------------
+# partial=True — HTMX live-validation
+# ---------------------------------------------------------------------------
+
+
+def test_partial_skips_missing_required_fields():
+    class S(Schema):
+        title: str = types.TextField(min_length=1)
+        priority: str = types.ChoiceField(
+            choices=[("low", "Low"), ("high", "High")]
+        )
+
+    # Just the title — priority is missing but partial=True ignores it.
+    result = S.validate({"title": "ok"}, partial=True)
+    assert isinstance(result, Valid)
+    assert result.data.title == "ok"
+
+
+def test_partial_still_reports_errors_on_present_fields():
+    class S(Schema):
+        title: str = types.TextField(min_length=5)
+        priority: str = types.ChoiceField(choices=[("low", "Low")])
+
+    # Title is too short; priority is missing but ignored.
+    result = S.validate({"title": "x"}, partial=True)
+    assert isinstance(result, Invalid)
+    assert "title" in result.errors
+    assert "priority" not in result.errors
+
+
+def test_partial_skips_check_hook():
+    """Cross-field validation can't run on partial data — it might reference
+    fields that aren't there."""
+    seen: list[bool] = []
+
+    class S(Schema):
+        a: int = types.IntegerField()
+        b: int = types.IntegerField()
+
+        @classmethod
+        def check(cls, data, *, context=None):
+            seen.append(True)
+            return None
+
+    S.validate({"a": "1"}, partial=True)
+    assert seen == []  # check() never called
+
+    # Full-mode validate runs check() as usual
+    S.validate({"a": "1", "b": "2"})
+    assert seen == [True]
+
+
+def test_partial_empty_input_is_valid():
+    """Validating no fields with partial=True is the trivial Valid case."""
+
+    class S(Schema):
+        title: str = types.TextField()
+
+    result = S.validate({}, partial=True)
+    assert isinstance(result, Valid)

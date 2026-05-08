@@ -110,17 +110,30 @@ class Schema(metaclass=SchemaMeta):
         data: dict[str, Any] | None,
         *,
         context: dict[str, Any] | None = None,
+        partial: bool = False,
     ) -> Valid[Self] | Invalid:
         """Validate `data` against this schema.
 
         Returns either `Valid[Self]` (cleaned typed instance) or `Invalid`
         (per-field errors). Never raises on validation failure.
+
+        Set `partial=True` to validate only the fields present in `data` —
+        missing required fields don't error. Useful for HTMX live-validation
+        where each keystroke sends just one field. The returned `Valid.data`
+        in partial mode is missing the unsubmitted attributes; access
+        through `Valid.raw` if you need the original input shape, or use
+        `partial=False` (default) for the full-submit path.
+
+        `check()` is skipped in `partial=True` mode — cross-field validation
+        only makes sense when every field is present.
         """
         raw = data or {}
         cleaned: dict[str, Any] = {}
         errors: dict[str, list[str]] = {}
 
         for name, field in cls._schema_fields.items():
+            if partial and name not in raw:
+                continue
             raw_value = raw.get(name)
             try:
                 cleaned[name] = field.clean(raw_value)
@@ -131,6 +144,11 @@ class Schema(metaclass=SchemaMeta):
             return Invalid(errors=errors, raw=raw)
 
         instance = cls(**cleaned)
+
+        if partial:
+            # Skip cross-field hook — caller is asking about a subset, so
+            # `check()` may reference fields that aren't there.
+            return Valid(data=instance, raw=raw)
 
         # Cross-field hook. Subclasses override `check()`; default is no-op.
         try:

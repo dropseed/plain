@@ -4,7 +4,7 @@ from typing import Any
 
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
-from plain.http import RedirectResponse, Response
+from plain.http import JsonResponse, RedirectResponse, Response
 from plain.schema import Invalid
 from plain.urls import reverse, reverse_lazy
 from plain.views import (
@@ -68,6 +68,19 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
             return
         task.title = result.data.title
         task.save()
+
+    def htmx_post_validate(self) -> Response:
+        """Live per-field validation: same TaskTitleSchema, partial=True.
+
+        Wire this to `hx-trigger="keyup changed delay:300ms"` on the title
+        input; returns a JSON shape the client can render as an error
+        indicator. The schema runs only on the fields actually present in
+        the payload, so missing-required errors don't fire on partial input.
+        """
+        result = TaskTitleSchema.validate(self.request.form_data, partial=True)
+        if isinstance(result, Invalid):
+            return JsonResponse({"valid": False, "errors": result.errors})
+        return JsonResponse({"valid": True})
 
 
 class TaskCreateView(AuthView, CreateView):
