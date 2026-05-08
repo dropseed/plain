@@ -1,5 +1,27 @@
 # plain-api changelog
 
+## [0.32.0](https://github.com/dropseed/plain/releases/plain-api@0.32.0) (2026-05-07)
+
+### What's changed
+
+- **Dropped the `int` return shorthand from `APIView`.** `return 200` was ambiguous (what should the body be?) and broke content-type conformance for 4xx/5xx responses. Return a `Response`, dict, list, tuple, or `None` instead. ([b5f38ef976d2](https://github.com/dropseed/plain/commit/b5f38ef976d2))
+- **Redesigned `ErrorSchema`.** Dropped the always-empty `url` field and added an optional `errors: list[{field, message}]` so structured field errors flow to clients without flattening. `handle_exception` populates it from `error_dict`-shaped `ValidationError`s. ([b5f38ef976d2](https://github.com/dropseed/plain/commit/b5f38ef976d2))
+- **`APIView` now renders 415 responses for Content-Type mismatches.** Pairs with the new `UnsupportedMediaTypeError415` exception in plain 0.141.0 — bad Content-Type on a JSON/form endpoint now returns a clean 415 with `error_id: "unsupported_media_type"` instead of a 500. ([b5f38ef976d2](https://github.com/dropseed/plain/commit/b5f38ef976d2))
+- **OpenAPI generator improvements.** Path converters emit native types (`<int:>` → `type: integer`, `<uuid:>` → `string + format: uuid`); `<name>` shorthand is translated to `{name}` parameters; default `operationId` is `{ViewClass}_{method}`; views that declare `openapi_security_schemes` (e.g. `APIKeyView` → `BearerAuth`) automatically emit `securitySchemes` and per-operation `security`. ([b5f38ef976d2](https://github.com/dropseed/plain/commit/b5f38ef976d2), [2fa13eda77de](https://github.com/dropseed/plain/commit/2fa13eda77de))
+- **New `openapi.json_content`, `openapi.json_body`, and `openapi.link_to` helpers** to cut the `application/json` envelope and link-to-by-operationId boilerplate in spec-decorated views. ([b5f38ef976d2](https://github.com/dropseed/plain/commit/b5f38ef976d2))
+- **New `JsonNotFoundView` catch-all** so unmatched paths under an API prefix return a JSON 404 instead of the framework's HTML error page. ([b5f38ef976d2](https://github.com/dropseed/plain/commit/b5f38ef976d2))
+- **`APIKey.is_expired()` helper** + fixed a naive-datetime comparison in expiry checks. ([2f2d4d5e6138](https://github.com/dropseed/plain/commit/2f2d4d5e6138))
+- **Generated OpenAPI specs are validated locally** via `openapi-spec-validator` in tests. ([a57b1e6bb93f](https://github.com/dropseed/plain/commit/a57b1e6bb93f))
+- Tightened `APIKeyView` typing to `View[APIResult]` so it composes cleanly with `APIView` under ty. ([b5f38ef976d2](https://github.com/dropseed/plain/commit/b5f38ef976d2))
+- README updates covering the new OpenAPI affordances. ([034aa5a820e1](https://github.com/dropseed/plain/commit/034aa5a820e1))
+
+### Upgrade instructions
+
+- Requires `plain>=0.141.0`.
+- **If any of your `APIView` handlers `return <int>`** (e.g. `return 204`) — change them to return a `Response(status_code=...)` or a `(body, status_code)` tuple.
+- **If you consume `ErrorSchema` from clients** — the `url` field is gone and the new optional `errors` list may now be present for validation errors.
+- **If you were rendering 415s manually** when a request hit an `APIView` with the wrong Content-Type — you can drop that, plain-api now handles it automatically.
+
 ## [0.31.1](https://github.com/dropseed/plain/releases/plain-api@0.31.1) (2026-05-05)
 
 ### What's changed
