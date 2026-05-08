@@ -4,10 +4,12 @@ from plain.api import openapi
 from plain.api.views import APIView
 from plain.auth import get_request_user
 from plain.auth.views import LoginRequired
+from plain.schema import Invalid
 from plain.urls import Router, path
 
 from .forms import TaskForm
 from .models import Task
+from .schemas import TaskQuickAddSchema
 
 TASK_SCHEMA = {
     "type": "object",
@@ -95,6 +97,50 @@ class TaskListAPIView(APIView):
         return 201, _serialize(task)
 
 
+class TaskQuickAddAPIView(APIView):
+    """Schema-based parallel to TaskListAPIView.post.
+
+    Same job (create a task from JSON), but uses plain.schema.Schema instead
+    of plain.forms.ModelForm. Validation is a pure function call — no
+    request kwarg, no .is_valid() / .cleaned_data dance — and the result
+    is type-narrowed so result.data attributes are statically typed.
+    """
+
+    @openapi.schema(
+        {
+            "summary": "Quick-add a task from a JSON body using a Schema.",
+            "responses": {
+                "201": {
+                    "description": "The created task.",
+                    "content": openapi.json_content(
+                        {"$ref": "#/components/schemas/Task"}
+                    ),
+                },
+                "400": {"description": "Validation errors."},
+            },
+        }
+    )
+    def post(self) -> tuple[int, dict]:
+        user = get_request_user(self.request)
+        if not user:
+            raise LoginRequired(login_url=None)
+
+        result = TaskQuickAddSchema.validate(self.request.json_data)
+        if isinstance(result, Invalid):
+            return 400, {"errors": result.errors}
+
+        # result.data is statically typed as TaskQuickAddSchema here.
+        # An agent that mistypes a field name gets caught at type-check time.
+        task = Task.query.create(
+            owner=user,
+            title=result.data.title,
+            notes=result.data.notes,
+            priority=result.data.priority or "med",
+            is_complete=result.data.is_complete,
+        )
+        return 201, _serialize(task)
+
+
 @openapi.schema(
     {
         "openapi": "3.0.3",
@@ -106,4 +152,5 @@ class TasksAPIRouter(Router):
     openapi_components = {"schemas": {"Task": TASK_SCHEMA}}
     urls = [
         path("tasks/", TaskListAPIView, name="list"),
+        path("tasks/quick/", TaskQuickAddAPIView, name="quick"),
     ]
