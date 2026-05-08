@@ -1,5 +1,17 @@
 # plain-cloud changelog
 
+## [0.4.1](https://github.com/dropseed/plain/releases/plain-cloud@0.4.1) (2026-05-08)
+
+### What's changed
+
+- **`Client` mounts `/api` in `base_url`** so callers and the built-in commands target paths like `/me/`, `/apps/`, etc. directly — no need to keep `/api/` in every path string. ([08ba073fa5](https://github.com/dropseed/plain/commit/08ba073fa5))
+- **`plain-cloud api <path>` accepts paths with or without the `/api/` prefix.** A redundant leading `/api/` is stripped before the request, so paths copied from `plain-cloud openapi` (which lists them without the mount prefix) work alongside the older prefixed form. ([08ba073fa5](https://github.com/dropseed/plain/commit/08ba073fa5))
+- README and `api --help` examples updated to the prefix-less form.
+
+### Upgrade instructions
+
+- No changes required. Existing `/api/...` paths still work; new code can drop the prefix.
+
 ## [0.4.0](https://github.com/dropseed/plain/releases/plain-cloud@0.4.0) (2026-05-07)
 
 First release of `plain-cloud` as a standalone command-line tool for managing your Plain Cloud account.
