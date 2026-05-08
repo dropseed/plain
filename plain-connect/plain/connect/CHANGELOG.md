@@ -1,5 +1,15 @@
 # plain-connect changelog
 
+## [0.3.5](https://github.com/dropseed/plain/releases/plain-connect@0.3.5) (2026-05-08)
+
+### What's changed
+
+- New agent rule (`plain-connect.md`) that points AI agents at the separate `plain-cloud` CLI for reading telemetry data back (production exceptions, slow endpoints, slow queries, recent deploys). Discovery-first guidance: use `plain-cloud openapi | jq '.paths | keys'` instead of hardcoding paths. ([c3d58e7a17](https://github.com/dropseed/plain/commit/c3d58e7a17))
+
+### Upgrade instructions
+
+- Run `plain agents install` to pick up the new rule.
+
 ## [0.3.4](https://github.com/dropseed/plain/releases/plain-connect@0.3.4) (2026-05-07)
 
 ### What's changed
