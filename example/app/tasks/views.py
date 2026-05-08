@@ -5,6 +5,7 @@ from typing import Any
 from plain.auth.views import AuthView
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
+from plain.schema import Invalid
 from plain.urls import reverse, reverse_lazy
 from plain.views import (
     CreateView,
@@ -17,6 +18,7 @@ from plain.views import (
 
 from .forms import TaskForm, TaskTitleForm
 from .models import Project, Tag, Task
+from .schemas import TaskTitleSchema
 
 
 class TaskListView(AuthView, ListView):
@@ -54,10 +56,18 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
         return context
 
     def htmx_post_rename(self) -> None:
-        form = TaskTitleForm(request=self.request)
-        if form.is_valid():
-            self.object.title = form.cleaned_data["title"]
-            self.object.save()
+        # Same TaskTitleSchema works for HTMX form-data and JSON request bodies —
+        # validate() takes any dict-like, no request kwarg, no .is_valid() dance.
+        # Narrow with isinstance(_, Invalid) — ty narrows the positive form
+        # cleanly; the inverted `not isinstance(_, Valid)` confuses generics.
+        result = TaskTitleSchema.validate(self.request.form_data)
+        if isinstance(result, Invalid):
+            return
+        task = self.get_object()
+        if task is None:
+            return
+        task.title = result.data.title
+        task.save()
 
 
 class TaskCreateView(AuthView, CreateView):

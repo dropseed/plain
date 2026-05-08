@@ -100,3 +100,118 @@ def test_no_form_request_required():
     """Schemas validate plain dicts — no request, no HTTP, no fakes."""
     result = ContactSchema.validate({"email": "a@b.co", "age": "1", "message": "x"})
     assert isinstance(result, Valid)
+
+
+# ---------------------------------------------------------------------------
+# check() — cross-field validation hook
+# ---------------------------------------------------------------------------
+
+
+def test_check_returning_dict_adds_errors():
+    class S(Schema):
+        a: int = types.IntegerField()
+        b: int = types.IntegerField()
+
+        @classmethod
+        def check(cls, data, *, context=None):
+            if data.a > data.b:
+                return {"__all__": ["a must be <= b"]}
+            return None
+
+    assert isinstance(S.validate({"a": "1", "b": "2"}), Valid)
+
+    bad = S.validate({"a": "5", "b": "2"})
+    assert isinstance(bad, Invalid)
+    assert bad.errors == {"__all__": ["a must be <= b"]}
+
+
+def test_check_raising_validationerror_string_attaches_to_all():
+    from plain.exceptions import ValidationError
+
+    class S(Schema):
+        a: int = types.IntegerField()
+
+        @classmethod
+        def check(cls, data, *, context=None):
+            raise ValidationError("global problem")
+
+    bad = S.validate({"a": "1"})
+    assert isinstance(bad, Invalid)
+    assert bad.errors == {"__all__": ["global problem"]}
+
+
+def test_check_raising_validationerror_dict_attaches_per_field():
+    from plain.exceptions import ValidationError
+
+    class S(Schema):
+        a: int = types.IntegerField()
+        b: int = types.IntegerField()
+
+        @classmethod
+        def check(cls, data, *, context=None):
+            raise ValidationError({"a": ["too big"], "b": "too small"})
+
+    bad = S.validate({"a": "1", "b": "2"})
+    assert isinstance(bad, Invalid)
+    assert bad.errors == {"a": ["too big"], "b": ["too small"]}
+
+
+def test_check_does_not_run_when_field_errors_exist():
+    """If any field fails, check() must not see a half-populated instance."""
+    seen: list[bool] = []
+
+    class S(Schema):
+        a: int = types.IntegerField()
+        b: int = types.IntegerField()
+
+        @classmethod
+        def check(cls, data, *, context=None):
+            seen.append(True)
+            return None
+
+    bad = S.validate({"a": "not-a-number", "b": "1"})
+    assert isinstance(bad, Invalid)
+    assert seen == []  # check() never called
+
+
+def test_check_receives_typed_instance():
+    captured: list = []
+
+    class S(Schema):
+        a: int = types.IntegerField()
+        name: str = types.TextField()
+
+        @classmethod
+        def check(cls, data, *, context=None):
+            # Attribute access, not dict access — proves typed instance.
+            captured.append((data.a, data.name))
+            return None
+
+    S.validate({"a": "42", "name": "ok"})
+    assert captured == [(42, "ok")]
+
+
+def test_check_receives_context():
+    captured: list = []
+
+    class S(Schema):
+        a: int = types.IntegerField()
+
+        @classmethod
+        def check(cls, data, *, context=None):
+            captured.append(context)
+            return None
+
+    S.validate({"a": "1"}, context={"user_id": 42})
+    assert captured == [{"user_id": 42}]
+
+
+def test_default_check_is_noop():
+    """Schemas without an override pass through cleanly."""
+
+    class S(Schema):
+        a: int = types.IntegerField()
+
+    result = S.validate({"a": "1"})
+    assert isinstance(result, Valid)
+    assert result.data.a == 1

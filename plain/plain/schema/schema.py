@@ -58,13 +58,26 @@ class Schema(metaclass=SchemaMeta):
 
         ContactSchema = make_schema(email=EmailField(), message=TextField())
 
-    Validate a dict and dispatch on the result type:
+    Validate a dict and dispatch on the result type. The canonical pattern
+    is to eliminate `Invalid` first — the `else` branch then narrows to
+    `Valid[T]` with the type parameter preserved:
 
-        match ContactSchema.validate(data):
-            case Valid(data=contact):
-                ...   # contact: ContactSchema, fully typed
-            case Invalid(errors=errs):
-                ...
+        result = ContactSchema.validate(data)
+        if isinstance(result, Invalid):
+            return ...                    # handle errors
+        contact = result.data             # ContactSchema, fully typed
+
+    Or as an early `assert`:
+
+        assert not isinstance(result, Invalid)
+        contact = result.data             # ContactSchema, fully typed
+
+    Avoid `isinstance(result, Valid)` directly — narrowing into a generic
+    class loses the type parameter under ty, so `result.data` falls back
+    to `object`. Always narrow by eliminating `Invalid`.
+
+    Override `check()` for cross-field validation that runs after fields
+    have cleaned successfully.
     """
 
     _schema_fields: ClassVar[dict[str, Field]] = {}
@@ -117,7 +130,43 @@ class Schema(metaclass=SchemaMeta):
         if errors:
             return Invalid(errors=errors, raw=raw)
 
-        return Valid(data=cls(**cleaned), raw=raw)
+        instance = cls(**cleaned)
+
+        # Cross-field hook. Subclasses override `check()`; default is no-op.
+        try:
+            extra_errors = cls.check(instance, context=context)
+        except ValidationError as e:
+            if hasattr(e, "error_dict"):
+                # Each error_list is a list of ValidationError objects; wrap
+                # in a ValidationError to flatten back to message strings.
+                extra_errors = {
+                    field: list(ValidationError(error_list))
+                    for field, error_list in e.error_dict.items()
+                }
+            else:
+                extra_errors = {"__all__": list(e.messages)}
+
+        if extra_errors:
+            return Invalid(errors=dict(extra_errors), raw=raw)
+
+        return Valid(data=instance, raw=raw)
+
+    @classmethod
+    def check(
+        cls,
+        data: Self,
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, list[str]] | None:
+        """Cross-field validation hook. Override in subclasses.
+
+        Runs after every field has cleaned successfully; receives the typed
+        instance with all cleaned values set. Return a dict of field-name →
+        error messages (use `"__all__"` for non-field errors) or `None`
+        when there are no errors. Raising `ValidationError` is also
+        supported.
+        """
+        return None
 
 
 def make_schema(name: str = "InlineSchema", /, **fields: Field) -> type[Schema]:
