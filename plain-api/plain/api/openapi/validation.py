@@ -14,11 +14,11 @@ def validate_openapi_schema(schema: dict[str, Any]) -> None:
     and run the appropriate JSON Schema validation locally — no network calls.
     """
     try:
-        from openapi_spec_validator import validate
-        from openapi_spec_validator.validation.exceptions import (
+        from openapi_spec_validator import validate  # ty: ignore[unresolved-import]
+        from openapi_spec_validator.validation.exceptions import (  # ty: ignore[unresolved-import]
             OpenAPIValidationError as _UpstreamValidationError,
         )
-        from referencing.exceptions import Unresolvable
+        from referencing.exceptions import Unresolvable  # ty: ignore[unresolved-import]
     except ImportError as exc:
         raise OpenAPIValidationError(
             "openapi-spec-validator is required for --validate. "
