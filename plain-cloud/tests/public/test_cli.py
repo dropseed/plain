@@ -203,6 +203,20 @@ def test_api_get_routes_fields_to_query_string(runner, mock_api):
     assert req.url.params["active"] == "true"
 
 
+def test_api_path_accepts_both_with_and_without_api_prefix(runner, mock_api):
+    save(Credentials(api_url="https://example.com", token="tok"))
+    captured: list[httpx.Request] = []
+    mock_api(_capture(captured))
+
+    result = runner.invoke(cli, ["api", "/apps/"])
+    assert result.exit_code == 0, result.output
+    assert captured[0].url.path == "/api/apps/"
+
+    result = runner.invoke(cli, ["api", "/api/apps/"])
+    assert result.exit_code == 0, result.output
+    assert captured[1].url.path == "/api/apps/"
+
+
 def test_api_post_routes_typed_and_raw_fields_to_json_body(runner, mock_api):
     save(Credentials(api_url="https://example.com", token="tok"))
     captured: list[httpx.Request] = []

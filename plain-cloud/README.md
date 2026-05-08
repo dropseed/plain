@@ -27,11 +27,13 @@ plain-cloud apps list
 - `plain-cloud apps list` — list apps you have access to across every team.
 - `plain-cloud api <path>` — call any API path with the saved token. Modeled on `gh api`: `-X/--method` (default `GET`); `-H KEY:VALUE` for headers; `-f key=value` for string fields; `-F key=value` for typed fields (`true`/`false`/`null`/numbers become JSON literals, `@path` reads a string from disk); `--input FILE` (or `-` for stdin) to send a raw body; `--raw` to skip JSON pretty-printing. Fields go in the query string for `GET` and in the JSON body otherwise. Exit code is 0 for 2xx, 1 otherwise.
 
+Pass paths exactly as listed in `plain-cloud openapi` — the `/api/` mount prefix is added for you (passing it explicitly also works).
+
 ```
-plain-cloud api /api/me/
-plain-cloud api /api/apps/ -F page=2
-plain-cloud api /api/apps/foo/exceptions/123/ -X PATCH -F resolved=true
-plain-cloud api /api/apps/ -X POST --input body.json -H "X-Trace: 1"
+plain-cloud api /me/
+plain-cloud api /apps/ -F page=2
+plain-cloud api /apps/foo/exceptions/abc123/resolve/ -X POST
+plain-cloud api /apps/ -X POST --input body.json -H "X-Trace: 1"
 ```
 
 - `plain-cloud openapi` — fetch the OpenAPI document. No token required (the schema is metadata). Pipe into `jq` or save with `> openapi.json` to feed to an agent.

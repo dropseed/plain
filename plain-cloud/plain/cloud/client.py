@@ -35,7 +35,7 @@ class Client:
         transport: httpx.BaseTransport | None = None,  # test seam for MockTransport
     ) -> None:
         self._client = httpx.Client(
-            base_url=creds.api_url.rstrip("/"),
+            base_url=creds.api_url.rstrip("/") + "/api",
             headers={
                 "Authorization": f"Bearer {creds.token}",
                 "Accept": "application/json",

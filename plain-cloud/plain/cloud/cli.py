@@ -50,6 +50,16 @@ def _split_kv(s: str, sep: str, flag: str) -> tuple[str, str]:
     return key, value
 
 
+def _normalize_api_path(path: str) -> str:
+    # Client.base_url already mounts /api. Strip a redundant leading
+    # /api/ so users who copy from old docs (or the README's older
+    # examples) still hit the right URL.
+    stripped = path.lstrip("/")
+    if stripped == "api" or stripped.startswith("api/"):
+        stripped = stripped[3:].lstrip("/")
+    return "/" + stripped
+
+
 @click.group()
 @click.version_option(package_name="plain.cloud", prog_name="plain-cloud")
 def cli() -> None:
@@ -88,7 +98,7 @@ def login(api_url: str, token: str | None) -> None:
     creds = Credentials(api_url=api_url, token=token)
     with Client(creds) as client:
         try:
-            me = client.get("/api/me/")
+            me = client.get("/me/")
         except httpx.HTTPError as exc:
             _die(f"Could not reach {api_url}: {exc}")
 
@@ -118,7 +128,7 @@ def whoami() -> None:
     """Show the user the current token belongs to."""
     creds = require()
     with Client(creds) as client:
-        me = client.get("/api/me/")
+        me = client.get("/me/")
     if email := me.get("email"):
         identity = click.style(email, bold=True)
     else:
@@ -148,7 +158,7 @@ def apps_list() -> None:
     """List apps you have access to."""
     creds = require()
     with Client(creds) as client:
-        data = client.get("/api/apps/")
+        data = client.get("/apps/")
     rows = data.get("apps") or []
     if not rows:
         click.secho("No apps yet.", dim=True)
@@ -222,21 +232,26 @@ def api(
     """Call any Plain Cloud API path with the saved token.
 
     \b
+    PATH is the API path as listed in `plain-cloud openapi` (e.g. /apps/).
+    The /api/ prefix is added automatically; passing it explicitly also works.
+
+    \b
     Fields go in the query string for GET requests and in the JSON body for
     everything else. Use -f for plain strings, -F for typed values
     (true/false/null/number, or @file to read a string from disk).
 
     \b
     Examples:
-      plain-cloud api /api/me/
-      plain-cloud api /api/apps/ -F page=2
-      plain-cloud api /api/apps/foo/exceptions/123/ -X PATCH -F resolved=true
-      plain-cloud api /api/apps/ -X POST --input body.json -H "X-Trace: 1"
+      plain-cloud api /me/
+      plain-cloud api /apps/ -F page=2
+      plain-cloud api /apps/foo/exceptions/123/resolve/ -X POST
+      plain-cloud api /apps/ -X POST --input body.json -H "X-Trace: 1"
 
     Exit code is 0 for 2xx, 1 for everything else.
     """
     creds = require()
     method_upper = method.upper()
+    path = _normalize_api_path(path)
 
     request_headers: dict[str, str] = {}
     for header in headers:
