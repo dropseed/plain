@@ -29,6 +29,8 @@ INSTALLED_PACKAGES = [
     "plain.observer",
     "app.users",
     "app.notes",
+    "app.contacts",
+    "app.tasks",
 ]
 
 

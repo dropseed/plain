@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ task.title }}{% endblock %}
+
+{% block content %}
+<div class="p-8 max-w-2xl mx-auto">
+    <div class="mb-4">
+        <a href="{{ url('tasks:detail', id=task.id) }}" class="text-sm text-blue-500 hover:underline">
+            ← Back
+        </a>
+    </div>
+
+    <h1 class="text-2xl font-bold mb-4">Edit task</h1>
+
+    <form method="post" class="flex flex-col">
+        {% include "tasks/_form_partial.html" %}
+
+        <div class="flex gap-2 mt-4">
+            <button
+                type="submit"
+                class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            >Save</button>
+            <a
+                href="{{ url('tasks:delete', id=task.id) }}"
+                class="text-red-500 hover:underline self-center text-sm"
+            >Delete</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

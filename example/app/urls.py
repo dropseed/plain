@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import NoReturn
 
+from app.contacts.urls import ContactsRouter
 from app.mcp import NotesMCP
 from app.notes.urls import NotesRouter
+from app.tasks.api import TasksAPIRouter
+from app.tasks.urls import TasksRouter
 from app.views.api import APIRouter
 from app.views.jobs import RunExampleJobView
 from app.views.sse import ClockView, StockTickerView
@@ -45,7 +48,10 @@ class AppRouter(Router):
         include("observer/", ObserverRouter),
         include("pageviews/", PageviewsRouter),
         include("notes/", NotesRouter),
+        include("contacts/", ContactsRouter),
+        include("tasks/", TasksRouter),
         include("api/", APIRouter),
+        include("tasks-api/", TasksAPIRouter),
         path("mcp/", NotesMCP, name="mcp"),
         path("login/", LoginView, name="login"),
         path("logout/", LogoutView, name="logout"),

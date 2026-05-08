@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}{{ task.title }}{% endblock %}
+
+{% block content %}
+<div class="p-8 max-w-2xl mx-auto">
+    <div class="mb-4">
+        <a href="{{ url('tasks:list') }}" class="text-sm text-blue-500 hover:underline">
+            ← Back to tasks
+        </a>
+    </div>
+
+    {% htmxfragment "title" %}
+    <div class="mb-2">
+        <form
+            hx-post
+            plain-hx-action="rename"
+            class="flex items-center gap-2"
+        >
+            <input
+                class="text-2xl font-bold flex-1 bg-transparent border border-transparent hover:border-stone-300 focus:border-stone-300 rounded px-2 py-1 outline-none"
+                type="text"
+                name="{{ title_form.title.html_name }}"
+                id="{{ title_form.title.html_id }}"
+                value="{{ title_form.title.value() or task.title }}"
+            >
+            <button
+                type="submit"
+                class="text-xs bg-stone-900 text-white px-2 py-1 rounded hover:bg-stone-700"
+            >Rename</button>
+        </form>
+        {% for error in title_form.title.errors %}
+        <div class="text-red-500 text-sm mt-1">{{ error }}</div>
+        {% endfor %}
+    </div>
+    {% endhtmxfragment %}
+
+    <div class="text-sm text-stone-500 mb-4">
+        {{ task.priority }}
+        {% if task.due_date %} · due {{ task.due_date }}{% endif %}
+        {% if task.is_complete %} · <span class="text-green-700">complete</span>{% endif %}
+        {% if task.project %} · {{ task.project.name }}{% endif %}
+    </div>
+
+    {% if task.notes %}
+    <div class="prose whitespace-pre-wrap mb-6">{{ task.notes }}</div>
+    {% endif %}
+
+    {% set tags = task.tags.query | list %}
+    {% if tags %}
+    <div class="flex flex-wrap gap-2 mb-6">
+        {% for tag in tags %}
+        <span class="text-xs bg-stone-100 text-stone-700 px-2 py-0.5 rounded">#{{ tag.name }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="flex gap-2">
+        <a
+            href="{{ url('tasks:update', id=task.id) }}"
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >Edit</a>
+        <a
+            href="{{ url('tasks:delete', id=task.id) }}"
+            class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+        >Delete</a>
+    </div>
+</div>
+{% endblock %}

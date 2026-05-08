@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Contact archive{% endblock %}
+
+{% block content %}
+<div class="p-8 max-w-3xl mx-auto">
+    <div class="mb-4">
+        <a href="{{ url('contacts:form') }}" class="text-sm text-blue-500 hover:underline">
+            ← Send a message
+        </a>
+    </div>
+
+    <h1 class="text-2xl font-bold mb-1">Contact archive</h1>
+    <p class="text-sm text-stone-600 mb-4">
+        Two GET forms on one page — proves <code class="font-mono">prefix</code>
+        keeps their fields disjoint.
+    </p>
+
+    <form method="get" class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end mb-4">
+        <div class="flex flex-col">
+            <label class="text-xs mb-1" for="{{ search_form.text.html_id }}">Search message</label>
+            <input
+                class="border border-stone-300 rounded-md px-3 py-2"
+                type="text"
+                name="{{ search_form.text.html_name }}"
+                id="{{ search_form.text.html_id }}"
+                value="{{ search_form.text.value() or '' }}"
+                placeholder="contains…"
+            >
+        </div>
+        <div class="flex flex-col">
+            <label class="text-xs mb-1" for="{{ filter_form.subject.html_id }}">Subject</label>
+            <select
+                class="border border-stone-300 rounded-md px-3 py-2"
+                name="{{ filter_form.subject.html_name }}"
+                id="{{ filter_form.subject.html_id }}"
+            >
+                {% for value, label in filter_form.subject.field.choices %}
+                <option value="{{ value }}" {% if filter_form.subject.value() == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="flex items-center gap-2">
+            <label class="flex items-center gap-2 text-sm">
+                <input
+                    type="checkbox"
+                    name="{{ filter_form.subscribed_only.html_name }}"
+                    id="{{ filter_form.subscribed_only.html_id }}"
+                    {% if filter_form.subscribed_only.value() %}checked{% endif %}
+                >
+                Subscribed only
+            </label>
+            <button
+                type="submit"
+                class="ml-auto bg-stone-900 text-white text-xs px-3 py-2 rounded-md hover:bg-stone-700"
+            >Apply</button>
+        </div>
+    </form>
+
+    <div class="border border-stone-200 rounded-lg bg-white divide-y divide-stone-100">
+        {% for s in submissions %}
+        <div class="p-3">
+            <div class="flex items-baseline justify-between">
+                <div class="font-medium text-sm">{{ s.name }} <span class="text-stone-400 text-xs">&lt;{{ s.email }}&gt;</span></div>
+                <div class="text-xs text-stone-500">{{ s.subject }} · {{ s.created_at.strftime('%Y-%m-%d') }}</div>
+            </div>
+            <div class="text-sm text-stone-700 mt-1 whitespace-pre-line">{{ s.message }}</div>
+        </div>
+        {% else %}
+        <div class="p-6 text-sm text-stone-500">No submissions match.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

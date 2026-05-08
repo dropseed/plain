@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Contact us{% endblock %}
+
+{% block content %}
+<div class="p-8 max-w-2xl mx-auto">
+    <div class="mb-4">
+        <a href="{{ url('index') }}" class="text-sm text-blue-500 hover:underline">
+            ← Back to index
+        </a>
+    </div>
+
+    <h1 class="text-2xl font-bold mb-1">Contact us</h1>
+    <p class="text-sm text-stone-600 mb-4">
+        Plain <code class="font-mono">forms.Form</code> with text, email, choice, boolean,
+        custom <code class="font-mono">clean_email</code>, cross-field <code class="font-mono">clean()</code>,
+        and a dynamic <code class="font-mono">company</code> field via
+        <a class="underline" href="?company=1">?company=1</a>.
+    </p>
+
+    <form method="post" class="flex flex-col">
+        {% for error in form.non_field_errors %}
+        <div class="text-red-500 border-red-500 border rounded-md p-2 mb-4">{{ error }}</div>
+        {% endfor %}
+
+        <label class="text-sm mb-1" for="{{ form.name.html_id }}">Name</label>
+        <input
+            class="border border-stone-300 rounded-md px-3 py-2 mb-1"
+            type="text"
+            name="{{ form.name.html_name }}"
+            id="{{ form.name.html_id }}"
+            value="{{ form.name.value() or '' }}"
+            autofocus
+            required
+        >
+        {% for error in form.name.errors %}<div class="text-red-500 text-sm mb-2">{{ error }}</div>{% endfor %}
+
+        <label class="text-sm mb-1 mt-3" for="{{ form.email.html_id }}">Email</label>
+        <input
+            class="border border-stone-300 rounded-md px-3 py-2 mb-1"
+            type="email"
+            name="{{ form.email.html_name }}"
+            id="{{ form.email.html_id }}"
+            value="{{ form.email.value() or '' }}"
+            required
+        >
+        {% for error in form.email.errors %}<div class="text-red-500 text-sm mb-2">{{ error }}</div>{% endfor %}
+
+        <label class="text-sm mb-1 mt-3" for="{{ form.subject.html_id }}">Subject</label>
+        <select
+            class="border border-stone-300 rounded-md px-3 py-2 mb-1"
+            name="{{ form.subject.html_name }}"
+            id="{{ form.subject.html_id }}"
+            required
+        >
+            {% for value, label in form.subject.field.choices %}
+            <option value="{{ value }}" {% if form.subject.value() == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        {% for error in form.subject.errors %}<div class="text-red-500 text-sm mb-2">{{ error }}</div>{% endfor %}
+
+        {% if 'company' in form.fields %}
+        <label class="text-sm mb-1 mt-3" for="{{ form.company.html_id }}">Company (optional)</label>
+        <input
+            class="border border-stone-300 rounded-md px-3 py-2 mb-1"
+            type="text"
+            name="{{ form.company.html_name }}"
+            id="{{ form.company.html_id }}"
+            value="{{ form.company.value() or '' }}"
+        >
+        {% for error in form.company.errors %}<div class="text-red-500 text-sm mb-2">{{ error }}</div>{% endfor %}
+        {% endif %}
+
+        <label class="text-sm mb-1 mt-3" for="{{ form.message.html_id }}">Message</label>
+        <textarea
+            class="border border-stone-300 rounded-md px-3 py-2 mb-1 min-h-[160px]"
+            name="{{ form.message.html_name }}"
+            id="{{ form.message.html_id }}"
+            required
+        >{{ form.message.value() or '' }}</textarea>
+        {% for error in form.message.errors %}<div class="text-red-500 text-sm mb-2">{{ error }}</div>{% endfor %}
+
+        <label class="flex items-center gap-2 mt-3 text-sm">
+            <input
+                type="checkbox"
+                name="{{ form.subscribe.html_name }}"
+                id="{{ form.subscribe.html_id }}"
+                {% if form.subscribe.value() %}checked{% endif %}
+            >
+            Subscribe to the newsletter
+        </label>
+        {% for error in form.subscribe.errors %}<div class="text-red-500 text-sm mb-2">{{ error }}</div>{% endfor %}
+
+        <button
+            type="submit"
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4 self-start"
+        >
+            Send
+        </button>
+    </form>
+
+    <p class="mt-6 text-sm text-stone-500">
+        See submitted entries in the <a class="underline" href="{{ url('contacts:archive') }}">archive</a>.
+    </p>
+</div>
+{% endblock %}

@@ -1,0 +1,89 @@
+{# Reusable rendering of TaskForm fields. Used by create.html and update.html. #}
+
+{% for error in form.non_field_errors %}
+<div class="text-red-500 border-red-500 border rounded-md p-2 mb-4">{{ error }}</div>
+{% endfor %}
+
+<label class="text-sm mb-1 mt-3 block" for="{{ form.title.html_id }}">Title</label>
+<input
+    class="border border-stone-300 rounded-md px-3 py-2 w-full"
+    type="text"
+    name="{{ form.title.html_name }}"
+    id="{{ form.title.html_id }}"
+    value="{{ form.title.value() or '' }}"
+    autofocus
+    required
+>
+{% for error in form.title.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
+
+<label class="text-sm mb-1 mt-3 block" for="{{ form.project.html_id }}">Project</label>
+<select
+    class="border border-stone-300 rounded-md px-3 py-2 w-full"
+    name="{{ form.project.html_name }}"
+    id="{{ form.project.html_id }}"
+>
+    {% for value, label in form.project.field.choices %}
+    <option value="{{ value }}" {% if (form.project.value()|string) == (value|string) %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+</select>
+{% for error in form.project.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
+
+<label class="text-sm mb-1 mt-3 block" for="{{ form.notes.html_id }}">Notes</label>
+<textarea
+    class="border border-stone-300 rounded-md px-3 py-2 w-full min-h-[120px]"
+    name="{{ form.notes.html_name }}"
+    id="{{ form.notes.html_id }}"
+>{{ form.notes.value() or '' }}</textarea>
+{% for error in form.notes.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
+
+<div class="grid grid-cols-2 gap-3 mt-3">
+    <div>
+        <label class="text-sm mb-1 block" for="{{ form.due_date.html_id }}">Due date</label>
+        <input
+            class="border border-stone-300 rounded-md px-3 py-2 w-full"
+            type="date"
+            name="{{ form.due_date.html_name }}"
+            id="{{ form.due_date.html_id }}"
+            value="{{ form.due_date.value() or '' }}"
+        >
+        {% for error in form.due_date.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
+    </div>
+    <div>
+        <label class="text-sm mb-1 block" for="{{ form.priority.html_id }}">Priority</label>
+        <select
+            class="border border-stone-300 rounded-md px-3 py-2 w-full"
+            name="{{ form.priority.html_name }}"
+            id="{{ form.priority.html_id }}"
+        >
+            {% for value, label in form.priority.field.choices %}
+            <option value="{{ value }}" {% if form.priority.value() == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        {% for error in form.priority.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
+    </div>
+</div>
+
+<label class="flex items-center gap-2 mt-3 text-sm">
+    <input
+        type="checkbox"
+        name="{{ form.is_complete.html_name }}"
+        id="{{ form.is_complete.html_id }}"
+        {% if form.is_complete.value() %}checked{% endif %}
+    >
+    Complete
+</label>
+
+<label class="text-sm mb-1 mt-3 block" for="{{ form.tags.html_id }}">Tags</label>
+<select
+    class="border border-stone-300 rounded-md px-3 py-2 w-full h-32"
+    name="{{ form.tags.html_name }}"
+    id="{{ form.tags.html_id }}"
+    multiple
+>
+    {# value() returns ints (unbound) or strings (bound) — coerce both sides to string #}
+    {% set selected_ids = (form.tags.value() or []) | map('string') | list %}
+    {% for value, label in form.tags.field.choices %}
+    <option value="{{ value }}" {% if (value|string) in selected_ids %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+</select>
+{% for error in form.tags.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}

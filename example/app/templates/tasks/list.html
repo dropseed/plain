@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks{% endblock %}
+
+{% block content %}
+<div class="p-8 max-w-3xl mx-auto">
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold">Tasks</h1>
+        <div class="flex gap-2">
+            <a
+                href="{{ url('tasks:seed') }}"
+                class="bg-stone-200 text-stone-800 text-sm font-medium py-2 px-3 rounded"
+            >Seed projects + tags</a>
+            <a
+                href="{{ url('tasks:create') }}"
+                class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            >New task</a>
+        </div>
+    </div>
+
+    <p class="text-sm text-stone-600 mb-4">
+        ModelForm with FK (project), M2M (tags), choice (priority), date (due_date),
+        boolean (is_complete), and a cross-field <code class="font-mono">clean()</code>.
+    </p>
+
+    {% if tasks %}
+    <ul class="divide-y divide-stone-200 border border-stone-200 rounded bg-white">
+        {% for task in tasks %}
+        <li class="p-4 hover:bg-stone-50">
+            <a href="{{ url('tasks:detail', id=task.id) }}" class="block">
+                <div class="flex items-baseline justify-between">
+                    <div class="font-medium {% if task.is_complete %}line-through text-stone-400{% endif %}">{{ task.title }}</div>
+                    <div class="text-xs text-stone-500">
+                        {{ task.priority }}{% if task.due_date %} · due {{ task.due_date }}{% endif %}
+                    </div>
+                </div>
+                <div class="text-xs text-stone-500 mt-1">
+                    {% if task.project %}{{ task.project.name }}{% else %}(no project){% endif %}
+                    {% for tag in task.tags.query %} · #{{ tag.name }}{% endfor %}
+                </div>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-stone-500">No tasks yet — start with <a class="underline" href="{{ url('tasks:seed') }}">seeding</a>, then create one.</p>
+    {% endif %}
+</div>
+{% endblock %}
