@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.141.1](https://github.com/dropseed/plain/releases/plain@0.141.1) (2026-05-08)
+
+### What's changed
+
+- **Annotation-only custom settings now work.** Declaring `APP_FOO: str` (no value) in `app/settings.py` previously dropped the setting on the floor — `dir()` doesn't include unassigned names, so `PLAIN_APP_FOO` env vars were ignored and `settings.APP_FOO` raised `AttributeError`. They now register as required settings, with `from __future__ import annotations` string annotations resolved via `typing.get_type_hints()` so env parsing receives `int` and not `'int'`. ([71535d6a30](https://github.com/dropseed/plain/commit/71535d6a30))
+
+### Upgrade instructions
+
+- No changes required. If you were working around this by assigning a sentinel default, you can drop it.
+
 ## [0.141.0](https://github.com/dropseed/plain/releases/plain@0.141.0) (2026-05-07)
 
 ### What's changed
