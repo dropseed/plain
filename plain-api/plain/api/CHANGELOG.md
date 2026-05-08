@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.33.1](https://github.com/dropseed/plain/releases/plain-api@0.33.1) (2026-05-08)
+
+### What's changed
+
+- Suppress `ty unresolved-import` warnings on the optional `openapi-spec-validator` and `referencing` imports inside `validate_openapi_schema`. They're guarded by an import-time `try/except`, but ty doesn't see the install-extras gate. ([7d831926bb](https://github.com/dropseed/plain/commit/7d831926bb))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.33.0](https://github.com/dropseed/plain/releases/plain-api@0.33.0) (2026-05-07)
 
 ### What's changed
