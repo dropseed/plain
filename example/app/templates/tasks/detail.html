@@ -1,69 +1,52 @@
 {% extends "base.html" %}
+{% from "_macros.html" import back_link, field_errors %}
 
 {% block title %}{{ task.title }}{% endblock %}
 
 {% block content %}
-<div class="p-8 max-w-2xl mx-auto">
-    <div class="mb-4">
-        <a href="{{ url('tasks:list') }}" class="text-sm text-blue-500 hover:underline">
-            ← Back to tasks
-        </a>
-    </div>
+<div class="max-w-2xl mx-auto px-5 py-12">
+    {{ back_link(url('tasks:list'), "Back to tasks") }}
 
     {% htmxfragment "title" %}
-    <div class="mb-2">
-        <form
-            hx-post
-            plain-hx-action="rename"
-            class="flex items-center gap-2"
-        >
+    <div>
+        <form hx-post plain-hx-action="rename" class="flex items-center gap-2">
             <input
-                class="text-2xl font-bold flex-1 bg-transparent border border-transparent hover:border-stone-300 focus:border-stone-300 rounded px-2 py-1 outline-none"
+                aria-label="Task title"
+                class="flex-1 page-h1 bg-transparent border border-transparent hover:border-outline focus:border-ink focus:ring-[3px] focus:ring-ink/15 rounded px-2 py-1 outline-none"
                 type="text"
                 name="{{ title_form.title.html_name }}"
                 id="{{ title_form.title.html_id }}"
                 value="{{ title_form.title.value() or task.title }}"
             >
-            <button
-                type="submit"
-                class="text-xs bg-stone-900 text-white px-2 py-1 rounded hover:bg-stone-700"
-            >Rename</button>
+            <button type="submit" class="btn-primary">Rename</button>
         </form>
-        {% for error in title_form.title.errors %}
-        <div class="text-red-500 text-sm mt-1">{{ error }}</div>
-        {% endfor %}
+        {{ field_errors(title_form.title) }}
     </div>
     {% endhtmxfragment %}
 
-    <div class="text-sm text-stone-500 mb-4">
+    <div class="mt-3 text-[12px] text-muted">
         {{ task.priority }}
-        {% if task.due_date %} · due {{ task.due_date }}{% endif %}
-        {% if task.is_complete %} · <span class="text-green-700">complete</span>{% endif %}
+        {% if task.due_date %} · due <span class="font-mono">{{ task.due_date }}</span>{% endif %}
         {% if task.project %} · {{ task.project.name }}{% endif %}
+        {% if task.is_complete %} · <span class="text-success">complete</span>{% endif %}
     </div>
 
     {% if task.notes %}
-    <div class="prose whitespace-pre-wrap mb-6">{{ task.notes }}</div>
+    <div class="mt-6 text-sm text-body whitespace-pre-wrap leading-relaxed">{{ task.notes }}</div>
     {% endif %}
 
     {% set tags = task.tags.query | list %}
     {% if tags %}
-    <div class="flex flex-wrap gap-2 mb-6">
+    <div class="mt-6 flex flex-wrap gap-2">
         {% for tag in tags %}
-        <span class="text-xs bg-stone-100 text-stone-700 px-2 py-0.5 rounded">#{{ tag.name }}</span>
+        <span class="text-[12px] text-muted bg-warm-tint border border-outline px-2 py-0.5 rounded-sm">#{{ tag.name }}</span>
         {% endfor %}
     </div>
     {% endif %}
 
-    <div class="flex gap-2">
-        <a
-            href="{{ url('tasks:update', id=task.id) }}"
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-        >Edit</a>
-        <a
-            href="{{ url('tasks:delete', id=task.id) }}"
-            class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-        >Delete</a>
+    <div class="mt-8 flex gap-2">
+        <a href="{{ url('tasks:update', id=task.id) }}" class="btn-primary">Edit</a>
+        <a href="{{ url('tasks:delete', id=task.id) }}" class="btn-secondary">Delete</a>
     </div>
 </div>
 {% endblock %}

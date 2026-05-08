@@ -1,195 +1,112 @@
 {% extends "base.html" %}
 
-{% block title %}plain — example app{% endblock %}
+{% block title %}Plain — example app{% endblock %}
+
+{% macro row(href, path, description, badge_class=None, badge_text=None) %}
+<a href="{{ href }}" class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-warm-tint transition-colors no-underline">
+    <div class="font-mono text-sm text-ink">{{ path }}</div>
+    <div class="text-sm text-body">{{ description|safe }}</div>
+    <div class="flex items-center gap-3">
+        {% if badge_text %}<span class="{{ badge_class }}">{{ badge_text }}</span>{% endif %}
+        <span class="row-arrow">→</span>
+    </div>
+</a>
+{% endmacro %}
 
 {% block content %}
-<div class="min-h-screen bg-stone-50 text-stone-800 font-sans tracking-tight">
-    <div class="h-8 flex items-center justify-center text-xs font-medium bg-amber-200/60 text-stone-700">
-        you are exploring the plain example app — every url below is wired up and live
-    </div>
-
-    {% if request.query_params.get('queued') %}
-    <div class="h-8 flex items-center justify-center text-xs font-medium bg-emerald-200/60 text-emerald-900">
-        queued <span class="font-mono ml-1">{{ request.query_params['queued'] }}</span> — watch <span class="font-mono ml-1">plain dev logs</span> or check
-        <a href="/admin/" class="ml-1 underline decoration-emerald-600/40 underline-offset-2 hover:text-emerald-950">/admin/</a>
-    </div>
-    {% endif %}
-
-    <header class="h-12 flex items-end bg-stone-50/95 border-b border-stone-200/60">
-        <div class="flex items-center w-full max-w-6xl mx-auto px-5 pb-2">
-            <a href="/" class="text-sm font-medium tracking-tight text-stone-900 no-underline">
-                plain <span class="text-stone-400 font-normal">· example</span>
+<div class="min-h-screen">
+    <header class="border-b border-outline">
+        <div class="flex items-center w-full max-w-6xl mx-auto px-5 h-12">
+            <a href="/" class="font-display font-medium text-[13px] tracking-tight text-ink no-underline">
+                Plain<span class="text-accent">·</span>example
             </a>
-            <div class="ml-auto flex items-center gap-2 text-xs text-stone-500">
+            <div class="ml-auto flex items-center gap-2 text-xs text-muted">
                 <span class="font-mono">localhost</span>
-                <span class="text-stone-300">·</span>
+                <span class="text-outline">·</span>
                 <span>dev</span>
             </div>
         </div>
     </header>
 
-    <div class="max-w-6xl mx-auto px-5 pt-12 pb-6">
-        <h1 class="font-medium text-3xl sm:text-4xl leading-tight tracking-tight text-stone-900 max-w-3xl">
-            a small tour of the example app.
+    <div class="max-w-6xl mx-auto px-5 pt-12 pb-2">
+        <a href="https://plainframework.com/" class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent-deep no-underline hover:underline underline-offset-4">
+            Plain framework — read the docs <span aria-hidden="true">→</span>
+        </a>
+        <h1 class="font-display font-bold text-[48px] leading-[1.05] tracking-[-0.025em] text-ink mt-3 max-w-3xl">
+            A small tour of the example app.
         </h1>
-        <p class="mt-2 text-sm lg:text-base text-stone-500 max-w-xl">
-            follow any route to see the piece of plain it exercises — pages, streaming, admin, tooling.
+        <p class="mt-3 text-base text-muted max-w-xl">
+            Follow any route to see the piece of Plain it exercises — pages, streaming, admin, tooling.
         </p>
     </div>
 
-    <section class="max-w-6xl mx-auto px-5 pt-8">
-        <h2 class="font-medium text-lg tracking-tight text-stone-900 mb-1">pages</h2>
-        <p class="text-sm text-stone-500 mb-4">
-            the hand-written views in <span class="font-mono text-stone-600">app/urls.py</span>.
+    {% if request.query_params.get('queued') %}
+    <div class="max-w-6xl mx-auto px-5 pt-6">
+        <div class="rounded border border-success/30 bg-success/8 px-3.5 py-3 text-sm text-ink">
+            Queued <span class="font-mono text-success">{{ request.query_params['queued'] }}</span> — watch
+            <span class="font-mono">plain dev logs</span> or check
+            <a href="/admin/" class="body-link font-semibold">/admin/</a>.
+        </div>
+    </div>
+    {% endif %}
+
+    <section class="max-w-6xl mx-auto px-5 pt-10">
+        <h2 class="page-h2">Pages</h2>
+        <p class="mt-1 text-sm text-muted">
+            Hand-written views in <span class="font-mono text-body">app/urls.py</span>.
         </p>
-        <div class="border border-stone-200 rounded-lg bg-white overflow-hidden divide-y divide-stone-100">
-            <a class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-stone-50 transition-colors" href="/">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600">this index — the page you're on.</div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center text-[10.5px] font-medium font-mono px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">get</span>
-                    <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
-                </div>
-            </a>
-            <a class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-stone-50 transition-colors" href="/notes/">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>notes<span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600">a tiny crud app — create, edit, pin, delete.</div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">auth</span>
-                    <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
-                </div>
-            </a>
-            <a class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-stone-50 transition-colors" href="/contacts/">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>contacts<span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600">plain <span class="font-mono">forms.Form</span> — text/email/choice/bool, dynamic fields, prefix.</div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">forms</span>
-                    <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
-                </div>
-            </a>
-            <a class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-stone-50 transition-colors" href="/tasks/">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>tasks<span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600"><span class="font-mono">ModelForm</span> — fk, m2m, date, choice, file. htmx inline rename. json api.</div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">forms</span>
-                    <span class="inline-flex items-center text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">auth</span>
-                    <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
-                </div>
-            </a>
-            <a class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-stone-50 transition-colors" href="/sse/">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>sse<span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600">server-sent events streaming in real time.</div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">live</span>
-                    <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
-                </div>
-            </a>
+        <div class="list-card mt-4">
+            {{ row("/", "/", "This index — the page you're on.") }}
+            {{ row("/notes/", "/notes/", "A tiny CRUD app — create, edit, pin, delete.", "badge-info", "Auth") }}
+            {{ row("/contacts/", "/contacts/", "Plain <span class='font-mono'>forms.Form</span> — text, email, choice, bool, dynamic fields, prefix.") }}
+            {{ row("/tasks/", "/tasks/", "<span class='font-mono'>ModelForm</span> — FK, M2M, date, choice, file. HTMX inline rename. JSON API.", "badge-info", "Auth") }}
+            {{ row("/sse/", "/sse/", "Server-sent events streaming in real time.", "badge-success", "Live") }}
         </div>
     </section>
 
-    <section class="max-w-6xl mx-auto px-5 pt-8">
-        <h2 class="font-medium text-lg tracking-tight text-stone-900 mb-1">dev tools</h2>
-        <p class="text-sm text-stone-500 mb-4">packages that ship with plain, mounted locally.</p>
-        <div class="border border-stone-200 rounded-lg bg-white overflow-hidden divide-y divide-stone-100">
-            <a class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-stone-50 transition-colors" href="/admin/">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>admin<span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600">browse models, run admin actions.</div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">auth</span>
-                    <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
-                </div>
-            </a>
-            <a class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-stone-50 transition-colors" href="/observer/">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>observer<span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600">traces, spans, and slow-query hunting.</div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">dev</span>
-                    <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
-                </div>
-            </a>
-            <a class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-stone-50 transition-colors" href="/error/">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>error<span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600">raises on purpose — see the toolbar catch it.</div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">500</span>
-                    <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
-                </div>
-            </a>
+    <section class="max-w-6xl mx-auto px-5 pt-10">
+        <h2 class="page-h2">Dev tools</h2>
+        <p class="mt-1 text-sm text-muted">Packages that ship with Plain, mounted locally.</p>
+        <div class="list-card mt-4">
+            {{ row("/admin/", "/admin/", "Browse models, run admin actions.", "badge-info", "Auth") }}
+            {{ row("/observer/", "/observer/", "Traces, spans, and slow-query hunting.") }}
+            {{ row("/error/", "/error/", "Raises on purpose — see the toolbar catch it.", "badge-danger", "500") }}
         </div>
     </section>
 
-    <section class="max-w-6xl mx-auto px-5 pt-8">
-        <h2 class="font-medium text-lg tracking-tight text-stone-900 mb-1">background jobs</h2>
-        <p class="text-sm text-stone-500 mb-4">
-            <span class="font-mono text-stone-600">plain dev</span> runs a worker — enqueue an
-            <span class="font-mono text-stone-600">ExampleJob</span> from <span class="font-mono text-stone-600">app/jobs.py</span>.
+    <section class="max-w-6xl mx-auto px-5 pt-10">
+        <h2 class="page-h2">Background jobs</h2>
+        <p class="mt-1 text-sm text-muted">
+            <span class="font-mono text-body">plain dev</span> runs a worker — enqueue an
+            <span class="font-mono text-body">ExampleJob</span> from <span class="font-mono text-body">app/jobs.py</span>.
         </p>
-        <div class="border border-stone-200 rounded-lg bg-white overflow-hidden">
+        <div class="border border-outline rounded bg-white overflow-hidden mt-4">
             <form method="post" action="{{ url('run_example_job') }}" class="grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>jobs<span class="text-stone-400 font-normal">/</span>run<span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600">enqueue an <span class="font-mono text-stone-700">ExampleJob</span> — the worker logs its progress.</div>
-                <div class="flex items-center gap-3">
-                    <button
-                        type="submit"
-                        class="inline-flex items-center text-xs font-medium px-3 py-1 rounded-full bg-stone-900 text-white hover:bg-stone-700 transition-colors cursor-pointer"
-                    >
-                        queue job →
-                    </button>
-                </div>
+                <div class="font-mono text-sm text-ink">/jobs/run/</div>
+                <div class="text-sm text-body">Enqueue an <span class="font-mono">ExampleJob</span> — the worker logs its progress.</div>
+                <button type="submit" class="btn-primary">
+                    Queue job <span class="ml-1.5" aria-hidden="true">→</span>
+                </button>
             </form>
         </div>
     </section>
 
-    <section class="max-w-6xl mx-auto px-5 pt-8">
-        <h2 class="font-medium text-lg tracking-tight text-stone-900 mb-1">auth</h2>
-        <p class="text-sm text-stone-500 mb-4">
-            sessions + password login, per <span class="font-mono text-stone-600">plain.passwords</span>.
+    <section class="max-w-6xl mx-auto px-5 pt-10">
+        <h2 class="page-h2">Auth</h2>
+        <p class="mt-1 text-sm text-muted">
+            Sessions and password login, per <span class="font-mono text-body">plain.passwords</span>.
         </p>
-        <div class="border border-stone-200 rounded-lg bg-white overflow-hidden divide-y divide-stone-100">
-            <a class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-stone-50 transition-colors" href="/login/">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>login<span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600">password login form.</div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center text-[10.5px] font-medium font-mono px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">get</span>
-                    <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
-                </div>
-            </a>
-            <a class="group grid grid-cols-[180px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-stone-50 transition-colors" href="/logout/">
-                <div class="font-mono text-sm font-medium text-stone-900 tracking-tight">
-                    <span class="text-stone-400 font-normal">/</span>logout<span class="text-stone-400 font-normal">/</span>
-                </div>
-                <div class="text-sm text-stone-600">sign out and clear the session.</div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center text-[10.5px] font-medium font-mono px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">post</span>
-                    <span class="font-mono text-stone-300 group-hover:translate-x-1 group-hover:text-stone-700 transition-all">→</span>
-                </div>
-            </a>
+        <div class="list-card mt-4">
+            {{ row("/login/", "/login/", "Password login form.") }}
+            {{ row("/logout/", "/logout/", "Sign out and clear the session.") }}
         </div>
     </section>
 
-    <footer class="max-w-6xl mx-auto px-5 pt-6 pb-10 mt-12 border-t border-stone-200/60 flex flex-wrap justify-between gap-2 text-xs text-stone-400">
-        <div>urls sourced from <span class="font-mono text-stone-600">app/urls.py</span>.</div>
-        <div><a href="https://plainframework.com/" class="text-stone-600 underline decoration-stone-300 underline-offset-2 hover:text-stone-900">plainframework.com</a></div>
+    <footer class="max-w-6xl mx-auto px-5 pt-10 pb-12 mt-12 border-t border-outline flex flex-wrap justify-between gap-2 text-xs text-muted">
+        <div>URLs sourced from <span class="font-mono text-body">app/urls.py</span>.</div>
+        <div>
+            <a href="https://plainframework.com/" class="text-ink font-semibold no-underline hover:underline underline-offset-4">plainframework.com</a>
+        </div>
     </footer>
 </div>
 {% endblock %}

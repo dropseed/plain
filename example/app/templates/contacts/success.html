@@ -3,11 +3,12 @@
 {% block title %}Thanks{% endblock %}
 
 {% block content %}
-<div class="p-8 max-w-2xl mx-auto">
-    <h1 class="text-2xl font-bold mb-2">Thanks — message received.</h1>
-    <p class="text-sm text-stone-600">
-        <a class="underline" href="{{ url('contacts:form') }}">Send another</a>
-        · <a class="underline" href="{{ url('contacts:archive') }}">View archive</a>
+<div class="max-w-2xl mx-auto px-5 py-16">
+    <h1 class="page-h1">Thanks — message received.</h1>
+    <p class="mt-4 text-sm text-muted">
+        <a class="body-link" href="{{ url('contacts:form') }}">Send another</a>
+        ·
+        <a class="body-link" href="{{ url('contacts:archive') }}">View archive</a>
     </p>
 </div>
 {% endblock %}

@@ -1,41 +1,17 @@
 {% extends "base.html" %}
+{% from "_macros.html" import field, nonfield_errors %}
 
-{% block title %}Login{% endblock %}
+{% block title %}Log in{% endblock %}
 
 {% block content %}
-<div class="p-8">
-    <div class="max-w-md mx-auto">
-        <h1 class="text-2xl font-bold mb-4">Login</h1>
+<div class="max-w-md mx-auto px-5 py-16">
+    <h1 class="page-h1">Log in</h1>
 
-        <form method="post" class="flex flex-col">
-            {% for error in form.non_field_errors %}
-            <div class="text-red-500 border-red-500 border rounded-md p-2 mb-4">{{ error }}</div>
-            {% endfor %}
-
-            <label class="text-sm mb-1" for="{{ form.email.html_id }}">Email</label>
-            <input
-                class="border border-gray-300 rounded-md px-3 py-2 mb-4"
-                type="email"
-                name="{{ form.email.html_name }}"
-                id="{{ form.email.html_id }}"
-                value="{{ form.email.value() or '' }}"
-                autocomplete="email"
-                autofocus
-                required>
-
-            <label class="text-sm mb-1" for="{{ form.password.html_id }}">Password</label>
-            <input
-                class="border border-gray-300 rounded-md px-3 py-2 mb-4"
-                type="password"
-                name="{{ form.password.html_name }}"
-                id="{{ form.password.html_id }}"
-                autocomplete="current-password"
-                required>
-
-            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                Login
-            </button>
-        </form>
-    </div>
+    <form method="post" class="mt-6 flex flex-col gap-5">
+        {{ nonfield_errors(form) }}
+        {{ field(form.email, "Email", type="email", autocomplete="email", autofocus=True, required=True) }}
+        {{ field(form.password, "Password", type="password", autocomplete="current-password", required=True) }}
+        <button type="submit" class="btn-primary self-start">Log in</button>
+    </form>
 </div>
 {% endblock %}

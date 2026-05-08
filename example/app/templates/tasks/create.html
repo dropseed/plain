@@ -1,24 +1,17 @@
 {% extends "base.html" %}
+{% from "_macros.html" import back_link %}
 
 {% block title %}New task{% endblock %}
 
 {% block content %}
-<div class="p-8 max-w-2xl mx-auto">
-    <div class="mb-4">
-        <a href="{{ url('tasks:list') }}" class="text-sm text-blue-500 hover:underline">
-            ← Back to tasks
-        </a>
-    </div>
+<div class="max-w-2xl mx-auto px-5 py-12">
+    {{ back_link(url('tasks:list'), "Back to tasks") }}
 
-    <h1 class="text-2xl font-bold mb-4">New task</h1>
+    <h1 class="page-h1">New task</h1>
 
-    <form method="post" class="flex flex-col">
+    <form method="post" class="mt-6 flex flex-col gap-5">
         {% include "tasks/_form_partial.html" %}
-
-        <button
-            type="submit"
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4 self-start"
-        >Create</button>
+        <button type="submit" class="btn-primary self-start">Create</button>
     </form>
 </div>
 {% endblock %}

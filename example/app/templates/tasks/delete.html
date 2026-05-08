@@ -1,23 +1,19 @@
 {% extends "base.html" %}
+{% from "_macros.html" import back_link %}
 
 {% block title %}Delete {{ task.title }}{% endblock %}
 
 {% block content %}
-<div class="p-8 max-w-2xl mx-auto">
-    <div class="mb-4">
-        <a href="{{ url('tasks:detail', id=task.id) }}" class="text-sm text-blue-500 hover:underline">
-            ← Cancel
-        </a>
-    </div>
+<div class="max-w-2xl mx-auto px-5 py-12">
+    {{ back_link(url('tasks:detail', id=task.id), "Cancel") }}
 
-    <h1 class="text-2xl font-bold mb-2">Delete this task?</h1>
-    <p class="text-stone-700 mb-6">{{ task.title }}</p>
+    <h1 class="page-h1">Delete this task?</h1>
+    <p class="mt-3 text-sm text-body">
+        <span class="font-semibold text-ink">{{ task.title }}</span>
+    </p>
 
-    <form method="post">
-        <button
-            type="submit"
-            class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-        >Yes, delete</button>
+    <form method="post" class="mt-6">
+        <button type="submit" class="btn-danger">Yes, delete</button>
     </form>
 </div>
 {% endblock %}

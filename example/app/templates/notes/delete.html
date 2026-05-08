@@ -1,38 +1,22 @@
 {% extends "base.html" %}
+{% from "_macros.html" import back_link %}
 
 {% block title %}Delete {{ note.title }}{% endblock %}
 
 {% block content %}
-<div class="p-8 max-w-2xl mx-auto">
-    <div class="mb-4">
-        <a
-            href="{{ url('notes:detail', id=note.id) }}"
-            class="text-sm text-blue-500 hover:underline"
-        >
-            ← Back to note
-        </a>
-    </div>
+<div class="max-w-2xl mx-auto px-5 py-12">
+    {{ back_link(url('notes:detail', id=note.id), "Back to note") }}
 
-    <h1 class="text-2xl font-bold mb-4">Delete note</h1>
-    <p class="mb-4">
+    <h1 class="page-h1">Delete note</h1>
+    <p class="mt-3 text-sm text-body">
         Are you sure you want to delete
-        <span class="font-semibold">{{ note.title }}</span>?
+        <span class="font-semibold text-ink">{{ note.title }}</span>?
         This can't be undone.
     </p>
 
-    <form method="post" class="flex gap-2">
-        <button
-            type="submit"
-            class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-        >
-            Delete
-        </button>
-        <a
-            href="{{ url('notes:detail', id=note.id) }}"
-            class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded"
-        >
-            Cancel
-        </a>
+    <form method="post" class="mt-6 flex gap-2">
+        <button type="submit" class="btn-danger">Delete</button>
+        <a href="{{ url('notes:detail', id=note.id) }}" class="btn-secondary">Cancel</a>
     </form>
 </div>
 {% endblock %}

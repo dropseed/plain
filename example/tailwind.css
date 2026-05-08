@@ -1,2 +1,84 @@
 @import "tailwindcss";
 @import "./.plain/tailwind.css";
+
+@theme {
+  /* Plain brand colors — see ../plain-public/DESIGN.md */
+  --color-ink: #14171a;
+  --color-body: #2a2e2c;
+  --color-muted: #5d6660;
+  --color-outline: #ebe8e7;
+  --color-warm-tint: #f4f1ec;
+
+  --color-accent: #f59e0b;
+  --color-accent-deep: #d97706;
+
+  --color-success: #4d8856;
+  --color-warning: #ad7320;
+  --color-danger: #963b2f;
+  --color-info: #356d83;
+
+  --font-sans:
+    "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --font-display:
+    "Lexend", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
+@layer components {
+  .page-h1 {
+    @apply font-display font-bold text-[30px] leading-[1.1] tracking-tight text-ink;
+  }
+  .page-h2 {
+    @apply font-display font-semibold text-[22px] tracking-[-0.015em] text-ink;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center text-[13px] font-semibold px-3.5 py-2 rounded bg-ink text-white no-underline hover:brightness-110 transition cursor-pointer;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center text-[13px] font-semibold px-3.5 py-2 rounded border border-outline text-ink no-underline hover:border-muted hover:bg-warm-tint transition cursor-pointer;
+  }
+  .btn-danger {
+    @apply inline-flex items-center text-[13px] font-semibold px-3.5 py-2 rounded bg-danger text-white no-underline hover:brightness-110 transition cursor-pointer;
+  }
+
+  .back-link {
+    @apply text-[13px] text-muted no-underline hover:text-ink;
+  }
+  .body-link {
+    @apply text-ink underline decoration-muted underline-offset-4 hover:decoration-ink;
+  }
+
+  .field-label {
+    @apply block text-[13px] font-semibold text-muted mb-1.5;
+  }
+  .field-input {
+    @apply w-full px-3 py-2.5 text-sm border border-outline rounded bg-white focus:outline-none focus:border-ink focus:ring-[3px] focus:ring-ink/15;
+  }
+  .field-error {
+    @apply text-[13px] text-danger mt-1.5;
+  }
+  .nonfield-error {
+    @apply rounded border border-danger/30 bg-danger/8 px-3.5 py-3 text-sm text-ink;
+  }
+
+  .list-card {
+    @apply border border-outline rounded bg-white overflow-hidden divide-y divide-outline;
+  }
+  .row-arrow {
+    @apply font-mono text-outline group-hover:translate-x-1 group-hover:text-ink transition-all;
+  }
+  .badge-info {
+    @apply rounded-sm bg-info/10 text-info text-[11px] font-semibold px-2 py-0.5;
+  }
+  .badge-success {
+    @apply rounded-sm bg-success/10 text-success text-[11px] font-semibold px-2 py-0.5;
+  }
+  .badge-danger {
+    @apply rounded-sm bg-danger/10 text-danger text-[11px] font-semibold px-2 py-0.5;
+  }
+}
