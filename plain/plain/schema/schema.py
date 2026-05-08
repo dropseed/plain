@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar, Self, cast
 
 from plain.exceptions import ValidationError
 from plain.forms.fields import Field
@@ -19,7 +19,7 @@ class SchemaMeta(type):
     """
 
     def __new__(
-        mcs,
+        mcs: type[SchemaMeta],
         name: str,
         bases: tuple[type, ...],
         namespace: dict[str, Any],
@@ -41,7 +41,7 @@ class SchemaMeta(type):
                 del namespace[key]
 
         new_cls = super().__new__(mcs, name, bases, namespace)
-        new_cls._schema_fields = fields
+        setattr(new_cls, "_schema_fields", fields)  # noqa: B010
         return new_cls
 
 
@@ -128,4 +128,4 @@ def make_schema(name: str = "InlineSchema", /, **fields: Field) -> type[Schema]:
     real subclass.
     """
     namespace: dict[str, Any] = {"__annotations__": {}, **fields}
-    return SchemaMeta(name, (Schema,), namespace)
+    return cast(type[Schema], SchemaMeta(name, (Schema,), namespace))

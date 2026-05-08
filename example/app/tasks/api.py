@@ -101,14 +101,15 @@ class TaskQuickAddAPIView(APIView):
     """Schema-based parallel to TaskListAPIView.post.
 
     Same job (create a task from JSON), but uses plain.schema.Schema instead
-    of plain.forms.ModelForm. Validation is a pure function call — no
-    request kwarg, no .is_valid() / .cleaned_data dance — and the result
-    is type-narrowed so result.data attributes are statically typed.
+    of plain.forms.ModelForm. The same TaskQuickAddSchema class drives
+    runtime validation AND the OpenAPI requestBody documentation — one
+    declaration, two outputs.
     """
 
     @openapi.schema(
         {
             "summary": "Quick-add a task from a JSON body using a Schema.",
+            "requestBody": openapi.schema_body(TaskQuickAddSchema),
             "responses": {
                 "201": {
                     "description": "The created task.",

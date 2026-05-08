@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from app.notes.models import Note
 from plain.api import openapi
 from plain.api.views import APIView
 from plain.http import NotFoundError404
 from plain.urls import Router, path
+
+from app.notes.models import Note
 
 NOTE_SCHEMA = {
     "type": "object",
@@ -53,7 +54,7 @@ def _serialize(note: Note) -> dict:
     }
 )
 class NoteListAPIView(APIView):
-    def get(self):
+    def get(self) -> dict:
         return {"results": [_serialize(n) for n in Note.query.all()[:25]]}
 
 
@@ -72,7 +73,7 @@ class NoteListAPIView(APIView):
     }
 )
 class NoteDetailAPIView(APIView):
-    def get(self):
+    def get(self) -> dict:
         note = Note.query.filter(id=self.url_kwargs["id"]).first()
         if note is None:
             raise NotFoundError404

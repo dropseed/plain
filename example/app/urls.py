@@ -2,14 +2,6 @@ from __future__ import annotations
 
 from typing import NoReturn
 
-from app.contacts.urls import ContactsRouter
-from app.mcp import NotesMCP
-from app.notes.urls import NotesRouter
-from app.tasks.api import TasksAPIRouter
-from app.tasks.urls import TasksRouter
-from app.views.api import APIRouter
-from app.views.jobs import RunExampleJobView
-from app.views.sse import ClockView, StockTickerView
 from plain.admin.urls import AdminRouter
 from plain.assets.urls import AssetsRouter
 from plain.auth.views import LogoutView
@@ -18,6 +10,15 @@ from plain.pageviews.urls import PageviewsRouter
 from plain.passwords.views import PasswordLoginView
 from plain.urls import Router, include, path
 from plain.views import TemplateView
+
+from app.contacts.urls import ContactsRouter
+from app.mcp import NotesMCP
+from app.notes.urls import NotesRouter
+from app.tasks.api import TasksAPIRouter
+from app.tasks.urls import TasksRouter
+from app.views.api import APIRouter
+from app.views.jobs import RunExampleJobView
+from app.views.sse import ClockView, StockTickerView
 
 
 class LoginView(PasswordLoginView):

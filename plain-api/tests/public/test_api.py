@@ -5,6 +5,7 @@ from plain.api.openapi.generator import OpenAPISchemaGenerator
 from plain.api.openapi.utils import schema_from_type
 from plain.api.openapi.validation import validate_openapi_schema
 from plain.api.views import APIKeyView, APIView
+from plain.schema import Schema, types
 from plain.test import Client
 from plain.urls import Router, path
 
@@ -918,4 +919,100 @@ def test_return_annotation_fills_in_200_when_schema_decorator_only_sets_summary(
     assert op["summary"] == "List items"
     assert op["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/Item"
+    }
+
+
+# ---------------------------------------------------------------------------
+# plain.schema.Schema integration
+# ---------------------------------------------------------------------------
+
+
+def test_schema_from_type_emits_object_with_properties_and_required():
+    class S(Schema):
+        title: str = types.TextField(max_length=200, min_length=1)
+        notes: str | None = types.TextField(required=False, max_length=2000)
+        count: int = types.IntegerField(min_value=0, max_value=100)
+
+    assert schema_from_type(S) == {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string", "maxLength": 200, "minLength": 1},
+            "notes": {"type": "string", "maxLength": 2000},
+            "count": {"type": "integer", "minimum": 0, "maximum": 100},
+        },
+        "required": ["title", "count"],
+    }
+
+
+def test_schema_choice_field_emits_enum():
+    class S(Schema):
+        priority: str = types.ChoiceField(choices=[("low", "Low"), ("high", "High")])
+
+    assert schema_from_type(S)["properties"]["priority"] == {
+        "type": "string",
+        "enum": ["low", "high"],
+    }
+
+
+def test_schema_email_url_uuid_get_format_hints():
+    class S(Schema):
+        email: str = types.EmailField()
+        site: str = types.URLField()
+
+    props = schema_from_type(S)["properties"]
+    assert props["email"] == {"type": "string", "format": "email"}
+    assert props["site"] == {"type": "string", "format": "uri"}
+
+
+def test_schema_registers_as_component_when_components_passed():
+    class TaskInput(Schema):
+        title: str = types.TextField(max_length=100)
+
+    components: dict = {}
+    ref = schema_from_type(TaskInput, components=components)
+    assert ref == {"$ref": "#/components/schemas/TaskInput"}
+    assert components["schemas"]["TaskInput"] == {
+        "type": "object",
+        "properties": {"title": {"type": "string", "maxLength": 100}},
+        "required": ["title"],
+    }
+
+
+def test_schema_return_annotation_drives_200_response():
+    class TaskOut(Schema):
+        title: str = types.TextField()
+
+    class V(APIView):
+        def get(self) -> TaskOut:
+            return TaskOut(title="x")
+
+    class LocalRouter(Router):
+        namespace = ""
+        urls = [path("tasks/", V, name="tasks")]
+
+    schema = OpenAPISchemaGenerator(LocalRouter()).schema
+    assert schema["paths"]["/tasks/"]["get"]["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"] == {"$ref": "#/components/schemas/TaskOut"}
+    assert schema["components"]["schemas"]["TaskOut"]["properties"]["title"] == {
+        "type": "string"
+    }
+
+
+def test_schema_body_helper_builds_request_body():
+    class TaskInput(Schema):
+        title: str = types.TextField(max_length=200)
+
+    body = openapi.schema_body(TaskInput)
+    assert body == {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {"title": {"type": "string", "maxLength": 200}},
+                    "required": ["title"],
+                }
+            }
+        },
     }
