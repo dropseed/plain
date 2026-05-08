@@ -5,6 +5,7 @@ from typing import Any, TypeVar
 from plain.forms import fields
 from plain.forms.forms import BaseForm
 
+from .helpers import json_content
 from .utils import merge_data, schema_from_type
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -29,23 +30,13 @@ def response_typed_dict(
             "description": description or HTTPStatus(int(status_code)).phrase,
         }
 
-        # If we have a return_type, then make it a component and add it
-        # to the response and components
         if return_type:
-            return_component_name = return_type.__name__
-            response_schema["content"] = {
-                "application/json": {
-                    "schema": {"$ref": f"#/components/schemas/{return_component_name}"}
-                }
-            }
-            _component_schema = {
-                "schemas": {
-                    return_component_name: schema_from_type(return_type),
-                },
-            }
+            registry: dict[str, Any] = {}
+            top_ref = schema_from_type(return_type, components=registry)
+            response_schema["content"] = json_content(top_ref)
             func.openapi_components = merge_data(
                 getattr(func, "openapi_components", {}),
-                _component_schema,
+                registry,
             )
 
         if component_name:
@@ -142,11 +133,7 @@ def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
             "properties": {},
         }
         request_body: dict[str, Any] = {
-            "content": {
-                "application/json": {
-                    "schema": json_schema,
-                }
-            }
+            "content": json_content(json_schema),
             # could add application/x-www-form-urlencoded?
         }
         _schema: dict[str, Any] = {

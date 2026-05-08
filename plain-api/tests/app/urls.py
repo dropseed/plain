@@ -1,4 +1,5 @@
 import re
+from typing import TypedDict
 
 from plain.api.versioning import APIVersionChange, VersionedAPIView
 from plain.api.views import APIView, JsonNotFoundView
@@ -9,6 +10,20 @@ from plain.urls import Router, path
 class TestView(APIView):
     def get(self):
         return {"message": "Hello, world!"}
+
+
+class GreetingResponse(TypedDict):
+    message: str
+
+
+class TypedDictReturnView(APIView):
+    def get(self) -> GreetingResponse:
+        return GreetingResponse(message="Hello, typed!")
+
+
+class TupleStatusReturnView(APIView):
+    def post(self):
+        return 201, {"id": 42, "created": True}
 
 
 class JsonEchoView(APIView):
@@ -64,6 +79,8 @@ class AppRouter(Router):
     namespace = ""
     urls = [
         path("test", TestView, name="test"),
+        path("typed-dict-return", TypedDictReturnView, name="typed_dict_return"),
+        path("tuple-status-return", TupleStatusReturnView, name="tuple_status_return"),
         path("test-versioned", TestVersionedAPIView, name="test_versioned"),
         path("validation-error", ValidationErrorView, name="validation_error"),
         path("json-echo", JsonEchoView, name="json_echo"),

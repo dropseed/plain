@@ -1,6 +1,7 @@
+from collections.abc import Mapping
 from functools import cached_property
 from http.client import responses as http_status_phrases
-from typing import Any
+from typing import Any, cast
 
 from plain.exceptions import ValidationError
 from plain.forms.exceptions import FormFieldMissingError
@@ -31,10 +32,12 @@ __all__ = [
     "JsonNotFoundView",
 ]
 
+# `Mapping[str, Any]` (vs `dict[str, Any]`) lets `def get(self) -> MyTypedDict:`
+# satisfy Liskov against the base view — TypedDicts aren't `dict` per PEP 589.
 type APIResult = (
     Response
     | None
-    | dict[str, Any]
+    | Mapping[str, Any]
     | list[Any]
     | tuple[int, dict[str, Any] | list[Any]]
 )
@@ -190,7 +193,7 @@ class APIView(View[APIResult]):
                 raise ValueError(
                     "Tuple response must be of length 2 (status_code, data)"
                 )
-            status_code, result = result
+            status_code, result = cast(tuple[int, dict[str, Any] | list[Any]], result)
 
         if isinstance(result, dict):
             return JsonResponse(result, status_code=status_code)
