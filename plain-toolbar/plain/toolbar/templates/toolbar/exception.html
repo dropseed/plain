@@ -87,7 +87,9 @@
         const container = button.closest('[data-exception-container]');
         const exceptionText = container.querySelector('[data-exception-message]').textContent.trim();
         const traceback = container.querySelector('[data-exception-traceback] code').textContent;
-        const fullText = `Exception: ${exceptionText}\n\n${traceback}`;
+        // Match Python's stdlib traceback format. The first line must NOT look like `word:` —
+        // iOS data detectors will treat it as a URL scheme and percent-encode the pasteboard.
+        const fullText = `Traceback (most recent call last):\n${traceback}${exceptionText}\n`;
 
         navigator.clipboard.writeText(fullText).then(() => {
             // Change icon and text to indicate success
