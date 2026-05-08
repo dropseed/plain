@@ -1,5 +1,15 @@
 # plain-toolbar changelog
 
+## [0.12.6](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.6) (2026-05-08)
+
+### What's changed
+
+- **Copy traceback now formats output as a stdlib Python traceback** (`Traceback (most recent call last):\n...\n<ExceptionType>: <message>\n`) instead of `Exception: <message>\n\n<traceback>`. The previous shape opened with `Exception:` which iOS data detectors would treat as a URL scheme and percent-encode the pasteboard, mangling pastes into mobile chat/notes. ([20e87701a4](https://github.com/dropseed/plain/commit/20e87701a4))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.12.5](https://github.com/dropseed/plain/releases/plain-toolbar@0.12.5) (2026-05-05)
 
 ### What's changed
