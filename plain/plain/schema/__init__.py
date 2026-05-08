@@ -12,7 +12,15 @@ needs to become typed Python data.
 
 from __future__ import annotations
 
+from .bind import BoundField, BoundSchema
 from .result import Invalid, Valid
 from .schema import Schema, make_schema
 
-__all__ = ("Schema", "Valid", "Invalid", "make_schema")
+__all__ = (
+    "BoundField",
+    "BoundSchema",
+    "Invalid",
+    "Schema",
+    "Valid",
+    "make_schema",
+)

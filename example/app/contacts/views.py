@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain.http import Response
+from plain.http import RedirectResponse, Response
+from plain.schema import BoundSchema, Invalid
 from plain.urls import reverse_lazy
-from plain.views import FormView, TemplateView
+from plain.views import FormView, TemplateView, View
 
 from .forms import ArchiveFilterForm, ArchiveSearchForm, ContactForm
 from .models import ContactSubmission
+from .schemas import ContactSchema
 
 
 class ContactView(FormView):
@@ -22,9 +24,61 @@ class ContactView(FormView):
             kwargs["initial"] = {"name": name}
         return kwargs
 
+    def get_template_context(self) -> dict[str, Any]:
+        context = super().get_template_context()
+        context["ask_company"] = self.request.query_params.get("company") == "1"
+        return context
+
     def form_valid(self, form: ContactForm) -> Response:
         form.save()
         return super().form_valid(form)
+
+
+class ContactSchemaView(View):
+    """Parallel to ContactView using plain.schema.Schema + BoundSchema.
+
+    Same fields, same validation, same template — but Schema replaces the
+    Form class. The view does the GET/POST orchestration explicitly so
+    the data flow is visible top-to-bottom.
+    """
+
+    def get(self) -> Response:
+        initial: dict[str, Any] = {}
+        if name := self.request.query_params.get("name"):
+            initial["name"] = name
+        bound = BoundSchema(schema_class=ContactSchema, initial=initial)
+        return self.render_template_response(bound)
+
+    def post(self) -> Response:
+        result = ContactSchema.validate(self.request.form_data)
+        if isinstance(result, Invalid):
+            bound = BoundSchema.from_result(ContactSchema, result)
+            return self.render_template_response(bound)
+
+        # result.data is statically typed as ContactSchema here.
+        ContactSubmission.query.create(
+            name=result.data.name,
+            email=result.data.email,
+            subject=result.data.subject,
+            message=result.data.message,
+            company=result.data.company or "",
+            subscribe=result.data.subscribe,
+        )
+        return RedirectResponse(reverse_lazy("contacts:success"))
+
+    def render_template_response(self, form: BoundSchema) -> Response:
+        from plain.templates import Template
+
+        ask_company = self.request.query_params.get("company") == "1"
+        return Response(
+            Template("contacts/form.html").render(
+                {
+                    "form": form,
+                    "ask_company": ask_company,
+                    "request": self.request,
+                }
+            )
+        )
 
 
 class ContactSuccessView(TemplateView):

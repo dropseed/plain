@@ -1,0 +1,55 @@
+"""Schema-based parallel to contacts/forms.py — same behavior, no Form
+class. Demonstrates the Schema + BoundSchema rebuild against the existing
+contacts/form.html template (which is duck-typed against the Form
+interface).
+
+What's lost vs ContactForm:
+  - Per-instance dynamic field (ask_company) — replaced by always-declaring
+    the field with required=False and rendering conditionally in the view.
+  - .save() method on the form — moved to the view body.
+
+What's gained:
+  - validate() is a pure classmethod — works in jobs / scripts / tests
+    without a request fake.
+  - result.data.email is statically typed `str` after Invalid narrow.
+  - Cross-field check() and per-email validation via plain validators.
+"""
+
+from __future__ import annotations
+
+from typing import Self
+
+from plain.exceptions import ValidationError
+from plain.schema import Schema, types
+
+from .models import SUBJECT_BUG, SUBJECT_CHOICES
+
+BLOCKED_EMAIL_DOMAINS = {"blocked.test", "spam.example"}
+
+
+def _disallow_blocked_email(value: str) -> None:
+    domain = value.rsplit("@", 1)[-1].lower()
+    if domain in BLOCKED_EMAIL_DOMAINS:
+        raise ValidationError(f"Email domain '{domain}' is not allowed.")
+
+
+class ContactSchema(Schema):
+    """Parallel to ContactForm — same fields, same validation rules."""
+
+    name: str = types.TextField(max_length=100, min_length=2)
+    email: str = types.EmailField(validators=[_disallow_blocked_email])
+    subject: str = types.ChoiceField(choices=SUBJECT_CHOICES)
+    message: str = types.TextField(min_length=10)
+    subscribe: bool = types.BooleanField(required=False, initial=False)
+    # Always declared; ContactSchemaView only renders this field when
+    # ?company=1 is set (matching ContactForm.ask_company behavior).
+    company: str | None = types.TextField(max_length=200, required=False, initial="")
+
+    @classmethod
+    def check(  # ty: ignore[invalid-method-override]
+        cls, data: Self, *, context: dict | None = None
+    ) -> dict[str, list[str]] | None:
+        """Cross-field: bug reports need at least 30 characters of detail."""
+        if data.subject == SUBJECT_BUG and len(data.message) < 30:
+            return {"__all__": ["Bug reports need at least 30 characters of detail."]}
+        return None

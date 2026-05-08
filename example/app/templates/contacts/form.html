@@ -59,7 +59,7 @@
         </select>
         {% for error in form.subject.errors %}<div class="text-red-500 text-sm mb-2">{{ error }}</div>{% endfor %}
 
-        {% if 'company' in form.fields %}
+        {% if ask_company %}
         <label class="text-sm mb-1 mt-3" for="{{ form.company.html_id }}">Company (optional)</label>
         <input
             class="border border-stone-300 rounded-md px-3 py-2 mb-1"
