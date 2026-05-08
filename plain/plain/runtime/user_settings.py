@@ -87,9 +87,8 @@ class Settings:
 
     def _load_module_settings(self, module: types.ModuleType) -> None:
         annotations = getattr(module, "__annotations__", {})
-        settings = dir(module)
 
-        for setting in settings:
+        for setting in dir(module):
             if setting.isupper() and setting not in self._IGNORED_NAMES:
                 if setting in self._settings:
                     self._errors.append(f"Duplicate setting '{setting}'.")
@@ -103,16 +102,7 @@ class Settings:
                     module=module,
                 )
 
-        # Store any annotations that didn't have a value (these are required settings)
-        for setting, annotation in annotations.items():
-            if setting not in self._settings:
-                self._settings[setting] = SettingDefinition(
-                    name=setting,
-                    default_value=None,
-                    annotation=annotation,
-                    module=module,
-                    required=True,
-                )
+        self._register_annotation_only_settings(module, require_app_prefix=False)
 
     def _load_default_settings(self, settings_module: types.ModuleType) -> None:
         for entry in getattr(settings_module, "INSTALLED_PACKAGES", []):
@@ -186,6 +176,41 @@ class Settings:
                     self._errors.append(
                         f"Unknown setting '{setting}'. Custom settings must start with '{_CUSTOM_SETTINGS_PREFIX}'."
                     )
+
+        # `dir()` skips annotation-only names like `APP_FOO: str`, so they
+        # need their own pass — otherwise PLAIN_APP_FOO would be ignored.
+        self._register_annotation_only_settings(
+            settings_module, require_app_prefix=True
+        )
+
+    def _register_annotation_only_settings(
+        self, module: types.ModuleType, *, require_app_prefix: bool
+    ) -> None:
+        raw_annotations = getattr(module, "__annotations__", {})
+        # Resolve string annotations from `from __future__ import annotations`
+        # so env parsing receives `int` not `'int'`.
+        try:
+            resolved = typing.get_type_hints(module, include_extras=True)
+        except Exception:
+            resolved = {}
+
+        for setting in raw_annotations:
+            if not setting.isupper() or setting in self._IGNORED_NAMES:
+                continue
+            if setting in self._settings:
+                continue
+            if require_app_prefix and not setting.startswith(_CUSTOM_SETTINGS_PREFIX):
+                self._errors.append(
+                    f"Unknown setting '{setting}'. Custom settings must start with '{_CUSTOM_SETTINGS_PREFIX}'."
+                )
+                continue
+            self._settings[setting] = SettingDefinition(
+                name=setting,
+                default_value=None,
+                annotation=resolved.get(setting, raw_annotations[setting]),
+                module=module,
+                required=True,
+            )
 
     def _apply_timezone(self) -> None:
         if hasattr(time, "tzset") and self.TIME_ZONE:

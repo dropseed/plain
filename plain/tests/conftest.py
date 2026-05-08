@@ -11,6 +11,8 @@ def pytest_configure(config):
     os.environ["PLAIN_ENV_SETTING"] = "1"
     os.environ["PLAIN_EXPLICIT_OVERRIDDEN_SETTING"] = "env value"
     os.environ["PLAIN_UNDEFINED_SETTING"] = "not used"
+    os.environ["PLAIN_APP_REQUIRED_FROM_ENV"] = "from env"
+    os.environ["PLAIN_APP_REQUIRED_TYPED_FROM_ENV"] = "42"
 
     from plain.packages.registry import packages_registry
 
