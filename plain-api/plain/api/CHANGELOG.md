@@ -1,5 +1,23 @@
 # plain-api changelog
 
+## [0.33.0](https://github.com/dropseed/plain/releases/plain-api@0.33.0) (2026-05-07)
+
+### What's changed
+
+- **Auto-200 from return type annotations.** `def get(self) -> MyTypedDict:` now emits a 200 response schema automatically — no decorator required. The annotation can also be a union (e.g. `MyDict | Response`); the first TypedDict member wins. Decorator-declared 2xx responses still take precedence. ([e9fdfcfe9c60](https://github.com/dropseed/plain/commit/e9fdfcfe9c60))
+- **Method/class docstrings drive operation `summary` and `description`.** PEP 257 split: first paragraph (joined into a single line) becomes `summary`; the rest becomes `description`. A leading `GET /path/` line is dropped because the URL already lives in `paths`. The view class docstring is the fallback when a method has none. ([e9fdfcfe9c60](https://github.com/dropseed/plain/commit/e9fdfcfe9c60))
+- **Nested TypedDicts now register as named components.** Previously `@openapi.response_typed_dict(200, Outer)` inlined `Inner` inside `Outer.properties`; now `Inner` is its own `#/components/schemas/Inner` and `Outer` references it by `$ref`. Cycle-safe via a placeholder. The same happens for the new auto-200 path. ([e9fdfcfe9c60](https://github.com/dropseed/plain/commit/e9fdfcfe9c60))
+- **`openapi_parameters` class attribute** is walked via the MRO and merged with auto-extracted URL path params (`(name, in)`-keyed; `$ref` parameters keyed by ref string). Subclasses can extend or override their parents' parameters. ([e9fdfcfe9c60](https://github.com/dropseed/plain/commit/e9fdfcfe9c60))
+- **Path params now merge with declared parameters** instead of being suppressed. Previously declaring any `parameters` in `@openapi.schema` blocked auto-extraction of URL path params, forcing you to re-list them; now they're merged by `(name, in)` with declared entries winning. ([e9fdfcfe9c60](https://github.com/dropseed/plain/commit/e9fdfcfe9c60))
+- **`OpenAPISchemaGenerator.include_view(view_class)` filter hook** for restricting the schema to a subset of views (e.g. only public ones). Default returns True. ([e9fdfcfe9c60](https://github.com/dropseed/plain/commit/e9fdfcfe9c60))
+- **`schema_from_type` improvements**: `Literal[...]` → `enum` (string/integer/boolean specialized; mixed types fall back to a bare `enum`); `dict[str, V]` → `additionalProperties` (was previously a bug that crashed on non-TypedDict value types); TypedDict annotations resolve via `get_type_hints` so `from __future__ import annotations` and forward refs work. ([e9fdfcfe9c60](https://github.com/dropseed/plain/commit/e9fdfcfe9c60))
+- **`APIResult` accepts `Mapping[str, Any]`** (instead of `dict[str, Any]`) so TypedDict return annotations on view methods satisfy Liskov against the base view. TypedDicts aren't `dict` per PEP 589. ([e9fdfcfe9c60](https://github.com/dropseed/plain/commit/e9fdfcfe9c60))
+
+### Upgrade instructions
+
+- **If you consume the generated OpenAPI spec for client codegen and snapshot it** — refresh the snapshot. Nested TypedDicts that previously appeared inlined under their parent will now appear as their own `#/components/schemas/<Name>` entries with the parent referencing them via `$ref`. This is what most codegen tools want, but it does change the spec shape.
+- All other changes are additive; no migration required.
+
 ## [0.32.0](https://github.com/dropseed/plain/releases/plain-api@0.32.0) (2026-05-07)
 
 ### What's changed
