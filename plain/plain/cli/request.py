@@ -69,6 +69,11 @@ from plain.test import Client
     multiple=True,
     help="Assert response body does not contain this text (repeatable)",
 )
+@click.option(
+    "--validate-html",
+    is_flag=True,
+    help="Validate HTML response body for broken markup (parse errors, duplicate ids, orphan label[for], nested interactive elements)",
+)
 def request(
     path: str,
     method: str,
@@ -82,6 +87,7 @@ def request(
     assert_status: int | None,
     assert_contains: tuple[str, ...],
     assert_not_contains: tuple[str, ...],
+    validate_html: bool,
 ) -> None:
     """Make HTTP requests against the dev database"""
 
@@ -260,6 +266,28 @@ def request(
         for text in assert_not_contains:
             if text in body_text:
                 failed.append(f"Response body contains: {text}")
+
+        if validate_html:
+            response_content_type = response.headers.get("Content-Type", "")
+            if "html" in response_content_type.lower():
+                from plain.cli.html_validation import validate_html as _validate
+
+                html_errors = _validate(body_text)
+                if html_errors:
+                    click.echo()
+                    click.secho(
+                        f"HTML validation errors ({len(html_errors)}):",
+                        fg="red",
+                        bold=True,
+                    )
+                    for err in html_errors:
+                        click.secho(f"  ✗ {err.format()}", fg="red")
+                    failed.append(f"HTML validation found {len(html_errors)} error(s)")
+            else:
+                click.secho(
+                    f"--validate-html skipped: Content-Type is {response_content_type!r}",
+                    fg="yellow",
+                )
 
         if failed:
             click.echo()
