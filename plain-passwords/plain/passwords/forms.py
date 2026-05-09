@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Generator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from app.users.models import User
-
-from plain import forms
 from plain.exceptions import ValidationError
-from plain.postgres.forms import ModelForm
+from plain.schema import Schema, types
 
 from .core import check_user_password
 from .hashers import check_password
 from .utils import unicode_ci_compare
 
+if TYPE_CHECKING:
+    from app.users.models import User
 
-class PasswordResetForm(forms.Form):
-    email = forms.EmailField(max_length=254)
+
+class PasswordResetSchema(Schema):
+    email: str = types.EmailField(max_length=254)
 
     def send_mail(
         self,
@@ -32,20 +32,19 @@ class PasswordResetForm(forms.Form):
             context=context,
             from_email=from_email,
             to=[to_email],
-            headers={
-                "X-Auto-Response-Suppress": "All",
-            },
+            headers={"X-Auto-Response-Suppress": "All"},
         )
-
         email.send()
 
     def get_users(self, email: str) -> Generator[User]:
         """Given an email, return matching user(s) who should receive a reset.
 
-        This allows subclasses to more easily customize the default policies
-        that prevent inactive users and users with unusable passwords from
-        resetting their password.
+        Override to customize the default policies that prevent inactive
+        users and users with unusable passwords from resetting their
+        password.
         """
+        from app.users.models import User
+
         active_users = User.query.filter(email__iexact=email)
         return (u for u in active_users if unicode_ci_compare(email, u.email))
 
@@ -57,14 +56,11 @@ class PasswordResetForm(forms.Form):
         from_email: str = "",
         extra_email_context: dict[str, Any] | None = None,
     ) -> None:
-        """
-        Generate a one-use only link for resetting password and send it to the
-        user.
-        """
-        email = self.cleaned_data["email"]
-        for user in self.get_users(email):
+        """Generate a one-use only link for resetting password and send it
+        to the user."""
+        for user in self.get_users(self.email):
             context = {
-                "email": email,
+                "email": self.email,
                 "user": user,
                 "url": generate_reset_url(user),
                 **(extra_email_context or {}),
@@ -77,114 +73,102 @@ class PasswordResetForm(forms.Form):
             )
 
 
-class PasswordSetForm(forms.Form):
-    """
-    A form that lets a user set their password without entering the old
-    password
-    """
+class PasswordSetSchema(Schema):
+    """Set a new password without entering the old one. The view passes the
+    target `User` via `validate(..., context={"user": user})` and then again
+    on `save(user=...)`."""
 
-    new_password1 = forms.TextField(strip=False)
-    new_password2 = forms.TextField(strip=False)
+    new_password1: str = types.TextField(strip=False)
+    new_password2: str = types.TextField(strip=False)
 
-    def __init__(self, user: User, *args: Any, **kwargs: Any) -> None:
-        self.user = user
-        super().__init__(*args, **kwargs)
+    def check(
+        self, *, context: dict[str, Any] | None = None
+    ) -> dict[str, list[str]] | None:
+        if self.new_password1 != self.new_password2:
+            return {
+                "new_password2": ["The two password fields didn't match."],
+            }
 
-    def clean_new_password2(self) -> str:
-        password1 = self.cleaned_data.get("new_password1")
-        password2 = self.cleaned_data.get("new_password2")
-        if password1 and password2 and password1 != password2:
-            raise ValidationError(
-                "The two password fields didn't match.",
-                code="password_mismatch",
-            )
-
-        # password2 must exist at this point (required field)
-        assert isinstance(password2, str), "new_password2 must be a string"
-
-        # Clean it as if it were being put into the model directly
-        self.user._model_meta.get_field("password").clean(password2, self.user)  # ty: ignore[unresolved-attribute]
-
-        return password2
-
-    def save(self, commit: bool = True) -> User:
-        self.user.password = self.cleaned_data["new_password1"]
-        if commit:
-            self.user.save()
-        return self.user
-
-
-class PasswordChangeForm(PasswordSetForm):
-    """
-    A form that lets a user change their password by entering their old
-    password.
-    """
-
-    current_password = forms.TextField(strip=False)
-
-    def clean_current_password(self) -> str:
-        """
-        Validate that the current_password field is correct.
-        """
-        current_password = self.cleaned_data["current_password"]
-        if not check_user_password(self.user, current_password):
-            raise ValidationError(
-                "Your old password was entered incorrectly. Please enter it again.",
-                code="password_incorrect",
-            )
-        return current_password
-
-
-class PasswordLoginForm(forms.Form):
-    email = forms.EmailField(max_length=150)
-    password = forms.TextField(strip=False)
-
-    def clean(self) -> dict[str, Any]:
-        email = self.cleaned_data.get("email")
-        password = self.cleaned_data.get("password")
-
-        if email and password:
+        # Run the model field validators on the new password — context["user"]
+        # gives us the target row whose password slot we're filling.
+        user: User | None = (context or {}).get("user")
+        if user is not None:
+            field = user._model_meta.get_field("password")
             try:
-                # The vast majority of users won't have a case-sensitive email, so we act that way
-                user = User.query.get(email__iexact=email)
-            except User.DoesNotExist:
-                # Run the default password hasher once to reduce the timing
-                # difference between an existing and a nonexistent user (django #20760).
-                check_password(password, "")
+                field.clean(self.new_password2, user)  # ty: ignore[unresolved-attribute]
+            except ValidationError as e:
+                return {"new_password2": list(e.messages)}
+        return None
 
-                raise ValidationError(
-                    "Please enter a correct email and password. Note that both fields may be case-sensitive.",
-                    code="invalid_login",
-                )
-
-            if not check_user_password(user, password):
-                raise ValidationError(
-                    "Please enter a correct email and password. Note that both fields may be case-sensitive.",
-                    code="invalid_login",
-                )
-
-            self._user = user
-
-        return self.cleaned_data
-
-    def get_user(self) -> User:
-        return self._user
+    def save(self, *, user: User) -> User:
+        user.password = self.new_password1
+        user.save()
+        return user
 
 
-class PasswordSignupForm(ModelForm):
-    confirm_password = forms.TextField(strip=False)
+class PasswordChangeSchema(PasswordSetSchema):
+    """Change an existing password by also entering the current one."""
 
-    class Meta:
-        model = User
-        fields = ("email", "password")
+    current_password: str = types.TextField(strip=False)
 
-    def clean(self) -> dict[str, Any]:
-        cleaned_data = super().clean()
-        password = cleaned_data.get("password")
-        confirm_password = cleaned_data.get("confirm_password")
-        if password and confirm_password and password != confirm_password:
-            raise ValidationError(
-                "The two password fields didn't match.",
-                code="password_mismatch",
-            )
-        return cleaned_data
+    def check(
+        self, *, context: dict[str, Any] | None = None
+    ) -> dict[str, list[str]] | None:
+        user: User | None = (context or {}).get("user")
+        if user is not None and not check_user_password(user, self.current_password):
+            return {
+                "current_password": [
+                    "Your old password was entered incorrectly. Please enter it again."
+                ],
+            }
+        return super().check(context=context)
+
+
+class PasswordLoginSchema(Schema):
+    """Validates email/password format. Authentication itself happens in the
+    view (`PasswordLoginView.schema_valid`) so the schema stays a pure
+    parser — no `_user` instance state."""
+
+    email: str = types.EmailField(max_length=150)
+    password: str = types.TextField(strip=False)
+
+
+def authenticate(email: str, password: str) -> User | None:
+    """Look up a user by email and verify their password.
+
+    Returns the User on success, None on failure. Always runs a hash check
+    even when the user doesn't exist, to reduce the timing difference
+    between an existing and a nonexistent user.
+    """
+    from app.users.models import User
+
+    try:
+        user = User.query.get(email__iexact=email)
+    except User.DoesNotExist:
+        check_password(password, "")
+        return None
+
+    if not check_user_password(user, password):
+        return None
+    return user
+
+
+class PasswordSignupSchema(Schema):
+    """Sign up a new user. Schema declares the user-facing fields directly
+    (the previous ModelForm version auto-derived them from User)."""
+
+    email: str = types.EmailField()
+    password: str = types.TextField(strip=False)
+    confirm_password: str = types.TextField(strip=False)
+
+    def check(
+        self, *, context: dict[str, Any] | None = None
+    ) -> dict[str, list[str]] | None:
+        if self.password != self.confirm_password:
+            return {"confirm_password": ["The two password fields didn't match."]}
+        return None
+
+    def save(self) -> User:
+        from app.users.models import User
+
+        return User.query.create(email=self.email, password=self.password)

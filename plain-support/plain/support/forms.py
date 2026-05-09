@@ -1,70 +1,53 @@
 from __future__ import annotations
 
-from typing import Any
-
-from app.users.models import User
+from typing import TYPE_CHECKING
 
 from plain.email import TemplateEmail
-from plain.postgres.forms import ModelForm
 from plain.runtime import settings
+from plain.schema import Schema, types
 
 from .models import SupportFormEntry
 
+if TYPE_CHECKING:
+    from app.users.models import User
 
-class SupportForm(ModelForm):
+
+class SupportSchema(Schema):
+    """The default support schema. Customization point — subclass to
+    change validation, override `save()`/`notify()` for custom behavior.
     """
-    The form is the customization point for users.
-    So any behavior modifications should be possible here.
-    """
 
-    class Meta:
-        model = SupportFormEntry
-        fields = ["name", "email", "message"]
-
-    def __init__(self, user: User | None, form_slug: str, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
-        self.user = user  # User provided directly by authed request
-        self.form_slug = form_slug
-        if self.user:
-            self.fields["email"].initial = self.user.email
+    name: str = types.TextField(max_length=255)
+    email: str = types.EmailField()
+    message: str = types.TextField()
 
     def find_user(self) -> User | None:
-        # If the user isn't logged in (typical in an iframe, depending on session cookie settings),
-        # we can still try to look them up by email
-        # to associate the entry with them.
-        #
-        # Note that since they aren't logged in, this doesn't necessarily
-        # confirm that this wasn't an impersonation attempt.
-        # Subsequent conversations over email will confirm that they have access to the email.
-        email = self.cleaned_data.get("email")
-        if not email:
-            return None
+        # If the request isn't authenticated (typical in an iframe), look
+        # up the user by submitted email so the entry is associated.
+        # Subsequent email exchange confirms ownership.
+        from app.users.models import User
+
         try:
-            return User.query.get(email=email)
+            return User.query.get(email=self.email)
         except User.DoesNotExist:
             return None
 
-    def save(self, commit: bool = True) -> SupportFormEntry:
-        instance = super().save(commit=False)
-        instance.user = self.user or self.find_user()
-        instance.form_slug = self.form_slug
-        if commit:
-            instance.save()
-        return instance
+    def save(self, *, user: User | None, form_slug: str) -> SupportFormEntry:
+        return SupportFormEntry.query.create(
+            name=self.name,
+            email=self.email,
+            message=self.message,
+            user=user or self.find_user(),
+            form_slug=form_slug,
+        )
 
-    def notify(self, instance: SupportFormEntry) -> None:
-        """
-        Notify the support team of a new support form entry.
-
-        Sends an immediate email by default.
-        """
+    def notify(self, entry: SupportFormEntry, *, user: User | None) -> None:
+        """Notify the support team of a new entry. Sends an email by default."""
         email = TemplateEmail(
             template="support_form_entry",
-            subject=f"Support request from {instance.name}",
+            subject=f"Support request from {entry.name}",
             to=[settings.SUPPORT_EMAIL],
-            reply_to=[str(instance.email)],
-            context={
-                "support_form_entry": instance,
-            },
+            reply_to=[str(entry.email)],
+            context={"support_form_entry": entry},
         )
         email.send()

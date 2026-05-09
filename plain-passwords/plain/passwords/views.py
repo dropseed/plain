@@ -4,36 +4,37 @@ import hmac
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from app.users.models import User
-
 from plain.auth.sessions import login as auth_login
 from plain.auth.sessions import update_session_auth_hash
 from plain.auth.views import AuthView
-from plain.forms import BaseForm
 from plain.http import (
     BadRequestError400,
     RedirectResponse,
 )
+from plain.schema import BoundSchema, Invalid
 from plain.signing import BadSignature, SignatureExpired, TimestampSigner
 from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
 from plain.utils.encoding import force_bytes
-from plain.views import CreateView, FormView
+from plain.views import SchemaView
+
+from app.users.models import User
 
 from .forms import (
-    PasswordChangeForm,
-    PasswordLoginForm,
-    PasswordResetForm,
-    PasswordSetForm,
-    PasswordSignupForm,
+    PasswordChangeSchema,
+    PasswordLoginSchema,
+    PasswordResetSchema,
+    PasswordSetSchema,
+    PasswordSignupSchema,
+    authenticate,
 )
 
 if TYPE_CHECKING:
     from plain.http import Response
 
 
-class PasswordForgotView(FormView[PasswordResetForm]):
-    form_class = PasswordResetForm
+class PasswordForgotView(SchemaView[PasswordResetSchema]):
+    schema_class = PasswordResetSchema
     reset_confirm_url_name: str
 
     def generate_password_reset_token(self, user: Any) -> str:
@@ -52,15 +53,13 @@ class PasswordForgotView(FormView[PasswordResetForm]):
         url = reverse(self.reset_confirm_url_name) + f"?token={token}"
         return self.request.build_absolute_uri(url)
 
-    def form_valid(self, form: PasswordResetForm) -> Response:
-        form.save(
-            generate_reset_url=self.generate_password_reset_url,
-        )
-        return super().form_valid(form)
+    def schema_valid(self, result: PasswordResetSchema) -> Response:
+        result.save(generate_reset_url=self.generate_password_reset_url)
+        return super().schema_valid(result)
 
 
-class PasswordResetView(AuthView, FormView[PasswordSetForm]):
-    form_class = PasswordSetForm
+class PasswordResetView(AuthView, SchemaView[PasswordSetSchema]):
+    schema_class = PasswordSetSchema
     reset_token_max_age = 60 * 60  # 1 hour
     _reset_token_session_key = "_password_reset_token"
 
@@ -118,50 +117,60 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
     def get_user(self) -> User:
         session_token = self.session.get(self._reset_token_session_key, "")
         if not session_token:
-            # No token in the session, so we can't check the password reset token.
             raise BadRequestError400("No password reset token found.")
 
         user = self.check_password_reset_token(session_token)
         if not user:
-            # Remove it from the session if it is invalid.
             del self.session[self._reset_token_session_key]
             raise BadRequestError400("Password reset token is no longer valid.")
 
         return user
 
-    def get_form_kwargs(self) -> dict:
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.get_user()
-        return kwargs
+    def post(self) -> Response:
+        # Pass the user via context so the schema can validate the new
+        # password against the user's model field validators.
+        user = self.get_user()
+        result = self.schema_class.validate(
+            self.request.form_data,
+            files=self.request.files,
+            context={"user": user},
+        )
+        if isinstance(result, Invalid):
+            bound = BoundSchema.from_invalid(self.schema_class, result)
+            return self.schema_invalid(bound)
+        return self.schema_valid_with_user(result, user)
 
-    def form_valid(self, form: PasswordSetForm) -> Response:
-        form.save()
+    def schema_valid_with_user(self, result: PasswordSetSchema, user: User) -> Response:
+        result.save(user=user)
         del self.session[self._reset_token_session_key]
-        # If you wanted, you could log in the user here so they don't have to
-        # go through the log in form again.
-        return super().form_valid(form)
+        return RedirectResponse(self.get_success_url(result))
 
 
-class PasswordChangeView(AuthView, FormView[PasswordChangeForm]):
-    # Change to PasswordSetForm if you want to set new passwords
-    # without confirming the old one.
-    form_class = PasswordChangeForm
+class PasswordChangeView(AuthView, SchemaView[PasswordChangeSchema]):
+    schema_class = PasswordChangeSchema
+    login_required = True
 
-    def get_form_kwargs(self) -> dict:
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.user
-        return kwargs
-
-    def form_valid(self, form: PasswordChangeForm) -> Response:
-        form.save()
+    def post(self) -> Response:
+        # `self.user` is guaranteed by login_required=True; assert for ty.
+        assert self.user is not None
+        result = self.schema_class.validate(
+            self.request.form_data,
+            files=self.request.files,
+            context={"user": self.user},
+        )
+        if isinstance(result, Invalid):
+            bound = BoundSchema.from_invalid(self.schema_class, result)
+            return self.schema_invalid(bound)
+        # Already validated against self.user via context.
+        result.save(user=self.user)
         # Updating the password logs out all other sessions for the user
         # except the current one.
-        update_session_auth_hash(self.request, form.user)
-        return super().form_valid(form)
+        update_session_auth_hash(self.request, self.user)
+        return RedirectResponse(self.get_success_url(result))
 
 
-class PasswordLoginView(AuthView, FormView[PasswordLoginForm]):
-    form_class = PasswordLoginForm
+class PasswordLoginView(AuthView, SchemaView[PasswordLoginSchema]):
+    schema_class = PasswordLoginSchema
     success_url = "/"
 
     def get(self) -> Response:
@@ -171,19 +180,35 @@ class PasswordLoginView(AuthView, FormView[PasswordLoginForm]):
 
         return super().get()
 
-    def form_valid(self, form: PasswordLoginForm) -> Response:
-        # Log the user in and redirect
-        auth_login(self.request, form.get_user())
+    def schema_valid(self, result: PasswordLoginSchema) -> Response:
+        # Authentication happens here, not in the schema — the schema
+        # validates email/password format only.
+        user = authenticate(result.email, result.password)
+        if user is None:
+            bound = BoundSchema.from_invalid(
+                self.schema_class,
+                Invalid(
+                    errors={
+                        "__all__": [
+                            "Please enter a correct email and password. "
+                            "Note that both fields may be case-sensitive."
+                        ]
+                    },
+                    raw=dict(self.request.form_data),
+                ),
+            )
+            return self.schema_invalid(bound)
 
-        return super().form_valid(form)
+        auth_login(self.request, user)
+        return super().schema_valid(result)
 
 
-class PasswordSignupView(CreateView):
-    form_class = PasswordSignupForm
+class PasswordSignupView(SchemaView[PasswordSignupSchema]):
+    schema_class = PasswordSignupSchema
     success_url = "/"
 
-    def form_valid(self, form: BaseForm) -> Response:
+    def schema_valid(self, result: PasswordSignupSchema) -> Response:
         # # Log the user in and redirect
-        # auth_login(self.request, form.save())
-
-        return super().form_valid(form)
+        # auth_login(self.request, result.save())
+        result.save()
+        return super().schema_valid(result)

@@ -8,5 +8,5 @@ class SupportRouter(Router):
     urls = [
         path("form/<slug:form_slug>.js", views.SupportFormJSView),
         path("form/<slug:form_slug>/iframe/", views.SupportIFrameView, name="iframe"),
-        path("form/<slug:form_slug>/", views.SupportFormView, name="form"),
+        path("form/<slug:form_slug>/", views.SupportSchemaView, name="form"),
     ]
