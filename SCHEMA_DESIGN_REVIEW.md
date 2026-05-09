@@ -1,14 +1,25 @@
 # plain.schema design review
 
-12 commits on `claude/compare-form-frameworks-9KkSG`, building a validation primitive from scratch and testing it across every Plain surface that needs it. This doc summarizes what was built, what was learned, and what's still open.
+A branch on `claude/compare-form-frameworks-9KkSG` building a validation primitive from scratch, exercising it across every Plain surface that needs it, and **completing the full migration** — `plain.forms.Form`, `BaseForm`, `BoundField`, `FormView`, `CreateView/UpdateView/DeleteView`, and `plain.postgres.forms.ModelForm` are all deleted. `plain.schema.Schema` and its companion `ModelSchema` are the only validation primitive.
 
 ## TL;DR
 
 `plain.schema.Schema` is a pure validating parser. `validate(data) → Self | Invalid`. The schema class plays double duty: it's both the parser and the validated-instance type. Eliminate `Invalid` via `isinstance` and the result is the typed schema directly — no `.data` indirection, no narrowing wart.
 
-The same primitive drives runtime validation across **JSON APIs, HTMX actions, HTMX live-validate, background jobs, full HTML form pages with template binding, and OpenAPI documentation generation**. Type checking pulls its weight: agents who mistype field names, miss narrows, or assign wrong types all get caught at check time.
+`plain.postgres.modelschema.ModelSchema` auto-derives Schema fields from a model class via class-attribute declaration:
 
-After 12 commits, the design holds up. The remaining open work is structural decisions (formal `plain.forms.Form` absorption, ModelForm story) rather than design exploration.
+```python
+class TaskSchema(ModelSchema):
+    model = Task
+
+    title: str
+    project: Project | None    # FK
+    tags: list[Tag]            # M2M
+```
+
+The same primitive drives runtime validation across **JSON APIs, HTMX actions, HTMX live-validate, background jobs, full HTML form pages with template binding, file uploads, multi-tenant FK/M2M, and OpenAPI documentation generation**. Type checking pulls its weight: agents who mistype field names, miss narrows, or assign wrong types all get caught at check time.
+
+The migration is complete. `plain.forms.Form` is deleted. `plain.postgres.forms.ModelForm` is deleted. `plain.views.FormView/CreateView/UpdateView/DeleteView` are deleted. The seven downstream packages that depended on them (plain-loginlink, plain-support, plain-passwords, plain-flags, plain-redirection, plain-admin, the example app's contacts/tasks/notes apps) all migrated to Schema or ModelSchema.
 
 ## The arc
 
@@ -134,9 +145,9 @@ Each wart was found by either writing real code against the design (commits 5–
   - 5 jobs payload-schema tests
 - Type-check clean across `plain.schema`, `plain.views`, `plain-api/openapi`, the entire example app
 
-## The migration playthrough — what we actually learned
+## The migration playthrough — every Form consumer migrated, plain.forms deleted
 
-After the v1 design landed, we pushed the migration through every package that depended on `plain.forms`. Five commits across `plain-loginlink`, `plain-support`, `plain-passwords`, the `plain.views.Schema*View` hierarchy, and the example app's `contacts` and `tasks` apps. Together with the ModelForm-derived `TaskForm` in `tasks` (the heaviest case), these exercise every shape `plain.forms.Form` was used for.
+After the v1 design landed, we pushed the migration through every package that depended on `plain.forms` and finished by **deleting `plain.forms.Form`, `BaseForm`, `BoundField`, `FormView`, `CreateView`/`UpdateView`/`DeleteView`, and `plain.postgres.forms.ModelForm`**. Eight migration commits across plain-loginlink, plain-support, plain-passwords, plain-flags, plain-redirection, plain-admin, and the example app's contacts/tasks/notes apps. Then ModelSchema landed as the auto-derive replacement for ModelForm. Together these exercise every shape `plain.forms.Form` was used for.
 
 ### What migrated cleanly
 
@@ -162,26 +173,77 @@ Two pre-existing bugs caught by tightened typing:
 1. **`FileField.error_messages["text"]`** referenced as `["max_length"]` in `to_python` — long filenames raised KeyError instead of ValidationError. Fixed during file-upload work.
 2. **`Schema.validate()` calling `.get()` on MultiValueDict** — for `MultipleChoiceField` this returned only the last submitted value. Now uses `.getlist()` when the input is a MultiValueDict and the field is MultipleChoiceField.
 
-### Where the migration stopped — the line in the sand
+### ModelSchema — replacing ModelForm's auto-derive
 
-`plain.postgres.forms.ModelForm` (782 lines) and `plain-admin` (which uses ModelForm via `Meta.model = X` auto-derive) were **not migrated**. Together they're an entangled subsystem that needs a real `ModelSchema` to replace cleanly:
+The 782-line `plain.postgres.forms.ModelForm` is replaced by `plain.postgres.modelschema.ModelSchema` (~250 lines). Two iterations on the declaration syntax:
 
-- ModelForm walks `model._model_meta.fields` and produces a Field-per-model-field via `modelfield_to_formfield()` (~100 lines of dispatch). The ModelSchema equivalent would walk the same structure and produce Schema field declarations.
-- `ModelChoiceField(queryset=...)` validates submitted IDs against a queryset. The schema equivalent needs the same queryset binding (the `resolve_relations(owner=...)` pattern in tasks/views.py shows what users do without it — it works but doubles the code).
-- `ModelMultipleChoiceField` for M2M — same story.
-- ModelForm's `save(commit=False)` and `save_m2m()` are convenient, but Schema's `apply_to(instance)` + manual `.tags.set(...)` covers the same ground with a few more lines.
+**v0 attempt** — Django-style `class Meta:`:
+```python
+class TaskSchema(ModelSchema):
+    class Meta:
+        model = Task
+        fields = ("title", "project", "tags")
+    title: str
+    project: Project | None
+    tags: list[Tag]
+```
 
-**Building a real `ModelSchema` is a multi-day project.** Without it, ModelForm continues to provide value for the auto-derive case. With it, ModelForm becomes redundant and `plain.forms` can be retired entirely.
+Got pushback: `class Meta:` was retired across Plain (postgres uses `model_options = postgres.Options(...)`), and `fields = (...)` duplicates the annotations.
 
-### Final state of `plain.forms`
+**Final shape** — class attribute + annotation-driven:
+```python
+class TaskSchema(ModelSchema):
+    model = Task
 
-After 5 migration commits, `plain.forms` is used by exactly two consumers:
-- `plain.postgres.forms.ModelForm` (and its `ModelChoiceField`/`ModelMultipleChoiceField` types)
-- `plain-admin` (via ModelForm)
+    title: str
+    project: Project | None
+    tags: list[Tag]
+```
 
-Plus `plain.views.objects.CreateView/UpdateView/DeleteView` and `plain.views.FormView` continue to exist as Form-based equivalents alongside the new Schema-based ones. `plain.views` now ships both side by side — `FormView`/`CreateView`/etc. for ModelForm-driven code, `SchemaView`/`SchemaCreateView`/etc. for Schema-driven code.
+The `model = Task` class attribute matches existing Plain patterns (`success_url = ...`, `template_name = ...`, `form_class = ...`). Field set comes from annotations directly. To exclude a model field, don't annotate it. To override an auto-derived Field, provide the Field instance: `name: str = types.TextField(min_length=2)`.
 
-This is the **honest endpoint** for the migration: Schema replaces Form for everything except the model-magic case. If/when ModelSchema gets built, the migration completes and `plain.forms` can be deprecated entirely.
+For multi-tenant FK/M2M scoping (the pattern ModelForm handled by mutating `self.fields["project"].queryset`), pass `context["querysets"]`:
+
+```python
+result = TaskSchema.validate(
+    request.json_data,
+    context={"querysets": {
+        "project": Project.query.filter(owner=user),
+        "tags": Tag.query.filter(owner=user),
+    }},
+)
+```
+
+The validate() override clones the schema class with substituted querysets so concurrent requests with different scopes don't interfere.
+
+`save_to(instance)` and `save()` replace `ModelForm.save()` — apply scalar + FK fields, save the instance, then set M2M (which needs the PK).
+
+### Final state — plain.forms slimmed to field types only
+
+What survives in `plain.forms`:
+- `plain.forms.fields.*` — `TextField`, `EmailField`, `IntegerField`, etc. The implementations themselves. Reused by `plain.schema.types`.
+- `plain.forms.exceptions` — `ValidationError`, `FormFieldMissingError`.
+
+What's deleted:
+- `plain.forms.forms` — `BaseForm`, `Form`, `DeclarativeFieldsMetaclass` (the Form classes themselves)
+- `plain.forms.boundfield` — `BoundField` (replaced by `plain.schema.bind.BoundSchema`/`BoundField`)
+- `plain.views.forms` — `FormView` (replaced by `SchemaView`)
+- `plain.views.objects.CreateView/UpdateView/DeleteView` — the form-based versions (replaced by `SchemaCreateView/UpdateView/DeleteView`). `DetailView` and `ListView` survive — they don't depend on Form.
+- `plain.postgres.forms.ModelForm/BaseModelForm/ModelFormMetaclass/ModelFormOptions` (the ModelForm machinery)
+- `plain.postgres.forms.model_to_dict/fields_for_model/construct_instance` (helpers used only by ModelForm)
+- `plain.api.openapi.decorators.request_form` — replaced by `openapi.schema_body(SchemaClass)`
+
+What survives in `plain.postgres.forms` (the module name is residual; module purpose is now "field-types-and-dispatch shared with ModelSchema"):
+- `ModelChoiceField`, `ModelMultipleChoiceField` — used by ModelSchema for FK/M2M
+- `modelfield_to_formfield` — the model-field → schema-field dispatch (used by `modelfield_to_schemafield`)
+
+Net code reduction:
+- `plain.forms`: 1764 → 1230 lines (-30%)
+- `plain.postgres.forms`: 782 → 358 lines (-54%)
+- `plain.views`: deleted `forms.py`, shrunk `objects.py` from 165 → 75 lines
+- Tests: deleted ~700 lines of ModelForm-specific test code
+
+This is the **complete migration**: Schema is the only validation primitive. ModelSchema is the only model-bound auto-deriver. Form is gone.
 
 ### Pydantic interop
 
@@ -214,9 +276,14 @@ The current design routes files through `request.files` to FileField via isinsta
 
 ## Honest read
 
-The design works **and the migration path through every Form consumer except ModelForm is proven to work**. Seventeen commits, every package that depended on plain.forms.Form successfully ported (loginlink, support, passwords, the example app's contacts and tasks). Every iteration found and resolved real friction; the migration playthrough surfaced two pre-existing bugs in plain.forms itself.
+The design works **and the full migration is complete**. `plain.forms.Form`, `BaseForm`, `BoundField`, `FormView`, `CreateView/UpdateView/DeleteView`, and `plain.postgres.forms.ModelForm` are all deleted. Every package that depended on them is ported.
 
-The remaining open work is **one design problem** — `ModelSchema` to replace `ModelForm`'s auto-derive-from-model machinery — not three or four. Once that exists, plain-admin migrates and `plain.forms` is dead code.
+Final state of the design after the full migration:
+- One validation primitive (`Schema`) covers JSON, HTMX, jobs, HTML pages, files, OpenAPI.
+- One model-bound primitive (`ModelSchema`) covers admin CRUD, model-edit pages, and any case where fields auto-derive from a model.
+- One view base hierarchy (`SchemaView/SchemaCreateView/SchemaUpdateView/SchemaDeleteView`) replaces the Form-based one.
+- Type checking pulls its weight throughout. Several pre-existing bugs surfaced as the type system tightened.
+- Net code reduction: ~1850 lines deleted across plain, plain-postgres, and tests.
 
 The agent-correctness story holds end to end:
 - Annotations drive both runtime behavior and type-checker visibility
@@ -236,16 +303,16 @@ If I had to grade the final design:
 
 In priority order:
 
-1. **Review this branch.** 17 commits / ~4500 lines diff. Read the example app diffs first (`example/app/contacts/views.py`, `example/app/tasks/views.py`, `example/app/tasks/schemas.py`, `example/app/jobs.py`) — those are the user-facing shape and they show what migrating actually looks like. Then the new Schema-based downstream packages (`plain-loginlink`, `plain-support`, `plain-passwords`). Then the implementation in `plain/plain/schema/` and `plain/plain/views/schema.py`.
+1. **Review this branch.** ~22 commits / ~5000 lines net diff (with ~1850 lines of deletions). Read in this order:
+   - The example app diffs first — `example/app/contacts/views.py`, `example/app/tasks/views.py`, `example/app/tasks/schemas.py`, `example/app/notes/views.py`, `example/app/jobs.py`. These show what real user code looks like after migration.
+   - Then the new Schema/ModelSchema implementations — `plain/plain/schema/`, `plain/plain/views/schema.py`, `plain-postgres/plain/postgres/modelschema.py`.
+   - Then the migrated downstream packages — `plain-loginlink`, `plain-support`, `plain-passwords`, `plain-flags`, `plain-redirection`, `plain-admin`.
 
-2. **Decide on `ModelSchema`.** The single open design problem. Two paths:
-   - **Build it.** Multi-day project. Once done, `plain.forms` can be deprecated entirely.
-   - **Don't build it.** Schema and Form coexist forever, with Schema the recommended path for everything except ModelForm-driven admin/CRUD.
+2. **Land.** The migration is complete. Form is gone. Schema is the only path. The remaining work is documentation, agent-rule updates, and a migration guide for any external users — all polish, not design.
 
-3. **Land or iterate.** The current branch is internally consistent and ships a coherent migration. If the shape feels right, merge to master and either commit to ModelSchema or settle on coexistence as the long-term answer.
-
-4. **Optional follow-ups (in order):**
-   - Migration guide for users moving from `Form` to `Schema` (the patterns we learned in plain-passwords would make a good appendix)
+3. **Optional follow-ups (in order):**
+   - Migration guide for users (the patterns we learned in plain-passwords + ModelSchema would make a good appendix)
+   - Update existing READMEs across the migrated packages to point at Schema patterns
    - Pydantic interop adapter, IF a real use case surfaces
 
-The honest endpoint: the migration playthrough resolved every speculative question into either "it works" or "needs ModelSchema." Further work is implementation, not design.
+The honest endpoint: the design works, the migration is done, the line in the sand is gone. There's no remaining design problem — only release work.
