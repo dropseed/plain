@@ -19,10 +19,8 @@ What's gained:
 
 from __future__ import annotations
 
-from typing import Any
-
 from plain.exceptions import ValidationError
-from plain.schema import Schema, types
+from plain.schema import Schema, UploadedFile, types
 
 from .models import SUBJECT_BUG, SUBJECT_CHOICES
 
@@ -57,13 +55,7 @@ class ContactSchema(Schema):
 class AttachmentUploadSchema(Schema):
     """File-upload demo. Plain.schema receives `request.files` as a kwarg
     and dispatches FileField fields to it; everything else continues to
-    read from `request.form_data`.
-
-    Constraints exercise the FileField surface: max filename length and
-    requiredness via the standard Schema mechanism. The Any annotation
-    on `document` is intentional — UploadedFile is opaque to ty (it lives
-    in plain.internal.files), and tests don't need its full type to
-    assert .name and .size attributes."""
+    read from `request.form_data`."""
 
     description: str = types.TextField(min_length=1, max_length=500)
-    document: Any = types.FileField(max_length=120)
+    document: UploadedFile = types.FileField(max_length=120)

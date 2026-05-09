@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
-from plain.schema import Invalid, Schema, make_schema, types
+from plain.schema import Invalid, Schema, UploadedFile, make_schema, types
 
 
 class ContactSchema(Schema):
@@ -273,7 +271,7 @@ def test_partial_empty_input_is_valid():
 # ---------------------------------------------------------------------------
 
 
-def _file(name: str = "report.pdf", content: bytes = b"hello") -> Any:
+def _file(name: str = "report.pdf", content: bytes = b"hello") -> UploadedFile:
     from plain.internal.files.uploadedfile import SimpleUploadedFile
 
     return SimpleUploadedFile(name, content, "application/pdf")
@@ -282,7 +280,7 @@ def _file(name: str = "report.pdf", content: bytes = b"hello") -> Any:
 def test_filefield_reads_from_files_not_data():
     class Upload(Schema):
         title: str = types.TextField()
-        document: Any = types.FileField()
+        document: UploadedFile = types.FileField()
 
     f = _file()
     result = Upload.validate({"title": "Q3"}, files={"document": f})
@@ -294,7 +292,7 @@ def test_filefield_reads_from_files_not_data():
 
 def test_filefield_missing_is_required_error():
     class Upload(Schema):
-        document: Any = types.FileField()
+        document: UploadedFile = types.FileField()
 
     result = Upload.validate({}, files={})
     assert isinstance(result, Invalid)
@@ -304,7 +302,7 @@ def test_filefield_missing_is_required_error():
 def test_filefield_optional_when_required_false():
     class Upload(Schema):
         title: str = types.TextField()
-        avatar: Any = types.FileField(required=False)
+        avatar: UploadedFile | None = types.FileField(required=False)
 
     result = Upload.validate({"title": "x"})
     assert not isinstance(result, Invalid)
@@ -314,7 +312,7 @@ def test_filefield_optional_when_required_false():
 def test_partial_includes_files_for_presence_check():
     class Upload(Schema):
         title: str = types.TextField(min_length=1)
-        document: Any = types.FileField()
+        document: UploadedFile = types.FileField()
 
     # Just the file present in partial mode — title missing but skipped.
     f = _file()
@@ -338,7 +336,7 @@ def test_filefield_with_other_field_errors():
 
     class Upload(Schema):
         title: str = types.TextField(min_length=5)
-        document: Any = types.FileField()
+        document: UploadedFile = types.FileField()
 
     result = Upload.validate({"title": "x"}, files={})
     assert isinstance(result, Invalid)

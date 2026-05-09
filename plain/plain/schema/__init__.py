@@ -13,6 +13,8 @@ anywhere a dict needs to become typed Python data.
 
 from __future__ import annotations
 
+from plain.internal.files.uploadedfile import UploadedFile
+
 from .bind import BoundField, BoundSchema
 from .result import Invalid
 from .schema import Schema, make_schema
@@ -22,5 +24,6 @@ __all__ = (
     "BoundSchema",
     "Invalid",
     "Schema",
+    "UploadedFile",
     "make_schema",
 )

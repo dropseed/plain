@@ -348,21 +348,44 @@ def JSONField(
     validators: Sequence[Callable[[Any], None]] = (),
 ) -> Any: ...
 
-# File fields — return type is opaque (UploadedFile or similar)
+# File fields — return UploadedFile (or None when required=False).
+from plain.internal.files.uploadedfile import UploadedFile
+
+@overload
 def FileField(
     *,
-    required: bool = True,
+    required: Literal[False],
     max_length: int | None = None,
     allow_empty_file: bool = False,
     initial: Any = None,
     error_messages: dict[str, str] | None = None,
     validators: Sequence[Callable[[Any], None]] = (),
-) -> Any: ...
+) -> UploadedFile | None: ...
+@overload
+def FileField(
+    *,
+    required: Literal[True] = True,
+    max_length: int | None = None,
+    allow_empty_file: bool = False,
+    initial: Any = None,
+    error_messages: dict[str, str] | None = None,
+    validators: Sequence[Callable[[Any], None]] = (),
+) -> UploadedFile: ...
+@overload
 def ImageField(
     *,
-    required: bool = True,
+    required: Literal[False],
     max_length: int | None = None,
     initial: Any = None,
     error_messages: dict[str, str] | None = None,
     validators: Sequence[Callable[[Any], None]] = (),
-) -> Any: ...
+) -> UploadedFile | None: ...
+@overload
+def ImageField(
+    *,
+    required: Literal[True] = True,
+    max_length: int | None = None,
+    initial: Any = None,
+    error_messages: dict[str, str] | None = None,
+    validators: Sequence[Callable[[Any], None]] = (),
+) -> UploadedFile: ...
