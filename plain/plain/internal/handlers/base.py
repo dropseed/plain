@@ -23,6 +23,7 @@ from opentelemetry.semconv.attributes import (
     user_agent_attributes,
 )
 from opentelemetry.semconv.metrics.http_metrics import HTTP_SERVER_REQUEST_DURATION
+
 from plain.runtime import settings
 from plain.urls import get_resolver
 from plain.utils.module_loading import import_string

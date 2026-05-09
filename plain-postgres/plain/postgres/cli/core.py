@@ -9,6 +9,7 @@ from collections import defaultdict
 
 import click
 import psycopg
+
 from plain.cli import register_cli
 
 from ..database_url import postgres_cli_args, postgres_cli_env

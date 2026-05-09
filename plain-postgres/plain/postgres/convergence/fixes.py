@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import psycopg
 import psycopg.sql
+
 from plain.logs import get_framework_logger
 from plain.runtime import settings as plain_settings
 

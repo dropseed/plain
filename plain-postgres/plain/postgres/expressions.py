@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Protocol, Self, runtime_checkable
 from uuid import UUID
 
 import psycopg
+
 from plain.postgres import fields
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import (

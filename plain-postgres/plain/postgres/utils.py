@@ -9,6 +9,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
 
 import psycopg
+
 from plain.logs import get_framework_logger
 from plain.postgres.otel import db_span
 from plain.utils.dateparse import parse_time

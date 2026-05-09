@@ -1,4 +1,5 @@
 import click
+
 from plain.utils.crypto import get_random_string
 
 

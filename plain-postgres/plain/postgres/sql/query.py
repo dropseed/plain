@@ -30,6 +30,7 @@ from typing import (
 )
 
 import psycopg
+
 from plain.postgres.aggregates import Count
 from plain.postgres.constants import LOOKUP_SEP, OnConflict
 from plain.postgres.db import get_connection

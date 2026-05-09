@@ -40,6 +40,7 @@ from decimal import Decimal
 from typing import Any
 
 from hypothesis import strategies as st  # ty: ignore[unresolved-import]
+
 from plain.forms import fields as form_fields
 
 from .schema import Schema

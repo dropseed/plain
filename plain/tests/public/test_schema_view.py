@@ -136,7 +136,11 @@ def test_initial_passed_to_bound_schema_on_invalid():
 # ---------------------------------------------------------------------------
 
 
-from plain.views import SchemaCreateView, SchemaDeleteView, SchemaUpdateView  # noqa: E402
+from plain.views import (  # noqa: E402
+    SchemaCreateView,
+    SchemaDeleteView,
+    SchemaUpdateView,
+)
 
 
 class _Bag:

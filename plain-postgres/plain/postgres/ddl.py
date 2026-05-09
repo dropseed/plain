@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import psycopg.sql
+
 from plain.postgres.db import get_connection
 from plain.postgres.dialect import quote_name
 from plain.postgres.expressions import ExpressionList

@@ -7,6 +7,7 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import click
+
 from plain.cli.print import print_event
 from plain.cli.runtime import common_command
 

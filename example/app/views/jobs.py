@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+from app.jobs import ExampleJob
 from plain.http import RedirectResponse, Response
 from plain.urls import reverse
 from plain.views import View
-
-from app.jobs import ExampleJob
 
 
 class RunExampleJobView(View):

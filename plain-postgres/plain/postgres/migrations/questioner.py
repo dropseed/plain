@@ -5,6 +5,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 import click
+
 from plain.packages import packages_registry
 
 from .loader import MigrationLoader

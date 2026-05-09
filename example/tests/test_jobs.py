@@ -7,9 +7,9 @@ validation surface directly (the run() method is a thin wrapper).
 
 from __future__ import annotations
 
-from plain.schema import Invalid
-
 from app.jobs import SendNotificationJob, SendNotificationPayload
+
+from plain.schema import Invalid
 
 
 def test_payload_schema_accepts_valid_input():

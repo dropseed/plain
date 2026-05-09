@@ -10,8 +10,9 @@ if TYPE_CHECKING:
     from plain.postgres.meta import Meta
     from plain.postgres.options import Options
 
-import plain.runtime
 import psycopg
+
+import plain.runtime
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import models_registry, transaction, types
 from plain.postgres.constants import LOOKUP_SEP

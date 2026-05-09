@@ -6,9 +6,9 @@ inline template here that exercises only the BoundSchema interface."""
 from __future__ import annotations
 
 import jinja2
-from plain.schema import BoundSchema, Invalid
-
 from app.contacts.schemas import ContactSchema
+
+from plain.schema import BoundSchema, Invalid
 
 # Inline jinja template exercising the same surface as contacts/form.html:
 # html_id, html_name, value(), errors, field.choices, non_field_errors.

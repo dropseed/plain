@@ -220,9 +220,7 @@ def test_default_check_is_noop():
 def test_partial_skips_missing_required_fields():
     class S(Schema):
         title: str = types.TextField(min_length=1)
-        priority: str = types.ChoiceField(
-            choices=[("low", "Low"), ("high", "High")]
-        )
+        priority: str = types.ChoiceField(choices=[("low", "Low"), ("high", "High")])
 
     result = S.validate({"title": "ok"}, partial=True)
     assert not isinstance(result, Invalid)

@@ -14,6 +14,7 @@ from collections.abc import Callable, Generator
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Self
 
 import psycopg
+
 from plain.logs import get_framework_logger
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.exceptions import FieldError

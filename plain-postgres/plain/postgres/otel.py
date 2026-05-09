@@ -16,9 +16,10 @@ from opentelemetry.semconv.metrics.db_metrics import DB_CLIENT_OPERATION_DURATIO
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Span
+    from psycopg import Connection as PsycopgConnection
+
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.sources import PoolSource
-    from psycopg import Connection as PsycopgConnection
 
 from opentelemetry.semconv._incubating.attributes.db_attributes import (
     DB_CLIENT_CONNECTION_POOL_NAME,
@@ -63,6 +64,7 @@ from opentelemetry.semconv.attributes.server_attributes import (
     SERVER_PORT,
 )
 from opentelemetry.trace import SpanKind
+
 from plain.runtime import settings
 from plain.utils.otel import format_exception_type
 

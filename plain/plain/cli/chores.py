@@ -1,6 +1,7 @@
 import sys
 
 import click
+
 from plain.logs import get_framework_logger
 
 logger = get_framework_logger()

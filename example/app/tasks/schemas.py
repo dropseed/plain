@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import datetime
 
+from app.users.models import User
 from plain.postgres.modelschema import ModelSchema
 from plain.schema import Schema, types
-
-from app.users.models import User
 
 from .models import PRIORITY_CHOICES, Project, Tag, Task
 

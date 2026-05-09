@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from app.users.models import User
+
 from plain.email import TemplateEmail
 from plain.schema import Schema, types
-
-from app.users.models import User
 
 from .links import generate_link_url
 

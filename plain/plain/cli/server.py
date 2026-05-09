@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import click
+
 from plain.cli.options import SettingOption
 from plain.utils.os import get_cpu_count
 

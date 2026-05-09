@@ -281,9 +281,9 @@ The strategy walks the schema fields and emits constrained values per type — `
 - **`Schema`** — anything not bound to a model: JSON APIs, HTMX actions, job payloads, webhooks, full HTML pages backed by `BoundSchema`, CLI scripts, tests.
 - **`ModelSchema`** — model-edit pages, admin CRUD, anywhere fields auto-derive from a `postgres.Model`. Auto-handles FK and M2M.
 - **Inline field** — trivial single-value parsing for cases where a class is overkill:
-  ```python
-  pin_id = types.IntegerField(min_value=1).clean(request.form_data["pin_id"])
-  ```
+    ```python
+    pin_id = types.IntegerField(min_value=1).clean(request.form_data["pin_id"])
+    ```
 
 If you're tempted to `request.json_data["x"]` and then check it manually — write a Schema instead.
 

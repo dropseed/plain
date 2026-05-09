@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+from app.notes.models import Note
 from plain.api import openapi
 from plain.api.views import APIView
 from plain.http import NotFoundError404
 from plain.urls import Router, path
-
-from app.notes.models import Note
 
 NOTE_SCHEMA = {
     "type": "object",
