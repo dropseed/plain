@@ -86,20 +86,14 @@ class TaskListAPIView(APIView):
         user = get_request_user(self.request)
         if not user:
             raise LoginRequired(login_url=None)
-        result = TaskSchema.validate(self.request.json_data)
+        result = TaskSchema.validate(
+            self.request.json_data,
+            context={"querysets": TaskSchema.querysets_for(user)},
+        )
         if isinstance(result, Invalid):
             return 400, {"errors": result.errors}
-
-        relations = result.resolve_relations(owner=user)
-        if isinstance(relations, Invalid):
-            return 400, {"errors": relations.errors}
-
-        task = Task()
-        task.owner = user
-        result.apply_to_task(task, project=relations["project"])
-        task.save()
-        if relations["tags"]:
-            task.tags.set(relations["tags"])
+        task = Task(owner=user)
+        result.save_to(task)
         return 201, _serialize(task)
 
 
