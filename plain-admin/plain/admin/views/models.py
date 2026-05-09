@@ -18,7 +18,7 @@ from .objects import (
 
 if TYPE_CHECKING:
     from plain import postgres
-    from plain.forms import BaseForm
+    from plain.postgres.modelschema import ModelSchema
 
 
 def get_model_field(instance: postgres.Model, field: str) -> Any:
@@ -236,7 +236,7 @@ class AdminModelDetailView(AdminDetailView):
 
 class AdminModelCreateView(AdminCreateView):
     model: type[postgres.Model]
-    form_class: type[BaseForm] | None = None
+    schema_class: type[ModelSchema] | None = None
 
     def get_title(self) -> str:
         if title := super().get_title():
@@ -254,7 +254,7 @@ class AdminModelCreateView(AdminCreateView):
 
 class AdminModelUpdateView(AdminUpdateView):
     model: type[postgres.Model]
-    form_class: type[BaseForm] | None = None
+    schema_class: type[ModelSchema] | None = None
     success_url = "."  # Redirect back to the same update page by default
 
     def get_title(self) -> str:

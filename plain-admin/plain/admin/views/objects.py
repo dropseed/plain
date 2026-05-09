@@ -6,16 +6,16 @@ from plain.http import RedirectResponse, Response
 from plain.paginator import Paginator
 from plain.postgres import QuerySet
 from plain.views import (
-    CreateView,
-    DeleteView,
     DetailView,
-    UpdateView,
+    SchemaCreateView,
+    SchemaDeleteView,
+    SchemaUpdateView,
 )
 
 from .base import AdminView
 
 if TYPE_CHECKING:
-    from plain.forms import BaseForm
+    from plain.schema import Schema
 
 
 _LABEL_ACRONYMS = {
@@ -261,7 +261,7 @@ class AdminListView(HTMXView, AdminView):
         return links
 
 
-class AdminCreateView(AdminView, CreateView):
+class AdminCreateView(AdminView, SchemaCreateView):
     template_name = None
     nav_section = None
 
@@ -280,11 +280,11 @@ class AdminCreateView(AdminView, CreateView):
     def get_delete_url(self, obj: Any) -> str:
         return ""
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self, result: "Schema") -> str:
         if list_url := self.get_list_url():
             return list_url
 
-        return super().get_success_url(form)
+        return super().get_success_url(result)
 
 
 class AdminDetailView(AdminView, DetailView):
@@ -339,7 +339,7 @@ class AdminDetailView(AdminView, DetailView):
         return links
 
 
-class AdminUpdateView(AdminView, UpdateView):
+class AdminUpdateView(AdminView, SchemaUpdateView):
     template_name = None
     nav_section = None
 
@@ -372,7 +372,7 @@ class AdminUpdateView(AdminView, UpdateView):
 
         return links
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self, result: "Schema") -> str:
         if detail_url := self.get_detail_url(self.object):
             return detail_url
 
@@ -382,10 +382,10 @@ class AdminUpdateView(AdminView, UpdateView):
         if update_url := self.get_update_url(self.object):
             return update_url
 
-        return super().get_success_url(form)
+        return super().get_success_url(result)
 
 
-class AdminDeleteView(AdminView, DeleteView):
+class AdminDeleteView(AdminView, SchemaDeleteView):
     template_name = "admin/delete.html"
     nav_section = None
 
@@ -418,8 +418,8 @@ class AdminDeleteView(AdminView, DeleteView):
 
         return links
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self, result: "Schema") -> str:
         if list_url := self.get_list_url():
             return list_url
 
-        return super().get_success_url(form)
+        return super().get_success_url(result)
