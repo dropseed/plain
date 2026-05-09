@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.103.3](https://github.com/dropseed/plain/releases/plain-postgres@0.103.3) (2026-05-08)
+
+### What's changed
+
+- **`QuerySet.__repr__` no longer issues SQL for unevaluated querysets.** Error reporters (Sentry, pdb, exception templates) call `repr()` on stack-frame locals to build error events, and a surprise `SELECT … LIMIT 21` inside an exception path is a known footgun — especially on production where the underlying query may itself be the cause of the failure. Unevaluated querysets now render as `<QuerySet [unevaluated]>`; once the result cache is populated, `repr()` formats from the cache as before (still truncating past 20 rows). ([d8b7c4ec30](https://github.com/dropseed/plain/commit/d8b7c4ec30))
+- **`ManyToManyField.value_from_object` no longer calls `.all()` on a manager.** The form-roundtrip path went through `getattr(obj, attname).all()`, which on the M2M manager dispatched to its descriptor and could trigger an unintended fetch/SQL path. Switched to the manager's `.query` queryset, which is the documented entry point. ([83da86b19b](https://github.com/dropseed/plain/commit/83da86b19b))
+
+### Upgrade instructions
+
+- No changes required. Note that interactive shell users who relied on `repr()` triggering evaluation (e.g., typing `qs` at the prompt to print rows) will now see `<QuerySet [unevaluated]>` — call `list(qs)` or slice it to materialize.
+
 ## [0.103.2](https://github.com/dropseed/plain/releases/plain-postgres@0.103.2) (2026-05-06)
 
 ### What's changed
