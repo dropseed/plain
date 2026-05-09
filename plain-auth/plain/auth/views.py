@@ -32,6 +32,7 @@ except ImportError:
 __all__ = [
     "AuthView",
     "LoginRequired",
+    "LoginRequiredView",
     "LogoutView",
     "redirect_to_login",
 ]
@@ -130,6 +131,30 @@ class AuthView(SessionView):
             # Make sure it at least has private as a default
             patch_cache_control(response, private=True)
         return response
+
+
+class LoginRequiredView(AuthView):
+    """An `AuthView` with `login_required=True` and `self.user` typed as
+    `User` (non-nullable).
+
+    `check_auth()` runs in `before_request`, so by the time any view method
+    executes, `self.user` is guaranteed non-None. This subclass declares
+    that invariant in the type system so callers don't need to write
+    `assert self.user is not None` repeatedly.
+
+    The `user: User` annotation is a type-only narrowing: it shadows the
+    parent's `User | None` annotation for static checkers without changing
+    the runtime descriptor (which is `AuthView.user`'s `cached_property`).
+    `check_auth` itself depends on the parent's nullable `user`, so we
+    deliberately do NOT override the runtime descriptor here.
+    """
+
+    login_required: bool = True
+
+    if TYPE_CHECKING:
+        # Re-annotate without an assignment so the cached_property in
+        # AuthView still wins at runtime via MRO.
+        user: User
 
 
 class LogoutView(View):

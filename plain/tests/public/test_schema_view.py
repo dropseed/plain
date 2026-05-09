@@ -96,6 +96,31 @@ def test_missing_schema_class_raises_improperlyconfigured():
         view.post()
 
 
+def test_schema_class_auto_derived_from_generic_parameter():
+    """`class V(SchemaView[NoteSchema])` sets schema_class without explicit
+    assignment — the generic parameter is the single source of truth."""
+
+    class _AutoView(SchemaView[_NoteSchema]):
+        template_name = "ignored"
+
+    assert _AutoView.schema_class is _NoteSchema
+
+
+def test_schema_class_explicit_override_wins_over_auto_derive():
+    """If a subclass sets schema_class explicitly, the auto-derive doesn't
+    clobber it. (Covers the case where the generic param is broader than
+    the runtime schema_class — e.g. `[BaseSchema]` with a stricter subclass.)"""
+
+    class _StricterSchema(_NoteSchema):
+        pass
+
+    class _ExplicitView(SchemaView[_NoteSchema]):
+        schema_class = _StricterSchema  # type: ignore[assignment]
+        template_name = "ignored"
+
+    assert _ExplicitView.schema_class is _StricterSchema
+
+
 def test_default_schema_valid_redirects_to_success_url():
     """Without a schema_valid override, a successful POST redirects."""
 

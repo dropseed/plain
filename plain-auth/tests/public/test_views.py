@@ -41,3 +41,21 @@ def test_no_login_url_forbidden(db):
     client = Client()
     response = client.get("/nolink/")
     assert response.status_code == 403
+
+
+def test_login_required_view_redirects_when_anonymous(db):
+    """LoginRequiredView inherits login_required=True — anonymous redirects."""
+    client = Client()
+    response = client.get("/typed/")
+    assert response.status_code == 302
+    assert response.url == "/login/?next=/typed/"
+
+
+def test_login_required_view_renders_with_typed_user(db):
+    """When authenticated, LoginRequiredView's `self.user` is the User model."""
+    user = User.query.create(username="alice")
+    client = Client()
+    client.force_login(user)
+    response = client.get("/typed/")
+    assert response.status_code == 200
+    assert response.content == b"user:alice"

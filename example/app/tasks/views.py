@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain.auth.views import AuthView
+from plain.auth.views import LoginRequiredView
 from plain.htmx.views import HTMXView
 from plain.http import JsonResponse, RedirectResponse, Response
 from plain.schema import BoundSchema, Invalid
@@ -20,10 +20,9 @@ from .models import Project, Tag, Task
 from .schemas import TaskSchema, TaskTitleSchema
 
 
-class TaskListView(AuthView, ListView):
+class TaskListView(LoginRequiredView, ListView):
     template_name = "tasks/list.html"
     context_object_name = "tasks"
-    login_required = True
 
     def get_objects(self) -> list[Task]:
         return list(
@@ -33,7 +32,7 @@ class TaskListView(AuthView, ListView):
         )
 
 
-class TaskDetailView(AuthView, HTMXView, DetailView):
+class TaskDetailView(LoginRequiredView, HTMXView, DetailView):
     """Detail page that also serves the HTMX inline-edit fragment.
 
     plain-hx-action="rename" → htmx_post_rename swaps the rendered title.
@@ -41,7 +40,6 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
 
     template_name = "tasks/detail.html"
     context_object_name = "task"
-    login_required = True
 
     def get_object(self) -> Task | None:
         return Task.query.filter(
@@ -71,30 +69,24 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
         return JsonResponse({"valid": True})
 
 
-class TaskCreateView(AuthView, SchemaCreateView[TaskSchema]):
+class TaskCreateView(LoginRequiredView, SchemaCreateView[TaskSchema]):
     """Create a Task using the auto-derived TaskSchema (ModelSchema)."""
 
     template_name = "tasks/create.html"
-    schema_class = TaskSchema
-    login_required = True
 
     def get_querysets(self) -> dict[str, Any]:
-        assert self.user is not None  # login_required=True
         return TaskSchema.querysets_for(self.user)
 
     def schema_valid(self, result: TaskSchema) -> Response:
         # Construct a Task with owner pre-set, then let ModelSchema
         # apply validated fields, save, and handle M2M.
-        assert self.user is not None
         self.object = result.save(Task(owner=self.user))
         return super().schema_valid(result)
 
 
-class TaskUpdateView(AuthView, SchemaUpdateView[TaskSchema]):
+class TaskUpdateView(LoginRequiredView, SchemaUpdateView[TaskSchema]):
     template_name = "tasks/update.html"
-    schema_class = TaskSchema
     context_object_name = "task"
-    login_required = True
 
     def get_object(self) -> Task | None:
         return Task.query.filter(
@@ -103,14 +95,12 @@ class TaskUpdateView(AuthView, SchemaUpdateView[TaskSchema]):
         ).first()
 
     def get_querysets(self) -> dict[str, Any]:
-        assert self.user is not None
         return TaskSchema.querysets_for(self.user)
 
 
-class TaskDeleteView(AuthView, SchemaDeleteView):
+class TaskDeleteView(LoginRequiredView, SchemaDeleteView):
     template_name = "tasks/delete.html"
     context_object_name = "task"
-    login_required = True
     success_url = reverse_lazy("tasks:list")
 
     def get_object(self) -> Task | None:
@@ -120,10 +110,8 @@ class TaskDeleteView(AuthView, SchemaDeleteView):
         ).first()
 
 
-class TaskSeedView(AuthView, View):
+class TaskSeedView(LoginRequiredView, View):
     """Convenience: ensures the current user has at least one Project and Tag."""
-
-    login_required = True
 
     def get(self) -> Response:
         if not Project.query.filter(owner=self.user).exists():

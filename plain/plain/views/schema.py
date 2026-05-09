@@ -2,17 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import Any, TypeVar, get_args, get_origin
 
 from plain.exceptions import ImproperlyConfigured
 from plain.http import RedirectResponse, Response
-from plain.schema import BoundSchema, Invalid
+from plain.schema import BoundSchema, Invalid, Schema
 
 from .objects import DetailView
 from .templates import TemplateView
-
-if TYPE_CHECKING:
-    from plain.schema import Schema
 
 
 class SchemaView[S: "Schema"](TemplateView):
@@ -38,6 +35,32 @@ class SchemaView[S: "Schema"](TemplateView):
 
     schema_class: type[S] | None = None
     success_url: Callable | str | None = None
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        # Auto-derive schema_class from the generic parameter.
+        #
+        #     class TaskCreateView(SchemaCreateView[TaskSchema]): ...
+        #
+        # ...sets schema_class = TaskSchema without an explicit assignment.
+        # Skip if the subclass already set it explicitly, or if the generic
+        # arg is still a TypeVar (intermediate generic class like
+        # `SchemaUpdateView[S](DetailView, SchemaView[S])`).
+        if cls.__dict__.get("schema_class") is not None:
+            return
+        for base in getattr(cls, "__orig_bases__", ()):
+            origin = get_origin(base)
+            if not (isinstance(origin, type) and issubclass(origin, SchemaView)):
+                continue
+            args = get_args(base)
+            if not args:
+                continue
+            candidate = args[0]
+            if isinstance(candidate, TypeVar):
+                continue
+            if isinstance(candidate, type) and issubclass(candidate, Schema):
+                cls.schema_class = candidate
+                return
 
     def get_schema_class(self) -> type[S]:
         if not self.schema_class:
