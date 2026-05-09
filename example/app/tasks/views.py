@@ -78,27 +78,15 @@ class TaskCreateView(AuthView, SchemaCreateView[TaskSchema]):
     schema_class = TaskSchema
     login_required = True
 
-    def post(self) -> Response:
-        # ModelSchema needs a per-request queryset for FK/M2M validation;
-        # SchemaView's default post() doesn't pass context. Override here.
+    def get_querysets(self) -> dict[str, Any]:
         assert self.user is not None  # login_required=True
-        result = self.schema_class.validate(
-            self.request.form_data,
-            files=self.request.files,
-            context={"querysets": TaskSchema.querysets_for(self.user)},
-        )
-        if isinstance(result, Invalid):
-            bound = BoundSchema.from_invalid(self.schema_class, result)
-            return self.schema_invalid(bound)
-        return self.schema_valid(result)
+        return TaskSchema.querysets_for(self.user)
 
     def schema_valid(self, result: TaskSchema) -> Response:
-        # Construct a fresh Task with owner pre-set, then let ModelSchema
-        # apply validated fields and save (handling M2M post-PK).
+        # Construct a Task with owner pre-set, then let ModelSchema
+        # apply validated fields, save, and handle M2M.
         assert self.user is not None
-        task = Task(owner=self.user)
-        result.save_to(task)
-        self.object = task
+        self.object = result.save(Task(owner=self.user))
         return super().schema_valid(result)
 
 
@@ -114,7 +102,13 @@ class TaskUpdateView(AuthView, SchemaUpdateView[TaskSchema]):
             id=self.url_kwargs["id"],
         ).first()
 
+    def get_querysets(self) -> dict[str, Any]:
+        assert self.user is not None
+        return TaskSchema.querysets_for(self.user)
+
     def get_initial(self) -> dict[str, Any]:
+        # SchemaUpdateView's default uses `getattr(self.object, name)` per
+        # field; for FK and M2M we want IDs, not the related instances.
         return {
             "title": self.object.title,
             "notes": self.object.notes,
@@ -124,24 +118,6 @@ class TaskUpdateView(AuthView, SchemaUpdateView[TaskSchema]):
             "project": self.object.project_id if self.object.project_id else None,
             "tags": [str(t.id) for t in self.object.tags.query],
         }
-
-    def post(self) -> Response:
-        assert self.user is not None
-        result = self.schema_class.validate(
-            self.request.form_data,
-            files=self.request.files,
-            context={"querysets": TaskSchema.querysets_for(self.user)},
-        )
-        if isinstance(result, Invalid):
-            bound = BoundSchema.from_invalid(
-                self.schema_class, result, initial=self.get_initial()
-            )
-            return self.schema_invalid(bound)
-        return self.schema_valid(result)
-
-    def schema_valid(self, result: TaskSchema) -> Response:
-        result.save_to(self.object)
-        return RedirectResponse(self.get_success_url(result))
 
 
 class TaskDeleteView(AuthView, SchemaDeleteView):

@@ -145,6 +145,26 @@ class Schema(metaclass=SchemaMeta):
                 setattr(instance, name, getattr(self, name))
         return instance
 
+    def save[Instance](self, instance: Instance | None = None) -> Instance:
+        """Apply validated values to `instance` and persist it.
+
+        Default behavior: `apply_to(instance)` then `instance.save()`. Suitable
+        for any object exposing a `save()` method (model instance, ORM-like
+        wrapper, custom record).
+
+        Plain `Schema` cannot construct a fresh instance — pass an existing
+        one. `ModelSchema` overrides this to support `save()` (no args, builds
+        from `model = ...`) and to handle M2M assignment ordering.
+        """
+        if instance is None:
+            raise TypeError(
+                f"{type(self).__name__}.save() requires an instance argument. "
+                f"Only ModelSchema can construct one from `model = ...`."
+            )
+        self.apply_to(instance)
+        instance.save()  # ty: ignore[unresolved-attribute]
+        return instance
+
     def check(
         self, *, context: dict[str, Any] | None = None
     ) -> dict[str, list[str]] | None:

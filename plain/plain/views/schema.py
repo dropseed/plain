@@ -52,6 +52,30 @@ class SchemaView[S: "Schema"](TemplateView):
         """Override to supply initial values for the unbound (GET) form."""
         return {}
 
+    def get_validate_context(self) -> dict[str, Any]:
+        """Override to supply per-request `context=` to `validate()`.
+
+        Schemas read context for `check()` cross-field validation.
+        ModelSchema-backed views typically also override `get_querysets()`
+        to scope FK/M2M validation against per-user querysets — those get
+        merged into the context automatically.
+        """
+        querysets = self.get_querysets()
+        if querysets:
+            return {"querysets": querysets}
+        return {}
+
+    def get_querysets(self) -> dict[str, Any]:
+        """Override on ModelSchema-backed views to scope FK/M2M validation.
+
+        Returns a dict mapping field names to per-request querysets — e.g.
+        `{"project": Project.query.filter(owner=self.user)}`. The default
+        `get_validate_context()` merges this under `context["querysets"]`,
+        which `ModelSchema.validate` reads to substitute `ModelChoiceField`
+        querysets per request.
+        """
+        return {}
+
     def get_success_url(self, result: S) -> str:
         if not self.success_url:
             raise ImproperlyConfigured("No URL to redirect to. Provide a success_url.")
@@ -80,6 +104,7 @@ class SchemaView[S: "Schema"](TemplateView):
         result = schema_class.validate(
             self.request.form_data,
             files=self.request.files,
+            context=self.get_validate_context(),
         )
         if isinstance(result, Invalid):
             bound = BoundSchema.from_invalid(
@@ -110,17 +135,16 @@ class SchemaCreateView[S: "Schema"](SchemaView[S]):
             ) from exc
 
     def schema_valid(self, result: S) -> Response:
-        self.object = result.save()  # ty: ignore[unresolved-attribute]
+        self.object = result.save()
         return super().schema_valid(result)
 
 
 class SchemaUpdateView[S: "Schema"](DetailView, SchemaView[S]):
     """SchemaView for update-flows — pre-fills the form from `self.object`
-    on GET, and applies validated values back to `self.object` on POST.
-
-    The schema is expected to expose `apply_to(instance)` (which
-    `Schema` provides by default) — the view calls it with the looked-up
-    object, then calls `.save()` on the instance.
+    on GET, applies validated values back to `self.object` on POST via
+    `result.save(self.object)`. The base `Schema.save()` method handles
+    scalar assignment + persistence; `ModelSchema.save()` additionally
+    handles M2M ordering.
     """
 
     def get_initial(self) -> dict[str, Any]:
@@ -143,8 +167,7 @@ class SchemaUpdateView[S: "Schema"](DetailView, SchemaView[S]):
             ) from exc
 
     def schema_valid(self, result: S) -> Response:
-        result.apply_to(self.object)
-        self.object.save()
+        result.save(self.object)
         return super().schema_valid(result)
 
 

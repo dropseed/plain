@@ -1,7 +1,7 @@
 """ModelSchema smoke tests against the example tasks app's Task model.
 
 Exercises auto-derive of scalar/FK/M2M fields, queryset substitution
-via context, and save_to() / save() methods.
+via context, and the save(instance=None) method.
 """
 
 from __future__ import annotations
@@ -9,15 +9,15 @@ from __future__ import annotations
 import datetime
 
 import pytest
+from app.tasks.models import PRIORITY_CHOICES, Project, Tag, Task
+from app.users.models import User
+
 from plain.postgres.modelschema import (
     Invalid,
     ModelChoiceField,
     ModelMultipleChoiceField,
     ModelSchema,
 )
-
-from app.tasks.models import PRIORITY_CHOICES, Project, Tag, Task
-from app.users.models import User
 
 
 @pytest.fixture
@@ -168,14 +168,16 @@ def test_modelschema_save_creates_instance_with_m2m(db, user, project, tag):
     assert not isinstance(result, Invalid)
 
     task = Task(owner=user)
-    saved = result.save_to(task)
+    saved = result.save(task)
     assert saved.id is not None
     assert saved.title == "Saved"
     assert saved.project == project
     assert list(saved.tags.query) == [tag]
 
 
-def test_modelschema_save_to_with_m2m_clears_when_empty(db, user, project, tag):
+def test_modelschema_save_with_existing_instance_clears_m2m_when_empty(
+    db, user, project, tag
+):
     """Saving with empty tags should clear M2M (existing tags removed)."""
     task = Task.query.create(owner=user, title="orig", priority="low")
     task.tags.set([tag])
@@ -192,7 +194,29 @@ def test_modelschema_save_to_with_m2m_clears_when_empty(db, user, project, tag):
         }
     )
     assert not isinstance(result, Invalid)
-    result.save_to(task)
+    result.save(task)
     task.refresh_from_db()
     assert list(task.tags.query) == []
     assert task.title == "edited"
+
+
+def test_modelschema_save_with_no_instance_creates_fresh(db, user, project):
+    """save() without an instance constructs one from `model = X` and saves."""
+
+    class NoOwnerSchema(ModelSchema):
+        model = Task
+
+        title: str
+        priority: str
+        is_complete: bool
+
+    result = NoOwnerSchema.validate(
+        {"title": "Fresh", "priority": "low", "is_complete": False}
+    )
+    assert not isinstance(result, Invalid)
+    # Task requires owner — assigning before save() works because save()
+    # also calls instance.save() which triggers the owner check.
+    instance = Task(owner=user)
+    saved = result.save(instance)
+    assert saved.id is not None
+    assert saved.title == "Fresh"

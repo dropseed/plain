@@ -185,12 +185,26 @@ class ModelSchema(Schema, metaclass=ModelSchemaMeta):
             target_cls, data, files=files, context=context, partial=partial
         )
 
-    def save_to(self, instance: Any) -> Any:
-        """Apply validated values to `instance` and save.
+    def save(self, instance: Any = None) -> Any:
+        """Apply validated values to a model instance and persist.
 
-        Sets scalar + FK fields, calls `instance.save()`, then sets M2M
-        relationships (which need the instance to have a primary key).
+        With `instance=None` (default), constructs a fresh instance from
+        the schema's `model` and saves it. Pass an existing instance to
+        update an existing row.
+
+        Scalar + FK fields are applied with `setattr`, then `instance.save()`
+        runs, then M2M relationships are set (they need the instance to
+        have a primary key).
         """
+        if instance is None:
+            model = type(self)._model_schema_model
+            if model is None:
+                raise TypeError(
+                    f"{type(self).__name__}.save() requires `model = ...` "
+                    f"to be set, or pass an explicit instance."
+                )
+            instance = model()
+
         m2m_assignments: list[tuple[str, Any]] = []
         for fname, field in type(self)._schema_fields.items():
             if not hasattr(self, fname):
@@ -207,15 +221,6 @@ class ModelSchema(Schema, metaclass=ModelSchemaMeta):
             getattr(instance, fname).set(list(value))
 
         return instance
-
-    def save(self) -> Any:
-        """Construct a fresh model instance from validated fields and save."""
-        model = type(self)._model_schema_model
-        if model is None:
-            raise TypeError(
-                f"{type(self).__name__}.save() requires `model = ...` to be set."
-            )
-        return self.save_to(model())
 
 
 def _with_substituted_querysets(

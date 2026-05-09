@@ -92,8 +92,7 @@ class TaskListAPIView(APIView):
         )
         if isinstance(result, Invalid):
             return 400, {"errors": result.errors}
-        task = Task(owner=user)
-        result.save_to(task)
+        task = result.save(Task(owner=user))
         return 201, _serialize(task)
 
 

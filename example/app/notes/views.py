@@ -44,9 +44,7 @@ class NoteCreateView(AuthView, SchemaCreateView[NoteSchema]):
     def schema_valid(self, result: NoteSchema) -> Response:
         # Author isn't a schema field — set on the instance before saving.
         assert self.user is not None
-        note = Note(author=self.user)
-        result.save_to(note)
-        self.object = note
+        self.object = result.save(Note(author=self.user))
         return super().schema_valid(result)
 
 
