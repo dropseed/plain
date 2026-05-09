@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from plain.http import RedirectResponse, Response
-from plain.schema import BoundSchema, Invalid
+from plain.http import Response
 from plain.urls import reverse_lazy
-from plain.views import FormView, TemplateView, View
+from plain.views import FormView, SchemaView, TemplateView
 
 from .forms import ArchiveFilterForm, ArchiveSearchForm, ContactForm
 from .models import ContactSubmission
@@ -34,50 +33,36 @@ class ContactView(FormView):
         return super().form_valid(form)
 
 
-class ContactSchemaView(View):
-    """Parallel to ContactView using plain.schema.Schema + BoundSchema.
+class ContactSchemaView(SchemaView[ContactSchema]):
+    """Parallel to ContactView using plain.schema.Schema + SchemaView.
 
     Same fields, same validation, same template — but Schema replaces the
-    Form class. The view does the GET/POST orchestration explicitly so
-    the data flow is visible top-to-bottom.
+    Form class and SchemaView replaces FormView. Compare the two side by
+    side: the SchemaView version is shorter because the GET/POST cycle
+    is handled by the base class, and `apply_to()` does the schema-to-model
+    field copy without listing fields twice.
     """
 
-    def get(self) -> Response:
-        initial: dict[str, Any] = {}
+    schema_class = ContactSchema
+    template_name = "contacts/form.html"
+    success_url = reverse_lazy("contacts:success")
+
+    def get_initial(self) -> dict[str, Any]:
         if name := self.request.query_params.get("name"):
-            initial["name"] = name
-        bound = BoundSchema(schema_class=ContactSchema, initial=initial)
-        return self.render_template_response(bound)
+            return {"name": name}
+        return {}
 
-    def post(self) -> Response:
-        result = ContactSchema.validate(self.request.form_data)
-        if isinstance(result, Invalid):
-            bound = BoundSchema.from_invalid(ContactSchema, result)
-            return self.render_template_response(bound)
+    def get_template_context(self) -> dict[str, Any]:
+        context = super().get_template_context()
+        context["ask_company"] = self.request.query_params.get("company") == "1"
+        return context
 
-        # result IS the typed ContactSchema. apply_to() copies validated
-        # fields onto a fresh model instance — schema and model field names
-        # line up, so this stays type-safe end-to-end without naming the
-        # same fields twice.
+    def schema_valid(self, result: ContactSchema) -> Response:
         submission = result.apply_to(ContactSubmission())
         # `company` is `str | None` on the schema; model wants `""` for null.
         submission.company = result.company or ""
         submission.save()
-        return RedirectResponse(reverse_lazy("contacts:success"))
-
-    def render_template_response(self, form: BoundSchema) -> Response:
-        from plain.templates import Template
-
-        ask_company = self.request.query_params.get("company") == "1"
-        return Response(
-            Template("contacts/form.html").render(
-                {
-                    "form": form,
-                    "ask_company": ask_company,
-                    "request": self.request,
-                }
-            )
-        )
+        return super().schema_valid(result)
 
 
 class ContactSuccessView(TemplateView):
