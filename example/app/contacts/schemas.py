@@ -34,7 +34,10 @@ def _disallow_blocked_email(value: str) -> None:
 
 
 class ContactSchema(Schema):
-    """Parallel to ContactForm — same fields, same validation rules."""
+    """Plain (non-model) schema exercising the common field types and
+    cross-field validation. The contacts/form.html template renders
+    against either Form or Schema — `BoundSchema` is duck-compatible
+    with `BoundField`."""
 
     name: str = types.TextField(max_length=100, min_length=2)
     email: str = types.EmailField(validators=[_disallow_blocked_email])
@@ -59,3 +62,20 @@ class AttachmentUploadSchema(Schema):
 
     description: str = types.TextField(min_length=1, max_length=500)
     document: UploadedFile = types.FileField(max_length=120)
+
+
+class ArchiveSearchSchema(Schema):
+    """Filter form for the archive page — uses prefix="q" so it can sit
+    next to ArchiveFilterSchema on the same page."""
+
+    text: str | None = types.TextField(required=False)
+
+
+class ArchiveFilterSchema(Schema):
+    """Second filter form for the archive page; prefix="f"."""
+
+    subject: str | None = types.ChoiceField(
+        choices=[("", "All subjects"), *SUBJECT_CHOICES],
+        required=False,
+    )
+    subscribed_only: bool = types.BooleanField(required=False)

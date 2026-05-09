@@ -3,45 +3,21 @@ from __future__ import annotations
 from typing import Any
 
 from plain.http import Response
+from plain.schema import BoundSchema
 from plain.urls import reverse_lazy
-from plain.views import FormView, SchemaView, TemplateView
+from plain.views import SchemaView, TemplateView
 
-from .forms import ArchiveFilterForm, ArchiveSearchForm, ContactForm
 from .models import ContactSubmission
-from .schemas import ContactSchema
+from .schemas import (
+    ArchiveFilterSchema,
+    ArchiveSearchSchema,
+    ContactSchema,
+)
 
 
-class ContactView(FormView):
-    template_name = "contacts/form.html"
-    form_class = ContactForm
-    success_url = reverse_lazy("contacts:success")
-
-    def get_form_kwargs(self) -> dict[str, Any]:
-        kwargs = super().get_form_kwargs()
-        kwargs["ask_company"] = self.request.query_params.get("company") == "1"
-        if name := self.request.query_params.get("name"):
-            kwargs["initial"] = {"name": name}
-        return kwargs
-
-    def get_template_context(self) -> dict[str, Any]:
-        context = super().get_template_context()
-        context["ask_company"] = self.request.query_params.get("company") == "1"
-        return context
-
-    def form_valid(self, form: ContactForm) -> Response:
-        form.save()
-        return super().form_valid(form)
-
-
-class ContactSchemaView(SchemaView[ContactSchema]):
-    """Parallel to ContactView using plain.schema.Schema + SchemaView.
-
-    Same fields, same validation, same template — but Schema replaces the
-    Form class and SchemaView replaces FormView. Compare the two side by
-    side: the SchemaView version is shorter because the GET/POST cycle
-    is handled by the base class, and `apply_to()` does the schema-to-model
-    field copy without listing fields twice.
-    """
+class ContactView(SchemaView[ContactSchema]):
+    """Schema-based contact form. Replaces the previous ContactView/Form
+    setup — same fields, same validation, same template."""
 
     schema_class = ContactSchema
     template_name = "contacts/form.html"
@@ -70,16 +46,24 @@ class ContactSuccessView(TemplateView):
 
 
 class ContactArchiveView(TemplateView):
-    """Two forms (search + filter) on the same page, distinguished by prefix."""
+    """Two filter forms (search + filter) on the same page via prefix.
+
+    Both are GET-style filters so they're rendered as unbound BoundSchemas
+    against the existing template; the actual filtering reads raw
+    query_params alongside.
+    """
 
     template_name = "contacts/archive.html"
 
     def get_template_context(self) -> dict[str, Any]:
         context = super().get_template_context()
-        search = ArchiveSearchForm(request=self.request)
-        filt = ArchiveFilterForm(request=self.request)
+        context["search_form"] = BoundSchema(
+            schema_class=ArchiveSearchSchema, prefix="q"
+        )
+        context["filter_form"] = BoundSchema(
+            schema_class=ArchiveFilterSchema, prefix="f"
+        )
 
-        # Both are unbound (GET-style) — read raw query_params for filtering.
         params = self.request.query_params
         query = ContactSubmission.query.all()
         if text := params.get("q-text"):
@@ -89,7 +73,5 @@ class ContactArchiveView(TemplateView):
         if params.get("f-subscribed_only") == "on":
             query = query.filter(subscribe=True)
 
-        context["search_form"] = search
-        context["filter_form"] = filt
         context["submissions"] = list(query[:50])
         return context
