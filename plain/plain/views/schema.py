@@ -142,37 +142,49 @@ class SchemaView[S: "Schema"](TemplateView):
         return self.schema_valid(result)
 
 
-class SchemaCreateView[S: "Schema"](SchemaView[S]):
+class SchemaCreateView[S: "Schema", M = Any](SchemaView[S]):
     """SchemaView for create-flows — the schema is expected to expose a
     `save()` method that returns the newly-created instance. The view
     stashes that instance on `self.object` so `success_url.format(...)`
     and `instance.get_absolute_url()` work the same way as `CreateView`.
+
+    Generic over both the schema type and the saved-instance type. Most
+    users only parameterize the schema (`SchemaCreateView[TaskSchema]`)
+    and leave `M = Any` — useful when the schema's save() return type is
+    enough. Fully-typed flows can pin both: `SchemaCreateView[TaskSchema, Task]`.
     """
 
-    object: Any = None
+    object: M | None = None
 
     def get_success_url(self, result: S) -> str:
+        # `schema_valid` (called immediately before get_success_url) sets
+        # self.object — narrow it for the type system.
+        assert self.object is not None
         if self.success_url:
             return str(self.success_url).format(**self.object.__dict__)
-        try:
-            return self.object.get_absolute_url()
-        except AttributeError as exc:
+        get_absolute_url = getattr(self.object, "get_absolute_url", None)
+        if get_absolute_url is None:
             raise ImproperlyConfigured(
                 "No URL to redirect to. Either provide a success_url or "
                 "define a get_absolute_url method on the saved instance."
-            ) from exc
+            )
+        return get_absolute_url()
 
     def schema_valid(self, result: S) -> Response:
         self.object = result.save()
         return super().schema_valid(result)
 
 
-class SchemaUpdateView[S: "Schema"](DetailView, SchemaView[S]):
+class SchemaUpdateView[S: "Schema", M = Any](DetailView[M], SchemaView[S]):
     """SchemaView for update-flows — pre-fills the form from `self.object`
     on GET, applies validated values back to `self.object` on POST via
     `result.save(self.object)`. The base `Schema.save()` method handles
     scalar assignment + persistence; `ModelSchema.save()` additionally
     handles M2M ordering.
+
+    Generic over both the schema type and the model type. Pin the model
+    type to get a typed `self.object`:
+    `class TaskUpdate(SchemaUpdateView[TaskSchema, Task])`.
     """
 
     def get_initial(self) -> dict[str, Any]:
@@ -185,22 +197,26 @@ class SchemaUpdateView[S: "Schema"](DetailView, SchemaView[S]):
     def get_success_url(self, result: S) -> str:
         if self.success_url:
             return str(self.success_url).format(**self.object.__dict__)
-        try:
-            return self.object.get_absolute_url()
-        except AttributeError as exc:
+        get_absolute_url = getattr(self.object, "get_absolute_url", None)
+        if get_absolute_url is None:
             raise ImproperlyConfigured(
                 "No URL to redirect to. Either provide a success_url or "
                 "define a get_absolute_url method on the instance."
-            ) from exc
+            )
+        return get_absolute_url()
 
     def schema_valid(self, result: S) -> Response:
         result.save(self.object)
         return super().schema_valid(result)
 
 
-class SchemaDeleteView(DetailView, SchemaView):
+class SchemaDeleteView[M = Any](DetailView[M], SchemaView):
     """Confirmation view for deleting `self.object` — uses an empty Schema
-    as the form (just a CSRF-protected POST submit, no fields)."""
+    as the form (just a CSRF-protected POST submit, no fields).
+
+    Pin the model type for a typed `self.object`:
+    `class TaskDelete(SchemaDeleteView[Task])`.
+    """
 
     @cached_property
     def schema_class(self) -> type[Schema]:
@@ -210,5 +226,9 @@ class SchemaDeleteView(DetailView, SchemaView):
         return type("EmptyDeleteSchema", (Schema,), {})
 
     def schema_valid(self, result: Schema) -> Response:
-        self.object.delete()
+        # `self.object` could be any M (default `Any`) — postgres models have
+        # `.delete()` but ty can't constrain `M` without forcing all users to
+        # implement a Protocol. AttributeError at runtime is acceptable for
+        # the misuse case (deleting an undeletable object).
+        self.object.delete()  # ty: ignore[unresolved-attribute]
         return super().schema_valid(result)

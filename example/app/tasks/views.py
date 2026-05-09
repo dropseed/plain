@@ -20,7 +20,7 @@ from .models import Project, Tag, Task
 from .schemas import TaskSchema, TaskTitleSchema
 
 
-class TaskListView(LoginRequiredView, ListView):
+class TaskListView(LoginRequiredView, ListView[Task]):
     template_name = "tasks/list.html"
     context_object_name = "tasks"
 
@@ -32,7 +32,7 @@ class TaskListView(LoginRequiredView, ListView):
         )
 
 
-class TaskDetailView(LoginRequiredView, HTMXView, DetailView):
+class TaskDetailView(LoginRequiredView, HTMXView, DetailView[Task]):
     """Detail page that also serves the HTMX inline-edit fragment.
 
     plain-hx-action="rename" → htmx_post_rename swaps the rendered title.
@@ -69,7 +69,7 @@ class TaskDetailView(LoginRequiredView, HTMXView, DetailView):
         return JsonResponse({"valid": True})
 
 
-class TaskCreateView(LoginRequiredView, SchemaCreateView[TaskSchema]):
+class TaskCreateView(LoginRequiredView, SchemaCreateView[TaskSchema, Task]):
     """Create a Task using the auto-derived TaskSchema (ModelSchema)."""
 
     template_name = "tasks/create.html"
@@ -84,7 +84,7 @@ class TaskCreateView(LoginRequiredView, SchemaCreateView[TaskSchema]):
         return super().schema_valid(result)
 
 
-class TaskUpdateView(LoginRequiredView, SchemaUpdateView[TaskSchema]):
+class TaskUpdateView(LoginRequiredView, SchemaUpdateView[TaskSchema, Task]):
     template_name = "tasks/update.html"
     context_object_name = "task"
 
@@ -98,7 +98,7 @@ class TaskUpdateView(LoginRequiredView, SchemaUpdateView[TaskSchema]):
         return TaskSchema.querysets_for(self.user)
 
 
-class TaskDeleteView(LoginRequiredView, SchemaDeleteView):
+class TaskDeleteView(LoginRequiredView, SchemaDeleteView[Task]):
     template_name = "tasks/delete.html"
     context_object_name = "task"
     success_url = reverse_lazy("tasks:list")

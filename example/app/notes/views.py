@@ -15,7 +15,7 @@ from .forms import NoteSchema
 from .models import Note
 
 
-class NoteListView(LoginRequiredView, ListView):
+class NoteListView(LoginRequiredView, ListView[Note]):
     template_name = "notes/list.html"
     context_object_name = "notes"
 
@@ -23,7 +23,7 @@ class NoteListView(LoginRequiredView, ListView):
         return list(Note.query.filter(author=self.user))
 
 
-class NoteDetailView(LoginRequiredView, DetailView):
+class NoteDetailView(LoginRequiredView, DetailView[Note]):
     template_name = "notes/detail.html"
     context_object_name = "note"
 
@@ -34,7 +34,7 @@ class NoteDetailView(LoginRequiredView, DetailView):
         ).first()
 
 
-class NoteCreateView(LoginRequiredView, SchemaCreateView[NoteSchema]):
+class NoteCreateView(LoginRequiredView, SchemaCreateView[NoteSchema, Note]):
     template_name = "notes/create.html"
 
     def schema_valid(self, result: NoteSchema) -> Response:
@@ -43,7 +43,7 @@ class NoteCreateView(LoginRequiredView, SchemaCreateView[NoteSchema]):
         return super().schema_valid(result)
 
 
-class NoteUpdateView(LoginRequiredView, SchemaUpdateView[NoteSchema]):
+class NoteUpdateView(LoginRequiredView, SchemaUpdateView[NoteSchema, Note]):
     template_name = "notes/update.html"
     context_object_name = "note"
 
@@ -54,7 +54,7 @@ class NoteUpdateView(LoginRequiredView, SchemaUpdateView[NoteSchema]):
         ).first()
 
 
-class NoteDeleteView(LoginRequiredView, SchemaDeleteView):
+class NoteDeleteView(LoginRequiredView, SchemaDeleteView[Note]):
     template_name = "notes/delete.html"
     context_object_name = "note"
     success_url = reverse_lazy("notes:list")
