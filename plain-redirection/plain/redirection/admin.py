@@ -8,22 +8,20 @@ from plain.admin.views import (
     AdminViewset,
     register_viewset,
 )
-from plain.postgres.forms import ModelForm
+from plain.postgres.modelschema import ModelSchema
 
 from .models import NotFoundLog, Redirect, RedirectLog
 
 
-class RedirectForm(ModelForm):
-    class Meta:
-        model = Redirect
-        fields = [
-            "from_pattern",
-            "to_pattern",
-            "http_status",
-            "order",
-            "enabled",
-            "is_regex",
-        ]
+class RedirectSchema(ModelSchema):
+    model = Redirect
+
+    from_pattern: str
+    to_pattern: str
+    http_status: int
+    order: int
+    enabled: bool
+    is_regex: bool
 
 
 @register_viewset
@@ -42,12 +40,12 @@ class RedirectAdmin(AdminViewset):
 
     class CreateView(AdminModelCreateView):
         model = Redirect
-        form_class = RedirectForm
+        schema_class = RedirectSchema
         template_name = "admin/plainredirection/redirect_form.html"
 
     class UpdateView(AdminModelUpdateView):
         model = Redirect
-        form_class = RedirectForm
+        schema_class = RedirectSchema
         template_name = "admin/plainredirection/redirect_form.html"
 
     class DeleteView(AdminModelDeleteView):

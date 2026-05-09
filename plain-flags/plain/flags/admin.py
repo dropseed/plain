@@ -9,7 +9,7 @@ from plain.admin.views import (
     register_viewset,
 )
 from plain.postgres import QuerySet
-from plain.postgres.forms import ModelForm
+from plain.postgres.modelschema import ModelSchema
 from plain.preflight import PreflightResult
 
 from .models import Flag, FlagResult
@@ -44,10 +44,11 @@ class FlagAdmin(AdminViewset):
         model = Flag
 
 
-class FlagResultForm(ModelForm):
-    class Meta:
-        model = FlagResult
-        fields = ["key", "value"]
+class FlagResultSchema(ModelSchema):
+    model = FlagResult
+
+    key: str
+    value: dict | list | str | int | float | bool | None
 
 
 @register_viewset
@@ -77,5 +78,5 @@ class FlagResultAdmin(AdminViewset):
     class UpdateView(AdminModelUpdateView):
         model = FlagResult
         title = "Update flag result"
-        form_class = FlagResultForm
+        schema_class = FlagResultSchema
         template_name = "admin/plainflags/flagresult_form.html"

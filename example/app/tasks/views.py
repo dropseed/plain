@@ -8,10 +8,10 @@ from plain.http import JsonResponse, RedirectResponse, Response
 from plain.schema import BoundSchema, Invalid
 from plain.urls import reverse, reverse_lazy
 from plain.views import (
-    DeleteView,
     DetailView,
     ListView,
     SchemaCreateView,
+    SchemaDeleteView,
     SchemaUpdateView,
     View,
 )
@@ -144,7 +144,7 @@ class TaskUpdateView(AuthView, SchemaUpdateView[TaskSchema]):
         return RedirectResponse(self.get_success_url(result))
 
 
-class TaskDeleteView(AuthView, DeleteView):
+class TaskDeleteView(AuthView, SchemaDeleteView):
     template_name = "tasks/delete.html"
     context_object_name = "task"
     login_required = True

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from typing import Any
-
 from plain.auth.views import AuthView
-from plain.forms import BaseForm
+from plain.http import Response
 from plain.urls import reverse_lazy
-from plain.views import CreateView, DeleteView, DetailView, ListView, UpdateView
+from plain.views import (
+    DetailView,
+    ListView,
+    SchemaCreateView,
+    SchemaDeleteView,
+    SchemaUpdateView,
+)
 
-from .forms import NoteForm
+from .forms import NoteSchema
 from .models import Note
 
 
@@ -32,21 +36,23 @@ class NoteDetailView(AuthView, DetailView):
         ).first()
 
 
-class NoteCreateView(AuthView, CreateView):
+class NoteCreateView(AuthView, SchemaCreateView[NoteSchema]):
     template_name = "notes/create.html"
-    form_class = NoteForm
+    schema_class = NoteSchema
     login_required = True
 
-    def form_valid(self, form: BaseForm) -> Any:
-        # Author isn't a form field — set it on the instance before save.
-        assert isinstance(form, NoteForm)
-        form.instance.author = self.user
-        return super().form_valid(form)
+    def schema_valid(self, result: NoteSchema) -> Response:
+        # Author isn't a schema field — set on the instance before saving.
+        assert self.user is not None
+        note = Note(author=self.user)
+        result.save_to(note)
+        self.object = note
+        return super().schema_valid(result)
 
 
-class NoteUpdateView(AuthView, UpdateView):
+class NoteUpdateView(AuthView, SchemaUpdateView[NoteSchema]):
     template_name = "notes/update.html"
-    form_class = NoteForm
+    schema_class = NoteSchema
     context_object_name = "note"
     login_required = True
 
@@ -57,7 +63,7 @@ class NoteUpdateView(AuthView, UpdateView):
         ).first()
 
 
-class NoteDeleteView(AuthView, DeleteView):
+class NoteDeleteView(AuthView, SchemaDeleteView):
     template_name = "notes/delete.html"
     context_object_name = "note"
     login_required = True

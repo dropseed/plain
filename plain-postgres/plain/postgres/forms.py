@@ -1,22 +1,20 @@
-"""
-Helper functions for creating Form classes from Plain models
-and database field objects.
+"""Choice-field types and the model-field → schema-field dispatch
+function used by `plain.postgres.modelschema`.
+
+This module is the residual of the previous Form/ModelForm implementation.
+The Form-based classes have been retired in favor of `plain.schema.Schema`
+and `plain.postgres.modelschema.ModelSchema`. The remaining contents are
+the FK/M2M choice fields and the dispatch function — both reused by
+ModelSchema's auto-derive metaclass.
 """
 
 from __future__ import annotations
 
-from itertools import chain
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
-from plain.exceptions import (
-    NON_FIELD_ERRORS,
-    ImproperlyConfigured,
-    ValidationError,
-)
+from plain.exceptions import ValidationError
 from plain.forms import fields
 from plain.forms.fields import ChoiceField, Field
-from plain.forms.forms import BaseForm, DeclarativeFieldsMetaclass
-from plain.postgres.exceptions import FieldError
 from plain.postgres.fields import ChoicesField
 from plain.postgres.fields.base import ColumnField, DefaultableField
 
@@ -24,400 +22,10 @@ if TYPE_CHECKING:
     from plain.postgres.fields import Field as ModelField
 
 __all__ = (
-    "ModelForm",
-    "BaseModelForm",
-    "model_to_dict",
-    "fields_for_model",
     "ModelChoiceField",
     "ModelMultipleChoiceField",
+    "modelfield_to_formfield",
 )
-
-
-def construct_instance(
-    form: BaseModelForm,
-    instance: Any,
-    fields: list[str] | tuple[str, ...] | None = None,
-) -> Any:
-    """
-    Construct and return a model instance from the bound ``form``'s
-    ``cleaned_data``, but do not save the returned instance to the database.
-    """
-    from plain import postgres
-
-    meta = instance._model_meta
-
-    cleaned_data = form.cleaned_data
-    file_field_list = []
-    for f in meta.fields:
-        if isinstance(f, postgres.PrimaryKeyField) or f.name not in cleaned_data:
-            continue
-        if fields is not None and f.name not in fields:
-            continue
-        # Leave defaults for fields that aren't in POST data, except for
-        # checkbox inputs because they don't appear in POST data if not checked.
-        if (
-            f.has_default()
-            and form.add_prefix(f.name) not in form.data
-            and form.add_prefix(f.name) not in form.files
-            # and form[f.name].field.widget.value_omitted_from_data(
-            #     form.data, form.files, form.add_prefix(f.name)
-            # )
-            and cleaned_data.get(f.name) in form[f.name].field.empty_values
-        ):
-            continue
-
-        # DB-expression defaults: preserve the DATABASE_DEFAULT sentinel that
-        # Model.__init__ already placed on the instance when the submitted
-        # value is empty. Otherwise save_form_data would overwrite it with
-        # None, and INSERT would pass NULL instead of DEFAULT.
-        if (
-            f.has_db_default()
-            and cleaned_data.get(f.name) in form[f.name].field.empty_values
-        ):
-            continue
-
-        f.save_form_data(instance, cleaned_data[f.name])
-
-    for f in file_field_list:
-        f.save_form_data(instance, cleaned_data[f.name])
-
-    return instance
-
-
-# ModelForms #################################################################
-
-
-def model_to_dict(
-    instance: Any, fields: list[str] | tuple[str, ...] | None = None
-) -> dict[str, Any]:
-    """
-    Return a dict containing the data in ``instance`` suitable for passing as
-    a Form's ``initial`` keyword argument.
-
-    ``fields`` is an optional list of field names. If provided, return only the
-    named.
-    """
-    from plain.postgres.fields import DATABASE_DEFAULT
-
-    meta = instance._model_meta
-    data = {}
-    for f in chain(meta.concrete_fields, meta.many_to_many):
-        if fields is not None and f.name not in fields:
-            continue
-        value = f.value_from_object(instance)
-        if value is DATABASE_DEFAULT:
-            # Field hasn't been populated yet — the DB will produce it on
-            # INSERT. Omit so it doesn't override the form field's own
-            # initial=None when used as form.initial.
-            continue
-        data[f.name] = value
-    return data
-
-
-def fields_for_model(
-    model: type[Any],
-    fields: list[str] | tuple[str, ...] | None = None,
-    formfield_callback: Any = None,
-    field_classes: dict[str, type[Field]] | None = None,
-) -> dict[str, Field | None]:
-    """
-    Return a dictionary containing form fields for the given model.
-
-    ``fields`` is an optional list of field names. If provided, return only the
-    named fields.
-
-    ``formfield_callback`` is a callable that takes a model field and returns
-    a form field.
-
-    ``field_classes`` is a dictionary of model field names mapped to a form
-    field class.
-    """
-    field_dict = {}
-    ignored = []
-    meta = model._model_meta
-
-    for f in sorted(
-        chain(meta.concrete_fields, meta.many_to_many), key=lambda f: f.name
-    ):
-        if fields is not None and f.name not in fields:
-            continue
-
-        kwargs = {}
-        if field_classes and f.name in field_classes:
-            kwargs["form_class"] = field_classes[f.name]
-
-        if formfield_callback is None:
-            formfield = modelfield_to_formfield(f, **kwargs)
-        elif not callable(formfield_callback):
-            raise TypeError("formfield_callback must be a function or callable")
-        else:
-            formfield = formfield_callback(f, **kwargs)
-
-        if formfield:
-            field_dict[f.name] = formfield
-        else:
-            ignored.append(f.name)
-    if fields:
-        field_dict = {f: field_dict.get(f) for f in fields if f not in ignored}
-    return field_dict
-
-
-class ModelFormOptions:
-    def __init__(self, options: Any = None) -> None:
-        self.model: type[Any] | None = getattr(options, "model", None)
-        self.fields: list[str] | tuple[str, ...] | None = getattr(
-            options, "fields", None
-        )
-        self.field_classes: dict[str, type[Field]] | None = getattr(
-            options, "field_classes", None
-        )
-        self.formfield_callback: Any = getattr(options, "formfield_callback", None)
-
-
-class ModelFormMetaclass(DeclarativeFieldsMetaclass):
-    def __new__(
-        mcs: type[ModelFormMetaclass],
-        name: str,
-        bases: tuple[type, ...],
-        attrs: dict[str, Any],
-    ) -> type[BaseModelForm]:
-        # Metaclass __new__ returns a type, specifically type[BaseModelForm]
-        new_class = cast(type[BaseModelForm], super().__new__(mcs, name, bases, attrs))
-
-        if bases == (BaseModelForm,):
-            return new_class
-
-        opts = new_class._meta = ModelFormOptions(getattr(new_class, "Meta", None))
-
-        # We check if a string was passed to `fields`,
-        # which is likely to be a mistake where the user typed ('foo') instead
-        # of ('foo',)
-        for opt in ["fields"]:
-            value = getattr(opts, opt)
-            if isinstance(value, str):
-                msg = (
-                    f"{new_class.__name__}.Meta.{opt} cannot be a string. "
-                    f"Did you mean to type: ('{value}',)?"
-                )
-                raise TypeError(msg)
-
-        if opts.model:
-            # If a model is defined, extract form fields from it.
-            if opts.fields is None:
-                raise ImproperlyConfigured(
-                    "Creating a ModelForm without the 'fields' attribute "
-                    f"is prohibited; form {name} "
-                    "needs updating."
-                )
-
-            fields = fields_for_model(
-                opts.model,
-                opts.fields,
-                opts.formfield_callback,
-                opts.field_classes,
-            )
-
-            # make sure opts.fields doesn't specify an invalid field
-            none_model_fields = {k for k, v in fields.items() if not v}
-            missing_fields = none_model_fields.difference(new_class.declared_fields)
-            if missing_fields:
-                message = "Unknown field(s) (%s) specified for %s"
-                message %= (", ".join(missing_fields), opts.model.__name__)
-                raise FieldError(message)
-            # Override default model fields with any custom declared ones
-            # (plus, include all the other declared fields).
-            fields.update(new_class.declared_fields)
-        else:
-            fields = new_class.declared_fields
-
-        # After validation and update, all fields should be non-None
-        new_class.base_fields = cast(dict[str, Field], fields)
-
-        return new_class
-
-
-class BaseModelForm(BaseForm):
-    # Set by DeclarativeFieldsMetaclass
-    declared_fields: dict[str, Field]
-    # Set by ModelFormMetaclass
-    _meta: ModelFormOptions
-
-    def __init__(
-        self,
-        *,
-        request: Any,
-        auto_id: str = "id_%s",
-        prefix: str | None = None,
-        initial: dict[str, Any] | None = None,
-        instance: Any = None,
-    ) -> None:
-        opts = self._meta
-        if opts.model is None:
-            raise ValueError("ModelForm has no model class specified.")
-        if instance is None:
-            # if we didn't get an instance, instantiate a new one
-            self.instance = opts.model()
-            object_data = {}
-        else:
-            self.instance = instance
-            object_data = model_to_dict(instance, opts.fields)
-        # if initial was provided, it should override the values from instance
-        if initial is not None:
-            object_data.update(initial)
-        # self._validate_unique will be set to True by BaseModelForm.clean().
-        # It is False by default so overriding self.clean() and failing to call
-        # super will stop validate_unique from being called.
-        self._validate_unique = False
-        super().__init__(
-            request=request,
-            auto_id=auto_id,
-            prefix=prefix,
-            initial=object_data,
-        )
-
-    def _get_validation_exclusions(self) -> set[str]:
-        """
-        For backwards-compatibility, exclude several types of fields from model
-        validation. See tickets #12507, #12521, #12553.
-        """
-        exclude = set()
-        # Build up a list of fields that should be excluded from model field
-        # validation and unique checks.
-        for f in self.instance._model_meta.fields:
-            field = f.name
-            # Exclude fields that aren't on the form. The developer may be
-            # adding these values to the model after form validation.
-            if field not in self.fields:
-                exclude.add(f.name)
-
-            # Don't perform model validation on fields that were defined
-            # manually on the form and excluded via the ModelForm's Meta
-            # class. See #12901.
-            elif self._meta.fields and field not in self._meta.fields:
-                exclude.add(f.name)
-
-            # Exclude fields that failed form validation. There's no need for
-            # the model fields to validate them as well.
-            elif self._errors and field in self._errors:
-                exclude.add(f.name)
-
-            # Exclude empty fields that are not required by the form, if the
-            # underlying model field is required. This keeps the model field
-            # from raising a required error. Note: don't exclude the field from
-            # validation if the model field allows blanks. If it does, the blank
-            # value may be included in a unique check, so cannot be excluded
-            # from validation.
-            else:
-                form_field = self.fields[field]
-                field_value = self.cleaned_data.get(field)
-                if (
-                    f.required
-                    and not form_field.required
-                    and field_value in form_field.empty_values
-                ):
-                    exclude.add(f.name)
-        return exclude
-
-    def clean(self) -> dict[str, Any]:
-        self._validate_unique = True
-        return self.cleaned_data
-
-    def _update_errors(self, errors: ValidationError) -> None:
-        # Override any validation error messages raised during model clean
-        # with the form field's error_messages when the error code matches.
-        if hasattr(errors, "error_dict"):
-            error_dict = errors.error_dict
-        else:
-            error_dict = {NON_FIELD_ERRORS: errors}
-
-        for field, messages in error_dict.items():
-            if field not in self.fields:
-                continue
-            error_messages = self.fields[field].error_messages
-            for message in messages:
-                if (
-                    isinstance(message, ValidationError)
-                    and message.code in error_messages
-                ):
-                    message.message = error_messages[message.code]
-
-        self.add_error(None, errors)
-
-    def _post_clean(self) -> None:
-        opts = self._meta
-
-        exclude = self._get_validation_exclusions()
-
-        try:
-            self.instance = construct_instance(self, self.instance, opts.fields)
-        except ValidationError as e:
-            self._update_errors(e)
-
-        try:
-            self.instance.full_clean(exclude=exclude, validate_unique=False)
-        except ValidationError as e:
-            self._update_errors(e)
-
-        # Validate uniqueness if needed.
-        if self._validate_unique:
-            self.validate_unique()
-
-    def validate_unique(self) -> None:
-        """
-        Call the instance's validate_unique() method and update the form's
-        validation errors if any were raised.
-        """
-        exclude = self._get_validation_exclusions()
-        try:
-            self.instance.validate_unique(exclude=exclude)
-        except ValidationError as e:
-            self._update_errors(e)
-
-    def _save_m2m(self) -> None:
-        """
-        Save the many-to-many fields and generic relations for this form.
-        """
-        cleaned_data = self.cleaned_data
-        fields = self._meta.fields
-        meta = self.instance._model_meta
-
-        for f in meta.many_to_many:
-            if not hasattr(f, "save_form_data"):
-                continue
-            if fields and f.name not in fields:
-                continue
-            if f.name in cleaned_data:
-                f.save_form_data(self.instance, cleaned_data[f.name])
-
-    def save(self, commit: bool = True) -> Any:
-        """
-        Save this form's self.instance object if commit=True. Otherwise, add
-        a save_m2m() method to the form which can be called after the instance
-        is saved manually at a later time. Return the model instance.
-        """
-        if self.errors:
-            raise ValueError(
-                "The {} could not be {} because the data didn't validate.".format(
-                    self.instance.model_options.object_name,
-                    "created" if self.instance._state.adding else "changed",
-                )
-            )
-        if commit:
-            # If committing, save the instance and the m2m data immediately.
-            self.instance.save(clean_and_validate=False)
-            self._save_m2m()
-        else:
-            # If not committing, add a method to the form to allow deferred
-            # saving of m2m data.
-            self.save_m2m = self._save_m2m
-        return self.instance
-
-
-class ModelForm(BaseModelForm, metaclass=ModelFormMetaclass):
-    pass
-
-
-# Fields #####################################################################
 
 
 class ModelChoiceIteratorValue:
@@ -503,7 +111,7 @@ class ModelChoiceField(ChoiceField):
 
     def __deepcopy__(self, memo: dict[int, Any]) -> ModelChoiceField:
         result = super(ChoiceField, self).__deepcopy__(memo)
-        # Need to force a new ModelChoiceIterator to be created, bug #11183
+        # Need to force a new ModelChoiceIterator to be created.
         if self.queryset is not None:
             result.queryset = self.queryset.all()
         return result
@@ -517,19 +125,8 @@ class ModelChoiceField(ChoiceField):
     queryset = property(_get_queryset, _set_queryset)
 
     def _get_choices(self) -> ModelChoiceIterator:
-        # If self._choices is set, then somebody must have manually set
-        # the property self.choices. In this case, just return self._choices.
         if hasattr(self, "_choices"):
-            # After checking hasattr, we know _choices exists and is ModelChoiceIterator
-            return cast(ModelChoiceIterator, self._choices)
-
-        # Otherwise, execute the QuerySet in self.queryset to determine the
-        # choices dynamically. Return a fresh ModelChoiceIterator that has not been
-        # consumed. Note that we're instantiating a new ModelChoiceIterator *each*
-        # time _get_choices() is called (and, thus, each time self.choices is
-        # accessed) so that we can ensure the QuerySet has not been consumed. This
-        # construct might look complicated but it allows for lazy evaluation of
-        # the queryset.
+            return self._choices  # ty: ignore[return-type]
         return self.iterator(self)
 
     choices = property(_get_choices, ChoiceField._set_choices)
@@ -599,17 +196,9 @@ class ModelMultipleChoiceField(ModelChoiceField):
         return qs
 
     def _check_values(self, value: Any) -> Any:
-        """
-        Given a list of possible PK values, return a QuerySet of the
-        corresponding objects. Raise a ValidationError if a given value is
-        invalid (not a valid PK, not in the queryset, etc.)
-        """
-        # deduplicate given values to avoid creating many querysets or
-        # requiring the database backend deduplicate efficiently.
         try:
             value = frozenset(value)
         except TypeError:
-            # list of lists isn't hashable, for example
             raise ValidationError(
                 self.error_messages["invalid_list"],
                 code="invalid_list",
@@ -665,13 +254,12 @@ def modelfield_to_formfield(
     choices_form_class: type[Field] | None = None,
     **kwargs: Any,
 ) -> Field | None:
+    """Map a model column-field to an appropriate plain.forms / plain.schema field."""
     # M2M and other non-column-backed fields don't render as form inputs.
     if not isinstance(modelfield, ColumnField):
         return None
 
-    # DB-expression defaults (`create_now=True`, `generate=True`) and
-    # pre_save-filled fields (`update_now=True`) produce values automatically.
-    # The form field must allow the user to omit the value.
+    # DB-expression defaults and auto-filled fields produce values automatically.
     auto_filled = modelfield.db_returning or modelfield.auto_fills_on_save
 
     defaults: dict[str, Any] = {
@@ -698,9 +286,6 @@ def modelfield_to_formfield(
             form_class = choices_form_class
         else:
             form_class = fields.TypedChoiceField
-        # Many of the subclass-specific formfield arguments (min_value,
-        # max_value) don't apply for choice fields, so be sure to only pass
-        # the values that TypedChoiceField will understand.
         for k in list(kwargs):
             if k not in (
                 "coerce",
@@ -716,11 +301,9 @@ def modelfield_to_formfield(
     if form_class is not None:
         return form_class(**defaults)
 
-    # Avoid a circular import
     from plain import postgres
     from plain.postgres.fields.encrypted import EncryptedJSONField, EncryptedTextField
 
-    # Primary key fields aren't rendered by default
     if isinstance(modelfield, postgres.PrimaryKeyField):
         return None
 
@@ -728,9 +311,8 @@ def modelfield_to_formfield(
         form_class = (
             fields.NullBooleanField if modelfield.allow_null else fields.BooleanField
         )
-        # In HTML checkboxes, 'required' means "must be checked" which is
-        # different from the choices case ("must select some value").
-        # required=False allows unchecked checkboxes.
+        # HTML checkboxes — 'required' means "must be checked" which is
+        # different from the choices case. required=False allows unchecked.
         defaults["required"] = False
         return form_class(**defaults)
 
@@ -752,9 +334,6 @@ def modelfield_to_formfield(
         return fields.TextField(max_length=modelfield.max_length, **defaults)
 
     if isinstance(modelfield, postgres.TextField):
-        # Passing max_length to fields.TextField means that the value's length
-        # will be validated twice. This is considered acceptable since we want
-        # the value in the form field (to pass into widget for example).
         if modelfield.allow_null:
             defaults["empty_value"] = None
         return fields.TextField(max_length=modelfield.max_length, **defaults)
@@ -770,13 +349,10 @@ def modelfield_to_formfield(
             **defaults,
         )
 
-    # TODO related (OneToOne, m2m)
-
-    # If there's a form field of the exact same name, use it
-    # (models.URLField -> forms.URLField)
+    # If there's a form field of the exact same name, use it.
     if hasattr(fields, modelfield.__class__.__name__):
         form_class = getattr(fields, modelfield.__class__.__name__)
         return form_class(**defaults)
 
-    # Default to TextField if we didn't find anything else
+    # Default to TextField if nothing else matches.
     return fields.TextField(**defaults)

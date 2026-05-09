@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from plain.postgres.forms import ModelForm
+from plain.postgres.modelschema import ModelSchema
 
 from .models import Note
 
 
-class NoteForm(ModelForm):
-    class Meta:
-        model = Note
-        fields = ("title", "body")
+class NoteSchema(ModelSchema):
+    model = Note
+
+    title: str
+    body: str | None

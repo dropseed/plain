@@ -2,9 +2,6 @@ from collections.abc import Callable
 from http import HTTPStatus
 from typing import Any, TypeVar
 
-from plain.forms import fields
-from plain.forms.forms import BaseForm
-
 from .helpers import json_content
 from .utils import merge_data, schema_from_type
 
@@ -18,9 +15,7 @@ def response_typed_dict(
     description: str = "",
     component_name: str = "",
 ) -> Callable[[F], F]:
-    """
-    A decorator to attach responses to a view method.
-    """
+    """A decorator to attach responses to a view method."""
 
     def decorator(func: F) -> F:
         # TODO if return_type is a list/tuple,
@@ -69,109 +64,8 @@ def response_typed_dict(
     return decorator
 
 
-def request_form(form_class: type[BaseForm]) -> Callable[[F], F]:
-    """
-    Create OpenAPI parameters from a form class.
-    """
-
-    def decorator(func: F) -> F:
-        field_mappings: dict[type[fields.Field], dict[str, str]] = {
-            fields.IntegerField: {
-                "type": "integer",
-            },
-            fields.FloatField: {
-                "type": "number",
-            },
-            fields.DateTimeField: {
-                "type": "string",
-                "format": "date-time",
-            },
-            fields.DateField: {
-                "type": "string",
-                "format": "date",
-            },
-            fields.TimeField: {
-                "type": "string",
-                "format": "time",
-            },
-            fields.EmailField: {
-                "type": "string",
-                "format": "email",
-            },
-            fields.URLField: {
-                "type": "string",
-                "format": "uri",
-            },
-            fields.UUIDField: {
-                "type": "string",
-                "format": "uuid",
-            },
-            fields.DecimalField: {
-                "type": "number",
-            },
-            # fields.FileField: {
-            #     "type": "string",
-            #     "format": "binary",
-            # },
-            fields.ImageField: {
-                "type": "string",
-                "format": "binary",
-            },
-            fields.BooleanField: {
-                "type": "boolean",
-            },
-            fields.TextField: {
-                "type": "string",
-            },
-            fields.EmailField: {
-                "type": "string",
-                "format": "email",
-            },
-        }
-        json_schema: dict[str, Any] = {
-            "type": "object",
-            "properties": {},
-        }
-        request_body: dict[str, Any] = {
-            "content": json_content(json_schema),
-            # could add application/x-www-form-urlencoded?
-        }
-        _schema: dict[str, Any] = {
-            "requestBody": request_body,
-        }
-
-        required_fields = []
-
-        for field_name, field in form_class.base_fields.items():
-            field_schema = field_mappings[field.__class__].copy()
-            json_schema["properties"][field_name] = field_schema
-
-            if field.required:
-                required_fields.append(field_name)
-
-            # TODO add description to the schema
-            # TODO add example to the schema
-            # TODO add default to the schema
-
-        if required_fields:
-            json_schema["required"] = required_fields
-            # The body is required if any field is
-            request_body["required"] = True
-
-        func.openapi_schema = merge_data(
-            getattr(func, "openapi_schema", {}),
-            _schema,
-        )
-
-        return func
-
-    return decorator
-
-
 def schema(data: dict[str, Any]) -> Callable[[F], F]:
-    """
-    A decorator to attach raw OpenAPI schema to a router, view, or view method.
-    """
+    """Attach raw OpenAPI schema to a router, view, or view method."""
 
     def decorator(func: F) -> F:
         func.openapi_schema = merge_data(

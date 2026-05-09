@@ -89,8 +89,10 @@ def field_strategy(field: form_fields.Field) -> st.SearchStrategy[Any]:
     if isinstance(field, form_fields.TextField):
         min_length = getattr(field, "min_length", None) or 0
         max_length = getattr(field, "max_length", None) or 100
+        # TextField strips by default — generate without leading/trailing
+        # whitespace so post-strip length still satisfies min_length.
         return st.text(
-            alphabet=string.ascii_letters + string.digits + " ",
+            alphabet=string.ascii_letters + string.digits,
             min_size=min_length,
             max_size=max_length,
         )

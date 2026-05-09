@@ -1,8 +1,12 @@
-"""
-Plain validation and HTML form handling.
+"""Field types and validation primitives shared by `plain.schema`.
+
+The previous Form / BaseForm / BoundField classes have been retired —
+`plain.schema.Schema` is the validation primitive, `plain.schema.BoundSchema`
+is the rendering binding. Field implementations live here because they
+predate plain.schema and because plain.postgres still consumes them via
+`plain.postgres.forms.modelfield_to_formfield`.
 """
 
-from .boundfield import BoundField
 from .exceptions import FormFieldMissingError, ValidationError
 from .fields import (
     BooleanField,
@@ -27,10 +31,8 @@ from .fields import (
     URLField,
     UUIDField,
 )
-from .forms import BaseForm, Form
 
 __all__ = [
-    "BoundField",
     "FormFieldMissingError",
     "ValidationError",
     "BooleanField",
@@ -54,6 +56,4 @@ __all__ = [
     "TypedChoiceField",
     "URLField",
     "UUIDField",
-    "BaseForm",
-    "Form",
 ]

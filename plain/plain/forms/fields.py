@@ -25,11 +25,10 @@ from plain.utils.duration import duration_string
 from plain.utils.regex_helper import _lazy_re_compile
 from plain.utils.text import pluralize_lazy
 
-from .boundfield import BoundField
 from .exceptions import FormFieldMissingError
 
 if TYPE_CHECKING:
-    from .forms import BaseForm
+    pass
 
 __all__ = (
     "Field",
@@ -153,13 +152,6 @@ class Field:
         initial_value = initial if initial is not None else ""
         data_value = data if data is not None else ""
         return initial_value != data_value
-
-    def get_bound_field(self, form: BaseForm, field_name: str) -> BoundField:
-        """
-        Return a BoundField instance that will be used when accessing the form
-        field in a template.
-        """
-        return BoundField(form, self, field_name)
 
     def __deepcopy__(self: Self, memo: dict[int, Any]) -> Self:
         result = copy.copy(self)
