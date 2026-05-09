@@ -8,9 +8,6 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, LiteralString, NamedTuple, cast
 
 import psycopg
-from psycopg import errors
-from psycopg import sql as psycopg_sql
-
 from plain.logs import get_framework_logger
 from plain.postgres import utils
 from plain.postgres.dialect import quote_name
@@ -21,12 +18,13 @@ from plain.postgres.transaction import TransactionManagementError
 from plain.postgres.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from plain.postgres.utils import CursorWrapper, debug_transaction
 from plain.runtime import settings
+from psycopg import errors
+from psycopg import sql as psycopg_sql
 
 if TYPE_CHECKING:
-    from psycopg import Connection as PsycopgConnection
-
     from plain.postgres.database_url import DatabaseConfig
     from plain.postgres.fields import Field
+    from psycopg import Connection as PsycopgConnection
 
 logger = get_framework_logger()
 

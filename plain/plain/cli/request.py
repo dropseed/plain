@@ -4,7 +4,6 @@ import json
 from typing import Any
 
 import click
-
 from plain.runtime import settings
 from plain.test import Client
 

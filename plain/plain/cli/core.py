@@ -5,9 +5,8 @@ from importlib.metadata import version
 from typing import Any
 
 import click
-from click.core import Command, Context
-
 import plain.runtime
+from click.core import Command, Context
 from plain.exceptions import ImproperlyConfigured
 
 from .agent import agent

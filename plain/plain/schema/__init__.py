@@ -13,7 +13,7 @@ anywhere a dict needs to become typed Python data.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .bind import BoundField, BoundSchema
 from .result import Invalid
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from plain.internal.files.uploadedfile import UploadedFile  # noqa: F401
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy attribute lookup for `UploadedFile` so we don't trigger the
     plain.http import chain at plain.schema module load time."""
     if name == "UploadedFile":

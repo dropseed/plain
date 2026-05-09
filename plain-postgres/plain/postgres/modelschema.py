@@ -120,10 +120,9 @@ def _auto_derive_fields(
     annotation that doesn't already have a Field declared. Annotations that
     aren't on the model are left for plain Schema handling (e.g. extra
     fields like `confirm_password` that the user adds)."""
-    model_meta = model._model_meta
+    model_meta = model._model_meta  # ty: ignore[unresolved-attribute]
     by_name = {
-        f.name: f
-        for f in chain(model_meta.concrete_fields, model_meta.many_to_many)
+        f.name: f for f in chain(model_meta.concrete_fields, model_meta.many_to_many)
     }
 
     for fname in annotation_names:
@@ -164,7 +163,7 @@ class ModelSchema(Schema, metaclass=ModelSchemaMeta):
     model: ClassVar[type | None] = None
 
     @classmethod
-    def validate(  # ty: ignore[invalid-method-override]
+    def validate(
         cls,
         data: dict[str, Any] | None,
         *,
@@ -182,7 +181,7 @@ class ModelSchema(Schema, metaclass=ModelSchemaMeta):
         target_cls = _with_substituted_querysets(cls, querysets) if querysets else cls
         # Call Schema.validate's underlying function bound to the (possibly
         # substituted) class, bypassing ModelSchema.validate to avoid recursion.
-        return Schema.validate.__func__(  # ty: ignore[unresolved-attribute]
+        return Schema.validate.__func__(
             target_cls, data, files=files, context=context, partial=partial
         )
 
@@ -228,9 +227,7 @@ def _with_substituted_querysets(
     Doesn't mutate the original — clones each affected field via copy.copy
     so concurrent requests with different querysets don't interfere.
     """
-    needs_substitution = any(
-        name in schema_class._schema_fields for name in querysets
-    )
+    needs_substitution = any(name in schema_class._schema_fields for name in querysets)
     if not needs_substitution:
         return schema_class
 

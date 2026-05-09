@@ -5,9 +5,8 @@ from collections.abc import Generator
 from typing import Any
 
 import pytest
-from psycopg import pq
-
 from plain.postgres.otel import suppress_db_tracing
+from psycopg import pq
 
 from .. import transaction
 from ..connection import DatabaseConnection

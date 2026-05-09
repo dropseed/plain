@@ -207,7 +207,8 @@ class Schema(metaclass=SchemaMeta):
                     errors[name] = list(e.messages)
             else:
                 if is_multi_value_dict and isinstance(field, MultipleChoiceField):
-                    raw_value = raw.getlist(name)  # ty: ignore[unresolved-attribute]
+                    # `raw` has .getlist (verified by is_multi_value_dict guard)
+                    raw_value = raw.getlist(name)  # ty: ignore[call-non-callable]
                 else:
                     raw_value = raw.get(name)
                 try:

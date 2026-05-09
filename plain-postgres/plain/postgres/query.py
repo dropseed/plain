@@ -12,9 +12,8 @@ from functools import cached_property
 from itertools import chain, islice
 from typing import TYPE_CHECKING, Any, Never, Self, overload
 
-import psycopg
-
 import plain.runtime
+import psycopg
 from plain.exceptions import ValidationError
 from plain.postgres import transaction
 from plain.postgres.constants import LOOKUP_SEP, OnConflict

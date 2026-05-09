@@ -5,7 +5,6 @@ from contextlib import ContextDecorator, contextmanager
 from typing import Any
 
 import psycopg
-
 from plain.postgres.db import get_connection
 
 
