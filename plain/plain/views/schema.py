@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ImproperlyConfigured
 from plain.http import RedirectResponse, Response
 from plain.schema import BoundSchema, Invalid
 
+from .objects import DetailView
 from .templates import TemplateView
 
 if TYPE_CHECKING:
@@ -85,3 +87,78 @@ class SchemaView[S: "Schema"](TemplateView):
             )
             return self.schema_invalid(bound)
         return self.schema_valid(result)
+
+
+class SchemaCreateView[S: "Schema"](SchemaView[S]):
+    """SchemaView for create-flows — the schema is expected to expose a
+    `save()` method that returns the newly-created instance. The view
+    stashes that instance on `self.object` so `success_url.format(...)`
+    and `instance.get_absolute_url()` work the same way as `CreateView`.
+    """
+
+    object: Any = None
+
+    def get_success_url(self, result: S) -> str:
+        if self.success_url:
+            return str(self.success_url).format(**self.object.__dict__)
+        try:
+            return self.object.get_absolute_url()
+        except AttributeError as exc:
+            raise ImproperlyConfigured(
+                "No URL to redirect to. Either provide a success_url or "
+                "define a get_absolute_url method on the saved instance."
+            ) from exc
+
+    def schema_valid(self, result: S) -> Response:
+        self.object = result.save()  # ty: ignore[unresolved-attribute]
+        return super().schema_valid(result)
+
+
+class SchemaUpdateView[S: "Schema"](DetailView, SchemaView[S]):
+    """SchemaView for update-flows — pre-fills the form from `self.object`
+    on GET, and applies validated values back to `self.object` on POST.
+
+    The schema is expected to expose `apply_to(instance)` (which
+    `Schema` provides by default) — the view calls it with the looked-up
+    object, then calls `.save()` on the instance.
+    """
+
+    def get_initial(self) -> dict[str, Any]:
+        # Pre-fill from the existing instance. BoundField.value() reads
+        # by name from this dict before falling back to field.initial.
+        return {
+            name: getattr(self.object, name, None)
+            for name in self.get_schema_class()._schema_fields
+        }
+
+    def get_success_url(self, result: S) -> str:
+        if self.success_url:
+            return str(self.success_url).format(**self.object.__dict__)
+        try:
+            return self.object.get_absolute_url()
+        except AttributeError as exc:
+            raise ImproperlyConfigured(
+                "No URL to redirect to. Either provide a success_url or "
+                "define a get_absolute_url method on the instance."
+            ) from exc
+
+    def schema_valid(self, result: S) -> Response:
+        result.apply_to(self.object)
+        self.object.save()
+        return super().schema_valid(result)
+
+
+class SchemaDeleteView(DetailView, SchemaView):
+    """Confirmation view for deleting `self.object` — uses an empty Schema
+    as the form (just a CSRF-protected POST submit, no fields)."""
+
+    @cached_property
+    def schema_class(self) -> type[Schema]:
+        from plain.schema import Schema
+
+        # Built lazily so this view has no class-level Schema definition.
+        return type("EmptyDeleteSchema", (Schema,), {})
+
+    def schema_valid(self, result: Schema) -> Response:
+        self.object.delete()
+        return super().schema_valid(result)

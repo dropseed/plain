@@ -16,7 +16,7 @@ from plain.signing import BadSignature, SignatureExpired, TimestampSigner
 from plain.urls import reverse
 from plain.utils.cache import add_never_cache_headers
 from plain.utils.encoding import force_bytes
-from plain.views import SchemaView
+from plain.views import SchemaCreateView, SchemaView
 
 from app.users.models import User
 
@@ -203,12 +203,15 @@ class PasswordLoginView(AuthView, SchemaView[PasswordLoginSchema]):
         return super().schema_valid(result)
 
 
-class PasswordSignupView(SchemaView[PasswordSignupSchema]):
+class PasswordSignupView(SchemaCreateView[PasswordSignupSchema]):
+    """Create a new User from a signup form. The schema's `save()` returns
+    the User instance; SchemaCreateView stashes it on `self.object` so the
+    redirect URL can use the new id."""
+
     schema_class = PasswordSignupSchema
     success_url = "/"
 
-    def schema_valid(self, result: PasswordSignupSchema) -> Response:
-        # # Log the user in and redirect
-        # auth_login(self.request, result.save())
-        result.save()
-        return super().schema_valid(result)
+    # # Log the user in and redirect
+    # def schema_valid(self, result):
+    #     auth_login(self.request, self.object)
+    #     return super().schema_valid(result)

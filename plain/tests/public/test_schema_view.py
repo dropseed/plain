@@ -129,3 +129,104 @@ def test_initial_passed_to_bound_schema_on_invalid():
     assert bound.title.value() == ""
     # initial preserved on the bound form
     assert bound.initial == {"title": "default"}
+
+
+# ---------------------------------------------------------------------------
+# SchemaCreateView / SchemaUpdateView / SchemaDeleteView
+# ---------------------------------------------------------------------------
+
+
+from plain.views import SchemaCreateView, SchemaDeleteView, SchemaUpdateView  # noqa: E402
+
+
+class _Bag:
+    """Stand-in for a model instance with arbitrary mutable attributes."""
+
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+class _NoteSavingSchema(_NoteSchema):
+    """Schema whose save() returns a fresh _Bag."""
+
+    def save(self) -> _Bag:
+        return _Bag(id=42, title=self.title, body=self.body or "")
+
+
+class _CreateView(SchemaCreateView[_NoteSavingSchema]):
+    schema_class = _NoteSavingSchema
+    template_name = "ignored"
+    success_url = "/notes/{id}/"
+
+
+def test_schema_create_view_calls_save_and_redirects_with_object_attrs():
+    view = _CreateView(
+        request=_FakeRequest({"title": "Q3", "body": "x"})  # ty: ignore[invalid-argument-type]
+    )
+    response = view.post()
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/notes/42/"
+    assert view.object.title == "Q3"
+
+
+class _UpdateView(SchemaUpdateView[_NoteSchema]):
+    schema_class = _NoteSchema
+    template_name = "ignored"
+    success_url = "/notes/{id}/"
+
+    # Provide the looked-up object via DetailView's get_object().
+    def get_object(self):
+        return _Bag(id=7, title="orig", body="orig body")
+
+
+def test_schema_update_view_applies_validated_to_instance_and_saves():
+    target = _Bag(id=7, title="orig", body="orig body", saves=0)
+
+    class _U(_UpdateView):
+        def get_object(self):
+            return target
+
+    saves: list = []
+    target.save = lambda: saves.append(True)  # ty: ignore[invalid-assignment]
+
+    view = _U(request=_FakeRequest({"title": "new", "body": "fresh"}))  # ty: ignore[invalid-argument-type]
+    response = view.post()
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/notes/7/"
+    assert target.title == "new"
+    assert target.body == "fresh"
+    assert saves == [True]
+
+
+def test_schema_update_view_get_initial_pre_fills_from_object():
+    target = _Bag(id=7, title="orig", body="orig body")
+
+    class _U(_UpdateView):
+        def get_object(self):
+            return target
+
+    view = _U(request=_FakeRequest({}))  # ty: ignore[invalid-argument-type]
+    initial = view.get_initial()
+    assert initial == {"title": "orig", "body": "orig body"}
+
+
+def test_schema_delete_view_calls_delete_on_object():
+    target = _Bag(id=7, title="x", body="")
+    deletes: list = []
+    target.delete = lambda: deletes.append(True)  # ty: ignore[invalid-assignment]
+
+    class _D(SchemaDeleteView):
+        template_name = "ignored"
+        success_url = "/notes/"
+
+        def get_object(self):
+            return target
+
+    view = _D(request=_FakeRequest({}))  # ty: ignore[invalid-argument-type]
+    response = view.post()
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/notes/"
+    assert deletes == [True]
