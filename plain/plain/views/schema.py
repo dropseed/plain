@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from functools import cached_property
 from typing import Any, TypeVar, get_args, get_origin
 
@@ -88,14 +88,19 @@ class SchemaView[S: "Schema"](TemplateView):
             return {"querysets": querysets}
         return {}
 
-    def get_querysets(self) -> dict[str, Any]:
+    def get_querysets(self) -> Mapping[str, Any]:
         """Override on ModelSchema-backed views to scope FK/M2M validation.
 
-        Returns a dict mapping field names to per-request querysets — e.g.
+        Returns a mapping of field names to per-request querysets — e.g.
         `{"project": Project.query.filter(owner=self.user)}`. The default
         `get_validate_context()` merges this under `context["querysets"]`,
         which `ModelSchema.validate` reads to substitute `ModelChoiceField`
         querysets per request.
+
+        Return type is `Mapping` (not `dict`) so subclasses can return a
+        more-specific TypedDict — e.g. `TaskSchema.Querysets` — without
+        violating LSP. Define `Querysets` on your `ModelSchema` to gain
+        per-key static typing.
         """
         return {}
 

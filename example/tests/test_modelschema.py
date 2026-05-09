@@ -221,6 +221,32 @@ def test_modelschema_initial_from_translates_fk_and_m2m(db, user, project, tag):
     assert initial["tags"] == [str(tag.id)]
 
 
+def test_modelschema_querysets_typeddict_unknown_key_at_class_creation():
+    """Declaring `Querysets` with a key that isn't an FK/M2M field raises
+    at class-creation time — preventing silent mis-scoping bugs."""
+    from typing import TypedDict
+
+    with pytest.raises(TypeError, match=r"unknown keys.*projectt"):
+
+        class _BadSchema(ModelSchema):
+            model = Task
+            project: Project | None
+            tags: list[Tag]
+
+            class Querysets(TypedDict, total=False):
+                projectt: object  # typo
+
+
+def test_modelschema_querysets_unknown_key_at_validate(db):
+    """Calling `validate(context={'querysets': {<typo>: ...}})` also raises,
+    since the static-type path is opt-in."""
+    with pytest.raises(TypeError, match=r"unknown keys.*projectt"):
+        TaskSchema.validate(
+            {"title": "T", "priority": "low", "is_complete": False, "tags": []},
+            context={"querysets": {"projectt": Project.query.all()}},
+        )
+
+
 def test_modelschema_save_with_no_instance_creates_fresh(db, user, project):
     """save() without an instance constructs one from `model = X` and saves."""
 

@@ -74,7 +74,7 @@ class TaskCreateView(LoginRequiredView, SchemaCreateView[TaskSchema]):
 
     template_name = "tasks/create.html"
 
-    def get_querysets(self) -> dict[str, Any]:
+    def get_querysets(self) -> TaskSchema.Querysets:
         return TaskSchema.querysets_for(self.user)
 
     def schema_valid(self, result: TaskSchema) -> Response:
@@ -94,7 +94,7 @@ class TaskUpdateView(LoginRequiredView, SchemaUpdateView[TaskSchema]):
             id=self.url_kwargs["id"],
         ).first()
 
-    def get_querysets(self) -> dict[str, Any]:
+    def get_querysets(self) -> TaskSchema.Querysets:
         return TaskSchema.querysets_for(self.user)
 
 

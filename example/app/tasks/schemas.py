@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import datetime
+from typing import TypedDict
 
 from app.users.models import User
 from plain.postgres.modelschema import ModelSchema
+from plain.postgres.query import QuerySet
 from plain.schema import Schema, types
 
 from .models import PRIORITY_CHOICES, Project, Tag, Task
@@ -46,6 +48,16 @@ class TaskSchema(ModelSchema):
     project: Project | None
     tags: list[Tag]
 
+    class Querysets(TypedDict, total=False):
+        """Per-request queryset scoping for FK/M2M fields. Keys must match
+        the FK/M2M field names declared above (validated at class-creation
+        time by `ModelSchemaMeta`). Values are typed as the related model's
+        QuerySet so a wrong-model queryset is caught at type-check time.
+        """
+
+        project: QuerySet[Project]
+        tags: QuerySet[Tag]
+
     def check(self, *, context: dict | None = None) -> dict[str, list[str]] | None:
         if self.is_complete and self.due_date and self.due_date > datetime.date.today():
             return {
@@ -56,7 +68,7 @@ class TaskSchema(ModelSchema):
         return None
 
     @staticmethod
-    def querysets_for(user: User) -> dict[str, object]:
+    def querysets_for(user: User) -> TaskSchema.Querysets:
         """Owner-scoped querysets for FK/M2M relation fields."""
         return {
             "project": Project.query.filter(owner=user),

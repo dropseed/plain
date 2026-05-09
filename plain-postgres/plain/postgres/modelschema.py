@@ -108,7 +108,37 @@ class ModelSchemaMeta(SchemaMeta):
                     model = inherited
                     break
         setattr(new_cls, "_model_schema_model", model)
+
+        # Validate user-declared `Querysets` TypedDict (if any) against the
+        # FK/M2M fields. Catches typos at class-creation time so they don't
+        # silently pass through `validate(context={"querysets": {...}})`.
+        querysets_dict = namespace.get("Querysets")
+        if querysets_dict is not None:
+            _validate_querysets_typeddict(name, new_cls, querysets_dict)
+
         return new_cls
+
+
+def _validate_querysets_typeddict(
+    schema_name: str, cls: type, querysets_dict: Any
+) -> None:
+    """Ensure a user-declared `Querysets` TypedDict's keys match the schema's
+    FK/M2M field names. Extra or misspelled keys raise at class-creation time.
+    """
+    declared_keys = set(getattr(querysets_dict, "__annotations__", {}).keys())
+    if not declared_keys:
+        return
+    valid_keys = {
+        fname
+        for fname, field in cls._schema_fields.items()  # ty: ignore[unresolved-attribute]
+        if isinstance(field, ModelChoiceField | ModelMultipleChoiceField)
+    }
+    unknown = declared_keys - valid_keys
+    if unknown:
+        raise TypeError(
+            f"{schema_name}.Querysets has unknown keys: {sorted(unknown)}. "
+            f"Valid FK/M2M field names: {sorted(valid_keys)}"
+        )
 
 
 def _auto_derive_fields(
@@ -178,6 +208,8 @@ class ModelSchema(Schema, metaclass=ModelSchemaMeta):
         owner-scoped multi-tenant validation.
         """
         querysets = (context or {}).get("querysets") or {}
+        if querysets:
+            _check_querysets_keys(cls, querysets)
         target_cls = _with_substituted_querysets(cls, querysets) if querysets else cls
         # Call Schema.validate's underlying function bound to the (possibly
         # substituted) class, bypassing ModelSchema.validate to avoid recursion.
@@ -244,6 +276,29 @@ class ModelSchema(Schema, metaclass=ModelSchemaMeta):
             getattr(instance, fname).set(list(value))
 
         return instance
+
+
+def _check_querysets_keys(
+    schema_class: type[ModelSchema], querysets: dict[str, Any]
+) -> None:
+    """Raise if `querysets` has keys that aren't FK/M2M fields on the schema.
+
+    Without this, a typo in `context={"querysets": {"projectt": ...}}` would
+    silently fail to substitute and the request would scope against the
+    default queryset — a hard-to-debug data-leak class of bug.
+    """
+    valid_keys = {
+        fname
+        for fname, field in schema_class._schema_fields.items()
+        if isinstance(field, ModelChoiceField | ModelMultipleChoiceField)
+    }
+    unknown = set(querysets) - valid_keys
+    if unknown:
+        raise TypeError(
+            f"{schema_class.__name__}.validate(context={{'querysets': ...}}) "
+            f"has unknown keys: {sorted(unknown)}. "
+            f"Valid FK/M2M field names: {sorted(valid_keys)}"
+        )
 
 
 def _with_substituted_querysets(
