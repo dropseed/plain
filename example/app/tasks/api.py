@@ -130,14 +130,14 @@ class TaskQuickAddAPIView(APIView):
         if isinstance(result, Invalid):
             return 400, {"errors": result.errors}
 
-        # result.data is statically typed as TaskQuickAddSchema here.
-        # An agent that mistypes a field name gets caught at type-check time.
+        # `result` IS the typed TaskQuickAddSchema instance after the Invalid
+        # eliminate. An agent that mistypes a field name fails type-check.
         task = Task.query.create(
             owner=user,
-            title=result.data.title,
-            notes=result.data.notes,
-            priority=result.data.priority or "med",
-            is_complete=result.data.is_complete,
+            title=result.title,
+            notes=result.notes,
+            priority=result.priority or "med",
+            is_complete=result.is_complete,
         )
         return 201, _serialize(task)
 

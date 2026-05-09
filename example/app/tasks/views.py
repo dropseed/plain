@@ -56,17 +56,16 @@ class TaskDetailView(AuthView, HTMXView, DetailView):
         return context
 
     def htmx_post_rename(self) -> None:
-        # Same TaskTitleSchema works for HTMX form-data and JSON request bodies —
-        # validate() takes any dict-like, no request kwarg, no .is_valid() dance.
-        # Narrow with isinstance(_, Invalid) — ty narrows the positive form
-        # cleanly; the inverted `not isinstance(_, Valid)` confuses generics.
+        # Same TaskTitleSchema works for HTMX form-data and JSON bodies —
+        # validate() takes any dict-like and returns either the typed
+        # schema instance or Invalid. No request kwarg, no .is_valid() dance.
         result = TaskTitleSchema.validate(self.request.form_data)
         if isinstance(result, Invalid):
             return
         task = self.get_object()
         if task is None:
             return
-        task.title = result.data.title
+        task.title = result.title
         task.save()
 
     def htmx_post_validate(self) -> Response:

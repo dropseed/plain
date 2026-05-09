@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Self, cast
 from plain.exceptions import ValidationError
 from plain.forms.fields import Field
 
-from .result import Invalid, Valid
+from .result import Invalid
 
 __all__ = ("Schema", "make_schema")
 
@@ -58,26 +58,20 @@ class Schema(metaclass=SchemaMeta):
 
         ContactSchema = make_schema(email=EmailField(), message=TextField())
 
-    Validate a dict and dispatch on the result type. The canonical pattern
-    is to eliminate `Invalid` first — the `else` branch then narrows to
-    `Valid[T]` with the type parameter preserved:
+    Validate a dict and dispatch on the result type. The schema class
+    plays double duty: `Schema.validate()` returns either an instance of
+    the schema (success) or `Invalid` (failure). Eliminate `Invalid` to
+    narrow:
 
         result = ContactSchema.validate(data)
         if isinstance(result, Invalid):
-            return ...                    # handle errors
-        contact = result.data             # ContactSchema, fully typed
+            return ...                # handle errors
+        # result is the typed schema instance — no `.data` indirection
+        contact = result
+        contact.email                 # str
 
-    Or as an early `assert`:
-
-        assert not isinstance(result, Invalid)
-        contact = result.data             # ContactSchema, fully typed
-
-    Avoid `isinstance(result, Valid)` directly — narrowing into a generic
-    class loses the type parameter under ty, so `result.data` falls back
-    to `object`. Always narrow by eliminating `Invalid`.
-
-    Override `check()` for cross-field validation that runs after fields
-    have cleaned successfully.
+    Override `check()` (instance method) for cross-field validation that
+    runs after fields have cleaned successfully.
     """
 
     _schema_fields: ClassVar[dict[str, Field]] = {}
@@ -104,6 +98,20 @@ class Schema(metaclass=SchemaMeta):
     def __hash__(self) -> int:
         return hash(tuple(getattr(self, k, None) for k in self._schema_fields))
 
+    def check(
+        self, *, context: dict[str, Any] | None = None
+    ) -> dict[str, list[str]] | None:
+        """Cross-field validation hook. Override in subclasses.
+
+        Runs after every field has cleaned successfully; `self` is the
+        typed instance with all cleaned values set, so subclass overrides
+        get full type-checker support without a Liskov violation. Return a
+        dict of field-name → error messages (use `"__all__"` for non-field
+        errors) or `None` when there are no errors. Raising
+        `ValidationError` is also supported.
+        """
+        return None
+
     @classmethod
     def validate(
         cls,
@@ -111,21 +119,17 @@ class Schema(metaclass=SchemaMeta):
         *,
         context: dict[str, Any] | None = None,
         partial: bool = False,
-    ) -> Valid[Self] | Invalid:
+    ) -> Self | Invalid:
         """Validate `data` against this schema.
 
-        Returns either `Valid[Self]` (cleaned typed instance) or `Invalid`
-        (per-field errors). Never raises on validation failure.
+        Returns either an instance of `cls` (cleaned, typed values set as
+        attributes) or `Invalid` (per-field errors). Never raises on
+        validation failure.
 
         Set `partial=True` to validate only the fields present in `data` —
-        missing required fields don't error. Useful for HTMX live-validation
-        where each keystroke sends just one field. The returned `Valid.data`
-        in partial mode is missing the unsubmitted attributes; access
-        through `Valid.raw` if you need the original input shape, or use
-        `partial=False` (default) for the full-submit path.
-
-        `check()` is skipped in `partial=True` mode — cross-field validation
-        only makes sense when every field is present.
+        missing required fields don't error and `check()` is skipped.
+        Useful for HTMX live-validation where each keystroke sends just
+        one field.
         """
         raw = data or {}
         cleaned: dict[str, Any] = {}
@@ -146,19 +150,18 @@ class Schema(metaclass=SchemaMeta):
         instance = cls(**cleaned)
 
         if partial:
-            # Skip cross-field hook — caller is asking about a subset, so
-            # `check()` may reference fields that aren't there.
-            return Valid(data=instance, raw=raw)
+            return instance
 
-        # Cross-field hook. Subclasses override `check()`; default is no-op.
+        # Cross-field hook — runs only on full validation.
+        extra_errors: dict[str, list[str]] | None
         try:
-            extra_errors = cls.check(instance, context=context)
+            extra_errors = instance.check(context=context)
         except ValidationError as e:
             if hasattr(e, "error_dict"):
                 # Each error_list is a list of ValidationError objects; wrap
                 # in a ValidationError to flatten back to message strings.
                 extra_errors = {
-                    field: list(ValidationError(error_list))
+                    field: [str(m) for m in ValidationError(error_list)]
                     for field, error_list in e.error_dict.items()
                 }
             else:
@@ -167,24 +170,7 @@ class Schema(metaclass=SchemaMeta):
         if extra_errors:
             return Invalid(errors=dict(extra_errors), raw=raw)
 
-        return Valid(data=instance, raw=raw)
-
-    @classmethod
-    def check(
-        cls,
-        data: Self,
-        *,
-        context: dict[str, Any] | None = None,
-    ) -> dict[str, list[str]] | None:
-        """Cross-field validation hook. Override in subclasses.
-
-        Runs after every field has cleaned successfully; receives the typed
-        instance with all cleaned values set. Return a dict of field-name →
-        error messages (use `"__all__"` for non-field errors) or `None`
-        when there are no errors. Raising `ValidationError` is also
-        supported.
-        """
-        return None
+        return instance
 
 
 def make_schema(name: str = "InlineSchema", /, **fields: Field) -> type[Schema]:

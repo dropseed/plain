@@ -67,11 +67,11 @@ def test_contact_schema_validates_valid_input():
             "message": "Hello, this is a long enough message.",
         }
     )
-    # Eliminate Invalid (positive isinstance(_, Valid) loses the type
-    # parameter under ty); result.data is then Valid[ContactSchema].data.
+    # Eliminate Invalid → ty narrows result to ContactSchema directly,
+    # no `.data` indirection.
     assert not isinstance(result, Invalid)
-    assert result.data.name == "Alice"
-    assert result.data.email == "a@b.co"
+    assert result.name == "Alice"
+    assert result.email == "a@b.co"
 
 
 def test_contact_schema_blocked_email_domain():
@@ -117,7 +117,8 @@ def test_bound_schema_after_invalid_renders_raw_and_errors():
     result = ContactSchema.validate(
         {"name": "X", "email": "bad", "subject": "general", "message": "short"}
     )
-    form = BoundSchema.from_result(ContactSchema, result)
+    assert isinstance(result, Invalid)
+    form = BoundSchema.from_invalid(ContactSchema, result)
     assert form.is_bound
     assert form.name.value() == "X"
     assert "at least 2 characters" in form.name.errors[0]
@@ -143,7 +144,8 @@ def test_template_renders_errors_after_invalid_post():
     result = ContactSchema.validate(
         {"name": "X", "email": "bad", "subject": "general", "message": "short"}
     )
-    form = BoundSchema.from_result(ContactSchema, result)
+    assert isinstance(result, Invalid)
+    form = BoundSchema.from_invalid(ContactSchema, result)
     html = _render(form)
     assert "at least 2 characters" in html
     assert "valid email" in html
@@ -167,6 +169,7 @@ def test_choice_field_selected_after_invalid_repost():
     result = ContactSchema.validate(
         {"name": "X", "email": "bad", "subject": "bug", "message": "short"}
     )
-    form = BoundSchema.from_result(ContactSchema, result)
+    assert isinstance(result, Invalid)
+    form = BoundSchema.from_invalid(ContactSchema, result)
     html = _render(form)
     assert '<option value="bug" selected>' in html

@@ -52,17 +52,18 @@ class ContactSchemaView(View):
     def post(self) -> Response:
         result = ContactSchema.validate(self.request.form_data)
         if isinstance(result, Invalid):
-            bound = BoundSchema.from_result(ContactSchema, result)
+            bound = BoundSchema.from_invalid(ContactSchema, result)
             return self.render_template_response(bound)
 
-        # result.data is statically typed as ContactSchema here.
+        # result IS the typed ContactSchema instance — attribute access
+        # is statically typed without a `.data` indirection.
         ContactSubmission.query.create(
-            name=result.data.name,
-            email=result.data.email,
-            subject=result.data.subject,
-            message=result.data.message,
-            company=result.data.company or "",
-            subscribe=result.data.subscribe,
+            name=result.name,
+            email=result.email,
+            subject=result.subject,
+            message=result.message,
+            company=result.company or "",
+            subscribe=result.subscribe,
         )
         return RedirectResponse(reverse_lazy("contacts:success"))
 

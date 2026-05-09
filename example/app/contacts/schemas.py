@@ -11,13 +11,13 @@ What's lost vs ContactForm:
 What's gained:
   - validate() is a pure classmethod — works in jobs / scripts / tests
     without a request fake.
-  - result.data.email is statically typed `str` after Invalid narrow.
-  - Cross-field check() and per-email validation via plain validators.
+  - The validated instance IS the typed schema — `result.email` is `str`,
+    no `.data` indirection, no narrowing wart.
+  - Cross-field check() (instance method, naturally typed `self`) and
+    per-email validation via plain validators.
 """
 
 from __future__ import annotations
-
-from typing import Self
 
 from plain.exceptions import ValidationError
 from plain.schema import Schema, types
@@ -45,11 +45,8 @@ class ContactSchema(Schema):
     # ?company=1 is set (matching ContactForm.ask_company behavior).
     company: str | None = types.TextField(max_length=200, required=False, initial="")
 
-    @classmethod
-    def check(  # ty: ignore[invalid-method-override]
-        cls, data: Self, *, context: dict | None = None
-    ) -> dict[str, list[str]] | None:
+    def check(self, *, context: dict | None = None) -> dict[str, list[str]] | None:
         """Cross-field: bug reports need at least 30 characters of detail."""
-        if data.subject == SUBJECT_BUG and len(data.message) < 30:
+        if self.subject == SUBJECT_BUG and len(self.message) < 30:
             return {"__all__": ["Bug reports need at least 30 characters of detail."]}
         return None

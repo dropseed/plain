@@ -2,14 +2,16 @@
 
 **Validating parsers for typed Python data — works in views, jobs, scripts, anywhere a dict needs to become typed Python data.**
 
-A `Schema` declares fields with type annotations and validators; `.validate(data)` returns `Valid[Self] | Invalid` — a sum type that narrows under `isinstance` without asserts. Schemas don't take a request, don't render HTML, and don't save to a database. They're the validation primitive Plain uses across packages.
+A `Schema` declares fields with type annotations and validators; `.validate(data)` returns either an instance of the schema (success) or an `Invalid` carrying per-field errors. Eliminate `Invalid` with `isinstance` to narrow into the typed instance — no `.data` indirection. Schemas don't take a request, don't render HTML, and don't save to a database. They're the validation primitive Plain uses across packages.
 
 - [Overview](#overview)
 - [Declaring schemas](#declaring-schemas)
 - [Inline schemas](#inline-schemas)
-- [The `Result` type](#the-result-type)
+- [The `Invalid` result](#the-invalid-result)
 - [Type narrowing](#type-narrowing)
 - [Cross-field validation](#cross-field-validation)
+- [Partial validation](#partial-validation)
+- [HTML rendering with BoundSchema](#html-rendering-with-boundschema)
 - [OpenAPI integration](#openapi-integration)
 - [When to use Schema vs Form](#when-to-use-schema-vs-form)
 - [Installation](#installation)
@@ -27,13 +29,13 @@ result = ContactSchema.validate({"email": "a@b.co", "message": "hi"})
 if isinstance(result, Invalid):
     return JsonResponse({"errors": result.errors}, status_code=400)
 
-# result.data is statically typed as ContactSchema
-contact = result.data
+# `result` IS the typed ContactSchema instance.
+contact = result
 contact.email     # str
 contact.message   # str
 ```
 
-The Schema class is the parser; `result.data` is the typed cleaned instance. Validation is a pure function call — no request, no `.is_valid()` dance, no `cleaned_data` dict.
+The Schema class is the parser; the validated instance IS the schema (no `.data` wrapper). Validation is a pure function call — no request, no `.is_valid()` dance.
 
 ## Declaring schemas
 
@@ -49,7 +51,7 @@ class TaskSchema(Schema):
     is_complete: bool = types.BooleanField(required=False)
 ```
 
-The annotation drives type-checker visibility into `result.data.<field>`; the `types.*` instance drives runtime parsing and validation. This mirrors `plain.postgres.types` for models — same pattern, same ergonomics.
+The annotation drives type-checker visibility into `result.<field>`; the `types.*` instance drives runtime parsing and validation. This mirrors `plain.postgres.types` for models — same pattern, same ergonomics.
 
 For optional fields, use `T | None` and `required=False` together — the `.pyi` stub overloads make this consistent.
 
@@ -66,22 +68,15 @@ result = make_schema(
 ).validate(request.query_params)
 ```
 
-Inline schemas trade ergonomics for typing — `result.data` is opaque (`object`) because the class doesn't exist statically. Promote to a named class when you want typed `result.data` access.
+Inline schemas trade ergonomics for typing — the validated instance is opaque (`Schema`) because the class doesn't exist statically. Promote to a named class when you want typed attribute access on the result.
 
-## The `Result` type
-
-`Schema.validate()` always returns a value, never raises:
+## The `Invalid` result
 
 ```python
 @dataclass(frozen=True)
-class Valid[T]:
-    data: T              # the typed schema instance
-    raw: dict            # original input
-
-@dataclass(frozen=True)
 class Invalid:
     errors: dict[str, list[str]]   # JSON-ready, per-field
-    raw: dict                      # original input
+    raw: dict                      # original input — preserved for re-rendering
 ```
 
 `errors` shape is canonical: a dict from field name to a list of message strings. The special key `"__all__"` carries non-field (cross-field) errors. Drops straight into a JSON response or template renderer.
@@ -94,8 +89,8 @@ The reliable narrowing pattern is to **eliminate `Invalid` first**:
 result = TaskSchema.validate(payload)
 if isinstance(result, Invalid):
     return JsonResponse({"errors": result.errors}, status_code=400)
-# result is now Valid[TaskSchema]; result.data is TaskSchema, fully typed
-do_stuff(result.data.title)
+# result is now TaskSchema; attribute access is statically checked
+do_stuff(result.title)
 ```
 
 Or as an early `assert`:
@@ -103,14 +98,14 @@ Or as an early `assert`:
 ```python
 result = TaskSchema.validate(payload)
 assert not isinstance(result, Invalid)
-contact = result.data    # TaskSchema, fully typed
+contact = result    # TaskSchema, fully typed
 ```
 
-**Avoid `isinstance(result, Valid)` directly.** Narrowing into a generic class doesn't preserve the type parameter under `ty`, so `result.data` falls back to `object`. Always narrow by eliminating `Invalid`.
+The schema-class-as-validated-instance design means `result.title` works directly without `.data` indirection. Narrowing is straightforward because `Invalid` is non-generic.
 
 ## Cross-field validation
 
-Override `check()` for validation that needs to see multiple fields at once. It runs after every field has cleaned successfully and receives the typed instance:
+Override `check()` as an instance method on the schema. `self` is the typed instance with all cleaned values set, so attribute access in the override is naturally typed.
 
 ```python
 class TaskSchema(Schema):
@@ -118,9 +113,8 @@ class TaskSchema(Schema):
     is_complete: bool = types.BooleanField(required=False)
     completed_at: datetime | None = types.DateTimeField(required=False)
 
-    @classmethod
-    def check(cls, data, *, context=None):
-        if data.is_complete and not data.completed_at:
+    def check(self, *, context=None):
+        if self.is_complete and not self.completed_at:
             return {"completed_at": ["Required when is_complete is True."]}
         return None
 ```
@@ -132,6 +126,41 @@ The `context` kwarg flows through from the call site:
 ```python
 result = TaskSchema.validate(payload, context={"user_id": user.id})
 ```
+
+## Partial validation
+
+For HTMX live-validation, where each keystroke sends just one field, pass `partial=True` to skip required-errors on missing fields. `check()` is also skipped (it can't run on a subset).
+
+```python
+def htmx_post_validate(self):
+    result = TaskSchema.validate(self.request.form_data, partial=True)
+    if isinstance(result, Invalid):
+        return JsonResponse({"valid": False, "errors": result.errors})
+    return JsonResponse({"valid": True})
+```
+
+## HTML rendering with BoundSchema
+
+When you need template binding (full HTML edit pages), pair the schema with a `BoundSchema`:
+
+```python
+from plain.schema import BoundSchema, Invalid
+
+class ContactView(View):
+    def get(self):
+        bound = BoundSchema(schema_class=ContactSchema, initial={"email": user.email})
+        return self.render(form=bound)
+
+    def post(self):
+        result = ContactSchema.validate(self.request.form_data)
+        if isinstance(result, Invalid):
+            bound = BoundSchema.from_invalid(ContactSchema, result)
+            return self.render(form=bound)
+        # use result.email, result.message, etc.
+        ...
+```
+
+The bound form's duck-typed surface (`html_id`, `html_name`, `value()`, `errors`, `field`, `non_field_errors`, `fields`) matches `plain.forms.BoundField`, so existing form templates render against `BoundSchema` unchanged.
 
 ## OpenAPI integration
 
@@ -151,7 +180,7 @@ class TaskCreateView(APIView):
         result = TaskSchema.validate(self.request.json_data)
         if isinstance(result, Invalid):
             return 400, {"errors": result.errors}
-        # result.data.title, result.data.priority, etc — all typed
+        # result.title, result.priority, etc — all typed
         ...
 ```
 
@@ -173,8 +202,8 @@ class TaskGetView(APIView):
 
 Different jobs:
 
-- **`Schema`** — parsing + validating typed input. Use everywhere: HTML forms, JSON APIs, HTMX actions, job payloads, webhook handlers, CLI scripts, tests. Never bound to a request.
-- **`Form`** (in `plain.forms`) — full HTML edit pages where you need template binding, `BoundField`, prefixed multi-form pages, and the GET/POST render-with-errors round-trip.
+- **`Schema`** — parsing + validating typed input. Use everywhere: HTML forms (paired with `BoundSchema`), JSON APIs, HTMX actions, job payloads, webhook handlers, CLI scripts, tests. Never bound to a request.
+- **`Form`** (in `plain.forms`) — the existing class-based form with `BoundField`, prefixed multi-form pages, and the GET/POST render-with-errors round-trip. Largely supplanted by Schema + BoundSchema for new code.
 
 If your endpoint isn't rendering an HTML form back to the user, you don't need `Form` — reach for `Schema`. That includes:
 
@@ -195,5 +224,5 @@ pin_id = types.IntegerField(min_value=1).clean(request.form_data["pin_id"])
 `plain.schema` ships with `plain` — no separate install. Import the public surface:
 
 ```python
-from plain.schema import Schema, Valid, Invalid, types, make_schema
+from plain.schema import Schema, Invalid, types, BoundSchema, make_schema
 ```

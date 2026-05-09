@@ -11,13 +11,15 @@ form templates render against `BoundSchema` unchanged.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
+
+from .result import Invalid
 
 if TYPE_CHECKING:
     from plain.forms.fields import Field
 
-    from .result import Invalid, Valid
     from .schema import Schema
 
 __all__ = ("BoundSchema", "BoundField")
@@ -80,26 +82,26 @@ class BoundSchema:
     prefix: str | None = None
 
     @classmethod
-    def from_result(
+    def from_invalid(
         cls,
         schema_class: type[Schema],
-        result: Valid[Any] | Invalid,
+        invalid: Invalid,
         *,
         initial: dict[str, Any] | None = None,
         prefix: str | None = None,
     ) -> BoundSchema:
-        """Build a BoundSchema from a `Schema.validate()` result.
+        """Build a BoundSchema from an `Invalid` result.
 
-        Use after a POST: validate, then bind the result for re-rendering
-        with errors and the user's submitted values.
+        Use after a POST that failed validation: validate, then bind the
+        Invalid for re-rendering with errors and the user's submitted
+        values. (The success case doesn't need a BoundSchema — the view
+        redirects or renders something else.)
         """
-        from .result import Invalid
-
         return cls(
             schema_class=schema_class,
-            raw=result.raw,
+            raw=invalid.raw,
             initial=initial or {},
-            errors=result.errors if isinstance(result, Invalid) else {},
+            errors=invalid.errors,
             is_bound=True,
             prefix=prefix,
         )
@@ -128,6 +130,6 @@ class BoundSchema:
             return BoundField(bound=self, name=name)
         raise AttributeError(name)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[BoundField]:
         for name in self.schema_class._schema_fields:
             yield BoundField(bound=self, name=name)

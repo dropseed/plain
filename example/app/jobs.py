@@ -49,12 +49,12 @@ class SendNotificationJob(Job):
             )
             return
 
-        # result.data is statically typed as SendNotificationPayload here.
+        # `result` IS the typed SendNotificationPayload instance.
         app_logger.info(
             "SendNotificationJob: dispatched",
             context={
-                "user_id": result.data.user_id,
-                "channel": result.data.channel,
-                "message_len": len(result.data.message),
+                "user_id": result.user_id,
+                "channel": result.channel,
+                "message_len": len(result.message),
             },
         )

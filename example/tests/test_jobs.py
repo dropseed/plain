@@ -16,13 +16,11 @@ def test_payload_schema_accepts_valid_input():
     result = SendNotificationPayload.validate(
         {"user_id": "42", "channel": "email", "message": "Hi"}
     )
-    # Narrow via the negative — `Valid` is generic so direct
-    # isinstance(_, Valid) doesn't preserve the type parameter under ty.
-    # Eliminating Invalid keeps result typed as Valid[SendNotificationPayload].
     assert not isinstance(result, Invalid)
-    assert result.data.user_id == 42  # coerced from string
-    assert result.data.channel == "email"
-    assert result.data.message == "Hi"
+    # `result` IS the typed SendNotificationPayload — no `.data` indirection.
+    assert result.user_id == 42  # coerced from string
+    assert result.channel == "email"
+    assert result.message == "Hi"
 
 
 def test_payload_schema_rejects_bad_choice_and_constraints():
