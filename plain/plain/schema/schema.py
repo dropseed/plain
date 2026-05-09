@@ -145,6 +145,17 @@ class Schema(metaclass=SchemaMeta):
                 setattr(instance, name, getattr(self, name))
         return instance
 
+    @classmethod
+    def initial_from(cls, instance: Any) -> dict[str, Any]:
+        """Build an `initial=` dict for `BoundSchema` from an existing object.
+
+        Default: `{name: getattr(instance, name, None)}` per declared field —
+        suitable for plain Python objects, dataclasses, and most simple
+        models. `ModelSchema` overrides to translate FKs to PK ids and M2M
+        relations to id-lists, which is what the form fields expect.
+        """
+        return {name: getattr(instance, name, None) for name in cls._schema_fields}
+
     def save[Instance](self, instance: Instance | None = None) -> Instance:
         """Apply validated values to `instance` and persist it.
 

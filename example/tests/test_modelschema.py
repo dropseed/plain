@@ -200,6 +200,27 @@ def test_modelschema_save_with_existing_instance_clears_m2m_when_empty(
     assert task.title == "edited"
 
 
+def test_modelschema_initial_from_translates_fk_and_m2m(db, user, project, tag):
+    """initial_from(instance) returns FK ids and M2M id-lists, not instances."""
+    task = Task.query.create(
+        owner=user,
+        title="Existing",
+        notes="n",
+        priority="high",
+        project=project,
+    )
+    task.tags.set([tag])
+
+    initial = TaskSchema.initial_from(task)
+    assert initial["title"] == "Existing"
+    assert initial["notes"] == "n"
+    assert initial["priority"] == "high"
+    # FK collapsed to id (not the Project instance)
+    assert initial["project"] == project.id
+    # M2M collapsed to a list of stringified ids
+    assert initial["tags"] == [str(tag.id)]
+
+
 def test_modelschema_save_with_no_instance_creates_fresh(db, user, project):
     """save() without an instance constructs one from `model = X` and saves."""
 

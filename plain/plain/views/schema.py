@@ -150,10 +150,9 @@ class SchemaUpdateView[S: "Schema"](DetailView, SchemaView[S]):
     def get_initial(self) -> dict[str, Any]:
         # Pre-fill from the existing instance. BoundField.value() reads
         # by name from this dict before falling back to field.initial.
-        return {
-            name: getattr(self.object, name, None)
-            for name in self.get_schema_class()._schema_fields
-        }
+        # ModelSchema overrides `initial_from` to translate FK→id and
+        # M2M→[id] for `ModelChoiceField`/`ModelMultipleChoiceField`.
+        return self.get_schema_class().initial_from(self.object)
 
     def get_success_url(self, result: S) -> str:
         if self.success_url:

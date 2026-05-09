@@ -63,7 +63,7 @@ result = TaskSchema.validate(
 )
 ```
 
-`save_to(instance)` and `save()` apply validated values and persist (M2M is set after the instance has a primary key).
+`save(instance=None)` applies validated values and persists. With an instance, sets scalar/FK fields, calls `instance.save()`, then assigns M2M relations. Without an instance, builds a fresh one from `model = X` (M2M is set after the row has a primary key).
 
 ## When to reach for Schema vs ModelSchema vs inline
 
@@ -93,6 +93,22 @@ Returns a per-field errors dict (use `"__all__"` for non-field errors), or raise
 ## SchemaView for HTML pages
 
 `plain.views.SchemaView[T]` orchestrates GET-render / POST-validate / re-render-or-redirect. `SchemaCreateView`, `SchemaUpdateView`, `SchemaDeleteView` for model-edit flows. Pair with `BoundSchema` (duck-compatible with the legacy `BoundField`) so existing form templates render unchanged.
+
+**Multi-tenant scoping** — override `get_querysets()` to scope FK/M2M validation per request. SchemaView merges it into `context["querysets"]` automatically; no `post()` override needed:
+
+```python
+class TaskCreateView(AuthView, SchemaCreateView[TaskSchema]):
+    schema_class = TaskSchema
+
+    def get_querysets(self):
+        return TaskSchema.querysets_for(self.user)
+
+    def schema_valid(self, result):
+        self.object = result.save(Task(owner=self.user))
+        return super().schema_valid(result)
+```
+
+For richer per-request context (beyond querysets), override `get_validate_context()`. `SchemaUpdateView` calls `result.save(self.object)` automatically — no override needed for vanilla model updates.
 
 ## OpenAPI integration
 

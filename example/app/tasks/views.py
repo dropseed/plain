@@ -106,19 +106,6 @@ class TaskUpdateView(AuthView, SchemaUpdateView[TaskSchema]):
         assert self.user is not None
         return TaskSchema.querysets_for(self.user)
 
-    def get_initial(self) -> dict[str, Any]:
-        # SchemaUpdateView's default uses `getattr(self.object, name)` per
-        # field; for FK and M2M we want IDs, not the related instances.
-        return {
-            "title": self.object.title,
-            "notes": self.object.notes,
-            "priority": self.object.priority,
-            "is_complete": self.object.is_complete,
-            "due_date": self.object.due_date,
-            "project": self.object.project_id if self.object.project_id else None,
-            "tags": [str(t.id) for t in self.object.tags.query],
-        }
-
 
 class TaskDeleteView(AuthView, SchemaDeleteView):
     template_name = "tasks/delete.html"

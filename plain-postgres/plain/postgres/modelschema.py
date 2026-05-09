@@ -185,6 +185,29 @@ class ModelSchema(Schema, metaclass=ModelSchemaMeta):
             target_cls, data, files=files, context=context, partial=partial
         )
 
+    @classmethod
+    def initial_from(cls, instance: Any) -> dict[str, Any]:
+        """Build an `initial=` dict from a model instance.
+
+        Translates FK fields to their `_id` value (what `ModelChoiceField`
+        renders) and M2M relations to a list of related-object ids (what
+        `ModelMultipleChoiceField` renders). Other fields fall through to
+        a plain `getattr`.
+        """
+        initial: dict[str, Any] = {}
+        for fname, field in cls._schema_fields.items():
+            if isinstance(field, ModelMultipleChoiceField):
+                related = getattr(instance, fname, None)
+                if related is None:
+                    initial[fname] = []
+                else:
+                    initial[fname] = [str(o.id) for o in related.query]
+            elif isinstance(field, ModelChoiceField):
+                initial[fname] = getattr(instance, f"{fname}_id", None)
+            else:
+                initial[fname] = getattr(instance, fname, None)
+        return initial
+
     def save(self, instance: Any = None) -> Any:
         """Apply validated values to a model instance and persist.
 

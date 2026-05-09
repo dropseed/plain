@@ -62,8 +62,8 @@ plain.schema/
 ├── __init__.py           Schema, Invalid, BoundSchema, BoundField,
 │                         UploadedFile, make_schema
 ├── schema.py             Schema base, SchemaMeta, validate(),
-│                         apply_to(), check() instance hook,
-│                         frozen __setattr__/__delattr__
+│                         apply_to(), save(instance), check() instance hook,
+│                         initial_from() classmethod, frozen __setattr__/__delattr__
 ├── result.py             Invalid (frozen dataclass)
 ├── bind.py               BoundSchema, BoundField — duck-typed against
 │                         plain.forms.BoundField for template reuse
@@ -216,7 +216,7 @@ result = TaskSchema.validate(
 
 The validate() override clones the schema class with substituted querysets so concurrent requests with different scopes don't interfere.
 
-`save_to(instance)` and `save()` replace `ModelForm.save()` — apply scalar + FK fields, save the instance, then set M2M (which needs the PK).
+`save(instance=None)` replaces `ModelForm.save()` — applies scalar + FK fields, saves the instance, then sets M2M (which needs the PK). With no instance, ModelSchema constructs a fresh one from `model = X`. Plain `Schema` also has `save(instance)` (default: `apply_to(instance); instance.save()`) so `SchemaUpdateView` works uniformly across both. `ModelSchema.initial_from(instance)` translates FK→id and M2M→[id] for `SchemaUpdateView.get_initial()` — no manual override needed.
 
 ### Final state — plain.forms slimmed to field types only
 
